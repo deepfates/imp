@@ -23,7 +23,9 @@ DSPy.Prediction.get(prediction, :answer)
 ## What Exists
 
 See [TELOS.md](TELOS.md) for the completion checklist, implemented surface, and
-explicit remaining gaps.
+test signals. The repo includes provider clients, adapters, programs,
+retrievers, datasets, streaming, persistence, sandboxed program-of-thought,
+evaluation, and teleprompter-style optimizers.
 
 ## Test
 

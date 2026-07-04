@@ -21,4 +21,12 @@ defmodule DSPy do
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
+
+  def program_of_thought(signature, opts \\ []),
+    do: DSPy.Predict.ProgramOfThought.new(signature, opts)
+
+  def openai(model, opts \\ []), do: DSPy.Clients.OpenAI.new(model, opts)
+  def litellm(model, opts \\ []), do: DSPy.Clients.LiteLLM.new(model, opts)
+  def local_lm(model, opts \\ []), do: DSPy.Clients.Local.new(model, opts)
+  def databricks(model, opts \\ []), do: DSPy.Clients.Databricks.new(model, opts)
 end
