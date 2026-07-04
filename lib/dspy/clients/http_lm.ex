@@ -79,9 +79,14 @@ defmodule DSPy.Clients.HTTPLM do
   defp auth_headers(%__MODULE__{api_key: nil}), do: []
   defp auth_headers(%__MODULE__{api_key: key}), do: [{"authorization", "Bearer #{key}"}]
 
-  defp default_base_url(:openai), do: "https://api.openai.com/v1"
-  defp default_base_url(:litellm), do: "http://localhost:4000/v1"
-  defp default_base_url(:local), do: "http://localhost:8000/v1"
+  defp default_base_url(:openai),
+    do: System.get_env("OPENAI_BASE_URL") || "https://api.openai.com/v1"
+
+  defp default_base_url(:litellm),
+    do: System.get_env("LITELLM_BASE_URL") || "http://localhost:4000/v1"
+
+  defp default_base_url(:local),
+    do: System.get_env("LOCAL_LM_BASE_URL") || "http://localhost:8000/v1"
 
   defp default_base_url(:databricks),
     do:

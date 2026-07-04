@@ -29,6 +29,13 @@ defmodule DSPy.HTTP.Hackneyless do
     :inets.start()
     :ssl.start()
 
+    headers =
+      headers
+      |> Enum.reject(fn {key, _value} -> String.downcase(to_string(key)) == "content-type" end)
+      |> Enum.map(fn {key, value} ->
+        {String.to_charlist(to_string(key)), String.to_charlist(to_string(value))}
+      end)
+
     request = {String.to_charlist(url), headers, ~c"application/json", IO.iodata_to_binary(body)}
     http_opts = Keyword.get(opts, :http_opts, [])
     request_opts = Keyword.get(opts, :request_opts, [])
