@@ -75,7 +75,9 @@ defmodule DSPy.Predict.ReActV2 do
       name = normalize_name(Map.get(call, :name) || Map.get(call, "name"))
 
       args =
-        Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") || %{}
+        (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
+           %{})
+        |> normalize_args()
 
       tool = Map.get(tools, name)
       result = if tool, do: DSPy.Tool.call(tool, args), else: {:error, :unknown_tool}
@@ -93,4 +95,9 @@ defmodule DSPy.Predict.ReActV2 do
   defp coerce_tool(%DSPy.Tool{} = tool), do: tool
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name), do: String.to_atom(to_string(name))
+
+  defp normalize_args(args) when is_map(args),
+    do: Map.new(args, fn {key, value} -> {normalize_name(key), value} end)
+
+  defp normalize_args(args), do: args
 end

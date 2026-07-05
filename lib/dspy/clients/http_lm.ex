@@ -113,10 +113,49 @@ defmodule DSPy.Clients.HTTPLM do
   defp role_name(role) when is_atom(role), do: Atom.to_string(role)
   defp role_name(role), do: to_string(role)
 
-  defp extract_content(%{"choices" => [%{"message" => %{"content" => content}} | _]}), do: content
+  defp extract_content(%{"choices" => [%{"message" => message} | _]}) do
+    cond do
+      is_list(message["tool_calls"]) ->
+        %{tool_calls: Enum.map(message["tool_calls"], &normalize_tool_call/1)}
+
+      Map.has_key?(message, "content") ->
+        message["content"]
+
+      true ->
+        message
+    end
+  end
+
   defp extract_content(%{"choices" => [%{"text" => text} | _]}), do: text
   defp extract_content(%{"output" => output}), do: output
   defp extract_content(other), do: other
+
+  defp normalize_tool_call(%{"function" => %{"name" => name, "arguments" => args}} = call) do
+    %{
+      id: call["id"],
+      name: name,
+      arguments: decode_arguments(args)
+    }
+  end
+
+  defp normalize_tool_call(%{"name" => name, "arguments" => args} = call) do
+    %{
+      id: call["id"],
+      name: name,
+      arguments: decode_arguments(args)
+    }
+  end
+
+  defp normalize_tool_call(call), do: call
+
+  defp decode_arguments(args) when is_binary(args) do
+    case Jason.decode(args) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> args
+    end
+  end
+
+  defp decode_arguments(args), do: args
 
   defp auth_headers(%__MODULE__{api_key: nil}), do: []
   defp auth_headers(%__MODULE__{api_key: key}), do: [{"authorization", "Bearer #{key}"}]
