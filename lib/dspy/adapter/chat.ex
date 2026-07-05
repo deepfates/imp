@@ -15,7 +15,7 @@ defmodule DSPy.Adapter.Chat do
 
   @impl true
   def parse(_signature, %DSPy.Prediction{} = prediction, _opts), do: {:ok, prediction}
-  def parse(_signature, map, _opts) when is_map(map), do: {:ok, DSPy.Prediction.new(map)}
+  def parse(signature, map, _opts) when is_map(map), do: build_prediction(signature, map)
 
   def parse(signature, text, _opts) when is_binary(text) do
     outputs = DSPy.Signature.output_names(signature)
@@ -28,10 +28,56 @@ defmodule DSPy.Adapter.Chat do
         Map.take(parsed, outputs)
       end
 
-    {:ok, DSPy.Prediction.new(fields)}
+    build_prediction(signature, fields)
   end
 
   def parse(_signature, raw, _opts), do: {:error, {:unsupported_lm_output, raw}}
+
+  defp build_prediction(signature, fields) do
+    fields = Map.new(fields, fn {key, value} -> {normalize_key(key), value} end)
+
+    required =
+      signature.outputs
+      |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
+      |> Enum.map(& &1.name)
+
+    output_names = DSPy.Signature.output_names(signature)
+    missing = Enum.reject(required, &Map.has_key?(fields, &1))
+
+    if missing == [] do
+      {:ok, DSPy.Prediction.new(coerce_fields(signature, Map.take(fields, output_names)))}
+    else
+      {:error, {:missing_output_fields, missing}}
+    end
+  end
+
+  defp coerce_fields(signature, fields) do
+    signature.outputs
+    |> Enum.reduce(fields, fn field, acc ->
+      if Map.has_key?(acc, field.name),
+        do: Map.update!(acc, field.name, &coerce_value(&1, field.type)),
+        else: acc
+    end)
+  end
+
+  defp coerce_value(value, :integer) when is_binary(value),
+    do: String.to_integer(String.trim(value))
+
+  defp coerce_value(value, :float) when is_binary(value) do
+    case Float.parse(String.trim(value)) do
+      {float, ""} -> float
+      {_float, _rest} -> value
+      :error -> value
+    end
+  end
+
+  defp coerce_value(value, :boolean) when is_binary(value),
+    do: String.downcase(String.trim(value)) in ["true", "yes", "1"]
+
+  defp coerce_value(value, _type), do: value
+
+  defp normalize_key(key) when is_atom(key), do: key
+  defp normalize_key(key) when is_binary(key), do: String.to_atom(key)
 
   defp render_inputs(signature, inputs) do
     signature.inputs

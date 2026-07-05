@@ -101,7 +101,7 @@ defmodule ParitySurfaceTest do
       module: DSPy.LM.Fake,
       opts: [
         handler: fn _messages, _opts ->
-          %{precision: 1, recall: 1, f1: 1, completeness: 1, groundedness: 1}
+          %{reasoning: "judge", precision: 1, recall: 1, f1: 1, completeness: 1, groundedness: 1}
         end
       ]
     }

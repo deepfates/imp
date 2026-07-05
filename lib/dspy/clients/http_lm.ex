@@ -96,7 +96,13 @@ defmodule DSPy.Clients.HTTPLM do
   defp sleep(backoff_ms, attempt), do: Process.sleep(backoff_ms * attempt)
 
   def dump(%__MODULE__{} = lm) do
-    %{provider: lm.provider, model: lm.model, base_url: lm.base_url, path: lm.path, opts: lm.opts}
+    %{
+      provider: lm.provider,
+      model: lm.model,
+      base_url: lm.base_url,
+      path: lm.path,
+      opts: Enum.map(lm.opts, fn {k, v} -> [Atom.to_string(k), v] end)
+    }
   end
 
   defp endpoint(%__MODULE__{} = lm), do: String.trim_trailing(lm.base_url, "/") <> lm.path

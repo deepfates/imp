@@ -13,7 +13,17 @@ defmodule DSPy.Predict.ReAct do
 
     signature = DSPy.Signature.ensure(signature)
     instructions = signature.instructions <> "\nYou may use these tools:\n" <> tool_text
-    signature = %{signature | instructions: instructions}
+
+    signature =
+      signature
+      |> DSPy.Signature.extend(
+        [
+          %{name: :tool, metadata: %{optional: true}},
+          %{name: :tool_input, metadata: %{optional: true}}
+        ],
+        :output
+      )
+      |> Map.put(:instructions, instructions)
 
     %__MODULE__{predict: DSPy.Predict.Predict.new(signature, opts), tools: tools}
   end

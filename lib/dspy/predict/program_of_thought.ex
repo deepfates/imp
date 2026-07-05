@@ -6,16 +6,20 @@ defmodule DSPy.Predict.ProgramOfThought do
   defstruct [:predict, output_field: :answer]
 
   def new(signature, opts \\ []) do
-    signature =
-      signature
-      |> DSPy.Signature.ensure()
-      |> DSPy.Signature.prepend_output(%{
-        name: :program,
-        desc: "Arithmetic expression to evaluate"
-      })
+    original = DSPy.Signature.ensure(signature)
+
+    program_signature = %{
+      original
+      | outputs: [
+          DSPy.Signature.Field.new(
+            %{name: :program, desc: "Arithmetic expression to evaluate"},
+            :output
+          )
+        ]
+    }
 
     %__MODULE__{
-      predict: DSPy.Predict.Predict.new(signature, opts),
+      predict: DSPy.Predict.Predict.new(program_signature, opts),
       output_field: Keyword.get(opts, :output_field, :answer)
     }
   end

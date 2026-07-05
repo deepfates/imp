@@ -2,8 +2,7 @@ defmodule DSPy.Adapter.JSON do
   @moduledoc """
   JSON-oriented adapter.
 
-  This dependency-free adapter accepts map outputs directly and parses a small
-  flat JSON object subset for local tests and simple providers.
+  This adapter accepts map outputs directly and parses provider JSON with Jason.
   """
 
   @behaviour DSPy.Adapter
@@ -20,25 +19,23 @@ defmodule DSPy.Adapter.JSON do
     do: DSPy.Adapter.Chat.parse(signature, raw, opts)
 
   def parse(signature, raw, opts) when is_binary(raw) do
-    case flat_json_object(raw) do
-      {:ok, map} -> DSPy.Adapter.Chat.parse(signature, map, opts)
-      :error -> DSPy.Adapter.Chat.parse(signature, raw, opts)
+    with {:ok, decoded} <- Jason.decode(extract_json(raw)),
+         true <- is_map(decoded) do
+      DSPy.Adapter.Chat.parse(signature, decoded, opts)
+    else
+      _ -> DSPy.Adapter.Chat.parse(signature, raw, opts)
     end
   end
 
   def parse(signature, raw, opts), do: DSPy.Adapter.Chat.parse(signature, raw, opts)
 
-  defp flat_json_object(raw) do
+  defp extract_json(raw) do
     trimmed = String.trim(raw)
 
-    if String.starts_with?(trimmed, "{") and String.ends_with?(trimmed, "}") do
-      pairs =
-        Regex.scan(~r/"([^"]+)"\s*:\s*"([^"]*)"/, trimmed)
-        |> Map.new(fn [_all, key, value] -> {String.to_atom(key), value} end)
-
-      if pairs == %{}, do: :error, else: {:ok, pairs}
-    else
-      :error
-    end
+    trimmed
+    |> String.trim_leading("```json")
+    |> String.trim_leading("```")
+    |> String.trim_trailing("```")
+    |> String.trim()
   end
 end

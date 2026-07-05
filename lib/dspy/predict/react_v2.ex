@@ -11,10 +11,19 @@ defmodule DSPy.Predict.ReActV2 do
     submit = DSPy.Tool.new(:submit, "Submit final outputs", fn args -> args end)
     tools = Map.put(tool_map, :submit, submit)
 
-    react_signature =
-      signature
-      |> DSPy.Signature.extend([:history, :tools], :input)
-      |> DSPy.Signature.extend([:next_thought, :tool_calls], :output)
+    react_signature = %DSPy.Signature{
+      inputs:
+        signature.inputs ++
+          [
+            DSPy.Signature.Field.new(:history, :input),
+            DSPy.Signature.Field.new(:tools, :input)
+          ],
+      outputs: [
+        DSPy.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
+        DSPy.Signature.Field.new(:tool_calls, :output)
+      ],
+      instructions: signature.instructions
+    }
 
     %__MODULE__{
       signature: signature,

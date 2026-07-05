@@ -24,17 +24,21 @@ defmodule DSPy.Saving do
     predict |> dump() |> Map.put("type", "chain_of_thought")
   end
 
-  def load(%{
-        "type" => "predict",
-        "signature" => signature,
-        "demos" => demos,
-        "config" => config,
-        "metadata" => metadata
-      }) do
+  def load(
+        %{
+          "type" => "predict",
+          "signature" => signature,
+          "demos" => demos,
+          "config" => config,
+          "metadata" => metadata
+        } = state
+      ) do
     DSPy.Predict.Predict.new(DSPy.Signature.load(signature),
       demos: Enum.map(demos, &DSPy.Example.new/1),
-      config: Enum.map(config, fn {k, v} -> {String.to_atom(k), v} end),
-      metadata: metadata
+      config: decode_config(config),
+      metadata: metadata,
+      adapter: decode_adapter(Map.get(state, "adapter")),
+      lm: decode_lm(Map.get(state, "lm"))
     )
   end
 
@@ -45,5 +49,31 @@ defmodule DSPy.Saving do
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved DSPy program type: #{inspect(type)}"
+  end
+
+  defp decode_config(config) when is_list(config) do
+    Enum.map(config, fn
+      {k, v} -> {String.to_atom(to_string(k)), v}
+      [k, v] -> {String.to_atom(to_string(k)), v}
+    end)
+  end
+
+  defp decode_config(config) when is_map(config),
+    do: Enum.map(config, fn {k, v} -> {String.to_atom(to_string(k)), v} end)
+
+  defp decode_adapter(nil), do: DSPy.Adapter.Chat
+  defp decode_adapter(name) when is_binary(name), do: String.to_existing_atom(name)
+
+  defp decode_lm(nil), do: nil
+
+  defp decode_lm(%{"provider" => provider, "model" => model} = state) do
+    provider = String.to_atom(to_string(provider))
+
+    DSPy.Clients.HTTPLM.new(model,
+      provider: provider,
+      base_url: state["base_url"],
+      path: state["path"],
+      opts: decode_config(Map.get(state, "opts", []))
+    )
   end
 end

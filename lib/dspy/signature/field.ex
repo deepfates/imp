@@ -29,9 +29,14 @@ defmodule DSPy.Signature.Field do
     }
   end
 
-  def new(name, kind) when is_atom(name) or is_binary(name) do
-    name = normalize_name(name)
+  def new(name, kind) when is_atom(name) do
     %__MODULE__{name: name, kind: normalize_kind(kind), prefix: infer_prefix(name)}
+  end
+
+  def new(name, kind) when is_binary(name) do
+    {name, type} = parse_name_and_type(name)
+    name = normalize_name(name)
+    %__MODULE__{name: name, kind: normalize_kind(kind), type: type, prefix: infer_prefix(name)}
   end
 
   def dump(%__MODULE__{} = field) do
@@ -54,6 +59,22 @@ defmodule DSPy.Signature.Field do
   defp normalize_kind("output"), do: :output
   defp normalize_type(type) when is_atom(type), do: type
   defp normalize_type(type) when is_binary(type), do: String.to_atom(type)
+
+  defp parse_name_and_type(raw) do
+    case String.split(raw, ":", parts: 2) do
+      [name, type] -> {String.trim(name), type |> String.trim() |> normalize_type_alias()}
+      [name] -> {String.trim(name), :string}
+    end
+  end
+
+  defp normalize_type_alias("str"), do: :string
+  defp normalize_type_alias("string"), do: :string
+  defp normalize_type_alias("int"), do: :integer
+  defp normalize_type_alias("integer"), do: :integer
+  defp normalize_type_alias("float"), do: :float
+  defp normalize_type_alias("bool"), do: :boolean
+  defp normalize_type_alias("boolean"), do: :boolean
+  defp normalize_type_alias(other), do: String.to_atom(other)
 
   defp infer_prefix(name) do
     name

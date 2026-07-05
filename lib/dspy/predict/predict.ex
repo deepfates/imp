@@ -39,10 +39,20 @@ defmodule DSPy.Predict.Predict do
     %{
       "signature" => DSPy.Signature.dump(predict.signature),
       "demos" => Enum.map(predict.demos, &DSPy.Example.to_map/1),
-      "config" => predict.config,
-      "metadata" => predict.metadata
+      "config" => encode_keyword(predict.config),
+      "metadata" => predict.metadata,
+      "adapter" => Atom.to_string(predict.adapter),
+      "lm" => dump_lm(predict.lm)
     }
   end
+
+  defp dump_lm(%DSPy.Clients.HTTPLM{} = lm), do: DSPy.Clients.HTTPLM.dump(lm)
+  defp dump_lm(_lm), do: nil
+
+  defp encode_keyword(values) when is_list(values),
+    do: Enum.map(values, fn {k, v} -> [Atom.to_string(k), v] end)
+
+  defp encode_keyword(values), do: values
 
   defp require_lm(nil), do: {:error, :lm_not_configured}
   defp require_lm(lm), do: {:ok, lm}
