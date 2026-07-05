@@ -24,4 +24,23 @@ defmodule LiveProviderTest do
 
     assert String.contains?(answer, "pong")
   end
+
+  @tag :live
+  test "OpenAI-compatible live provider completes structured JSON prediction" do
+    api_key = System.get_env("OPENAI_API_KEY")
+    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+
+    assert is_binary(api_key) and byte_size(api_key) > 0
+
+    lm = DSPy.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 80])
+    program = DSPy.predict("question -> answer, score: int", lm: lm, adapter: DSPy.Adapter.JSON)
+
+    assert {:ok, prediction} =
+             DSPy.Predict.Predict.call(program, %{
+               question: "Return only a JSON object. The answer must be pong and score must be 7."
+             })
+
+    assert DSPy.Prediction.get(prediction, :answer) == "pong"
+    assert DSPy.Prediction.get(prediction, :score) == 7
+  end
 end
