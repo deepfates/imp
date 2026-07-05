@@ -5,6 +5,11 @@ defmodule DSPy.HTTP do
               {:ok, %{status: non_neg_integer(), body: binary(), headers: list()}}
               | {:error, term()}
 
+  @callback stream(String.t(), [{String.t(), String.t()}], iodata(), keyword()) ::
+              Enumerable.t()
+
+  @optional_callbacks stream: 4
+
   def post(transport, url, headers, body, opts \\ [])
 
   def post(module, url, headers, body, opts) when is_atom(module),
@@ -12,6 +17,27 @@ defmodule DSPy.HTTP do
 
   def post(fun, url, headers, body, opts) when is_function(fun, 4),
     do: fun.(url, headers, body, opts)
+
+  def stream(transport, url, headers, body, opts \\ [])
+
+  def stream(module, url, headers, body, opts) when is_atom(module) do
+    if function_exported?(module, :stream, 4) do
+      module.stream(url, headers, body, opts)
+    else
+      Stream.resource(
+        fn -> post(module, url, headers, body, opts) end,
+        fn
+          {:ok, %{body: response}} -> {[response], :done}
+          {:error, reason} -> {[{:error, reason}], :done}
+          :done -> {:halt, :done}
+        end,
+        fn _ -> :ok end
+      )
+    end
+  end
+
+  def stream(fun, url, headers, body, opts) when is_function(fun, 4),
+    do: Stream.map([fun.(url, headers, body, opts)], & &1)
 end
 
 defmodule DSPy.HTTP.Hackneyless do

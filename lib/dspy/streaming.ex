@@ -2,6 +2,16 @@ defmodule DSPy.Streaming do
   @moduledoc "Enumerable-friendly streaming helpers."
 
   def stream(program, inputs, opts \\ []) do
+    cond do
+      Keyword.get(opts, :provider_stream, false) and match?(%DSPy.Predict.Predict{}, program) ->
+        provider_stream(program, inputs, opts)
+
+      true ->
+        fallback_stream(program, inputs, opts)
+    end
+  end
+
+  defp fallback_stream(program, inputs, opts) do
     case Keyword.get(opts, :chunker) do
       nil ->
         Stream.resource(
@@ -23,6 +33,17 @@ defmodule DSPy.Streaming do
         end
         |> Stream.map(& &1)
     end
+  end
+
+  defp provider_stream(%DSPy.Predict.Predict{} = program, inputs, opts) do
+    inputs = Map.new(inputs)
+    messages = program.adapter.format(program.signature, inputs, demos: program.demos)
+
+    program.lm
+    |> DSPy.Clients.HTTPLM.stream(
+      messages,
+      Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream]))
+    )
   end
 
   def collect(program, inputs, opts \\ []) do

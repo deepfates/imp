@@ -35,6 +35,30 @@ defmodule DSPy.Clients.HTTPLM do
     do: generate(new(Keyword.fetch!(opts, :model), opts), messages, opts)
 
   def generate(%__MODULE__{} = lm, messages, opts) do
+    {body, headers} = request(lm, messages, opts)
+
+    request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
+
+    with {:ok, %{status: status, body: response}} when status in 200..299 <-
+           post_with_retries(lm, headers, body, request_opts, retry_config(opts)),
+         {:ok, decoded} <- Jason.decode(response) do
+      {:ok, extract_content(decoded)}
+    else
+      {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def stream(%__MODULE__{} = lm, messages, opts \\ []) do
+    {body, headers} = request(lm, messages, Keyword.put(opts, :stream, true))
+    request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
+
+    lm.transport
+    |> DSPy.HTTP.stream(endpoint(lm), headers, body, request_opts)
+    |> Stream.flat_map(&parse_stream_chunk/1)
+  end
+
+  defp request(%__MODULE__{} = lm, messages, opts) do
     payload =
       lm.opts
       |> Keyword.merge(opts)
@@ -49,16 +73,7 @@ defmodule DSPy.Clients.HTTPLM do
         auth_headers(lm) ++
         Enum.map(lm.headers, fn {k, v} -> {to_string(k), to_string(v)} end)
 
-    request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
-
-    with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           post_with_retries(lm, headers, body, request_opts, retry_config(opts)),
-         {:ok, decoded} <- Jason.decode(response) do
-      {:ok, extract_content(decoded)}
-    else
-      {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
-      {:error, reason} -> {:error, reason}
-    end
+    {body, headers}
   end
 
   defp retry_config(opts) do
@@ -129,6 +144,67 @@ defmodule DSPy.Clients.HTTPLM do
   defp extract_content(%{"choices" => [%{"text" => text} | _]}), do: text
   defp extract_content(%{"output" => output}), do: output
   defp extract_content(other), do: other
+
+  defp parse_stream_chunk({:error, reason}),
+    do: [%DSPy.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
+
+  defp parse_stream_chunk(chunk) when is_binary(chunk) do
+    chunk
+    |> String.split(~r/\r?\n/, trim: true)
+    |> Enum.flat_map(&parse_sse_line/1)
+  end
+
+  defp parse_stream_chunk(%{} = event), do: parse_stream_event(event)
+
+  defp parse_sse_line("data: [DONE]"), do: [%DSPy.Streaming.Messages.StreamResponse{done: true}]
+
+  defp parse_sse_line("data: " <> json) do
+    case Jason.decode(json) do
+      {:ok, event} -> parse_stream_event(event)
+      {:error, _} -> []
+    end
+  end
+
+  defp parse_sse_line(_line), do: []
+
+  defp parse_stream_event(%{"choices" => choices}) do
+    Enum.flat_map(choices, fn choice ->
+      delta = choice["delta"] || choice["message"] || %{}
+      finish = choice["finish_reason"]
+
+      chunks =
+        cond do
+          is_binary(delta["content"]) ->
+            [%DSPy.Streaming.Messages.StreamResponse{chunk: delta["content"]}]
+
+          is_list(delta["tool_calls"]) ->
+            [
+              %DSPy.Streaming.Messages.StreamResponse{
+                chunk: %{tool_calls: Enum.map(delta["tool_calls"], &normalize_tool_call/1)}
+              }
+            ]
+
+          true ->
+            []
+        end
+
+      if finish,
+        do:
+          chunks ++
+            [
+              %DSPy.Streaming.Messages.StreamResponse{
+                done: true,
+                metadata: %{finish_reason: finish}
+              }
+            ],
+        else: chunks
+    end)
+  end
+
+  defp parse_stream_event(%{"output_text" => text}),
+    do: [%DSPy.Streaming.Messages.StreamResponse{chunk: text}]
+
+  defp parse_stream_event(_event), do: []
 
   defp normalize_tool_call(%{"function" => %{"name" => name, "arguments" => args}} = call) do
     %{
