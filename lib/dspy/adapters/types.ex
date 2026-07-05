@@ -11,4 +11,7 @@ defmodule DSPy.Adapters.Types do
   defmodule Citation, do: defstruct([:text, :source, metadata: %{}])
   defmodule ToolCall, do: defstruct([:name, :arguments, id: nil])
   defmodule ToolResult, do: defstruct([:name, :result, id: nil])
+  defmodule Type, do: defstruct([:value, metadata: %{}])
+  defmodule ToolCalls, do: defstruct(tool_calls: [])
+  defmodule ToolCallResults, do: defstruct(tool_call_results: [])
 end

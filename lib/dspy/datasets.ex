@@ -48,3 +48,54 @@ defmodule DSPy.Datasets do
     end)
   end
 end
+
+defmodule DSPy.Datasets.Dataset do
+  @moduledoc "Dataset container with train/dev/test splits."
+  defstruct train: [], dev: [], test: [], metadata: %{}
+
+  def new(examples, opts \\ []) do
+    {train, rest} =
+      DSPy.Datasets.split(examples,
+        train: Keyword.get(opts, :train, 0.8),
+        shuffle: Keyword.get(opts, :shuffle, false)
+      )
+
+    {dev, test} = Enum.split(rest, div(length(rest), 2))
+    %__MODULE__{train: train, dev: dev, test: test, metadata: Keyword.get(opts, :metadata, %{})}
+  end
+end
+
+defmodule DSPy.Datasets.DataLoader do
+  @moduledoc "Loader facade for JSONL/CSV records."
+
+  def load(path, input_keys, opts \\ []) do
+    case Keyword.get(opts, :format, Path.extname(path)) do
+      ".csv" -> DSPy.Datasets.csv(path, input_keys)
+      _ -> DSPy.Datasets.jsonl(path, input_keys)
+    end
+  end
+end
+
+defmodule DSPy.Datasets.GSM8K do
+  @moduledoc "GSM8K-style JSONL dataset loader."
+  def load(path), do: DSPy.Datasets.gsm8k(path)
+
+  def metric(example, prediction, _trace \\ nil) do
+    DSPy.Metrics.em(DSPy.Prediction.get(prediction, :answer), DSPy.Example.get(example, :answer))
+  end
+end
+
+defmodule DSPy.Datasets.HotPotQA do
+  @moduledoc "HotPotQA-style JSONL dataset loader."
+  def load(path), do: DSPy.Datasets.hotpotqa(path)
+end
+
+defmodule DSPy.Datasets.MATH do
+  @moduledoc "MATH-style JSONL dataset loader."
+  def load(path), do: DSPy.Datasets.jsonl(path, [:problem])
+end
+
+defmodule DSPy.Datasets.Colors do
+  @moduledoc "Simple color dataset helper."
+  def load(records), do: DSPy.Datasets.from_records(records, [:input])
+end

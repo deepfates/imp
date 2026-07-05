@@ -17,6 +17,7 @@ defmodule DSPy do
   defdelegate signature(spec, instructions \\ nil), to: Signature, as: :new
   defdelegate example(fields), to: Example, as: :new
   defdelegate prediction(fields), to: Prediction, as: :new
+  defdelegate majority(predictions, opts \\ []), to: DSPy.Predict.Aggregation
 
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
@@ -24,6 +25,12 @@ defmodule DSPy do
 
   def program_of_thought(signature, opts \\ []),
     do: DSPy.Predict.ProgramOfThought.new(signature, opts)
+
+  def code_act(signature, tools \\ [], opts \\ []),
+    do: DSPy.Predict.CodeAct.new(signature, tools, opts)
+
+  def react_v2(signature, tools, opts \\ []), do: DSPy.Predict.ReActV2.new(signature, tools, opts)
+  def rlm(signature, retriever, opts \\ []), do: DSPy.Predict.RLM.new(signature, retriever, opts)
 
   def openai(model, opts \\ []), do: DSPy.Clients.OpenAI.new(model, opts)
   def litellm(model, opts \\ []), do: DSPy.Clients.LiteLLM.new(model, opts)

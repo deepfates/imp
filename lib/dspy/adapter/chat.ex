@@ -35,9 +35,16 @@ defmodule DSPy.Adapter.Chat do
 
   defp render_inputs(signature, inputs) do
     signature.inputs
-    |> Enum.map(fn field -> "#{field.prefix} #{Map.get(inputs, field.name)}" end)
+    |> Enum.map(fn field -> "#{field.prefix} #{format_value(Map.get(inputs, field.name))}" end)
     |> Enum.join("\n")
   end
+
+  defp format_value(value) when is_binary(value), do: value
+
+  defp format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
+    do: to_string(value)
+
+  defp format_value(value), do: inspect(value)
 
   defp render_demos([]), do: ""
 
