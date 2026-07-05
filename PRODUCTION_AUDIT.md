@@ -32,6 +32,6 @@ Statuses:
 
 ## Current Verdict
 
-The project is not yet production-ready. It has many proven production slices,
-but production readiness remains `PARTIAL` until every P0 and P1 row above is
-`PROVEN`.
+The project satisfies the production-readiness bar defined in
+[PRODUCTION.md](PRODUCTION.md): every P0 and P1 row above is `PROVEN`, and
+`mix production.check` reports zero unproven audit rows.
