@@ -1,11 +1,10 @@
 {
   "rows": [
-    "| V2-GEPA-001 | P0 | GEPA supports Pareto-aware reflective evolution with Actionable Side Information (ASI), mutation, candidate lineage, and system-aware merge. | UNPROVEN | None yet. | Candidate pool tracks per-example scores; Pareto frontier selection is tested; ASI diagnostics influence mutations; merge combines complementary candidates; tests cover single-task, multi-task, and generalization behavior. |",
     "| V2-AGENT-001 | P0 | Agent runtime affordances cover typed agents, flows, runtime sessions, memory/context fields, tool execution, and child/specialist agents. | UNPROVEN | None yet. | Agents can forward typed inputs through tools and child agents; large context can live by reference in a runtime session; memory/context state is inspectable; tests cover tool success/failure, nested agents, context references, streaming, and trace capture. |",
     "| V2-MCP-001 | P1 | MCP-style tool discovery/import exposes external tool catalogs as typed `DSPy.Tool` values without hard-coding tool schemas. | UNPROVEN | None yet. | Discovery adapter parses tool list/schema responses; imported tools validate inputs and normalize outputs/errors; tests use an in-process fake MCP server/catalog and prove agent integration. |",
     "| V2-SCHEMA-001 | P0 | Signature fields support schema constraints and validation retry feedback: enum, numeric bounds, string length/pattern, arrays, nested objects, optional fields, and JSON Schema export. | UNPROVEN | None yet. | Constraint parser and builder APIs exist; adapters validate outputs and generate retry feedback; tests cover success/failure for every constraint family and prove schema export stability. |",
     "| V2-BENCH-001 | P0 | Benchmark fixtures compare Ax-style signatures and GEPA optimize-anything tasks with reproducible scores and production-gate reporting. | UNPROVEN | None yet. | Benchmarks include at least one structured extraction task, one agent/tool task, one prompt optimization task, and one arbitrary text/code/config optimization task; results are deterministic in CI and fail on material regressions. |",
     "| V2-DOC-001 | P1 | V2 docs explain APIs, completion evidence, examples, migration notes from V1, and honest remaining non-goals. | UNPROVEN | None yet. | README/docs include runnable examples for Optimize.Anything, Pareto GEPA, agents/MCP, schema constraints, and benchmarks; docs link to tests/gates and do not claim unsupported parity. |"
   ],
-  "unproven_count": 6
+  "unproven_count": 5
 }
