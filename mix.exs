@@ -6,18 +6,18 @@ defmodule DspyElixir.MixProject do
       app: :dspy_elixir,
       version: "0.1.0",
       elixir: "~> 1.19",
-      name: "DSPy Elixir",
+      name: "DSPEx",
       source_url: "https://github.com/deepfates/dspy_elixir",
-      description:
-        "An Elixir-native translation of DSPy's programming model for language models.",
+      description: "Declarative self-improving language-model programs for Elixir.",
       package: package(),
       docs: [
-        main: "DSPy",
+        main: "DSPEx",
         extras: [
           "README.md",
           "docs/README.md",
-          "docs/DSPY_PHILOSOPHY.md",
+          "docs/DSPEX_PHILOSOPHY.md",
           "docs/ARCHITECTURE.md",
+          "docs/TERMINOLOGY.md",
           "docs/API_GUIDE.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "livebooks/01_programming_not_prompting.livemd",
@@ -71,7 +71,10 @@ defmodule DspyElixir.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"DSPy" => "https://dspy.ai/"}
+      links: %{
+        "DSPy" => "https://dspy.ai/",
+        "Source" => "https://github.com/deepfates/dspy_elixir"
+      }
     ]
   end
 

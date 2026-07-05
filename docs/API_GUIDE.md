@@ -4,6 +4,9 @@ This guide is organized around the things you build.
 
 ## Configure An LM
 
+Use the `DSPEx` facade for application code. The deeper `DSPy.*` modules are
+still public, but they are implementation and compatibility surfaces.
+
 For deterministic examples:
 
 ```elixir
@@ -12,14 +15,14 @@ lm = %{
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-DSPy.configure(lm: lm, adapter: DSPy.Adapter.Chat)
+DSPEx.configure(lm: lm, adapter: DSPy.Adapter.Chat)
 ```
 
 For a live OpenAI-compatible provider:
 
 ```elixir
-lm = DSPy.openai("gpt-4o-mini", opts: [temperature: 0])
-DSPy.configure(lm: lm)
+lm = DSPEx.openai("gpt-4o-mini", opts: [temperature: 0])
+DSPEx.configure(lm: lm)
 ```
 
 The provider client reads `OPENAI_API_KEY` unless `api_key:` is supplied.
@@ -27,19 +30,19 @@ The provider client reads `OPENAI_API_KEY` unless `api_key:` is supplied.
 ## Basic Predict
 
 ```elixir
-program = DSPy.predict("question -> answer")
-{:ok, pred} = DSPy.Predict.Predict.call(program, %{question: "Capital of France?"})
-DSPy.Prediction.get(pred, :answer)
+program = DSPEx.predict("question -> answer")
+{:ok, pred} = DSPEx.call(program, %{question: "Capital of France?"})
+DSPEx.get(pred, :answer)
 ```
 
 ## Chain Of Thought
 
 ```elixir
-program = DSPy.chain_of_thought("question -> answer")
-{:ok, pred} = DSPy.Predict.ChainOfThought.call(program, %{question: "2+2?"})
+program = DSPEx.chain_of_thought("question -> answer")
+{:ok, pred} = DSPEx.call(program, %{question: "2+2?"})
 
-DSPy.Prediction.get(pred, :reasoning)
-DSPy.Prediction.get(pred, :answer)
+DSPEx.get(pred, :reasoning)
+DSPEx.get(pred, :answer)
 ```
 
 ## Schema-Constrained JSON
@@ -54,7 +57,7 @@ signature =
     ]
   })
 
-program = DSPy.predict(signature, adapter: DSPy.Adapter.JSON)
+program = DSPEx.predict(signature, adapter: DSPy.Adapter.JSON)
 ```
 
 The JSON adapter validates output fields and returns retry feedback for schema
@@ -64,12 +67,12 @@ violations.
 
 ```elixir
 demo =
-  DSPy.example(question: "2+2?", answer: "4")
+  DSPEx.example(question: "2+2?", answer: "4")
   |> DSPy.Example.with_inputs(:question)
 
 program =
   "question -> answer"
-  |> DSPy.predict()
+  |> DSPEx.predict()
   |> DSPy.Predict.Predict.with_demos([demo])
 ```
 
@@ -77,7 +80,7 @@ program =
 
 ```elixir
 devset = [
-  DSPy.example(question: "Capital of France?", answer: "Paris") |> DSPy.Example.with_inputs(:question)
+  DSPEx.example(question: "Capital of France?", answer: "Paris") |> DSPy.Example.with_inputs(:question)
 ]
 
 metric = DSPy.Metrics.exact_match(:answer)
@@ -151,7 +154,7 @@ lookup =
     %{query: "capital-france"} -> "Paris"
   end)
 
-agent = DSPy.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
+agent = DSPEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
 ```
 
 `ReActV2` expects the LM to produce provider-style tool calls. A reserved
@@ -198,7 +201,7 @@ tools = DSPy.MCP.import_tools(client)
 
 ```elixir
 rlm =
-  DSPy.rlm("context, question -> answer",
+  DSPEx.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 10,
@@ -206,7 +209,7 @@ rlm =
     max_time_ms: 30_000
   )
 
-DSPy.Predict.RLM.call(rlm, %{context: long_context, question: "What matters?"})
+DSPEx.call(rlm, %{context: long_context, question: "What matters?"})
 ```
 
 RLM controller actions:

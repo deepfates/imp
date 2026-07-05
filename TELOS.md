@@ -1,6 +1,8 @@
-# DSPy Elixir Telos
+# DSPEx Telos
 
-This project translates DSPy philosophically as well as literally.
+DSPEx is a declarative self-improving programming system for language models on
+the BEAM. It keeps a verifiable bridge to DSPy ancestry while presenting the
+user-facing system as ordinary, idiomatic Elixir.
 
 ## Definition of Done
 
@@ -9,12 +11,13 @@ This project translates DSPy philosophically as well as literally.
 - Optimizers compile programs from examples and metrics rather than hiding prompt edits in strings.
 - End-to-end tests exercise the loop: examples -> optimizer -> program -> LM -> adapter -> prediction -> metric.
 - Provider integrations are contract-tested through injectable transports and can be live-tested by supplying credentials.
-- Python-specific runtime patterns are translated into BEAM-safe equivalents rather than copied unsafely.
-- Upstream public export parity is generated from a checked-out DSPy repo and enforced by `mix parity.check`.
+- Runtime patterns are BEAM-safe by construction: explicit data, OTP boundaries, injectable clients, and supervised state.
+- DSPy ancestry is tracked through a generated public-export parity check enforced by `mix parity.check`.
 - Production readiness requires `mix production.check` plus the live-provider gate when credentials are present.
 
 ## Implemented Surface
 
+- Facade: `DSPEx`
 - Core: `DSPy`, `DSPy.Settings`, `DSPy.Signature`, `DSPy.Signature.Field`
 - Primitives: `DSPy.Example`, `DSPy.Prediction`, `DSPy.Tool`
 - Adapters: `DSPy.Adapter.Chat`, `DSPy.Adapter.JSON`, `DSPy.Adapter.XML`, `DSPy.Adapter.TwoStep`, `DSPy.Adapter.BAML`
@@ -32,11 +35,11 @@ This project translates DSPy philosophically as well as literally.
 
 ## Completion Boundary
 
-This repo now implements the DSPy programming model end-to-end in Elixir. The
-only boundary not exercised by default is live third-party network behavior:
-OpenAI, Databricks, LiteLLM, and local model servers are represented by real
-HTTP clients with contract tests against injectable transports. Live calls are
-an operational concern requiring credentials and endpoints, not missing library
+This repo now implements the DSPEx programming model end-to-end. The only
+boundary not exercised by default is live third-party network behavior: OpenAI,
+Databricks, LiteLLM, and local model servers are represented by real HTTP
+clients with contract tests against injectable transports. Live calls are an
+operational concern requiring credentials and endpoints, not missing library
 surface.
 
 Production readiness is defined by [PRODUCTION.md](PRODUCTION.md) and

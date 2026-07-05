@@ -1,13 +1,14 @@
 # Ecosystem Coverage Comparison
 
-This repo ports DSPy's programming model into idiomatic Elixir. Ax and
-optimize_anything/GEPA are useful comparison points because they share the same
-philosophy: typed or declarative LM programs, explicit evaluation, and
-optimization loops that improve behavior from examples or feedback.
+DSPEx brings declarative self-improving language-model programs to idiomatic
+Elixir. DSPy, Ax, and optimize_anything/GEPA are useful comparison points
+because they share the same philosophy: typed or declarative LM programs,
+explicit evaluation, and optimization loops that improve behavior from examples
+or feedback.
 
 ## Summary
 
-| Capability | This Elixir port | Ax | optimize_anything / GEPA |
+| Capability | DSPEx | Ax | optimize_anything / GEPA |
 | --- | --- | --- | --- |
 | Declarative signatures | Covered with `DSPy.Signature`, string signatures, fields, examples, and predictions. | Core feature; signatures compile into prompts, parsers, validators, retries, traces, and optimization inputs. | Not a general signature framework; optimizes text artifacts via evaluator contracts. |
 | Structured generation | Covered with Chat/JSON/XML/TwoStep adapters and parser/error tests. | Strong: typed outputs, validation, retries, streaming, and constraints are first-class. | Only through the system being optimized, not as a primary app framework. |
@@ -21,12 +22,12 @@ optimization loops that improve behavior from examples or feedback.
 | Multi-language conformance | Elixir only. | Major strength: generated/verified packages for TypeScript plus Python, Java, C++, Go, and Rust. | Python package/API. |
 | Production evidence | Strong inside this repo: parity matrix, adversarial audit, deterministic production gate, live provider smoke, behavioral tests. | Public docs describe conformance manifests and generated examples; external comparison would need cloning/running Ax gates. | Public docs and examples emphasize benchmarked case studies; external comparison would need reproducing artifact benchmarks. |
 
-## Where This Port Is Competitive
+## Where DSPEx Is Competitive
 
 - It is closest to DSPy in surface area: signatures, adapters, prediction
   modules, retrieval, evaluation, datasets, optimizers, streaming, saving, and
   provider contracts are all represented.
-- It has unusually explicit production evidence for a port: P0/P1 audit rows
+- It has unusually explicit production evidence: P0/P1 audit rows
   map to tests, and `mix production.check` fails if parity/audit/test gates
   regress.
 - The BEAM-native choices are credible rather than cosmetic: concurrency uses
@@ -39,8 +40,8 @@ optimization loops that improve behavior from examples or feedback.
   MCP, skills, memory/context maps, and long-horizon agent affordances.
 - Ax has stronger type/schema ergonomics around constraints and validation,
   including fluent schemas and generated native packages.
-- Ax's multi-language AxIR/conformance story is a major advantage. This Elixir
-  port has parity gates against DSPy, but it does not yet have a portable IR or
+- Ax's multi-language AxIR/conformance story is a major advantage. DSPEx has
+  parity gates against DSPy, but it does not yet have a portable IR or
   cross-language conformance fixtures.
 
 ## Where optimize_anything / GEPA Is Ahead
@@ -51,7 +52,7 @@ optimization loops that improve behavior from examples or feedback.
 - It optimizes arbitrary text artifacts, not only LM-program prompts or demos:
   code, configurations, agent architectures, SVGs, policies, and prompts.
 - Its evaluator API captures rich diagnostics as the gradient-like signal. This
-  port records traces and optimizer reports, but does not yet expose a general
+  DSPEx records traces and optimizer reports, but does not yet expose a general
   "optimize any text artifact" API.
 
 ## Best Next Moves

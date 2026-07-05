@@ -1,4 +1,4 @@
-# DSPy Elixir 02: Evaluate And Optimize
+# DSPEx 02: Evaluate And Optimize
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
@@ -9,12 +9,12 @@ Mix.install([{:dspy_elixir, path: repo}])
 
 ```elixir
 trainset = [
-  DSPy.example(question: "2+2?", answer: "4") |> DSPy.Example.with_inputs(:question),
-  DSPy.example(question: "3+3?", answer: "6") |> DSPy.Example.with_inputs(:question)
+  DSPEx.example(question: "2+2?", answer: "4") |> DSPy.Example.with_inputs(:question),
+  DSPEx.example(question: "3+3?", answer: "6") |> DSPy.Example.with_inputs(:question)
 ]
 
 devset = [
-  DSPy.example(question: "2 plus 2?", answer: "4") |> DSPy.Example.with_inputs(:question)
+  DSPEx.example(question: "2 plus 2?", answer: "4") |> DSPy.Example.with_inputs(:question)
 ]
 ```
 
@@ -39,7 +39,7 @@ lm = %{
   ]
 }
 
-program = DSPy.predict("question -> answer", lm: lm)
+program = DSPEx.predict("question -> answer", lm: lm)
 evaluator = DSPy.Evaluate.new(devset, metric)
 DSPy.Evaluate.run(evaluator, program)
 ```

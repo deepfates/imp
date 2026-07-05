@@ -1,24 +1,28 @@
 defmodule DspyElixir do
   @moduledoc """
-  Compatibility wrapper for the `DSPy` namespace.
+  Historical package wrapper.
+
+  Prefer `DSPEx` in new code.
   """
 
-  defdelegate configure(opts), to: DSPy
-  defdelegate settings(), to: DSPy
-  defdelegate context(opts, fun), to: DSPy
-  defdelegate signature(spec, instructions \\ nil), to: DSPy
-  defdelegate example(fields), to: DSPy
-  defdelegate prediction(fields), to: DSPy
-  defdelegate majority(predictions, opts \\ []), to: DSPy
-  defdelegate predict(signature, opts \\ []), to: DSPy
-  defdelegate chain_of_thought(signature, opts \\ []), to: DSPy
-  defdelegate react(signature, tools, opts \\ []), to: DSPy
-  defdelegate program_of_thought(signature, opts \\ []), to: DSPy
-  defdelegate code_act(signature, tools \\ [], opts \\ []), to: DSPy
-  defdelegate react_v2(signature, tools, opts \\ []), to: DSPy
-  defdelegate rlm(signature, opts \\ []), to: DSPy
-  defdelegate openai(model, opts \\ []), to: DSPy
-  defdelegate litellm(model, opts \\ []), to: DSPy
-  defdelegate local_lm(model, opts \\ []), to: DSPy
-  defdelegate databricks(model, opts \\ []), to: DSPy
+  defdelegate configure(opts), to: DSPEx
+  defdelegate settings(), to: DSPEx
+  defdelegate context(opts, fun), to: DSPEx
+  defdelegate signature(spec, instructions \\ nil), to: DSPEx
+  defdelegate example(fields), to: DSPEx
+  defdelegate prediction(fields), to: DSPEx
+  defdelegate get(container, key, default \\ nil), to: DSPEx
+  defdelegate majority(predictions, opts \\ []), to: DSPEx
+  defdelegate predict(signature, opts \\ []), to: DSPEx
+  defdelegate chain_of_thought(signature, opts \\ []), to: DSPEx
+  defdelegate react(signature, tools, opts \\ []), to: DSPEx
+  defdelegate program_of_thought(signature, opts \\ []), to: DSPEx
+  defdelegate code_act(signature, tools \\ [], opts \\ []), to: DSPEx
+  defdelegate react_v2(signature, tools, opts \\ []), to: DSPEx
+  defdelegate rlm(signature, opts \\ []), to: DSPEx
+  defdelegate call(program, inputs), to: DSPEx
+  defdelegate openai(model, opts \\ []), to: DSPEx
+  defdelegate litellm(model, opts \\ []), to: DSPEx
+  defdelegate local_lm(model, opts \\ []), to: DSPEx
+  defdelegate databricks(model, opts \\ []), to: DSPEx
 end

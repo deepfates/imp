@@ -1,17 +1,19 @@
-# DSPy Elixir Documentation
+# DSPEx Documentation
 
-This directory is the practical manual for the Elixir port. It is meant to be
-read alongside the code and tests, not instead of them.
+This directory is the practical manual for DSPEx. It is meant to be read
+alongside the code and tests, not instead of them.
 
 ## Reading Path
 
-1. [Philosophy](DSPY_PHILOSOPHY.md): how DSPy's "program, do not prompt" idea
-   translates into Elixir.
+1. [Philosophy](DSPEX_PHILOSOPHY.md): the Elixir-native model of declarative
+   self-improving programs.
 2. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
    supervision/runtime boundaries.
-3. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
+3. [Terminology](TERMINOLOGY.md): the canonical vocabulary for an Elixir-native
+   DSPEx project.
+4. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
    adapters, optimizers, agents, RLM, MCP, persistence, and providers.
-4. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
+5. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
    security posture, and release discipline.
 
 ## Livebooks
@@ -25,4 +27,3 @@ Open the notebooks in `livebooks/` when you want to learn by running code:
 
 All notebooks use deterministic fake LMs by default. The live-provider notebook
 has an explicit opt-in cell for local `.env` credentials.
-

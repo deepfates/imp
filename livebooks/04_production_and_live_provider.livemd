@@ -1,4 +1,4 @@
-# DSPy Elixir 04: Production And Live Provider
+# DSPEx 04: Production And Live Provider
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
@@ -57,9 +57,9 @@ paste secrets into the notebook.
 ```elixir
 if System.get_env("OPENAI_API_KEY") do
   model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
-  lm = DSPy.openai(model, opts: [temperature: 0, max_completion_tokens: 40])
-  program = DSPy.predict("question -> answer", lm: lm)
-  DSPy.Predict.Predict.call(program, %{question: "Reply with exactly: pong"})
+  lm = DSPEx.openai(model, opts: [temperature: 0, max_completion_tokens: 40])
+  program = DSPEx.predict("question -> answer", lm: lm)
+  DSPEx.call(program, %{question: "Reply with exactly: pong"})
 else
   {:skip, "Set OPENAI_API_KEY before running the live provider cell."}
 end
@@ -79,8 +79,8 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 ## Saving Without Secrets
 
 ```elixir
-lm = DSPy.openai("gpt-test", api_key: "not-persisted")
-program = DSPy.predict("question -> answer", lm: lm)
+lm = DSPEx.openai("gpt-test", api_key: "not-persisted")
+program = DSPEx.predict("question -> answer", lm: lm)
 
 path = Path.join(System.tmp_dir!(), "dspy-elixir-no-secret.json")
 DSPy.Saving.save!(program, path)

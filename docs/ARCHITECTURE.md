@@ -15,15 +15,17 @@ Example / inputs
 
 ## Public Facade
 
-`DSPy` in `lib/dspy.ex` is the friendly entry point:
+`DSPEx` in `lib/dspex.ex` is the canonical public entry point:
 
-- `DSPy.configure/1`, `DSPy.context/2`
-- `DSPy.signature/2`, `DSPy.example/1`, `DSPy.prediction/1`
-- `DSPy.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
+- `DSPEx.configure/1`, `DSPEx.context/2`
+- `DSPEx.signature/2`, `DSPEx.example/1`, `DSPEx.prediction/1`
+- `DSPEx.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
+- `DSPEx.call/2`
 - provider helpers: `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
 
 Use the facade for application code. Use deeper modules when you need direct
-control in tests, docs, or advanced systems.
+control in tests, docs, or advanced systems. `DSPy` remains as the compatibility
+namespace for upstream parity and implementation modules.
 
 ## Core Data
 
@@ -148,7 +150,8 @@ Built-in metrics live in `DSPy.Metrics`:
 
 ## Optimization
 
-Classic teleprompter-style optimizers live under `DSPy.Teleprompt.*`:
+Metric-driven optimizers live under the historical `DSPy.Teleprompt.*`
+namespace:
 
 - `LabeledFewShot`
 - `BootstrapFewShot`

@@ -1,4 +1,4 @@
-# DSPy Elixir 01: Programming, Not Prompting
+# DSPEx 01: Programming, Not Prompting
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
@@ -7,10 +7,10 @@ Mix.install([{:dspy_elixir, path: repo}])
 
 ## The Idea
 
-DSPy-style programming means declaring the task boundary first:
+DSPEx-style programming means declaring the task boundary first:
 
 ```elixir
-signature = DSPy.signature("question -> answer")
+signature = DSPEx.signature("question -> answer")
 DSPy.Signature.to_spec(signature)
 ```
 
@@ -27,10 +27,10 @@ lm = %{
   ]
 }
 
-DSPy.configure(lm: lm, adapter: DSPy.Adapter.Chat)
+DSPEx.configure(lm: lm, adapter: DSPy.Adapter.Chat)
 
-program = DSPy.predict("question -> answer")
-{:ok, prediction} = DSPy.Predict.Predict.call(program, %{question: "Capital of France?"})
+program = DSPEx.predict("question -> answer")
+{:ok, prediction} = DSPEx.call(program, %{question: "Capital of France?"})
 DSPy.Prediction.to_map(prediction)
 ```
 
@@ -53,8 +53,8 @@ cot_lm = %{
   opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
 }
 
-program = DSPy.chain_of_thought("question -> answer", lm: cot_lm)
-{:ok, pred} = DSPy.Predict.ChainOfThought.call(program, %{question: "What is 2+2?"})
+program = DSPEx.chain_of_thought("question -> answer", lm: cot_lm)
+{:ok, pred} = DSPEx.call(program, %{question: "What is 2+2?"})
 DSPy.Prediction.to_map(pred)
 ```
 
@@ -90,7 +90,7 @@ DSPy.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [
 
 ```elixir
 example =
-  DSPy.example(question: "2+2?", answer: "4")
+  DSPEx.example(question: "2+2?", answer: "4")
   |> DSPy.Example.with_inputs(:question)
 
 {DSPy.Example.to_map(DSPy.Example.inputs(example)), DSPy.Example.to_map(DSPy.Example.labels(example))}

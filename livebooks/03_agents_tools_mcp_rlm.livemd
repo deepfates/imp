@@ -1,4 +1,4 @@
-# DSPy Elixir 03: Agents, Tools, MCP, And RLM
+# DSPEx 03: Agents, Tools, MCP, And RLM
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
@@ -85,8 +85,8 @@ lm = %{
   ]
 }
 
-react = DSPy.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
-{:ok, pred} = DSPy.Predict.ReActV2.call(react, %{question: "Capital of France?"})
+react = DSPEx.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
+{:ok, pred} = DSPEx.call(react, %{question: "Capital of France?"})
 DSPy.Prediction.to_map(pred)
 ```
 
@@ -116,7 +116,7 @@ controller_lm = %{
 Process.put(:rlm_actions, actions)
 
 rlm =
-  DSPy.rlm("context, question -> answer",
+  DSPEx.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 5,
@@ -125,7 +125,7 @@ rlm =
   )
 
 {:ok, pred} =
-  DSPy.Predict.RLM.call(rlm, %{
+  DSPEx.call(rlm, %{
     context: String.duplicate("large context ", 200),
     question: "What is the capital?"
   })
@@ -143,6 +143,6 @@ loop_lm = %{
   opts: [handler: fn _messages, _opts -> %{action: "eval", code: "1 + 1"} end]
 }
 
-rlm = DSPy.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
-DSPy.Predict.RLM.call(rlm, %{question: "loop?"})
+rlm = DSPEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
+DSPEx.call(rlm, %{question: "loop?"})
 ```
