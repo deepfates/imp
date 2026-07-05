@@ -38,3 +38,9 @@ classified in `PARITY.md`.
 `priv/parity/production_audit_unproven.json`. That file reports how many P0/P1
 audit rows still need stronger evidence before the project can honestly be
 called production-ready.
+
+## V2 Production Bar
+
+Production-ready V2 is tracked separately in [V2_ROADMAP.md](V2_ROADMAP.md).
+V2 is not complete until every P0/P1 V2 row is `PROVEN`, `mix v2.check` passes,
+the existing production gate passes, and applicable live gates pass.
