@@ -1,0 +1,76 @@
+defmodule ExternalRetrieverTest do
+  use ExUnit.Case
+
+  defmodule WeaviateTransport do
+    @behaviour DSPy.HTTP
+
+    @impl true
+    def post(url, headers, body, _opts) do
+      send(self(), {:weaviate_request, url, headers, Jason.decode!(body)})
+
+      response = %{
+        data: %{
+          Get: %{
+            Passage: [
+              %{text: "Paris is the capital of France.", _additional: %{score: 0.91, id: "p1"}}
+            ]
+          }
+        }
+      }
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(response)}}
+    end
+  end
+
+  defmodule DatabricksTransport do
+    @behaviour DSPy.HTTP
+
+    @impl true
+    def post(url, headers, body, _opts) do
+      send(self(), {:databricks_request, url, headers, Jason.decode!(body)})
+
+      response = %{
+        manifest: %{columns: [%{name: "text"}, %{name: "score"}, %{name: "doc_id"}]},
+        result: %{data_array: [["Paris is the capital of France.", 0.88, "d1"]]}
+      }
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(response)}}
+    end
+  end
+
+  test "Weaviate retriever builds GraphQL request and maps documents" do
+    retriever =
+      DSPy.Retrievers.Weaviate.new("https://weaviate.example", "Passage",
+        transport: WeaviateTransport
+      )
+
+    assert {:ok, [%{text: "Paris is the capital of France.", score: 0.91, metadata: metadata}]} =
+             DSPy.Retrieve.retrieve(retriever, "capital France", k: 1)
+
+    assert metadata["id"] == "p1"
+    assert_received {:weaviate_request, "https://weaviate.example/v1/graphql", headers, body}
+    assert {"content-type", "application/json"} in headers
+    assert body["query"] =~ "nearText"
+    assert body["query"] =~ "capital France"
+  end
+
+  test "Databricks retriever builds vector-search request and maps rows" do
+    retriever =
+      DSPy.Retrievers.Databricks.new("https://dbc.example/api/2.0/vector-search/indexes/i/query",
+        transport: DatabricksTransport,
+        token: "dbc-token"
+      )
+
+    assert {:ok, [%{text: "Paris is the capital of France.", score: 0.88, metadata: metadata}]} =
+             DSPy.Retrieve.retrieve(retriever, "capital France", k: 1)
+
+    assert metadata["doc_id"] == "d1"
+
+    assert_received {:databricks_request,
+                     "https://dbc.example/api/2.0/vector-search/indexes/i/query", headers, body}
+
+    assert {"authorization", "Bearer dbc-token"} in headers
+    assert body["query_text"] == "capital France"
+    assert body["num_results"] == 1
+  end
+end

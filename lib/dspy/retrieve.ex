@@ -7,6 +7,14 @@ defmodule DSPy.Retrieve do
   def retrieve(module, query, opts) when is_atom(module), do: module.retrieve(query, opts)
   def retrieve(fun, query, opts) when is_function(fun, 2), do: fun.(query, opts)
 
+  def retrieve(%module{} = retriever, query, opts) do
+    if function_exported?(module, :retrieve, 3) do
+      module.retrieve(retriever, query, opts)
+    else
+      {:error, {:not_a_retriever, module}}
+    end
+  end
+
   defmodule Memory do
     @moduledoc "Token-overlap in-memory retriever for deterministic local workflows."
     @behaviour DSPy.Retrieve
@@ -41,6 +49,4 @@ defmodule DSPy.Retrieve do
         |> List.flatten()
         |> Enum.map(&String.downcase/1)
   end
-
-  def retrieve(%Memory{} = retriever, query, opts), do: Memory.retrieve(retriever, query, opts)
 end
