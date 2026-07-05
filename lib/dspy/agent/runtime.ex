@@ -33,5 +33,11 @@ defmodule DSPy.Agent.Runtime do
     do: %{runtime | traces: runtime.traces ++ [Map.put(event, :at, length(runtime.traces))]}
 
   defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: String.to_atom(key)
+  defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
+
+  defp existing_atom_or_string(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
 end

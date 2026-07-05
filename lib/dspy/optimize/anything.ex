@@ -86,7 +86,7 @@ defmodule DSPy.Optimize.Anything do
         parent_id: state["parent_id"],
         mutation: state["mutation"],
         diagnostics: state["diagnostics"] || [],
-        metadata: atomize_keys(state["metadata"] || %{})
+        metadata: normalize_keys(state["metadata"] || %{})
       }
     end
 
@@ -103,10 +103,10 @@ defmodule DSPy.Optimize.Anything do
     defp artifact_from_map(state) do
       %Artifact{
         id: state["id"],
-        kind: String.to_atom(state["kind"]),
+        kind: existing_atom_or_string(state["kind"]),
         text: state["text"],
-        parameters: atomize_keys(state["parameters"] || %{}),
-        metadata: atomize_keys(state["metadata"] || %{})
+        parameters: normalize_keys(state["parameters"] || %{}),
+        metadata: normalize_keys(state["metadata"] || %{})
       }
     end
 
@@ -114,15 +114,23 @@ defmodule DSPy.Optimize.Anything do
 
     defp normalize_report_metadata(metadata) do
       metadata
-      |> atomize_keys()
+      |> normalize_keys()
       |> Map.update(:artifact_kind, nil, fn
-        value when is_binary(value) -> String.to_atom(value)
+        value when is_binary(value) -> existing_atom_or_string(value)
         value -> value
       end)
     end
 
-    defp atomize_keys(map),
-      do: Map.new(map, fn {key, value} -> {String.to_atom(to_string(key)), value} end)
+    defp normalize_keys(map),
+      do: Map.new(map, fn {key, value} -> {existing_atom_or_string(to_string(key)), value} end)
+
+    defp existing_atom_or_string(value) when is_atom(value), do: value
+
+    defp existing_atom_or_string(value) when is_binary(value) do
+      String.to_existing_atom(value)
+    rescue
+      ArgumentError -> value
+    end
   end
 
   def new_artifact(kind, text, opts \\ []) when is_binary(text) do

@@ -3,22 +3,31 @@ defmodule DSPy.Agent do
 
   alias DSPy.Agent.Runtime
 
-  defstruct [:name, :handler, tools: %{}, children: %{}, input_schema: %{}, output_schema: %{}]
+  defstruct [
+    :name,
+    :handler,
+    tools: %{},
+    children: %{},
+    input_schema: %{},
+    output_schema: %{},
+    tool_policy: :allow
+  ]
 
-  def new(name, handler, opts \\ []) when is_function(handler, 2) do
+  def new(name, handler, opts \\ []) when is_function(handler, 2) or is_function(handler, 3) do
     %__MODULE__{
       name: normalize_name(name),
       handler: handler,
       tools: index_by_name(Keyword.get(opts, :tools, [])),
       children: index_by_name(Keyword.get(opts, :children, [])),
       input_schema: Keyword.get(opts, :input_schema, %{}),
-      output_schema: Keyword.get(opts, :output_schema, %{})
+      output_schema: Keyword.get(opts, :output_schema, %{}),
+      tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
   end
 
   def run(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
     with :ok <- validate(inputs, agent.input_schema),
-         {:ok, output, runtime} <- agent.handler.(resolve_inputs(inputs, runtime), runtime),
+         {:ok, output, runtime} <- invoke_handler(agent, resolve_inputs(inputs, runtime), runtime),
          :ok <- validate(output, agent.output_schema) do
       {:ok, output, Runtime.trace(runtime, %{type: :agent, agent: agent.name, output: output})}
     else
@@ -35,24 +44,60 @@ defmodule DSPy.Agent do
   def call_tool(%__MODULE__{} = agent, name, input, %Runtime{} = runtime) do
     name = normalize_name(name)
 
-    case Map.fetch(agent.tools, name) do
-      {:ok, tool} ->
-        try do
-          output = DSPy.Tool.call(tool, input)
+    with :ok <- authorize_tool(agent, name, input) do
+      case Map.fetch(agent.tools, name) do
+        {:ok, tool} ->
+          try do
+            output = DSPy.Tool.call(tool, input)
 
-          {:ok, output,
-           Runtime.trace(runtime, %{type: :tool, tool: name, input: input, output: output})}
-        rescue
-          exception ->
-            reason = {:tool_error, name, Exception.message(exception)}
+            {:ok, output,
+             Runtime.trace(runtime, %{type: :tool, tool: name, input: input, output: output})}
+          rescue
+            exception ->
+              reason = {:tool_error, name, Exception.message(exception)}
 
-            {:error, reason,
-             Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
-        end
+              {:error, reason,
+               Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
+          end
 
-      :error ->
-        {:error, {:unknown_tool, name},
-         Runtime.trace(runtime, %{type: :tool_error, tool: name, error: :unknown_tool})}
+        :error ->
+          {:error, {:unknown_tool, name},
+           Runtime.trace(runtime, %{type: :tool_error, tool: name, error: :unknown_tool})}
+      end
+    else
+      {:error, reason} ->
+        {:error, reason, Runtime.trace(runtime, %{type: :tool_denied, tool: name, error: reason})}
+    end
+  end
+
+  defp invoke_handler(%__MODULE__{handler: handler} = agent, inputs, runtime) do
+    case :erlang.fun_info(handler, :arity) do
+      {:arity, 2} -> handler.(inputs, runtime)
+      {:arity, 3} -> handler.(agent, inputs, runtime)
+    end
+  end
+
+  defp authorize_tool(%__MODULE__{tool_policy: :allow}, _name, _input), do: :ok
+
+  defp authorize_tool(%__MODULE__{tool_policy: allowed}, name, _input) when is_list(allowed) do
+    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
+  end
+
+  defp authorize_tool(%__MODULE__{tool_policy: policy}, name, input)
+       when is_function(policy, 2) do
+    case policy.(name, input) do
+      true -> :ok
+      :ok -> :ok
+      false -> {:error, {:tool_denied, name}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp authorize_tool(%__MODULE__{tool_policy: policy}, name, _input) do
+    if MapSet.member?(MapSet.new(List.wrap(policy)), name) do
+      :ok
+    else
+      {:error, {:tool_denied, name}}
     end
   end
 
@@ -112,5 +157,11 @@ defmodule DSPy.Agent do
 
   defp index_by_name(values), do: Map.new(values, fn item -> {item.name, item} end)
   defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name) when is_binary(name), do: String.to_atom(name)
+  defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
+
+  defp existing_atom_or_string(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
+  end
 end

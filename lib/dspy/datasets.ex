@@ -94,11 +94,8 @@ defmodule DSPy.Datasets do
 
   defp normalize_record(record, nil) when is_map(record), do: record
 
-  defp normalize_record(record, module) when is_map(record) do
-    module
-    |> struct(atomize_keys(record))
-    |> Map.from_struct()
-  end
+  defp normalize_record(record, module) when is_map(record),
+    do: module |> struct(existing_keys(record)) |> Map.from_struct()
 
   defp normalize_record(record, _module), do: record
 
@@ -108,8 +105,7 @@ defmodule DSPy.Datasets do
       |> List.wrap()
       |> Enum.map(&normalize_key/1)
       |> Enum.reject(fn key ->
-        atomized = atomize_keys(record)
-        Map.has_key?(atomized, key) and not is_nil(Map.get(atomized, key))
+        match?({:ok, value} when not is_nil(value), fetch_record_key(record, key))
       end)
 
     case missing do
@@ -148,11 +144,33 @@ defmodule DSPy.Datasets do
     :ok
   end
 
-  defp atomize_keys(record),
+  defp existing_keys(record),
     do: Map.new(record, fn {key, value} -> {normalize_key(key), value} end)
 
   defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: String.to_atom(key)
+  defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
+
+  defp existing_atom_or_string(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
+
+  defp fetch_record_key(record, key) when is_atom(key) do
+    cond do
+      Map.has_key?(record, key) -> Map.fetch(record, key)
+      Map.has_key?(record, Atom.to_string(key)) -> Map.fetch(record, Atom.to_string(key))
+      true -> :error
+    end
+  end
+
+  defp fetch_record_key(record, key) when is_binary(key) do
+    cond do
+      Map.has_key?(record, key) -> Map.fetch(record, key)
+      is_atom(existing_atom_or_string(key)) -> Map.fetch(record, existing_atom_or_string(key))
+      true -> :error
+    end
+  end
 end
 
 defmodule DSPy.Datasets.Dataset do

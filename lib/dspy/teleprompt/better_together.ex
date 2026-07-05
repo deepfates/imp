@@ -25,7 +25,7 @@ defmodule DSPy.Teleprompt.BetterTogether do
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
     |> Enum.reduce(student, fn key, program ->
-      optimizer = Map.fetch!(bt.optimizers, String.to_atom(key))
+      optimizer = fetch_optimizer!(bt.optimizers, key)
       compile_step(optimizer, program, trainset, valset)
     end)
   end
@@ -48,5 +48,25 @@ defmodule DSPy.Teleprompt.BetterTogether do
       true ->
         program
     end
+  end
+
+  defp fetch_optimizer!(optimizers, key) do
+    cond do
+      Map.has_key?(optimizers, key) ->
+        Map.fetch!(optimizers, key)
+
+      is_atom(existing_atom_or_string(key)) and
+          Map.has_key?(optimizers, existing_atom_or_string(key)) ->
+        Map.fetch!(optimizers, existing_atom_or_string(key))
+
+      true ->
+        raise KeyError, key: key, term: optimizers
+    end
+  end
+
+  defp existing_atom_or_string(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
   end
 end

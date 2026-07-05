@@ -19,9 +19,14 @@ defmodule DSPy.Prediction do
   end
 
   def get(%__MODULE__{fields: fields}, key, default \\ nil),
-    do: Map.get(fields, normalize_key(key), default)
+    do: get_key(fields, normalize_key(key), default)
 
-  def fetch!(%__MODULE__{fields: fields}, key), do: Map.fetch!(fields, normalize_key(key))
+  def fetch!(%__MODULE__{fields: fields}, key) do
+    case fetch_key(fields, normalize_key(key)) do
+      {:ok, value} -> value
+      :error -> raise KeyError, key: key, term: fields
+    end
+  end
 
   def put(%__MODULE__{fields: fields} = prediction, key, value),
     do: %{prediction | fields: Map.put(fields, normalize_key(key), value)}
@@ -32,5 +37,37 @@ defmodule DSPy.Prediction do
     do: new(DSPy.Example.to_map(example), opts)
 
   defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: String.to_atom(key)
+  defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
+
+  defp existing_atom_or_string(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
+
+  defp get_key(fields, key, default) do
+    case fetch_key(fields, key) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
+  defp fetch_key(fields, key) do
+    cond do
+      Map.has_key?(fields, key) ->
+        Map.fetch(fields, key)
+
+      is_atom(key) and Map.has_key?(fields, Atom.to_string(key)) ->
+        Map.fetch(fields, Atom.to_string(key))
+
+      is_binary(key) ->
+        case existing_atom_or_string(key) do
+          atom when is_atom(atom) -> Map.fetch(fields, atom)
+          _string -> :error
+        end
+
+      true ->
+        :error
+    end
+  end
 end

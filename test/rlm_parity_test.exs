@@ -30,6 +30,35 @@ defmodule RLMParityTest do
     Process.delete(:rlm_actions)
   end
 
+  test "RLM exposes large context as metadata and preview, not full prompt text" do
+    hidden = "DO_NOT_PROMPT_FULL_CONTEXT"
+    context = String.duplicate("a", 40) <> hidden
+
+    lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          Process.put(:rlm_controller_messages, messages)
+          %{action: "submit", result: %{answer: "ok"}}
+        end
+      ]
+    }
+
+    rlm = DSPy.Predict.RLM.new("context, question -> answer", lm: lm, max_preview_chars: 10)
+
+    assert {:ok, prediction} =
+             DSPy.Predict.RLM.call(rlm, %{context: context, question: "what is inside?"})
+
+    assert DSPy.Prediction.get(prediction, :answer) == "ok"
+
+    prompt = Process.get(:rlm_controller_messages) |> Enum.map_join("\n", & &1.content)
+    refute prompt =~ hidden
+    assert prompt =~ ~s("length":#{String.length(context)})
+    assert prompt =~ ~s("truncated":true)
+  after
+    Process.delete(:rlm_controller_messages)
+  end
+
   test "RLM enforces max iteration and sub-LM budgets" do
     loop_lm = %{
       module: DSPy.LM.Fake,

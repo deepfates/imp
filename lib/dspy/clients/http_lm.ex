@@ -19,7 +19,11 @@ defmodule DSPy.Clients.HTTPLM do
   def new(model, opts \\ []) do
     %__MODULE__{
       model: model,
-      api_key: Keyword.get(opts, :api_key) || env_key(Keyword.get(opts, :provider, :openai)),
+      api_key:
+        if(Keyword.has_key?(opts, :api_key),
+          do: Keyword.get(opts, :api_key),
+          else: env_key(Keyword.get(opts, :provider, :openai))
+        ),
       base_url:
         Keyword.get(opts, :base_url, default_base_url(Keyword.get(opts, :provider, :openai))),
       provider: Keyword.get(opts, :provider, :openai),

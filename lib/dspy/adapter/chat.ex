@@ -19,7 +19,7 @@ defmodule DSPy.Adapter.Chat do
 
   def parse(signature, text, _opts) when is_binary(text) do
     outputs = DSPy.Signature.output_names(signature)
-    parsed = parse_labelled_text(text)
+    parsed = parse_labelled_text(signature, text)
 
     fields =
       if parsed == %{} and length(outputs) == 1 do
@@ -34,14 +34,20 @@ defmodule DSPy.Adapter.Chat do
   def parse(_signature, raw, _opts), do: {:error, {:unsupported_lm_output, raw}}
 
   defp build_prediction(signature, fields) do
-    fields = Map.new(fields, fn {key, value} -> {normalize_key(key), value} end)
-
     required =
       signature.outputs
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
       |> Enum.map(& &1.name)
 
     output_names = DSPy.Signature.output_names(signature)
+
+    fields =
+      Map.new(output_names, fn name ->
+        {name, fetch_field(fields, name)}
+      end)
+      |> Enum.reject(fn {_name, value} -> is_nil(value) end)
+      |> Map.new()
+
     missing = Enum.reject(required, &Map.has_key?(fields, &1))
 
     if missing == [] do
@@ -60,8 +66,12 @@ defmodule DSPy.Adapter.Chat do
     end)
   end
 
-  defp coerce_value(value, :integer) when is_binary(value),
-    do: String.to_integer(String.trim(value))
+  defp coerce_value(value, :integer) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {integer, ""} -> integer
+      _ -> value
+    end
+  end
 
   defp coerce_value(value, :float) when is_binary(value) do
     case Float.parse(String.trim(value)) do
@@ -76,8 +86,15 @@ defmodule DSPy.Adapter.Chat do
 
   defp coerce_value(value, _type), do: value
 
-  defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: String.to_atom(key)
+  defp fetch_field(fields, name) do
+    string_name = Atom.to_string(name)
+
+    cond do
+      Map.has_key?(fields, name) -> Map.fetch!(fields, name)
+      Map.has_key?(fields, string_name) -> Map.fetch!(fields, string_name)
+      true -> nil
+    end
+  end
 
   defp render_inputs(signature, inputs) do
     signature.inputs
@@ -106,13 +123,21 @@ defmodule DSPy.Adapter.Chat do
     |> Kernel.<>("\n\n")
   end
 
-  defp parse_labelled_text(text) do
-    Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
-    |> Map.new(fn [_line, key, value] ->
-      key =
-        key |> String.trim() |> String.downcase() |> String.replace(" ", "_") |> String.to_atom()
+  defp parse_labelled_text(signature, text) do
+    allowed =
+      signature
+      |> DSPy.Signature.output_names()
+      |> Map.new(fn name -> {name |> Atom.to_string() |> String.downcase(), name} end)
 
-      {key, String.trim(value)}
+    Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
+    |> Enum.reduce(%{}, fn [_line, key, value], acc ->
+      key =
+        key |> String.trim() |> String.downcase() |> String.replace(" ", "_")
+
+      case Map.fetch(allowed, key) do
+        {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
+        :error -> acc
+      end
     end)
   end
 end

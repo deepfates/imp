@@ -78,7 +78,7 @@ defmodule DSPy.Clients.TrainingJob do
   defp normalize_status("cancelled"), do: :cancelled
   defp normalize_status("running"), do: :running
   defp normalize_status("pending"), do: :pending
-  defp normalize_status(other), do: String.to_atom(to_string(other))
+  defp normalize_status(other), do: {:unknown, to_string(other)}
 
   defp auth_headers(nil), do: []
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
@@ -197,7 +197,7 @@ defmodule DSPy.Clients.HTTPTrainer do
   defp normalize_status("cancelled"), do: :cancelled
   defp normalize_status("running"), do: :running
   defp normalize_status("pending"), do: :pending
-  defp normalize_status(other), do: String.to_atom(to_string(other))
+  defp normalize_status(other), do: {:unknown, to_string(other)}
 
   defp auth_headers(nil), do: []
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]

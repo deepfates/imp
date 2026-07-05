@@ -15,5 +15,11 @@ defmodule DSPy.Tool do
   def call(%__MODULE__{run: run}, arg), do: run.(arg)
 
   defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name) when is_binary(name), do: String.to_atom(name)
+  defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
+
+  defp existing_atom_or_string(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
+  end
 end

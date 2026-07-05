@@ -58,6 +58,40 @@ defmodule AgentRuntimeTest do
     assert length > 1000
   end
 
+  test "arity-3 handlers receive the agent without process dictionary self-reference" do
+    normalize =
+      DSPy.Tool.new(:normalize, "normalize text", fn %{text: text} -> String.downcase(text) end)
+
+    agent =
+      Agent.new(
+        :parent,
+        fn agent, %{text: text}, runtime ->
+          Agent.call_tool(agent, :normalize, %{text: text}, runtime)
+        end,
+        tools: [normalize]
+      )
+
+    assert {:ok, "hello", runtime} = Agent.run(agent, %{text: "HeLLo"})
+    assert [%{type: :tool, tool: :normalize}, %{type: :agent, agent: :parent}] = runtime.traces
+  end
+
+  test "tool policy can deny tool execution with a structured trace" do
+    boom = DSPy.Tool.new(:boom, "blocked", fn _ -> raise "should not run" end)
+
+    agent =
+      Agent.new(
+        :locked,
+        fn agent, _input, runtime -> Agent.call_tool(agent, :boom, %{}, runtime) end,
+        tools: [boom],
+        tool_policy: []
+      )
+
+    assert {:error, {:tool_denied, :boom}, runtime} = Agent.run(agent, %{})
+
+    assert [%{type: :tool_denied, tool: :boom}, %{type: :agent_error, agent: :locked}] =
+             runtime.traces
+  end
+
   test "agent returns structured failures for tools children and schemas" do
     boom = DSPy.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
 

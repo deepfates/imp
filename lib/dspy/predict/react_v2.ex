@@ -59,10 +59,20 @@ defmodule DSPy.Predict.ReActV2 do
           history = history ++ events
 
           if final do
-            {:ok,
-             DSPy.Prediction.new(
-               Map.merge(final, %{history: history, termination_reason: :submit})
-             )}
+            final = Map.merge(final, %{history: history, termination_reason: :submit})
+
+            case DSPy.Adapter.Chat.parse(agent.signature, final, []) do
+              {:ok, prediction} ->
+                prediction =
+                  prediction
+                  |> DSPy.Prediction.put(:history, history)
+                  |> DSPy.Prediction.put(:termination_reason, :submit)
+
+                {:ok, prediction}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
           else
             run_loop(agent, %{}, history, remaining - 1)
           end
@@ -72,14 +82,14 @@ defmodule DSPy.Predict.ReActV2 do
 
   defp execute_calls(tools, calls) do
     Enum.reduce(calls, {[], nil}, fn call, {events, final} ->
-      name = normalize_name(Map.get(call, :name) || Map.get(call, "name"))
+      name = normalize_tool_name(tools, Map.get(call, :name) || Map.get(call, "name"))
 
       args =
         (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
            %{})
         |> normalize_args()
 
-      tool = Map.get(tools, name)
+      tool = if name, do: Map.get(tools, name)
       result = if tool, do: DSPy.Tool.call(tool, args), else: {:error, :unknown_tool}
       event = %{tool: name, arguments: args, result: result}
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
@@ -93,11 +103,23 @@ defmodule DSPy.Predict.ReActV2 do
   end
 
   defp coerce_tool(%DSPy.Tool{} = tool), do: tool
-  defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name), do: String.to_atom(to_string(name))
+
+  defp normalize_tool_name(tools, name) do
+    Enum.find_value(Map.keys(tools), fn known ->
+      if Atom.to_string(known) == to_string(name), do: known
+    end)
+  end
 
   defp normalize_args(args) when is_map(args),
-    do: Map.new(args, fn {key, value} -> {normalize_name(key), value} end)
+    do: Map.new(args, fn {key, value} -> {safe_existing_atom(key), value} end)
 
   defp normalize_args(args), do: args
+
+  defp safe_existing_atom(key) when is_atom(key), do: key
+
+  defp safe_existing_atom(key) do
+    String.to_existing_atom(to_string(key))
+  rescue
+    ArgumentError -> to_string(key)
+  end
 end

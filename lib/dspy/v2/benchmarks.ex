@@ -29,6 +29,28 @@ defmodule DSPy.V2.Benchmarks do
     results
   end
 
+  def negative_controls do
+    [
+      structured_extraction_negative(),
+      agent_tool_task_negative(),
+      prompt_optimization_negative(),
+      arbitrary_artifact_optimization_negative()
+    ]
+  end
+
+  def assert_negative_controls! do
+    false_passes =
+      Enum.filter(negative_controls(), fn result ->
+        result.score >= result.threshold
+      end)
+
+    if false_passes != [] do
+      raise "V2 benchmark negative controls passed unexpectedly: #{inspect(false_passes)}"
+    end
+
+    negative_controls()
+  end
+
   defp structured_extraction do
     signature =
       DSPy.Signature.new(%{
@@ -56,15 +78,13 @@ defmodule DSPy.V2.Benchmarks do
     agent =
       Agent.new(
         :doubler,
-        fn %{x: x}, runtime ->
-          Agent.call_tool(agent_ref(), :double, %{x: x}, runtime)
+        fn agent, %{x: x}, runtime ->
+          Agent.call_tool(agent, :double, %{x: x}, runtime)
         end,
         tools: [tool]
       )
 
-    Process.put(:benchmark_agent, agent)
     {:ok, %{y: 8}, runtime} = Agent.run(agent, %{x: 4})
-    Process.delete(:benchmark_agent)
 
     score = if Enum.any?(runtime.traces, &(&1.type == :tool)), do: 1.0, else: 0.0
     result(:agent_tool_task, score)
@@ -119,5 +139,76 @@ defmodule DSPy.V2.Benchmarks do
   end
 
   defp result(name, score), do: %{name: name, score: score, threshold: 1.0}
-  defp agent_ref, do: Process.get(:benchmark_agent)
+
+  defp structured_extraction_negative do
+    signature =
+      DSPy.Signature.new(%{
+        inputs: [:text],
+        outputs: [
+          %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
+          %{name: :confidence, type: :number, constraints: %{min: 0.5, max: 1.0}}
+        ]
+      })
+
+    score =
+      case DSPy.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":0.1}), []) do
+        {:ok, _prediction} -> 1.0
+        {:error, _reason} -> 0.0
+      end
+
+    result(:structured_extraction_negative, score)
+  end
+
+  defp agent_tool_task_negative do
+    tool = DSPy.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+
+    agent =
+      Agent.new(
+        :doubler_locked,
+        fn agent, %{x: x}, runtime ->
+          Agent.call_tool(agent, :double, %{x: x}, runtime)
+        end,
+        tools: [tool],
+        tool_policy: []
+      )
+
+    score =
+      case Agent.run(agent, %{x: 4}) do
+        {:ok, %{y: 8}, _runtime} -> 1.0
+        {:error, {:tool_denied, :double}, _runtime} -> 0.0
+      end
+
+    result(:agent_tool_task_negative, score)
+  end
+
+  defp prompt_optimization_negative do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    report =
+      GEPA.optimize(
+        artifact,
+        fn _artifact, examples ->
+          %{per_example_scores: Enum.map(examples, fn _ -> 0.0 end), asi: examples}
+        end,
+        examples: ["Paris", "concise"],
+        generations: 1,
+        mutation_fn: fn _artifact, _asi, _generation -> "still wrong" end
+      )
+
+    result(:prompt_optimization_negative, report.best.aggregate_score)
+  end
+
+  defp arbitrary_artifact_optimization_negative do
+    artifact = Anything.new_artifact(:config, "mode=slow")
+
+    report =
+      Anything.optimize(
+        artifact,
+        fn _artifact, _examples -> 0.0 end,
+        trials: 1,
+        mutation_fn: fn _artifact, _trial, _seed -> "mode=slow" end
+      )
+
+    result(:arbitrary_artifact_optimization_negative, report.best.score)
+  end
 end

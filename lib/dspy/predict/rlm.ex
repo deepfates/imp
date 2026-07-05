@@ -26,7 +26,9 @@ defmodule DSPy.Predict.RLM do
     :sub_lm,
     tools: [],
     max_iterations: 10,
-    max_llm_calls: 20
+    max_llm_calls: 20,
+    max_preview_chars: 2_000,
+    max_observation_chars: 10_000
   ]
 
   def new(signature, opts \\ []) do
@@ -39,7 +41,10 @@ defmodule DSPy.Predict.RLM do
       sub_lm: Keyword.get(opts, :sub_lm, Keyword.get(opts, :lm)),
       tools: Keyword.get(opts, :tools, []),
       max_iterations: Keyword.get(opts, :max_iterations, 10),
-      max_llm_calls: Keyword.get(opts, :max_llm_calls, 20)
+      max_llm_calls: Keyword.get(opts, :max_llm_calls, 20),
+      max_preview_chars: Keyword.get(opts, :max_preview_chars, 2_000),
+      max_observation_chars:
+        Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000))
     }
   end
 
@@ -89,9 +94,12 @@ defmodule DSPy.Predict.RLM do
           Jason.encode!(%{
             signature: DSPy.Signature.to_spec(rlm.signature),
             iteration: iteration,
-            variables: state.vars,
+            variables: variable_metadata(state.vars, rlm.max_preview_chars),
             observations: Enum.map(state.observations, &safe_json/1),
-            remaining_llm_calls: rlm.max_llm_calls - state.llm_calls
+            budget: %{
+              remaining_iterations: rlm.max_iterations - iteration + 1,
+              remaining_llm_calls: rlm.max_llm_calls - state.llm_calls
+            }
           })
       }
     ]
@@ -137,8 +145,10 @@ defmodule DSPy.Predict.RLM do
     end
   end
 
-  defp step(_rlm, %{"action" => "eval", "code" => code}, state, iteration) when is_binary(code) do
-    observation = DSPy.Sandbox.eval(code, state.vars)
+  defp step(rlm, %{"action" => "eval", "code" => code}, state, iteration) when is_binary(code) do
+    observation =
+      code |> DSPy.Sandbox.eval(state.vars) |> truncate_observation(rlm.max_observation_chars)
+
     state = add_observation(state, %{action: :eval, code: code, result: observation})
     {:cont, trace(state, iteration, :eval, code, observation)}
   end
@@ -181,6 +191,49 @@ defmodule DSPy.Predict.RLM do
     metadata = Map.put(prediction.metadata, :rlm_trace, Enum.reverse(state.trace))
     %{prediction | metadata: metadata}
   end
+
+  defp variable_metadata(vars, preview_chars) do
+    Map.new(vars, fn {key, value} -> {key, describe_value(value, preview_chars)} end)
+  end
+
+  defp describe_value(value, preview_chars) when is_binary(value) do
+    %{
+      type: :string,
+      length: String.length(value),
+      preview: String.slice(value, 0, preview_chars),
+      truncated: String.length(value) > preview_chars
+    }
+  end
+
+  defp describe_value(value, preview_chars) when is_list(value) do
+    %{
+      type: :list,
+      length: length(value),
+      preview: Enum.take(value, preview_chars),
+      truncated: length(value) > preview_chars
+    }
+  end
+
+  defp describe_value(value, _preview_chars) when is_map(value),
+    do: %{type: :map, keys: Map.keys(value), size: map_size(value)}
+
+  defp describe_value(value, _preview_chars), do: %{type: type_of(value), value: value}
+
+  defp type_of(value) when is_integer(value), do: :integer
+  defp type_of(value) when is_float(value), do: :float
+  defp type_of(value) when is_boolean(value), do: :boolean
+  defp type_of(value) when is_nil(value), do: nil
+  defp type_of(_value), do: :term
+
+  defp truncate_observation({:ok, value}, max_chars) when is_binary(value) do
+    {:ok,
+     %{
+       value: String.slice(value, 0, max_chars),
+       truncated: String.length(value) > max_chars
+     }}
+  end
+
+  defp truncate_observation(observation, _max_chars), do: observation
 
   defp safe_json(value) do
     Jason.encode!(value)

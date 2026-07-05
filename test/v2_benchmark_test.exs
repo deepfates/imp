@@ -14,4 +14,18 @@ defmodule V2BenchmarkTest do
 
     assert Enum.all?(results, &(&1.score == 1.0))
   end
+
+  @tag :v2
+  test "V2 benchmark negative controls fail below threshold" do
+    results = DSPy.V2.Benchmarks.assert_negative_controls!()
+
+    assert Enum.map(results, & &1.name) == [
+             :structured_extraction_negative,
+             :agent_tool_task_negative,
+             :prompt_optimization_negative,
+             :arbitrary_artifact_optimization_negative
+           ]
+
+    assert Enum.all?(results, &(&1.score < &1.threshold))
+  end
 end

@@ -50,5 +50,48 @@ defmodule MCPImportTest do
     assert {:error, {:missing_required, [:key]}} = DSPy.Tool.call(tool, %{})
   end
 
+  test "imported MCP tools validate string-key JSON schema properties without atomizing keys" do
+    external_key = "external_mcp_key_#{System.unique_integer([:positive])}"
+
+    [tool] =
+      MCP.import_tools([
+        %{
+          "name" => "score",
+          "description" => "score a value",
+          "input_schema" => %{
+            "required" => [external_key],
+            "properties" => %{
+              external_key => %{"type" => "integer", "minimum" => 1, "maximum" => 5}
+            }
+          },
+          "run" => fn input -> {:ok, input[external_key]} end
+        }
+      ])
+
+    assert {:ok, 3} = DSPy.Tool.call(tool, %{external_key => 3})
+
+    assert {:error, {:schema_validation, [%{field: ^external_key, rule: :type}]}} =
+             DSPy.Tool.call(tool, %{external_key => "bad"})
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
+  end
+
+  test "MCP import rejects duplicate tool names and malformed schemas" do
+    duplicate = %{
+      name: :lookup,
+      description: "lookup",
+      input_schema: %{},
+      run: fn input -> input end
+    }
+
+    assert_raise ArgumentError, ~r/duplicate MCP tool names/, fn ->
+      MCP.import_tools([duplicate, duplicate])
+    end
+
+    assert_raise ArgumentError, ~r/MCP tool schema missing run/, fn ->
+      MCP.import_tools([Map.delete(duplicate, :run)])
+    end
+  end
+
   defp agent_ref, do: Process.get(:agent_ref)
 end

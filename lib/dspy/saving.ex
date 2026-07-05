@@ -53,13 +53,13 @@ defmodule DSPy.Saving do
 
   defp decode_config(config) when is_list(config) do
     Enum.map(config, fn
-      {k, v} -> {String.to_atom(to_string(k)), v}
-      [k, v] -> {String.to_atom(to_string(k)), v}
+      {k, v} -> {decode_config_key(k), v}
+      [k, v] -> {decode_config_key(k), v}
     end)
   end
 
   defp decode_config(config) when is_map(config),
-    do: Enum.map(config, fn {k, v} -> {String.to_atom(to_string(k)), v} end)
+    do: Enum.map(config, fn {k, v} -> {decode_config_key(k), v} end)
 
   defp decode_adapter(nil), do: DSPy.Adapter.Chat
   defp decode_adapter(name) when is_binary(name), do: String.to_existing_atom(name)
@@ -67,13 +67,46 @@ defmodule DSPy.Saving do
   defp decode_lm(nil), do: nil
 
   defp decode_lm(%{"provider" => provider, "model" => model} = state) do
-    provider = String.to_atom(to_string(provider))
+    provider = decode_provider(provider)
 
     DSPy.Clients.HTTPLM.new(model,
+      api_key: nil,
       provider: provider,
       base_url: state["base_url"],
       path: state["path"],
       opts: decode_config(Map.get(state, "opts", []))
     )
+  end
+
+  defp decode_config_key(key) when is_atom(key), do: key
+
+  defp decode_config_key(key) do
+    case to_string(key) do
+      "temperature" -> :temperature
+      "max_tokens" -> :max_tokens
+      "top_p" -> :top_p
+      "stop" -> :stop
+      "response_format" -> :response_format
+      "tools" -> :tools
+      "tool_choice" -> :tool_choice
+      "stream" -> :stream
+      "timeout" -> :timeout
+      "retries" -> :retries
+      "retry_backoff_ms" -> :retry_backoff_ms
+      other -> other
+    end
+  end
+
+  defp decode_provider(provider) when provider in [:openai, :litellm, :local, :databricks],
+    do: provider
+
+  defp decode_provider(provider) do
+    case to_string(provider) do
+      "openai" -> :openai
+      "litellm" -> :litellm
+      "local" -> :local
+      "databricks" -> :databricks
+      other -> raise ArgumentError, "unsupported saved DSPy provider: #{inspect(other)}"
+    end
   end
 end
