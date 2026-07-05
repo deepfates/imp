@@ -28,10 +28,18 @@ defmodule ParitySurfaceTest do
 
     assert DSPy.Prediction.get(compared, :answer) == "4"
 
-    retriever = DSPy.Retrieve.Memory.new([%{text: "2+2 is 4"}])
-    rlm = DSPy.rlm("question, context -> answer", retriever, lm: lm)
-    assert {:ok, rlm_pred} = DSPy.Predict.RLM.call(rlm, %{question: "2+2?"})
+    rlm_lm = %{
+      module: DSPy.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "4"}} end]
+    }
+
+    rlm = DSPy.rlm("question, logs -> answer", lm: rlm_lm, max_iterations: 2)
+
+    assert {:ok, rlm_pred} =
+             DSPy.Predict.RLM.call(rlm, %{question: "2+2?", logs: "large context"})
+
     assert DSPy.Prediction.get(rlm_pred, :answer) == "4"
+    assert [%{action: :submit}] = rlm_pred.metadata.rlm_trace
   end
 
   test "react v2 and code act execute operational loops" do

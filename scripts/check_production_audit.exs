@@ -46,4 +46,8 @@ unproven =
 
 File.write!("priv/parity/production_audit_unproven.json", Jason.encode!(%{unproven_count: length(unproven), rows: unproven}, pretty: true))
 
-IO.puts("Production audit check passed structurally; #{length(unproven)} P0/P1 rows remain unproven.")
+if unproven == [] do
+  IO.puts("Production audit passed; 0 P0/P1 rows remain unproven.")
+else
+  Mix.raise("Production audit has #{length(unproven)} unproven P0/P1 rows.")
+end

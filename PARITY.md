@@ -94,7 +94,7 @@ Statuses:
 | `Parallel` | `DSPy.Predict.Parallel` | operational | `completion_surface_test.exs` |
 | `KNN` | `DSPy.Predict.KNN` | operational | `parity_surface_test.exs` |
 | `MultiChainComparison` | `DSPy.Predict.MultiChainComparison` | operational | `parity_surface_test.exs` |
-| `RLM` | `DSPy.Predict.RLM` | operational | `parity_surface_test.exs` |
+| `RLM` | `DSPy.Predict.RLM` | equivalent | `rlm_parity_test.exs` |
 | `majority` | `DSPy.Predict.Aggregation.majority/2` | operational | `parity_surface_test.exs` |
 | `Tool` from predict namespace | `DSPy.Tool` | operational | `dspy_elixir_test.exs` |
 

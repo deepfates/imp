@@ -15,7 +15,7 @@ Statuses:
 
 | ID | Priority | Requirement | Status | Evidence | Next action |
 | --- | --- | --- | --- | --- | --- |
-| API-001 | P0 | Generated upstream public export parity is enforced in CI. | PROVEN | `mix parity.generate`, `mix parity.check`, CI workflow | Keep snapshot current with upstream updates. |
+| API-001 | P0 | Generated upstream public export parity is enforced in CI. | PARTIAL | `mix parity.generate`, `mix parity.check`; no checked-in CI workflow yet. | Add CI workflow that runs parity, production, and V2 gates. |
 | CORE-001 | P0 | Signatures, examples, predictions, settings, and modules behave as stable public API. | PROVEN | `dspy_elixir_test.exs`, `production_adapter_persistence_test.exs` | Add docs examples before Hex release. |
 | ADAPT-001 | P0 | Chat/JSON/XML/two-step adapters parse required fields, type coercion, missing fields, and fenced JSON. | PROVEN | `production_adapter_persistence_test.exs`, `completion_surface_test.exs` | Add multimodal binary fixture tests. |
 | LM-001 | P0 | OpenAI-compatible provider supports non-streaming, structured JSON, retries, and provider tool-call normalization. | PROVEN | `live_provider_test.exs`, `provider_tool_call_test.exs`, `production_hardening_test.exs` | Add live streaming once provider/account supports it reliably. |
@@ -28,10 +28,13 @@ Statuses:
 | DATA-001 | P1 | Dataset loaders cover JSONL/CSV/GSM8K/HotPotQA/MATH/Colors and reject malformed rows clearly. | PROVEN | `test/datasets_contract_test.exs` covers malformed JSONL, missing required input keys, ragged CSV rows, and typed GSM8K/HotPotQA/MATH/Colors ingestion. | Extend with fixture snapshots for newly added upstream datasets. |
 | SAVE-001 | P0 | Program save/load is JSON-safe, rejects unsupported types, preserves adapter/provider config, and does not persist secrets. | PROVEN | `production_adapter_persistence_test.exs`, `production_hardening_test.exs` | Add versioned state migration tests. |
 | ERR-001 | P0 | Provider errors, retryable failures, parse errors, and unsupported operations are explicit. | PROVEN | `production_hardening_test.exs`, adapter tests | Broaden error taxonomy to match every upstream LM error subtype. |
+| RLM-001 | P0 | `DSPy.Predict.RLM` matches upstream RLM philosophy: sandbox variables, iterative controller loop, sub-LM calls, budgets, and structured submit. | PARTIAL | `rlm_parity_test.exs`; source-backed correction from incorrect RAG wrapper to constrained BEAM RLM loop. | Add source-backed parity fixtures for tools, richer sandbox values, media, and optimizer compatibility before marking production-ready. |
+| SEC-001 | P0 | External input handling is safe from atom exhaustion, credential exfiltration through saved programs, and unsafe tool execution defaults. | UNPROVEN | Cold-reader security review found atom creation and saved-program credential risks. | Remove unbounded atom creation on untrusted inputs; require explicit credential rebinding after load; add permission policy for tools. |
 | DOC-001 | P1 | Production docs describe proven gates and do not claim unresolved requirements as complete. | PROVEN | `PRODUCTION.md`, this audit | Keep final answers aligned with audit status. |
 
 ## Current Verdict
 
-The project satisfies the production-readiness bar defined in
-[PRODUCTION.md](PRODUCTION.md): every P0 and P1 row above is `PROVEN`, and
-`mix production.check` reports zero unproven audit rows.
+The project is not currently production-ready. A cold-reader audit found
+source-backed parity and security gaps, including an incorrect RLM
+implementation and unbounded atom creation from external inputs. The production
+gate now fails until every P0/P1 row above is `PROVEN`.

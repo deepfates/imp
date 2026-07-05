@@ -30,7 +30,7 @@ defmodule DSPy do
     do: DSPy.Predict.CodeAct.new(signature, tools, opts)
 
   def react_v2(signature, tools, opts \\ []), do: DSPy.Predict.ReActV2.new(signature, tools, opts)
-  def rlm(signature, retriever, opts \\ []), do: DSPy.Predict.RLM.new(signature, retriever, opts)
+  def rlm(signature, opts \\ []), do: DSPy.Predict.RLM.new(signature, opts)
 
   def openai(model, opts \\ []), do: DSPy.Clients.OpenAI.new(model, opts)
   def litellm(model, opts \\ []), do: DSPy.Clients.LiteLLM.new(model, opts)

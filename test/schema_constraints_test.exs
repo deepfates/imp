@@ -88,4 +88,19 @@ defmodule SchemaConstraintsTest do
     assert error.message =~ "confidence"
     assert error.message =~ "Retry with corrected output"
   end
+
+  test "boolean false is valid and missing boolean is still required" do
+    fields = [
+      Field.new(%{name: :flag, type: :boolean}, :output),
+      Field.new(
+        %{name: :meta, type: :object, constraints: %{properties: %{enabled: %{type: :boolean}}}},
+        :output
+      )
+    ]
+
+    assert :ok = DSPy.Schema.validate_fields(fields, %{flag: false, meta: %{enabled: false}})
+
+    assert {:error, errors} = DSPy.Schema.validate_fields(fields, %{meta: %{enabled: false}})
+    assert [%{field: :flag, rule: :required}] = errors
+  end
 end

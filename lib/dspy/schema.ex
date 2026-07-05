@@ -5,7 +5,7 @@ defmodule DSPy.Schema do
     errors =
       fields
       |> Enum.flat_map(fn field ->
-        value = Map.get(values, field.name) || Map.get(values, Atom.to_string(field.name))
+        value = fetch_value(values, field.name)
         validate_field(field, value)
       end)
 
@@ -133,7 +133,7 @@ defmodule DSPy.Schema do
             }
         }
 
-        validate_field(pseudo, Map.get(value, name) || Map.get(value, Atom.to_string(name)))
+        validate_field(pseudo, fetch_value(value, name))
       end)
 
     errors ++ nested
@@ -207,4 +207,11 @@ defmodule DSPy.Schema do
   defp json_type(_), do: "string"
 
   defp error(field, rule, message), do: %{field: field.name, rule: rule, message: message}
+
+  defp fetch_value(values, key) do
+    case Map.fetch(values, key) do
+      {:ok, value} -> value
+      :error -> Map.get(values, Atom.to_string(key))
+    end
+  end
 end

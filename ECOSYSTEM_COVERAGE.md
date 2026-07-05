@@ -17,7 +17,7 @@ optimization loops that improve behavior from examples or feedback.
 | Streaming | Covered with provider SSE parsing, program streaming, and stream messages. | Strong: structured streaming is a core generation capability. | Not the central abstraction. |
 | Multimodal | Covered for OpenAI-compatible image/audio/file/document encoding and decoding. | Stronger product claim around audio and realtime. | Supports multimodal ASI such as images for optimization feedback. |
 | Optimization | Covered with LabeledFewShot, BootstrapFewShot, RandomSearch, MIPROv2, GEPA, SIMBA, COPRO, GRPO, finetune, reports, and behavioral tests. | Stronger current frontier: GEPA/Pareto optimization over prompts, demos, flows, and agents. | Much deeper for reflective text evolution, Pareto search, ASI, and arbitrary text artifacts. |
-| Arbitrary text artifact optimization | Not currently a first-class API. | Partly through flow/agent/program optimization. | Primary purpose: optimize prompts, code, configs, agent architectures, vector graphics, and more. |
+| Arbitrary text artifact optimization | Minimal first-class experimental API via `DSPy.Optimize.Anything`; not yet comparable to optimize_anything/GEPA. | Partly through flow/agent/program optimization. | Primary purpose: optimize prompts, code, configs, agent architectures, vector graphics, and more. |
 | Multi-language conformance | Elixir only. | Major strength: generated/verified packages for TypeScript plus Python, Java, C++, Go, and Rust. | Python package/API. |
 | Production evidence | Strong inside this repo: parity matrix, adversarial audit, deterministic production gate, live provider smoke, behavioral tests. | Public docs describe conformance manifests and generated examples; external comparison would need cloning/running Ax gates. | Public docs and examples emphasize benchmarked case studies; external comparison would need reproducing artifact benchmarks. |
 
@@ -56,12 +56,12 @@ optimization loops that improve behavior from examples or feedback.
 
 ## Best Next Moves
 
-1. Add an `DSPy.Optimize.Anything` API that accepts text artifacts, evaluator
-   functions returning score plus diagnostics, train/val examples, and optimizer
-   config.
-2. Extend `DSPy.Teleprompt.GEPA` from prompt-only reflection candidates toward
+1. Harden `DSPy.Optimize.Anything` with train/validation splits, richer
+   diagnostics, non-append mutations, and comparative benchmark tasks.
+2. Extend `DSPy.Teleprompt.GEPA` and `DSPy.Optimize.GEPA` from deterministic
+   mechanics toward
    Pareto-aware candidate pools and ASI-informed mutation.
-3. Add MCP client/tool discovery support to close the most obvious Ax agent gap.
+3. Add transport-backed MCP client/tool discovery support to close the most obvious Ax agent gap.
 4. Add schema constraints beyond basic field types: enum, min/max, arrays,
    nested JSON schema, and retry feedback generated from validation errors.
 5. Add benchmark fixtures comparing this repo against Ax-style signatures and

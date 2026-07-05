@@ -1,4 +1,8 @@
 {
-  "rows": [],
-  "unproven_count": 0
+  "rows": [
+    "| API-001 | P0 | Generated upstream public export parity is enforced in CI. | PARTIAL | `mix parity.generate`, `mix parity.check`; no checked-in CI workflow yet. | Add CI workflow that runs parity, production, and V2 gates. |",
+    "| RLM-001 | P0 | `DSPy.Predict.RLM` matches upstream RLM philosophy: sandbox variables, iterative controller loop, sub-LM calls, budgets, and structured submit. | PARTIAL | `rlm_parity_test.exs`; source-backed correction from incorrect RAG wrapper to constrained BEAM RLM loop. | Add source-backed parity fixtures for tools, richer sandbox values, media, and optimizer compatibility before marking production-ready. |",
+    "| SEC-001 | P0 | External input handling is safe from atom exhaustion, credential exfiltration through saved programs, and unsafe tool execution defaults. | UNPROVEN | Cold-reader security review found atom creation and saved-program credential risks. | Remove unbounded atom creation on untrusted inputs; require explicit credential rebinding after load; add permission policy for tools. |"
+  ],
+  "unproven_count": 3
 }
