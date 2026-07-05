@@ -1,7 +1,6 @@
 {
   "rows": [
-    "| V2-BENCH-001 | P0 | Benchmark fixtures compare Ax-style signatures and GEPA optimize-anything tasks with reproducible scores and production-gate reporting. | UNPROVEN | None yet. | Benchmarks include at least one structured extraction task, one agent/tool task, one prompt optimization task, and one arbitrary text/code/config optimization task; results are deterministic in CI and fail on material regressions. |",
     "| V2-DOC-001 | P1 | V2 docs explain APIs, completion evidence, examples, migration notes from V1, and honest remaining non-goals. | UNPROVEN | None yet. | README/docs include runnable examples for Optimize.Anything, Pareto GEPA, agents/MCP, schema constraints, and benchmarks; docs link to tests/gates and do not claim unsupported parity. |"
   ],
-  "unproven_count": 2
+  "unproven_count": 1
 }

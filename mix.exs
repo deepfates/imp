@@ -81,7 +81,7 @@ defmodule DspyElixir.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "v2.audit",
-        "test --only v2"
+        "test --include v2"
       ]
     ]
   end
