@@ -20,6 +20,7 @@ defmodule DspyElixir.MixProject do
           "PRODUCTION.md",
           "PRODUCTION_AUDIT.md",
           "ECOSYSTEM_COVERAGE.md",
+          "V2.md",
           "V2_ROADMAP.md"
         ]
       ],

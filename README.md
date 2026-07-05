@@ -27,6 +27,10 @@ test signals. The repo includes provider clients, adapters, programs,
 retrievers, datasets, streaming, persistence, sandboxed program-of-thought,
 evaluation, and teleprompter-style optimizers.
 
+See [V2.md](V2.md) for the production-ready V2 surface: optimize-anything,
+Pareto/ASI GEPA, agents, MCP-style tool import, schema constraints, and
+deterministic benchmark fixtures.
+
 ## Test
 
 ```sh
@@ -37,6 +41,7 @@ mix test
 
 ```sh
 mix production.check
+mix v2.check
 LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 ```
 

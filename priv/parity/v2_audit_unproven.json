@@ -1,6 +1,4 @@
 {
-  "rows": [
-    "| V2-DOC-001 | P1 | V2 docs explain APIs, completion evidence, examples, migration notes from V1, and honest remaining non-goals. | UNPROVEN | None yet. | README/docs include runnable examples for Optimize.Anything, Pareto GEPA, agents/MCP, schema constraints, and benchmarks; docs link to tests/gates and do not claim unsupported parity. |"
-  ],
-  "unproven_count": 1
+  "rows": [],
+  "unproven_count": 0
 }
