@@ -10,7 +10,7 @@ defmodule DSPy.Optimize.Anything do
 
   defmodule Artifact do
     @moduledoc "Text artifact under optimization."
-    defstruct [:id, :kind, :text, metadata: %{}]
+    defstruct [:id, :kind, :text, parameters: %{}, metadata: %{}]
   end
 
   defmodule Evaluation do
@@ -95,6 +95,7 @@ defmodule DSPy.Optimize.Anything do
         "id" => artifact.id,
         "kind" => Atom.to_string(artifact.kind),
         "text" => artifact.text,
+        "parameters" => stringify_keys(artifact.parameters),
         "metadata" => stringify_keys(artifact.metadata)
       }
     end
@@ -104,6 +105,7 @@ defmodule DSPy.Optimize.Anything do
         id: state["id"],
         kind: String.to_atom(state["kind"]),
         text: state["text"],
+        parameters: atomize_keys(state["parameters"] || %{}),
         metadata: atomize_keys(state["metadata"] || %{})
       }
     end
@@ -124,10 +126,16 @@ defmodule DSPy.Optimize.Anything do
   end
 
   def new_artifact(kind, text, opts \\ []) when is_binary(text) do
+    parameters =
+      opts
+      |> Keyword.get(:parameters, %{})
+      |> Map.put_new(:main, text)
+
     %Artifact{
       id: Keyword.get(opts, :id, stable_id(kind, text)),
       kind: kind,
       text: text,
+      parameters: parameters,
       metadata: Keyword.get(opts, :metadata, %{})
     }
   end
@@ -140,14 +148,14 @@ defmodule DSPy.Optimize.Anything do
 
     baseline = evaluate_candidate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
-    candidates =
+    {candidates, errors} =
       1..trials
-      |> Enum.reduce([baseline], fn trial, candidates ->
+      |> Enum.reduce({[baseline], error_list(baseline)}, fn trial, {candidates, errors} ->
         parent = select_parent(candidates)
         mutation = mutation_fn.(parent.artifact, trial, seed)
         artifact = apply_mutation(parent.artifact, mutation, trial)
 
-        [
+        candidate =
           evaluate_candidate(
             artifact,
             evaluator,
@@ -156,10 +164,11 @@ defmodule DSPy.Optimize.Anything do
             parent.id,
             mutation
           )
-          | candidates
-        ]
+
+        {[candidate | candidates], errors ++ error_list(candidate)}
       end)
-      |> Enum.reverse()
+
+    candidates = Enum.reverse(candidates)
 
     best = select_parent(candidates)
 
@@ -167,6 +176,7 @@ defmodule DSPy.Optimize.Anything do
       baseline: baseline,
       best: best,
       candidates: candidates,
+      errors: errors,
       metadata: %{
         seed: seed,
         trials: trials,
@@ -193,17 +203,7 @@ defmodule DSPy.Optimize.Anything do
   end
 
   defp evaluate_candidate(%Artifact{} = artifact, evaluator, examples, id, parent_id, mutation) do
-    evaluation =
-      case evaluator.(artifact, examples) do
-        %Evaluation{} = evaluation ->
-          evaluation
-
-        %{score: _score} = result ->
-          struct(Evaluation, Map.take(result, [:score, :diagnostics, :metadata]))
-
-        score when is_number(score) ->
-          %Evaluation{score: score}
-      end
+    evaluation = normalize_evaluation(evaluator.(artifact, examples))
 
     %Candidate{
       id: id,
@@ -214,6 +214,17 @@ defmodule DSPy.Optimize.Anything do
       diagnostics: List.wrap(evaluation.diagnostics),
       metadata: evaluation.metadata
     }
+  rescue
+    exception ->
+      %Candidate{
+        id: id,
+        artifact: artifact,
+        parent_id: parent_id,
+        mutation: mutation,
+        score: 0.0,
+        diagnostics: [Exception.message(exception)],
+        metadata: %{error: inspect(exception.__struct__)}
+      }
   end
 
   defp select_parent(candidates), do: Enum.max_by(candidates, & &1.score)
@@ -229,8 +240,35 @@ defmodule DSPy.Optimize.Anything do
   end
 
   defp apply_mutation(%Artifact{} = artifact, mutation, trial) do
-    %{artifact | id: candidate_id(trial), text: String.trim(artifact.text <> "\n" <> mutation)}
+    text = String.trim(artifact.text <> "\n" <> mutation)
+
+    %{
+      artifact
+      | id: candidate_id(trial),
+        text: text,
+        parameters: Map.put(artifact.parameters, :main, text)
+    }
   end
+
+  defp normalize_evaluation(%Evaluation{} = evaluation), do: evaluation
+
+  defp normalize_evaluation(%{score: _score} = result),
+    do: struct(Evaluation, Map.take(result, [:score, :diagnostics, :metadata]))
+
+  defp normalize_evaluation(score) when is_number(score), do: %Evaluation{score: score}
+
+  defp normalize_evaluation({:ok, score}) when is_number(score), do: %Evaluation{score: score}
+
+  defp normalize_evaluation({:ok, %Evaluation{} = evaluation}), do: evaluation
+
+  defp normalize_evaluation({:error, reason}),
+    do: %Evaluation{score: 0.0, diagnostics: [inspect(reason)], metadata: %{error: reason}}
+
+  defp error_list(%Candidate{metadata: %{error: error}} = candidate) do
+    [%{candidate_id: candidate.id, error: inspect(error), diagnostics: candidate.diagnostics}]
+  end
+
+  defp error_list(_candidate), do: []
 
   defp stable_id(kind, text) do
     hash = :crypto.hash(:sha256, "#{kind}:#{text}") |> Base.encode16(case: :lower)

@@ -66,4 +66,44 @@ defmodule OptimizeAnythingTest do
     assert Enum.map(reports, & &1.best.score) == [1.0, 1.0, 1.0, 1.0]
     assert Enum.map(reports, & &1.metadata.artifact_kind) == kinds
   end
+
+  test "captures evaluator errors as failed candidates without aborting search" do
+    artifact = Anything.new_artifact(:prompt, "base")
+
+    evaluator = fn artifact, _examples ->
+      if artifact.id == "candidate-1" do
+        raise "bad candidate"
+      else
+        0.5
+      end
+    end
+
+    report = Anything.optimize(artifact, evaluator, trials: 2)
+
+    assert report.best.score == 0.5
+    assert [%{candidate_id: "candidate-1", diagnostics: ["bad candidate"]}] = report.errors
+    assert Enum.find(report.candidates, &(&1.id == "candidate-1")).score == 0.0
+  end
+
+  test "artifacts carry named text parameters through mutation and report roundtrip" do
+    artifact =
+      Anything.new_artifact(:code, "def answer, do: :old",
+        id: "solver",
+        parameters: %{source: "def answer, do: :old", config: "mode=safe"}
+      )
+
+    report =
+      Anything.optimize(artifact, fn artifact, _examples ->
+        if artifact.parameters.main =~ "candidate", do: 1.0, else: 0.0
+      end)
+
+    assert report.best.artifact.parameters.source == "def answer, do: :old"
+    assert report.best.artifact.parameters.config == "mode=safe"
+    assert report.best.artifact.parameters.main =~ "candidate"
+
+    path = Path.join(System.tmp_dir!(), "dspy-elixir-optimize-anything-parameters.json")
+    Anything.save_report!(report, path)
+    assert Anything.load_report!(path) == report
+    File.rm(path)
+  end
 end
