@@ -20,7 +20,7 @@ defmodule DSPy.Teleprompt.SIMBA do
       |> Enum.reduce({elem(initial, 0), elem(initial, 1), []}, fn step,
                                                                   {best_score, best_program,
                                                                    candidates} ->
-        demos = trainset |> Enum.shuffle() |> Enum.take(optimizer.demos_per_step)
+        demos = demo_window(trainset, step, optimizer.demos_per_step)
 
         instruction =
           (DSPy.Teleprompt.InstructionSearch.current_instruction(best_program) || "") <>
@@ -55,8 +55,24 @@ defmodule DSPy.Teleprompt.SIMBA do
         optimizer: :simba,
         best_score: best_score,
         candidate_count: length(candidates),
-        candidates: candidates
+        candidates: candidates,
+        metadata: %{
+          baseline_score: elem(initial, 0),
+          policy: :monotonic_minibatch_ascent
+        }
       })
     )
+  end
+
+  defp demo_window(_trainset, _step, k) when k <= 0, do: []
+  defp demo_window([], _step, _k), do: []
+
+  defp demo_window(trainset, step, k) do
+    offset = rem(step - 1, length(trainset))
+
+    trainset
+    |> Stream.cycle()
+    |> Stream.drop(offset)
+    |> Enum.take(k)
   end
 end

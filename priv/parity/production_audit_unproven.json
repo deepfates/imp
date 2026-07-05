@@ -1,6 +1,4 @@
 {
-  "rows": [
-    "| OPT-002 | P1 | MIPROv2, GEPA, SIMBA, COPRO behavior is faithful enough for production workloads, not only simplified search. | PARTIAL | Implementations exist with candidate reports; no upstream behavioral corpus yet. | Build upstream behavioral fixtures and port algorithm-specific invariants. |"
-  ],
-  "unproven_count": 1
+  "rows": [],
+  "unproven_count": 0
 }

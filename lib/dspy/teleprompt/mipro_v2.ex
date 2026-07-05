@@ -12,25 +12,22 @@ defmodule DSPy.Teleprompt.MIPROv2 do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    candidates = DSPy.Teleprompt.InstructionSearch.candidate_instructions(program, trainset)
+    instructions = DSPy.Teleprompt.InstructionSearch.candidate_instructions(program, trainset)
+    demo_sets = demo_candidates(trainset, optimizer.demos_per_candidate)
     evaluator = DSPy.Evaluate.new(devset, optimizer.metric)
+    baseline = {DSPy.Evaluate.run(evaluator, program).score, program, %{trial: 0, baseline: true}}
 
     results =
-      1..optimizer.trials
-      |> Enum.map(fn trial ->
-        instruction = Enum.at(candidates, rem(trial - 1, length(candidates)))
-        demos = trainset |> Enum.shuffle() |> Enum.take(optimizer.demos_per_candidate)
-
-        candidate =
-          %DSPy.Teleprompt.LabeledFewShot{k: optimizer.demos_per_candidate}
-          |> DSPy.Teleprompt.LabeledFewShot.compile(
-            DSPy.Teleprompt.InstructionSearch.put_instruction(program, instruction),
-            demos
-          )
-
+      instructions
+      |> candidate_pairs(demo_sets)
+      |> Enum.take(optimizer.trials)
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{instruction, demos}, trial} ->
+        candidate = build_candidate(program, instruction, demos, optimizer.demos_per_candidate)
         result = DSPy.Evaluate.run(evaluator, candidate)
         {result.score, candidate, %{trial: trial, instruction: instruction, demos: demos}}
       end)
+      |> Kernel.++([baseline])
 
     {best_score, best, _metadata} =
       Enum.max_by(results, fn {score, _candidate, _metadata} -> score end)
@@ -44,8 +41,42 @@ defmodule DSPy.Teleprompt.MIPROv2 do
         candidates:
           Enum.map(results, fn {score, _candidate, metadata} ->
             Map.put(metadata, :score, score)
-          end)
+          end),
+        metadata: %{
+          search: :joint_instruction_demo_grid,
+          instruction_count: length(instructions),
+          demo_candidate_count: length(demo_sets)
+        }
       })
+    )
+  end
+
+  defp candidate_pairs(instructions, demo_sets) do
+    for instruction <- instructions, demos <- demo_sets, do: {instruction, demos}
+  end
+
+  defp demo_candidates(_trainset, k) when k <= 0, do: [[]]
+
+  defp demo_candidates([], _k), do: [[]]
+
+  defp demo_candidates(trainset, k) do
+    1..length(trainset)
+    |> Enum.map(fn index ->
+      offset = index - 1
+
+      trainset
+      |> Stream.cycle()
+      |> Stream.drop(offset)
+      |> Enum.take(k)
+    end)
+    |> Enum.uniq()
+  end
+
+  defp build_candidate(program, instruction, demos, k) do
+    %DSPy.Teleprompt.LabeledFewShot{k: k}
+    |> DSPy.Teleprompt.LabeledFewShot.compile(
+      DSPy.Teleprompt.InstructionSearch.put_instruction(program, instruction),
+      demos
     )
   end
 end

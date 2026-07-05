@@ -27,12 +27,30 @@ defmodule DSPy.Teleprompt.GEPA do
          end))
       |> Enum.take(length(base) + optimizer.generations)
 
-    DSPy.Teleprompt.InstructionSearch.compile(
-      program,
-      optimizer.metric,
-      trainset,
-      devset,
-      candidates
+    compiled =
+      DSPy.Teleprompt.InstructionSearch.compile(
+        program,
+        optimizer.metric,
+        trainset,
+        devset,
+        candidates
+      )
+
+    search_report = DSPy.Teleprompt.Report.fetch(compiled)
+
+    DSPy.Teleprompt.Report.attach(
+      compiled,
+      DSPy.Teleprompt.Report.new(%{
+        optimizer: :gepa,
+        best_score: search_report.best_score,
+        candidate_count: search_report.candidate_count,
+        candidates: search_report.candidates,
+        metadata: %{
+          feedback: feedback,
+          generations: optimizer.generations,
+          base_candidate_count: length(base)
+        }
+      })
     )
   end
 

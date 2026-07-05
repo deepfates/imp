@@ -13,22 +13,48 @@ defmodule DSPy.Teleprompt.COPRO do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    1..optimizer.depth
-    |> Enum.reduce(program, fn _round, current ->
-      candidates =
-        current
-        |> DSPy.Teleprompt.InstructionSearch.candidate_instructions(trainset,
-          extra_instructions: optimizer.extra_instructions
-        )
-        |> Enum.take(optimizer.breadth)
+    {compiled, round_reports} =
+      1..optimizer.depth
+      |> Enum.reduce({program, []}, fn round, {current, reports} ->
+        candidates =
+          current
+          |> DSPy.Teleprompt.InstructionSearch.candidate_instructions(trainset,
+            extra_instructions: optimizer.extra_instructions
+          )
+          |> Enum.take(optimizer.breadth)
 
-      DSPy.Teleprompt.InstructionSearch.compile(
-        current,
-        optimizer.metric,
-        trainset,
-        devset,
-        candidates
-      )
-    end)
+        next =
+          DSPy.Teleprompt.InstructionSearch.compile(
+            current,
+            optimizer.metric,
+            trainset,
+            devset,
+            candidates
+          )
+
+        report = DSPy.Teleprompt.Report.fetch(next)
+        {next, reports ++ [Map.put(report, :metadata, Map.put(report.metadata, :round, round))]}
+      end)
+
+    final_report = List.last(round_reports)
+
+    DSPy.Teleprompt.Report.attach(
+      compiled,
+      DSPy.Teleprompt.Report.new(%{
+        optimizer: :copro,
+        best_score: final_report.best_score,
+        candidate_count: Enum.reduce(round_reports, 0, &(&1.candidate_count + &2)),
+        candidates:
+          Enum.flat_map(round_reports, fn report ->
+            round = report.metadata.round
+            Enum.map(report.candidates, &Map.put(&1, :round, round))
+          end),
+        metadata: %{
+          breadth: optimizer.breadth,
+          depth: optimizer.depth,
+          rounds: round_reports
+        }
+      })
+    )
   end
 end
