@@ -5,9 +5,9 @@ defmodule DSPy.Signature.Field do
   defstruct [:name, :kind, type: :string, desc: nil, prefix: nil, metadata: %{}]
 
   @type t :: %__MODULE__{
-          name: atom(),
+          name: atom() | String.t(),
           kind: :input | :output,
-          type: atom(),
+          type: atom() | String.t(),
           desc: String.t() | nil,
           prefix: String.t() | nil,
           metadata: map()
@@ -41,9 +41,9 @@ defmodule DSPy.Signature.Field do
 
   def dump(%__MODULE__{} = field) do
     %{
-      "name" => Atom.to_string(field.name),
+      "name" => to_string(field.name),
       "kind" => Atom.to_string(field.kind),
-      "type" => Atom.to_string(field.type),
+      "type" => to_string(field.type),
       "desc" => field.desc,
       "prefix" => field.prefix,
       "metadata" => field.metadata
@@ -71,12 +71,15 @@ defmodule DSPy.Signature.Field do
   end
 
   defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name) when is_binary(name), do: name |> String.trim() |> String.to_atom()
+
+  defp normalize_name(name) when is_binary(name),
+    do: name |> String.trim() |> existing_atom_or_string()
+
   defp normalize_kind(kind) when kind in [:input, :output], do: kind
   defp normalize_kind("input"), do: :input
   defp normalize_kind("output"), do: :output
   defp normalize_type(type) when is_atom(type), do: type
-  defp normalize_type(type) when is_binary(type), do: String.to_atom(type)
+  defp normalize_type(type) when is_binary(type), do: normalize_type_alias(type)
 
   defp parse_name_and_type(raw) do
     case String.split(raw, ":", parts: 2) do
@@ -90,15 +93,22 @@ defmodule DSPy.Signature.Field do
   defp normalize_type_alias("int"), do: :integer
   defp normalize_type_alias("integer"), do: :integer
   defp normalize_type_alias("float"), do: :float
+  defp normalize_type_alias("number"), do: :number
   defp normalize_type_alias("bool"), do: :boolean
   defp normalize_type_alias("boolean"), do: :boolean
-  defp normalize_type_alias(other), do: String.to_atom(other)
+  defp normalize_type_alias(other), do: existing_atom_or_string(other)
 
   defp infer_prefix(name) do
     name
-    |> Atom.to_string()
+    |> to_string()
     |> String.replace("_", " ")
     |> String.capitalize()
     |> Kernel.<>(":")
+  end
+
+  defp existing_atom_or_string(value) do
+    String.to_existing_atom(value)
+  rescue
+    ArgumentError -> value
   end
 end

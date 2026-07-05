@@ -41,7 +41,7 @@ defmodule DSPy.Predict.ReAct do
     tool_input = DSPy.Prediction.get(prediction, :tool_input)
 
     if tool_name do
-      tool = Enum.find(tools, &(Atom.to_string(&1.name) == to_string(tool_name)))
+      tool = Enum.find(tools, &(to_string(&1.name) == to_string(tool_name)))
 
       case tool do
         nil ->

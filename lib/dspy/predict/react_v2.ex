@@ -3,7 +3,7 @@ defmodule DSPy.Predict.ReActV2 do
 
   @behaviour DSPy.Module
 
-  defstruct [:signature, :react, tools: %{}, max_iters: 20]
+  defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
 
   def new(signature, tools, opts \\ []) do
     signature = DSPy.Signature.ensure(signature)
@@ -29,7 +29,8 @@ defmodule DSPy.Predict.ReActV2 do
       signature: signature,
       react: DSPy.Predict.Predict.new(react_signature, opts),
       tools: tools,
-      max_iters: Keyword.get(opts, :max_iters, 20)
+      max_iters: Keyword.get(opts, :max_iters, 20),
+      tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
   end
 
@@ -55,47 +56,74 @@ defmodule DSPy.Predict.ReActV2 do
           {:ok, %{final | metadata: Map.put(final.metadata, :history, history)}}
 
         calls ->
-          {events, final} = execute_calls(agent.tools, List.wrap(calls))
+          {events, final} = execute_calls(agent, List.wrap(calls))
           history = history ++ events
 
-          if final do
-            final = Map.merge(final, %{history: history, termination_reason: :submit})
+          denied = Enum.find(events, &match?(%{result: {:error, {:tool_denied, _name}}}, &1))
 
-            case DSPy.Adapter.Chat.parse(agent.signature, final, []) do
-              {:ok, prediction} ->
-                prediction =
-                  prediction
-                  |> DSPy.Prediction.put(:history, history)
-                  |> DSPy.Prediction.put(:termination_reason, :submit)
+          cond do
+            denied ->
+              denied.result
 
-                {:ok, prediction}
+            final ->
+              final = Map.merge(final, %{history: history, termination_reason: :submit})
 
-              {:error, reason} ->
-                {:error, reason}
-            end
-          else
-            run_loop(agent, %{}, history, remaining - 1)
+              case DSPy.Adapter.Chat.parse(agent.signature, final, []) do
+                {:ok, prediction} ->
+                  prediction =
+                    prediction
+                    |> DSPy.Prediction.put(:history, history)
+                    |> DSPy.Prediction.put(:termination_reason, :submit)
+
+                  {:ok, prediction}
+
+                {:error, reason} ->
+                  {:error, reason}
+              end
+
+            true ->
+              run_loop(agent, %{}, history, remaining - 1)
           end
       end
     end
   end
 
-  defp execute_calls(tools, calls) do
+  defp execute_calls(agent, calls) do
     Enum.reduce(calls, {[], nil}, fn call, {events, final} ->
-      name = normalize_tool_name(tools, Map.get(call, :name) || Map.get(call, "name"))
+      name = normalize_tool_name(agent.tools, Map.get(call, :name) || Map.get(call, "name"))
 
       args =
         (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
            %{})
         |> normalize_args()
 
-      tool = if name, do: Map.get(tools, name)
-      result = if tool, do: DSPy.Tool.call(tool, args), else: {:error, :unknown_tool}
+      tool = if name, do: Map.get(agent.tools, name)
+
+      result =
+        cond do
+          is_nil(tool) -> {:error, :unknown_tool}
+          not authorized_tool?(agent.tool_policy, name, args) -> {:error, {:tool_denied, name}}
+          true -> DSPy.Tool.call(tool, args)
+        end
+
       event = %{tool: name, arguments: args, result: result}
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
       {events ++ [event], final}
     end)
   end
+
+  defp authorized_tool?(:allow, _name, _args), do: true
+  defp authorized_tool?(allowed, name, _args) when is_list(allowed), do: name in allowed
+
+  defp authorized_tool?(policy, name, args) when is_function(policy, 2) do
+    case policy.(name, args) do
+      true -> true
+      :ok -> true
+      _other -> false
+    end
+  end
+
+  defp authorized_tool?(policy, name, _args), do: name in List.wrap(policy)
 
   defp project_outputs(signature, prediction) do
     fields = Map.take(DSPy.Prediction.to_map(prediction), DSPy.Signature.output_names(signature))
@@ -106,7 +134,7 @@ defmodule DSPy.Predict.ReActV2 do
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->
-      if Atom.to_string(known) == to_string(name), do: known
+      if to_string(known) == to_string(name), do: known
     end)
   end
 

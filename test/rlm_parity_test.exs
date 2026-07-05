@@ -81,4 +81,68 @@ defmodule RLMParityTest do
     assert {:error, {:rlm_max_llm_calls, 0, _trace}} =
              DSPy.Predict.RLM.call(rlm, %{question: "q"})
   end
+
+  test "RLM supports persistent assignment and tool actions" do
+    actions = [
+      %{action: "assign", name: "scratch", value: "Paris"},
+      %{action: "tool", name: "lookup", arguments: %{"key" => "capital"}},
+      %{action: "submit", result: %{answer: "Paris"}}
+    ]
+
+    lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          Process.put(:rlm_tool_prompt, Enum.map_join(messages, "\n", & &1.content))
+          [action | rest] = Process.get(:rlm_actions)
+          Process.put(:rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    lookup = DSPy.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
+    Process.put(:rlm_actions, actions)
+
+    rlm = DSPy.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 4)
+
+    assert {:ok, prediction} = DSPy.Predict.RLM.call(rlm, %{question: "q"})
+    assert DSPy.Prediction.get(prediction, :answer) == "Paris"
+    assert Process.get(:rlm_tool_prompt) =~ "lookup a key"
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:assign, :tool, :submit]
+  after
+    Process.delete(:rlm_actions)
+    Process.delete(:rlm_tool_prompt)
+  end
+
+  test "RLM enforces tool policy and wall-clock budget" do
+    denied_lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts -> %{action: "tool", name: "lookup", arguments: %{}} end
+      ]
+    }
+
+    lookup = DSPy.Tool.new(:lookup, "lookup", fn _ -> :ok end)
+
+    denied =
+      DSPy.Predict.RLM.new("question -> answer", lm: denied_lm, tools: [lookup], tool_policy: [])
+
+    assert {:error, {:tool_denied, :lookup}} = DSPy.Predict.RLM.call(denied, %{question: "q"})
+
+    timeout_lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          Process.sleep(2)
+          %{action: "eval", code: "1 + 1"}
+        end
+      ]
+    }
+
+    timeout = DSPy.Predict.RLM.new("question -> answer", lm: timeout_lm, max_time_ms: 0)
+
+    assert {:error, {:rlm_max_time_ms, 0, _trace}} =
+             DSPy.Predict.RLM.call(timeout, %{question: "q"})
+  end
 end

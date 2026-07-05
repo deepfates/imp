@@ -4,6 +4,42 @@ defmodule MCPImportTest do
   alias DSPy.Agent
   alias DSPy.MCP
 
+  defmodule MCPTransport do
+    @behaviour DSPy.HTTP
+
+    @impl true
+    def post(url, headers, body, _opts) do
+      decoded = Jason.decode!(body)
+      request = %{url: url, headers: headers, body: decoded}
+      Process.put(:mcp_requests, Process.get(:mcp_requests, []) ++ [request])
+
+      case decoded do
+        %{"method" => "tools/list"} ->
+          {:ok,
+           %{
+             status: 200,
+             headers: [],
+             body:
+               Jason.encode!(%{
+                 "result" => %{
+                   "tools" => [
+                     %{
+                       "name" => "remote_lookup",
+                       "description" => "lookup remotely",
+                       "input_schema" => %{"required" => ["key"]}
+                     }
+                   ]
+                 }
+               })
+           }}
+
+        %{"method" => "tools/call", "params" => %{"arguments" => %{"key" => key}}} ->
+          {:ok,
+           %{status: 200, headers: [], body: Jason.encode!(%{"result" => %{"value" => key}})}}
+      end
+    end
+  end
+
   test "imports MCP-style catalog tools and runs them through an agent" do
     catalog =
       MCP.Catalog.new([
@@ -91,6 +127,21 @@ defmodule MCPImportTest do
     assert_raise ArgumentError, ~r/MCP tool schema missing run/, fn ->
       MCP.import_tools([Map.delete(duplicate, :run)])
     end
+  end
+
+  test "HTTP MCP client discovers tools through injectable transport" do
+    client = MCP.HTTPClient.new("https://mcp.example/tools", transport: MCPTransport)
+
+    [tool] = MCP.import_tools(client)
+
+    assert tool.name == "remote_lookup"
+    assert %{"value" => "abc"} = DSPy.Tool.call(tool, %{"key" => "abc"})
+    assert [list_request, call_request] = Process.get(:mcp_requests)
+    assert list_request.url == "https://mcp.example/tools"
+    assert list_request.body == %{"method" => "tools/list"}
+    assert call_request.body["method"] == "tools/call"
+  after
+    Process.delete(:mcp_requests)
   end
 
   defp agent_ref, do: Process.get(:agent_ref)

@@ -93,7 +93,7 @@ defmodule DSPy.Optimize.Anything do
     defp artifact_to_map(%Artifact{} = artifact) do
       %{
         "id" => artifact.id,
-        "kind" => Atom.to_string(artifact.kind),
+        "kind" => to_string(artifact.kind),
         "text" => artifact.text,
         "parameters" => stringify_keys(artifact.parameters),
         "metadata" => stringify_keys(artifact.metadata)

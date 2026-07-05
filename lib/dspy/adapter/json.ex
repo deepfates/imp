@@ -10,7 +10,7 @@ defmodule DSPy.Adapter.JSON do
   @impl true
   def format(signature, inputs, opts) do
     messages = DSPy.Adapter.Chat.format(signature, inputs, opts)
-    schema = signature.outputs |> Enum.map(&Atom.to_string(&1.name)) |> Enum.join(", ")
+    schema = signature.outputs |> Enum.map(&to_string(&1.name)) |> Enum.join(", ")
     [%{role: :system, content: "Return a JSON object with keys: #{schema}"} | messages]
   end
 

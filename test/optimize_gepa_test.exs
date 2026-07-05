@@ -84,6 +84,77 @@ defmodule OptimizeGEPATest do
     assert report.best.artifact.text =~ "beta"
   end
 
+  test "reflection LM proposer receives ASI and proposes candidate mutations" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    reflection_lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          Process.put(:gepa_reflection_prompt, Enum.map_join(messages, "\n", & &1.content))
+          %{mutation: "Paris\nconcise"}
+        end
+      ]
+    }
+
+    evaluator = fn artifact, examples ->
+      %{
+        per_example_scores:
+          Enum.map(examples, fn required ->
+            if artifact.text =~ required, do: 1.0, else: 0.0
+          end),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["Paris", "concise"],
+        generations: 1,
+        reflection_lm: reflection_lm
+      )
+
+    assert report.best.aggregate_score == 1.0
+    assert report.best.mutation == "Paris\nconcise"
+    assert Process.get(:gepa_reflection_prompt) =~ "Paris"
+    assert Process.get(:gepa_reflection_prompt) =~ "concise"
+  after
+    Process.delete(:gepa_reflection_prompt)
+  end
+
+  test "dev examples can select a held-out candidate over train-only score" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    evaluator = fn artifact, examples ->
+      %{
+        per_example_scores:
+          Enum.map(examples, fn required ->
+            if artifact.text =~ required, do: 1.0, else: 0.0
+          end),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end
+
+    mutation_fn = fn _artifact, _asi, generation ->
+      case generation do
+        1 -> {:replace, "train"}
+        2 -> {:replace, "dev"}
+      end
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["train"],
+        dev_examples: ["dev"],
+        generations: 2,
+        mutation_fn: mutation_fn
+      )
+
+    assert report.best.artifact.text == "dev"
+    assert report.best.metadata.dev_score == 1.0
+    assert report.metadata.dev_examples == 1
+  end
+
   test "covers single-task multi-task and held-out generalization behavior" do
     evaluator = fn artifact, examples ->
       %{

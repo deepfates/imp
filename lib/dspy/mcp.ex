@@ -9,6 +9,71 @@ defmodule DSPy.MCP do
     def list_tools(%__MODULE__{tools: tools}), do: tools
   end
 
+  defmodule HTTPClient do
+    @moduledoc "Transport-backed MCP-style catalog client."
+
+    defstruct [
+      :url,
+      transport: DSPy.HTTP.Hackneyless,
+      headers: [],
+      body: %{"method" => "tools/list"}
+    ]
+
+    def new(url, opts \\ []) do
+      %__MODULE__{
+        url: url,
+        transport: Keyword.get(opts, :transport, DSPy.HTTP.Hackneyless),
+        headers: Keyword.get(opts, :headers, []),
+        body: Keyword.get(opts, :body, %{"method" => "tools/list"})
+      }
+    end
+
+    def list_tools(%__MODULE__{} = client) do
+      headers = [{"content-type", "application/json"} | client.headers]
+
+      with {:ok, %{status: status, body: body}} when status in 200..299 <-
+             DSPy.HTTP.post(client.transport, client.url, headers, Jason.encode!(client.body), []),
+           {:ok, decoded} <- Jason.decode(body),
+           {:ok, tools} <- decode_tools(decoded) do
+        Enum.map(tools, &attach_remote_run(client, &1))
+      else
+        {:ok, %{status: status, body: body}} ->
+          raise ArgumentError, "MCP tools/list HTTP #{status}: #{body}"
+
+        {:error, reason} ->
+          raise ArgumentError, "MCP tools/list failed: #{inspect(reason)}"
+      end
+    end
+
+    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(%{tools: tools}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(%{result: %{tools: tools}}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(other), do: {:error, {:missing_tools, other}}
+
+    defp attach_remote_run(client, tool) do
+      name = Map.get(tool, "name", Map.get(tool, :name))
+
+      Map.put(tool, "run", fn arguments ->
+        body = %{
+          "method" => "tools/call",
+          "params" => %{"name" => name, "arguments" => arguments}
+        }
+
+        headers = [{"content-type", "application/json"} | client.headers]
+
+        with {:ok, %{status: status, body: response}} when status in 200..299 <-
+               DSPy.HTTP.post(client.transport, client.url, headers, Jason.encode!(body), []),
+             {:ok, decoded} <- Jason.decode(response) do
+          Map.get(decoded, "result", decoded)
+        else
+          {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+          {:error, reason} -> {:error, reason}
+        end
+      end)
+    end
+  end
+
   def import_tools(catalog) do
     catalog
     |> list_tools()

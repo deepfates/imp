@@ -39,8 +39,9 @@ defmodule DSPy.Optimize.GEPA do
 
   def optimize(%Artifact{} = artifact, evaluator, opts \\ []) when is_function(evaluator, 2) do
     examples = Keyword.get(opts, :examples, [])
+    dev_examples = Keyword.get(opts, :dev_examples, [])
     generations = Keyword.get(opts, :generations, 4)
-    mutation_fn = Keyword.get(opts, :mutation_fn, &default_mutation/3)
+    mutation_fn = Keyword.get(opts, :mutation_fn, reflection_mutation_fn(opts))
 
     baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
@@ -61,9 +62,14 @@ defmodule DSPy.Optimize.GEPA do
 
     frontier = pareto_frontier(evolved)
     {merged_candidates, merges} = merge_frontier(frontier, evaluator, examples)
-    candidates = evolved ++ merged_candidates
+
+    candidates =
+      evolved
+      |> Kernel.++(merged_candidates)
+      |> annotate_dev_scores(evaluator, dev_examples)
+
     final_frontier = pareto_frontier(candidates)
-    best = Enum.max_by(candidates, & &1.aggregate_score)
+    best = Enum.max_by(candidates, &selection_score/1)
 
     %Report{
       baseline: baseline,
@@ -74,6 +80,7 @@ defmodule DSPy.Optimize.GEPA do
       metadata: %{
         generations: generations,
         examples: length(examples),
+        dev_examples: length(dev_examples),
         frontier_size: length(final_frontier)
       }
     }
@@ -166,6 +173,27 @@ defmodule DSPy.Optimize.GEPA do
     )
   end
 
+  defp annotate_dev_scores(candidates, _evaluator, []), do: candidates
+
+  defp annotate_dev_scores(candidates, evaluator, dev_examples) do
+    Enum.map(candidates, fn candidate ->
+      dev = evaluator.(candidate.artifact, dev_examples)
+      dev_scores = Map.fetch!(dev, :per_example_scores)
+      dev_score = average(dev_scores)
+
+      %{
+        candidate
+        | metadata:
+            candidate.metadata
+            |> Map.put(:dev_per_example_scores, dev_scores)
+            |> Map.put(:dev_score, dev_score)
+      }
+    end)
+  end
+
+  defp selection_score(%Candidate{metadata: %{dev_score: score}}), do: score
+  defp selection_score(%Candidate{aggregate_score: score}), do: score
+
   defp default_mutation(%Artifact{} = _artifact, asi, generation) do
     asi_text =
       asi
@@ -173,6 +201,60 @@ defmodule DSPy.Optimize.GEPA do
       |> Enum.join("; ")
 
     "Reflection #{generation}: address #{asi_text}."
+  end
+
+  defp reflection_mutation_fn(opts) do
+    case Keyword.get(opts, :reflection_lm) do
+      nil -> &default_mutation/3
+      lm -> fn artifact, asi, generation -> propose_reflection(lm, artifact, asi, generation) end
+    end
+  end
+
+  defp propose_reflection(lm, %Artifact{} = artifact, asi, generation) do
+    messages = [
+      %{
+        role: :system,
+        content:
+          "You are a GEPA reflection proposer. Return JSON with a mutation that addresses the actionable side information."
+      },
+      %{
+        role: :user,
+        content:
+          Jason.encode!(%{
+            generation: generation,
+            artifact: %{
+              id: artifact.id,
+              kind: artifact.kind,
+              text: artifact.text,
+              parameters: artifact.parameters
+            },
+            asi: asi
+          })
+      }
+    ]
+
+    case DSPy.LM.generate(lm, messages, []) do
+      {:ok, %{"mutation" => mutation}} when is_binary(mutation) ->
+        mutation
+
+      {:ok, %{mutation: mutation}} when is_binary(mutation) ->
+        mutation
+
+      {:ok, %{"text" => text}} when is_binary(text) ->
+        text
+
+      {:ok, %{text: text}} when is_binary(text) ->
+        text
+
+      {:ok, text} when is_binary(text) ->
+        text
+
+      {:ok, other} ->
+        inspect(other)
+
+      {:error, reason} ->
+        default_mutation(artifact, asi ++ ["reflection failed: #{inspect(reason)}"], generation)
+    end
   end
 
   defp average([]), do: 0.0

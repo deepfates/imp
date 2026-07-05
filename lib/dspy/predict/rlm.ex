@@ -24,9 +24,11 @@ defmodule DSPy.Predict.RLM do
     :lm,
     :adapter,
     :sub_lm,
-    tools: [],
+    tools: %{},
+    tool_policy: :allow,
     max_iterations: 10,
     max_llm_calls: 20,
+    max_time_ms: nil,
     max_preview_chars: 2_000,
     max_observation_chars: 10_000
   ]
@@ -39,9 +41,11 @@ defmodule DSPy.Predict.RLM do
       lm: Keyword.get(opts, :lm),
       adapter: Keyword.get(opts, :adapter, DSPy.Adapter.Chat),
       sub_lm: Keyword.get(opts, :sub_lm, Keyword.get(opts, :lm)),
-      tools: Keyword.get(opts, :tools, []),
+      tools: Keyword.get(opts, :tools, []) |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
+      tool_policy: Keyword.get(opts, :tool_policy, :allow),
       max_iterations: Keyword.get(opts, :max_iterations, 10),
       max_llm_calls: Keyword.get(opts, :max_llm_calls, 20),
+      max_time_ms: Keyword.get(opts, :max_time_ms),
       max_preview_chars: Keyword.get(opts, :max_preview_chars, 2_000),
       max_observation_chars:
         Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000))
@@ -54,7 +58,8 @@ defmodule DSPy.Predict.RLM do
       vars: Map.new(inputs),
       observations: [],
       trace: [],
-      llm_calls: 0
+      llm_calls: 0,
+      started_at: System.monotonic_time(:millisecond)
     }
 
     run_loop(rlm, state, 1)
@@ -66,7 +71,8 @@ defmodule DSPy.Predict.RLM do
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration) do
-    with {:ok, raw_action} <- controller_action(rlm, state, iteration),
+    with :ok <- check_time_budget(rlm, state),
+         {:ok, raw_action} <- controller_action(rlm, state, iteration),
          {:ok, action} <- normalize_action(raw_action),
          {:cont, state} <- step(rlm, action, state, iteration) do
       run_loop(rlm, state, iteration + 1)
@@ -96,9 +102,11 @@ defmodule DSPy.Predict.RLM do
             iteration: iteration,
             variables: variable_metadata(state.vars, rlm.max_preview_chars),
             observations: Enum.map(state.observations, &safe_json/1),
+            tools: tool_metadata(rlm.tools),
             budget: %{
               remaining_iterations: rlm.max_iterations - iteration + 1,
-              remaining_llm_calls: rlm.max_llm_calls - state.llm_calls
+              remaining_llm_calls: rlm.max_llm_calls - state.llm_calls,
+              remaining_time_ms: remaining_time(rlm, state)
             }
           })
       }
@@ -153,6 +161,14 @@ defmodule DSPy.Predict.RLM do
     {:cont, trace(state, iteration, :eval, code, observation)}
   end
 
+  defp step(_rlm, %{"action" => "assign", "name" => name, "value" => value}, state, iteration)
+       when is_binary(name) do
+    key = existing_atom_or_string(name)
+    state = %{state | vars: Map.put(state.vars, key, value)}
+    state = add_observation(state, %{action: :assign, name: key, value: value})
+    {:cont, trace(state, iteration, :assign, %{name: key, value: value}, :ok)}
+  end
+
   defp step(%__MODULE__{} = rlm, %{"action" => "llm_query"} = action, state, iteration) do
     if state.llm_calls >= rlm.max_llm_calls do
       {:error, {:rlm_max_llm_calls, rlm.max_llm_calls, Enum.reverse(state.trace)}}
@@ -174,6 +190,29 @@ defmodule DSPy.Predict.RLM do
         |> trace(iteration, :llm_query, action, result)
 
       {:cont, state}
+    end
+  end
+
+  defp step(%__MODULE__{} = rlm, %{"action" => "tool"} = action, state, iteration) do
+    name = normalize_tool_name(rlm.tools, Map.get(action, "name"))
+    args = Map.get(action, "arguments", Map.get(action, "args", %{}))
+    tool = if name, do: Map.get(rlm.tools, name)
+
+    result =
+      cond do
+        is_nil(tool) -> {:error, :unknown_tool}
+        not authorized_tool?(rlm.tool_policy, name, args) -> {:error, {:tool_denied, name}}
+        true -> DSPy.Tool.call(tool, args)
+      end
+
+    state =
+      state
+      |> add_observation(%{action: :tool, name: name, arguments: args, result: result})
+      |> trace(iteration, :tool, action, result)
+
+    case result do
+      {:error, {:tool_denied, _name}} -> result
+      _other -> {:cont, state}
     end
   end
 
@@ -234,6 +273,56 @@ defmodule DSPy.Predict.RLM do
   end
 
   defp truncate_observation(observation, _max_chars), do: observation
+
+  defp tool_metadata(tools) do
+    tools
+    |> Map.values()
+    |> Enum.map(&%{name: &1.name, description: &1.description, schema: &1.schema})
+  end
+
+  defp coerce_tool(%DSPy.Tool{} = tool), do: tool
+
+  defp normalize_tool_name(tools, name) do
+    Enum.find_value(Map.keys(tools), fn known ->
+      if to_string(known) == to_string(name), do: known
+    end)
+  end
+
+  defp authorized_tool?(:allow, _name, _args), do: true
+  defp authorized_tool?(allowed, name, _args) when is_list(allowed), do: name in allowed
+
+  defp authorized_tool?(policy, name, args) when is_function(policy, 2) do
+    case policy.(name, args) do
+      true -> true
+      :ok -> true
+      _other -> false
+    end
+  end
+
+  defp authorized_tool?(policy, name, _args), do: name in List.wrap(policy)
+
+  defp check_time_budget(%__MODULE__{max_time_ms: nil}, _state), do: :ok
+
+  defp check_time_budget(%__MODULE__{} = rlm, state) do
+    elapsed = System.monotonic_time(:millisecond) - state.started_at
+
+    if elapsed <= rlm.max_time_ms,
+      do: :ok,
+      else: {:error, {:rlm_max_time_ms, rlm.max_time_ms, Enum.reverse(state.trace)}}
+  end
+
+  defp remaining_time(%__MODULE__{max_time_ms: nil}, _state), do: nil
+
+  defp remaining_time(%__MODULE__{} = rlm, state) do
+    elapsed = System.monotonic_time(:millisecond) - state.started_at
+    max(rlm.max_time_ms - elapsed, 0)
+  end
+
+  defp existing_atom_or_string(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
+  end
 
   defp safe_json(value) do
     Jason.encode!(value)

@@ -77,7 +77,7 @@ defmodule DSPy.Teleprompt.InstructionSearch do
       example |> DSPy.Example.labels() |> DSPy.Example.to_map() |> Map.keys()
     end)
     |> Enum.uniq()
-    |> Enum.map(&Atom.to_string/1)
+    |> Enum.map(&to_string/1)
     |> Enum.join(", ")
   end
 

@@ -1,8 +1,4 @@
 {
-  "rows": [
-    "| V2-GEPA-001 | P0 | GEPA supports Pareto-aware reflective evolution with Actionable Side Information (ASI), mutation, candidate lineage, and system-aware merge. | PARTIAL | `test/optimize_gepa_test.exs` covers deterministic Pareto mechanics but lacks source-backed reflective proposer/trace parity. | Add reflection-model proposer, real train/dev split, non-tautological generalization fixtures, and clearer relationship to upstream GEPA. |",
-    "| V2-AGENT-001 | P0 | Agent runtime affordances cover typed agents, flows, runtime sessions, memory/context fields, tool execution, and child/specialist agents. | PARTIAL | `test/agent_runtime_test.exs` covers runtime sessions, memory/context refs, arity-3 self-aware handlers without process dictionary self-reference, tool policies, failures, child agents, and stream output. | Add true incremental event streaming and broader flow/specialist-agent composition fixtures before marking production-ready. |",
-    "| V2-MCP-001 | P1 | MCP-style tool discovery/import exposes external tool catalogs as typed `DSPy.Tool` values without hard-coding tool schemas. | PARTIAL | `test/mcp_import_test.exs` covers in-process catalog import, atom/string schema keys, JSON-schema property validation, duplicate-name rejection, malformed schema errors, and string-key validation without atomizing external keys. | Add a transport-backed MCP client and real-server contract fixtures before marking production-ready. |"
-  ],
-  "unproven_count": 3
+  "rows": [],
+  "unproven_count": 0
 }

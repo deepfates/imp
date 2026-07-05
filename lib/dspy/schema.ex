@@ -48,12 +48,12 @@ defmodule DSPy.Schema do
 
   def json_schema(fields) do
     properties =
-      Map.new(fields, fn field -> {Atom.to_string(field.name), field_schema(field)} end)
+      Map.new(fields, fn field -> {to_string(field.name), field_schema(field)} end)
 
     required =
       fields
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
-      |> Enum.map(&Atom.to_string(&1.name))
+      |> Enum.map(&to_string(&1.name))
 
     %{"type" => "object", "properties" => properties, "required" => required}
   end
@@ -107,7 +107,7 @@ defmodule DSPy.Schema do
       |> Enum.flat_map(fn {item, index} ->
         pseudo = %{
           field
-          | name: :"#{field.name}[#{index}]",
+          | name: "#{field.name}[#{index}]",
             type: Map.get(item_schema, :type, :any),
             metadata: %{constraints: Map.delete(item_schema, :type)}
         }
@@ -125,7 +125,7 @@ defmodule DSPy.Schema do
       Enum.flat_map(properties, fn {name, spec} ->
         pseudo = %{
           field
-          | name: :"#{field.name}.#{name}",
+          | name: "#{field.name}.#{name}",
             type: Map.get(spec, :type, :any),
             metadata: %{
               constraints: Map.delete(spec, :type),
@@ -191,7 +191,7 @@ defmodule DSPy.Schema do
 
   defp json_properties(properties) do
     Map.new(properties, fn {name, spec} ->
-      {Atom.to_string(name), %{"type" => json_type(Map.get(spec, :type, :string))}}
+      {to_string(name), %{"type" => json_type(Map.get(spec, :type, :string))}}
     end)
   end
 
@@ -211,7 +211,7 @@ defmodule DSPy.Schema do
   defp fetch_value(values, key) do
     case Map.fetch(values, key) do
       {:ok, value} -> value
-      :error -> Map.get(values, Atom.to_string(key))
+      :error -> Map.get(values, to_string(key))
     end
   end
 end

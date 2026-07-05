@@ -94,6 +94,23 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
   end
 
+  test "signature parsing does not intern arbitrary external field names" do
+    external_input = "external_input_#{System.unique_integer([:positive])}"
+    external_output = "external_output_#{System.unique_integer([:positive])}"
+
+    signature = DSPy.Signature.new("#{external_input} -> #{external_output}")
+
+    assert DSPy.Signature.input_names(signature) == [external_input]
+    assert DSPy.Signature.output_names(signature) == [external_output]
+
+    assert {:ok, prediction} =
+             DSPy.Adapter.Chat.parse(signature, %{external_output => "ok"}, [])
+
+    assert DSPy.Prediction.get(prediction, external_output) == "ok"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(external_input) end
+    assert_raise ArgumentError, fn -> String.to_existing_atom(external_output) end
+  end
+
   test "optimize-anything report loading keeps unknown external metadata keys as strings" do
     external_key = "report_key_#{System.unique_integer([:positive])}"
 

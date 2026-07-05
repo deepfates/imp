@@ -87,18 +87,28 @@ defmodule DSPy.Adapter.Chat do
   defp coerce_value(value, _type), do: value
 
   defp fetch_field(fields, name) do
-    string_name = Atom.to_string(name)
+    string_name = to_string(name)
 
     cond do
-      Map.has_key?(fields, name) -> Map.fetch!(fields, name)
-      Map.has_key?(fields, string_name) -> Map.fetch!(fields, string_name)
-      true -> nil
+      Map.has_key?(fields, name) ->
+        Map.fetch!(fields, name)
+
+      Map.has_key?(fields, string_name) ->
+        Map.fetch!(fields, string_name)
+
+      (is_binary(name) and existing_atom(name)) && Map.has_key?(fields, existing_atom(name)) ->
+        Map.fetch!(fields, existing_atom(name))
+
+      true ->
+        nil
     end
   end
 
   defp render_inputs(signature, inputs) do
     signature.inputs
-    |> Enum.map(fn field -> "#{field.prefix} #{format_value(Map.get(inputs, field.name))}" end)
+    |> Enum.map(fn field ->
+      "#{field.prefix} #{format_value(fetch_field(inputs, field.name))}"
+    end)
     |> Enum.join("\n")
   end
 
@@ -127,7 +137,7 @@ defmodule DSPy.Adapter.Chat do
     allowed =
       signature
       |> DSPy.Signature.output_names()
-      |> Map.new(fn name -> {name |> Atom.to_string() |> String.downcase(), name} end)
+      |> Map.new(fn name -> {name |> to_string() |> String.downcase(), name} end)
 
     Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
     |> Enum.reduce(%{}, fn [_line, key, value], acc ->
@@ -139,5 +149,11 @@ defmodule DSPy.Adapter.Chat do
         :error -> acc
       end
     end)
+  end
+
+  defp existing_atom(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> nil
   end
 end

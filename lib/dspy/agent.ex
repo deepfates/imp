@@ -132,6 +132,43 @@ defmodule DSPy.Agent do
     )
   end
 
+  def stream_events(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
+    Stream.resource(
+      fn ->
+        owner = self()
+        ref = make_ref()
+        runtime = %{runtime | event_sink: fn event -> send(owner, {:agent_event, ref, event}) end}
+        task = Task.async(fn -> run(agent, inputs, runtime) end)
+        %{task: task, ref: ref, done?: false}
+      end,
+      fn
+        %{done?: true} = state ->
+          {:halt, state}
+
+        %{task: task, ref: ref} = state ->
+          receive do
+            {:agent_event, ^ref, event} ->
+              {[%{type: :trace, event: event}], state}
+
+            {task_ref, {:ok, output, runtime}} when task_ref == task.ref ->
+              Process.demonitor(task.ref, [:flush])
+              {[%{type: :output, output: output, traces: runtime.traces}], %{state | done?: true}}
+
+            {task_ref, {:error, reason, runtime}} when task_ref == task.ref ->
+              Process.demonitor(task.ref, [:flush])
+              {[%{type: :error, error: reason, traces: runtime.traces}], %{state | done?: true}}
+
+            {:DOWN, task_ref, :process, _pid, reason} when task_ref == task.ref ->
+              {[%{type: :error, error: reason}], %{state | done?: true}}
+          end
+      end,
+      fn
+        %{done?: true} -> :ok
+        %{task: task} -> Task.shutdown(task, :brutal_kill)
+      end
+    )
+  end
+
   defp resolve_inputs(inputs, runtime) do
     Map.new(inputs, fn {key, value} ->
       case Runtime.resolve(runtime, value) do

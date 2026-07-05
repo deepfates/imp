@@ -92,6 +92,34 @@ defmodule AgentRuntimeTest do
              runtime.traces
   end
 
+  test "runtime redacts sensitive trace keys" do
+    echo = DSPy.Tool.new(:echo, "echo", fn input -> input end)
+
+    agent =
+      Agent.new(
+        :redactor,
+        fn agent, _input, runtime ->
+          Agent.call_tool(
+            agent,
+            :echo,
+            %{api_key: "sk-live", nested: %{token: "secret"}},
+            runtime
+          )
+        end,
+        tools: [echo]
+      )
+
+    assert {:ok, _output, runtime} = Agent.run(agent, %{})
+
+    assert [
+             %{
+               input: %{api_key: "[REDACTED]", nested: %{token: "[REDACTED]"}},
+               output: %{api_key: "[REDACTED]", nested: %{token: "[REDACTED]"}}
+             },
+             %{output: %{api_key: "[REDACTED]", nested: %{token: "[REDACTED]"}}}
+           ] = runtime.traces
+  end
+
   test "agent returns structured failures for tools children and schemas" do
     boom = DSPy.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
 
@@ -124,6 +152,28 @@ defmodule AgentRuntimeTest do
              Agent.stream(agent, %{x: 1}) |> Enum.to_list()
 
     assert [%{type: :agent, agent: :streamer}] = traces
+  end
+
+  test "agent stream_events emits trace events before final output" do
+    normalize =
+      DSPy.Tool.new(:normalize, "normalize text", fn %{text: text} -> String.downcase(text) end)
+
+    agent =
+      Agent.new(
+        :streamer,
+        fn agent, %{text: text}, runtime ->
+          Agent.call_tool(agent, :normalize, %{text: text}, runtime)
+        end,
+        tools: [normalize]
+      )
+
+    events = Agent.stream_events(agent, %{text: "HeLLo"}) |> Enum.to_list()
+
+    assert [
+             %{type: :trace, event: %{type: :tool, tool: :normalize}},
+             %{type: :trace, event: %{type: :agent, agent: :streamer}},
+             %{type: :output, output: "hello"}
+           ] = events
   end
 
   defp agent_ref, do: Process.get(:agent_ref)

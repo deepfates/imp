@@ -106,5 +106,5 @@ defmodule DSPy.Signature do
     "Given the fields #{input_names}, produce the fields #{output_names}."
   end
 
-  defp join_names(fields), do: fields |> Enum.map(& &1.name) |> Enum.join(", ")
+  defp join_names(fields), do: fields |> Enum.map(&to_string(&1.name)) |> Enum.join(", ")
 end

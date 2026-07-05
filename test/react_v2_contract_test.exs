@@ -16,4 +16,21 @@ defmodule ReActV2ContractTest do
     assert {:error, {:missing_output_fields, [:answer]}} =
              DSPy.Predict.ReActV2.call(agent, %{question: "q"})
   end
+
+  test "tool policy denial stops ReActV2 before executing LM-selected tool" do
+    lm = %{
+      module: DSPy.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "secret"}}]}
+        end
+      ]
+    }
+
+    lookup = DSPy.Tool.new(:lookup, "lookup", fn _args -> raise "should not run" end)
+    agent = DSPy.Predict.ReActV2.new("question -> answer", [lookup], lm: lm, tool_policy: [])
+
+    assert {:error, {:tool_denied, :lookup}} =
+             DSPy.Predict.ReActV2.call(agent, %{question: "q"})
+  end
 end
