@@ -39,8 +39,8 @@ HTTP clients with contract tests against injectable transports. Live calls are
 an operational concern requiring credentials and endpoints, not missing library
 surface.
 
-Production readiness is defined by [PRODUCTION.md](PRODUCTION.md), not by manual
-inspection.
+Production readiness is defined by [PRODUCTION.md](PRODUCTION.md) and
+[PRODUCTION_AUDIT.md](PRODUCTION_AUDIT.md), not by manual inspection.
 
 ## Test Signals
 

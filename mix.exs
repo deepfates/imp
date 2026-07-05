@@ -13,7 +13,7 @@ defmodule DspyElixir.MixProject do
       package: package(),
       docs: [
         main: "DSPy",
-        extras: ["README.md", "TELOS.md", "PARITY.md", "PRODUCTION.md"]
+        extras: ["README.md", "TELOS.md", "PARITY.md", "PRODUCTION.md", "PRODUCTION_AUDIT.md"]
       ],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -33,6 +33,7 @@ defmodule DspyElixir.MixProject do
     [
       preferred_envs: [
         "production.check": :test,
+        "production.audit": :test,
         "parity.check": :test,
         "parity.generate": :test
       ]
@@ -61,8 +62,10 @@ defmodule DspyElixir.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "parity.check",
+        "production.audit",
         "test"
-      ]
+      ],
+      "production.audit": ["run scripts/check_production_audit.exs"]
     ]
   end
 end

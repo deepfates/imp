@@ -1,7 +1,8 @@
 # Production Readiness Gate
 
 This repo is not considered production-ready unless all of these pass from a
-clean tree:
+clean tree and [PRODUCTION_AUDIT.md](PRODUCTION_AUDIT.md) has no `PARTIAL` or
+`UNPROVEN` P0/P1 rows:
 
 ```sh
 mix production.check
@@ -13,6 +14,7 @@ The deterministic gate runs:
 - formatting check
 - compilation with warnings as errors
 - generated upstream public export parity check
+- production audit structural check
 - full non-live test suite
 
 The live gate uses local `.env` credentials and validates a real
@@ -29,3 +31,10 @@ mix parity.generate
 
 `mix parity.check` fails if any upstream public export in that snapshot is not
 classified in `PARITY.md`.
+
+## Current Audit Status
+
+`mix production.check` writes
+`priv/parity/production_audit_unproven.json`. That file reports how many P0/P1
+audit rows still need stronger evidence before the project can honestly be
+called production-ready.
