@@ -80,6 +80,9 @@ defmodule DSPy.Signature do
     }
   end
 
+  def json_schema(%__MODULE__{} = signature),
+    do: DSPy.Schema.json_schema(signature.outputs)
+
   def load(%{"inputs" => inputs, "outputs" => outputs} = state) do
     %__MODULE__{
       inputs: Enum.map(inputs, &Field.load/1),

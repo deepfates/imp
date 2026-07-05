@@ -25,7 +25,7 @@ defmodule DSPy.Signature.Field do
       type: attrs |> Map.get(:type, Map.get(attrs, "type", :string)) |> normalize_type(),
       desc: Map.get(attrs, :desc, Map.get(attrs, "desc")),
       prefix: Map.get(attrs, :prefix, Map.get(attrs, "prefix", infer_prefix(name))),
-      metadata: Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
+      metadata: metadata(attrs)
     }
   end
 
@@ -51,6 +51,24 @@ defmodule DSPy.Signature.Field do
   end
 
   def load(map), do: new(map, map["kind"])
+
+  def constrained(%__MODULE__{} = field, constraints) do
+    %__MODULE__{field | metadata: Map.put(field.metadata, :constraints, constraints)}
+  end
+
+  def optional(%__MODULE__{} = field),
+    do: %__MODULE__{field | metadata: Map.put(field.metadata, :optional, true)}
+
+  defp metadata(attrs) do
+    metadata = Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
+    constraints = Map.get(attrs, :constraints, Map.get(attrs, "constraints"))
+
+    if constraints do
+      Map.put(metadata, :constraints, constraints)
+    else
+      metadata
+    end
+  end
 
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name) when is_binary(name), do: name |> String.trim() |> String.to_atom()

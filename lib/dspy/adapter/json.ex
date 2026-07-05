@@ -20,10 +20,20 @@ defmodule DSPy.Adapter.JSON do
 
   def parse(signature, raw, opts) when is_binary(raw) do
     with {:ok, decoded} <- Jason.decode(extract_json(raw)),
-         true <- is_map(decoded) do
-      DSPy.Adapter.Chat.parse(signature, decoded, opts)
+         true <- is_map(decoded),
+         {:ok, prediction} <- DSPy.Adapter.Chat.parse(signature, decoded, opts),
+         :ok <- DSPy.Schema.validate_fields(signature.outputs, DSPy.Prediction.to_map(prediction)) do
+      {:ok, prediction}
     else
-      _ -> DSPy.Adapter.Chat.parse(signature, raw, opts)
+      {:error, errors} when is_list(errors) ->
+        {:error,
+         %DSPy.AdapterParseError{message: DSPy.Schema.retry_feedback(errors), reason: raw}}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      _ ->
+        DSPy.Adapter.Chat.parse(signature, raw, opts)
     end
   end
 
