@@ -1,8 +1,7 @@
 {
   "rows": [
     "| OPT-002 | P1 | MIPROv2, GEPA, SIMBA, COPRO behavior is faithful enough for production workloads, not only simplified search. | PARTIAL | Implementations exist with candidate reports; no upstream behavioral corpus yet. | Build upstream behavioral fixtures and port algorithm-specific invariants. |",
-    "| MULTI-001 | P1 | Multimodal adapter types encode/decode provider-compatible image/audio/file/document payloads. | PARTIAL | Structs exist and parity matrix classifies public types. | Add encoding functions and provider-format contract tests. |",
     "| DATA-001 | P1 | Dataset loaders cover JSONL/CSV/GSM8K/HotPotQA/MATH/Colors and reject malformed rows clearly. | PARTIAL | `completion_surface_test.exs`, `parity_surface_test.exs` | Add malformed input tests and typed dataset structs. |"
   ],
-  "unproven_count": 3
+  "unproven_count": 2
 }

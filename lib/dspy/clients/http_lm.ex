@@ -122,6 +122,12 @@ defmodule DSPy.Clients.HTTPLM do
 
   defp endpoint(%__MODULE__{} = lm), do: String.trim_trailing(lm.base_url, "/") <> lm.path
 
+  defp encode_message(%{role: role, content: content}) when is_list(content),
+    do: %{role: role_name(role), content: DSPy.Adapters.Types.content_to_openai(content)}
+
+  defp encode_message(%{role: role, content: %_struct{} = content}),
+    do: %{role: role_name(role), content: DSPy.Adapters.Types.content_to_openai(content)}
+
   defp encode_message(%{role: role, content: content}),
     do: %{role: role_name(role), content: content}
 
