@@ -5,25 +5,40 @@ defmodule DSPy.Teleprompt.InstructionSearch do
     demos = Keyword.get(opts, :demos, [])
     evaluator = DSPy.Evaluate.new(devset, metric)
 
-    candidates
-    |> Enum.uniq()
-    |> Enum.map(fn instruction ->
-      candidate =
-        program
-        |> put_instruction(instruction)
-        |> maybe_put_demos(demos)
+    results =
+      candidates
+      |> Enum.uniq()
+      |> Enum.map(fn instruction ->
+        candidate =
+          program
+          |> put_instruction(instruction)
+          |> maybe_put_demos(demos)
 
-      {DSPy.Evaluate.run(evaluator, candidate).score, candidate, instruction}
-    end)
-    |> Kernel.++([
-      {DSPy.Evaluate.run(evaluator, program).score, program, current_instruction(program)}
-    ])
-    |> Enum.max_by(fn {score, _candidate, _instruction} -> score end)
-    |> elem(1)
+        {DSPy.Evaluate.run(evaluator, candidate).score, candidate, instruction}
+      end)
+      |> Kernel.++([
+        {DSPy.Evaluate.run(evaluator, program).score, program, current_instruction(program)}
+      ])
+
+    {best_score, best, _instruction} =
+      Enum.max_by(results, fn {score, _candidate, _instruction} -> score end)
+
+    best
     |> attach_optimizer_metadata(%{
       trainset_size: length(trainset),
       candidate_count: length(candidates)
     })
+    |> DSPy.Teleprompt.Report.attach(
+      DSPy.Teleprompt.Report.new(%{
+        optimizer: :instruction_search,
+        best_score: best_score,
+        candidate_count: length(results),
+        candidates:
+          Enum.map(results, fn {score, _candidate, instruction} ->
+            %{score: score, instruction: instruction}
+          end)
+      })
+    )
   end
 
   def put_instruction(%DSPy.Predict.Predict{signature: signature} = program, instruction) do

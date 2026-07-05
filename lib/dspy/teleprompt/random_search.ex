@@ -14,20 +14,61 @@ defmodule DSPy.Teleprompt.RandomSearch do
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
     evaluator = DSPy.Evaluate.new(devset, optimizer.metric)
 
-    1..optimizer.candidates
-    |> Enum.map(fn _ ->
-      demos = trainset |> Enum.shuffle() |> Enum.take(optimizer.demos_per_candidate)
+    results =
+      1..optimizer.candidates
+      |> Enum.map(fn index ->
+        demos = trainset |> Enum.shuffle() |> Enum.take(optimizer.demos_per_candidate)
 
-      candidate =
-        DSPy.Teleprompt.LabeledFewShot.compile(
-          %DSPy.Teleprompt.LabeledFewShot{k: optimizer.demos_per_candidate},
-          program,
-          demos
-        )
+        candidate =
+          DSPy.Teleprompt.LabeledFewShot.compile(
+            %DSPy.Teleprompt.LabeledFewShot{k: optimizer.demos_per_candidate},
+            program,
+            demos
+          )
 
-      {DSPy.Evaluate.run(evaluator, candidate).score, candidate}
-    end)
-    |> Enum.max_by(fn {score, _candidate} -> score end)
-    |> elem(1)
+        evaluate_candidate(evaluator, candidate, %{index: index, demos: demos})
+      end)
+
+    {best_score, best, report_candidates, errors} = summarize(results)
+
+    best
+    |> DSPy.Teleprompt.Report.attach(
+      DSPy.Teleprompt.Report.new(%{
+        optimizer: :random_search,
+        best_score: best_score,
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
+        errors: errors
+      })
+    )
+  end
+
+  defp evaluate_candidate(evaluator, candidate, metadata) do
+    result = DSPy.Evaluate.run(evaluator, candidate)
+    {:ok, result.score, candidate, metadata}
+  rescue
+    error -> {:error, error, metadata}
+  end
+
+  defp summarize(results) do
+    successes =
+      Enum.flat_map(results, fn
+        {:ok, score, candidate, metadata} -> [{score, candidate, metadata}]
+        _ -> []
+      end)
+
+    errors =
+      Enum.flat_map(results, fn
+        {:error, error, metadata} -> [%{error: Exception.message(error), metadata: metadata}]
+        _ -> []
+      end)
+
+    {best_score, best, _metadata} =
+      Enum.max_by(successes, fn {score, _candidate, _metadata} -> score end)
+
+    report_candidates =
+      Enum.map(successes, fn {score, _candidate, metadata} -> Map.put(metadata, :score, score) end)
+
+    {best_score, best, report_candidates, errors}
   end
 end
