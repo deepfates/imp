@@ -1,0 +1,131 @@
+{
+  "adapters": [
+    "Adapter",
+    "Audio",
+    "ChatAdapter",
+    "Code",
+    "File",
+    "History",
+    "Image",
+    "JSONAdapter",
+    "Reasoning",
+    "Tool",
+    "ToolCallResults",
+    "ToolCalls",
+    "TwoStepAdapter",
+    "Type",
+    "XMLAdapter"
+  ],
+  "clients": [
+    "BaseLM",
+    "Embedder",
+    "LM",
+    "Provider",
+    "TrainingJob",
+    "configure_cache",
+    "disable_litellm_logging",
+    "enable_litellm_logging",
+    "inspect_history"
+  ],
+  "datasets": [
+    "Colors",
+    "DataLoader",
+    "Dataset",
+    "HotPotQA",
+    "MATH"
+  ],
+  "evaluate": [
+    "CompleteAndGrounded",
+    "EM",
+    "Evaluate",
+    "EvaluationResult",
+    "SemanticF1",
+    "answer_exact_match",
+    "answer_passage_match",
+    "normalize_text"
+  ],
+  "predict": [
+    "BestOfN",
+    "ChainOfThought",
+    "CodeAct",
+    "KNN",
+    "MultiChainComparison",
+    "Parallel",
+    "Predict",
+    "ProgramOfThought",
+    "RLM",
+    "ReAct",
+    "ReActV2",
+    "Refine",
+    "Tool",
+    "majority"
+  ],
+  "primitives": [
+    "BaseModule",
+    "CodeInterpreter",
+    "CodeInterpreterError",
+    "Completions",
+    "Example",
+    "FinalOutput",
+    "Module",
+    "Prediction",
+    "PythonInterpreter",
+    "SandboxSerializable"
+  ],
+  "retrievers": [
+    "Embeddings",
+    "EmbeddingsWithScores",
+    "Retrieve"
+  ],
+  "root": [
+    "ColBERTv2",
+    "DSPY_CACHE",
+    "asyncify",
+    "configure_dspy_loggers",
+    "disable_logging",
+    "enable_logging",
+    "load",
+    "settings",
+    "streamify",
+    "syncify",
+    "track_usage"
+  ],
+  "signatures": [
+    "InputField",
+    "OldField",
+    "OldInputField",
+    "OldOutputField",
+    "OutputField",
+    "Signature",
+    "SignatureMeta",
+    "ensure_signature",
+    "infer_prefix",
+    "make_signature"
+  ],
+  "streaming": [
+    "StatusMessage",
+    "StatusMessageProvider",
+    "StreamListener",
+    "StreamResponse",
+    "apply_sync_streaming",
+    "streamify",
+    "streaming_response"
+  ],
+  "teleprompt": [
+    "AvatarOptimizer",
+    "BetterTogether",
+    "BootstrapFewShot",
+    "BootstrapFewShotWithOptuna",
+    "BootstrapFewShotWithRandomSearch",
+    "BootstrapFinetune",
+    "COPRO",
+    "Ensemble",
+    "GEPA",
+    "InferRules",
+    "KNNFewShot",
+    "LabeledFewShot",
+    "MIPROv2",
+    "SIMBA",
+    "bootstrap_trace_data"
+  ]
+}

@@ -20,7 +20,7 @@ Statuses:
 | `streamify` | `DSPy.Streaming` | operational | `completion_surface_test.exs` |
 | `cache`, `configure_cache` | `DSPy.Cache` | operational | `parity_surface_test.exs` |
 | `asyncify`, `syncify` | native Elixir tasks are used directly (`Task`, `Task.async_stream`) | intentional | `parity_surface_test.exs` |
-| logging toggles | standard `Logger`/OTP application logging | intentional | compile gate |
+| `configure_dspy_loggers`, `enable_logging`, `disable_logging` | standard `Logger`/OTP application logging | intentional | compile gate |
 | `ColBERTv2` | retriever behaviour implementation point | equivalent | `dspy_elixir_test.exs` |
 
 ## Signatures And Primitives
@@ -29,10 +29,14 @@ Statuses:
 | --- | --- | --- | --- |
 | `Signature`, `ensure_signature`, `make_signature` | `DSPy.Signature` | operational | `dspy_elixir_test.exs` |
 | `InputField`, `OutputField`, legacy fields | `DSPy.Signature.Field` with `:input`/`:output` | equivalent | `dspy_elixir_test.exs` |
+| `OldField`, `OldInputField`, `OldOutputField` | `DSPy.Signature.Field` compatibility mode | compat | `dspy_elixir_test.exs` |
+| `SignatureMeta` | struct construction and explicit functions instead of Python metaclass | intentional | `dspy_elixir_test.exs` |
+| `infer_prefix` | `DSPy.Signature.Field` prefix inference | operational | `dspy_elixir_test.exs` |
 | `Example` | `DSPy.Example` | operational | `dspy_elixir_test.exs` |
 | `Prediction`, `Completions` | `DSPy.Prediction` | operational | `dspy_elixir_test.exs` |
 | `Module`, `BaseModule`, `Parameter` | `DSPy.Module` behaviour and structs | equivalent | `parity_surface_test.exs` |
 | `PythonInterpreter`, `CodeInterpreter`, `SandboxSerializable` | `DSPy.Sandbox` | intentional | `completion_surface_test.exs`, `parity_surface_test.exs` |
+| `CodeInterpreterError` | `DSPy.Error` / tagged sandbox errors | equivalent | `completion_surface_test.exs` |
 | `FinalOutput` | regular tagged values / predictions | equivalent | `parity_surface_test.exs` |
 
 ## Adapters And Types
@@ -59,7 +63,9 @@ Statuses:
 | `LocalProvider` | `DSPy.Clients.Local` | operational contract | `completion_surface_test.exs` |
 | LiteLLM client | `DSPy.Clients.LiteLLM` | operational contract | `completion_surface_test.exs` |
 | `TrainingJob`, finetune provider API | `DSPy.Clients.TrainingJob`, `DSPy.Clients.Trainer` | operational | `completion_surface_test.exs` |
+| `Provider` | provider modules implementing `DSPy.Clients.Trainer` / `DSPy.LM` | equivalent | `completion_surface_test.exs` |
 | `Embedder` | `DSPy.Embeddings` | operational | `completion_surface_test.exs` |
+| `enable_litellm_logging`, `disable_litellm_logging` | no-op under Elixir Logger; LiteLLM proxy logging belongs to proxy process | intentional | compile gate |
 | `inspect_history` | prediction traces and metadata | equivalent | `dspy_elixir_test.exs` |
 | `DSPY_CACHE` | `DSPy.Cache` | operational | `parity_surface_test.exs` |
 
@@ -129,6 +135,7 @@ Statuses:
 | `BetterTogether` | `DSPy.Teleprompt.BetterTogether` | operational | `parity_surface_test.exs` |
 | `InferRules` | `DSPy.Teleprompt.InferRules` | operational | `parity_surface_test.exs` |
 | `AvatarOptimizer` | `DSPy.Teleprompt.AvatarOptimizer` | compat | `parity_surface_test.exs` |
+| `bootstrap_trace_data` | prediction traces in metadata and bootstrap demos | equivalent | `dspy_elixir_test.exs` |
 
 ## Streaming
 

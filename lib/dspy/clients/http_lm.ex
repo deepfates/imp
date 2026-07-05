@@ -49,8 +49,10 @@ defmodule DSPy.Clients.HTTPLM do
         auth_headers(lm) ++
         Enum.map(lm.headers, fn {k, v} -> {to_string(k), to_string(v)} end)
 
+    request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
+
     with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           DSPy.HTTP.post(lm.transport, endpoint(lm), headers, body, []),
+           post_with_retries(lm, headers, body, request_opts, retry_config(opts)),
          {:ok, decoded} <- Jason.decode(response) do
       {:ok, extract_content(decoded)}
     else
@@ -58,6 +60,40 @@ defmodule DSPy.Clients.HTTPLM do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp retry_config(opts) do
+    %{
+      attempts: Keyword.get(opts, :num_retries, Keyword.get(opts, :retries, 2)) + 1,
+      backoff_ms: Keyword.get(opts, :retry_backoff_ms, 25)
+    }
+  end
+
+  defp post_with_retries(lm, headers, body, request_opts, %{
+         attempts: attempts,
+         backoff_ms: backoff_ms
+       }) do
+    Enum.reduce_while(1..attempts, nil, fn attempt, _last ->
+      case DSPy.HTTP.post(lm.transport, endpoint(lm), headers, body, request_opts) do
+        {:ok, %{status: status}} = response when status in 200..299 ->
+          {:halt, response}
+
+        {:ok, %{status: status}} = response
+        when status in [408, 409, 429, 500, 502, 503, 504] and attempt < attempts ->
+          sleep(backoff_ms, attempt)
+          {:cont, response}
+
+        {:error, _reason} = error when attempt < attempts ->
+          sleep(backoff_ms, attempt)
+          {:cont, error}
+
+        other ->
+          {:halt, other}
+      end
+    end)
+  end
+
+  defp sleep(0, _attempt), do: :ok
+  defp sleep(backoff_ms, attempt), do: Process.sleep(backoff_ms * attempt)
 
   def dump(%__MODULE__{} = lm) do
     %{provider: lm.provider, model: lm.model, base_url: lm.base_url, path: lm.path, opts: lm.opts}

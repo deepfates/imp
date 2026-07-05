@@ -42,4 +42,8 @@ defmodule DSPy.Saving do
     predict = state |> Map.put("type", "predict") |> load()
     %DSPy.Predict.ChainOfThought{predict: predict}
   end
+
+  def load(%{"type" => type}) do
+    raise ArgumentError, "unsupported saved DSPy program type: #{inspect(type)}"
+  end
 end

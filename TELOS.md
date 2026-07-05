@@ -10,6 +10,8 @@ This project translates DSPy philosophically as well as literally.
 - End-to-end tests exercise the loop: examples -> optimizer -> program -> LM -> adapter -> prediction -> metric.
 - Provider integrations are contract-tested through injectable transports and can be live-tested by supplying credentials.
 - Python-specific runtime patterns are translated into BEAM-safe equivalents rather than copied unsafely.
+- Upstream public export parity is generated from a checked-out DSPy repo and enforced by `mix parity.check`.
+- Production readiness requires `mix production.check` plus the live-provider gate when credentials are present.
 
 ## Implemented Surface
 
@@ -36,6 +38,9 @@ OpenAI, Databricks, LiteLLM, and local model servers are represented by real
 HTTP clients with contract tests against injectable transports. Live calls are
 an operational concern requiring credentials and endpoints, not missing library
 surface.
+
+Production readiness is defined by [PRODUCTION.md](PRODUCTION.md), not by manual
+inspection.
 
 ## Test Signals
 

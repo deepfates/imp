@@ -32,3 +32,15 @@ evaluation, and teleprompter-style optimizers.
 ```sh
 mix test
 ```
+
+## Production Gate
+
+```sh
+mix production.check
+LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+```
+
+The production gate verifies formatting, warnings-as-errors compilation,
+generated upstream public-export parity, and the full deterministic integration
+suite. The live gate validates real OpenAI-compatible provider execution using
+local `.env` credentials.

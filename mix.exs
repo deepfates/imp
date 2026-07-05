@@ -13,10 +13,11 @@ defmodule DspyElixir.MixProject do
       package: package(),
       docs: [
         main: "DSPy",
-        extras: ["README.md", "TELOS.md"]
+        extras: ["README.md", "TELOS.md", "PARITY.md", "PRODUCTION.md"]
       ],
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -25,6 +26,16 @@ defmodule DspyElixir.MixProject do
     [
       extra_applications: [:logger, :inets, :ssl],
       mod: {DspyElixir.Application, []}
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        "production.check": :test,
+        "parity.check": :test,
+        "parity.generate": :test
+      ]
     ]
   end
 
@@ -39,6 +50,19 @@ defmodule DspyElixir.MixProject do
     [
       licenses: ["MIT"],
       links: %{"DSPy" => "https://dspy.ai/"}
+    ]
+  end
+
+  defp aliases do
+    [
+      "parity.generate": ["run scripts/generate_parity_exports.exs"],
+      "parity.check": ["run scripts/check_parity_exports.exs"],
+      "production.check": [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "parity.check",
+        "test"
+      ]
     ]
   end
 end
