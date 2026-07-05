@@ -1,0 +1,148 @@
+# DSPy Elixir 03: Agents, Tools, MCP, And RLM
+
+```elixir
+repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
+Mix.install([{:dspy_elixir, path: repo}])
+```
+
+## Tools
+
+```elixir
+lookup =
+  DSPy.Tool.new(:lookup, "lookup a fact", fn
+    %{query: "capital-france"} -> "Paris"
+    %{"query" => "capital-france"} -> "Paris"
+  end)
+
+DSPy.Tool.call(lookup, %{query: "capital-france"})
+```
+
+## Agent Runtime
+
+```elixir
+agent =
+  DSPy.Agent.new(
+    :qa_agent,
+    fn agent, %{query: query}, runtime ->
+      DSPy.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
+    end,
+    tools: [lookup],
+    tool_policy: [:lookup]
+  )
+
+{:ok, output, runtime} = DSPy.Agent.run(agent, %{query: "capital-france"})
+{output, runtime.traces}
+```
+
+Incremental trace events:
+
+```elixir
+DSPy.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
+```
+
+Tool policy denial:
+
+```elixir
+locked =
+  DSPy.Agent.new(:locked, fn agent, _input, runtime ->
+    DSPy.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
+  end, tools: [lookup], tool_policy: [])
+
+DSPy.Agent.run(locked, %{})
+```
+
+## MCP Catalog Import
+
+```elixir
+catalog =
+  DSPy.MCP.Catalog.new([
+    %{
+      name: :remote_lookup,
+      description: "lookup through an imported catalog",
+      input_schema: %{required: [:key]},
+      run: fn %{key: "capital"} -> %{value: "Paris"} end
+    }
+  ])
+
+[tool] = DSPy.MCP.import_tools(catalog)
+DSPy.Tool.call(tool, %{key: "capital"})
+```
+
+## ReActV2
+
+```elixir
+lm = %{
+  module: DSPy.LM.Fake,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{
+        tool_calls: [
+          %{name: :lookup, arguments: %{query: "capital-france"}},
+          %{name: :submit, arguments: %{answer: "Paris"}}
+        ]
+      }
+    end
+  ]
+}
+
+react = DSPy.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
+{:ok, pred} = DSPy.Predict.ReActV2.call(react, %{question: "Capital of France?"})
+DSPy.Prediction.to_map(pred)
+```
+
+## RLM
+
+RLM explores large or awkward context through actions rather than stuffing the
+entire context into one prompt.
+
+```elixir
+actions = [
+  %{action: "assign", name: "scratch", value: "Paris"},
+  %{action: "tool", name: "lookup", arguments: %{"query" => "capital-france"}},
+  %{action: "submit", result: %{answer: "Paris"}}
+]
+
+controller_lm = %{
+  module: DSPy.LM.Fake,
+  opts: [
+    handler: fn _messages, _opts ->
+      [action | rest] = Process.get(:rlm_actions)
+      Process.put(:rlm_actions, rest)
+      action
+    end
+  ]
+}
+
+Process.put(:rlm_actions, actions)
+
+rlm =
+  DSPy.rlm("context, question -> answer",
+    lm: controller_lm,
+    tools: [lookup],
+    max_iterations: 5,
+    max_llm_calls: 5,
+    max_preview_chars: 20
+  )
+
+{:ok, pred} =
+  DSPy.Predict.RLM.call(rlm, %{
+    context: String.duplicate("large context ", 200),
+    question: "What is the capital?"
+  })
+
+Process.delete(:rlm_actions)
+
+{DSPy.Prediction.to_map(pred), pred.metadata.rlm_trace}
+```
+
+## RLM Budget Failure
+
+```elixir
+loop_lm = %{
+  module: DSPy.LM.Fake,
+  opts: [handler: fn _messages, _opts -> %{action: "eval", code: "1 + 1"} end]
+}
+
+rlm = DSPy.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
+DSPy.Predict.RLM.call(rlm, %{question: "loop?"})
+```

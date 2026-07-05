@@ -1,0 +1,108 @@
+# DSPy Elixir 01: Programming, Not Prompting
+
+```elixir
+repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
+Mix.install([{:dspy_elixir, path: repo}])
+```
+
+## The Idea
+
+DSPy-style programming means declaring the task boundary first:
+
+```elixir
+signature = DSPy.signature("question -> answer")
+DSPy.Signature.to_spec(signature)
+```
+
+Then you attach an LM and call a program:
+
+```elixir
+lm = %{
+  module: DSPy.LM.Fake,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      if prompt =~ "France", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+    end
+  ]
+}
+
+DSPy.configure(lm: lm, adapter: DSPy.Adapter.Chat)
+
+program = DSPy.predict("question -> answer")
+{:ok, prediction} = DSPy.Predict.Predict.call(program, %{question: "Capital of France?"})
+DSPy.Prediction.to_map(prediction)
+```
+
+## Inspect The Generated Messages
+
+Predictions keep trace metadata:
+
+```elixir
+prediction.metadata.trace.messages
+```
+
+The point is not to hide prompts forever. The point is to make them a generated
+artifact of a typed program.
+
+## Chain Of Thought
+
+```elixir
+cot_lm = %{
+  module: DSPy.LM.Fake,
+  opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
+}
+
+program = DSPy.chain_of_thought("question -> answer", lm: cot_lm)
+{:ok, pred} = DSPy.Predict.ChainOfThought.call(program, %{question: "What is 2+2?"})
+DSPy.Prediction.to_map(pred)
+```
+
+## Schema-Constrained Output
+
+```elixir
+signature =
+  DSPy.Signature.new(%{
+    inputs: [:text],
+    outputs: [
+      %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
+      %{name: :confidence, type: :number, constraints: %{min: 0.0, max: 1.0}}
+    ]
+  })
+
+{:ok, pred} =
+  DSPy.Adapter.JSON.parse(
+    signature,
+    ~s({"sentiment":"positive","confidence":0.91}),
+    []
+  )
+
+DSPy.Prediction.to_map(pred)
+```
+
+Try a bad output:
+
+```elixir
+DSPy.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [])
+```
+
+## Examples
+
+```elixir
+example =
+  DSPy.example(question: "2+2?", answer: "4")
+  |> DSPy.Example.with_inputs(:question)
+
+{DSPy.Example.to_map(DSPy.Example.inputs(example)), DSPy.Example.to_map(DSPy.Example.labels(example))}
+```
+
+## Save And Load
+
+```elixir
+path = Path.join(System.tmp_dir!(), "dspy-elixir-livebook-program.json")
+DSPy.Saving.save!(program, path)
+loaded = DSPy.Saving.load!(path)
+File.rm(path)
+
+loaded.signature |> DSPy.Signature.to_spec()
+```

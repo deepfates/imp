@@ -1,0 +1,146 @@
+# DSPy Elixir 02: Evaluate And Optimize
+
+```elixir
+repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
+Mix.install([{:dspy_elixir, path: repo}])
+```
+
+## Build Train And Dev Sets
+
+```elixir
+trainset = [
+  DSPy.example(question: "2+2?", answer: "4") |> DSPy.Example.with_inputs(:question),
+  DSPy.example(question: "3+3?", answer: "6") |> DSPy.Example.with_inputs(:question)
+]
+
+devset = [
+  DSPy.example(question: "2 plus 2?", answer: "4") |> DSPy.Example.with_inputs(:question)
+]
+```
+
+## Define A Metric
+
+```elixir
+metric = DSPy.Metrics.exact_match(:answer)
+```
+
+## Evaluate A Baseline
+
+```elixir
+lm = %{
+  module: DSPy.LM.Fake,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      if prompt =~ "answer: 4" or prompt =~ "Always answer 4",
+        do: %{answer: "4"},
+        else: %{answer: "unknown"}
+    end
+  ]
+}
+
+program = DSPy.predict("question -> answer", lm: lm)
+evaluator = DSPy.Evaluate.new(devset, metric)
+DSPy.Evaluate.run(evaluator, program)
+```
+
+## Labeled Few-Shot
+
+```elixir
+compiled =
+  DSPy.Teleprompt.LabeledFewShot.new(k: 1)
+  |> DSPy.Teleprompt.LabeledFewShot.compile(program, trainset)
+
+DSPy.Evaluate.run(evaluator, compiled)
+```
+
+## Random Search
+
+```elixir
+compiled =
+  metric
+  |> DSPy.Teleprompt.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+  |> DSPy.Teleprompt.RandomSearch.compile(program, trainset, devset)
+
+{
+  DSPy.Evaluate.run(evaluator, compiled),
+  DSPy.Teleprompt.Report.fetch(compiled)
+}
+```
+
+## Instruction Search
+
+```elixir
+compiled =
+  DSPy.Teleprompt.InstructionSearch.compile(
+    program,
+    metric,
+    trainset,
+    devset,
+    ["Answer unknown.", "Always answer 4."]
+  )
+
+DSPy.Teleprompt.Report.fetch(compiled)
+```
+
+## Optimize Anything
+
+```elixir
+artifact = DSPy.Optimize.Anything.new_artifact(:config, "mode=slow")
+
+report =
+  DSPy.Optimize.Anything.optimize(
+    artifact,
+    fn artifact, _examples ->
+      cond do
+        artifact.text =~ "mode=fast" and artifact.text =~ "timeout=5" -> 1.0
+        artifact.text =~ "mode=fast" -> 0.5
+        true -> 0.0
+      end
+    end,
+    trials: 2,
+    mutation_fn: fn _artifact, trial, _seed ->
+      case trial do
+        1 -> "mode=fast"
+        2 -> "timeout=5"
+      end
+    end
+  )
+
+report.best
+```
+
+## GEPA-Style Reflection
+
+```elixir
+reflection_lm = %{
+  module: DSPy.LM.Fake,
+  opts: [handler: fn _messages, _opts -> %{mutation: "Paris\nconcise"} end]
+}
+
+artifact = DSPy.Optimize.Anything.new_artifact(:prompt, "Base")
+
+report =
+  DSPy.Optimize.GEPA.optimize(
+    artifact,
+    fn artifact, examples ->
+      %{
+        per_example_scores: Enum.map(examples, &if(String.contains?(artifact.text, &1), do: 1.0, else: 0.0)),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end,
+    examples: ["Paris", "concise"],
+    dev_examples: ["Paris"],
+    generations: 1,
+    reflection_lm: reflection_lm
+  )
+
+report.best
+```
+
+## V2 Benchmarks
+
+```elixir
+DSPy.V2.Benchmarks.assert_pass!()
+DSPy.V2.Benchmarks.assert_negative_controls!()
+```

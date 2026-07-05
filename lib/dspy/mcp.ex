@@ -1,5 +1,11 @@
 defmodule DSPy.MCP do
-  @moduledoc "MCP-style tool catalog importer."
+  @moduledoc """
+  MCP-style tool catalog importer.
+
+  `DSPy.MCP.import_tools/1` converts either an in-process catalog or a
+  transport-backed HTTP catalog into ordinary `DSPy.Tool` values. Imported tools
+  validate required fields and basic JSON-schema-style property constraints.
+  """
 
   defmodule Catalog do
     @moduledoc "In-process MCP-like catalog used for tests and adapters."
@@ -74,6 +80,7 @@ defmodule DSPy.MCP do
     end
   end
 
+  @doc "Imports a catalog or list of tool schemas into `DSPy.Tool` structs."
   def import_tools(catalog) do
     catalog
     |> list_tools()

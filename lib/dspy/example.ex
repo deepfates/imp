@@ -1,6 +1,8 @@
 defmodule DSPy.Example do
   @moduledoc "Flexible row of named data used for train/dev/test sets."
 
+  @type t :: %__MODULE__{fields: map(), input_keys: [atom() | String.t()] | nil, demos: list()}
+
   defstruct fields: %{}, input_keys: nil, demos: []
 
   def new(fields \\ %{})

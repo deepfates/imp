@@ -1,6 +1,19 @@
 defmodule DSPy.Clients.TrainingJob do
   @moduledoc "Provider-neutral finetuning or reinforcement-training job."
 
+  @type t :: %__MODULE__{
+          id: String.t(),
+          provider: atom(),
+          model: String.t() | nil,
+          status: atom() | {:unknown, String.t()},
+          training_data: list(),
+          result_model: String.t() | nil,
+          transport: module() | function() | nil,
+          status_url: String.t() | nil,
+          api_key: String.t() | nil,
+          metadata: map()
+        }
+
   defstruct [
     :id,
     :provider,

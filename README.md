@@ -22,6 +22,11 @@ DSPy.Prediction.get(prediction, :answer)
 
 ## What Exists
 
+Start with [docs/README.md](docs/README.md) for the full guide set and
+interactive Livebooks. The docs are organized as a learning path:
+philosophy, architecture, API guide, production operations, and runnable
+notebooks.
+
 See [TELOS.md](TELOS.md) for the completion checklist, implemented surface, and
 test signals. The repo includes provider clients, adapters, programs,
 retrievers, datasets, streaming, persistence, sandboxed program-of-thought,

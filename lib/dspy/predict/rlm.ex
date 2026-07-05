@@ -33,6 +33,19 @@ defmodule DSPy.Predict.RLM do
     max_observation_chars: 10_000
   ]
 
+  @doc """
+  Creates an RLM controller loop.
+
+  Options:
+
+  - `:lm` - controller LM.
+  - `:sub_lm` - LM used for `llm_query` actions; defaults to `:lm`.
+  - `:tools` - list of `DSPy.Tool` values available to `tool` actions.
+  - `:tool_policy` - `:allow`, a list of allowed tool names, or a predicate.
+  - `:max_iterations`, `:max_llm_calls`, `:max_time_ms` - execution budgets.
+  - `:max_preview_chars` - how much large input context the controller sees.
+  - `:max_observation_chars` - truncation limit for string observations.
+  """
   def new(signature, opts \\ []) do
     signature = DSPy.Signature.ensure(signature)
 
@@ -53,6 +66,13 @@ defmodule DSPy.Predict.RLM do
   end
 
   @impl true
+  @doc """
+  Runs the RLM loop.
+
+  The controller LM returns actions such as `eval`, `assign`, `tool`,
+  `llm_query`, and `submit`. A successful submit returns a `DSPy.Prediction`
+  with `:rlm_trace` metadata.
+  """
   def call(%__MODULE__{} = rlm, inputs) do
     state = %{
       vars: Map.new(inputs),

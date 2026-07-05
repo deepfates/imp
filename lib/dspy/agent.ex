@@ -1,5 +1,18 @@
 defmodule DSPy.Agent do
-  @moduledoc "Typed agent runtime with tools, child agents, memory/context, and traces."
+  @moduledoc """
+  Typed agent runtime with tools, child agents, memory/context, policies, and traces.
+
+  Agents are ordinary Elixir structs. A handler can be arity 2:
+
+      fn inputs, runtime -> {:ok, output, runtime} end
+
+  or arity 3 when it needs access to the agent's tools or children:
+
+      fn agent, inputs, runtime -> DSPy.Agent.call_tool(agent, :tool, inputs, runtime) end
+
+  Tool execution is policy-gated with `:tool_policy`, and every trace event is
+  redacted through `DSPy.Agent.Runtime` before it is stored or streamed.
+  """
 
   alias DSPy.Agent.Runtime
 
@@ -13,6 +26,16 @@ defmodule DSPy.Agent do
     tool_policy: :allow
   ]
 
+  @doc """
+  Creates an agent.
+
+  Options:
+
+  - `:tools` - list of `DSPy.Tool` values.
+  - `:children` - list of child agents.
+  - `:input_schema` / `:output_schema` - maps with `:required` keys.
+  - `:tool_policy` - `:allow`, a list of allowed names, or a predicate function.
+  """
   def new(name, handler, opts \\ []) when is_function(handler, 2) or is_function(handler, 3) do
     %__MODULE__{
       name: normalize_name(name),
@@ -25,6 +48,7 @@ defmodule DSPy.Agent do
     }
   end
 
+  @doc "Runs an agent and returns `{:ok, output, runtime}` or `{:error, reason, runtime}`."
   def run(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
     with :ok <- validate(inputs, agent.input_schema),
          {:ok, output, runtime} <- invoke_handler(agent, resolve_inputs(inputs, runtime), runtime),
@@ -41,6 +65,7 @@ defmodule DSPy.Agent do
     end
   end
 
+  @doc "Calls a named tool through the agent's policy and trace boundary."
   def call_tool(%__MODULE__{} = agent, name, input, %Runtime{} = runtime) do
     name = normalize_name(name)
 
@@ -101,6 +126,7 @@ defmodule DSPy.Agent do
     end
   end
 
+  @doc "Runs a named child agent with the current runtime."
   def call_child(%__MODULE__{} = agent, name, input, %Runtime{} = runtime) do
     name = normalize_name(name)
 
@@ -114,6 +140,7 @@ defmodule DSPy.Agent do
     end
   end
 
+  @doc "Streams final output/error plus the completed trace bundle."
   def stream(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
     Stream.resource(
       fn -> run(agent, inputs, runtime) end,
@@ -132,6 +159,7 @@ defmodule DSPy.Agent do
     )
   end
 
+  @doc "Streams trace events incrementally, followed by the final output/error event."
   def stream_events(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
     Stream.resource(
       fn ->

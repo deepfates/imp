@@ -63,6 +63,8 @@ defmodule DatasetsContractTest do
     cleanup_tmp("typed-math.jsonl")
   end
 
-  defp tmp_path(name), do: Path.join(System.tmp_dir!(), "dspy-elixir-#{name}")
+  defp tmp_path(name),
+    do: Path.join(System.tmp_dir!(), "dspy-elixir-#{:erlang.phash2(self())}-#{name}")
+
   defp cleanup_tmp(name), do: File.rm(tmp_path(name))
 end

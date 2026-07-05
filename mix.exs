@@ -15,6 +15,15 @@ defmodule DspyElixir.MixProject do
         main: "DSPy",
         extras: [
           "README.md",
+          "docs/README.md",
+          "docs/DSPY_PHILOSOPHY.md",
+          "docs/ARCHITECTURE.md",
+          "docs/API_GUIDE.md",
+          "docs/PRODUCTION_OPERATIONS.md",
+          "livebooks/01_programming_not_prompting.livemd",
+          "livebooks/02_evaluate_and_optimize.livemd",
+          "livebooks/03_agents_tools_mcp_rlm.livemd",
+          "livebooks/04_production_and_live_provider.livemd",
           "TELOS.md",
           "PARITY.md",
           "PRODUCTION.md",
@@ -54,7 +63,8 @@ defmodule DspyElixir.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+      {:ex_doc, "~> 0.35", only: :dev, runtime: false}
     ]
   end
 
