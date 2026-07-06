@@ -1,0 +1,3 @@
+{"question":"Janet's ducks lay 16 eggs per day. She eats three for breakfast and bakes muffins with four. She sells the rest for $2 each. How much does she make?","answer":"Janet sells 16 - 3 - 4 = <<16-3-4=9>>9 eggs. She makes 9 * 2 = <<9*2=18>>18 dollars. #### 18","canonical_answer":"18","source_task":"gsm8k"}
+{"question":"A robe takes 2 bolts of blue fiber and half that much white fiber. How many bolts total?","answer":"White fiber is 2 / 2 = <<2/2=1>>1 bolt. Total is 2 + 1 = <<2+1=3>>3 bolts. #### 3","canonical_answer":"3","source_task":"gsm8k"}
+

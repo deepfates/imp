@@ -42,7 +42,7 @@ defmodule DSEx.Streaming do
     adapter =
       if program.dynamic_adapter?, do: settings.adapter, else: program.adapter || settings.adapter
 
-    lm = if program.dynamic_lm?, do: settings.lm, else: program.lm || settings.lm
+    lm = if program.dynamic_lm?, do: settings.lm, else: program.lm
     messages = adapter.format(program.signature, inputs, demos: program.demos)
 
     stream_lm(lm, messages, Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream])))

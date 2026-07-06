@@ -8,6 +8,7 @@ defmodule GateContractTest do
              "format --check-formatted",
              "compile --warnings-as-errors",
              "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
+             "benchmark.truth.check",
              "docs"
            ]
 
@@ -20,6 +21,15 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"protocol.check") == [
              "test --include protocol_training --include protocol_retriever --include protocol_mcp test/protocol_training test/protocol_retriever test/protocol_mcp"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.truth.check") == [
+             "test test/benchmark_truth_test.exs"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.live.check") == [
+             "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+             "dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
            ]
 
     assert Keyword.fetch!(aliases, :"live.check") == [

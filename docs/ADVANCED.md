@@ -145,3 +145,8 @@ clients. The benchmark fixtures are deterministic regression fixtures for
 DSEx behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared DSEx
 contracts and tested through injectable transports.
+
+For real dataset benchmark evidence, use `DSEx.BenchmarkTruth` and
+`BENCHMARK_TRUTH.md`. That lane fetches canonical GSM8K/HotPotQA rows, writes
+manifests and result artifacts, and keeps research evidence separate from
+deterministic production-gate fixtures.

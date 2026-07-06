@@ -202,7 +202,7 @@ end
 
 defmodule DSEx.Datasets.GSM8K do
   @moduledoc "GSM8K-style JSONL dataset loader."
-  defmodule Record, do: defstruct([:question, :answer])
+  defmodule Record, do: defstruct([:question, :answer, :canonical_answer, :source_task])
 
   def load(path), do: DSEx.Datasets.gsm8k(path)
 
@@ -216,7 +216,8 @@ end
 
 defmodule DSEx.Datasets.HotPotQA do
   @moduledoc "HotPotQA-style JSONL dataset loader."
-  defmodule Record, do: defstruct([:question, :context, :answer])
+  defmodule Record,
+    do: defstruct([:id, :question, :context, :answer, :supporting_facts, :source_task])
 
   def load(path), do: DSEx.Datasets.hotpotqa(path)
 end

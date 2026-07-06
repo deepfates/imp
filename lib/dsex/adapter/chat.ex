@@ -158,7 +158,7 @@ defmodule DSEx.Adapter.Chat do
     |> Enum.map(fn demo ->
       demo
       |> DSEx.Example.to_map()
-      |> Enum.map(fn {k, v} -> "#{k}: #{v}" end)
+      |> Enum.map(fn {k, v} -> "#{k}: #{format_value(v)}" end)
       |> Enum.join("\n")
     end)
     |> Enum.join("\n---\n")

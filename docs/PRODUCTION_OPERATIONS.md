@@ -10,6 +10,7 @@ Run from a clean tree:
 mix production.check
 mix integration.check
 mix protocol.check
+mix benchmark.truth.check
 mix quality.check
 ```
 
@@ -93,6 +94,7 @@ Dependency policy:
 - compile with warnings as errors
 - the deterministic non-live, non-integration test suite, including the public
   surface contract, benchmark positive controls, and benchmark negative controls
+- benchmark truth fixture harness tests through `mix benchmark.truth.check`
 - documentation generation with ExDoc
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
@@ -133,6 +135,12 @@ The live provider tests prove a real provider can execute:
 - `ReActV2` function-tool calls plus reserved `submit`
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
+
+`mix benchmark.live.check` is a separate research smoke gate. It fetches fresh
+GSM8K and HotPotQA rows and runs DSEx programs over a live provider, writing
+result artifacts under `benchmarks/results/`. It is intentionally not part of
+the fast production gate because it spends provider tokens and depends on
+external dataset and provider availability.
 
 ## What The Gates Do Not Prove
 
@@ -237,6 +245,7 @@ Benchmark failure:
 
 ```sh
 mix test test/benchmark_test.exs
+mix benchmark.truth.check
 ```
 
 Local integration failure:

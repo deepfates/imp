@@ -1,0 +1,73 @@
+defmodule Mix.Tasks.Dsex.Benchmark.Run do
+  @moduledoc """
+  Run benchmark truth evaluation over canonical JSONL files.
+
+      mix dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-20.jsonl \\
+        --hotpotqa benchmarks/data/hotpotqa-validation-0-20.jsonl --max-examples 20
+
+  By default this runs in fixture mode. Use `--live` to use an OpenAI-compatible
+  live provider from `OPENAI_API_KEY`/`OPENAI_MODEL`.
+  """
+
+  use Mix.Task
+
+  @shortdoc "Run DSEx benchmark truth evaluations"
+
+  @impl true
+  def run(args) do
+    Mix.Task.run("app.start")
+
+    {opts, _argv, invalid} =
+      OptionParser.parse(args,
+        strict: [
+          gsm8k: :string,
+          hotpotqa: :string,
+          max_examples: :integer,
+          out: :string,
+          live: :boolean,
+          model: :string
+        ]
+      )
+
+    if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
+
+    tasks = tasks(opts)
+
+    if tasks == [] do
+      Mix.raise("provide at least one dataset path with --gsm8k or --hotpotqa")
+    end
+
+    mode = if Keyword.get(opts, :live, false), do: :live, else: :fixture
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: tasks,
+        mode: mode,
+        lm: live_lm(mode, opts),
+        out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+        max_examples: Keyword.get(opts, :max_examples, 20)
+      )
+
+    Mix.shell().info("benchmark truth report: #{result.out_path}")
+    Mix.shell().info("aggregate score: #{result.report["aggregate_score"]}")
+  end
+
+  defp tasks(opts) do
+    []
+    |> maybe_put(:gsm8k, Keyword.get(opts, :gsm8k))
+    |> maybe_put(:hotpotqa, Keyword.get(opts, :hotpotqa))
+  end
+
+  defp maybe_put(tasks, _task, nil), do: tasks
+  defp maybe_put(tasks, task, path), do: [{task, path} | tasks] |> Enum.reverse()
+
+  defp live_lm(:fixture, _opts), do: nil
+
+  defp live_lm(:live, opts) do
+    api_key =
+      System.get_env("OPENAI_API_KEY") || Mix.raise("OPENAI_API_KEY is required for --live")
+
+    model = Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
+    DSEx.openai(model, api_key: api_key)
+  end
+end

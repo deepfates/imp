@@ -20,6 +20,7 @@ defmodule DSEx.MixProject do
           "docs/ARCHITECTURE.md",
           "docs/API_GUIDE.md",
           "docs/ADVANCED.md",
+          "docs/BENCHMARK_TRUTH.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "docs/COVERAGE_MATRIX.md",
           "docs/RELEASE_CRITERIA.md",
@@ -54,6 +55,8 @@ defmodule DSEx.MixProject do
         "protocol.training.check": :test,
         "protocol.retriever.check": :test,
         "protocol.mcp.check": :test,
+        "benchmark.truth.check": :test,
+        "benchmark.live.check": :test,
         "live.check": :test,
         "quality.check": :test
       ]
@@ -95,6 +98,7 @@ defmodule DSEx.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
+        "benchmark.truth.check",
         "docs"
       ],
       "integration.check": [
@@ -111,6 +115,13 @@ defmodule DSEx.MixProject do
       ],
       "protocol.mcp.check": [
         "test --only protocol_mcp test/protocol_mcp"
+      ],
+      "benchmark.truth.check": [
+        "test test/benchmark_truth_test.exs"
+      ],
+      "benchmark.live.check": [
+        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+        "dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
       ],
       "live.check": [
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"

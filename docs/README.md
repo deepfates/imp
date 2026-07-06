@@ -18,13 +18,15 @@ alongside the code and tests, not instead of them.
    MCP-style catalogs, ReActV2, and RLM.
 7. [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA, agents, MCP, schemas,
    and deterministic benchmark fixtures.
-8. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
+8. [Benchmark Truth](BENCHMARK_TRUTH.md): real-dataset benchmark evidence,
+   manifests, result artifacts, and live-provider research smoke runs.
+9. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
    security posture, and release discipline.
-9. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
+10. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
    supervision/runtime boundaries.
-10. [Coverage Matrix](COVERAGE_MATRIX.md): the release truth table mapping
+11. [Coverage Matrix](COVERAGE_MATRIX.md): the release truth table mapping
     upstream concepts to DSEx surfaces, tests, docs, and V3 decisions.
-11. [Release Criteria](RELEASE_CRITERIA.md): production gate criteria and the
+12. [Release Criteria](RELEASE_CRITERIA.md): production gate criteria and the
     external references used to define release readiness.
 
 ## Livebooks

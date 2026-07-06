@@ -41,12 +41,22 @@ defmodule DatasetsContractTest do
     hotpot_path = tmp_path("typed-hotpot.jsonl")
     math_path = tmp_path("typed-math.jsonl")
 
-    File.write!(gsm8k_path, ~s({"question":"2+2?","answer":"4"}\n))
-    File.write!(hotpot_path, ~s({"question":"q","context":["c1"],"answer":"a"}\n))
+    File.write!(
+      gsm8k_path,
+      ~s({"question":"2+2?","answer":"work #### 4","canonical_answer":"4","source_task":"gsm8k"}\n)
+    )
+
+    File.write!(
+      hotpot_path,
+      ~s({"id":"hp","question":"q","context":["c1"],"answer":"a","supporting_facts":{"title":["t"],"sent_id":[0]},"source_task":"hotpotqa"}\n)
+    )
+
     File.write!(math_path, ~s({"problem":"1+1","solution":"2","answer":"2"}\n))
 
     assert [%DSEx.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
     assert DSEx.Example.to_map(DSEx.Example.inputs(gsm8k)) == %{question: "2+2?"}
+    assert DSEx.Example.get(gsm8k, :canonical_answer) == "4"
+    assert DSEx.Example.get(gsm8k, :source_task) == "gsm8k"
 
     assert [%DSEx.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
 
@@ -54,6 +64,9 @@ defmodule DatasetsContractTest do
              question: "q",
              context: ["c1"]
            }
+
+    assert DSEx.Example.get(hotpot, :id) == "hp"
+    assert DSEx.Example.get(hotpot, :supporting_facts) == %{"title" => ["t"], "sent_id" => [0]}
 
     assert [%DSEx.Example{} = math] = Datasets.MATH.load(math_path)
     assert DSEx.Example.to_map(DSEx.Example.inputs(math)) == %{problem: "1+1"}

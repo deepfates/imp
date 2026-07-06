@@ -12,6 +12,8 @@
 
 # Temporary files, for example, from tests.
 /tmp/
+/benchmarks/data/
+/benchmarks/results/
 
 # Local provider credentials.
 .env

@@ -1,0 +1,3 @@
+{"id":"hp-1","question":"Were Scott Derrickson and Ed Wood of the same nationality?","answer":"yes","context":"Scott Derrickson: Scott Derrickson is an American film director.\nEd Wood: Ed Wood was an American filmmaker.","supporting_facts":{"title":["Scott Derrickson","Ed Wood"],"sent_id":[0,0]},"source_task":"hotpotqa"}
+{"id":"hp-2","question":"What government position was held by the woman who portrayed Corliss Archer?","answer":"Chief of Protocol","context":"Corliss Archer: The character was portrayed by Shirley Temple.\nShirley Temple: Shirley Temple served as United States Chief of Protocol.","supporting_facts":{"title":["Corliss Archer","Shirley Temple"],"sent_id":[0,0]},"source_task":"hotpotqa"}
+
