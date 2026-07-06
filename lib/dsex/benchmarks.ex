@@ -1,5 +1,5 @@
-defmodule DSEx.V2.Benchmarks do
-  @moduledoc "Deterministic V2 benchmark fixtures for production gates."
+defmodule DSEx.Benchmarks do
+  @moduledoc "Deterministic benchmark fixtures for production gates."
 
   alias DSEx.Agent
   alias DSEx.Optimize.Anything
@@ -24,7 +24,7 @@ defmodule DSEx.V2.Benchmarks do
       end)
 
     if failures != [] do
-      raise "V2 benchmark regressions: #{inspect(failures)}"
+      raise "benchmark regressions: #{inspect(failures)}"
     end
 
     results
@@ -47,7 +47,7 @@ defmodule DSEx.V2.Benchmarks do
       end)
 
     if false_passes != [] do
-      raise "V2 benchmark negative controls passed unexpectedly: #{inspect(false_passes)}"
+      raise "benchmark negative controls passed unexpectedly: #{inspect(false_passes)}"
     end
 
     negative_controls()

@@ -6,18 +6,19 @@ catalogs, schema constraints, and deterministic benchmark fixtures.
 
 ## Gates
 
-V2 is part of the production gate. These commands must pass before release:
+Advanced DSEx behavior is part of the production gate. These commands must pass
+before release:
 
 ```sh
-mix v2.check
 mix production.check
 mix integration.check
 LIVE_PROVIDER=1 mix live.check
 ```
 
-`mix v2.check` enforces warnings-as-errors compilation, formatting, and V2
-benchmark tests. The benchmark suite includes positive controls that must
-reach threshold and negative controls that must remain below threshold.
+`mix production.check` enforces warnings-as-errors compilation, formatting,
+documentation generation, public surface checks, and deterministic benchmark
+tests. The benchmark suite includes positive controls that must reach threshold
+and negative controls that must remain below threshold.
 
 ## Optimize Anything
 
@@ -120,7 +121,7 @@ return retry feedback suitable for another model attempt.
 ## Benchmarks
 
 ```elixir
-DSEx.V2.Benchmarks.assert_pass!()
+DSEx.Benchmarks.assert_pass!()
 ```
 
 The current deterministic benchmark fixture covers:
@@ -140,7 +141,7 @@ JSON-safe persistence where applicable, and keep provider credentials out of
 saved artifacts.
 
 MCP support covers catalog import plus JSON-RPC HTTP, stdio, and Streamable HTTP
-clients. The V2 benchmark fixtures are deterministic regression fixtures for
+clients. The benchmark fixtures are deterministic regression fixtures for
 DSEx behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared DSEx
 contracts and tested through injectable transports.

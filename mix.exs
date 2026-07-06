@@ -19,7 +19,7 @@ defmodule DSEx.MixProject do
           "docs/PRIOR_ART.md",
           "docs/ARCHITECTURE.md",
           "docs/API_GUIDE.md",
-          "docs/V2.md",
+          "docs/ADVANCED.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "docs/COVERAGE_MATRIX.md",
           "docs/RELEASE_CRITERIA.md",
@@ -48,7 +48,6 @@ defmodule DSEx.MixProject do
     [
       preferred_envs: [
         "production.check": :test,
-        "v2.check": :test,
         "public_surface.check": :test,
         "integration.check": :test,
         "live.check": :test,
@@ -96,11 +95,6 @@ defmodule DSEx.MixProject do
         "compile --warnings-as-errors",
         "test --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp",
         "docs"
-      ],
-      "v2.check": [
-        "format --check-formatted",
-        "compile --warnings-as-errors",
-        "test --include v2 --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp"
       ],
       "integration.check": [
         "test --only integration test/integration"

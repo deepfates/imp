@@ -15,6 +15,5 @@ jobs:
           elixir-version: "1.19"
       - run: mix deps.get
       - run: mix production.check
-      - run: mix v2.check
       - run: mix integration.check
       - run: mix quality.check

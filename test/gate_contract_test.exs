@@ -1,7 +1,7 @@
 defmodule GateContractTest do
   use ExUnit.Case, async: true
 
-  test "production and v2 gates encode the release contract" do
+  test "production gates encode the release contract" do
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
 
     assert Keyword.fetch!(aliases, :"production.check") == [
@@ -11,11 +11,8 @@ defmodule GateContractTest do
              "docs"
            ]
 
-    assert Keyword.fetch!(aliases, :"v2.check") == [
-             "format --check-formatted",
-             "compile --warnings-as-errors",
-             "test --include v2 --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp"
-           ]
+    retired_gate = String.to_atom("v2" <> ".check")
+    refute Keyword.has_key?(aliases, retired_gate)
 
     assert Keyword.fetch!(aliases, :"integration.check") == [
              "test --only integration test/integration"

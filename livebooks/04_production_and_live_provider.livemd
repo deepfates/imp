@@ -11,7 +11,6 @@ Run these in a terminal from the repo root:
 
 ```sh
 mix production.check
-mix v2.check
 mix integration.check
 ```
 

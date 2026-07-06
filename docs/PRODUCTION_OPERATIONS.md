@@ -8,7 +8,6 @@ Run from a clean tree:
 
 ```sh
 mix production.check
-mix v2.check
 mix integration.check
 mix quality.check
 ```
@@ -88,16 +87,8 @@ Dependency policy:
 - format check
 - compile with warnings as errors
 - the deterministic non-live, non-integration test suite, including the public
-  surface contract
+  surface contract, benchmark positive controls, and benchmark negative controls
 - documentation generation with ExDoc
-
-`mix v2.check` runs:
-
-- format check
-- compile with warnings as errors
-- the deterministic suite with V2-tagged tests included
-- V2 positive controls and negative controls, including reward-encoding
-  program-optimization fixtures
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other
@@ -220,8 +211,8 @@ Before tagging:
 
 1. `git status --short` is clean.
 2. `mix production.check` passes.
-3. `mix v2.check` passes.
-4. `mix integration.check` passes.
+3. `mix integration.check` passes.
+4. `mix quality.check` passes.
 5. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
 6. Any production claim about live training, external retrievers, or external
    MCP servers is backed by the corresponding opt-in live gate.
@@ -235,10 +226,10 @@ Public surface failure:
 mix public_surface.check
 ```
 
-V2 failure:
+Benchmark failure:
 
 ```sh
-mix test --include v2
+mix test test/benchmark_test.exs
 ```
 
 Local integration failure:

@@ -44,7 +44,6 @@ mix test
 
 ```sh
 mix production.check
-mix v2.check
 mix integration.check
 LIVE_PROVIDER=1 mix live.check
 ```

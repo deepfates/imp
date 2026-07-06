@@ -156,6 +156,6 @@ belong in production gates, but they are useful here because their passing and
 failing cases are small enough to inspect while learning.
 
 ```elixir
-DSEx.V2.Benchmarks.assert_pass!()
-DSEx.V2.Benchmarks.assert_negative_controls!()
+DSEx.Benchmarks.assert_pass!()
+DSEx.Benchmarks.assert_negative_controls!()
 ```

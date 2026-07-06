@@ -49,7 +49,6 @@ Required gates:
 
 ```sh
 mix production.check
-mix v2.check
 mix integration.check
 mix quality.check
 LIVE_PROVIDER=1 mix live.check
@@ -75,12 +74,11 @@ DSEx V3 is complete when:
 1. `tk ready -T dsex` returns no V3 release blockers.
 2. `tk dep cycle` reports no cycles.
 3. `mix production.check` passes.
-4. `mix v2.check` passes.
-5. `mix integration.check` passes.
-6. `mix quality.check` passes.
-7. GitHub Actions runs the deterministic release gates:
-   `production.check`, `v2.check`, `integration.check`, and `quality.check`.
-8. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
-9. Any public production claim about training, retrievers, or MCP is backed by
+4. `mix integration.check` passes.
+5. `mix quality.check` passes.
+6. GitHub Actions runs the deterministic release gates:
+   `production.check`, `integration.check`, and `quality.check`.
+7. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
+8. Any public production claim about training, retrievers, or MCP is backed by
    an integration/live gate, or the claim is removed.
-10. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+9. The docs and Livebooks teach DSEx as a coherent Elixir-native system.

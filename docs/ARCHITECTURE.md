@@ -268,7 +268,7 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
   explicit real trainer backend is supplied. DSEx does not include an in-process
   local training fallback.
 
-V2 arbitrary artifact optimization lives under `DSEx.Optimize.*`:
+Arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 
 - `DSEx.Optimize.Anything`
 - `DSEx.Optimize.GEPA`
@@ -313,9 +313,8 @@ ambient environment credentials.
 
 ## Gates
 
-The production and V2 gates are not docs-only promises:
+The production gates are not docs-only promises:
 
 - `mix production.check`
-- `mix v2.check`
 - `mix integration.check`
 - `LIVE_PROVIDER=1 mix live.check`

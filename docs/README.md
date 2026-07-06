@@ -16,7 +16,7 @@ alongside the code and tests, not instead of them.
    optimizer reports, and artifact optimization.
 6. [Livebook 03](../livebooks/03_agents_tools_mcp_rlm.livemd): tools, agents,
    MCP-style catalogs, ReActV2, and RLM.
-7. [Advanced DSEx](V2.md): artifact optimization, GEPA, agents, MCP, schemas,
+7. [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA, agents, MCP, schemas,
    and deterministic benchmark fixtures.
 8. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
    security posture, and release discipline.

@@ -30,7 +30,7 @@ defmodule LivebookContractTest do
     body = File.read!("livebooks/04_production_and_live_provider.livemd")
 
     assert body =~ "mix production.check"
-    assert body =~ "mix v2.check"
+    refute body =~ "mix " <> "v2" <> ".check"
     assert body =~ "mix integration.check"
     assert body =~ "LIVE_PROVIDER=1 mix live.check"
   end
