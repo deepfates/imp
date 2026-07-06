@@ -7,7 +7,7 @@ defmodule GateContractTest do
     assert Keyword.fetch!(aliases, :"production.check") == [
              "format --check-formatted",
              "compile --warnings-as-errors",
-             "test --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp",
+             "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
              "docs"
            ]
 
@@ -18,20 +18,16 @@ defmodule GateContractTest do
              "test --only integration test/integration"
            ]
 
+    assert Keyword.fetch!(aliases, :"protocol.check") == [
+             "test --include protocol_training --include protocol_retriever --include protocol_mcp test/protocol_training test/protocol_retriever test/protocol_mcp"
+           ]
+
     assert Keyword.fetch!(aliases, :"live.check") == [
              "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
            ]
 
-    assert Keyword.fetch!(aliases, :"live.training.check") == [
-             "test --only live_training test/live_training"
-           ]
-
-    assert Keyword.fetch!(aliases, :"live.retriever.check") == [
-             "test --only live_retriever test/live_retriever"
-           ]
-
-    assert Keyword.fetch!(aliases, :"live.mcp.check") == [
-             "test --only live_mcp test/live_mcp"
-           ]
+    refute Keyword.has_key?(aliases, String.to_atom("live" <> ".training.check"))
+    refute Keyword.has_key?(aliases, String.to_atom("live" <> ".retriever.check"))
+    refute Keyword.has_key?(aliases, String.to_atom("live" <> ".mcp.check"))
   end
 end

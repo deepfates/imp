@@ -166,7 +166,7 @@ defmodule DSEx.Agent do
         owner = self()
         ref = make_ref()
         runtime = %{runtime | event_sink: fn event -> send(owner, {:agent_event, ref, event}) end}
-        task = DSEx.Tasks.async(fn -> run(agent, inputs, runtime) end)
+        task = DSEx.Tasks.async_nolink(fn -> run(agent, inputs, runtime) end)
         %{task: task, ref: ref, done?: false}
       end,
       fn

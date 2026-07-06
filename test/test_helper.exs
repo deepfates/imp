@@ -38,9 +38,9 @@ DSEx.Test.EnvLoader.load()
 external_excludes =
   [
     {"LIVE_PROVIDER", :live},
-    {"LIVE_TRAINING", :live_training},
-    {"LIVE_RETRIEVER", :live_retriever},
-    {"LIVE_MCP", :live_mcp}
+    {"PROTOCOL_TRAINING", :protocol_training},
+    {"PROTOCOL_RETRIEVER", :protocol_retriever},
+    {"PROTOCOL_MCP", :protocol_mcp}
   ]
   |> Enum.reject(fn {env, _tag} -> System.get_env(env) in ["1", "true", "TRUE", "yes"] end)
   |> Enum.map(fn {_env, tag} -> {tag, true} end)

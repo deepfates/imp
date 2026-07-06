@@ -9,6 +9,7 @@ Run from a clean tree:
 ```sh
 mix production.check
 mix integration.check
+mix protocol.check
 mix quality.check
 ```
 
@@ -21,13 +22,10 @@ set +a
 LIVE_PROVIDER=1 mix live.check
 ```
 
-Stateful or external-service gates are opt-in because they may create provider
-resources, depend on private infrastructure, or talk to trusted MCP servers:
+Live provider inference is opt-in because it requires external credentials:
 
 ```sh
-LIVE_TRAINING=1 mix live.training.check
-LIVE_RETRIEVER=1 mix live.retriever.check
-LIVE_MCP=1 mix live.mcp.check
+LIVE_PROVIDER=1 mix live.check
 ```
 
 ## Runtime Posture
@@ -100,6 +98,20 @@ The current integration gate proves:
 - HTTP MCP initialize, discovery, and tool-call flow through a local JSON-RPC server
 - stdio MCP discovery and tool-call flow through a trusted local executable
 
+`mix protocol.check` runs provider-compatible protocol tests over local
+controlled endpoints. It proves DSEx's production HTTP/MCP/training/retriever
+code paths and wire-shape handling, but it does not claim paid external service
+state:
+
+- `mix protocol.training.check` proves provider-compatible training
+  submit/refresh over the production HTTP transport and provider trainer/job
+  lifecycle.
+- `mix protocol.retriever.check` proves Weaviate-compatible and
+  Databricks-compatible retriever requests over the production HTTP transport.
+- `mix protocol.mcp.check` proves JSON-RPC HTTP, Streamable HTTP with SSE
+  decoding, and trusted stdio MCP clients through imported tool discovery and
+  tool-call execution.
+
 `mix quality.check` runs the static warning gate. CI must run it alongside the
 deterministic release gates so style and maintainability regressions are caught
 before merge, not only during local release preparation.
@@ -115,19 +127,6 @@ The live provider tests prove a real provider can execute:
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
-The stateful live aliases are opt-in gates. They are intentionally separate
-from the default release gate because they may create provider resources, depend
-on private infrastructure, or talk to trusted services. A release may only claim
-one of these external systems is live-proven when the corresponding alias
-contains real service tests:
-
-- `mix live.training.check` proves provider-compatible training submit/refresh
-  over the production HTTP transport and provider trainer/job lifecycle.
-- `mix live.retriever.check` proves Weaviate-compatible and
-  Databricks-compatible retriever requests over the production HTTP transport.
-- `mix live.mcp.check` proves JSON-RPC HTTP, Streamable HTTP, and trusted
-  stdio MCP clients through imported tool discovery and tool-call execution.
-
 ## What The Gates Do Not Prove
 
 They do not prove:
@@ -135,8 +134,8 @@ They do not prove:
 - every possible provider feature or future model response shape
 - every provider-specific feature is live-tested
 - paid provider-side training jobs, external MCP servers, or external retriever
-  services unless the matching opt-in live alias contains real service tests and
-  is configured/run
+  services; `protocol.*` gates prove provider-compatible local protocol
+  behavior, not account-specific external service state
 - credentials are safe if a local `.env` has leaked elsewhere
 
 ## Secret Handling
@@ -212,11 +211,12 @@ Before tagging:
 1. `git status --short` is clean.
 2. `mix production.check` passes.
 3. `mix integration.check` passes.
-4. `mix quality.check` passes.
-5. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
-6. Any production claim about live training, external retrievers, or external
-   MCP servers is backed by the corresponding opt-in live gate.
-7. Docs and Livebooks match the current public API.
+4. `mix protocol.check` passes.
+5. `mix quality.check` passes.
+6. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
+7. Any production claim about paid training, external retrievers, or external
+   MCP servers is backed by dedicated external-service tests.
+8. Docs and Livebooks match the current public API.
 
 ## Debugging Gates
 
@@ -236,6 +236,12 @@ Local integration failure:
 
 ```sh
 mix integration.check
+```
+
+Protocol failure:
+
+```sh
+mix protocol.check
 ```
 
 Provider failure:

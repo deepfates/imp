@@ -22,6 +22,27 @@ defmodule ProductionHardeningTest do
     end
   end
 
+  defmodule TransientErrorTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts) do
+      count = Process.get(:transient_error_count, 0)
+      Process.put(:transient_error_count, count + 1)
+
+      if count == 0 do
+        {:error, :temporary_unavailable}
+      else
+        {:ok,
+         %{
+           status: 200,
+           headers: [],
+           body: Jason.encode!(%{choices: [%{message: %{content: "Answer: recovered"}}]})
+         }}
+      end
+    end
+  end
+
   test "HTTP LM retries retryable provider failures" do
     Process.delete(:flaky_count)
 
@@ -76,6 +97,36 @@ defmodule ProductionHardeningTest do
     assert is_integer(duration)
   after
     Process.delete(:flaky_count)
+  end
+
+  test "HTTP LM cache does not store transient errors" do
+    DSEx.Cache.clear()
+    Process.delete(:transient_error_count)
+
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :cache, :miss],
+        [:dsex, :cache, :hit]
+      ])
+
+    lm =
+      DSEx.Clients.OpenAI.new("gpt-test",
+        api_key: "sk-test",
+        transport: TransientErrorTransport,
+        opts: [cache: true, num_retries: 0]
+      )
+
+    messages = [%{role: :user, content: "cache transient"}]
+
+    assert {:error, :temporary_unavailable} = DSEx.LM.generate(lm, messages, [])
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
+    assert Process.get(:transient_error_count) == 2
+
+    assert_received {^ref, [:dsex, :cache, :miss], _, _}
+    assert_received {^ref, [:dsex, :cache, :hit], _, _}
+  after
+    Process.delete(:transient_error_count)
   end
 
   @tag capture_log: true

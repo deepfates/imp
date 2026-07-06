@@ -17,6 +17,15 @@ defmodule ProviderStreamingTest do
     end
   end
 
+  defp function_sse_transport(_url, _headers, _body, _opts) do
+    {:ok,
+     %{
+       status: 200,
+       headers: [],
+       body: ~s(data: {"choices":[{"delta":{"content":"fn"},"finish_reason":"stop"}]}\n\n)
+     }}
+  end
+
   test "HTTP LM parses OpenAI-style SSE streaming chunks" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
@@ -51,5 +60,18 @@ defmodule ProviderStreamingTest do
       |> Enum.join()
 
     assert text == "pong"
+  end
+
+  test "function transports stream through the same buffered fallback shape as module transports" do
+    lm =
+      DSEx.Clients.OpenAI.new("gpt-test",
+        api_key: "sk-test",
+        transport: &function_sse_transport/4
+      )
+
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: "fn"}] =
+             lm
+             |> DSEx.Clients.HTTPLM.stream([%{role: :user, content: "stream"}])
+             |> Enum.reject(& &1.done)
   end
 end

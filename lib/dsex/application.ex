@@ -10,7 +10,8 @@ defmodule DSEx.Application do
     children = [
       DSEx.Settings,
       DSEx.Cache,
-      {Task.Supervisor, name: DSEx.TaskSupervisor}
+      {Task.Supervisor, name: DSEx.TaskSupervisor},
+      {Task.Supervisor, name: DSEx.UnlinkedTaskSupervisor}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -50,10 +50,11 @@ defmodule DSEx.MixProject do
         "production.check": :test,
         "public_surface.check": :test,
         "integration.check": :test,
+        "protocol.check": :test,
+        "protocol.training.check": :test,
+        "protocol.retriever.check": :test,
+        "protocol.mcp.check": :test,
         "live.check": :test,
-        "live.training.check": :test,
-        "live.retriever.check": :test,
-        "live.mcp.check": :test,
         "quality.check": :test
       ]
     ]
@@ -93,23 +94,26 @@ defmodule DSEx.MixProject do
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "test --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp",
+        "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
         "docs"
       ],
       "integration.check": [
         "test --only integration test/integration"
       ],
+      "protocol.check": [
+        "test --include protocol_training --include protocol_retriever --include protocol_mcp test/protocol_training test/protocol_retriever test/protocol_mcp"
+      ],
+      "protocol.training.check": [
+        "test --only protocol_training test/protocol_training"
+      ],
+      "protocol.retriever.check": [
+        "test --only protocol_retriever test/protocol_retriever"
+      ],
+      "protocol.mcp.check": [
+        "test --only protocol_mcp test/protocol_mcp"
+      ],
       "live.check": [
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
-      ],
-      "live.training.check": [
-        "test --only live_training test/live_training"
-      ],
-      "live.retriever.check": [
-        "test --only live_retriever test/live_retriever"
-      ],
-      "live.mcp.check": [
-        "test --only live_mcp test/live_mcp"
       ],
       "quality.check": [
         "credo --only warning"

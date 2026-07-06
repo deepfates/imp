@@ -1,9 +1,9 @@
-defmodule LiveMCPProviderTest do
+defmodule ProtocolMCPProviderTest do
   use ExUnit.Case
 
-  @moduletag :live_mcp
+  @moduletag :protocol_mcp
 
-  test "live MCP gate exercises JSON-RPC HTTP and Streamable HTTP clients" do
+  test "protocol MCP gate exercises JSON-RPC HTTP and Streamable HTTP clients" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
         [:dsex, :mcp, :http, :start],
@@ -71,7 +71,7 @@ defmodule LiveMCPProviderTest do
     assert_received {^ref, [:dsex, :mcp, :streamable_http, :start], _, %{method: "initialize"}}
   end
 
-  test "live MCP gate exercises trusted stdio client" do
+  test "protocol MCP gate exercises trusted stdio client" do
     script =
       Path.join(System.tmp_dir!(), "dsex-live-mcp-#{System.unique_integer([:positive])}.exs")
 

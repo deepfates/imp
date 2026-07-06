@@ -22,6 +22,17 @@ defmodule DSEx.Tasks do
     end
   end
 
+  def async_nolink(fun) when is_function(fun, 0) do
+    case Process.whereis(@supervisor) do
+      nil ->
+        {:ok, supervisor} = Task.Supervisor.start_link()
+        Task.Supervisor.async_nolink(supervisor, fun)
+
+      _pid ->
+        Task.Supervisor.async_nolink(@supervisor, fun)
+    end
+  end
+
   def async_stream(enumerable, fun, opts \\ []) when is_function(fun, 1) do
     case Process.whereis(@supervisor) do
       nil -> Task.async_stream(enumerable, fun, opts)

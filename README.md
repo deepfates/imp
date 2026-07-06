@@ -45,12 +45,13 @@ mix test
 ```sh
 mix production.check
 mix integration.check
+mix protocol.check
 LIVE_PROVIDER=1 mix live.check
 ```
 
 See [Production Operations](docs/PRODUCTION_OPERATIONS.md) for the current gate
-contract. The integration gate validates local service boundaries; the live gate
-validates prediction, structured JSON, chain-of-thought, streaming, ReActV2 tool
-calls, orchestration wrappers, and program-of-thought sandbox execution against a
-real provider using local `.env` credentials, including the ReqLLM-backed DSEx
-client path.
+contract. The integration and protocol gates validate local service and
+provider-compatible protocol boundaries; the live gate validates prediction,
+structured JSON, chain-of-thought, streaming, ReActV2 tool calls, orchestration
+wrappers, and program-of-thought sandbox execution against a real provider using
+local `.env` credentials, including the ReqLLM-backed DSEx client path.

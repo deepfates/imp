@@ -50,17 +50,18 @@ Required gates:
 ```sh
 mix production.check
 mix integration.check
+mix protocol.check
 mix quality.check
 LIVE_PROVIDER=1 mix live.check
 ```
 
-Stateful or paid external workflows have explicit opt-in gates instead of being
-smuggled into the default release path:
+Provider-compatible protocol workflows have explicit local gates instead of
+being smuggled into the live-provider path:
 
 ```sh
-LIVE_TRAINING=1 mix live.training.check
-LIVE_RETRIEVER=1 mix live.retriever.check
-LIVE_MCP=1 mix live.mcp.check
+mix protocol.training.check
+mix protocol.retriever.check
+mix protocol.mcp.check
 ```
 
 If DSEx does not support one of those workflows as production surface, the API
@@ -75,10 +76,13 @@ DSEx V3 is complete when:
 2. `tk dep cycle` reports no cycles.
 3. `mix production.check` passes.
 4. `mix integration.check` passes.
-5. `mix quality.check` passes.
-6. GitHub Actions runs the deterministic release gates:
-   `production.check`, `integration.check`, and `quality.check`.
-7. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
-8. Any public production claim about training, retrievers, or MCP is backed by
-   an integration/live gate, or the claim is removed.
-9. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+5. `mix protocol.check` passes.
+6. `mix quality.check` passes.
+7. GitHub Actions runs the deterministic release gates:
+   `production.check`, `integration.check`, `protocol.check`, and
+   `quality.check`.
+8. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
+9. Any public production claim about paid training, external retrievers, or
+   external MCP servers is backed by dedicated external-service tests, or the
+   claim is removed.
+10. The docs and Livebooks teach DSEx as a coherent Elixir-native system.

@@ -1,9 +1,9 @@
-defmodule LiveTrainingProviderLifecycleTest do
+defmodule ProtocolTrainingProviderLifecycleTest do
   use ExUnit.Case
 
-  @moduletag :live_training
+  @moduletag :protocol_training
 
-  test "live training gate exercises provider-compatible submit and refresh lifecycle" do
+  test "protocol training gate exercises provider-compatible submit and refresh lifecycle" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
         [:dsex, :training, :submit, :start],
@@ -26,17 +26,17 @@ defmodule LiveTrainingProviderLifecycleTest do
 
             {200,
              %{
-               id: "ftjob_live_training_gate",
+               id: "ftjob_protocol_training_gate",
                status: "running",
                model: payload["model"]
              }}
 
-          "/v1/fine_tuning/jobs/ftjob_live_training_gate" ->
-            assert payload["job_id"] == "ftjob_live_training_gate"
+          "/v1/fine_tuning/jobs/ftjob_protocol_training_gate" ->
+            assert payload["job_id"] == "ftjob_protocol_training_gate"
 
             {200,
              %{
-               id: "ftjob_live_training_gate",
+               id: "ftjob_protocol_training_gate",
                status: "succeeded",
                fine_tuned_model: "ft:gpt-training-test:dsex:live-gate"
              }}
@@ -59,7 +59,7 @@ defmodule LiveTrainingProviderLifecycleTest do
              )
 
     assert %DSEx.Clients.TrainingJob{
-             id: "ftjob_live_training_gate",
+             id: "ftjob_protocol_training_gate",
              provider: :openai,
              model: "gpt-training-test",
              status: :running
@@ -73,6 +73,6 @@ defmodule LiveTrainingProviderLifecycleTest do
                      %{provider: :openai, model: "gpt-training-test"}}
 
     assert_received {^ref, [:dsex, :training, :refresh, :start], _measurements,
-                     %{provider: :openai, job_id: "ftjob_live_training_gate"}}
+                     %{provider: :openai, job_id: "ftjob_protocol_training_gate"}}
   end
 end

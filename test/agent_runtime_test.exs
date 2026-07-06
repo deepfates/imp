@@ -96,6 +96,19 @@ defmodule AgentRuntimeTest do
              runtime.traces
   end
 
+  @tag :capture_log
+  test "stream_events reports worker crashes as structured error events" do
+    agent =
+      Agent.new(:boom, fn _inputs, _runtime ->
+        raise "stream worker exploded"
+      end)
+
+    assert [%{type: :error, error: {%RuntimeError{message: "stream worker exploded"}, _stack}}] =
+             agent
+             |> Agent.stream_events(%{})
+             |> Enum.to_list()
+  end
+
   test "runtime redacts sensitive trace keys" do
     echo = DSEx.Tool.new(:echo, "echo", fn input -> input end)
 

@@ -51,6 +51,64 @@ defmodule MCPImportTest do
     end
   end
 
+  defmodule MCPErrorTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, body, _opts) do
+      decoded = Jason.decode!(body)
+
+      response =
+        case decoded["method"] do
+          "initialize" ->
+            %{"jsonrpc" => "2.0", "id" => decoded["id"], "result" => %{}}
+
+          "notifications/initialized" ->
+            %{"jsonrpc" => "2.0", "result" => %{}}
+
+          "tools/list" ->
+            %{
+              "jsonrpc" => "2.0",
+              "id" => decoded["id"],
+              "result" => %{
+                "tools" => [
+                  %{
+                    "name" => "remote_fail",
+                    "description" => "fails remotely",
+                    "input_schema" => %{"type" => "object"}
+                  }
+                ]
+              }
+            }
+
+          "tools/call" ->
+            %{
+              "jsonrpc" => "2.0",
+              "id" => decoded["id"],
+              "error" => %{"code" => -32_000, "message" => "remote failed"}
+            }
+        end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(response)}}
+    end
+  end
+
+  defmodule MCPSSETransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(url, headers, body, opts) do
+      with {:ok, %{body: response}} <- MCPTransport.post(url, headers, body, opts) do
+        {:ok,
+         %{
+           status: 200,
+           headers: [{"content-type", "text/event-stream"}],
+           body: "event: message\ndata: #{response}\n\n"
+         }}
+      end
+    end
+  end
+
   test "imports MCP-style catalog tools and runs them through an agent" do
     catalog =
       MCP.Catalog.new([
@@ -166,6 +224,16 @@ defmodule MCPImportTest do
     Process.delete(:mcp_requests)
   end
 
+  test "HTTP MCP client returns JSON-RPC errors as tool errors" do
+    [tool] =
+      "https://mcp.example/tools"
+      |> MCP.HTTPClient.new(transport: MCPErrorTransport)
+      |> MCP.import_tools()
+
+    assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
+             DSEx.Tool.call(tool, %{})
+  end
+
   test "stdio MCP client encodes JSON-RPC lines for process transports" do
     line = MCP.StdioClient.encode("tools/list", %{}, 123)
 
@@ -178,7 +246,7 @@ defmodule MCPImportTest do
   test "streamable HTTP MCP client sends session headers and decodes SSE data" do
     client =
       MCP.StreamableHTTPClient.new("https://mcp.example/stream",
-        transport: MCPTransport,
+        transport: MCPSSETransport,
         session_id: "session-1"
       )
 
@@ -193,6 +261,16 @@ defmodule MCPImportTest do
     assert call_request.body["method"] == "tools/call"
   after
     Process.delete(:mcp_requests)
+  end
+
+  test "streamable HTTP MCP client returns JSON-RPC errors as tool errors" do
+    [tool] =
+      "https://mcp.example/stream"
+      |> MCP.StreamableHTTPClient.new(transport: MCPErrorTransport)
+      |> MCP.import_tools()
+
+    assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
+             DSEx.Tool.call(tool, %{})
   end
 
   defp agent_ref, do: Process.get(:agent_ref)

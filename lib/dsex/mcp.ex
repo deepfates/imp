@@ -83,14 +83,21 @@ defmodule DSEx.MCP do
       Map.put(tool, "run", fn arguments ->
         with {:ok, %{status: status, body: response}} when status in 200..299 <-
                post_json(client, "tools/call", %{"name" => name, "arguments" => arguments}),
-             {:ok, decoded} <- Jason.decode(response) do
-          Map.get(decoded, "result", decoded)
+             {:ok, decoded} <- Jason.decode(response),
+             {:ok, result} <- json_rpc_result(decoded) do
+          result
         else
           {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
           {:error, reason} -> {:error, reason}
         end
       end)
     end
+
+    defp json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
+    defp json_rpc_result(%{"result" => result}), do: {:ok, result}
+    defp json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
+    defp json_rpc_result(%{result: result}), do: {:ok, result}
+    defp json_rpc_result(other), do: {:ok, other}
 
     defp post_json(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
@@ -328,11 +335,18 @@ defmodule DSEx.MCP do
 
       Map.put(tool, "run", fn arguments ->
         with {:ok, decoded} <-
-               rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}) do
-          Map.get(decoded, "result", decoded)
+               rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}),
+             {:ok, result} <- json_rpc_result(decoded) do
+          result
         end
       end)
     end
+
+    defp json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
+    defp json_rpc_result(%{"result" => result}), do: {:ok, result}
+    defp json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
+    defp json_rpc_result(%{result: result}), do: {:ok, result}
+    defp json_rpc_result(other), do: {:ok, other}
 
     defp rpc(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}

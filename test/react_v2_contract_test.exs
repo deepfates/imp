@@ -66,4 +66,35 @@ defmodule ReActV2ContractTest do
     assert {:error, {:tool_denied, :lookup}} =
              DSEx.Predict.ReActV2.call(agent, %{question: "q"})
   end
+
+  test "submit short-circuits later provider tool calls" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{
+            tool_calls: [
+              %{name: :submit, arguments: %{answer: "done"}},
+              %{name: :side_effect, arguments: %{}}
+            ]
+          }
+        end
+      ]
+    }
+
+    side_effect =
+      DSEx.Tool.new(:side_effect, "must not run after submit", fn _args ->
+        send(parent, :side_effect_ran)
+        "bad"
+      end)
+
+    agent = DSEx.Predict.ReActV2.new("question -> answer", [side_effect], lm: lm)
+
+    assert {:ok, prediction} = DSEx.Predict.ReActV2.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    refute_received :side_effect_ran
+    assert [%{tool: :submit}] = DSEx.Prediction.get(prediction, :history)
+  end
 end

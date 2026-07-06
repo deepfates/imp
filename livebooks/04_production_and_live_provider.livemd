@@ -12,10 +12,12 @@ Run these in a terminal from the repo root:
 ```sh
 mix production.check
 mix integration.check
+mix protocol.check
 ```
 
 These gates are the local project contract. They check formatting, compilation,
-public-surface tests, deterministic gates, and local service integration.
+public-surface tests, deterministic gates, local service integration, and
+provider-compatible protocol behavior.
 
 ## Security Posture
 

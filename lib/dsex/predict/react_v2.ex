@@ -99,7 +99,7 @@ defmodule DSEx.Predict.ReActV2 do
   end
 
   defp execute_calls(agent, calls) do
-    Enum.reduce(calls, {[], nil}, fn call, {events, final} ->
+    Enum.reduce_while(calls, {[], nil}, fn call, {events, final} ->
       name = normalize_tool_name(agent.tools, Map.get(call, :name) || Map.get(call, "name"))
 
       args =
@@ -118,7 +118,12 @@ defmodule DSEx.Predict.ReActV2 do
 
       event = DSEx.Redaction.redact(%{tool: name, arguments: args, result: result})
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
-      {events ++ [event], final}
+
+      if final do
+        {:halt, {events ++ [event], final}}
+      else
+        {:cont, {events ++ [event], final}}
+      end
     end)
   end
 

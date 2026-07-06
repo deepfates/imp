@@ -1,9 +1,9 @@
-defmodule LiveRetrieverProviderTest do
+defmodule ProtocolRetrieverProviderTest do
   use ExUnit.Case
 
-  @moduletag :live_retriever
+  @moduletag :protocol_retriever
 
-  test "live retriever gate exercises Weaviate-compatible HTTP retrieval" do
+  test "protocol retriever gate exercises Weaviate-compatible HTTP retrieval" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
         [:dsex, :retriever, :start],
@@ -47,7 +47,7 @@ defmodule LiveRetrieverProviderTest do
     assert is_integer(duration)
   end
 
-  test "live retriever gate exercises Databricks-compatible vector-search retrieval" do
+  test "protocol retriever gate exercises Databricks-compatible vector-search retrieval" do
     base_url =
       DSEx.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"

@@ -16,4 +16,5 @@ jobs:
       - run: mix deps.get
       - run: mix production.check
       - run: mix integration.check
+      - run: mix protocol.check
       - run: mix quality.check

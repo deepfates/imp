@@ -63,9 +63,29 @@ defmodule DSEx.Clients.HTTPLM do
     cache_key = cache_key(lm, messages, opts)
 
     if Keyword.get(opts, :cache, false) do
-      DSEx.Cache.fetch_or_store(cache_key, fn -> generate_uncached(lm, messages, opts) end)
+      generate_cached(lm, messages, opts, cache_key)
     else
       generate_uncached(lm, messages, opts)
+    end
+  end
+
+  defp generate_cached(lm, messages, opts, cache_key) do
+    case DSEx.Cache.get(cache_key, :__missing__) do
+      :__missing__ ->
+        DSEx.Telemetry.execute([:dsex, :cache, :miss], %{count: 1}, %{key: cache_key})
+
+        case generate_uncached(lm, messages, opts) do
+          {:ok, _value} = success ->
+            DSEx.Cache.put(cache_key, success)
+            success
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      value ->
+        DSEx.Telemetry.execute([:dsex, :cache, :hit], %{count: 1}, %{key: cache_key})
+        value
     end
   end
 
@@ -299,6 +319,8 @@ defmodule DSEx.Clients.HTTPLM do
 
   defp parse_stream_chunk({:error, reason}),
     do: [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
+
+  defp parse_stream_chunk({:ok, %{body: response}}), do: parse_stream_chunk(response)
 
   defp parse_stream_chunk(chunk) when is_binary(chunk) do
     chunk
