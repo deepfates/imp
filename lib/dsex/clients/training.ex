@@ -147,7 +147,18 @@ defmodule DSEx.Clients.HTTPTrainer do
     response_mapper: nil
   ]
 
+  @option_schema [
+    status_url: [type: {:or, [:string, nil]}],
+    api_key: [type: {:or, [:string, nil]}],
+    transport: [type: :any],
+    headers: [type: {:list, {:tuple, [:any, :any]}}],
+    payload_builder: [type: {:fun, 3}],
+    response_mapper: [type: {:fun, 4}]
+  ]
+
   def new(provider, submit_url, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/3")
+
     %__MODULE__{
       provider: provider,
       submit_url: submit_url,
@@ -246,7 +257,19 @@ defmodule DSEx.Clients.OpenAITrainer do
   `:training_file` either to `new/1` or to `Trainer.finetune/4`.
   """
 
+  @option_schema [
+    base_url: [type: :string],
+    api_key: [type: {:or, [:string, nil]}],
+    transport: [type: :any],
+    training_file: [type: :string],
+    validation_file: [type: :string],
+    suffix: [type: :string],
+    metadata: [type: :map]
+  ]
+
   def new(opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/1")
+
     base =
       Keyword.get(opts, :base_url) || System.get_env("OPENAI_BASE_URL") ||
         "https://api.openai.com/v1"
@@ -302,7 +325,15 @@ end
 defmodule DSEx.Clients.DatabricksTrainer do
   @moduledoc "Databricks training job contract."
 
+  @option_schema [
+    base_url: [type: :string],
+    api_key: [type: {:or, [:string, nil]}],
+    transport: [type: :any]
+  ]
+
   def new(opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/1")
+
     base =
       Keyword.get(opts, :base_url) || System.get_env("DATABRICKS_BASE_URL") ||
         "https://example.cloud.databricks.com"

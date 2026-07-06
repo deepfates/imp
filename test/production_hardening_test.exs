@@ -164,6 +164,32 @@ defmodule ProductionHardeningTest do
     end
   end
 
+  test "network-facing constructors reject unknown or malformed options" do
+    assert_raise ArgumentError, ~r/DSEx.Clients.HTTPLM\.new\/2: unknown options \[:typo\]/, fn ->
+      DSEx.Clients.OpenAI.new("gpt-test", typo: true)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.MCP.StdioClient\.new\/2: invalid value for :timeout/,
+                 fn ->
+                   DSEx.MCP.StdioClient.new("/bin/cat", timeout: 0)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Retrievers.HTTP\.new\/2: invalid value for :body_builder/,
+                 fn ->
+                   DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+                     body_builder: :not_a_fun
+                   )
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.OpenAITrainer\.new\/1: unknown options \[:upload\]/,
+                 fn ->
+                   DSEx.Clients.OpenAITrainer.new(upload: true)
+                 end
+  end
+
   test "saving rejects unsupported program types explicitly" do
     assert_raise ArgumentError, ~r/unsupported saved DSEx program type/, fn ->
       DSEx.Saving.load(%{"type" => "unknown"})

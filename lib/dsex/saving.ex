@@ -102,7 +102,9 @@ defmodule DSEx.Saving do
       "stream" -> :stream
       "timeout" -> :timeout
       "retries" -> :retries
+      "num_retries" -> :num_retries
       "retry_backoff_ms" -> :retry_backoff_ms
+      "max_completion_tokens" -> :max_completion_tokens
       other -> other
     end
   end

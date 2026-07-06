@@ -122,6 +122,17 @@ Production clients are OpenAI-compatible HTTP wrappers:
 The underlying transport is injectable via `DSEx.HTTP`, which is how provider
 contracts are tested without live credentials.
 
+Runtime dependencies are deliberately small and production-oriented:
+
+- `Jason` is the JSON boundary for providers, adapters, datasets, reports, and
+  saved state.
+- `NimbleOptions` validates network-facing and provider-facing constructor
+  options so typos fail before a live request or training job is submitted.
+- `:telemetry` is the stable observability boundary. DSEx keeps a tiny wrapper
+  in `DSEx.Telemetry` so tests can also attach process-local handlers.
+- `ExDoc` is dev/test only and is part of the production gate because generated
+  docs are treated as release artifacts.
+
 ## Retrieval And Datasets
 
 Retrievers:

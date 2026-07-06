@@ -12,7 +12,17 @@ defmodule DSEx.Retrievers.HTTP do
     method: :post
   ]
 
+  @option_schema [
+    transport: [type: :any],
+    headers: [type: {:list, {:tuple, [:any, :any]}}],
+    body_builder: [type: {:fun, 2}],
+    response_mapper: [type: {:fun, 1}],
+    method: [type: :atom]
+  ]
+
   def new(url, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+
     %__MODULE__{
       url: url,
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
@@ -64,7 +74,15 @@ end
 defmodule DSEx.Retrievers.Weaviate do
   @moduledoc "Weaviate GraphQL retriever."
 
+  @option_schema [
+    transport: [type: :any],
+    headers: [type: {:list, {:tuple, [:any, :any]}}],
+    k: [type: :pos_integer],
+    field: [type: :string]
+  ]
+
   def new(base_url, class_name, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/3")
     endpoint = String.trim_trailing(base_url, "/") <> "/v1/graphql"
 
     DSEx.Retrievers.HTTP.new(endpoint,
@@ -108,7 +126,17 @@ end
 defmodule DSEx.Retrievers.Databricks do
   @moduledoc "Databricks Vector Search retriever."
 
+  @option_schema [
+    transport: [type: :any],
+    headers: [type: {:list, {:tuple, [:any, :any]}}],
+    token: [type: {:or, [:string, nil]}],
+    k: [type: :pos_integer],
+    columns: [type: {:list, :string}]
+  ]
+
   def new(endpoint_url, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+
     DSEx.Retrievers.HTTP.new(endpoint_url,
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
       headers: auth_headers(opts) ++ Keyword.get(opts, :headers, []),

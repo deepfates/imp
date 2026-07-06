@@ -17,7 +17,19 @@ defmodule DSEx.Clients.HTTPLM do
 
   @type t :: %__MODULE__{}
 
+  @option_schema [
+    api_key: [type: {:or, [:string, nil]}],
+    base_url: [type: :string],
+    provider: [type: {:in, [:openai, :litellm, :local, :databricks]}],
+    path: [type: :string],
+    transport: [type: :any],
+    headers: [type: {:list, {:tuple, [:any, :any]}}],
+    opts: [type: :keyword_list],
+    test_mode: [type: {:in, [:mock, :fallback, :live, nil]}]
+  ]
+
   def new(model, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
     provider = Keyword.get(opts, :provider, :openai)
 
     %__MODULE__{

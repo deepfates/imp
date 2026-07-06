@@ -21,6 +21,7 @@ defmodule DSEx.MixProject do
           "docs/API_GUIDE.md",
           "docs/V2.md",
           "docs/PRODUCTION_OPERATIONS.md",
+          "docs/COVERAGE_MATRIX.md",
           "docs/COMPLETION_PLAN.md",
           "livebooks/01_programming_not_prompting.livemd",
           "livebooks/02_evaluate_and_optimize.livemd",
@@ -57,6 +58,8 @@ defmodule DSEx.MixProject do
   defp deps do
     [
       {:jason, "~> 1.4"},
+      {:nimble_options, "~> 1.1"},
+      {:telemetry, "~> 1.3"},
       {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]
   end

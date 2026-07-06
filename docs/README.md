@@ -22,7 +22,9 @@ alongside the code and tests, not instead of them.
    security posture, and release discipline.
 9. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
    supervision/runtime boundaries.
-10. [Completion Plan](COMPLETION_PLAN.md): release-blocking V3 criteria and
+10. [Coverage Matrix](COVERAGE_MATRIX.md): the release truth table mapping
+    upstream concepts to DSEx surfaces, tests, docs, and V3 decisions.
+11. [Completion Plan](COMPLETION_PLAN.md): release-blocking V3 criteria and
     the external references used to define production readiness.
 
 ## Livebooks

@@ -25,7 +25,15 @@ defmodule DSEx.MCP do
       protocol_version: "2025-03-26"
     ]
 
+    @option_schema [
+      transport: [type: :any],
+      headers: [type: {:list, {:tuple, [:any, :any]}}],
+      protocol_version: [type: :string]
+    ]
+
     def new(url, opts \\ []) do
+      opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+
       %__MODULE__{
         url: url,
         transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
@@ -114,7 +122,15 @@ defmodule DSEx.MCP do
       timeout: 5_000
     ]
 
+    @option_schema [
+      args: [type: {:list, :string}],
+      protocol_version: [type: :string],
+      timeout: [type: :pos_integer]
+    ]
+
     def new(command, opts \\ []) do
+      opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+
       %__MODULE__{
         command: command,
         args: Keyword.get(opts, :args, []),
@@ -249,7 +265,16 @@ defmodule DSEx.MCP do
       protocol_version: "2025-03-26"
     ]
 
+    @option_schema [
+      transport: [type: :any],
+      headers: [type: {:list, {:tuple, [:any, :any]}}],
+      session_id: [type: {:or, [:string, nil]}],
+      protocol_version: [type: :string]
+    ]
+
     def new(url, opts \\ []) do
+      opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+
       %__MODULE__{
         url: url,
         transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
