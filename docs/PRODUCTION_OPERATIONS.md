@@ -142,6 +142,18 @@ result artifacts under `benchmarks/results/`. It is intentionally not part of
 the fast production gate because it spends provider tokens and depends on
 external dataset and provider availability.
 
+`mix benchmark.parity.check` is a live smoke comparison: it runs DSEx and the
+real Python DSPy package against the same rows and model endpoint, then writes a
+parity artifact with score, latency, error, row-level agreement, and evidence
+scale. It requires a local Python environment with `dspy-ai` installed and live
+provider credentials. It proves wiring, not full parity.
+
+`mix benchmark.parity.full` is the expensive evidence lane. It fetches the full
+canonical GSM8K test and HotPotQA fullwiki validation splits, uses current
+OpenAI-compatible model discovery when `OPENAI_MODEL` is unset, and writes the
+same DSEx-vs-DSPy report schema over the full row set. Use full-lane artifacts,
+not smoke runs, before making production parity claims.
+
 ## What The Gates Do Not Prove
 
 They do not prove:

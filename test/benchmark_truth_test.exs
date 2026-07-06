@@ -24,6 +24,7 @@ defmodule BenchmarkTruthTest do
       DSEx.BenchmarkTruth.fetch(["gsm8k"],
         out_dir: out_dir,
         length: 1,
+        page_delay_ms: 0,
         transport: fn _url -> {:ok, body} end
       )
 
@@ -35,6 +36,42 @@ defmodule BenchmarkTruthTest do
 
     assert byte_size(sha) == 64
     assert [%{"canonical_answer" => "4"}] = result.data_path |> File.read!() |> read_jsonl()
+  end
+
+  test "fetcher paginates full-size requests and records source pages" do
+    out_dir = tmp_dir("fetch-pages")
+    parent = self()
+
+    [result] =
+      DSEx.BenchmarkTruth.fetch(["gsm8k"],
+        out_dir: out_dir,
+        length: 101,
+        page_delay_ms: 0,
+        transport: fn url ->
+          send(parent, {:fetched, URI.decode(url)})
+
+          rows =
+            if String.contains?(url, "offset=0") do
+              Enum.map(1..100, &gsm8k_hf_row/1)
+            else
+              [gsm8k_hf_row(101)]
+            end
+
+          {:ok, Jason.encode!(%{"rows" => rows})}
+        end
+      )
+
+    manifest = Jason.decode!(File.read!(result.manifest_path))
+    rows = result.data_path |> File.read!() |> read_jsonl()
+
+    assert manifest["requested_length"] == 101
+    assert manifest["rows"] == 101
+    assert length(manifest["source_urls"]) == 2
+    assert length(rows) == 101
+    assert_received {:fetched, url}
+    assert url =~ "length=100"
+    assert_received {:fetched, url}
+    assert url =~ "offset=100"
   end
 
   test "HotPotQA normalization flattens title/sentence context" do
@@ -78,6 +115,25 @@ defmodule BenchmarkTruthTest do
              Jason.decode!(File.read!(result.out_path))
   end
 
+  test "benchmark truth runner supports offset chunks" do
+    out_dir = tmp_dir("offset-results")
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
+        out_dir: out_dir,
+        offset: 1,
+        max_examples: 1
+      )
+
+    [task] = result.report["tasks"]
+    [row] = task["rows"]
+
+    assert task["offset"] == 1
+    assert task["examples"] == 1
+    assert row["prediction"][:answer] == "3"
+  end
+
   defp read_jsonl(text) do
     text
     |> String.split("\n", trim: true)
@@ -95,5 +151,14 @@ defmodule BenchmarkTruthTest do
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)
     path
+  end
+
+  defp gsm8k_hf_row(index) do
+    %{
+      "row" => %{
+        "question" => "What is #{index}+0?",
+        "answer" => "Compute #{index}+0. #### #{index}"
+      }
+    }
   end
 end

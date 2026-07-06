@@ -14,15 +14,18 @@ defmodule DSEx.BenchmarkTruth.Runner do
     mode = Keyword.get(opts, :mode, :fixture)
     tasks = Keyword.fetch!(opts, :tasks)
     out_dir = Keyword.get(opts, :out_dir, @default_out_dir)
+    offset = Keyword.get(opts, :offset, 0)
     max_examples = Keyword.get(opts, :max_examples, 20)
     lm = Keyword.get(opts, :lm)
+    model = Keyword.get(opts, :model)
+    optimizer_comparisons? = Keyword.get(opts, :optimizer_comparisons, true)
 
     File.mkdir_p!(out_dir)
 
     task_results =
       tasks
       |> Enum.map(fn {task, path} ->
-        run_task(task, path, mode, max_examples, lm)
+        run_task(task, path, mode, offset, max_examples, lm, model, optimizer_comparisons?)
       end)
 
     report = %{
@@ -32,6 +35,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "git_sha" => git_sha(),
       "elixir" => System.version(),
       "otp" => System.otp_release(),
+      "model" => safe_json(model),
       "tasks" => task_results,
       "aggregate_score" => average(Enum.map(task_results, & &1["score"]))
     }
@@ -43,26 +47,33 @@ defmodule DSEx.BenchmarkTruth.Runner do
     %{report: report, out_path: out_path}
   end
 
-  defp run_task(task, path, mode, max_examples, lm) do
+  defp run_task(task, path, mode, offset, max_examples, lm, model, optimizer_comparisons?) do
     examples =
       task
       |> load_examples(path)
+      |> Enum.drop(offset)
       |> Enum.take(max_examples)
 
     effective_lm = lm || fixture_lm(task, examples)
     program = program(task, effective_lm)
     metric = metric(task)
-    evaluator = DSEx.Evaluate.new(examples, metric, max_errors: :infinity)
-    result = DSEx.Evaluate.run(evaluator, program)
-    optimizer_comparisons = optimizer_comparisons(task, examples, effective_lm, metric)
+    {duration_us, result} = timed(fn -> evaluate(program, examples, metric) end)
+
+    optimizer_comparisons =
+      if optimizer_comparisons?,
+        do: optimizer_comparisons(task, examples, effective_lm, metric),
+        else: []
 
     %{
       "task" => Atom.to_string(task),
       "path" => path,
       "sha256" => file_sha256(path),
       "mode" => Atom.to_string(mode),
+      "model" => safe_json(model),
+      "offset" => offset,
       "examples" => length(examples),
       "score" => result.score,
+      "duration_ms" => us_to_ms(duration_us),
       "optimizer_comparisons" => optimizer_comparisons,
       "errors" => Enum.map(result.errors, &safe_json/1),
       "rows" => Enum.map(result.rows, &row_summary/1)
@@ -104,6 +115,74 @@ defmodule DSEx.BenchmarkTruth.Runner do
       )
     end
   end
+
+  defp evaluate(program, examples, metric) do
+    {rows, errors} =
+      examples
+      |> Enum.with_index()
+      |> Enum.map(fn {example, index} ->
+        inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
+
+        {duration_us, outcome} =
+          timed(fn ->
+            with {:ok, prediction} <- DSEx.Module.call(program, inputs) do
+              result =
+                metric
+                |> apply_metric(example, prediction)
+                |> DSEx.Metrics.normalize_result()
+
+              {:ok, prediction, result}
+            end
+          end)
+
+        row =
+          case outcome do
+            {:ok, prediction, result} ->
+              %{
+                index: index,
+                example: example,
+                prediction: prediction,
+                score: result.score,
+                passed?: result.passed?,
+                feedback: result.feedback,
+                metric_metadata: result.metadata,
+                error: nil,
+                duration_us: duration_us
+              }
+
+            {:error, reason} ->
+              %{
+                index: index,
+                example: example,
+                prediction: nil,
+                score: 0.0,
+                passed?: false,
+                feedback: nil,
+                metric_metadata: %{},
+                error: reason,
+                duration_us: duration_us
+              }
+          end
+
+        error = if row.error, do: %{index: index, reason: row.error}, else: nil
+        {row, error}
+      end)
+      |> Enum.unzip()
+
+    errors = Enum.reject(errors, &is_nil/1)
+
+    %DSEx.Evaluate.Result{
+      score: average(Enum.map(rows, & &1.score)),
+      rows: rows,
+      errors: errors
+    }
+  end
+
+  defp apply_metric(metric, example, prediction) when is_function(metric, 2),
+    do: metric.(example, prediction)
+
+  defp apply_metric(metric, example, prediction) when is_function(metric, 3),
+    do: metric.(example, prediction, nil)
 
   defp optimizer_comparisons(_task, examples, _lm, _metric) when length(examples) < 2, do: []
 
@@ -164,8 +243,10 @@ defmodule DSEx.BenchmarkTruth.Runner do
          evaluator,
          baseline_result
        ) do
-    optimized = compile_fun.(baseline, trainset, devset)
-    optimized_result = DSEx.Evaluate.run(evaluator, optimized)
+    {compile_duration_us, optimized} = timed(fn -> compile_fun.(baseline, trainset, devset) end)
+
+    {eval_duration_us, optimized_result} =
+      timed(fn -> DSEx.Evaluate.run(evaluator, optimized) end)
 
     %{
       "optimizer" => name,
@@ -174,6 +255,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "baseline_score" => baseline_result.score,
       "optimized_score" => optimized_result.score,
       "delta" => optimized_result.score - baseline_result.score,
+      "compile_duration_ms" => us_to_ms(compile_duration_us),
+      "eval_duration_ms" => us_to_ms(eval_duration_us),
       "status" => "ok"
     }
   rescue
@@ -223,7 +306,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "score" => row.score,
       "passed" => row.passed?,
       "prediction" => prediction_summary(row.prediction),
-      "error" => safe_json(row.error)
+      "error" => safe_json(row.error),
+      "duration_ms" => us_to_ms(Map.get(row, :duration_us, 0))
     }
   end
 
@@ -235,6 +319,13 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp safe_json(value) when is_atom(value), do: Atom.to_string(value)
   defp safe_json(value) when is_list(value), do: Enum.map(value, &safe_json/1)
 
+  defp safe_json(%module{} = value),
+    do:
+      value
+      |> Map.from_struct()
+      |> Map.put(:__struct__, inspect(module))
+      |> safe_json()
+
   defp safe_json(value) when is_map(value),
     do: Map.new(value, fn {k, v} -> {to_string(k), safe_json(v)} end)
 
@@ -242,6 +333,14 @@ defmodule DSEx.BenchmarkTruth.Runner do
 
   defp average([]), do: 0.0
   defp average(scores), do: Enum.sum(scores) / length(scores)
+
+  defp timed(fun) do
+    started = System.monotonic_time(:microsecond)
+    result = fun.()
+    {System.monotonic_time(:microsecond) - started, result}
+  end
+
+  defp us_to_ms(us), do: Float.round(us / 1000, 3)
 
   defp file_sha256(path), do: path |> File.read!() |> sha256()
   defp sha256(data), do: :crypto.hash(:sha256, data) |> Base.encode16(case: :lower)

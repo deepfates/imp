@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
         strict: [
           gsm8k: :string,
           hotpotqa: :string,
+          offset: :integer,
           max_examples: :integer,
           out: :string,
           live: :boolean,
@@ -44,7 +45,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
         tasks: tasks,
         mode: mode,
         lm: live_lm(mode, opts),
+        model: model_metadata(mode, opts),
         out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+        offset: Keyword.get(opts, :offset, 0),
         max_examples: Keyword.get(opts, :max_examples, 20)
       )
 
@@ -69,5 +72,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
 
     model = Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
     DSEx.openai(model, api_key: api_key)
+  end
+
+  defp model_metadata(:fixture, _opts), do: %{provider: "fixture", model: "oracle"}
+
+  defp model_metadata(:live, opts) do
+    %{
+      provider: "openai-compatible",
+      model: Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
+    }
   end
 end

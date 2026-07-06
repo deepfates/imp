@@ -57,6 +57,8 @@ defmodule DSEx.MixProject do
         "protocol.mcp.check": :test,
         "benchmark.truth.check": :test,
         "benchmark.live.check": :test,
+        "benchmark.parity.check": :test,
+        "benchmark.parity.full": :test,
         "live.check": :test,
         "quality.check": :test
       ]
@@ -122,6 +124,14 @@ defmodule DSEx.MixProject do
       "benchmark.live.check": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
         "dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
+      ],
+      "benchmark.parity.check": [
+        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+        "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2"
+      ],
+      "benchmark.parity.full": [
+        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data",
+        "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
       ],
       "live.check": [
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"

@@ -26,6 +26,13 @@ defmodule ProductionAdapterPersistenceTest do
     assert DSEx.Prediction.get(prediction, :score) == 42
   end
 
+  test "string output fields accept scalar provider JSON values" do
+    signature = DSEx.signature("question -> answer")
+
+    assert {:ok, prediction} = DSEx.Adapter.JSON.parse(signature, %{"answer" => 42}, [])
+    assert DSEx.Prediction.get(prediction, :answer) == "42"
+  end
+
   test "json adapter parses fenced provider json and rejects missing fields" do
     signature = DSEx.signature("question -> answer, confidence: float")
 

@@ -32,6 +32,16 @@ defmodule GateContractTest do
              "dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
            ]
 
+    assert Keyword.fetch!(aliases, :"benchmark.parity.check") == [
+             "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+             "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.parity.full") == [
+             "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data",
+             "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
+           ]
+
     assert Keyword.fetch!(aliases, :"live.check") == [
              "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
            ]
