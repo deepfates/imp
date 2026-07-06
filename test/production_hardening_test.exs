@@ -205,6 +205,135 @@ defmodule ProductionHardeningTest do
     Process.delete(:previous_openai_api_key)
   end
 
+  test "custom provider base URLs do not bind ambient credentials implicitly" do
+    previous = System.get_env("OPENAI_API_KEY")
+    Process.put(:previous_openai_api_key, previous)
+    System.put_env("OPENAI_API_KEY", "sk-should-not-bind")
+
+    lm = DSEx.Clients.OpenAI.new("gpt-test", base_url: "https://evil.example/v1")
+    assert lm.api_key == nil
+
+    explicit =
+      DSEx.Clients.OpenAI.new("gpt-test",
+        base_url: "https://trusted-proxy.example/v1",
+        api_key: "sk-explicit"
+      )
+
+    assert explicit.api_key == "sk-explicit"
+  after
+    previous = Process.get(:previous_openai_api_key)
+
+    if previous do
+      System.put_env("OPENAI_API_KEY", previous)
+    else
+      System.delete_env("OPENAI_API_KEY")
+    end
+
+    Process.delete(:previous_openai_api_key)
+  end
+
+  test "saved adapter loading is allowlisted" do
+    state = %{
+      "type" => "predict",
+      "signature" => DSEx.Signature.dump(DSEx.Signature.new("question -> answer")),
+      "demos" => [],
+      "config" => [],
+      "metadata" => %{},
+      "adapter" => "Elixir.String",
+      "lm" => nil
+    }
+
+    assert_raise ArgumentError, ~r/unsupported saved DSEx adapter/, fn ->
+      DSEx.Saving.load(state)
+    end
+  end
+
+  test "prediction and program traces redact secret-shaped values" do
+    secret = "sk-secretvalue123"
+
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{answer: "saw #{secret}"}
+        end
+      ]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+    assert {:ok, prediction} = DSEx.Predict.Predict.call(program, %{question: secret})
+    trace_text = inspect(prediction.metadata.trace)
+    refute trace_text =~ secret
+    assert trace_text =~ "[REDACTED]"
+  end
+
+  test "ReAct CodeAct and RLM traces redact tool and observation secrets" do
+    secret = "Bearer abcdefghijklmnop"
+
+    react_lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{
+            tool_calls: [
+              %{name: :leak, arguments: %{token: secret}},
+              %{name: :submit, arguments: %{answer: "ok"}}
+            ]
+          }
+        end
+      ]
+    }
+
+    leak = DSEx.Tool.new(:leak, "leak", fn _args -> secret end)
+    react = DSEx.Predict.ReActV2.new("question -> answer", [leak], lm: react_lm)
+    assert {:ok, react_prediction} = DSEx.Predict.ReActV2.call(react, %{question: "q"})
+    refute inspect(DSEx.Prediction.get(react_prediction, :history)) =~ secret
+
+    code_lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:code_redaction_actions)
+          Process.put(:code_redaction_actions, rest)
+          action
+        end
+      ]
+    }
+
+    code_tool = DSEx.Tool.new(:leak, "leak", fn _args -> secret end)
+
+    Process.put(:code_redaction_actions, [%{tool: "leak", arguments: %{}}, %{program: ~s("done")}])
+
+    code_act =
+      DSEx.Predict.CodeAct.new("question -> answer", [code_tool], lm: code_lm, max_iters: 2)
+
+    assert {:ok, code_prediction} = DSEx.Predict.CodeAct.call(code_act, %{question: "q"})
+    refute inspect(code_prediction.metadata.code_act_trace) =~ secret
+
+    rlm_lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:rlm_redaction_actions)
+          Process.put(:rlm_redaction_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:rlm_redaction_actions, [
+      %{action: "assign", name: "token", value: secret},
+      %{action: "submit", result: %{answer: "ok"}}
+    ])
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: rlm_lm, max_iterations: 2)
+    assert {:ok, rlm_prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    refute inspect(rlm_prediction.metadata.rlm_trace) =~ secret
+  after
+    Process.delete(:code_redaction_actions)
+    Process.delete(:rlm_redaction_actions)
+  end
+
   test "examples and predictions do not intern arbitrary external keys" do
     external_key = "external_key_#{System.unique_integer([:positive])}"
 

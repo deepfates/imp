@@ -251,7 +251,7 @@ defmodule DSEx.Clients.OpenAITrainer do
       Keyword.get(opts, :base_url) || System.get_env("OPENAI_BASE_URL") ||
         "https://api.openai.com/v1"
 
-    api_key = Keyword.get(opts, :api_key) || System.get_env("OPENAI_API_KEY")
+    api_key = provider_api_key(opts, "OPENAI_API_KEY")
 
     defaults = Keyword.take(opts, [:training_file, :validation_file, :suffix, :metadata])
 
@@ -289,6 +289,14 @@ defmodule DSEx.Clients.OpenAITrainer do
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
   defp map_or_nil(nil), do: nil
   defp map_or_nil(values), do: Map.new(values)
+
+  defp provider_api_key(opts, env_key) do
+    cond do
+      Keyword.has_key?(opts, :api_key) -> Keyword.get(opts, :api_key)
+      Keyword.has_key?(opts, :base_url) -> nil
+      true -> System.get_env(env_key)
+    end
+  end
 end
 
 defmodule DSEx.Clients.DatabricksTrainer do
@@ -299,7 +307,7 @@ defmodule DSEx.Clients.DatabricksTrainer do
       Keyword.get(opts, :base_url) || System.get_env("DATABRICKS_BASE_URL") ||
         "https://example.cloud.databricks.com"
 
-    api_key = Keyword.get(opts, :api_key) || System.get_env("DATABRICKS_TOKEN")
+    api_key = provider_api_key(opts, "DATABRICKS_TOKEN")
 
     DSEx.Clients.HTTPTrainer.new(
       :databricks,
@@ -318,6 +326,14 @@ defmodule DSEx.Clients.DatabricksTrainer do
       train_data: Enum.map(examples, &DSEx.Example.to_map/1),
       config: Map.new(Keyword.drop(opts, [:method]))
     }
+  end
+
+  defp provider_api_key(opts, env_key) do
+    cond do
+      Keyword.has_key?(opts, :api_key) -> Keyword.get(opts, :api_key)
+      Keyword.has_key?(opts, :base_url) -> nil
+      true -> System.get_env(env_key)
+    end
   end
 end
 

@@ -286,10 +286,12 @@ defmodule DSEx.Predict.RLM do
   defp step(_rlm, action, _state, _iteration), do: {:error, {:unsupported_rlm_action, action}}
 
   defp add_observation(state, observation),
-    do: Map.update!(state, :observations, &[observation | &1])
+    do: Map.update!(state, :observations, &[DSEx.Redaction.redact(observation) | &1])
 
   defp trace(state, iteration, action, input, output) do
-    event = %{iteration: iteration, action: action, input: input, output: output}
+    event =
+      DSEx.Redaction.redact(%{iteration: iteration, action: action, input: input, output: output})
+
     Map.update!(state, :trace, &[event | &1])
   end
 

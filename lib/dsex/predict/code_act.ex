@@ -77,7 +77,10 @@ defmodule DSEx.Predict.CodeAct do
   end
 
   defp trace_event(trace, iteration, action, input, output) do
-    [%{iteration: iteration, action: action, input: input, output: output} | trace]
+    [
+      DSEx.Redaction.redact(%{iteration: iteration, action: action, input: input, output: output})
+      | trace
+    ]
   end
 
   defp put_trace(%DSEx.Prediction{} = prediction, trace) do

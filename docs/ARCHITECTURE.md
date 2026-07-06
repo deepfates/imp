@@ -179,7 +179,8 @@ agents, memory/context, policies, and traces.
 `DSEx.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
 into `DSEx.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,
 initialize before discovery, and expose remote `tools/list` / `tools/call`
-style flows through ordinary tools.
+style flows through ordinary tools. Stdio clients spawn trusted local MCP
+server executables; they are not a sandbox for untrusted commands.
 
 ## RLM
 

@@ -108,7 +108,8 @@ defmodule DSEx.Predict.Predict do
   defp resolve_adapter(%__MODULE__{adapter: adapter}), do: adapter
 
   defp add_trace(%DSEx.Prediction{} = prediction, messages, raw) do
-    metadata = Map.put(prediction.metadata, :trace, %{messages: messages, raw: raw})
+    trace = DSEx.Redaction.redact(%{messages: messages, raw: raw})
+    metadata = Map.put(prediction.metadata, :trace, trace)
     %{prediction | metadata: metadata}
   end
 end

@@ -112,6 +112,31 @@ defmodule ProviderTrainingLifecycleTest do
              DSEx.Clients.Trainer.finetune(trainer, lm, examples(), [])
   end
 
+  test "OpenAI trainer custom base URL does not bind ambient API key implicitly" do
+    previous = System.get_env("OPENAI_API_KEY")
+    Process.put(:previous_training_openai_api_key, previous)
+    System.put_env("OPENAI_API_KEY", "sk-should-not-bind")
+
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://evil.example/v1",
+        transport: OpenAITrainingTransport,
+        training_file: "file-abc"
+      )
+
+    assert trainer.api_key == nil
+  after
+    previous = Process.get(:previous_training_openai_api_key)
+
+    if previous do
+      System.put_env("OPENAI_API_KEY", previous)
+    else
+      System.delete_env("OPENAI_API_KEY")
+    end
+
+    Process.delete(:previous_training_openai_api_key)
+  end
+
   test "Databricks trainer submits expected payload and auth" do
     lm = DSEx.Clients.Databricks.new("databricks-meta-llama", api_key: "dbc")
 

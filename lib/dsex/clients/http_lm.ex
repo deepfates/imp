@@ -18,16 +18,13 @@ defmodule DSEx.Clients.HTTPLM do
   @type t :: %__MODULE__{}
 
   def new(model, opts \\ []) do
+    provider = Keyword.get(opts, :provider, :openai)
+
     %__MODULE__{
       model: model,
-      api_key:
-        if(Keyword.has_key?(opts, :api_key),
-          do: Keyword.get(opts, :api_key),
-          else: env_key(Keyword.get(opts, :provider, :openai))
-        ),
-      base_url:
-        Keyword.get(opts, :base_url, default_base_url(Keyword.get(opts, :provider, :openai))),
-      provider: Keyword.get(opts, :provider, :openai),
+      api_key: api_key(provider, opts),
+      base_url: Keyword.get(opts, :base_url, default_base_url(provider)),
+      provider: provider,
       path: Keyword.get(opts, :path, "/chat/completions"),
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
       headers: Keyword.get(opts, :headers, []),
@@ -135,6 +132,14 @@ defmodule DSEx.Clients.HTTPLM do
        do: true
 
   defp missing_required_credential?(_lm), do: false
+
+  defp api_key(provider, opts) do
+    cond do
+      Keyword.has_key?(opts, :api_key) -> Keyword.get(opts, :api_key)
+      Keyword.has_key?(opts, :base_url) -> nil
+      true -> env_key(provider)
+    end
+  end
 
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
     {body, headers} = request(lm, messages, Keyword.put(opts, :stream, true))

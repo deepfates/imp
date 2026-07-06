@@ -103,7 +103,7 @@ defmodule DSEx.Predict.ReActV2 do
           true -> DSEx.Tool.call(tool, args)
         end
 
-      event = %{tool: name, arguments: args, result: result}
+      event = DSEx.Redaction.redact(%{tool: name, arguments: args, result: result})
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
       {events ++ [event], final}
     end)

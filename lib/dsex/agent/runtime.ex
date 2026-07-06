@@ -1,13 +1,11 @@
 defmodule DSEx.Agent.Runtime do
   @moduledoc "Runtime sessions, context references, and traces for agents."
 
-  @default_redact_keys [:api_key, :authorization, :token, :password, :secret]
-
   defstruct context: %{},
             memory: %{},
             traces: [],
             event_sink: nil,
-            redact_keys: @default_redact_keys
+            redact_keys: DSEx.Redaction.default_keys()
 
   def new(opts \\ []) do
     %__MODULE__{
@@ -15,7 +13,7 @@ defmodule DSEx.Agent.Runtime do
       memory: Keyword.get(opts, :memory, %{}),
       traces: Keyword.get(opts, :traces, []),
       event_sink: Keyword.get(opts, :event_sink),
-      redact_keys: Keyword.get(opts, :redact_keys, @default_redact_keys)
+      redact_keys: Keyword.get(opts, :redact_keys, DSEx.Redaction.default_keys())
     }
   end
 
@@ -40,37 +38,11 @@ defmodule DSEx.Agent.Runtime do
   def trace(%__MODULE__{} = runtime, event) do
     event =
       event
-      |> redact(runtime.redact_keys)
+      |> DSEx.Redaction.redact(runtime.redact_keys)
       |> Map.put(:at, length(runtime.traces))
 
     emit(runtime.event_sink, event)
     %{runtime | traces: runtime.traces ++ [event]}
-  end
-
-  defp redact(value, keys) when is_map(value) do
-    Map.new(value, fn {key, nested} ->
-      if redacted_key?(key, keys), do: {key, "[REDACTED]"}, else: {key, redact(nested, keys)}
-    end)
-  end
-
-  defp redact(value, keys) when is_list(value), do: Enum.map(value, &redact(&1, keys))
-
-  defp redact(value, _keys) when is_binary(value) do
-    if secret_value?(value), do: "[REDACTED]", else: value
-  end
-
-  defp redact(value, _keys), do: value
-
-  defp redacted_key?(key, keys) do
-    normalized = key |> to_string() |> String.downcase()
-    Enum.any?(keys, &(normalized == &1 |> to_string() |> String.downcase()))
-  end
-
-  defp secret_value?(value) do
-    String.match?(value, ~r/\bsk-[A-Za-z0-9_-]{8,}\b/) or
-      String.match?(value, ~r/\bBearer\s+[A-Za-z0-9._~+\/=-]{12,}\b/i) or
-      String.match?(value, ~r/\b[A-Fa-f0-9]{32,}\b/) or
-      String.match?(value, ~r/\b[A-Za-z0-9+\/_-]{40,}={0,2}\b/)
   end
 
   defp emit(nil, _event), do: :ok

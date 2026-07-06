@@ -44,6 +44,13 @@ DSEx.get(pred, :answer)
 ## Chain Of Thought
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Fake,
+  opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
+}
+
+DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+
 program = DSEx.chain_of_thought("question -> answer")
 {:ok, pred} = DSEx.call(program, %{question: "2+2?"})
 
@@ -162,15 +169,23 @@ report.best
 
 ```elixir
 lookup =
-  DSEx.Tool.new(:lookup, "lookup facts", fn
-    %{query: "capital-france"} -> "Paris"
-  end)
+  DSEx.Tool.new(
+    :lookup,
+    "lookup facts",
+    fn %{query: "capital-france"} -> "Paris" end,
+    schema: %{
+      "type" => "object",
+      "properties" => %{"query" => %{"type" => "string"}},
+      "required" => ["query"]
+    }
+  )
 
-agent = DSEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
+agent = DSEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup, :submit])
 ```
 
-`ReActV2` expects the LM to produce provider-style tool calls. A reserved
-`submit` tool validates final outputs against the original signature.
+`ReActV2` sends provider-style function definitions when the LM client supports
+them. A reserved `submit` tool validates final outputs against the original
+signature.
 
 ## Agents
 
@@ -215,6 +230,24 @@ For stdio or Streamable HTTP transports:
 stdio = DSEx.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
 streamable = DSEx.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", session_id: "session")
 ```
+
+Only connect MCP stdio clients to trusted local executables. The stdio client
+opens a process for discovery and opens a fresh process for each imported tool
+call. DSEx treats MCP tools like ordinary `DSEx.Tool` values, so use tool
+policies for anything with side effects.
+
+## Provider Training
+
+`BootstrapFinetune` and `GRPO` build provider training jobs when a real trainer
+backend is supplied. The default local trainer returns `{:error,
+:not_implemented}`.
+
+```elixir
+trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
+```
+
+`OpenAITrainer` submits a fine-tuning job for an already uploaded provider file.
+It does not upload examples itself.
 
 ## RLM
 

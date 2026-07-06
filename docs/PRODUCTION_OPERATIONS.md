@@ -55,9 +55,12 @@ The library avoids persisting provider secrets in saved program JSON.
 Security-sensitive defaults:
 
 - saved HTTP LMs load with `api_key: nil`
+- custom provider `base_url:` values require explicit `api_key:` and do not
+  silently bind ambient provider credentials
 - default `:httpc` transport verifies TLS peer certificates
 - unknown external keys are not converted with `String.to_atom/1`
-- agent traces redact common secret keys and secret-shaped values
+- prediction, program, agent, ReAct, CodeAct, and RLM traces redact common
+  secret keys and secret-shaped values
 - agents and ReAct/RLM support tool policies
 
 Operational advice:
@@ -66,6 +69,8 @@ Operational advice:
 - rotate keys that were pasted into logs, screenshots, or shared artifacts
 - prefer short-lived provider keys for CI and demos
 - use explicit `api_key:` or environment variables at runtime, not saved state
+- treat MCP, retriever, training, and provider URLs as trusted configuration;
+  DSEx does not provide a network egress sandbox or private-IP SSRF guard
 
 ## Live Provider Setup
 

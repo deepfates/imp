@@ -105,7 +105,7 @@ defmodule DSEx.MCP do
   end
 
   defmodule StdioClient do
-    @moduledoc "Persistent stdio JSON-RPC MCP client."
+    @moduledoc "Stdio JSON-RPC MCP client that opens a process per discovery or tool call."
 
     defstruct [
       :command,

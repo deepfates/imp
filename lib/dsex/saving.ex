@@ -62,7 +62,17 @@ defmodule DSEx.Saving do
     do: Enum.map(config, fn {k, v} -> {decode_config_key(k), v} end)
 
   defp decode_adapter(nil), do: DSEx.Adapter.Chat
-  defp decode_adapter(name) when is_binary(name), do: String.to_existing_atom(name)
+
+  defp decode_adapter(name) when is_binary(name) do
+    case name do
+      "Elixir.DSEx.Adapter.Chat" -> DSEx.Adapter.Chat
+      "Elixir.DSEx.Adapter.JSON" -> DSEx.Adapter.JSON
+      "Elixir.DSEx.Adapter.XML" -> DSEx.Adapter.XML
+      "Elixir.DSEx.Adapter.TwoStep" -> DSEx.Adapter.TwoStep
+      "Elixir.DSEx.Adapter.BAML" -> DSEx.Adapter.BAML
+      other -> raise ArgumentError, "unsupported saved DSEx adapter: #{inspect(other)}"
+    end
+  end
 
   defp decode_lm(nil), do: nil
 
