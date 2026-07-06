@@ -167,7 +167,7 @@ defmodule DSEx.MCP do
           {:error, reason} -> raise ArgumentError, "MCP stdio failed: #{inspect(reason)}"
         end
       after
-        Port.close(port)
+        safe_close(port)
       end
     end
 
@@ -190,9 +190,15 @@ defmodule DSEx.MCP do
             Map.get(decoded, "result", decoded)
           end
         after
-          Port.close(port)
+          safe_close(port)
         end
       end)
+    end
+
+    defp safe_close(port) do
+      Port.close(port)
+    rescue
+      ArgumentError -> :ok
     end
 
     defp open_port(%__MODULE__{} = client) do

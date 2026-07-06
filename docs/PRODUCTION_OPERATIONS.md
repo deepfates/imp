@@ -51,6 +51,12 @@ LIVE_MCP=1 mix live.mcp.check
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other
 controlled local infrastructure, but do not require paid provider credentials.
+The current integration gate proves:
+
+- save/load/rebind/deployed-call through a local OpenAI-compatible HTTP server
+- generic HTTP retriever request and response mapping through a local server
+- HTTP MCP initialize, discovery, and tool-call flow through a local JSON-RPC server
+- stdio MCP discovery and tool-call flow through a trusted local executable
 
 The live provider tests prove a real OpenAI-compatible provider can execute:
 
