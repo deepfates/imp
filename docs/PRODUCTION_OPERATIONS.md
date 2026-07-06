@@ -27,7 +27,7 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 
 - format check
 - compile with warnings as errors
-- upstream public export parity check
+- Dachshund public surface check
 - production audit check
 - non-live test suite
 
@@ -45,7 +45,7 @@ basic program and structured-output path with local credentials.
 
 They do not prove:
 
-- every upstream Python implementation detail is byte-identical
+- every implementation detail from adjacent projects is copied
 - every provider-specific feature is live-tested
 - every future model response shape is supported
 - credentials are safe if a local `.env` has leaked elsewhere
@@ -96,30 +96,28 @@ Before tagging:
 4. Live provider gate passes, or release notes explicitly say it was skipped.
 5. `PRODUCTION_AUDIT.md` has no `PARTIAL` or `UNPROVEN` P0/P1 rows.
 6. `V2_ROADMAP.md` has no `PARTIAL` or `UNPROVEN` P0/P1 rows.
-7. `PARITY.md` classifications are current after `mix parity.generate`.
-8. Docs and Livebooks match the current public API.
+7. Docs and Livebooks match the current public API.
 
 ## Debugging Gates
 
-Parity failure:
+Public surface failure:
 
 ```sh
-mix parity.generate
-mix parity.check
+mix public_surface.check
 ```
 
 Audit failure:
 
 ```sh
 mix production.audit
-cat priv/parity/production_audit_unproven.json
+cat tmp/audit/production_audit_unproven.json
 ```
 
 V2 failure:
 
 ```sh
 mix v2.audit
-cat priv/parity/v2_audit_unproven.json
+cat tmp/audit/v2_audit_unproven.json
 ```
 
 Provider failure:
@@ -128,4 +126,3 @@ Provider failure:
 - confirm the provider model exists for the account
 - run only the live test file first
 - inspect contract tests before assuming provider behavior is a library bug
-

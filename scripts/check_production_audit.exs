@@ -44,7 +44,12 @@ unproven =
     end
   end)
 
-File.write!("priv/parity/production_audit_unproven.json", Jason.encode!(%{unproven_count: length(unproven), rows: unproven}, pretty: true))
+File.mkdir_p!("tmp/audit")
+
+File.write!(
+  "tmp/audit/production_audit_unproven.json",
+  Jason.encode!(%{unproven_count: length(unproven), rows: unproven}, pretty: true)
+)
 
 if unproven == [] do
   IO.puts("Production audit passed; 0 P0/P1 rows remain unproven.")

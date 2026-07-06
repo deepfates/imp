@@ -1,61 +1,61 @@
-# DSPEx 03: Agents, Tools, MCP, And RLM
+# Dachshund 03: Agents, Tools, MCP, And RLM
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dspy_elixir, path: repo}])
+Mix.install([{:dachshund, path: repo}])
 ```
 
 ## Tools
 
 ```elixir
 lookup =
-  DSPy.Tool.new(:lookup, "lookup a fact", fn
+  Dachshund.Tool.new(:lookup, "lookup a fact", fn
     %{query: "capital-france"} -> "Paris"
     %{"query" => "capital-france"} -> "Paris"
   end)
 
-DSPy.Tool.call(lookup, %{query: "capital-france"})
+Dachshund.Tool.call(lookup, %{query: "capital-france"})
 ```
 
 ## Agent Runtime
 
 ```elixir
 agent =
-  DSPy.Agent.new(
+  Dachshund.Agent.new(
     :qa_agent,
     fn agent, %{query: query}, runtime ->
-      DSPy.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
+      Dachshund.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
     end,
     tools: [lookup],
     tool_policy: [:lookup]
   )
 
-{:ok, output, runtime} = DSPy.Agent.run(agent, %{query: "capital-france"})
+{:ok, output, runtime} = Dachshund.Agent.run(agent, %{query: "capital-france"})
 {output, runtime.traces}
 ```
 
 Incremental trace events:
 
 ```elixir
-DSPy.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
+Dachshund.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
 ```
 
 Tool policy denial:
 
 ```elixir
 locked =
-  DSPy.Agent.new(:locked, fn agent, _input, runtime ->
-    DSPy.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
+  Dachshund.Agent.new(:locked, fn agent, _input, runtime ->
+    Dachshund.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
   end, tools: [lookup], tool_policy: [])
 
-DSPy.Agent.run(locked, %{})
+Dachshund.Agent.run(locked, %{})
 ```
 
 ## MCP Catalog Import
 
 ```elixir
 catalog =
-  DSPy.MCP.Catalog.new([
+  Dachshund.MCP.Catalog.new([
     %{
       name: :remote_lookup,
       description: "lookup through an imported catalog",
@@ -64,15 +64,15 @@ catalog =
     }
   ])
 
-[tool] = DSPy.MCP.import_tools(catalog)
-DSPy.Tool.call(tool, %{key: "capital"})
+[tool] = Dachshund.MCP.import_tools(catalog)
+Dachshund.Tool.call(tool, %{key: "capital"})
 ```
 
 ## ReActV2
 
 ```elixir
 lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [
     handler: fn _messages, _opts ->
       %{
@@ -85,9 +85,9 @@ lm = %{
   ]
 }
 
-react = DSPEx.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
-{:ok, pred} = DSPEx.call(react, %{question: "Capital of France?"})
-DSPy.Prediction.to_map(pred)
+react = Dachshund.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
+{:ok, pred} = Dachshund.call(react, %{question: "Capital of France?"})
+Dachshund.Prediction.to_map(pred)
 ```
 
 ## RLM
@@ -103,7 +103,7 @@ actions = [
 ]
 
 controller_lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_actions)
@@ -116,7 +116,7 @@ controller_lm = %{
 Process.put(:rlm_actions, actions)
 
 rlm =
-  DSPEx.rlm("context, question -> answer",
+  Dachshund.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 5,
@@ -125,24 +125,24 @@ rlm =
   )
 
 {:ok, pred} =
-  DSPEx.call(rlm, %{
+  Dachshund.call(rlm, %{
     context: String.duplicate("large context ", 200),
     question: "What is the capital?"
   })
 
 Process.delete(:rlm_actions)
 
-{DSPy.Prediction.to_map(pred), pred.metadata.rlm_trace}
+{Dachshund.Prediction.to_map(pred), pred.metadata.rlm_trace}
 ```
 
 ## RLM Budget Failure
 
 ```elixir
 loop_lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [handler: fn _messages, _opts -> %{action: "eval", code: "1 + 1"} end]
 }
 
-rlm = DSPEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
-DSPEx.call(rlm, %{question: "loop?"})
+rlm = Dachshund.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
+Dachshund.call(rlm, %{question: "loop?"})
 ```

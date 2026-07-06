@@ -1,24 +1,24 @@
-# DSPEx 01: Programming, Not Prompting
+# Dachshund 01: Programming, Not Prompting
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dspy_elixir, path: repo}])
+Mix.install([{:dachshund, path: repo}])
 ```
 
 ## The Idea
 
-DSPEx-style programming means declaring the task boundary first:
+Dachshund-style programming means declaring the task boundary first:
 
 ```elixir
-signature = DSPEx.signature("question -> answer")
-DSPy.Signature.to_spec(signature)
+signature = Dachshund.signature("question -> answer")
+Dachshund.Signature.to_spec(signature)
 ```
 
 Then you attach an LM and call a program:
 
 ```elixir
 lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -27,11 +27,11 @@ lm = %{
   ]
 }
 
-DSPEx.configure(lm: lm, adapter: DSPy.Adapter.Chat)
+Dachshund.configure(lm: lm, adapter: Dachshund.Adapter.Chat)
 
-program = DSPEx.predict("question -> answer")
-{:ok, prediction} = DSPEx.call(program, %{question: "Capital of France?"})
-DSPy.Prediction.to_map(prediction)
+program = Dachshund.predict("question -> answer")
+{:ok, prediction} = Dachshund.call(program, %{question: "Capital of France?"})
+Dachshund.Prediction.to_map(prediction)
 ```
 
 ## Inspect The Generated Messages
@@ -49,20 +49,20 @@ artifact of a typed program.
 
 ```elixir
 cot_lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
 }
 
-program = DSPEx.chain_of_thought("question -> answer", lm: cot_lm)
-{:ok, pred} = DSPEx.call(program, %{question: "What is 2+2?"})
-DSPy.Prediction.to_map(pred)
+program = Dachshund.chain_of_thought("question -> answer", lm: cot_lm)
+{:ok, pred} = Dachshund.call(program, %{question: "What is 2+2?"})
+Dachshund.Prediction.to_map(pred)
 ```
 
 ## Schema-Constrained Output
 
 ```elixir
 signature =
-  DSPy.Signature.new(%{
+  Dachshund.Signature.new(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
@@ -71,38 +71,38 @@ signature =
   })
 
 {:ok, pred} =
-  DSPy.Adapter.JSON.parse(
+  Dachshund.Adapter.JSON.parse(
     signature,
     ~s({"sentiment":"positive","confidence":0.91}),
     []
   )
 
-DSPy.Prediction.to_map(pred)
+Dachshund.Prediction.to_map(pred)
 ```
 
 Try a bad output:
 
 ```elixir
-DSPy.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [])
+Dachshund.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [])
 ```
 
 ## Examples
 
 ```elixir
 example =
-  DSPEx.example(question: "2+2?", answer: "4")
-  |> DSPy.Example.with_inputs(:question)
+  Dachshund.example(question: "2+2?", answer: "4")
+  |> Dachshund.Example.with_inputs(:question)
 
-{DSPy.Example.to_map(DSPy.Example.inputs(example)), DSPy.Example.to_map(DSPy.Example.labels(example))}
+{Dachshund.Example.to_map(Dachshund.Example.inputs(example)), Dachshund.Example.to_map(Dachshund.Example.labels(example))}
 ```
 
 ## Save And Load
 
 ```elixir
-path = Path.join(System.tmp_dir!(), "dspy-elixir-livebook-program.json")
-DSPy.Saving.save!(program, path)
-loaded = DSPy.Saving.load!(path)
+path = Path.join(System.tmp_dir!(), "dachshund-livebook-program.json")
+Dachshund.Saving.save!(program, path)
+loaded = Dachshund.Saving.load!(path)
 File.rm(path)
 
-loaded.signature |> DSPy.Signature.to_spec()
+loaded.signature |> Dachshund.Signature.to_spec()
 ```

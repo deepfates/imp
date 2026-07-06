@@ -1,7 +1,7 @@
 defmodule OptimizeAnythingTest do
   use ExUnit.Case, async: true
 
-  alias DSPy.Optimize.Anything
+  alias Dachshund.Optimize.Anything
 
   test "optimizes arbitrary text artifacts while retaining baseline and lineage" do
     artifact = Anything.new_artifact(:prompt, "Answer cautiously.")
@@ -43,7 +43,7 @@ defmodule OptimizeAnythingTest do
     evaluator = fn artifact, _examples -> if artifact.text =~ "timeout", do: 1.0, else: 0.0 end
     report = Anything.optimize(artifact, evaluator, trials: 1, seed: 3)
 
-    path = Path.join(System.tmp_dir!(), "dspy-elixir-optimize-anything-report.json")
+    path = Path.join(System.tmp_dir!(), "dachshund-optimize-anything-report.json")
     assert :ok = Anything.save_report!(report, path)
 
     assert Anything.load_report!(path) == report
@@ -101,7 +101,7 @@ defmodule OptimizeAnythingTest do
     assert report.best.artifact.parameters.config == "mode=safe"
     assert report.best.artifact.parameters.main =~ "candidate"
 
-    path = Path.join(System.tmp_dir!(), "dspy-elixir-optimize-anything-parameters.json")
+    path = Path.join(System.tmp_dir!(), "dachshund-optimize-anything-parameters.json")
     Anything.save_report!(report, path)
     assert Anything.load_report!(path) == report
     File.rm(path)

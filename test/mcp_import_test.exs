@@ -1,11 +1,11 @@
 defmodule MCPImportTest do
   use ExUnit.Case, async: true
 
-  alias DSPy.Agent
-  alias DSPy.MCP
+  alias Dachshund.Agent
+  alias Dachshund.MCP
 
   defmodule MCPTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
@@ -83,7 +83,7 @@ defmodule MCPImportTest do
         }
       ])
 
-    assert {:error, {:missing_required, [:key]}} = DSPy.Tool.call(tool, %{})
+    assert {:error, {:missing_required, [:key]}} = Dachshund.Tool.call(tool, %{})
   end
 
   test "imported MCP tools validate string-key JSON schema properties without atomizing keys" do
@@ -104,10 +104,10 @@ defmodule MCPImportTest do
         }
       ])
 
-    assert {:ok, 3} = DSPy.Tool.call(tool, %{external_key => 3})
+    assert {:ok, 3} = Dachshund.Tool.call(tool, %{external_key => 3})
 
     assert {:error, {:schema_validation, [%{field: ^external_key, rule: :type}]}} =
-             DSPy.Tool.call(tool, %{external_key => "bad"})
+             Dachshund.Tool.call(tool, %{external_key => "bad"})
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
   end
@@ -135,7 +135,7 @@ defmodule MCPImportTest do
     [tool] = MCP.import_tools(client)
 
     assert tool.name == "remote_lookup"
-    assert %{"value" => "abc"} = DSPy.Tool.call(tool, %{"key" => "abc"})
+    assert %{"value" => "abc"} = Dachshund.Tool.call(tool, %{"key" => "abc"})
     assert [list_request, call_request] = Process.get(:mcp_requests)
     assert list_request.url == "https://mcp.example/tools"
     assert list_request.body == %{"method" => "tools/list"}

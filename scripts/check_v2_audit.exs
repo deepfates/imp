@@ -44,8 +44,10 @@ unproven =
     end
   end)
 
+File.mkdir_p!("tmp/audit")
+
 File.write!(
-  "priv/parity/v2_audit_unproven.json",
+  "tmp/audit/v2_audit_unproven.json",
   Jason.encode!(%{unproven_count: length(unproven), rows: unproven}, pretty: true)
 )
 

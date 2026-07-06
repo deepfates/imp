@@ -1,21 +1,21 @@
-defmodule DspyElixir.MixProject do
+defmodule Dachshund.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :dspy_elixir,
+      app: :dachshund,
       version: "0.1.0",
       elixir: "~> 1.19",
-      name: "DSPEx",
-      source_url: "https://github.com/deepfates/dspy_elixir",
+      name: "Dachshund",
+      source_url: "https://github.com/deepfates/dachshund",
       description: "Declarative self-improving language-model programs for Elixir.",
       package: package(),
       docs: [
-        main: "DSPEx",
+        main: "Dachshund",
         extras: [
           "README.md",
           "docs/README.md",
-          "docs/DSPEX_PHILOSOPHY.md",
+          "docs/DACHSHUND_PHILOSOPHY.md",
           "docs/ARCHITECTURE.md",
           "docs/TERMINOLOGY.md",
           "docs/API_GUIDE.md",
@@ -25,7 +25,6 @@ defmodule DspyElixir.MixProject do
           "livebooks/03_agents_tools_mcp_rlm.livemd",
           "livebooks/04_production_and_live_provider.livemd",
           "TELOS.md",
-          "PARITY.md",
           "PRODUCTION.md",
           "PRODUCTION_AUDIT.md",
           "ECOSYSTEM_COVERAGE.md",
@@ -43,7 +42,7 @@ defmodule DspyElixir.MixProject do
   def application do
     [
       extra_applications: [:logger, :inets, :ssl],
-      mod: {DspyElixir.Application, []}
+      mod: {Dachshund.Application, []}
     ]
   end
 
@@ -54,8 +53,7 @@ defmodule DspyElixir.MixProject do
         "production.audit": :test,
         "v2.audit": :test,
         "v2.check": :test,
-        "parity.check": :test,
-        "parity.generate": :test
+        "public_surface.check": :test
       ]
     ]
   end
@@ -72,20 +70,17 @@ defmodule DspyElixir.MixProject do
     [
       licenses: ["MIT"],
       links: %{
-        "DSPy" => "https://dspy.ai/",
-        "Source" => "https://github.com/deepfates/dspy_elixir"
+        "Source" => "https://github.com/deepfates/dachshund"
       }
     ]
   end
 
   defp aliases do
     [
-      "parity.generate": ["run scripts/generate_parity_exports.exs"],
-      "parity.check": ["run scripts/check_parity_exports.exs"],
+      "public_surface.check": ["test test/public_surface_test.exs"],
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "parity.check",
         "production.audit",
         "test"
       ],

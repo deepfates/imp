@@ -1,7 +1,7 @@
 defmodule MultimodalAdapterTest do
   use ExUnit.Case
 
-  alias DSPy.Adapters.Types
+  alias Dachshund.Adapters.Types
 
   test "encodes image/audio/file/document/code content to OpenAI-compatible blocks" do
     blocks =
@@ -35,7 +35,7 @@ defmodule MultimodalAdapterTest do
 
   test "HTTP LM request encoder preserves multimodal content arrays" do
     defmodule Transport do
-      @behaviour DSPy.HTTP
+      @behaviour Dachshund.HTTP
 
       @impl true
       def post(_url, _headers, body, _opts) do
@@ -50,10 +50,10 @@ defmodule MultimodalAdapterTest do
       end
     end
 
-    lm = DSPy.Clients.OpenAI.new("gpt-test", api_key: "sk", transport: Transport)
+    lm = Dachshund.Clients.OpenAI.new("gpt-test", api_key: "sk", transport: Transport)
 
     assert {:ok, "ok"} =
-             DSPy.Clients.HTTPLM.generate(
+             Dachshund.Clients.HTTPLM.generate(
                lm,
                [
                  %{

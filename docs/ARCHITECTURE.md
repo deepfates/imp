@@ -15,21 +15,20 @@ Example / inputs
 
 ## Public Facade
 
-`DSPEx` in `lib/dspex.ex` is the canonical public entry point:
+`Dachshund` in `lib/dachshund.ex` is the canonical public entry point:
 
-- `DSPEx.configure/1`, `DSPEx.context/2`
-- `DSPEx.signature/2`, `DSPEx.example/1`, `DSPEx.prediction/1`
-- `DSPEx.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
-- `DSPEx.call/2`
+- `Dachshund.configure/1`, `Dachshund.context/2`
+- `Dachshund.signature/2`, `Dachshund.example/1`, `Dachshund.prediction/1`
+- `Dachshund.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
+- `Dachshund.call/2`
 - provider helpers: `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
 
 Use the facade for application code. Use deeper modules when you need direct
-control in tests, docs, or advanced systems. `DSPy` remains as the compatibility
-namespace for upstream parity and implementation modules.
+control in tests, docs, or advanced systems.
 
 ## Core Data
 
-### `DSPy.Signature`
+### `Dachshund.Signature`
 
 Defines input and output fields. String field names from external data remain
 strings unless the atom already exists, which prevents atom exhaustion.
@@ -43,7 +42,7 @@ Important functions:
 - `dump/1`, `load/1`
 - `json_schema/1`
 
-### `DSPy.Example`
+### `Dachshund.Example`
 
 Stores train/dev/test rows and optional input keys.
 
@@ -54,7 +53,7 @@ Important functions:
 - `inputs/1`, `labels/1`
 - `get/3`, `fetch!/2`, `put/3`, `delete/2`
 
-### `DSPy.Prediction`
+### `Dachshund.Prediction`
 
 Stores model outputs plus completions, score, and metadata.
 
@@ -67,21 +66,21 @@ Important functions:
 
 ## Program Modules
 
-All major program structs implement the `DSPy.Module` behaviour.
+All major program structs implement the `Dachshund.Module` behaviour.
 
 | Module | Purpose |
 | --- | --- |
-| `DSPy.Predict.Predict` | Basic signature-to-output LM call. |
-| `DSPy.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
-| `DSPy.Predict.ReAct` | Simple one-shot tool call. |
-| `DSPy.Predict.ReActV2` | Iterative provider-tool-call ReAct with reserved `submit`. |
-| `DSPy.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
-| `DSPy.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
-| `DSPy.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
-| `DSPy.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
-| `DSPy.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
-| `DSPy.Predict.Refine` | Repeated attempts with reward threshold. |
-| `DSPy.Predict.Parallel` | Parallel map helpers. |
+| `Dachshund.Predict.Predict` | Basic signature-to-output LM call. |
+| `Dachshund.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
+| `Dachshund.Predict.ReAct` | Simple one-shot tool call. |
+| `Dachshund.Predict.ReActV2` | Iterative provider-tool-call ReAct with reserved `submit`. |
+| `Dachshund.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
+| `Dachshund.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
+| `Dachshund.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
+| `Dachshund.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
+| `Dachshund.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
+| `Dachshund.Predict.Refine` | Repeated attempts with reward threshold. |
+| `Dachshund.Predict.Parallel` | Parallel map helpers. |
 
 ## Adapters
 
@@ -94,55 +93,55 @@ parse(signature, raw, opts) :: {:ok, prediction} | {:error, reason}
 
 Available adapters:
 
-- `DSPy.Adapter.Chat`
-- `DSPy.Adapter.JSON`
-- `DSPy.Adapter.XML`
-- `DSPy.Adapter.TwoStep`
-- `DSPy.Adapter.BAML`
+- `Dachshund.Adapter.Chat`
+- `Dachshund.Adapter.JSON`
+- `Dachshund.Adapter.XML`
+- `Dachshund.Adapter.TwoStep`
+- `Dachshund.Adapter.BAML`
 
 `JSON` and schema-constrained signatures are the best fit when the output shape
 matters more than prose flexibility.
 
 ## LMs And Providers
 
-`DSPy.LM` is a small behaviour. Tests usually use:
+`Dachshund.LM` is a small behaviour. Tests usually use:
 
 ```elixir
-%{module: DSPy.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
+%{module: Dachshund.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
 ```
 
 Production clients are OpenAI-compatible HTTP wrappers:
 
-- `DSPy.Clients.OpenAI`
-- `DSPy.Clients.LiteLLM`
-- `DSPy.Clients.Local`
-- `DSPy.Clients.Databricks`
+- `Dachshund.Clients.OpenAI`
+- `Dachshund.Clients.LiteLLM`
+- `Dachshund.Clients.Local`
+- `Dachshund.Clients.Databricks`
 
-The underlying transport is injectable via `DSPy.HTTP`, which is how provider
+The underlying transport is injectable via `Dachshund.HTTP`, which is how provider
 contracts are tested without live credentials.
 
 ## Retrieval And Datasets
 
 Retrievers:
 
-- `DSPy.Retrieve.Memory`
-- `DSPy.Retrievers.KNN`
-- `DSPy.Retrievers.HTTP`
-- `DSPy.Retrievers.Weaviate`
-- `DSPy.Retrievers.Databricks`
+- `Dachshund.Retrieve.Memory`
+- `Dachshund.Retrievers.KNN`
+- `Dachshund.Retrievers.HTTP`
+- `Dachshund.Retrievers.Weaviate`
+- `Dachshund.Retrievers.Databricks`
 
 Datasets:
 
-- `DSPy.Datasets.from_records/3`
+- `Dachshund.Datasets.from_records/3`
 - `jsonl/3`, `csv/3`
 - `GSM8K`, `HotPotQA`, `MATH`, `Colors`
-- `DSPy.Datasets.Dataset` split container
+- `Dachshund.Datasets.Dataset` split container
 
 ## Evaluation
 
-`DSPy.Evaluate` runs a program over a dev set with a metric.
+`Dachshund.Evaluate` runs a program over a dev set with a metric.
 
-Built-in metrics live in `DSPy.Metrics`:
+Built-in metrics live in `Dachshund.Metrics`:
 
 - exact match
 - semantic-ish F1 helpers
@@ -150,8 +149,7 @@ Built-in metrics live in `DSPy.Metrics`:
 
 ## Optimization
 
-Metric-driven optimizers live under the historical `DSPy.Teleprompt.*`
-namespace:
+Metric-driven optimizers live under `Dachshund.Optimizer.*`:
 
 - `LabeledFewShot`
 - `BootstrapFewShot`
@@ -164,23 +162,23 @@ namespace:
 - `BetterTogether`
 - `BootstrapFinetune`, `GRPO`
 
-V2 arbitrary artifact optimization lives under `DSPy.Optimize.*`:
+V2 arbitrary artifact optimization lives under `Dachshund.Optimize.*`:
 
-- `DSPy.Optimize.Anything`
-- `DSPy.Optimize.GEPA`
+- `Dachshund.Optimize.Anything`
+- `Dachshund.Optimize.GEPA`
 
 ## Agents, Tools, MCP
 
-`DSPy.Tool` wraps callable functionality. `DSPy.Agent` composes tools, child
+`Dachshund.Tool` wraps callable functionality. `Dachshund.Agent` composes tools, child
 agents, memory/context, policies, and traces.
 
-`DSPy.MCP` imports in-process or HTTP-discovered tool catalogs into `DSPy.Tool`
+`Dachshund.MCP` imports in-process or HTTP-discovered tool catalogs into `Dachshund.Tool`
 values. The HTTP client supports deterministic transport-backed tests and
 remote `tools/list` / `tools/call` style flows.
 
 ## RLM
 
-`DSPy.Predict.RLM` is intentionally not RAG. It gives the controller LM:
+`Dachshund.Predict.RLM` is intentionally not RAG. It gives the controller LM:
 
 - signature metadata
 - variable metadata and previews
@@ -201,7 +199,7 @@ execution. That is a deliberate production translation.
 
 ## Persistence
 
-`DSPy.Saving` saves portable program state. It does not persist secrets. Loading
+`Dachshund.Saving` saves portable program state. It does not persist secrets. Loading
 an HTTP LM requires explicit credential rebinding rather than silently capturing
 ambient environment credentials.
 

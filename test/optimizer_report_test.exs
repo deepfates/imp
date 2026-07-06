@@ -3,7 +3,7 @@ defmodule OptimizerReportTest do
 
   defp lm do
     %{
-      module: DSPy.LM.Fake,
+      module: Dachshund.LM.Fake,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -18,13 +18,13 @@ defmodule OptimizerReportTest do
 
   defp sets do
     train = [
-      DSPy.example(question: "France capital?", answer: "Paris")
-      |> DSPy.Example.with_inputs(:question)
+      Dachshund.example(question: "France capital?", answer: "Paris")
+      |> Dachshund.Example.with_inputs(:question)
     ]
 
     dev = [
-      DSPy.example(question: "Capital of France?", answer: "Paris")
-      |> DSPy.Example.with_inputs(:question)
+      Dachshund.example(question: "Capital of France?", answer: "Paris")
+      |> Dachshund.Example.with_inputs(:question)
     ]
 
     {train, dev}
@@ -32,17 +32,21 @@ defmodule OptimizerReportTest do
 
   test "random search attaches candidate history and best score" do
     {train, dev} = sets()
-    metric = DSPy.Metrics.exact_match(:answer)
-    program = DSPy.predict("question -> answer", lm: lm())
+    metric = Dachshund.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: lm())
 
     compiled =
       metric
-      |> DSPy.Teleprompt.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-      |> DSPy.Teleprompt.RandomSearch.compile(program, train, dev)
+      |> Dachshund.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+      |> Dachshund.Optimizer.RandomSearch.compile(program, train, dev)
 
-    report = DSPy.Teleprompt.Report.fetch(compiled)
+    report = Dachshund.Optimizer.Report.fetch(compiled)
 
-    assert %DSPy.Teleprompt.Report{optimizer: :random_search, best_score: 1.0, candidate_count: 3} =
+    assert %Dachshund.Optimizer.Report{
+             optimizer: :random_search,
+             best_score: 1.0,
+             candidate_count: 3
+           } =
              report
 
     assert Enum.all?(report.candidates, &Map.has_key?(&1, :score))
@@ -50,16 +54,16 @@ defmodule OptimizerReportTest do
 
   test "instruction search attaches candidate score report" do
     {_train, dev} = sets()
-    metric = DSPy.Metrics.exact_match(:answer)
-    program = DSPy.predict("question -> answer", lm: lm())
+    metric = Dachshund.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: lm())
 
     compiled =
-      DSPy.Teleprompt.InstructionSearch.compile(program, metric, [], dev, [
+      Dachshund.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
         "Answer unknown.",
         "Always answer Paris."
       ])
 
-    report = DSPy.Teleprompt.Report.fetch(compiled)
+    report = Dachshund.Optimizer.Report.fetch(compiled)
     assert report.optimizer == :instruction_search
     assert report.best_score == 1.0
     assert Enum.any?(report.candidates, &(&1.instruction == "Always answer Paris."))

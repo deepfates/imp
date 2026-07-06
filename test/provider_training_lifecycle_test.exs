@@ -2,7 +2,7 @@ defmodule ProviderTrainingLifecycleTest do
   use ExUnit.Case
 
   defmodule OpenAITrainingTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
@@ -43,7 +43,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   defmodule DatabricksTrainingTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
@@ -61,27 +61,28 @@ defmodule ProviderTrainingLifecycleTest do
 
   defp examples do
     [
-      DSPy.example(question: "2+2?", answer: "4") |> DSPy.Example.with_inputs(:question)
+      Dachshund.example(question: "2+2?", answer: "4") |> Dachshund.Example.with_inputs(:question)
     ]
   end
 
   test "OpenAI trainer submits job and refreshes lifecycle status" do
-    lm = DSPy.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
+    lm = Dachshund.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
 
     trainer =
-      DSPy.Clients.OpenAITrainer.new(
+      Dachshund.Clients.OpenAITrainer.new(
         base_url: "https://api.example/v1",
         api_key: "sk-test",
         transport: OpenAITrainingTransport
       )
 
     assert {:ok, job} =
-             DSPy.Clients.Trainer.finetune(trainer, lm, examples(),
+             Dachshund.Clients.Trainer.finetune(trainer, lm, examples(),
                training_file: "file-abc",
                hyperparameters: [n_epochs: 1]
              )
 
-    assert %DSPy.Clients.TrainingJob{id: "ftjob_123", provider: :openai, status: :running} = job
+    assert %Dachshund.Clients.TrainingJob{id: "ftjob_123", provider: :openai, status: :running} =
+             job
 
     assert_received {:openai_training_request, "https://api.example/v1/fine_tuning/jobs", headers,
                      payload}
@@ -90,33 +91,34 @@ defmodule ProviderTrainingLifecycleTest do
     assert payload["model"] == "gpt-test"
     assert payload["training_file"] == "file-abc"
     assert payload["hyperparameters"] == %{"n_epochs" => 1}
-    assert [%{"question" => "2+2?", "answer" => "4"}] = payload["dspy_training_data"]
+    assert [%{"question" => "2+2?", "answer" => "4"}] = payload["Dachshund_training_data"]
 
-    assert {:ok, refreshed} = DSPy.Clients.TrainingJob.refresh(job)
+    assert {:ok, refreshed} = Dachshund.Clients.TrainingJob.refresh(job)
     assert refreshed.status == :succeeded
     assert refreshed.result_model == "ft:gpt-test:org:abc"
   end
 
   test "Databricks trainer submits expected payload and auth" do
-    lm = DSPy.Clients.Databricks.new("databricks-meta-llama", api_key: "dbc")
+    lm = Dachshund.Clients.Databricks.new("databricks-meta-llama", api_key: "dbc")
 
     trainer =
-      DSPy.Clients.DatabricksTrainer.new(
+      Dachshund.Clients.DatabricksTrainer.new(
         base_url: "https://dbc.example",
         api_key: "dbc-token",
         transport: DatabricksTrainingTransport
       )
 
     assert {:ok, job} =
-             DSPy.Clients.Trainer.finetune(trainer, lm, examples(),
+             Dachshund.Clients.Trainer.finetune(trainer, lm, examples(),
                method: :grpo,
                learning_rate: 1.0e-5
              )
 
-    assert %DSPy.Clients.TrainingJob{id: "dbx_1", provider: :databricks, status: :pending} = job
+    assert %Dachshund.Clients.TrainingJob{id: "dbx_1", provider: :databricks, status: :pending} =
+             job
 
-    assert_received {:databricks_training_request, "https://dbc.example/api/2.0/dspy/finetune",
-                     headers, payload}
+    assert_received {:databricks_training_request,
+                     "https://dbc.example/api/2.0/Dachshund/finetune", headers, payload}
 
     assert {"authorization", "Bearer dbc-token"} in headers
     assert payload["base_model"] == "databricks-meta-llama"
@@ -127,16 +129,16 @@ defmodule ProviderTrainingLifecycleTest do
 
   test "BootstrapFinetune accepts provider trainer structs" do
     lm =
-      DSPy.Clients.OpenAI.new("gpt-test",
+      Dachshund.Clients.OpenAI.new("gpt-test",
         api_key: "sk-test",
         transport: OpenAITrainingTransport
       )
 
-    program = DSPy.predict("question -> answer", lm: lm)
-    metric = DSPy.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: lm)
+    metric = Dachshund.Metrics.exact_match(:answer)
 
     trainer =
-      DSPy.Clients.OpenAITrainer.new(
+      Dachshund.Clients.OpenAITrainer.new(
         base_url: "https://api.example/v1",
         api_key: "sk-test",
         transport: OpenAITrainingTransport
@@ -144,10 +146,13 @@ defmodule ProviderTrainingLifecycleTest do
 
     result =
       metric
-      |> DSPy.Teleprompt.BootstrapFinetune.new(trainer: trainer, max_demos: 1)
-      |> DSPy.Teleprompt.BootstrapFinetune.compile(program, examples())
+      |> Dachshund.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: 1)
+      |> Dachshund.Optimizer.BootstrapFinetune.compile(program, examples())
 
-    assert %{program: %DSPy.Predict.Predict{}, job: %DSPy.Clients.TrainingJob{provider: :openai}} =
+    assert %{
+             program: %Dachshund.Predict.Predict{},
+             job: %Dachshund.Clients.TrainingJob{provider: :openai}
+           } =
              result
   end
 end

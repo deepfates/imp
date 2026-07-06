@@ -1,12 +1,14 @@
 defmodule AgentRuntimeTest do
   use ExUnit.Case, async: true
 
-  alias DSPy.Agent
-  alias DSPy.Agent.Runtime
+  alias Dachshund.Agent
+  alias Dachshund.Agent.Runtime
 
   test "agent forwards typed inputs through tools and child agents with trace capture" do
     normalize =
-      DSPy.Tool.new(:normalize, "normalize text", fn %{text: text} -> String.downcase(text) end)
+      Dachshund.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+        String.downcase(text)
+      end)
 
     child =
       Agent.new(
@@ -60,7 +62,9 @@ defmodule AgentRuntimeTest do
 
   test "arity-3 handlers receive the agent without process dictionary self-reference" do
     normalize =
-      DSPy.Tool.new(:normalize, "normalize text", fn %{text: text} -> String.downcase(text) end)
+      Dachshund.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+        String.downcase(text)
+      end)
 
     agent =
       Agent.new(
@@ -76,7 +80,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "tool policy can deny tool execution with a structured trace" do
-    boom = DSPy.Tool.new(:boom, "blocked", fn _ -> raise "should not run" end)
+    boom = Dachshund.Tool.new(:boom, "blocked", fn _ -> raise "should not run" end)
 
     agent =
       Agent.new(
@@ -93,7 +97,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "runtime redacts sensitive trace keys" do
-    echo = DSPy.Tool.new(:echo, "echo", fn input -> input end)
+    echo = Dachshund.Tool.new(:echo, "echo", fn input -> input end)
 
     agent =
       Agent.new(
@@ -121,7 +125,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "agent returns structured failures for tools children and schemas" do
-    boom = DSPy.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
+    boom = Dachshund.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
 
     agent =
       Agent.new(
@@ -156,7 +160,9 @@ defmodule AgentRuntimeTest do
 
   test "agent stream_events emits trace events before final output" do
     normalize =
-      DSPy.Tool.new(:normalize, "normalize text", fn %{text: text} -> String.downcase(text) end)
+      Dachshund.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+        String.downcase(text)
+      end)
 
     agent =
       Agent.new(

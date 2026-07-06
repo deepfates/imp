@@ -4,25 +4,26 @@ This guide is organized around the things you build.
 
 ## Configure An LM
 
-Use the `DSPEx` facade for application code. The deeper `DSPy.*` modules are
-still public, but they are implementation and compatibility surfaces.
+Use the `Dachshund` facade for application code. Reach for deeper
+`Dachshund.*` modules when you need direct control over adapters, optimizers,
+tools, agents, or persistence.
 
 For deterministic examples:
 
 ```elixir
 lm = %{
-  module: DSPy.LM.Fake,
+  module: Dachshund.LM.Fake,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-DSPEx.configure(lm: lm, adapter: DSPy.Adapter.Chat)
+Dachshund.configure(lm: lm, adapter: Dachshund.Adapter.Chat)
 ```
 
 For a live OpenAI-compatible provider:
 
 ```elixir
-lm = DSPEx.openai("gpt-4o-mini", opts: [temperature: 0])
-DSPEx.configure(lm: lm)
+lm = Dachshund.openai("gpt-4o-mini", opts: [temperature: 0])
+Dachshund.configure(lm: lm)
 ```
 
 The provider client reads `OPENAI_API_KEY` unless `api_key:` is supplied.
@@ -30,26 +31,26 @@ The provider client reads `OPENAI_API_KEY` unless `api_key:` is supplied.
 ## Basic Predict
 
 ```elixir
-program = DSPEx.predict("question -> answer")
-{:ok, pred} = DSPEx.call(program, %{question: "Capital of France?"})
-DSPEx.get(pred, :answer)
+program = Dachshund.predict("question -> answer")
+{:ok, pred} = Dachshund.call(program, %{question: "Capital of France?"})
+Dachshund.get(pred, :answer)
 ```
 
 ## Chain Of Thought
 
 ```elixir
-program = DSPEx.chain_of_thought("question -> answer")
-{:ok, pred} = DSPEx.call(program, %{question: "2+2?"})
+program = Dachshund.chain_of_thought("question -> answer")
+{:ok, pred} = Dachshund.call(program, %{question: "2+2?"})
 
-DSPEx.get(pred, :reasoning)
-DSPEx.get(pred, :answer)
+Dachshund.get(pred, :reasoning)
+Dachshund.get(pred, :answer)
 ```
 
 ## Schema-Constrained JSON
 
 ```elixir
 signature =
-  DSPy.Signature.new(%{
+  Dachshund.Signature.new(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
@@ -57,7 +58,7 @@ signature =
     ]
   })
 
-program = DSPEx.predict(signature, adapter: DSPy.Adapter.JSON)
+program = Dachshund.predict(signature, adapter: Dachshund.Adapter.JSON)
 ```
 
 The JSON adapter validates output fields and returns retry feedback for schema
@@ -67,35 +68,35 @@ violations.
 
 ```elixir
 demo =
-  DSPEx.example(question: "2+2?", answer: "4")
-  |> DSPy.Example.with_inputs(:question)
+  Dachshund.example(question: "2+2?", answer: "4")
+  |> Dachshund.Example.with_inputs(:question)
 
 program =
   "question -> answer"
-  |> DSPEx.predict()
-  |> DSPy.Predict.Predict.with_demos([demo])
+  |> Dachshund.predict()
+  |> Dachshund.Predict.Predict.with_demos([demo])
 ```
 
 ## Evaluate A Program
 
 ```elixir
 devset = [
-  DSPEx.example(question: "Capital of France?", answer: "Paris") |> DSPy.Example.with_inputs(:question)
+  Dachshund.example(question: "Capital of France?", answer: "Paris") |> Dachshund.Example.with_inputs(:question)
 ]
 
-metric = DSPy.Metrics.exact_match(:answer)
-evaluator = DSPy.Evaluate.new(devset, metric)
-report = DSPy.Evaluate.run(evaluator, program)
+metric = Dachshund.Metrics.exact_match(:answer)
+evaluator = Dachshund.Evaluate.new(devset, metric)
+report = Dachshund.Evaluate.run(evaluator, program)
 report.score
 ```
 
 ## Optimize A Program
 
 ```elixir
-optimizer = DSPy.Teleprompt.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-compiled = DSPy.Teleprompt.RandomSearch.compile(optimizer, program, trainset, devset)
+optimizer = Dachshund.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+compiled = Dachshund.Optimizer.RandomSearch.compile(optimizer, program, trainset, devset)
 
-DSPy.Teleprompt.Report.fetch(compiled)
+Dachshund.Optimizer.Report.fetch(compiled)
 ```
 
 Use:
@@ -109,10 +110,10 @@ Use:
 ## Optimize Arbitrary Artifacts
 
 ```elixir
-artifact = DSPy.Optimize.Anything.new_artifact(:config, "mode=slow")
+artifact = Dachshund.Optimize.Anything.new_artifact(:config, "mode=slow")
 
 report =
-  DSPy.Optimize.Anything.optimize(
+  Dachshund.Optimize.Anything.optimize(
     artifact,
     fn artifact, _examples ->
       if artifact.text =~ "mode=fast", do: 1.0, else: 0.0
@@ -127,10 +128,10 @@ report.best.score
 ## GEPA-Style Reflection
 
 ```elixir
-artifact = DSPy.Optimize.Anything.new_artifact(:prompt, "Base")
+artifact = Dachshund.Optimize.Anything.new_artifact(:prompt, "Base")
 
 report =
-  DSPy.Optimize.GEPA.optimize(
+  Dachshund.Optimize.GEPA.optimize(
     artifact,
     fn artifact, examples ->
       %{
@@ -150,11 +151,11 @@ report.best
 
 ```elixir
 lookup =
-  DSPy.Tool.new(:lookup, "lookup facts", fn
+  Dachshund.Tool.new(:lookup, "lookup facts", fn
     %{query: "capital-france"} -> "Paris"
   end)
 
-agent = DSPEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
+agent = Dachshund.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
 ```
 
 `ReActV2` expects the LM to produce provider-style tool calls. A reserved
@@ -163,45 +164,45 @@ agent = DSPEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup])
 ## Agents
 
 ```elixir
-tool = DSPy.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+tool = Dachshund.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
 agent =
-  DSPy.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
-    DSPy.Agent.call_tool(agent, :double, %{x: x}, runtime)
+  Dachshund.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
+    Dachshund.Agent.call_tool(agent, :double, %{x: x}, runtime)
   end, tools: [tool], tool_policy: [:double])
 
-{:ok, output, runtime} = DSPy.Agent.run(agent, %{x: 4})
+{:ok, output, runtime} = Dachshund.Agent.run(agent, %{x: 4})
 ```
 
 For incremental traces:
 
 ```elixir
-DSPy.Agent.stream_events(agent, %{x: 4}) |> Enum.to_list()
+Dachshund.Agent.stream_events(agent, %{x: 4}) |> Enum.to_list()
 ```
 
 ## MCP Import
 
 ```elixir
 catalog =
-  DSPy.MCP.Catalog.new([
+  Dachshund.MCP.Catalog.new([
     %{name: :lookup, description: "lookup", input_schema: %{required: [:key]}, run: & &1}
   ])
 
-[tool] = DSPy.MCP.import_tools(catalog)
+[tool] = Dachshund.MCP.import_tools(catalog)
 ```
 
 For HTTP-backed discovery:
 
 ```elixir
-client = DSPy.MCP.HTTPClient.new("https://mcp.example/tools")
-tools = DSPy.MCP.import_tools(client)
+client = Dachshund.MCP.HTTPClient.new("https://mcp.example/tools")
+tools = Dachshund.MCP.import_tools(client)
 ```
 
 ## RLM
 
 ```elixir
 rlm =
-  DSPEx.rlm("context, question -> answer",
+  Dachshund.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 10,
@@ -209,7 +210,7 @@ rlm =
     max_time_ms: 30_000
   )
 
-DSPEx.call(rlm, %{context: long_context, question: "What matters?"})
+Dachshund.call(rlm, %{context: long_context, question: "What matters?"})
 ```
 
 RLM controller actions:
@@ -225,8 +226,8 @@ RLM controller actions:
 ## Save And Load
 
 ```elixir
-DSPy.Saving.save!(program, "tmp/program.json")
-loaded = DSPy.Saving.load!("tmp/program.json")
+Dachshund.Saving.save!(program, "tmp/program.json")
+loaded = Dachshund.Saving.load!("tmp/program.json")
 ```
 
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
@@ -235,7 +236,7 @@ credentials; reconfigure credentials explicitly before live use.
 ## Streaming
 
 ```elixir
-DSPy.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
+Dachshund.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
 ```
 
 Provider SSE streaming is covered through injectable transports.

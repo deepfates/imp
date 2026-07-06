@@ -2,7 +2,7 @@ defmodule ProviderToolCallTest do
   use ExUnit.Case
 
   defmodule ToolCallTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(_url, _headers, _body, _opts) do
@@ -40,25 +40,25 @@ defmodule ProviderToolCallTest do
 
   test "HTTP LM normalizes OpenAI tool_calls for ReActV2 execution" do
     lm =
-      DSPy.Clients.OpenAI.new("gpt-test",
+      Dachshund.Clients.OpenAI.new("gpt-test",
         api_key: "sk-test",
         transport: ToolCallTransport,
         opts: [num_retries: 0]
       )
 
     lookup =
-      DSPy.Tool.new(:lookup, "Lookup by query", fn
+      Dachshund.Tool.new(:lookup, "Lookup by query", fn
         %{query: "capital-france"} -> "Paris"
       end)
 
-    agent = DSPy.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2)
+    agent = Dachshund.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2)
 
     assert {:ok, prediction} =
-             DSPy.Predict.ReActV2.call(agent, %{question: "What is the capital of France?"})
+             Dachshund.Predict.ReActV2.call(agent, %{question: "What is the capital of France?"})
 
-    assert DSPy.Prediction.get(prediction, :answer) == "Paris"
+    assert Dachshund.Prediction.get(prediction, :answer) == "Paris"
 
     assert [%{tool: :lookup, result: "Paris"}, %{tool: :submit, result: %{answer: "Paris"}}] =
-             DSPy.Prediction.get(prediction, :history)
+             Dachshund.Prediction.get(prediction, :history)
   end
 end

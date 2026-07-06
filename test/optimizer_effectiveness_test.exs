@@ -3,7 +3,7 @@ defmodule OptimizerEffectivenessTest do
 
   defp demo_sensitive_lm do
     %{
-      module: DSPy.LM.Fake,
+      module: Dachshund.LM.Fake,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -20,40 +20,40 @@ defmodule OptimizerEffectivenessTest do
 
   defp trainset do
     [
-      DSPy.example(question: "What is the capital of France?", answer: "Paris")
-      |> DSPy.Example.with_inputs(:question)
+      Dachshund.example(question: "What is the capital of France?", answer: "Paris")
+      |> Dachshund.Example.with_inputs(:question)
     ]
   end
 
   defp devset do
     [
-      DSPy.example(question: "Capital of France?", answer: "Paris")
-      |> DSPy.Example.with_inputs(:question)
+      Dachshund.example(question: "Capital of France?", answer: "Paris")
+      |> Dachshund.Example.with_inputs(:question)
     ]
   end
 
   test "labeled few-shot compilation improves evaluated score" do
-    metric = DSPy.Metrics.exact_match(:answer)
-    program = DSPy.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = DSPy.Evaluate.new(devset(), metric)
+    metric = Dachshund.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = Dachshund.Evaluate.new(devset(), metric)
 
-    assert DSPy.Evaluate.run(evaluator, program).score == 0.0
+    assert Dachshund.Evaluate.run(evaluator, program).score == 0.0
 
     compiled =
-      DSPy.Teleprompt.LabeledFewShot.new(k: 1)
-      |> DSPy.Teleprompt.LabeledFewShot.compile(program, trainset())
+      Dachshund.Optimizer.LabeledFewShot.new(k: 1)
+      |> Dachshund.Optimizer.LabeledFewShot.compile(program, trainset())
 
-    assert DSPy.Evaluate.run(evaluator, compiled).score == 1.0
+    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
   test "instruction optimizer can improve score using candidate instructions" do
-    metric = DSPy.Metrics.exact_match(:answer)
-    program = DSPy.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = DSPy.Evaluate.new(devset(), metric)
-    assert DSPy.Evaluate.run(evaluator, program).score == 0.0
+    metric = Dachshund.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = Dachshund.Evaluate.new(devset(), metric)
+    assert Dachshund.Evaluate.run(evaluator, program).score == 0.0
 
     optimizer =
-      DSPy.Teleprompt.SignatureOptimizer.new(metric,
+      Dachshund.Optimizer.SignatureOptimizer.new(metric,
         candidates: [
           "Answer unknown.",
           "Always answer Paris when asked about France."
@@ -61,19 +61,21 @@ defmodule OptimizerEffectivenessTest do
       )
 
     compiled =
-      DSPy.Teleprompt.SignatureOptimizer.compile(optimizer, program, trainset(), devset())
+      Dachshund.Optimizer.SignatureOptimizer.compile(optimizer, program, trainset(), devset())
 
-    assert DSPy.Evaluate.run(evaluator, compiled).score == 1.0
+    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
   test "random search keeps a candidate that improves dev score" do
-    metric = DSPy.Metrics.exact_match(:answer)
-    program = DSPy.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = DSPy.Evaluate.new(devset(), metric)
+    metric = Dachshund.Metrics.exact_match(:answer)
+    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = Dachshund.Evaluate.new(devset(), metric)
 
-    optimizer = DSPy.Teleprompt.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-    compiled = DSPy.Teleprompt.RandomSearch.compile(optimizer, program, trainset(), devset())
+    optimizer =
+      Dachshund.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
 
-    assert DSPy.Evaluate.run(evaluator, compiled).score == 1.0
+    compiled = Dachshund.Optimizer.RandomSearch.compile(optimizer, program, trainset(), devset())
+
+    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
   end
 end

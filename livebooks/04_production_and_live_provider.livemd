@@ -1,8 +1,8 @@
-# DSPEx 04: Production And Live Provider
+# Dachshund 04: Production And Live Provider
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dspy_elixir, path: repo}])
+Mix.install([{:dachshund, path: repo}])
 ```
 
 ## Deterministic Gates
@@ -15,7 +15,7 @@ mix v2.check
 ```
 
 These gates are the project contract. They check formatting, compilation,
-parity classifications, audit rows, and deterministic tests.
+public-surface tests, audit rows, and deterministic tests.
 
 ## Security Posture
 
@@ -23,10 +23,10 @@ Unknown external keys remain strings:
 
 ```elixir
 key = "external_key_#{System.unique_integer([:positive])}"
-example = DSPy.Example.new(%{key => "value"})
+example = Dachshund.Example.new(%{key => "value"})
 
 {
-  DSPy.Example.get(example, key),
+  Dachshund.Example.get(example, key),
   try do
     String.to_existing_atom(key)
   rescue
@@ -38,14 +38,14 @@ example = DSPy.Example.new(%{key => "value"})
 Trace redaction:
 
 ```elixir
-echo = DSPy.Tool.new(:echo, "echo", fn input -> input end)
+echo = Dachshund.Tool.new(:echo, "echo", fn input -> input end)
 
 agent =
-  DSPy.Agent.new(:redactor, fn agent, _input, runtime ->
-    DSPy.Agent.call_tool(agent, :echo, %{api_key: "sk-live", nested: %{token: "secret"}}, runtime)
+  Dachshund.Agent.new(:redactor, fn agent, _input, runtime ->
+    Dachshund.Agent.call_tool(agent, :echo, %{api_key: "sk-live", nested: %{token: "secret"}}, runtime)
   end, tools: [echo])
 
-{:ok, _output, runtime} = DSPy.Agent.run(agent, %{})
+{:ok, _output, runtime} = Dachshund.Agent.run(agent, %{})
 runtime.traces
 ```
 
@@ -57,9 +57,9 @@ paste secrets into the notebook.
 ```elixir
 if System.get_env("OPENAI_API_KEY") do
   model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
-  lm = DSPEx.openai(model, opts: [temperature: 0, max_completion_tokens: 40])
-  program = DSPEx.predict("question -> answer", lm: lm)
-  DSPEx.call(program, %{question: "Reply with exactly: pong"})
+  lm = Dachshund.openai(model, opts: [temperature: 0, max_completion_tokens: 40])
+  program = Dachshund.predict("question -> answer", lm: lm)
+  Dachshund.call(program, %{question: "Reply with exactly: pong"})
 else
   {:skip, "Set OPENAI_API_KEY before running the live provider cell."}
 end
@@ -79,13 +79,13 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 ## Saving Without Secrets
 
 ```elixir
-lm = DSPEx.openai("gpt-test", api_key: "not-persisted")
-program = DSPEx.predict("question -> answer", lm: lm)
+lm = Dachshund.openai("gpt-test", api_key: "not-persisted")
+program = Dachshund.predict("question -> answer", lm: lm)
 
-path = Path.join(System.tmp_dir!(), "dspy-elixir-no-secret.json")
-DSPy.Saving.save!(program, path)
+path = Path.join(System.tmp_dir!(), "dachshund-no-secret.json")
+Dachshund.Saving.save!(program, path)
 state = File.read!(path)
-loaded = DSPy.Saving.load!(path)
+loaded = Dachshund.Saving.load!(path)
 File.rm(path)
 
 {

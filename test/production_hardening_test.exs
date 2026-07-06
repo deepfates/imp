@@ -2,7 +2,7 @@ defmodule ProductionHardeningTest do
   use ExUnit.Case
 
   defmodule FlakyTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(_url, _headers, _body, _opts) do
@@ -26,22 +26,22 @@ defmodule ProductionHardeningTest do
     Process.delete(:flaky_count)
 
     lm =
-      DSPy.Clients.OpenAI.new("gpt-test",
+      Dachshund.Clients.OpenAI.new("gpt-test",
         api_key: "sk-test",
         transport: FlakyTransport,
         opts: [num_retries: 1, retry_backoff_ms: 0]
       )
 
-    program = DSPy.predict("question -> answer", lm: lm)
+    program = Dachshund.predict("question -> answer", lm: lm)
 
-    assert {:ok, prediction} = DSPy.Predict.Predict.call(program, %{question: "recover?"})
-    assert DSPy.Prediction.get(prediction, :answer) == "recovered"
+    assert {:ok, prediction} = Dachshund.Predict.Predict.call(program, %{question: "recover?"})
+    assert Dachshund.Prediction.get(prediction, :answer) == "recovered"
     assert Process.get(:flaky_count) == 2
   end
 
   test "saving rejects unsupported program types explicitly" do
-    assert_raise ArgumentError, ~r/unsupported saved DSPy program type/, fn ->
-      DSPy.Saving.load(%{"type" => "unknown"})
+    assert_raise ArgumentError, ~r/unsupported saved Dachshund program type/, fn ->
+      Dachshund.Saving.load(%{"type" => "unknown"})
     end
   end
 
@@ -52,11 +52,11 @@ defmodule ProductionHardeningTest do
 
     state = %{
       "type" => "predict",
-      "signature" => DSPy.Signature.dump(DSPy.Signature.new("question -> answer")),
+      "signature" => Dachshund.Signature.dump(Dachshund.Signature.new("question -> answer")),
       "demos" => [],
       "config" => [],
       "metadata" => %{},
-      "adapter" => "Elixir.DSPy.Adapter.Chat",
+      "adapter" => "Elixir.Dachshund.Adapter.Chat",
       "lm" => %{
         "provider" => "openai",
         "model" => "gpt-test",
@@ -66,8 +66,8 @@ defmodule ProductionHardeningTest do
       }
     }
 
-    program = DSPy.Saving.load(state)
-    assert %DSPy.Clients.HTTPLM{api_key: nil, base_url: "https://evil.example"} = program.lm
+    program = Dachshund.Saving.load(state)
+    assert %Dachshund.Clients.HTTPLM{api_key: nil, base_url: "https://evil.example"} = program.lm
   after
     previous = Process.get(:previous_openai_api_key)
 
@@ -83,13 +83,13 @@ defmodule ProductionHardeningTest do
   test "examples and predictions do not intern arbitrary external keys" do
     external_key = "external_key_#{System.unique_integer([:positive])}"
 
-    example = DSPy.Example.new(%{external_key => "kept"})
-    prediction = DSPy.Prediction.new(%{external_key => "kept"})
+    example = Dachshund.Example.new(%{external_key => "kept"})
+    prediction = Dachshund.Prediction.new(%{external_key => "kept"})
 
-    assert DSPy.Example.to_map(example) == %{external_key => "kept"}
-    assert DSPy.Example.get(example, external_key) == "kept"
-    assert DSPy.Prediction.to_map(prediction) == %{external_key => "kept"}
-    assert DSPy.Prediction.get(prediction, external_key) == "kept"
+    assert Dachshund.Example.to_map(example) == %{external_key => "kept"}
+    assert Dachshund.Example.get(example, external_key) == "kept"
+    assert Dachshund.Prediction.to_map(prediction) == %{external_key => "kept"}
+    assert Dachshund.Prediction.get(prediction, external_key) == "kept"
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
   end
@@ -98,15 +98,15 @@ defmodule ProductionHardeningTest do
     external_input = "external_input_#{System.unique_integer([:positive])}"
     external_output = "external_output_#{System.unique_integer([:positive])}"
 
-    signature = DSPy.Signature.new("#{external_input} -> #{external_output}")
+    signature = Dachshund.Signature.new("#{external_input} -> #{external_output}")
 
-    assert DSPy.Signature.input_names(signature) == [external_input]
-    assert DSPy.Signature.output_names(signature) == [external_output]
+    assert Dachshund.Signature.input_names(signature) == [external_input]
+    assert Dachshund.Signature.output_names(signature) == [external_output]
 
     assert {:ok, prediction} =
-             DSPy.Adapter.Chat.parse(signature, %{external_output => "ok"}, [])
+             Dachshund.Adapter.Chat.parse(signature, %{external_output => "ok"}, [])
 
-    assert DSPy.Prediction.get(prediction, external_output) == "ok"
+    assert Dachshund.Prediction.get(prediction, external_output) == "ok"
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_input) end
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_output) end
   end
@@ -123,7 +123,7 @@ defmodule ProductionHardeningTest do
         "errors" => [],
         "metadata" => %{external_key => "kept", "seed" => 1, "artifact_kind" => "prompt"}
       }
-      |> DSPy.Optimize.Anything.Report.from_map()
+      |> Dachshund.Optimize.Anything.Report.from_map()
 
     assert report.metadata[external_key] == "kept"
     assert report.metadata.seed == 1
@@ -132,16 +132,16 @@ defmodule ProductionHardeningTest do
   end
 
   test "parallel maps preserve per-input success shape under concurrency" do
-    lm = %{module: DSPy.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
-    program = DSPy.predict("question -> answer", lm: lm)
+    lm = %{module: Dachshund.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    program = Dachshund.predict("question -> answer", lm: lm)
 
     results =
-      DSPy.Predict.Parallel.map(program, [
+      Dachshund.Predict.Parallel.map(program, [
         %{question: "a"},
         %{question: "b"},
         %{question: "c"}
       ])
 
-    assert Enum.all?(results, &match?({:ok, %DSPy.Prediction{}}, &1))
+    assert Enum.all?(results, &match?({:ok, %Dachshund.Prediction{}}, &1))
   end
 end

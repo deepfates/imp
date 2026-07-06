@@ -2,7 +2,7 @@ defmodule ExternalRetrieverTest do
   use ExUnit.Case
 
   defmodule WeaviateTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
@@ -23,7 +23,7 @@ defmodule ExternalRetrieverTest do
   end
 
   defmodule DatabricksTransport do
-    @behaviour DSPy.HTTP
+    @behaviour Dachshund.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
@@ -40,12 +40,12 @@ defmodule ExternalRetrieverTest do
 
   test "Weaviate retriever builds GraphQL request and maps documents" do
     retriever =
-      DSPy.Retrievers.Weaviate.new("https://weaviate.example", "Passage",
+      Dachshund.Retrievers.Weaviate.new("https://weaviate.example", "Passage",
         transport: WeaviateTransport
       )
 
     assert {:ok, [%{text: "Paris is the capital of France.", score: 0.91, metadata: metadata}]} =
-             DSPy.Retrieve.retrieve(retriever, "capital France", k: 1)
+             Dachshund.Retrieve.retrieve(retriever, "capital France", k: 1)
 
     assert metadata["id"] == "p1"
     assert_received {:weaviate_request, "https://weaviate.example/v1/graphql", headers, body}
@@ -56,13 +56,14 @@ defmodule ExternalRetrieverTest do
 
   test "Databricks retriever builds vector-search request and maps rows" do
     retriever =
-      DSPy.Retrievers.Databricks.new("https://dbc.example/api/2.0/vector-search/indexes/i/query",
+      Dachshund.Retrievers.Databricks.new(
+        "https://dbc.example/api/2.0/vector-search/indexes/i/query",
         transport: DatabricksTransport,
         token: "dbc-token"
       )
 
     assert {:ok, [%{text: "Paris is the capital of France.", score: 0.88, metadata: metadata}]} =
-             DSPy.Retrieve.retrieve(retriever, "capital France", k: 1)
+             Dachshund.Retrieve.retrieve(retriever, "capital France", k: 1)
 
     assert metadata["doc_id"] == "d1"
 

@@ -1,16 +1,16 @@
-# DSPEx Documentation
+# Dachshund Documentation
 
-This directory is the practical manual for DSPEx. It is meant to be read
+This directory is the practical manual for Dachshund. It is meant to be read
 alongside the code and tests, not instead of them.
 
 ## Reading Path
 
-1. [Philosophy](DSPEX_PHILOSOPHY.md): the Elixir-native model of declarative
+1. [Philosophy](DACHSHUND_PHILOSOPHY.md): the Elixir-native model of declarative
    self-improving programs.
 2. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
    supervision/runtime boundaries.
 3. [Terminology](TERMINOLOGY.md): the canonical vocabulary for an Elixir-native
-   DSPEx project.
+   Dachshund project.
 4. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
    adapters, optimizers, agents, RLM, MCP, persistence, and providers.
 5. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
