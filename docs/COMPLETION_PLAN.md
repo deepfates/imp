@@ -60,8 +60,8 @@ V3 completion should add a local integration gate:
 mix integration.check
 ```
 
-Stateful or paid external workflows should have explicit opt-in gates instead
-of being smuggled into the default release path:
+Stateful or paid external workflows have explicit opt-in gates instead of being
+smuggled into the default release path:
 
 ```sh
 LIVE_TRAINING=1 mix live.training.check

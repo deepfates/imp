@@ -90,8 +90,8 @@ Status values:
 | Production gate | Implemented | `mix production.check` | `test/gate_contract_test.exs` | Runs locally | `docs/PRODUCTION_OPERATIONS.md` | Keep |
 | V2 gate | Implemented | `mix v2.check` | `test/gate_contract_test.exs`, `test/v2_benchmark_test.exs` | Runs locally | `docs/PRODUCTION_OPERATIONS.md`, `docs/V2.md` | Keep |
 | Live inference gate | Implemented | `mix live.check` | `test/gate_contract_test.exs` | `LIVE_PROVIDER=1 mix live.check` | `README.md`, `docs/PRODUCTION_OPERATIONS.md` | Keep as paid live inference gate |
-| Local integration gate | Release blocker | Future `mix integration.check` | Not present | Required before V3: `de-i8cc`, `de-wrnz` | `docs/COMPLETION_PLAN.md` | Add and make green |
-| Optional live stateful gates | Release blocker | Future live training/retriever/MCP gates if claimed | Not present | Required only for production claims: `de-i8cc`, `de-ld5r`, `de-wrnz` | `docs/COMPLETION_PLAN.md` | Either implement or remove claims |
+| Local integration gate | Implemented | `mix integration.check`, `test/integration` | `test/gate_contract_test.exs`, `test/integration/gate_contract_test.exs` | Real local service coverage still required under `de-wrnz` | `docs/PRODUCTION_OPERATIONS.md`, `docs/COMPLETION_PLAN.md` | Keep and populate with local E2E |
+| Optional live stateful gates | Implemented | `mix live.training.check`, `mix live.retriever.check`, `mix live.mcp.check` | Gate-contract tests under `test/live_*` | Real external coverage required only for production claims: `de-wrnz` | `docs/PRODUCTION_OPERATIONS.md`, `docs/COMPLETION_PLAN.md` | Keep opt-in and explicit |
 | Documentation and Livebooks | Release blocker | `docs/*`, `livebooks/*`, ExDoc extras | `mix docs` via `production.check` | Runnable-mode proof required under `de-t7s8` | `docs/README.md` | Final product pass under `de-t7s8` |
 
 ## Intentional Deviations From Python DSPy

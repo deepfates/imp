@@ -9,6 +9,7 @@ Run from a clean tree:
 ```sh
 mix production.check
 mix v2.check
+mix integration.check
 ```
 
 With live credentials:
@@ -20,13 +21,23 @@ set +a
 LIVE_PROVIDER=1 mix live.check
 ```
 
+Stateful or external-service gates are opt-in because they may create provider
+resources, depend on private infrastructure, or talk to trusted MCP servers:
+
+```sh
+LIVE_TRAINING=1 mix live.training.check
+LIVE_RETRIEVER=1 mix live.retriever.check
+LIVE_MCP=1 mix live.mcp.check
+```
+
 ## What The Gates Prove
 
 `mix production.check` runs:
 
 - format check
 - compile with warnings as errors
-- the non-live test suite, including the public surface contract
+- the deterministic non-live, non-integration test suite, including the public
+  surface contract
 - documentation generation with ExDoc
 
 `mix v2.check` runs:
@@ -36,6 +47,10 @@ LIVE_PROVIDER=1 mix live.check
 - the deterministic suite with V2-tagged tests included
 - V2 positive controls and negative controls, including reward-encoding
   program-optimization fixtures
+
+`mix integration.check` runs local-service end-to-end tests. It is reserved for
+tests that may start local HTTP servers, local MCP processes, or other
+controlled local infrastructure, but do not require paid provider credentials.
 
 The live provider tests prove a real OpenAI-compatible provider can execute:
 
@@ -47,13 +62,20 @@ The live provider tests prove a real OpenAI-compatible provider can execute:
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
+The stateful live gates are explicit contracts:
+
+- `mix live.training.check` is for provider-side training-job lifecycle tests.
+- `mix live.retriever.check` is for real external retriever services.
+- `mix live.mcp.check` is for trusted external MCP servers.
+
 ## What The Gates Do Not Prove
 
 They do not prove:
 
 - every possible provider feature or future model response shape
 - every provider-specific feature is live-tested
-- live training jobs, MCP servers, or external retriever services
+- live training jobs, MCP servers, or external retriever services unless the
+  matching opt-in live gate is configured and run
 - credentials are safe if a local `.env` has leaked elsewhere
 
 ## Secret Handling
@@ -106,8 +128,11 @@ Before tagging:
 1. `git status --short` is clean.
 2. `mix production.check` passes.
 3. `mix v2.check` passes.
-4. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
-5. Docs and Livebooks match the current public API.
+4. `mix integration.check` passes.
+5. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
+6. Any production claim about live training, external retrievers, or external
+   MCP servers is backed by the corresponding opt-in live gate.
+7. Docs and Livebooks match the current public API.
 
 ## Debugging Gates
 
@@ -121,6 +146,12 @@ V2 failure:
 
 ```sh
 mix test --include v2
+```
+
+Local integration failure:
+
+```sh
+mix integration.check
 ```
 
 Provider failure:

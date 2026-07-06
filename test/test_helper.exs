@@ -35,8 +35,16 @@ end
 
 DSEx.Test.EnvLoader.load()
 
-unless System.get_env("LIVE_PROVIDER") in ["1", "true", "TRUE", "yes"] do
-  ExUnit.configure(exclude: [live: true])
-end
+external_excludes =
+  [
+    {"LIVE_PROVIDER", :live},
+    {"LIVE_TRAINING", :live_training},
+    {"LIVE_RETRIEVER", :live_retriever},
+    {"LIVE_MCP", :live_mcp}
+  ]
+  |> Enum.reject(fn {env, _tag} -> System.get_env(env) in ["1", "true", "TRUE", "yes"] end)
+  |> Enum.map(fn {_env, tag} -> {tag, true} end)
+
+ExUnit.configure(exclude: external_excludes)
 
 ExUnit.start()

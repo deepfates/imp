@@ -49,7 +49,11 @@ defmodule DSEx.MixProject do
         "production.check": :test,
         "v2.check": :test,
         "public_surface.check": :test,
-        "live.check": :test
+        "integration.check": :test,
+        "live.check": :test,
+        "live.training.check": :test,
+        "live.retriever.check": :test,
+        "live.mcp.check": :test
       ]
     ]
   end
@@ -79,16 +83,28 @@ defmodule DSEx.MixProject do
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "test",
+        "test --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp",
         "docs"
       ],
       "v2.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "test --include v2"
+        "test --include v2 --exclude live --exclude integration --exclude live_training --exclude live_retriever --exclude live_mcp"
+      ],
+      "integration.check": [
+        "test --only integration test/integration"
       ],
       "live.check": [
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
+      ],
+      "live.training.check": [
+        "test --only live_training test/live_training"
+      ],
+      "live.retriever.check": [
+        "test --only live_retriever test/live_retriever"
+      ],
+      "live.mcp.check": [
+        "test --only live_mcp test/live_mcp"
       ]
     ]
   end
