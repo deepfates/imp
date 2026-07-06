@@ -14,6 +14,123 @@ defmodule DSExTest do
     assert DSEx.Signature.to_spec(signature) == "question, context -> answer"
   end
 
+  test "parses typed signatures with descriptions and constraints" do
+    signature =
+      DSEx.signature(
+        ~s(question: string "User question", attempts: integer -> answer: string, confidence: number, verdict: enum[yes,no])
+      )
+
+    assert [
+             %{name: :question, type: :string, desc: "User question"},
+             %{name: :attempts, type: :integer}
+           ] =
+             signature.inputs
+
+    assert [%{name: :answer, type: :string}, %{name: :confidence, type: :number}, verdict] =
+             signature.outputs
+
+    assert verdict.type == :string
+    assert verdict.metadata.constraints.enum == ["yes", "no"]
+
+    assert {:ok, prediction} =
+             DSEx.Adapter.Chat.parse(
+               signature,
+               %{answer: "ok", confidence: "0.8", verdict: "yes"},
+               []
+             )
+
+    assert DSEx.Prediction.get(prediction, :confidence) == 0.8
+
+    assert {:error, %DSEx.AdapterParseError{message: message}} =
+             DSEx.Adapter.Chat.parse(
+               signature,
+               %{answer: "ok", confidence: "many", verdict: "maybe"},
+               []
+             )
+
+    assert message =~ "confidence"
+    assert message =~ "verdict"
+  end
+
+  test "signature parse errors include position and suggestions" do
+    assert_raise DSEx.Signature.ParseError, ~r/position.*did you mean \"string\"/s, fn ->
+      DSEx.signature("question: strng -> answer")
+    end
+  end
+
+  test "configured settings resolve dynamically for existing programs" do
+    first = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "first"} end]
+    }
+
+    second = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "second"} end]
+    }
+
+    DSEx.configure(lm: first)
+    program = DSEx.predict("question -> answer")
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "q"})
+    assert DSEx.get(prediction, :answer) == "first"
+
+    DSEx.configure(lm: second)
+    assert {:ok, prediction} = DSEx.call(program, %{question: "q"})
+    assert DSEx.get(prediction, :answer) == "second"
+  end
+
+  test "context settings are process-local and restored" do
+    global = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
+    }
+
+    local = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
+    }
+
+    DSEx.configure(lm: global)
+    program = DSEx.predict("question -> answer")
+
+    inside =
+      DSEx.context([lm: local], fn ->
+        task = Task.async(fn -> DSEx.call(program, %{question: "q"}) end)
+
+        {:ok, local_prediction} = DSEx.call(program, %{question: "q"})
+        {:ok, task_prediction} = Task.await(task)
+
+        {DSEx.get(local_prediction, :answer), DSEx.get(task_prediction, :answer)}
+      end)
+
+    assert inside == {"local", "global"}
+    assert {:ok, prediction} = DSEx.call(program, %{question: "q"})
+    assert DSEx.get(prediction, :answer) == "global"
+  end
+
+  test "RLM controller LM resolves settings dynamically" do
+    first = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "first"}} end]
+    }
+
+    second = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "second"}} end]
+    }
+
+    DSEx.configure(lm: first)
+    rlm = DSEx.rlm("question -> answer")
+
+    assert {:ok, prediction} = DSEx.call(rlm, %{question: "q"})
+    assert DSEx.get(prediction, :answer) == "first"
+
+    DSEx.configure(lm: second)
+    assert {:ok, prediction} = DSEx.call(rlm, %{question: "q"})
+    assert DSEx.get(prediction, :answer) == "second"
+  end
+
   test "examples split inputs and labels" do
     example =
       DSEx.example(question: "2+2?", answer: "4", dsex_internal: true)

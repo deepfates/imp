@@ -16,7 +16,7 @@ defmodule ProductionAdapterPersistenceTest do
   end
 
   test "typed signatures coerce adapter outputs" do
-    signature = DSEx.signature("question: str -> score: int")
+    signature = DSEx.signature("question: string -> score: int")
     assert [:question] == DSEx.Signature.input_names(signature)
 
     assert [%{name: :score, type: :integer}] =

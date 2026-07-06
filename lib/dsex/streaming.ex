@@ -37,9 +37,15 @@ defmodule DSEx.Streaming do
 
   defp provider_stream(%DSEx.Predict.Predict{} = program, inputs, opts) do
     inputs = Map.new(inputs)
-    messages = program.adapter.format(program.signature, inputs, demos: program.demos)
+    settings = DSEx.Settings.get()
 
-    program.lm
+    adapter =
+      if program.dynamic_adapter?, do: settings.adapter, else: program.adapter || settings.adapter
+
+    lm = if program.dynamic_lm?, do: settings.lm, else: program.lm || settings.lm
+    messages = adapter.format(program.signature, inputs, demos: program.demos)
+
+    lm
     |> DSEx.Clients.HTTPLM.stream(
       messages,
       Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream]))

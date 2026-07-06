@@ -9,7 +9,7 @@ defmodule DSEx.Evaluate.SemanticF1 do
     %__MODULE__{
       predict:
         DSEx.Predict.ChainOfThought.new(
-          "question, ground_truth, system_response -> precision, recall, f1",
+          "question, ground_truth, system_response -> precision: number, recall: number, f1: number",
           opts
         )
     }
@@ -31,7 +31,7 @@ defmodule DSEx.Evaluate.CompleteAndGrounded do
     %__MODULE__{
       predict:
         DSEx.Predict.ChainOfThought.new(
-          "question, context, answer -> completeness, groundedness",
+          "question, context, answer -> completeness: number, groundedness: number",
           opts
         )
     }

@@ -19,6 +19,11 @@ lm = %{
 DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
 ```
 
+Programs built without explicit `:lm` or `:adapter` resolve settings when they
+are called, so a later `DSEx.configure/1` or scoped `DSEx.context/2` affects
+existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
+runtime dependency.
+
 For a live OpenAI-compatible provider:
 
 ```elixir
@@ -49,6 +54,8 @@ DSEx.get(pred, :answer)
 ## Schema-Constrained JSON
 
 ```elixir
+typed = DSEx.signature(~s(text: string -> sentiment: enum[positive,negative], confidence: number))
+
 signature =
   DSEx.Signature.new(%{
     inputs: [:text],

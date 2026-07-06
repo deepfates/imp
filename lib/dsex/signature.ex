@@ -20,14 +20,7 @@ defmodule DSEx.Signature do
   def new(%__MODULE__{} = signature, _instructions), do: signature
 
   def new(spec, instructions) when is_binary(spec) do
-    [raw_inputs, raw_outputs] =
-      case String.split(spec, "->", parts: 2) do
-        [inputs, outputs] -> [inputs, outputs]
-        _ -> raise ArgumentError, "signature must contain `->`, got: #{inspect(spec)}"
-      end
-
-    inputs = parse_fields(raw_inputs, :input)
-    outputs = parse_fields(raw_outputs, :output)
+    {inputs, outputs} = DSEx.Signature.Parser.parse(spec)
 
     %__MODULE__{
       inputs: inputs,
@@ -90,14 +83,6 @@ defmodule DSEx.Signature do
       instructions: Map.get(state, "instructions"),
       metadata: Map.get(state, "metadata", %{})
     }
-  end
-
-  defp parse_fields(raw, kind) do
-    raw
-    |> String.split(",", trim: true)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.map(&Field.new(&1, kind))
   end
 
   defp default_instructions(inputs, outputs) do

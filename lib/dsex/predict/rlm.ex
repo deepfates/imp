@@ -30,7 +30,10 @@ defmodule DSEx.Predict.RLM do
     max_llm_calls: 20,
     max_time_ms: nil,
     max_preview_chars: 2_000,
-    max_observation_chars: 10_000
+    max_observation_chars: 10_000,
+    dynamic_lm?: true,
+    dynamic_sub_lm?: true,
+    dynamic_adapter?: true
   ]
 
   @doc """
@@ -52,7 +55,7 @@ defmodule DSEx.Predict.RLM do
     %__MODULE__{
       signature: signature,
       lm: Keyword.get(opts, :lm),
-      adapter: Keyword.get(opts, :adapter, DSEx.Adapter.Chat),
+      adapter: Keyword.get(opts, :adapter),
       sub_lm: Keyword.get(opts, :sub_lm, Keyword.get(opts, :lm)),
       tools: Keyword.get(opts, :tools, []) |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
       tool_policy: Keyword.get(opts, :tool_policy, :allow),
@@ -61,7 +64,10 @@ defmodule DSEx.Predict.RLM do
       max_time_ms: Keyword.get(opts, :max_time_ms),
       max_preview_chars: Keyword.get(opts, :max_preview_chars, 2_000),
       max_observation_chars:
-        Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000))
+        Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000)),
+      dynamic_lm?: not Keyword.has_key?(opts, :lm),
+      dynamic_sub_lm?: not Keyword.has_key?(opts, :sub_lm) and not Keyword.has_key?(opts, :lm),
+      dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
     }
   end
 
@@ -105,10 +111,14 @@ defmodule DSEx.Predict.RLM do
     end
   end
 
-  defp controller_action(%__MODULE__{lm: nil}, _state, _iteration),
-    do: {:error, :rlm_requires_controller_lm}
-
   defp controller_action(%__MODULE__{} = rlm, state, iteration) do
+    case resolve_lm(rlm) do
+      nil -> {:error, :rlm_requires_controller_lm}
+      lm -> controller_action_with_lm(rlm, lm, state, iteration)
+    end
+  end
+
+  defp controller_action_with_lm(%__MODULE__{} = rlm, lm, state, iteration) do
     messages = [
       %{
         role: :system,
@@ -132,7 +142,7 @@ defmodule DSEx.Predict.RLM do
       }
     ]
 
-    DSEx.LM.generate(rlm.lm, messages, [])
+    DSEx.LM.generate(lm, messages, [])
   end
 
   defp normalize_action(%{"action" => _action} = action), do: {:ok, action}
@@ -163,7 +173,7 @@ defmodule DSEx.Predict.RLM do
 
   defp step(rlm, %{"action" => "submit", "result" => result}, state, iteration)
        when is_map(result) do
-    case DSEx.Adapter.Chat.parse(rlm.signature, result, []) do
+    case resolve_adapter(rlm).parse(rlm.signature, result, []) do
       {:ok, prediction} ->
         state = trace(state, iteration, :submit, result, :done)
         {:done, prediction, state}
@@ -197,7 +207,13 @@ defmodule DSEx.Predict.RLM do
     else
       signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
       inputs = Map.get(action, "inputs", %{})
-      program = DSEx.Predict.Predict.new(signature, lm: rlm.sub_lm, adapter: rlm.adapter)
+
+      program =
+        DSEx.Predict.Predict.new(signature,
+          lm: resolve_sub_lm(rlm),
+          adapter: resolve_adapter(rlm)
+        )
+
       result = DSEx.Predict.Predict.call(program, inputs)
 
       state =
@@ -339,6 +355,17 @@ defmodule DSEx.Predict.RLM do
     elapsed = System.monotonic_time(:millisecond) - state.started_at
     max(rlm.max_time_ms - elapsed, 0)
   end
+
+  defp resolve_lm(%__MODULE__{dynamic_lm?: true}), do: DSEx.Settings.get().lm
+  defp resolve_lm(%__MODULE__{lm: lm}), do: lm
+
+  defp resolve_sub_lm(%__MODULE__{dynamic_sub_lm?: true}), do: DSEx.Settings.get().lm
+  defp resolve_sub_lm(%__MODULE__{sub_lm: nil} = rlm), do: resolve_lm(rlm)
+  defp resolve_sub_lm(%__MODULE__{sub_lm: lm}), do: lm
+
+  defp resolve_adapter(%__MODULE__{dynamic_adapter?: true}), do: DSEx.Settings.get().adapter
+  defp resolve_adapter(%__MODULE__{adapter: nil}), do: DSEx.Settings.get().adapter
+  defp resolve_adapter(%__MODULE__{adapter: adapter}), do: adapter
 
   defp existing_atom_or_string(name) do
     String.to_existing_atom(name)

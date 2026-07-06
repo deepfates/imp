@@ -50,10 +50,20 @@ defmodule DSEx.Adapter.Chat do
 
     missing = Enum.reject(required, &Map.has_key?(fields, &1))
 
-    if missing == [] do
-      {:ok, DSEx.Prediction.new(coerce_fields(signature, Map.take(fields, output_names)))}
+    with true <- missing == [],
+         fields <- coerce_fields(signature, Map.take(fields, output_names)),
+         :ok <- DSEx.Schema.validate_fields(signature.outputs, fields) do
+      {:ok, DSEx.Prediction.new(fields)}
     else
-      {:error, {:missing_output_fields, missing}}
+      false ->
+        {:error, {:missing_output_fields, missing}}
+
+      {:error, errors} ->
+        {:error,
+         %DSEx.AdapterParseError{
+           message: DSEx.Schema.retry_feedback(errors),
+           reason: fields
+         }}
     end
   end
 
@@ -81,8 +91,21 @@ defmodule DSEx.Adapter.Chat do
     end
   end
 
-  defp coerce_value(value, :boolean) when is_binary(value),
-    do: String.downcase(String.trim(value)) in ["true", "yes", "1"]
+  defp coerce_value(value, :number) when is_binary(value) do
+    case Float.parse(String.trim(value)) do
+      {float, ""} -> float
+      {_float, _rest} -> value
+      :error -> value
+    end
+  end
+
+  defp coerce_value(value, :boolean) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      value when value in ["true", "yes", "1"] -> true
+      value when value in ["false", "no", "0"] -> false
+      _other -> value
+    end
+  end
 
   defp coerce_value(value, _type), do: value
 

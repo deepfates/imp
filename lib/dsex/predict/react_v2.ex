@@ -23,7 +23,7 @@ defmodule DSEx.Predict.ReActV2 do
           %{name: :next_thought, metadata: %{optional: true}},
           :output
         ),
-        DSEx.Signature.Field.new(:tool_calls, :output)
+        DSEx.Signature.Field.new(%{name: :tool_calls, type: :array}, :output)
       ],
       instructions: signature.instructions
     }

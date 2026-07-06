@@ -7,6 +7,7 @@ defmodule DSEx.Settings do
 
   @name __MODULE__
   @defaults %{lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil, callbacks: []}
+  @context_key :dsex_context_stack
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
@@ -20,19 +21,23 @@ defmodule DSEx.Settings do
   def get do
     ensure_started()
     global = Agent.get(@name, & &1)
-    Map.merge(global, Process.get(:dsex_context, %{}))
+
+    @context_key
+    |> Process.get([])
+    |> Enum.reverse()
+    |> Enum.reduce(global, &Map.merge(&2, &1))
   end
 
   def fetch!(key), do: get() |> Map.fetch!(key)
 
   def context(opts, fun) when is_function(fun, 0) do
-    previous = Process.get(:dsex_context, %{})
-    Process.put(:dsex_context, Map.merge(previous, Map.new(opts)))
+    previous = Process.get(@context_key, [])
+    Process.put(@context_key, [Map.new(opts) | previous])
 
     try do
       fun.()
     after
-      Process.put(:dsex_context, previous)
+      Process.put(@context_key, previous)
     end
   end
 

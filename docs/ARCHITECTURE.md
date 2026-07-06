@@ -30,8 +30,10 @@ control in tests, docs, or advanced systems.
 
 ### `DSEx.Signature`
 
-Defines input and output fields. String field names from external data remain
-strings unless the atom already exists, which prevents atom exhaustion.
+Defines input and output fields. The string DSL supports typed flat fields,
+descriptions, arrays, and enum/class constraints with position-aware parse
+errors. String field names from external data remain strings unless the atom
+already exists, which prevents atom exhaustion.
 
 Important functions:
 
