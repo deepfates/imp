@@ -1,7 +1,17 @@
 defmodule DSEx.Redaction do
   @moduledoc "Shared redaction helpers for traces and runtime metadata."
 
-  @default_redact_keys [:api_key, :authorization, :token, :password, :secret]
+  @default_redact_keys [
+    :api_key,
+    :authorization,
+    :token,
+    :password,
+    :secret,
+    :access_token,
+    :client_secret,
+    :private_key,
+    :"x-api-key"
+  ]
 
   def default_keys, do: @default_redact_keys
 
@@ -28,8 +38,15 @@ defmodule DSEx.Redaction do
   def redact(value, _keys), do: value
 
   defp redacted_key?(key, keys) do
-    normalized = key |> to_string() |> String.downcase()
-    Enum.any?(keys, &(normalized == &1 |> to_string() |> String.downcase()))
+    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
+
+    Enum.any?(keys, fn redact_key ->
+      redact_key = redact_key |> to_string() |> String.downcase() |> String.replace("-", "_")
+
+      normalized == redact_key or
+        String.ends_with?(normalized, "_#{redact_key}") or
+        String.contains?(normalized, redact_key)
+    end)
   end
 
   defp secret_value?(value) do

@@ -33,13 +33,16 @@ defmodule DSEx.Saving do
           "metadata" => metadata
         } = state
       ) do
-    DSEx.Predict.Predict.new(DSEx.Signature.load(signature),
-      demos: Enum.map(demos, &DSEx.Example.new/1),
-      config: decode_config(config),
-      metadata: metadata,
-      adapter: decode_adapter(Map.get(state, "adapter")),
-      lm: decode_lm(Map.get(state, "lm"))
-    )
+    opts =
+      [
+        demos: Enum.map(demos, &DSEx.Example.new/1),
+        config: decode_config(config),
+        metadata: metadata
+      ]
+      |> maybe_put_adapter(state)
+      |> maybe_put_lm(state)
+
+    DSEx.Predict.Predict.new(DSEx.Signature.load(signature), opts)
   end
 
   def load(%{"type" => "chain_of_thought"} = state) do
@@ -49,6 +52,21 @@ defmodule DSEx.Saving do
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved DSEx program type: #{inspect(type)}"
+  end
+
+  defp maybe_put_adapter(opts, %{"dynamic_adapter" => true}), do: opts
+
+  defp maybe_put_adapter(opts, state) do
+    Keyword.put(opts, :adapter, decode_adapter(Map.get(state, "adapter")))
+  end
+
+  defp maybe_put_lm(opts, %{"dynamic_lm" => true}), do: opts
+
+  defp maybe_put_lm(opts, state) do
+    case decode_lm(Map.get(state, "lm")) do
+      nil -> opts
+      lm -> Keyword.put(opts, :lm, lm)
+    end
   end
 
   defp decode_config(config) when is_list(config) do

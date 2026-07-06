@@ -61,18 +61,21 @@ The current integration gate proves:
 The live provider tests prove a real OpenAI-compatible provider can execute:
 
 - basic `Predict`
-- schema-constrained JSON `Predict`
+- JSON `Predict` with schema validation and retry feedback
 - `ChainOfThought` with required reasoning
 - provider streaming through `DSEx.Streaming`
 - `ReActV2` function-tool calls plus reserved `submit`
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
-The stateful live gates are explicit contracts:
+The stateful live aliases are reserved opt-in gates. They are intentionally
+separate from the release gate because they require external provider resources
+or trusted infrastructure. A release may only claim one of these external
+systems is live-proven when the corresponding alias contains real service tests:
 
-- `mix live.training.check` is for provider-side training-job lifecycle tests.
-- `mix live.retriever.check` is for real external retriever services.
-- `mix live.mcp.check` is for trusted external MCP servers.
+- `mix live.training.check` is reserved for provider-side training-job lifecycle tests.
+- `mix live.retriever.check` is reserved for real external retriever services.
+- `mix live.mcp.check` is reserved for trusted external MCP servers.
 
 ## What The Gates Do Not Prove
 
@@ -81,7 +84,7 @@ They do not prove:
 - every possible provider feature or future model response shape
 - every provider-specific feature is live-tested
 - live training jobs, MCP servers, or external retriever services unless the
-  matching opt-in live gate is configured and run
+  matching opt-in live alias contains real service tests and is configured/run
 - credentials are safe if a local `.env` has leaked elsewhere
 
 ## Secret Handling
@@ -93,7 +96,12 @@ Security-sensitive defaults:
 - saved HTTP LMs load with `api_key: nil`
 - custom provider `base_url:` values require explicit `api_key:` and do not
   silently bind ambient provider credentials
+- provider clients use real transport by default; mock/fallback behavior
+  requires explicit `DSEX_TEST_MODE` or `test_mode:` configuration
+- Databricks vector-search retrievers require explicit `token:` for explicit
+  endpoint URLs and do not silently bind ambient `DATABRICKS_TOKEN`
 - default `:httpc` transport verifies TLS peer certificates
+- default `:httpc` transport applies finite HTTP timeouts unless overridden
 - unknown external keys are not converted with `String.to_atom/1`
 - prediction, program, agent, ReAct, CodeAct, and RLM traces redact common
   secret keys and secret-shaped values
@@ -134,7 +142,6 @@ Typical `.env`:
 ```sh
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4o-mini
-DSEX_TEST_MODE=live
 ```
 
 Run:

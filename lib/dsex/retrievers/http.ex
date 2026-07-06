@@ -168,7 +168,7 @@ defmodule DSEx.Retrievers.Databricks do
   end
 
   defp auth_headers(opts) do
-    token = Keyword.get(opts, :token) || System.get_env("DATABRICKS_TOKEN")
+    token = Keyword.get(opts, :token)
     if token, do: [{"authorization", "Bearer #{token}"}], else: []
   end
 end

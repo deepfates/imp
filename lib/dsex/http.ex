@@ -50,6 +50,8 @@ defmodule DSEx.HTTP.Hackneyless do
 
   @behaviour DSEx.HTTP
 
+  @default_timeout 15_000
+
   @impl true
   def post(url, headers, body, opts) do
     :inets.start()
@@ -63,7 +65,7 @@ defmodule DSEx.HTTP.Hackneyless do
       end)
 
     request = {String.to_charlist(url), headers, ~c"application/json", IO.iodata_to_binary(body)}
-    http_opts = opts |> Keyword.get(:http_opts, []) |> secure_http_opts()
+    http_opts = http_opts(opts)
     request_opts = Keyword.get(opts, :request_opts, [])
 
     case :httpc.request(:post, request, http_opts, request_opts) do
@@ -80,6 +82,16 @@ defmodule DSEx.HTTP.Hackneyless do
     Keyword.update(http_opts, :ssl, default_ssl_opts(), fn ssl_opts ->
       Keyword.merge(default_ssl_opts(), ssl_opts)
     end)
+  end
+
+  def http_opts(opts) do
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
+
+    opts
+    |> Keyword.get(:http_opts, [])
+    |> Keyword.put_new(:timeout, timeout)
+    |> Keyword.put_new(:connect_timeout, timeout)
+    |> secure_http_opts()
   end
 
   def default_ssl_opts do

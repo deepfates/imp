@@ -8,17 +8,31 @@ defmodule DSEx.Sandbox do
   """
 
   @allowed_ops [:+, :-, :*, :/, :div, :rem, :==, :!=, :<, :<=, :>, :>=, :and, :or, :in, :++]
-  @safe_local_functions [:length, :hd, :tl]
-  @safe_string_functions [:length, :downcase, :upcase, :trim, :contains?, :split]
 
   def eval(expression, vars \\ %{}) when is_binary(expression) do
-    with {:ok, ast} <- Code.string_to_quoted(expression),
-         {:ok, value} <- eval_ast(ast, Map.new(vars)) do
+    with {:ok, ast} <- parse(expression),
+         {:ok, value} <- eval_ast(ast, normalize_vars(vars)) do
       {:ok, value}
     else
       {:error, reason} -> {:error, reason}
       other -> {:error, {:invalid_expression, other}}
     end
+  end
+
+  defp parse(expression) do
+    Code.string_to_quoted(expression,
+      static_atoms_encoder: fn value, _meta -> {:ok, to_string(value)} end
+    )
+  end
+
+  defp normalize_vars(vars) do
+    vars
+    |> Map.new()
+    |> Enum.flat_map(fn
+      {key, value} when is_atom(key) -> [{key, value}, {Atom.to_string(key), value}]
+      pair -> [pair]
+    end)
+    |> Map.new()
   end
 
   defp eval_ast(value, _vars)
@@ -42,8 +56,23 @@ defmodule DSEx.Sandbox do
     end
   end
 
+  defp eval_ast({name, _meta, nil}, vars) when is_binary(name) do
+    case Map.fetch(vars, name) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:unknown_variable, name}}
+    end
+  end
+
   defp eval_ast({:if, _meta, [condition, [do: then_ast, else: else_ast]]}, vars) do
     with {:ok, condition} <- eval_ast(condition, vars) do
+      eval_ast(if(condition, do: then_ast, else: else_ast), vars)
+    end
+  end
+
+  defp eval_ast({"if", _meta, [condition, clauses]}, vars) when is_list(clauses) do
+    with {:ok, condition} <- eval_ast(condition, vars),
+         {:ok, then_ast} <- fetch_clause(clauses, "do"),
+         {:ok, else_ast} <- fetch_clause(clauses, "else") do
       eval_ast(if(condition, do: then_ast, else: else_ast), vars)
     end
   end
@@ -59,17 +88,24 @@ defmodule DSEx.Sandbox do
     with {:ok, value} <- eval_ast(value, vars), do: {:ok, -value}
   end
 
-  defp eval_ast({name, _meta, args}, vars)
-       when name in @safe_local_functions and is_list(args) do
-    call_safe(name, args, vars)
-  end
-
-  defp eval_ast({{:., _meta, [{:__aliases__, _, [:String]}, name]}, _call_meta, args}, vars)
-       when name in @safe_string_functions and is_list(args) do
+  defp eval_ast({{:., _meta, [{:__aliases__, _, module}, name]}, _call_meta, args}, vars)
+       when module in [[:String], ["String"]] and is_list(args) do
     call_safe({String, name}, args, vars)
   end
 
+  defp eval_ast({name, _meta, args}, vars)
+       when (is_atom(name) or is_binary(name)) and is_list(args) do
+    call_safe(name, args, vars)
+  end
+
   defp eval_ast(other, _vars), do: {:error, {:unsafe_ast, other}}
+
+  defp fetch_clause(clauses, key) do
+    case List.keyfind(clauses, key, 0) do
+      {^key, value} -> {:ok, value}
+      nil -> {:error, {:missing_clause, key}}
+    end
+  end
 
   defp apply_op(:+, left, right), do: {:ok, left + right}
   defp apply_op(:-, left, right), do: {:ok, left - right}
@@ -107,23 +143,44 @@ defmodule DSEx.Sandbox do
 
   defp apply_safe(:length, [value]) when is_list(value), do: {:ok, length(value)}
   defp apply_safe(:length, [value]) when is_binary(value), do: {:ok, String.length(value)}
+  defp apply_safe("length", [value]) when is_list(value), do: {:ok, length(value)}
+  defp apply_safe("length", [value]) when is_binary(value), do: {:ok, String.length(value)}
   defp apply_safe(:hd, [[head | _tail]]), do: {:ok, head}
+  defp apply_safe("hd", [[head | _tail]]), do: {:ok, head}
   defp apply_safe(:tl, [[_head | tail]]), do: {:ok, tail}
+  defp apply_safe("tl", [[_head | tail]]), do: {:ok, tail}
 
   defp apply_safe({String, :length}, [value]) when is_binary(value),
+    do: {:ok, String.length(value)}
+
+  defp apply_safe({String, "length"}, [value]) when is_binary(value),
     do: {:ok, String.length(value)}
 
   defp apply_safe({String, :downcase}, [value]) when is_binary(value),
     do: {:ok, String.downcase(value)}
 
+  defp apply_safe({String, "downcase"}, [value]) when is_binary(value),
+    do: {:ok, String.downcase(value)}
+
   defp apply_safe({String, :upcase}, [value]) when is_binary(value),
     do: {:ok, String.upcase(value)}
 
+  defp apply_safe({String, "upcase"}, [value]) when is_binary(value),
+    do: {:ok, String.upcase(value)}
+
   defp apply_safe({String, :trim}, [value]) when is_binary(value), do: {:ok, String.trim(value)}
+  defp apply_safe({String, "trim"}, [value]) when is_binary(value), do: {:ok, String.trim(value)}
 
   defp apply_safe({String, :contains?}, [value, needle]) when is_binary(value),
     do: {:ok, String.contains?(value, needle)}
 
+  defp apply_safe({String, "contains?"}, [value, needle]) when is_binary(value),
+    do: {:ok, String.contains?(value, needle)}
+
   defp apply_safe({String, :split}, [value]) when is_binary(value), do: {:ok, String.split(value)}
+
+  defp apply_safe({String, "split"}, [value]) when is_binary(value),
+    do: {:ok, String.split(value)}
+
   defp apply_safe(name, args), do: {:error, {:unsafe_call, name, args}}
 end

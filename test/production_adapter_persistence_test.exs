@@ -108,4 +108,27 @@ defmodule ProductionAdapterPersistenceTest do
     refute loaded.lm.api_key == "not-persisted"
     assert loaded.config == []
   end
+
+  test "save/load preserves dynamic LM rebinding for settings-based programs" do
+    program = DSEx.predict("question -> answer")
+
+    path =
+      Path.join(System.tmp_dir!(), "DSEx-dynamic-save-#{System.unique_integer([:positive])}.json")
+
+    assert :ok = DSEx.Saving.save!(program, path)
+    loaded = DSEx.Saving.load!(path)
+    File.rm(path)
+
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "settings-ok"} end]
+    }
+
+    assert {:ok, prediction} =
+             DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+               DSEx.call(loaded, %{question: "works?"})
+             end)
+
+    assert DSEx.Prediction.get(prediction, :answer) == "settings-ok"
+  end
 end

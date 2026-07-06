@@ -87,6 +87,32 @@ defmodule ExternalRetrieverTest do
     Process.delete(:dsex_telemetry_handler)
   end
 
+  test "Databricks retriever does not bind ambient token to explicit endpoints" do
+    Process.put(:previous_databricks_token, System.get_env("DATABRICKS_TOKEN"))
+    System.put_env("DATABRICKS_TOKEN", "ambient-token")
+
+    retriever =
+      DSEx.Retrievers.Databricks.new(
+        "https://dbc.example/api/2.0/vector-search/indexes/i/query",
+        transport: DatabricksTransport
+      )
+
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(retriever, "capital France", k: 1)
+
+    assert_received {:databricks_request,
+                     "https://dbc.example/api/2.0/vector-search/indexes/i/query", headers, _body}
+
+    refute {"authorization", "Bearer ambient-token"} in headers
+  after
+    if previous = Process.get(:previous_databricks_token) do
+      System.put_env("DATABRICKS_TOKEN", previous)
+    else
+      System.delete_env("DATABRICKS_TOKEN")
+    end
+
+    Process.delete(:previous_databricks_token)
+  end
+
   test "generic HTTP retriever rejects unsupported methods explicitly" do
     retriever =
       DSEx.Retrievers.HTTP.new("https://retriever.example/search",

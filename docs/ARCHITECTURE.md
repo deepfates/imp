@@ -122,6 +122,15 @@ Production clients are OpenAI-compatible HTTP wrappers:
 The underlying transport is injectable via `DSEx.HTTP`, which is how provider
 contracts are tested without live credentials.
 
+Provider clients use real transport by default. Deterministic provider-contract
+tests must opt into `DSEX_TEST_MODE=mock`, `DSEX_TEST_MODE=fallback`, or a
+constructor-level `test_mode:`.
+
+Provider streaming is transport-dependent. Transports that implement
+`DSEx.HTTP.stream/4` can deliver incremental chunks. Transports that only
+implement `post/4`, including the default `:httpc` transport, expose a buffered
+body that DSEx can parse as stream events but cannot make incrementally arrive.
+
 Runtime dependencies are deliberately small and production-oriented:
 
 - `Jason` is the JSON boundary for providers, adapters, datasets, reports, and

@@ -45,4 +45,29 @@ defmodule LiveProviderTest do
     assert DSEx.Prediction.get(prediction, :answer) == "pong"
     assert DSEx.Prediction.get(prediction, :score) == 7
   end
+
+  @tag :live
+  test "OpenAI-compatible live provider accepts native JSON schema response format" do
+    api_key = System.get_env("OPENAI_API_KEY")
+    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+
+    assert is_binary(api_key) and byte_size(api_key) > 0
+
+    lm = DSEx.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 80])
+
+    program =
+      DSEx.predict("question -> answer, score: int",
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [native_json_schema: true]
+      )
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Predict.call(program, %{
+               question: "Set answer to pong and score to 7."
+             })
+
+    assert DSEx.Prediction.get(prediction, :answer) == "pong"
+    assert DSEx.Prediction.get(prediction, :score) == 7
+  end
 end

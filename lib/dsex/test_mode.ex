@@ -8,13 +8,11 @@ defmodule DSEx.TestMode do
   """
 
   def mode do
-    default = if System.get_env("LIVE_PROVIDER") == "1", do: "live", else: "mock"
-
-    case System.get_env("DSEX_TEST_MODE", default) |> String.downcase() do
+    case System.get_env("DSEX_TEST_MODE", "live") |> String.downcase() do
       "live" -> :live
       "fallback" -> :fallback
       "mock" -> :mock
-      _other -> :mock
+      other -> raise ArgumentError, "unsupported DSEX_TEST_MODE: #{inspect(other)}"
     end
   end
 

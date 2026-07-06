@@ -55,7 +55,9 @@ defmodule DSEx.Predict.Predict do
       "config" => encode_keyword(predict.config),
       "metadata" => predict.metadata,
       "adapter" => predict |> resolve_adapter() |> Atom.to_string(),
-      "lm" => dump_lm(predict.lm)
+      "lm" => dump_lm(predict.lm),
+      "dynamic_lm" => predict.dynamic_lm?,
+      "dynamic_adapter" => predict.dynamic_adapter?
     }
   end
 

@@ -53,9 +53,18 @@ defmodule CompletionSurfaceTest do
              )
 
     assert {:ok, true} = DSEx.Sandbox.eval("length([1, 2, 3]) == 3 and \"a\" in [\"a\", \"b\"]")
+    assert {:ok, 5} = DSEx.Sandbox.eval("x + y", %{"x" => 2, y: 3})
 
     assert {:error, {:unsafe_ast, _}} =
              DSEx.Sandbox.eval("System.cmd(\"rm\", [\"-rf\", \"/\"])")
+
+    external_identifier = "sandbox_external_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(external_identifier) end
+
+    assert {:error, {:unknown_variable, ^external_identifier}} =
+             DSEx.Sandbox.eval(external_identifier)
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(external_identifier) end
   end
 
   test "CodeAct loops through tool observations before evaluating a program" do

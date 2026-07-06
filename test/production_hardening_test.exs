@@ -78,6 +78,16 @@ defmodule ProductionHardeningTest do
   @tag capture_log: true
   test "default httpc transport verifies TLS peer certificates" do
     assert Keyword.fetch!(DSEx.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer
+    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts([]), :timeout) == 15_000
+    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts(timeout: 123), :timeout) == 123
+
+    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts(timeout: 123), :connect_timeout) ==
+             123
+
+    assert Keyword.fetch!(
+             DSEx.HTTP.Hackneyless.http_opts(http_opts: [timeout: 456]),
+             :timeout
+           ) == 456
 
     dir = Path.join(System.tmp_dir!(), "dsex-tls-#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
@@ -160,6 +170,41 @@ defmodule ProductionHardeningTest do
 
       System.put_env("DSEX_TEST_MODE", "fallback")
       assert {:ok, "Answer: mock"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
+    after
+      restore_env("DSEX_TEST_MODE", previous_mode)
+      restore_env("LIVE_PROVIDER", previous_live)
+    end
+  end
+
+  test "provider clients do not mock by default when credentials are present" do
+    previous_mode = System.get_env("DSEX_TEST_MODE")
+    previous_live = System.get_env("LIVE_PROVIDER")
+
+    try do
+      System.delete_env("DSEX_TEST_MODE")
+      System.delete_env("LIVE_PROVIDER")
+
+      lm =
+        DSEx.Clients.OpenAI.new("gpt-test",
+          api_key: "sk-test",
+          base_url: "https://api.example/v1",
+          transport: fn url, _headers, _body, _opts ->
+            send(self(), {:provider_called, url})
+
+            {:ok,
+             %{
+               status: 200,
+               headers: [],
+               body: Jason.encode!(%{choices: [%{message: %{content: "real"}}]})
+             }}
+          end
+        )
+
+      assert {:ok, "real"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
+      assert_received {:provider_called, "https://api.example/v1/chat/completions"}
+
+      System.put_env("DSEX_TEST_MODE", "garbage")
+      assert_raise ArgumentError, ~r/unsupported DSEX_TEST_MODE/, fn -> DSEx.TestMode.mode() end
     after
       restore_env("DSEX_TEST_MODE", previous_mode)
       restore_env("LIVE_PROVIDER", previous_live)
@@ -376,6 +421,23 @@ defmodule ProductionHardeningTest do
     assert metadata.arguments["api_key"] == "[REDACTED]"
   after
     Process.delete(:dsex_telemetry_handler)
+  end
+
+  test "redaction covers common compound secret keys" do
+    redacted =
+      DSEx.Redaction.redact(%{
+        :access_token => "short-token",
+        :client_secret => "short-secret",
+        "x-api-key" => "short-key",
+        :private_key => "private",
+        :nested => %{refresh_token: "refresh"}
+      })
+
+    assert redacted.access_token == "[REDACTED]"
+    assert redacted.client_secret == "[REDACTED]"
+    assert redacted["x-api-key"] == "[REDACTED]"
+    assert redacted.private_key == "[REDACTED]"
+    assert redacted.nested.refresh_token == "[REDACTED]"
   end
 
   test "examples and predictions do not intern arbitrary external keys" do

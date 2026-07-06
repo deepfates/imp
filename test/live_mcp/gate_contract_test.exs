@@ -3,7 +3,7 @@ defmodule LiveMCPGateContractTest do
 
   @moduletag :live_mcp
 
-  test "live MCP gate is explicit because it depends on external MCP servers" do
+  test "live MCP alias is reserved until real external-server tests are configured" do
     assert System.get_env("LIVE_MCP") in [nil, "0", "1"]
   end
 end
