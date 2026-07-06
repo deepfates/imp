@@ -209,6 +209,13 @@ client = DSEx.MCP.HTTPClient.new("https://mcp.example/tools")
 tools = DSEx.MCP.import_tools(client)
 ```
 
+For stdio or Streamable HTTP transports:
+
+```elixir
+stdio = DSEx.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
+streamable = DSEx.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", session_id: "session")
+```
+
 ## RLM
 
 ```elixir
@@ -247,6 +254,7 @@ RLM controller actions:
 %{action: "assign", name: "scratch", value: "note"}
 %{action: "tool", name: "lookup", arguments: %{"key" => "x"}}
 %{action: "llm_query", signature: "question -> answer", inputs: %{question: "q"}}
+%{action: "recurse", signature: "question -> answer", inputs: %{question: "q"}}
 %{action: "submit", result: %{answer: "final"}}
 ```
 
@@ -264,6 +272,12 @@ credentials; reconfigure credentials explicitly before live use.
 
 ```elixir
 DSEx.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
+
+DSEx.Streaming.incremental_fields(
+  ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
+  "question -> answer, rationale"
+)
 ```
 
-Provider SSE streaming is covered through injectable transports.
+Provider streaming and delimiter-based field parsing are covered through
+injectable transports and deterministic chunk fixtures.

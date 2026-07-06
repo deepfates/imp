@@ -76,8 +76,8 @@ All major program structs implement the `DSEx.Module` behaviour.
 | `DSEx.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
 | `DSEx.Predict.ReAct` | Compatibility facade for `ReActV2`. |
 | `DSEx.Predict.ReActV2` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
-| `DSEx.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
-| `DSEx.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
+| `DSEx.Predict.ProgramOfThought` | LM emits a safe expression or tool action plan. |
+| `DSEx.Predict.CodeAct` | Iterates tool observations and BEAM-safe sandbox execution with trace metadata. |
 | `DSEx.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
 | `DSEx.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
 | `DSEx.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
@@ -176,9 +176,10 @@ V2 arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 `DSEx.Tool` wraps callable functionality. `DSEx.Agent` composes tools, child
 agents, memory/context, policies, and traces.
 
-`DSEx.MCP` imports in-process or HTTP-discovered tool catalogs into `DSEx.Tool`
-values. The HTTP client supports deterministic transport-backed tests and
-remote `tools/list` / `tools/call` style flows.
+`DSEx.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
+into `DSEx.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,
+initialize before discovery, and expose remote `tools/list` / `tools/call`
+style flows through ordinary tools.
 
 ## RLM
 
@@ -196,6 +197,7 @@ The controller may return actions:
 - `assign`
 - `tool`
 - `llm_query`
+- `recurse`
 - `submit`
 
 The implementation uses a BEAM-safe sandbox for production control.
@@ -212,4 +214,4 @@ The production and V2 gates are not docs-only promises:
 
 - `mix production.check`
 - `mix v2.check`
-- `LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs`
+- `LIVE_PROVIDER=1 mix live.check`

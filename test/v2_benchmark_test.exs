@@ -9,6 +9,7 @@ defmodule V2BenchmarkTest do
              :structured_extraction,
              :agent_tool_task,
              :prompt_optimization,
+             :program_reward_optimization,
              :arbitrary_artifact_optimization
            ]
 
@@ -23,6 +24,7 @@ defmodule V2BenchmarkTest do
              :structured_extraction_negative,
              :agent_tool_task_negative,
              :prompt_optimization_negative,
+             :program_reward_optimization_negative,
              :arbitrary_artifact_optimization_negative
            ]
 

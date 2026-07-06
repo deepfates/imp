@@ -9,17 +9,18 @@ alongside the code and tests, not instead of them.
    self-improving programs.
 2. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
    adapters, optimizers, agents, RLM, MCP, persistence, and providers.
-3. [Livebook 01](../livebooks/01_programming_not_prompting.livemd):
+3. [Prior Art](PRIOR_ART.md): project lineage, terminology, and independence.
+4. [Livebook 01](../livebooks/01_programming_not_prompting.livemd):
    signatures, predictions, examples, and schema-constrained output.
-4. [Livebook 02](../livebooks/02_evaluate_and_optimize.livemd): evaluation,
+5. [Livebook 02](../livebooks/02_evaluate_and_optimize.livemd): evaluation,
    optimizer reports, and artifact optimization.
-5. [Livebook 03](../livebooks/03_agents_tools_mcp_rlm.livemd): tools, agents,
+6. [Livebook 03](../livebooks/03_agents_tools_mcp_rlm.livemd): tools, agents,
    MCP-style catalogs, ReActV2, and RLM.
-6. [Advanced DSEx](V2.md): artifact optimization, GEPA, agents, MCP, schemas,
+7. [Advanced DSEx](V2.md): artifact optimization, GEPA, agents, MCP, schemas,
    and deterministic benchmark fixtures.
-7. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
+8. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
    security posture, and release discipline.
-8. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
+9. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
    supervision/runtime boundaries.
 
 ## Livebooks

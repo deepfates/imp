@@ -26,6 +26,9 @@ datasets, streaming, persistence, sandboxed program-of-thought, evaluation,
 agents, MCP-style tool import, schema constraints, optimize-anything flows,
 GEPA-inspired Pareto mechanics, and metric-driven optimizers.
 
+See [Prior Art](docs/PRIOR_ART.md) for lineage and independence from DSPy,
+Ax, and GEPA/optimize_anything.
+
 ## Test
 
 ```sh
@@ -37,7 +40,7 @@ mix test
 ```sh
 mix production.check
 mix v2.check
-LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+LIVE_PROVIDER=1 mix live.check
 ```
 
 See [Production Operations](docs/PRODUCTION_OPERATIONS.md) for the current gate

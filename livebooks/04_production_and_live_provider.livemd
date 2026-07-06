@@ -73,7 +73,7 @@ In a terminal:
 set -a
 . ./.env
 set +a
-LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+LIVE_PROVIDER=1 mix live.check
 ```
 
 ## Saving Without Secrets

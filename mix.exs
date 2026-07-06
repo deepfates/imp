@@ -16,6 +16,7 @@ defmodule DSEx.MixProject do
           "README.md",
           "docs/README.md",
           "docs/DSEX_PHILOSOPHY.md",
+          "docs/PRIOR_ART.md",
           "docs/ARCHITECTURE.md",
           "docs/API_GUIDE.md",
           "docs/V2.md",
@@ -45,7 +46,8 @@ defmodule DSEx.MixProject do
       preferred_envs: [
         "production.check": :test,
         "v2.check": :test,
-        "public_surface.check": :test
+        "public_surface.check": :test,
+        "live.check": :test
       ]
     ]
   end
@@ -54,7 +56,7 @@ defmodule DSEx.MixProject do
   defp deps do
     [
       {:jason, "~> 1.4"},
-      {:ex_doc, "~> 0.35", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -73,13 +75,15 @@ defmodule DSEx.MixProject do
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "test"
+        "test",
+        "docs"
       ],
       "v2.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
         "test --include v2"
-      ]
+      ],
+      "live.check": ["test --include live test/live_provider_test.exs"]
     ]
   end
 end

@@ -110,7 +110,7 @@ The codebase should be judged by gates, not vibes:
 ```sh
 mix production.check
 mix v2.check
-LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+LIVE_PROVIDER=1 mix live.check
 ```
 
 The first two are deterministic. The live gate is opt-in because provider

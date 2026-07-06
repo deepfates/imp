@@ -17,7 +17,7 @@ With live credentials:
 set -a
 . ./.env
 set +a
-LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+LIVE_PROVIDER=1 mix live.check
 ```
 
 ## What The Gates Prove
@@ -27,12 +27,15 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 - format check
 - compile with warnings as errors
 - the non-live test suite, including the public surface contract
+- documentation generation with ExDoc
 
 `mix v2.check` runs:
 
 - format check
 - compile with warnings as errors
 - the deterministic suite with V2-tagged tests included
+- V2 positive controls and negative controls, including reward-encoding
+  program-optimization fixtures
 
 The live provider test proves a real OpenAI-compatible provider can execute the
 basic program and structured-output path with local credentials.
@@ -80,7 +83,7 @@ Run:
 set -a
 . ./.env
 set +a
-LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
+LIVE_PROVIDER=1 mix live.check
 ```
 
 ## Release Checklist
@@ -90,7 +93,7 @@ Before tagging:
 1. `git status --short` is clean.
 2. `mix production.check` passes.
 3. `mix v2.check` passes.
-4. Live provider gate passes, or release notes explicitly say it was skipped.
+4. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
 5. Docs and Livebooks match the current public API.
 
 ## Debugging Gates
@@ -111,5 +114,5 @@ Provider failure:
 
 - confirm `.env` is loaded
 - confirm the provider model exists for the account
-- run only the live test file first
+- run `LIVE_PROVIDER=1 mix live.check`
 - inspect contract tests before assuming provider behavior is a library bug

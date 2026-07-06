@@ -10,6 +10,7 @@ defmodule DSEx.V2.Benchmarks do
       structured_extraction(),
       agent_tool_task(),
       prompt_optimization(),
+      program_reward_optimization(),
       arbitrary_artifact_optimization()
     ]
   end
@@ -34,6 +35,7 @@ defmodule DSEx.V2.Benchmarks do
       structured_extraction_negative(),
       agent_tool_task_negative(),
       prompt_optimization_negative(),
+      program_reward_optimization_negative(),
       arbitrary_artifact_optimization_negative()
     ]
   end
@@ -111,6 +113,26 @@ defmodule DSEx.V2.Benchmarks do
       )
 
     result(:prompt_optimization, report.best.aggregate_score)
+  end
+
+  defp program_reward_optimization do
+    metric = DSEx.Metrics.exact_match(:answer)
+    evaluator = DSEx.Evaluate.new(reward_devset(), metric)
+    program = DSEx.predict("question -> answer", lm: reward_lm())
+    baseline = DSEx.Evaluate.run(evaluator, program).score
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, reward_trainset())
+
+    optimized = DSEx.Evaluate.run(evaluator, compiled).score
+
+    score =
+      if baseline == 0.0 and optimized == 1.0,
+        do: 1.0,
+        else: 0.0
+
+    result(:program_reward_optimization, score)
   end
 
   defp arbitrary_artifact_optimization do
@@ -198,6 +220,23 @@ defmodule DSEx.V2.Benchmarks do
     result(:prompt_optimization_negative, report.best.aggregate_score)
   end
 
+  defp program_reward_optimization_negative do
+    metric = DSEx.Metrics.exact_match(:answer)
+    evaluator = DSEx.Evaluate.new(reward_devset(), metric)
+    program = DSEx.predict("question -> answer", lm: reward_lm())
+
+    poisoned_trainset = [
+      DSEx.example(question: "What is the capital of France?", answer: "London")
+      |> DSEx.Example.with_inputs(:question)
+    ]
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, poisoned_trainset)
+
+    result(:program_reward_optimization_negative, DSEx.Evaluate.run(evaluator, compiled).score)
+  end
+
   defp arbitrary_artifact_optimization_negative do
     artifact = Anything.new_artifact(:config, "mode=slow")
 
@@ -210,5 +249,34 @@ defmodule DSEx.V2.Benchmarks do
       )
 
     result(:arbitrary_artifact_optimization_negative, report.best.score)
+  end
+
+  defp reward_lm do
+    %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "answer: Paris",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      ]
+    }
+  end
+
+  defp reward_trainset do
+    [
+      DSEx.example(question: "What is the capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
+    ]
+  end
+
+  defp reward_devset do
+    [
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
+    ]
   end
 end
