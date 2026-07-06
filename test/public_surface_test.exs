@@ -153,4 +153,123 @@ defmodule PublicSurfaceTest do
 
     assert %DSEx.Core.LMRequest{messages: [%DSEx.Core.User{content: "hi"}]}
   end
+
+  test "documented public modules and facade constructors remain available" do
+    public_modules = [
+      DSEx,
+      DSEx.Adapter.Chat,
+      DSEx.Adapter.JSON,
+      DSEx.Adapter.XML,
+      DSEx.Adapter.TwoStep,
+      DSEx.Cache,
+      DSEx.Clients.Databricks,
+      DSEx.Clients.DatabricksTrainer,
+      DSEx.Clients.HTTPLM,
+      DSEx.Clients.Local,
+      DSEx.Clients.LiteLLM,
+      DSEx.Clients.OpenAI,
+      DSEx.Clients.OpenAITrainer,
+      DSEx.Clients.ReqLLM,
+      DSEx.Clients.Trainer,
+      DSEx.Datasets,
+      DSEx.Embeddings,
+      DSEx.Evaluate,
+      DSEx.Example,
+      DSEx.MCP,
+      DSEx.Metrics,
+      DSEx.Optimize.Anything,
+      DSEx.Optimize.GEPA,
+      DSEx.Optimizer.BetterTogether,
+      DSEx.Optimizer.BootstrapFewShot,
+      DSEx.Optimizer.BootstrapFinetune,
+      DSEx.Optimizer.COPRO,
+      DSEx.Optimizer.Ensemble,
+      DSEx.Optimizer.GEPA,
+      DSEx.Optimizer.InstructionSearch,
+      DSEx.Optimizer.KNNFewShot,
+      DSEx.Optimizer.LabeledFewShot,
+      DSEx.Optimizer.MIPROv2,
+      DSEx.Optimizer.RandomSearch,
+      DSEx.Optimizer.SIMBA,
+      DSEx.Predict.BestOfN,
+      DSEx.Predict.ChainOfThought,
+      DSEx.Predict.CodeAct,
+      DSEx.Predict.Parallel,
+      DSEx.Predict.Predict,
+      DSEx.Predict.RLM,
+      DSEx.Predict.ReAct,
+      DSEx.Predict.ReActV2,
+      DSEx.Predict.Refine,
+      DSEx.Prediction,
+      DSEx.Retrieve,
+      DSEx.Retrievers.Databricks,
+      DSEx.Retrievers.HTTP,
+      DSEx.Retrievers.KNN,
+      DSEx.Retrievers.Weaviate,
+      DSEx.Saving,
+      DSEx.Signature,
+      DSEx.Streaming,
+      DSEx.Telemetry,
+      DSEx.Tool
+    ]
+
+    assert Enum.all?(public_modules, &Code.ensure_loaded?/1)
+
+    facade_exports = [
+      configure: 1,
+      settings: 0,
+      context: 2,
+      signature: 1,
+      signature: 2,
+      example: 1,
+      prediction: 1,
+      get: 2,
+      get: 3,
+      majority: 1,
+      majority: 2,
+      predict: 1,
+      predict: 2,
+      chain_of_thought: 1,
+      chain_of_thought: 2,
+      react: 3,
+      react: 2,
+      program_of_thought: 1,
+      program_of_thought: 2,
+      code_act: 1,
+      code_act: 2,
+      code_act: 3,
+      react_v2: 3,
+      rlm: 1,
+      rlm: 2,
+      call: 2,
+      openai: 1,
+      openai: 2,
+      req_llm: 1,
+      req_llm: 2,
+      litellm: 1,
+      litellm: 2,
+      local_lm: 1,
+      local_lm: 2,
+      databricks: 1,
+      databricks: 2
+    ]
+
+    assert Enum.all?(facade_exports, fn {name, arity} ->
+             function_exported?(DSEx, name, arity)
+           end)
+
+    assert %DSEx.Clients.ReqLLM{} = DSEx.req_llm("openai:gpt-test")
+
+    assert %DSEx.Clients.HTTPLM{provider: :openai} =
+             DSEx.openai("gpt-test", api_key: "sk-test")
+
+    assert %DSEx.Retrievers.HTTP{} = DSEx.Retrievers.HTTP.new("https://retriever.example")
+    assert %DSEx.MCP.HTTPClient{} = DSEx.MCP.HTTPClient.new("https://mcp.example")
+
+    assert %DSEx.MCP.StreamableHTTPClient{} =
+             DSEx.MCP.StreamableHTTPClient.new("https://mcp.example")
+
+    assert %DSEx.Clients.HTTPTrainer{} =
+             DSEx.Clients.OpenAITrainer.new(training_file: "file-test")
+  end
 end

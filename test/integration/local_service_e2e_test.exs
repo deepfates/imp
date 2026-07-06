@@ -136,7 +136,7 @@ defmodule LocalServiceE2ETest do
 
     [tool] =
       System.find_executable("mix")
-      |> DSEx.MCP.StdioClient.new(args: ["run", script])
+      |> DSEx.MCP.StdioClient.new(args: ["run", script], timeout: 15_000)
       |> DSEx.MCP.import_tools()
 
     assert tool.name == :echo

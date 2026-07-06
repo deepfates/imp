@@ -10,6 +10,7 @@ Run from a clean tree:
 mix production.check
 mix v2.check
 mix integration.check
+mix quality.check
 ```
 
 With live credentials:
@@ -108,6 +109,10 @@ The current integration gate proves:
 - HTTP MCP initialize, discovery, and tool-call flow through a local JSON-RPC server
 - stdio MCP discovery and tool-call flow through a trusted local executable
 
+`mix quality.check` runs the static warning gate. CI must run it alongside the
+deterministic release gates so style and maintainability regressions are caught
+before merge, not only during local release preparation.
+
 The live provider tests prove a real provider can execute:
 
 - basic `Predict`
@@ -119,14 +124,18 @@ The live provider tests prove a real provider can execute:
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
-The stateful live aliases are reserved opt-in gates. They are intentionally
-separate from the release gate because they require external provider resources
-or trusted infrastructure. A release may only claim one of these external
-systems is live-proven when the corresponding alias contains real service tests:
+The stateful live aliases are opt-in gates. They are intentionally separate
+from the default release gate because they may create provider resources, depend
+on private infrastructure, or talk to trusted services. A release may only claim
+one of these external systems is live-proven when the corresponding alias
+contains real service tests:
 
-- `mix live.training.check` is reserved for provider-side training-job lifecycle tests.
-- `mix live.retriever.check` is reserved for real external retriever services.
-- `mix live.mcp.check` is reserved for trusted external MCP servers.
+- `mix live.training.check` proves provider-compatible training submit/refresh
+  over the production HTTP transport and provider trainer/job lifecycle.
+- `mix live.retriever.check` proves Weaviate-compatible and
+  Databricks-compatible retriever requests over the production HTTP transport.
+- `mix live.mcp.check` proves JSON-RPC HTTP, Streamable HTTP, and trusted
+  stdio MCP clients through imported tool discovery and tool-call execution.
 
 ## What The Gates Do Not Prove
 
@@ -134,8 +143,9 @@ They do not prove:
 
 - every possible provider feature or future model response shape
 - every provider-specific feature is live-tested
-- live training jobs, MCP servers, or external retriever services unless the
-  matching opt-in live alias contains real service tests and is configured/run
+- paid provider-side training jobs, external MCP servers, or external retriever
+  services unless the matching opt-in live alias contains real service tests and
+  is configured/run
 - credentials are safe if a local `.env` has leaked elsewhere
 
 ## Secret Handling

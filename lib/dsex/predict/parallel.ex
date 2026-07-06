@@ -7,7 +7,8 @@ defmodule DSEx.Predict.Parallel do
     inputs
     |> DSEx.Tasks.async_stream(&program.__struct__.call(program, &1),
       max_concurrency: concurrency,
-      timeout: Keyword.get(opts, :timeout, 30_000)
+      timeout: Keyword.get(opts, :timeout, 30_000),
+      on_timeout: Keyword.get(opts, :on_timeout, :kill_task)
     )
     |> Enum.map(fn
       {:ok, result} -> result
