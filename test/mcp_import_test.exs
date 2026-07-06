@@ -14,7 +14,13 @@ defmodule MCPImportTest do
       Process.put(:mcp_requests, Process.get(:mcp_requests, []) ++ [request])
 
       case decoded do
-        %{"method" => "tools/list"} ->
+        %{"method" => "initialize", "jsonrpc" => "2.0", "id" => _id} ->
+          {:ok, %{status: 200, headers: [], body: Jason.encode!(%{"result" => %{}})}}
+
+        %{"method" => "notifications/initialized", "jsonrpc" => "2.0"} ->
+          {:ok, %{status: 202, headers: [], body: Jason.encode!(%{})}}
+
+        %{"method" => "tools/list", "jsonrpc" => "2.0", "id" => _id} ->
           {:ok,
            %{
              status: 200,
@@ -33,7 +39,12 @@ defmodule MCPImportTest do
                })
            }}
 
-        %{"method" => "tools/call", "params" => %{"arguments" => %{"key" => key}}} ->
+        %{
+          "method" => "tools/call",
+          "jsonrpc" => "2.0",
+          "id" => _id,
+          "params" => %{"arguments" => %{"key" => key}}
+        } ->
           {:ok,
            %{status: 200, headers: [], body: Jason.encode!(%{"result" => %{"value" => key}})}}
       end
@@ -136,9 +147,15 @@ defmodule MCPImportTest do
 
     assert tool.name == "remote_lookup"
     assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
-    assert [list_request, call_request] = Process.get(:mcp_requests)
+
+    assert [init_request, initialized_request, list_request, call_request] =
+             Process.get(:mcp_requests)
+
+    assert init_request.body["method"] == "initialize"
+    assert initialized_request.body["method"] == "notifications/initialized"
     assert list_request.url == "https://mcp.example/tools"
-    assert list_request.body == %{"method" => "tools/list"}
+    assert list_request.body["jsonrpc"] == "2.0"
+    assert list_request.body["method"] == "tools/list"
     assert call_request.body["method"] == "tools/call"
   after
     Process.delete(:mcp_requests)

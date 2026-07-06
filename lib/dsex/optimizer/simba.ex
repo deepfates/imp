@@ -1,12 +1,13 @@
 defmodule DSEx.Optimizer.SIMBA do
   @moduledoc "Simple stochastic improvement loop over demo subsets and concise instructions."
 
-  defstruct [:metric, steps: 8, demos_per_step: 3]
+  defstruct [:metric, :judge_lm, steps: 8, demos_per_step: 3]
 
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
       steps: Keyword.get(opts, :steps, 8),
+      judge_lm: Keyword.get(opts, :judge_lm),
       demos_per_step: Keyword.get(opts, :demos_per_step, 3)
     }
   end
@@ -22,9 +23,7 @@ defmodule DSEx.Optimizer.SIMBA do
                                                                    candidates} ->
         demos = demo_window(trainset, step, optimizer.demos_per_step)
 
-        instruction =
-          (DSEx.Optimizer.InstructionSearch.current_instruction(best_program) || "") <>
-            "\nPrefer answers that score well on the metric."
+        instruction = introspective_instruction(best_program, optimizer.judge_lm, candidates)
 
         candidate =
           %DSEx.Optimizer.LabeledFewShot{k: optimizer.demos_per_step}
@@ -58,10 +57,31 @@ defmodule DSEx.Optimizer.SIMBA do
         candidates: candidates,
         metadata: %{
           baseline_score: elem(initial, 0),
-          policy: :monotonic_minibatch_ascent
+          policy: :monotonic_minibatch_ascent,
+          introspection: not is_nil(optimizer.judge_lm)
         }
       })
     )
+  end
+
+  defp introspective_instruction(program, nil, _candidates),
+    do:
+      (DSEx.Optimizer.InstructionSearch.current_instruction(program) || "") <>
+        "\nPrefer answers that score well on the metric."
+
+  defp introspective_instruction(program, judge_lm, candidates) do
+    prompt =
+      Jason.encode!(%{
+        current_instruction: DSEx.Optimizer.InstructionSearch.current_instruction(program),
+        recent_candidates: Enum.take(candidates, -4)
+      })
+
+    case DSEx.LM.generate(judge_lm, [%{role: :user, content: prompt}], []) do
+      {:ok, %{instruction: instruction}} -> instruction
+      {:ok, %{"instruction" => instruction}} -> instruction
+      {:ok, instruction} when is_binary(instruction) -> instruction
+      _other -> introspective_instruction(program, nil, candidates)
+    end
   end
 
   defp demo_window(_trainset, _step, k) when k <= 0, do: []

@@ -242,18 +242,26 @@ defmodule DSExTest do
   end
 
   test "react can execute a requested tool" do
-    tool = DSEx.Tool.new(:lookup, "Lookup a value", fn "x" -> "found x" end)
+    tool = DSEx.Tool.new(:lookup, "Lookup a value", fn %{query: "x"} -> "found x" end)
 
     lm = %{
       module: DSEx.LM.Fake,
       opts: [
-        handler: fn _messages, _opts -> %{tool: "lookup", tool_input: "x", answer: "pending"} end
+        handler: fn _messages, _opts ->
+          %{
+            tool_calls: [
+              %{name: :lookup, arguments: %{query: "x"}},
+              %{name: :submit, arguments: %{answer: "found x"}}
+            ]
+          }
+        end
       ]
     }
 
     program = DSEx.react("question -> answer", [tool], lm: lm)
 
     assert {:ok, prediction} = DSEx.Predict.ReAct.call(program, %{question: "Find x"})
-    assert DSEx.Prediction.get(prediction, :observation) == "found x"
+    assert DSEx.Prediction.get(prediction, :answer) == "found x"
+    assert [%{tool: :lookup}, %{tool: :submit}] = DSEx.Prediction.get(prediction, :history)
   end
 end

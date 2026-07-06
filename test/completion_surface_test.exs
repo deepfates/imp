@@ -46,6 +46,14 @@ defmodule CompletionSurfaceTest do
     assert {:ok, prediction} = DSEx.Predict.ProgramOfThought.call(program, %{x: 3})
     assert DSEx.Prediction.get(prediction, :answer) == 7
 
+    assert {:ok, "beam"} =
+             DSEx.Sandbox.eval(
+               "if String.contains?(text, \"BE\"), do: String.downcase(text), else: \"no\"",
+               %{text: "BEAM"}
+             )
+
+    assert {:ok, true} = DSEx.Sandbox.eval("length([1, 2, 3]) == 3 and \"a\" in [\"a\", \"b\"]")
+
     assert {:error, {:unsafe_ast, _}} =
              DSEx.Sandbox.eval("System.cmd(\"rm\", [\"-rf\", \"/\"])")
   end

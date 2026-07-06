@@ -90,6 +90,27 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, & &1.accepted)
   end
 
+  test "SIMBA can use introspective LM feedback for candidate instructions" do
+    judge_lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          send(self(), {:simba_judge, messages})
+          %{instruction: "Always answer Paris when asked about France."}
+        end
+      ]
+    }
+
+    compiled =
+      DSEx.Optimizer.SIMBA.new(metric(), steps: 1, demos_per_step: 1, judge_lm: judge_lm)
+      |> DSEx.Optimizer.SIMBA.compile(france_program(), trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    assert report.metadata.introspection
+    assert report.best_score == 1.0
+    assert_received {:simba_judge, _messages}
+  end
+
   test "COPRO reports coordinate prompt optimization across breadth and depth" do
     program = france_program()
 
@@ -110,5 +131,27 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.depth == 2
     assert Enum.map(report.metadata.rounds, & &1.metadata.round) == [1, 2]
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
+  end
+
+  test "COPRO can use LM-generated score-informed instruction proposals" do
+    proposer_lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          send(self(), {:copro_proposer, messages})
+          ~s(["Always answer Paris when asked about France."])
+        end
+      ]
+    }
+
+    compiled =
+      DSEx.Optimizer.COPRO.new(metric(), breadth: 1, depth: 1, proposer_lm: proposer_lm)
+      |> DSEx.Optimizer.COPRO.compile(france_program(), trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    assert report.best_score == 1.0
+    assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
+    assert_received {:copro_proposer, messages}
+    assert Enum.map_join(messages, "\n", & &1.content) =~ "scored_examples"
   end
 end

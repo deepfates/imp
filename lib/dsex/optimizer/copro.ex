@@ -1,13 +1,14 @@
 defmodule DSEx.Optimizer.COPRO do
   @moduledoc "Coordinate prompt optimizer over instruction candidates."
 
-  defstruct [:metric, breadth: 5, depth: 2, extra_instructions: []]
+  defstruct [:metric, :proposer_lm, breadth: 5, depth: 2, extra_instructions: []]
 
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
       breadth: Keyword.get(opts, :breadth, 5),
       depth: Keyword.get(opts, :depth, 2),
+      proposer_lm: Keyword.get(opts, :proposer_lm),
       extra_instructions: Keyword.get(opts, :extra_instructions, [])
     }
   end
@@ -19,6 +20,8 @@ defmodule DSEx.Optimizer.COPRO do
         candidates =
           current
           |> DSEx.Optimizer.InstructionSearch.candidate_instructions(trainset,
+            lm: optimizer.proposer_lm,
+            scores: round_score_summary(reports),
             extra_instructions: optimizer.extra_instructions
           )
           |> Enum.take(optimizer.breadth)
@@ -56,5 +59,11 @@ defmodule DSEx.Optimizer.COPRO do
         }
       })
     )
+  end
+
+  defp round_score_summary(reports) do
+    reports
+    |> Enum.flat_map(& &1.candidates)
+    |> Enum.map(&Map.take(&1, [:instruction, :score, :round]))
   end
 end

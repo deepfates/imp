@@ -16,13 +16,13 @@ defmodule DSEx.MCP do
   end
 
   defmodule HTTPClient do
-    @moduledoc "Transport-backed MCP-style catalog client."
+    @moduledoc "JSON-RPC 2.0 transport-backed MCP-style catalog client."
 
     defstruct [
       :url,
       transport: DSEx.HTTP.Hackneyless,
       headers: [],
-      body: %{"method" => "tools/list"}
+      protocol_version: "2025-03-26"
     ]
 
     def new(url, opts \\ []) do
@@ -30,21 +30,14 @@ defmodule DSEx.MCP do
         url: url,
         transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
         headers: Keyword.get(opts, :headers, []),
-        body: Keyword.get(opts, :body, %{"method" => "tools/list"})
+        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26")
       }
     end
 
     def list_tools(%__MODULE__{} = client) do
-      headers = [{"content-type", "application/json"} | client.headers]
-
-      with {:ok, %{status: status, body: body}} when status in 200..299 <-
-             DSEx.HTTP.post(
-               client.transport,
-               client.url,
-               headers,
-               Jason.encode!(client.body),
-               []
-             ),
+      with {:ok, :initialized} <- initialize(client),
+           {:ok, %{status: status, body: body}} when status in 200..299 <-
+             post_json(client, "tools/list", %{}),
            {:ok, decoded} <- Jason.decode(body),
            {:ok, tools} <- decode_tools(decoded) do
         Enum.map(tools, &attach_remote_run(client, &1))
@@ -63,19 +56,25 @@ defmodule DSEx.MCP do
     defp decode_tools(%{result: %{tools: tools}}) when is_list(tools), do: {:ok, tools}
     defp decode_tools(other), do: {:error, {:missing_tools, other}}
 
+    defp initialize(client) do
+      with {:ok, %{status: status}} when status in 200..299 <-
+             post_json(client, "initialize", %{
+               "protocolVersion" => client.protocol_version,
+               "capabilities" => %{},
+               "clientInfo" => %{"name" => "dsex", "version" => "0.1.0"}
+             }),
+           {:ok, %{status: status}} when status in 200..299 <-
+             post_notification(client, "notifications/initialized", %{}) do
+        {:ok, :initialized}
+      end
+    end
+
     defp attach_remote_run(client, tool) do
       name = Map.get(tool, "name", Map.get(tool, :name))
 
       Map.put(tool, "run", fn arguments ->
-        body = %{
-          "method" => "tools/call",
-          "params" => %{"name" => name, "arguments" => arguments}
-        }
-
-        headers = [{"content-type", "application/json"} | client.headers]
-
         with {:ok, %{status: status, body: response}} when status in 200..299 <-
-               DSEx.HTTP.post(client.transport, client.url, headers, Jason.encode!(body), []),
+               post_json(client, "tools/call", %{"name" => name, "arguments" => arguments}),
              {:ok, decoded} <- Jason.decode(response) do
           Map.get(decoded, "result", decoded)
         else
@@ -84,6 +83,25 @@ defmodule DSEx.MCP do
         end
       end)
     end
+
+    defp post_json(client, method, params) do
+      body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
+      DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+    end
+
+    defp post_notification(client, method, params) do
+      body = %{"jsonrpc" => "2.0", "method" => method, "params" => params}
+      DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+    end
+
+    defp headers(client),
+      do: [
+        {"content-type", "application/json"},
+        {"mcp-protocol-version", client.protocol_version}
+        | client.headers
+      ]
+
+    defp next_id, do: System.unique_integer([:positive])
   end
 
   @doc "Imports a catalog or list of tool schemas into `DSEx.Tool` structs."

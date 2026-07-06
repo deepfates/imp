@@ -74,8 +74,8 @@ All major program structs implement the `DSEx.Module` behaviour.
 | --- | --- |
 | `DSEx.Predict.Predict` | Basic signature-to-output LM call. |
 | `DSEx.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
-| `DSEx.Predict.ReAct` | Simple one-shot tool call. |
-| `DSEx.Predict.ReActV2` | Iterative provider-tool-call ReAct with reserved `submit`. |
+| `DSEx.Predict.ReAct` | Compatibility facade for `ReActV2`. |
+| `DSEx.Predict.ReActV2` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
 | `DSEx.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
 | `DSEx.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
 | `DSEx.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
