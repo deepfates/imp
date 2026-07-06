@@ -70,6 +70,34 @@ defmodule SchemaConstraintsTest do
            }
   end
 
+  test "loaded JSON metadata preserves string-key constraints" do
+    original =
+      DSEx.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{name: :score, type: :number, constraints: %{min: 0, max: 1}},
+          %{
+            name: :meta,
+            type: :object,
+            constraints: %{properties: %{count: %{type: :integer, min: 1}}}
+          }
+        ]
+      })
+
+    loaded =
+      original
+      |> DSEx.Signature.dump()
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> DSEx.Signature.load()
+
+    assert {:error, errors} =
+             DSEx.Schema.validate_fields(loaded.outputs, %{score: 2, meta: %{count: 0}})
+
+    assert Enum.map(errors, & &1.rule) == [:max, :min]
+    assert DSEx.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
+  end
+
   test "JSON adapter returns retry feedback for constraint failures" do
     signature =
       DSEx.Signature.new(%{

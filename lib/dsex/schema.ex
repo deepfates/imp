@@ -17,9 +17,11 @@ defmodule DSEx.Schema do
 
   def validate_field(field, value) do
     constraints =
-      Map.get(field.metadata, :constraints, Map.get(field.metadata, "constraints", %{}))
+      field.metadata
+      |> fetch_meta(:constraints, %{})
+      |> normalize_constraints()
 
-    optional = Map.get(field.metadata, :optional, Map.get(field.metadata, "optional", false))
+    optional = fetch_meta(field.metadata, :optional, false)
 
     cond do
       is_nil(value) and optional ->
@@ -101,6 +103,8 @@ defmodule DSEx.Schema do
   defp validate_string(errors, _field, _value, _constraints), do: errors
 
   defp validate_array(errors, field, value, %{items: item_schema}) when is_list(value) do
+    item_schema = normalize_constraints(item_schema)
+
     item_errors =
       value
       |> Enum.with_index()
@@ -108,8 +112,8 @@ defmodule DSEx.Schema do
         pseudo = %{
           field
           | name: "#{field.name}[#{index}]",
-            type: Map.get(item_schema, :type, :any),
-            metadata: %{constraints: Map.delete(item_schema, :type)}
+            type: fetch_meta(item_schema, :type, :any),
+            metadata: %{constraints: delete_meta(item_schema, :type)}
         }
 
         validate_field(pseudo, item)
@@ -123,13 +127,15 @@ defmodule DSEx.Schema do
   defp validate_object(errors, field, value, %{properties: properties}) when is_map(value) do
     nested =
       Enum.flat_map(properties, fn {name, spec} ->
+        spec = normalize_constraints(spec)
+
         pseudo = %{
           field
           | name: "#{field.name}.#{name}",
-            type: Map.get(spec, :type, :any),
+            type: fetch_meta(spec, :type, :any),
             metadata: %{
-              constraints: Map.delete(spec, :type),
-              optional: Map.get(spec, :optional, false)
+              constraints: delete_meta(spec, :type),
+              optional: fetch_meta(spec, :optional, false)
             }
         }
 
@@ -171,27 +177,34 @@ defmodule DSEx.Schema do
 
   defp field_schema(field) do
     constraints =
-      Map.get(field.metadata, :constraints, Map.get(field.metadata, "constraints", %{}))
+      field.metadata
+      |> fetch_meta(:constraints, %{})
+      |> normalize_constraints()
 
     %{"type" => json_type(field.type)}
-    |> maybe_put("enum", Map.get(constraints, :enum))
-    |> maybe_put("minimum", Map.get(constraints, :min))
-    |> maybe_put("maximum", Map.get(constraints, :max))
-    |> maybe_put("minLength", Map.get(constraints, :min_length))
-    |> maybe_put("maxLength", Map.get(constraints, :max_length))
-    |> maybe_put("pattern", Map.get(constraints, :pattern))
-    |> maybe_put("items", json_nested(Map.get(constraints, :items)))
-    |> maybe_put("properties", json_properties(Map.get(constraints, :properties)))
+    |> maybe_put("enum", fetch_meta(constraints, :enum))
+    |> maybe_put("minimum", fetch_meta(constraints, :min))
+    |> maybe_put("maximum", fetch_meta(constraints, :max))
+    |> maybe_put("minLength", fetch_meta(constraints, :min_length))
+    |> maybe_put("maxLength", fetch_meta(constraints, :max_length))
+    |> maybe_put("pattern", fetch_meta(constraints, :pattern))
+    |> maybe_put("items", json_nested(fetch_meta(constraints, :items)))
+    |> maybe_put("properties", json_properties(fetch_meta(constraints, :properties)))
   end
 
   defp json_nested(nil), do: nil
-  defp json_nested(spec), do: %{"type" => json_type(Map.get(spec, :type, :string))}
+
+  defp json_nested(spec) do
+    spec = normalize_constraints(spec)
+    %{"type" => json_type(fetch_meta(spec, :type, :string))}
+  end
 
   defp json_properties(nil), do: nil
 
   defp json_properties(properties) do
     Map.new(properties, fn {name, spec} ->
-      {to_string(name), %{"type" => json_type(Map.get(spec, :type, :string))}}
+      spec = normalize_constraints(spec)
+      {to_string(name), %{"type" => json_type(fetch_meta(spec, :type, :string))}}
     end)
   end
 
@@ -210,8 +223,56 @@ defmodule DSEx.Schema do
 
   defp fetch_value(values, key) do
     case Map.fetch(values, key) do
-      {:ok, value} -> value
-      :error -> Map.get(values, to_string(key))
+      {:ok, value} ->
+        value
+
+      :error ->
+        case Map.fetch(values, to_string(key)) do
+          {:ok, value} -> value
+          :error -> fetch_existing_atom(values, key)
+        end
     end
   end
+
+  defp fetch_existing_atom(values, key) do
+    atom = String.to_existing_atom(to_string(key))
+    Map.get(values, atom)
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp fetch_meta(map, key, default \\ nil)
+
+  defp fetch_meta(map, key, default) when is_atom(key),
+    do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+
+  defp fetch_meta(map, key, default), do: Map.get(map, key, default)
+
+  defp delete_meta(map, key) when is_atom(key),
+    do: map |> Map.delete(key) |> Map.delete(Atom.to_string(key))
+
+  defp normalize_constraints(%{} = constraints) do
+    Map.new(constraints, fn {key, value} ->
+      {normalize_constraint_key(key), normalize_constraint_value(value)}
+    end)
+  end
+
+  defp normalize_constraints(other), do: other
+
+  defp normalize_constraint_value(%{} = value), do: normalize_constraints(value)
+
+  defp normalize_constraint_value(values) when is_list(values),
+    do: Enum.map(values, &normalize_constraint_value/1)
+
+  defp normalize_constraint_value(value), do: value
+
+  defp normalize_constraint_key(key) when is_atom(key), do: key
+  defp normalize_constraint_key("minLength"), do: :min_length
+  defp normalize_constraint_key("maxLength"), do: :max_length
+
+  defp normalize_constraint_key(key)
+       when key in ["enum", "min", "max", "items", "properties", "type", "optional", "pattern"],
+       do: String.to_existing_atom(key)
+
+  defp normalize_constraint_key(key), do: key
 end

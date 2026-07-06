@@ -161,20 +161,21 @@ defmodule DSEx.Clients.HTTPTrainer do
   end
 
   def finetune(%__MODULE__{} = trainer, lm, examples, opts) do
-    payload = trainer.payload_builder.(lm, examples, opts)
-    body = Jason.encode!(payload)
+    with {:ok, payload} <- build_payload(trainer, lm, examples, opts) do
+      body = Jason.encode!(payload)
 
-    headers =
-      [{"content-type", "application/json"}] ++
-        auth_headers(trainer.api_key) ++ trainer.headers
+      headers =
+        [{"content-type", "application/json"}] ++
+          auth_headers(trainer.api_key) ++ trainer.headers
 
-    with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts),
-         {:ok, decoded} <- Jason.decode(response) do
-      {:ok, trainer.response_mapper.(trainer, lm, examples, decoded)}
-    else
-      {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-      {:error, reason} -> {:error, reason}
+      with {:ok, %{status: status, body: response}} when status in 200..299 <-
+             DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts),
+           {:ok, decoded} <- Jason.decode(response) do
+        {:ok, trainer.response_mapper.(trainer, lm, examples, decoded)}
+      else
+        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -188,6 +189,17 @@ defmodule DSEx.Clients.HTTPTrainer do
       method: Keyword.get(opts, :method, :sft),
       training_data: Enum.map(examples, &DSEx.Example.to_map/1)
     }
+  end
+
+  defp build_payload(%__MODULE__{} = trainer, lm, examples, opts) do
+    case trainer.payload_builder.(lm, examples, opts) do
+      {:ok, payload} -> {:ok, payload}
+      {:error, reason} -> {:error, reason}
+      payload when is_map(payload) -> {:ok, payload}
+      other -> {:error, {:invalid_training_payload, other}}
+    end
+  rescue
+    error -> {:error, {:invalid_training_payload, Exception.message(error)}}
   end
 
   defp default_response(trainer, lm, examples, decoded) do
@@ -226,7 +238,13 @@ defmodule DSEx.Clients.HTTPTrainer do
 end
 
 defmodule DSEx.Clients.OpenAITrainer do
-  @moduledoc "OpenAI fine-tuning trainer contract."
+  @moduledoc """
+  OpenAI fine-tuning job client.
+
+  This client submits an OpenAI fine-tuning job for an existing uploaded
+  training file. It does not upload examples itself; callers must provide
+  `:training_file` either to `new/1` or to `Trainer.finetune/4`.
+  """
 
   def new(opts \\ []) do
     base =
@@ -235,24 +253,42 @@ defmodule DSEx.Clients.OpenAITrainer do
 
     api_key = Keyword.get(opts, :api_key) || System.get_env("OPENAI_API_KEY")
 
+    defaults = Keyword.take(opts, [:training_file, :validation_file, :suffix, :metadata])
+
     DSEx.Clients.HTTPTrainer.new(
       :openai,
       String.trim_trailing(base, "/") <> "/fine_tuning/jobs",
       api_key: api_key,
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
       status_url: String.trim_trailing(base, "/") <> "/fine_tuning/jobs/{id}",
-      payload_builder: &payload/3
+      payload_builder: fn lm, examples, call_opts ->
+        payload(lm, examples, Keyword.merge(defaults, call_opts))
+      end
     )
   end
 
-  defp payload(lm, examples, opts) do
-    %{
-      model: Map.get(lm, :model),
-      training_file: Keyword.get(opts, :training_file, "inline://dsex"),
-      hyperparameters: Map.new(Keyword.get(opts, :hyperparameters, [])),
-      dsex_training_data: Enum.map(examples, &DSEx.Example.to_map/1)
-    }
+  defp payload(lm, _examples, opts) do
+    case Keyword.fetch(opts, :training_file) do
+      {:ok, training_file} ->
+        {:ok,
+         %{
+           model: Map.get(lm, :model),
+           training_file: training_file
+         }
+         |> maybe_put(:validation_file, Keyword.get(opts, :validation_file))
+         |> maybe_put(:suffix, Keyword.get(opts, :suffix))
+         |> maybe_put(:metadata, Keyword.get(opts, :metadata))
+         |> maybe_put(:hyperparameters, map_or_nil(Keyword.get(opts, :hyperparameters)))}
+
+      :error ->
+        {:error, :openai_training_file_required}
+    end
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+  defp map_or_nil(nil), do: nil
+  defp map_or_nil(values), do: Map.new(values)
 end
 
 defmodule DSEx.Clients.DatabricksTrainer do

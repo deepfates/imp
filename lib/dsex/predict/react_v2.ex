@@ -28,9 +28,14 @@ defmodule DSEx.Predict.ReActV2 do
       instructions: signature.instructions
     }
 
+    react_opts =
+      Keyword.update(opts, :config, provider_tool_config(tools, signature), fn config ->
+        Keyword.merge(config, provider_tool_config(tools, signature))
+      end)
+
     %__MODULE__{
       signature: signature,
-      react: DSEx.Predict.Predict.new(react_signature, opts),
+      react: DSEx.Predict.Predict.new(react_signature, react_opts),
       tools: tools,
       max_iters: Keyword.get(opts, :max_iters, 20),
       tool_policy: Keyword.get(opts, :tool_policy, :allow)
@@ -43,7 +48,7 @@ defmodule DSEx.Predict.ReActV2 do
   end
 
   defp run_loop(_agent, _inputs, history, 0) do
-    {:ok, DSEx.Prediction.new(%{history: history, termination_reason: :max_iters})}
+    {:error, {:react_v2_max_iters, history}}
   end
 
   defp run_loop(agent, inputs, history, remaining) do
@@ -56,7 +61,7 @@ defmodule DSEx.Predict.ReActV2 do
       case DSEx.Prediction.get(prediction, :tool_calls, []) do
         [] ->
           final = project_outputs(agent.signature, prediction)
-          {:ok, %{final | metadata: Map.put(final.metadata, :history, history)}}
+          validate_final(agent.signature, final, history, :direct)
 
         calls ->
           {events, final} = execute_calls(agent, List.wrap(calls))
@@ -70,19 +75,8 @@ defmodule DSEx.Predict.ReActV2 do
 
             final ->
               final = Map.merge(final, %{history: history, termination_reason: :submit})
-
-              case DSEx.Adapter.Chat.parse(agent.signature, final, []) do
-                {:ok, prediction} ->
-                  prediction =
-                    prediction
-                    |> DSEx.Prediction.put(:history, history)
-                    |> DSEx.Prediction.put(:termination_reason, :submit)
-
-                  {:ok, prediction}
-
-                {:error, reason} ->
-                  {:error, reason}
-              end
+              prediction = DSEx.Prediction.new(final)
+              validate_final(agent.signature, prediction, history, :submit)
 
             true ->
               run_loop(agent, %{}, history, remaining - 1)
@@ -137,6 +131,59 @@ defmodule DSEx.Predict.ReActV2 do
 
     DSEx.Prediction.new(fields, metadata: prediction.metadata)
   end
+
+  defp validate_final(signature, prediction, history, reason) do
+    fields = DSEx.Prediction.to_map(prediction)
+
+    case DSEx.Schema.validate_fields(signature.outputs, fields) do
+      :ok ->
+        prediction =
+          prediction
+          |> DSEx.Prediction.put(:history, history)
+          |> DSEx.Prediction.put(:termination_reason, reason)
+
+        {:ok, prediction}
+
+      {:error, errors} ->
+        missing =
+          errors
+          |> Enum.filter(&(&1.rule == :required))
+          |> Enum.map(& &1.field)
+
+        if missing == [] do
+          {:error,
+           %DSEx.AdapterParseError{message: DSEx.Schema.retry_feedback(errors), reason: fields}}
+        else
+          {:error, {:missing_output_fields, missing}}
+        end
+    end
+  end
+
+  defp provider_tool_config(tools_map, signature) do
+    tools =
+      tools_map
+      |> Map.values()
+      |> Enum.map(fn tool ->
+        %{
+          type: "function",
+          function: %{
+            name: to_string(tool.name),
+            description: tool.description,
+            parameters: tool_parameters(tool, signature)
+          }
+        }
+      end)
+
+    [tools: tools, tool_choice: "auto"]
+  end
+
+  defp tool_parameters(%DSEx.Tool{name: :submit}, signature),
+    do: DSEx.Signature.json_schema(signature)
+
+  defp tool_parameters(%DSEx.Tool{schema: schema}, _signature) when map_size(schema) > 0,
+    do: schema
+
+  defp tool_parameters(_tool, _signature), do: %{"type" => "object", "properties" => %{}}
 
   defp coerce_tool(%DSEx.Tool{} = tool), do: tool
 

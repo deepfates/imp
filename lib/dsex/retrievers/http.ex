@@ -24,7 +24,13 @@ defmodule DSEx.Retrievers.HTTP do
   end
 
   @impl true
-  def retrieve(%__MODULE__{} = retriever, query, opts \\ []) do
+  def retrieve(retriever, query, opts \\ [])
+
+  def retrieve(%__MODULE__{method: method}, _query, _opts) when method != :post do
+    {:error, {:unsupported_http_method, method}}
+  end
+
+  def retrieve(%__MODULE__{} = retriever, query, opts) do
     body = retriever.body_builder.(query, opts) |> Jason.encode!()
     headers = [{"content-type", "application/json"} | retriever.headers]
 

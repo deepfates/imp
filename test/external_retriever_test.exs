@@ -74,4 +74,15 @@ defmodule ExternalRetrieverTest do
     assert body["query_text"] == "capital France"
     assert body["num_results"] == 1
   end
+
+  test "generic HTTP retriever rejects unsupported methods explicitly" do
+    retriever =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        transport: DatabricksTransport,
+        method: :get
+      )
+
+    assert {:error, {:unsupported_http_method, :get}} =
+             DSEx.Retrieve.retrieve(retriever, "capital France")
+  end
 end

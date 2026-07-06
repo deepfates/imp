@@ -5,7 +5,10 @@ defmodule ProviderToolCallTest do
     @behaviour DSEx.HTTP
 
     @impl true
-    def post(_url, _headers, _body, _opts) do
+    def post(_url, _headers, body, _opts) do
+      payload = Jason.decode!(body)
+      send(self(), {:tool_call_payload, payload})
+
       response = %{
         choices: [
           %{
@@ -47,9 +50,18 @@ defmodule ProviderToolCallTest do
       )
 
     lookup =
-      DSEx.Tool.new(:lookup, "Lookup by query", fn
-        %{query: "capital-france"} -> "Paris"
-      end)
+      DSEx.Tool.new(
+        :lookup,
+        "Lookup by query",
+        fn
+          %{query: "capital-france"} -> "Paris"
+        end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{"query" => %{"type" => "string"}},
+          "required" => ["query"]
+        }
+      )
 
     agent = DSEx.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2)
 
@@ -60,5 +72,22 @@ defmodule ProviderToolCallTest do
 
     assert [%{tool: :lookup, result: "Paris"}, %{tool: :submit, result: %{answer: "Paris"}}] =
              DSEx.Prediction.get(prediction, :history)
+
+    assert_received {:tool_call_payload, payload}
+    assert payload["tool_choice"] == "auto"
+
+    assert [
+             %{
+               "type" => "function",
+               "function" => %{"name" => "lookup", "parameters" => %{"required" => ["query"]}}
+             },
+             %{
+               "type" => "function",
+               "function" => %{
+                 "name" => "submit",
+                 "parameters" => %{"required" => ["answer"]}
+               }
+             }
+           ] = Enum.sort_by(payload["tools"], &get_in(&1, ["function", "name"]))
   end
 end

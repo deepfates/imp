@@ -91,11 +91,25 @@ defmodule ProviderTrainingLifecycleTest do
     assert payload["model"] == "gpt-test"
     assert payload["training_file"] == "file-abc"
     assert payload["hyperparameters"] == %{"n_epochs" => 1}
-    assert [%{"question" => "2+2?", "answer" => "4"}] = payload["dsex_training_data"]
+    refute Map.has_key?(payload, "dsex_training_data")
 
     assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
     assert refreshed.status == :succeeded
     assert refreshed.result_model == "ft:gpt-test:org:abc"
+  end
+
+  test "OpenAI trainer requires an uploaded training file id" do
+    lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
+
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport
+      )
+
+    assert {:error, :openai_training_file_required} =
+             DSEx.Clients.Trainer.finetune(trainer, lm, examples(), [])
   end
 
   test "Databricks trainer submits expected payload and auth" do
@@ -141,7 +155,8 @@ defmodule ProviderTrainingLifecycleTest do
       DSEx.Clients.OpenAITrainer.new(
         base_url: "https://api.example/v1",
         api_key: "sk-test",
-        transport: OpenAITrainingTransport
+        transport: OpenAITrainingTransport,
+        training_file: "file-abc"
       )
 
     result =
