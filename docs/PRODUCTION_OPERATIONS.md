@@ -154,6 +154,13 @@ OpenAI-compatible model discovery when `OPENAI_MODEL` is unset, and writes the
 same DSEx-vs-DSPy report schema over the full row set. Use full-lane artifacts,
 not smoke runs, before making production parity claims.
 
+For long campaigns, run `mix dsex.benchmark.parity` in chunks with `--offset`
+and `--max-examples`, then run
+`mix dsex.benchmark.parity.aggregate --model MODEL`. The campaign aggregate is
+the decisive artifact: it deduplicates overlapping chunks by absolute row index,
+reports missing ranges, computes weighted scores, and refuses `full_parity`
+unless the complete canonical row range is covered.
+
 ## What The Gates Do Not Prove
 
 They do not prove:

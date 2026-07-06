@@ -1,6 +1,8 @@
 defmodule BenchmarkTruthTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
+
   alias DSEx.BenchmarkTruth.Fetcher
 
   @fixtures Path.expand("fixtures/benchmarks", __DIR__)
@@ -134,6 +136,36 @@ defmodule BenchmarkTruthTest do
     assert row["prediction"][:answer] == "3"
   end
 
+  test "parity aggregate deduplicates overlapping chunks and reports coverage gaps" do
+    out_dir = tmp_dir("parity-aggregate")
+    write_parity_report(out_dir, "older.json", "2026-07-06T00:00:00Z", 0, [true, false])
+    write_parity_report(out_dir, "newer.json", "2026-07-06T00:01:00Z", 1, [true, true])
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+    gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
+
+    assert campaign["model"] == "gpt-test"
+    assert campaign["coverage"]["covered"] == 3
+    refute campaign["coverage"]["full"]
+    refute campaign["parity"]["full_parity"]
+    assert gsm8k["coverage"]["covered"] == 3
+    assert gsm8k["dsex_passes"] == 3
+    assert gsm8k["dspy_passes"] == 3
+    assert [%{"from" => 3, "to" => 1318} | _] = gsm8k["coverage"]["missing_ranges"]
+  end
+
   defp read_jsonl(text) do
     text
     |> String.split("\n", trim: true)
@@ -160,5 +192,43 @@ defmodule BenchmarkTruthTest do
         "answer" => "Compute #{index}+0. #### #{index}"
       }
     }
+  end
+
+  defp write_parity_report(out_dir, name, generated_at, offset, passes) do
+    rows =
+      passes
+      |> Enum.with_index()
+      |> Enum.map(fn {passed?, index} ->
+        %{
+          "index" => index,
+          "absolute_index" => offset + index,
+          "dsex_passed" => passed?,
+          "dspy_passed" => passed?,
+          "pass_agreement" => true,
+          "answer_agreement" => true,
+          "dsex_answer" => to_string(offset + index),
+          "dspy_answer" => to_string(offset + index)
+        }
+      end)
+
+    report = %{
+      "schema_version" => 1,
+      "generated_at" => generated_at,
+      "dsex" => %{"model" => %{"model" => "gpt-test"}},
+      "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
+      "tasks" => [
+        %{
+          "task" => "gsm8k",
+          "offset" => offset,
+          "examples" => length(rows),
+          "dsex_duration_ms" => 10.0,
+          "dspy_duration_ms" => 20.0,
+          "row_agreement" => rows
+        }
+      ],
+      "evidence" => %{"examples" => length(rows)}
+    }
+
+    File.write!(Path.join(out_dir, name), Jason.encode!(report, pretty: true) <> "\n")
   end
 end

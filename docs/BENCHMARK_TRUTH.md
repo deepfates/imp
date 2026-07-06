@@ -154,6 +154,27 @@ mix dsex.benchmark.parity \
 Chunked runs avoid losing an entire benchmark to one network interruption. A
 full parity claim still requires covering the complete row range.
 
+Aggregate chunk artifacts into a campaign report:
+
+```sh
+mix dsex.benchmark.parity.aggregate \
+  --model gpt-5.4-mini \
+  --in 'benchmarks/results/dsex-dspy-parity-gpt-5.4-mini-*.json'
+```
+
+The aggregator counts each `(task, absolute_index)` once, so overlapping smoke
+or retry chunks cannot inflate coverage. It reports:
+
+- total covered rows versus canonical expected rows
+- per-task covered rows and missing ranges
+- weighted DSEx/DSPy scores from row-level pass/fail outcomes
+- aggregate and task score gaps
+- latency ratio from covered chunk artifacts
+- explicit `full_parity: true/false`
+
+`full_parity` is false unless every canonical row is covered and both aggregate
+and per-task score gaps are within the configured strict thresholds.
+
 ## Evidence Standard
 
 A credible DSEx benchmark report must include:

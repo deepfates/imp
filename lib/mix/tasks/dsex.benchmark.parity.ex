@@ -246,6 +246,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
 
       %{
         "index" => row["index"],
+        "absolute_index" => (dsex["offset"] || 0) + row["index"],
         "dsex_passed" => row["passed"],
         "dspy_passed" => other && other["passed"],
         "pass_agreement" => other && row["passed"] == other["passed"],
