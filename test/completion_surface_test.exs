@@ -58,6 +58,35 @@ defmodule CompletionSurfaceTest do
              DSEx.Sandbox.eval("System.cmd(\"rm\", [\"-rf\", \"/\"])")
   end
 
+  test "CodeAct loops through tool observations before evaluating a program" do
+    actions = [
+      %{tool: "lookup", arguments: %{"key" => "n"}},
+      %{program: "observation + 1"}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:code_act_actions)
+          Process.put(:code_act_actions, rest)
+          action
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup a number", fn %{"key" => "n"} -> 41 end)
+    Process.put(:code_act_actions, actions)
+
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
+
+    assert {:ok, prediction} = DSEx.Predict.CodeAct.call(code_act, %{question: "life?"})
+    assert DSEx.Prediction.get(prediction, :answer) == 42
+    assert Enum.map(prediction.metadata.code_act_trace, & &1.action) == [:tool, :program]
+  after
+    Process.delete(:code_act_actions)
+  end
+
   test "streaming exposes predictions as an enumerable" do
     lm = %{
       module: DSEx.LM.Fake,
@@ -72,6 +101,15 @@ defmodule CompletionSurfaceTest do
              "b",
              "e"
            ]
+
+    assert [
+             %{field: :answer, value: "beam"},
+             %{field: :rationale, value: "fast"}
+           ] =
+             DSEx.Streaming.incremental_fields(
+               ["[[ ## ans", "wer ## ]]beam", "[[ ## rationale ## ]]fast"],
+               "question -> answer, rationale"
+             )
   end
 
   test "dataset loaders produce examples with declared inputs" do

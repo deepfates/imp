@@ -47,6 +47,9 @@ defmodule OptimizeGEPATest do
     assert Enum.any?(report.candidates, &(&1.mutation =~ "Paris"))
     assert report.best.aggregate_score == 1.0
     assert report.best.parent_id in ["baseline", "gepa-1", nil]
+    assert report.metadata.parent_sampling == :pareto_round_robin
+    assert report.metadata.component_selector == :actionable_side_information
+    assert report.metadata.merge_strategy == :pareto_frontier_union
   end
 
   test "system-aware merge combines complementary frontier candidates" do

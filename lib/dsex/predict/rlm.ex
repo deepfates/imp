@@ -11,6 +11,7 @@ defmodule DSEx.Predict.RLM do
 
   - `%{action: "eval", code: "x + 1"}` to evaluate a safe expression.
   - `%{action: "llm_query", signature: "...", inputs: %{...}}` to call a sub-LM.
+  - `%{action: "recurse", signature: "...", inputs: %{...}}` to invoke a smaller child RLM.
   - `%{action: "submit", result: %{...}}` to return signature outputs.
 
   The loop enforces `max_iterations` and `max_llm_calls` budgets and stores an
@@ -122,7 +123,8 @@ defmodule DSEx.Predict.RLM do
     messages = [
       %{
         role: :system,
-        content: "You are an RLM controller. Return JSON with action eval, llm_query, or submit."
+        content:
+          "You are an RLM controller. Return JSON with action eval, assign, tool, llm_query, recurse, or submit."
       },
       %{
         role: :user,
@@ -252,6 +254,33 @@ defmodule DSEx.Predict.RLM do
       {:error, {:tool_denied, _name}} -> result
       _other -> {:cont, state}
     end
+  end
+
+  defp step(%__MODULE__{} = rlm, %{"action" => "recurse"} = action, state, iteration) do
+    signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
+    inputs = Map.get(action, "inputs", state.vars)
+
+    child = %{
+      rlm
+      | signature: DSEx.Signature.ensure(signature),
+        max_iterations: max(rlm.max_iterations - iteration, 1),
+        max_llm_calls: max(rlm.max_llm_calls - state.llm_calls, 0),
+        max_time_ms: remaining_time(rlm, state)
+    }
+
+    result = call(child, inputs)
+
+    state =
+      state
+      |> add_observation(%{
+        action: :recurse,
+        signature: signature,
+        inputs: inputs,
+        result: result
+      })
+      |> trace(iteration, :recurse, action, result)
+
+    {:cont, state}
   end
 
   defp step(_rlm, action, _state, _iteration), do: {:error, {:unsupported_rlm_action, action}}

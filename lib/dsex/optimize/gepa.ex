@@ -81,7 +81,11 @@ defmodule DSEx.Optimize.GEPA do
         generations: generations,
         examples: length(examples),
         dev_examples: length(dev_examples),
-        frontier_size: length(final_frontier)
+        frontier_size: length(final_frontier),
+        parent_sampling: :pareto_round_robin,
+        component_selector: :actionable_side_information,
+        merge_strategy: :pareto_frontier_union,
+        selection_score: if(dev_examples == [], do: :train_aggregate, else: :held_out_dev)
       }
     }
   end

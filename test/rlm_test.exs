@@ -123,6 +123,38 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_tool_prompt)
   end
 
+  test "RLM supports genuine recursive child calls with reduced budget" do
+    actions = [
+      %{action: "recurse", signature: "question -> answer", inputs: %{question: "child"}},
+      %{action: "submit", result: %{answer: "child answer"}},
+      %{action: "submit", result: %{answer: "parent answer"}}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:rlm_recurse_actions)
+          Process.put(:rlm_recurse_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:rlm_recurse_actions, actions)
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 4)
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "parent"})
+    assert DSEx.Prediction.get(prediction, :answer) == "parent answer"
+
+    assert [%{action: :recurse, output: {:ok, child}}, %{action: :submit}] =
+             prediction.metadata.rlm_trace
+
+    assert DSEx.Prediction.get(child, :answer) == "child answer"
+  after
+    Process.delete(:rlm_recurse_actions)
+  end
+
   test "RLM enforces tool policy and wall-clock budget" do
     denied_lm = %{
       module: DSEx.LM.Fake,

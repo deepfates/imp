@@ -39,19 +39,24 @@ defmodule OptimizerBehavioralCorpusTest do
     ]
   end
 
-  test "MIPROv2 searches joint instruction and demo candidates without regressing baseline" do
+  test "MIPROv2 searches categorical instruction and demo candidates without regressing baseline" do
     program = france_program()
     baseline_score = evaluator(program).score
 
-    optimizer = DSEx.Optimizer.MIPROv2.new(metric(), trials: 5, demos_per_candidate: 1)
+    optimizer =
+      DSEx.Optimizer.MIPROv2.new(metric(), trials: 5, demos_per_candidate: 1, cold_start: 2)
+
     compiled = DSEx.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
     report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :mipro_v2
-    assert report.metadata.search == :joint_instruction_demo_grid
+    assert report.metadata.search == :categorical_tpe
+    assert report.metadata.acquisition == :laplace_density_ratio
     assert report.best_score >= baseline_score
     assert report.best_score == evaluator(compiled).score
     assert Enum.any?(report.candidates, &Map.get(&1, :baseline))
+    assert Enum.any?(report.candidates, &(&1[:source] == :random_cold_start))
+    assert Enum.any?(report.candidates, &(&1[:source] == :tpe_density_ratio))
     assert Enum.any?(report.candidates, &(not Enum.empty?(Map.get(&1, :demos, []))))
   end
 

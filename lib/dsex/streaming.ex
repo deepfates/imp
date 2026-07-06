@@ -59,6 +59,28 @@ defmodule DSEx.Streaming do
     |> Enum.join()
   end
 
+  @doc """
+  Parses provider chunks into incremental typed field updates.
+
+  The parser follows the ChatAdapter delimiter format:
+  `[[ ## field ## ]]` followed by field text. A field is emitted when the next
+  field delimiter arrives or when the stream ends.
+  """
+  def incremental_fields(chunks, signature) do
+    signature = DSEx.Signature.ensure(signature)
+    allowed = MapSet.new(Enum.map(signature.outputs, & &1.name))
+    text = Enum.map_join(chunks, &to_string/1)
+
+    ~r/\[\[\s*##\s*([a-zA-Z_][\w]*)\s*##\s*\]\](.*?)(?=\[\[\s*##\s*[a-zA-Z_][\w]*\s*##\s*\]\]|\z)/s
+    |> Regex.scan(text)
+    |> Enum.flat_map(fn [_, field, value] ->
+      case field_event(field, String.trim(value), allowed) do
+        nil -> []
+        event -> [event]
+      end
+    end)
+  end
+
   defp call_once(program, inputs) do
     case program.__struct__.call(program, inputs) do
       {:ok, prediction} ->
@@ -67,5 +89,16 @@ defmodule DSEx.Streaming do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp field_event(field, value, allowed) do
+    key = existing_atom_or_string(field)
+    if MapSet.member?(allowed, key), do: %{field: key, value: value}
+  end
+
+  defp existing_atom_or_string(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
   end
 end

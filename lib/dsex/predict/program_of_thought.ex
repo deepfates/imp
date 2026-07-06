@@ -1,5 +1,5 @@
 defmodule DSEx.Predict.ProgramOfThought do
-  @moduledoc "Program-of-thought module that asks for code/expression then evaluates it in `DSEx.Sandbox`."
+  @moduledoc "Program-of-thought module that asks for code/tool actions then evaluates through safe runtime hooks."
 
   @behaviour DSEx.Module
 
@@ -12,7 +12,28 @@ defmodule DSEx.Predict.ProgramOfThought do
       original
       | outputs: [
           DSEx.Signature.Field.new(
-            %{name: :program, desc: "Arithmetic expression to evaluate"},
+            %{
+              name: :program,
+              desc: "Safe Elixir expression to evaluate",
+              metadata: %{optional: true}
+            },
+            :output
+          ),
+          DSEx.Signature.Field.new(
+            %{
+              name: :tool,
+              desc: "Optional tool name to call before the next program step",
+              metadata: %{optional: true}
+            },
+            :output
+          ),
+          DSEx.Signature.Field.new(
+            %{
+              name: :arguments,
+              type: :object,
+              desc: "Optional map of tool arguments",
+              metadata: %{optional: true}
+            },
             :output
           )
         ]
@@ -26,7 +47,7 @@ defmodule DSEx.Predict.ProgramOfThought do
 
   @impl true
   def call(%__MODULE__{} = pot, inputs) do
-    with {:ok, prediction} <- DSEx.Predict.Predict.call(pot.predict, inputs),
+    with {:ok, prediction} <- predict_step(pot, inputs),
          program when is_binary(program) <- DSEx.Prediction.get(prediction, :program),
          {:ok, value} <- DSEx.Sandbox.eval(program, inputs) do
       {:ok, prediction |> DSEx.Prediction.put(pot.output_field, value)}
@@ -35,5 +56,10 @@ defmodule DSEx.Predict.ProgramOfThought do
       {:error, reason} -> {:error, reason}
       other -> {:error, {:invalid_program, other}}
     end
+  end
+
+  @doc false
+  def predict_step(%__MODULE__{} = pot, inputs) do
+    DSEx.Predict.Predict.call(pot.predict, inputs)
   end
 end

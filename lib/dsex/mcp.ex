@@ -104,6 +104,236 @@ defmodule DSEx.MCP do
     defp next_id, do: System.unique_integer([:positive])
   end
 
+  defmodule StdioClient do
+    @moduledoc "Persistent stdio JSON-RPC MCP client."
+
+    defstruct [
+      :command,
+      args: [],
+      protocol_version: "2025-03-26",
+      timeout: 5_000
+    ]
+
+    def new(command, opts \\ []) do
+      %__MODULE__{
+        command: command,
+        args: Keyword.get(opts, :args, []),
+        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26"),
+        timeout: Keyword.get(opts, :timeout, 5_000)
+      }
+    end
+
+    def encode(method, params \\ %{}, id \\ next_id()) do
+      Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params}) <>
+        "\n"
+    end
+
+    def list_tools(%__MODULE__{} = client) do
+      port = open_port(client)
+
+      try do
+        with {:ok, _} <-
+               request(
+                 port,
+                 "initialize",
+                 %{
+                   "protocolVersion" => client.protocol_version,
+                   "capabilities" => %{},
+                   "clientInfo" => %{"name" => "dsex", "version" => "0.1.0"}
+                 },
+                 client.timeout
+               ),
+             :ok <- notify(port, "notifications/initialized", %{}),
+             {:ok, decoded} <- request(port, "tools/list", %{}, client.timeout),
+             {:ok, tools} <- decode_tools(decoded) do
+          Enum.map(tools, &attach_stdio_run(client, &1))
+        else
+          {:error, reason} -> raise ArgumentError, "MCP stdio failed: #{inspect(reason)}"
+        end
+      after
+        Port.close(port)
+      end
+    end
+
+    defp attach_stdio_run(client, tool) do
+      name = Map.get(tool, "name", Map.get(tool, :name))
+
+      Map.put(tool, "run", fn arguments ->
+        port = open_port(client)
+
+        try do
+          with {:ok, _} <- request(port, "initialize", %{}, client.timeout),
+               :ok <- notify(port, "notifications/initialized", %{}),
+               {:ok, decoded} <-
+                 request(
+                   port,
+                   "tools/call",
+                   %{"name" => name, "arguments" => arguments},
+                   client.timeout
+                 ) do
+            Map.get(decoded, "result", decoded)
+          end
+        after
+          Port.close(port)
+        end
+      end)
+    end
+
+    defp open_port(%__MODULE__{} = client) do
+      Port.open({:spawn_executable, client.command}, [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        :stderr_to_stdout,
+        args: client.args
+      ])
+    end
+
+    defp request(port, method, params, timeout) do
+      id = next_id()
+      Port.command(port, encode(method, params, id))
+      read_response(port, id, "", timeout)
+    end
+
+    defp notify(port, method, params) do
+      body = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params}) <> "\n"
+      Port.command(port, body)
+      :ok
+    end
+
+    defp read_response(port, id, buffer, timeout) do
+      receive do
+        {^port, {:data, data}} ->
+          buffer = buffer <> data
+
+          case decode_line(buffer, id) do
+            {:ok, decoded} -> {:ok, decoded}
+            :more -> read_response(port, id, buffer, timeout)
+            {:error, reason} -> {:error, reason}
+          end
+
+        {^port, {:exit_status, status}} ->
+          {:error, {:stdio_exit, status}}
+      after
+        timeout -> {:error, :timeout}
+      end
+    end
+
+    defp decode_line(buffer, id) do
+      buffer
+      |> String.split("\n", trim: true)
+      |> Enum.find_value(:more, fn line ->
+        case Jason.decode(line) do
+          {:ok, %{"id" => ^id, "error" => error}} -> {:error, error}
+          {:ok, %{"id" => ^id} = decoded} -> {:ok, decoded}
+          _other -> false
+        end
+      end)
+    end
+
+    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(other), do: {:error, {:missing_tools, other}}
+
+    defp next_id, do: System.unique_integer([:positive])
+  end
+
+  defmodule StreamableHTTPClient do
+    @moduledoc "MCP Streamable HTTP client with session-aware headers and SSE decoding."
+
+    defstruct [
+      :url,
+      :session_id,
+      transport: DSEx.HTTP.Hackneyless,
+      headers: [],
+      protocol_version: "2025-03-26"
+    ]
+
+    def new(url, opts \\ []) do
+      %__MODULE__{
+        url: url,
+        transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
+        headers: Keyword.get(opts, :headers, []),
+        session_id: Keyword.get(opts, :session_id),
+        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26")
+      }
+    end
+
+    def list_tools(%__MODULE__{} = client) do
+      with {:ok, _} <- rpc(client, "initialize", %{}),
+           {:ok, decoded} <- rpc(client, "tools/list", %{}),
+           {:ok, tools} <- decode_tools(decoded) do
+        Enum.map(tools, &attach_remote_run(client, &1))
+      else
+        {:error, reason} -> raise ArgumentError, "MCP streamable HTTP failed: #{inspect(reason)}"
+      end
+    end
+
+    def headers(%__MODULE__{} = client) do
+      base = [
+        {"content-type", "application/json"},
+        {"accept", "application/json, text/event-stream"},
+        {"mcp-protocol-version", client.protocol_version}
+        | client.headers
+      ]
+
+      if client.session_id, do: [{"mcp-session-id", client.session_id} | base], else: base
+    end
+
+    defp attach_remote_run(client, tool) do
+      name = Map.get(tool, "name", Map.get(tool, :name))
+
+      Map.put(tool, "run", fn arguments ->
+        with {:ok, decoded} <-
+               rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}) do
+          Map.get(decoded, "result", decoded)
+        end
+      end)
+    end
+
+    defp rpc(client, method, params) do
+      body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
+
+      with {:ok, %{status: status, body: response}} when status in 200..299 <-
+             DSEx.HTTP.post(
+               client.transport,
+               client.url,
+               headers(client),
+               Jason.encode!(body),
+               []
+             ),
+           {:ok, decoded} <- decode_body(response) do
+        {:ok, decoded}
+      else
+        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    defp decode_body(body) do
+      cond do
+        String.contains?(body, "\ndata:") or String.starts_with?(body, "data:") ->
+          body
+          |> String.split("\n")
+          |> Enum.filter(&String.starts_with?(&1, "data:"))
+          |> Enum.map(&String.trim_leading(&1, "data:"))
+          |> Enum.map(&String.trim/1)
+          |> Enum.reject(&(&1 == "" or &1 == "[DONE]"))
+          |> List.last()
+          |> Jason.decode()
+
+        true ->
+          Jason.decode(body)
+      end
+    end
+
+    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
+    defp decode_tools(other), do: {:error, {:missing_tools, other}}
+
+    defp next_id, do: System.unique_integer([:positive])
+  end
+
   @doc "Imports a catalog or list of tool schemas into `DSEx.Tool` structs."
   def import_tools(catalog) do
     catalog

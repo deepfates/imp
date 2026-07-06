@@ -161,5 +161,34 @@ defmodule MCPImportTest do
     Process.delete(:mcp_requests)
   end
 
+  test "stdio MCP client encodes JSON-RPC lines for process transports" do
+    line = MCP.StdioClient.encode("tools/list", %{}, 123)
+
+    assert String.ends_with?(line, "\n")
+
+    assert %{"jsonrpc" => "2.0", "id" => 123, "method" => "tools/list", "params" => %{}} =
+             Jason.decode!(line)
+  end
+
+  test "streamable HTTP MCP client sends session headers and decodes SSE data" do
+    client =
+      MCP.StreamableHTTPClient.new("https://mcp.example/stream",
+        transport: MCPTransport,
+        session_id: "session-1"
+      )
+
+    [tool] = MCP.import_tools(client)
+
+    assert tool.name == "remote_lookup"
+    assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
+
+    assert [init_request, list_request, call_request] = Process.get(:mcp_requests)
+    assert {"mcp-session-id", "session-1"} in init_request.headers
+    assert {"accept", "application/json, text/event-stream"} in list_request.headers
+    assert call_request.body["method"] == "tools/call"
+  after
+    Process.delete(:mcp_requests)
+  end
+
   defp agent_ref, do: Process.get(:agent_ref)
 end
