@@ -124,6 +124,41 @@ defmodule AgentRuntimeTest do
            ] = runtime.traces
   end
 
+  test "runtime redacts secret-shaped values under unexpected keys" do
+    echo = DSEx.Tool.new(:echo, "echo", fn input -> input end)
+
+    agent =
+      Agent.new(
+        :redactor,
+        fn agent, _input, runtime ->
+          Agent.call_tool(
+            agent,
+            :echo,
+            %{
+              harmless: "visible",
+              random_header: "Bearer abcdefghijklmnopqrstuvwxyz0123456789",
+              nested: %{odd_name: "sk-abcdefghijklmnopqrstuvwxyz"}
+            },
+            runtime
+          )
+        end,
+        tools: [echo]
+      )
+
+    assert {:ok, _output, runtime} = Agent.run(agent, %{})
+
+    assert [
+             %{
+               input: %{
+                 harmless: "visible",
+                 random_header: "[REDACTED]",
+                 nested: %{odd_name: "[REDACTED]"}
+               }
+             },
+             %{output: %{random_header: "[REDACTED]", nested: %{odd_name: "[REDACTED]"}}}
+           ] = runtime.traces
+  end
+
   test "agent returns structured failures for tools children and schemas" do
     boom = DSEx.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
 

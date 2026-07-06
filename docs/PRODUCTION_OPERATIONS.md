@@ -52,8 +52,9 @@ The library avoids persisting provider secrets in saved program JSON.
 Security-sensitive defaults:
 
 - saved HTTP LMs load with `api_key: nil`
+- default `:httpc` transport verifies TLS peer certificates
 - unknown external keys are not converted with `String.to_atom/1`
-- agent traces redact common secret keys
+- agent traces redact common secret keys and secret-shaped values
 - agents and ReAct/RLM support tool policies
 
 Operational advice:
@@ -70,6 +71,7 @@ Typical `.env`:
 ```sh
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4o-mini
+DSEX_TEST_MODE=live
 ```
 
 Run:

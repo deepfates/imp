@@ -11,7 +11,8 @@ defmodule DSEx.Clients.HTTPLM do
     path: "/chat/completions",
     transport: DSEx.HTTP.Hackneyless,
     headers: [],
-    opts: []
+    opts: [],
+    test_mode: nil
   ]
 
   @type t :: %__MODULE__{}
@@ -30,7 +31,8 @@ defmodule DSEx.Clients.HTTPLM do
       path: Keyword.get(opts, :path, "/chat/completions"),
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
       headers: Keyword.get(opts, :headers, []),
-      opts: Keyword.get(opts, :opts, [])
+      opts: Keyword.get(opts, :opts, []),
+      test_mode: Keyword.get(opts, :test_mode)
     }
   end
 
@@ -39,6 +41,15 @@ defmodule DSEx.Clients.HTTPLM do
     do: generate(new(Keyword.fetch!(opts, :model), opts), messages, opts)
 
   def generate(%__MODULE__{} = lm, messages, opts) do
+    opts = maybe_put_test_mode(lm, opts)
+
+    case test_mode_action(lm, messages, opts) do
+      {:mock, content} -> {:ok, content}
+      :real -> generate_live(lm, messages, opts)
+    end
+  end
+
+  defp generate_live(%__MODULE__{} = lm, messages, opts) do
     {body, headers} = request(lm, messages, opts)
 
     request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
@@ -52,6 +63,37 @@ defmodule DSEx.Clients.HTTPLM do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp test_mode_action(%__MODULE__{} = lm, messages, opts) do
+    case DSEx.TestMode.mode(opts) do
+      :mock ->
+        if test_mode_transport?(lm),
+          do: {:mock, DSEx.TestMode.mock_content(lm, messages, opts)},
+          else: :real
+
+      :fallback ->
+        if test_mode_transport?(lm) and missing_required_credential?(lm),
+          do: {:mock, DSEx.TestMode.mock_content(lm, messages, opts)},
+          else: :real
+
+      :live ->
+        :real
+    end
+  end
+
+  defp maybe_put_test_mode(%__MODULE__{test_mode: nil}, opts), do: opts
+
+  defp maybe_put_test_mode(%__MODULE__{test_mode: mode}, opts),
+    do: Keyword.put_new(opts, :test_mode, mode)
+
+  defp test_mode_transport?(%__MODULE__{transport: DSEx.HTTP.Hackneyless}), do: true
+  defp test_mode_transport?(_lm), do: false
+
+  defp missing_required_credential?(%__MODULE__{provider: provider, api_key: nil})
+       when provider in [:openai, :databricks],
+       do: true
+
+  defp missing_required_credential?(_lm), do: false
 
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
     {body, headers} = request(lm, messages, Keyword.put(opts, :stream, true))

@@ -160,7 +160,9 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 - `SIMBA`
 - `GEPA`
 - `BetterTogether`
-- `BootstrapFinetune`, `GRPO`
+- `BootstrapFinetune`, `GRPO` build provider training jobs only when a real
+  trainer backend is supplied; the local trainer is an honest not-implemented
+  stub.
 
 V2 arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 

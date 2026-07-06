@@ -63,7 +63,7 @@ defmodule DSEx.HTTP.Hackneyless do
       end)
 
     request = {String.to_charlist(url), headers, ~c"application/json", IO.iodata_to_binary(body)}
-    http_opts = Keyword.get(opts, :http_opts, [])
+    http_opts = opts |> Keyword.get(:http_opts, []) |> secure_http_opts()
     request_opts = Keyword.get(opts, :request_opts, [])
 
     case :httpc.request(:post, request, http_opts, request_opts) do
@@ -74,5 +74,37 @@ defmodule DSEx.HTTP.Hackneyless do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  def secure_http_opts(http_opts) do
+    Keyword.update(http_opts, :ssl, default_ssl_opts(), fn ssl_opts ->
+      Keyword.merge(default_ssl_opts(), ssl_opts)
+    end)
+  end
+
+  def default_ssl_opts do
+    [
+      verify: :verify_peer,
+      customize_hostname_check: [
+        match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+      ]
+    ]
+    |> maybe_put_cacertfile()
+  end
+
+  defp maybe_put_cacertfile(ssl_opts) do
+    case Enum.find(ca_cert_paths(), &File.regular?/1) do
+      nil -> ssl_opts
+      path -> Keyword.put(ssl_opts, :cacertfile, String.to_charlist(path))
+    end
+  end
+
+  defp ca_cert_paths do
+    [
+      "/etc/ssl/cert.pem",
+      "/etc/ssl/certs/ca-certificates.crt",
+      "/etc/pki/tls/certs/ca-bundle.crt",
+      "/etc/ssl/ca-bundle.pem"
+    ]
   end
 end

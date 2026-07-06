@@ -39,6 +39,97 @@ defmodule ProductionHardeningTest do
     assert Process.get(:flaky_count) == 2
   end
 
+  @tag capture_log: true
+  test "default httpc transport verifies TLS peer certificates" do
+    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer
+
+    dir = Path.join(System.tmp_dir!(), "dsex-tls-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    cert = Path.join(dir, "cert.pem")
+    key = Path.join(dir, "key.pem")
+
+    {_out, 0} =
+      System.cmd(
+        "openssl",
+        [
+          "req",
+          "-x509",
+          "-newkey",
+          "rsa:2048",
+          "-nodes",
+          "-keyout",
+          key,
+          "-out",
+          cert,
+          "-subj",
+          "/CN=localhost",
+          "-days",
+          "1"
+        ],
+        stderr_to_stdout: true
+      )
+
+    {:ok, listen_socket} =
+      :ssl.listen(0,
+        certfile: String.to_charlist(cert),
+        keyfile: String.to_charlist(key),
+        active: false,
+        packet: :raw,
+        reuseaddr: true
+      )
+
+    {:ok, {_addr, port}} = :ssl.sockname(listen_socket)
+
+    task =
+      Task.async(fn ->
+        case :ssl.transport_accept(listen_socket, 5_000) do
+          {:ok, socket} ->
+            case :ssl.handshake(socket) do
+              {:ok, socket} ->
+                :ssl.recv(socket, 0, 1_000)
+                :ssl.send(socket, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+                :ssl.close(socket)
+
+              {:error, _reason} ->
+                :ok
+            end
+
+          {:error, _reason} ->
+            :ok
+        end
+      end)
+
+    assert {:error, _reason} =
+             DSEx.HTTP.Hackneyless.post(
+               "https://localhost:#{port}/",
+               [],
+               "{}",
+               http_opts: [timeout: 2_000]
+             )
+
+    Task.await(task, 6_000)
+    :ssl.close(listen_socket)
+    File.rm_rf!(dir)
+  end
+
+  test "DSEX_TEST_MODE gates default provider transport at runtime" do
+    previous_mode = System.get_env("DSEX_TEST_MODE")
+    previous_live = System.get_env("LIVE_PROVIDER")
+
+    try do
+      System.delete_env("LIVE_PROVIDER")
+      System.put_env("DSEX_TEST_MODE", "mock")
+      lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: nil)
+      assert {:ok, "Answer: mock"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
+
+      System.put_env("DSEX_TEST_MODE", "fallback")
+      assert {:ok, "Answer: mock"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
+    after
+      restore_env("DSEX_TEST_MODE", previous_mode)
+      restore_env("LIVE_PROVIDER", previous_live)
+    end
+  end
+
   test "saving rejects unsupported program types explicitly" do
     assert_raise ArgumentError, ~r/unsupported saved DSEx program type/, fn ->
       DSEx.Saving.load(%{"type" => "unknown"})
@@ -144,4 +235,7 @@ defmodule ProductionHardeningTest do
 
     assert Enum.all?(results, &match?({:ok, %DSEx.Prediction{}}, &1))
   end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
 end
