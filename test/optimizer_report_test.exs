@@ -3,7 +3,7 @@ defmodule OptimizerReportTest do
 
   defp lm do
     %{
-      module: Dachshund.LM.Fake,
+      module: DSEx.LM.Fake,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -18,13 +18,13 @@ defmodule OptimizerReportTest do
 
   defp sets do
     train = [
-      Dachshund.example(question: "France capital?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "France capital?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
 
     dev = [
-      Dachshund.example(question: "Capital of France?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
 
     {train, dev}
@@ -32,17 +32,17 @@ defmodule OptimizerReportTest do
 
   test "random search attaches candidate history and best score" do
     {train, dev} = sets()
-    metric = Dachshund.Metrics.exact_match(:answer)
-    program = Dachshund.predict("question -> answer", lm: lm())
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
 
     compiled =
       metric
-      |> Dachshund.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-      |> Dachshund.Optimizer.RandomSearch.compile(program, train, dev)
+      |> DSEx.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+      |> DSEx.Optimizer.RandomSearch.compile(program, train, dev)
 
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    report = DSEx.Optimizer.Report.fetch(compiled)
 
-    assert %Dachshund.Optimizer.Report{
+    assert %DSEx.Optimizer.Report{
              optimizer: :random_search,
              best_score: 1.0,
              candidate_count: 3
@@ -54,16 +54,16 @@ defmodule OptimizerReportTest do
 
   test "instruction search attaches candidate score report" do
     {_train, dev} = sets()
-    metric = Dachshund.Metrics.exact_match(:answer)
-    program = Dachshund.predict("question -> answer", lm: lm())
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
 
     compiled =
-      Dachshund.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
+      DSEx.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
         "Answer unknown.",
         "Always answer Paris."
       ])
 
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    report = DSEx.Optimizer.Report.fetch(compiled)
     assert report.optimizer == :instruction_search
     assert report.best_score == 1.0
     assert Enum.any?(report.candidates, &(&1.instruction == "Always answer Paris."))

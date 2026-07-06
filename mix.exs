@@ -1,21 +1,21 @@
-defmodule Dachshund.MixProject do
+defmodule DSEx.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :dachshund,
+      app: :dsex,
       version: "0.1.0",
       elixir: "~> 1.19",
-      name: "Dachshund",
-      source_url: "https://github.com/deepfates/dachshund",
+      name: "DSEx",
+      source_url: "https://github.com/deepfates/dsex",
       description: "Declarative self-improving language-model programs for Elixir.",
       package: package(),
       docs: [
-        main: "Dachshund",
+        main: "DSEx",
         extras: [
           "README.md",
           "docs/README.md",
-          "docs/DACHSHUND_PHILOSOPHY.md",
+          "docs/DSEX_PHILOSOPHY.md",
           "docs/ARCHITECTURE.md",
           "docs/TERMINOLOGY.md",
           "docs/API_GUIDE.md",
@@ -42,7 +42,7 @@ defmodule Dachshund.MixProject do
   def application do
     [
       extra_applications: [:logger, :inets, :ssl],
-      mod: {Dachshund.Application, []}
+      mod: {DSEx.Application, []}
     ]
   end
 
@@ -70,7 +70,7 @@ defmodule Dachshund.MixProject do
     [
       licenses: ["MIT"],
       links: %{
-        "Source" => "https://github.com/deepfates/dachshund"
+        "Source" => "https://github.com/deepfates/dsex"
       }
     ]
   end

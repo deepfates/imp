@@ -3,7 +3,7 @@ defmodule OptimizerEffectivenessTest do
 
   defp demo_sensitive_lm do
     %{
-      module: Dachshund.LM.Fake,
+      module: DSEx.LM.Fake,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -20,40 +20,40 @@ defmodule OptimizerEffectivenessTest do
 
   defp trainset do
     [
-      Dachshund.example(question: "What is the capital of France?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "What is the capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
   end
 
   defp devset do
     [
-      Dachshund.example(question: "Capital of France?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
   end
 
   test "labeled few-shot compilation improves evaluated score" do
-    metric = Dachshund.Metrics.exact_match(:answer)
-    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = Dachshund.Evaluate.new(devset(), metric)
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = DSEx.Evaluate.new(devset(), metric)
 
-    assert Dachshund.Evaluate.run(evaluator, program).score == 0.0
+    assert DSEx.Evaluate.run(evaluator, program).score == 0.0
 
     compiled =
-      Dachshund.Optimizer.LabeledFewShot.new(k: 1)
-      |> Dachshund.Optimizer.LabeledFewShot.compile(program, trainset())
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset())
 
-    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
+    assert DSEx.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
   test "instruction optimizer can improve score using candidate instructions" do
-    metric = Dachshund.Metrics.exact_match(:answer)
-    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = Dachshund.Evaluate.new(devset(), metric)
-    assert Dachshund.Evaluate.run(evaluator, program).score == 0.0
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = DSEx.Evaluate.new(devset(), metric)
+    assert DSEx.Evaluate.run(evaluator, program).score == 0.0
 
     optimizer =
-      Dachshund.Optimizer.SignatureOptimizer.new(metric,
+      DSEx.Optimizer.SignatureOptimizer.new(metric,
         candidates: [
           "Answer unknown.",
           "Always answer Paris when asked about France."
@@ -61,21 +61,21 @@ defmodule OptimizerEffectivenessTest do
       )
 
     compiled =
-      Dachshund.Optimizer.SignatureOptimizer.compile(optimizer, program, trainset(), devset())
+      DSEx.Optimizer.SignatureOptimizer.compile(optimizer, program, trainset(), devset())
 
-    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
+    assert DSEx.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
   test "random search keeps a candidate that improves dev score" do
-    metric = Dachshund.Metrics.exact_match(:answer)
-    program = Dachshund.predict("question -> answer", lm: demo_sensitive_lm())
-    evaluator = Dachshund.Evaluate.new(devset(), metric)
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: demo_sensitive_lm())
+    evaluator = DSEx.Evaluate.new(devset(), metric)
 
     optimizer =
-      Dachshund.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+      DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
 
-    compiled = Dachshund.Optimizer.RandomSearch.compile(optimizer, program, trainset(), devset())
+    compiled = DSEx.Optimizer.RandomSearch.compile(optimizer, program, trainset(), devset())
 
-    assert Dachshund.Evaluate.run(evaluator, compiled).score == 1.0
+    assert DSEx.Evaluate.run(evaluator, compiled).score == 1.0
   end
 end

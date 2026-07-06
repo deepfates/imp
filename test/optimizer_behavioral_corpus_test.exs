@@ -1,15 +1,15 @@
 defmodule OptimizerBehavioralCorpusTest do
   use ExUnit.Case
 
-  defp metric, do: Dachshund.Metrics.exact_match(:answer)
+  defp metric, do: DSEx.Metrics.exact_match(:answer)
 
   defp evaluator(program),
-    do: Dachshund.Evaluate.run(Dachshund.Evaluate.new(devset(), metric()), program)
+    do: DSEx.Evaluate.run(DSEx.Evaluate.new(devset(), metric()), program)
 
   defp france_program do
-    Dachshund.predict("question -> answer",
+    DSEx.predict("question -> answer",
       lm: %{
-        module: Dachshund.LM.Fake,
+        module: DSEx.LM.Fake,
         opts: [
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -27,15 +27,15 @@ defmodule OptimizerBehavioralCorpusTest do
 
   defp trainset do
     [
-      Dachshund.example(question: "What is the capital of France?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "What is the capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
   end
 
   defp devset do
     [
-      Dachshund.example(question: "Capital of France?", answer: "Paris")
-      |> Dachshund.Example.with_inputs(:question)
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.Example.with_inputs(:question)
     ]
   end
 
@@ -43,9 +43,9 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
     baseline_score = evaluator(program).score
 
-    optimizer = Dachshund.Optimizer.MIPROv2.new(metric(), trials: 5, demos_per_candidate: 1)
-    compiled = Dachshund.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    optimizer = DSEx.Optimizer.MIPROv2.new(metric(), trials: 5, demos_per_candidate: 1)
+    compiled = DSEx.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
+    report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :mipro_v2
     assert report.metadata.search == :joint_instruction_demo_grid
@@ -59,13 +59,13 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     optimizer =
-      Dachshund.Optimizer.GEPA.new(metric(),
+      DSEx.Optimizer.GEPA.new(metric(),
         generations: 2,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
 
-    compiled = Dachshund.Optimizer.GEPA.compile(optimizer, program, trainset(), devset())
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    compiled = DSEx.Optimizer.GEPA.compile(optimizer, program, trainset(), devset())
+    report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.best_score == 1.0
@@ -78,9 +78,9 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
     baseline_score = evaluator(program).score
 
-    optimizer = Dachshund.Optimizer.SIMBA.new(metric(), steps: 3, demos_per_step: 1)
-    compiled = Dachshund.Optimizer.SIMBA.compile(optimizer, program, trainset(), devset())
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    optimizer = DSEx.Optimizer.SIMBA.new(metric(), steps: 3, demos_per_step: 1)
+    compiled = DSEx.Optimizer.SIMBA.compile(optimizer, program, trainset(), devset())
+    report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :simba
     assert report.metadata.policy == :monotonic_minibatch_ascent
@@ -93,14 +93,14 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     optimizer =
-      Dachshund.Optimizer.COPRO.new(metric(),
+      DSEx.Optimizer.COPRO.new(metric(),
         breadth: 6,
         depth: 2,
         extra_instructions: ["Always answer Paris when asked about France."]
       )
 
-    compiled = Dachshund.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
-    report = Dachshund.Optimizer.Report.fetch(compiled)
+    compiled = DSEx.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
+    report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
     assert report.best_score == 1.0

@@ -1,4 +1,4 @@
-defmodule Dachshund.Test.EnvLoader do
+defmodule DSEx.Test.EnvLoader do
   @moduledoc false
 
   def load(path \\ ".env") do
@@ -33,7 +33,7 @@ defmodule Dachshund.Test.EnvLoader do
   end
 end
 
-Dachshund.Test.EnvLoader.load()
+DSEx.Test.EnvLoader.load()
 
 unless System.get_env("LIVE_PROVIDER") in ["1", "true", "TRUE", "yes"] do
   ExUnit.configure(exclude: [live: true])

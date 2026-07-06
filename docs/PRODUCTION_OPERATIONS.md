@@ -27,7 +27,7 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 
 - format check
 - compile with warnings as errors
-- Dachshund public surface check
+- DSEx public surface check
 - production audit check
 - non-live test suite
 

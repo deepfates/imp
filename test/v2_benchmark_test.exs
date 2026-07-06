@@ -3,7 +3,7 @@ defmodule V2BenchmarkTest do
 
   @tag :v2
   test "V2 benchmark fixtures pass with deterministic scores" do
-    results = Dachshund.V2.Benchmarks.assert_pass!()
+    results = DSEx.V2.Benchmarks.assert_pass!()
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction,
@@ -17,7 +17,7 @@ defmodule V2BenchmarkTest do
 
   @tag :v2
   test "V2 benchmark negative controls fail below threshold" do
-    results = Dachshund.V2.Benchmarks.assert_negative_controls!()
+    results = DSEx.V2.Benchmarks.assert_negative_controls!()
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction_negative,

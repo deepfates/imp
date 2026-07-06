@@ -1,18 +1,18 @@
-# Dachshund
+# DSEx
 
-Dachshund is a declarative self-improving programming system for language models on the BEAM: signatures, programs, examples, evaluation, retrieval, optimization, agents, and production gates.
+DSEx is a declarative self-improving programming system for language models on the BEAM: signatures, programs, examples, evaluation, retrieval, optimization, agents, and production gates.
 
 It stands in the DSP tradition, but it is taught and shaped as if the idea had started in Elixir: structs, behaviours, OTP boundaries, explicit calls, immutable data, supervised state, and deterministic gates.
 
 ## Quick Example
 
 ```elixir
-Dachshund.configure(lm: %{module: Dachshund.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]})
+DSEx.configure(lm: %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]})
 
-program = Dachshund.predict("question -> answer")
-{:ok, prediction} = Dachshund.call(program, %{question: "Capital of France?"})
+program = DSEx.predict("question -> answer")
+{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
 
-Dachshund.get(prediction, :answer)
+DSEx.get(prediction, :answer)
 #=> "Paris"
 ```
 
@@ -47,6 +47,6 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 ```
 
 The production gate verifies formatting, warnings-as-errors compilation,
-the Dachshund public surface, audit checks, and the full deterministic
+the DSEx public surface, audit checks, and the full deterministic
 integration suite. The live gate validates real OpenAI-compatible provider
 execution using local `.env` credentials.

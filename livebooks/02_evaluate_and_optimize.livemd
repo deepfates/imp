@@ -1,34 +1,34 @@
-# Dachshund 02: Evaluate And Optimize
+# DSEx 02: Evaluate And Optimize
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dachshund, path: repo}])
+Mix.install([{:dsex, path: repo}])
 ```
 
 ## Build Train And Dev Sets
 
 ```elixir
 trainset = [
-  Dachshund.example(question: "2+2?", answer: "4") |> Dachshund.Example.with_inputs(:question),
-  Dachshund.example(question: "3+3?", answer: "6") |> Dachshund.Example.with_inputs(:question)
+  DSEx.example(question: "2+2?", answer: "4") |> DSEx.Example.with_inputs(:question),
+  DSEx.example(question: "3+3?", answer: "6") |> DSEx.Example.with_inputs(:question)
 ]
 
 devset = [
-  Dachshund.example(question: "2 plus 2?", answer: "4") |> Dachshund.Example.with_inputs(:question)
+  DSEx.example(question: "2 plus 2?", answer: "4") |> DSEx.Example.with_inputs(:question)
 ]
 ```
 
 ## Define A Metric
 
 ```elixir
-metric = Dachshund.Metrics.exact_match(:answer)
+metric = DSEx.Metrics.exact_match(:answer)
 ```
 
 ## Evaluate A Baseline
 
 ```elixir
 lm = %{
-  module: Dachshund.LM.Fake,
+  module: DSEx.LM.Fake,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -39,19 +39,19 @@ lm = %{
   ]
 }
 
-program = Dachshund.predict("question -> answer", lm: lm)
-evaluator = Dachshund.Evaluate.new(devset, metric)
-Dachshund.Evaluate.run(evaluator, program)
+program = DSEx.predict("question -> answer", lm: lm)
+evaluator = DSEx.Evaluate.new(devset, metric)
+DSEx.Evaluate.run(evaluator, program)
 ```
 
 ## Labeled Few-Shot
 
 ```elixir
 compiled =
-  Dachshund.Optimizer.LabeledFewShot.new(k: 1)
-  |> Dachshund.Optimizer.LabeledFewShot.compile(program, trainset)
+  DSEx.Optimizer.LabeledFewShot.new(k: 1)
+  |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
 
-Dachshund.Evaluate.run(evaluator, compiled)
+DSEx.Evaluate.run(evaluator, compiled)
 ```
 
 ## Random Search
@@ -59,12 +59,12 @@ Dachshund.Evaluate.run(evaluator, compiled)
 ```elixir
 compiled =
   metric
-  |> Dachshund.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-  |> Dachshund.Optimizer.RandomSearch.compile(program, trainset, devset)
+  |> DSEx.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+  |> DSEx.Optimizer.RandomSearch.compile(program, trainset, devset)
 
 {
-  Dachshund.Evaluate.run(evaluator, compiled),
-  Dachshund.Optimizer.Report.fetch(compiled)
+  DSEx.Evaluate.run(evaluator, compiled),
+  DSEx.Optimizer.Report.fetch(compiled)
 }
 ```
 
@@ -72,7 +72,7 @@ compiled =
 
 ```elixir
 compiled =
-  Dachshund.Optimizer.InstructionSearch.compile(
+  DSEx.Optimizer.InstructionSearch.compile(
     program,
     metric,
     trainset,
@@ -80,16 +80,16 @@ compiled =
     ["Answer unknown.", "Always answer 4."]
   )
 
-Dachshund.Optimizer.Report.fetch(compiled)
+DSEx.Optimizer.Report.fetch(compiled)
 ```
 
 ## Optimize Anything
 
 ```elixir
-artifact = Dachshund.Optimize.Anything.new_artifact(:config, "mode=slow")
+artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
 
 report =
-  Dachshund.Optimize.Anything.optimize(
+  DSEx.Optimize.Anything.optimize(
     artifact,
     fn artifact, _examples ->
       cond do
@@ -114,14 +114,14 @@ report.best
 
 ```elixir
 reflection_lm = %{
-  module: Dachshund.LM.Fake,
+  module: DSEx.LM.Fake,
   opts: [handler: fn _messages, _opts -> %{mutation: "Paris\nconcise"} end]
 }
 
-artifact = Dachshund.Optimize.Anything.new_artifact(:prompt, "Base")
+artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
 
 report =
-  Dachshund.Optimize.GEPA.optimize(
+  DSEx.Optimize.GEPA.optimize(
     artifact,
     fn artifact, examples ->
       %{
@@ -141,6 +141,6 @@ report.best
 ## V2 Benchmarks
 
 ```elixir
-Dachshund.V2.Benchmarks.assert_pass!()
-Dachshund.V2.Benchmarks.assert_negative_controls!()
+DSEx.V2.Benchmarks.assert_pass!()
+DSEx.V2.Benchmarks.assert_negative_controls!()
 ```

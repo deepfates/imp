@@ -1,7 +1,7 @@
 defmodule DatasetsContractTest do
   use ExUnit.Case
 
-  alias Dachshund.Datasets
+  alias DSEx.Datasets
 
   test "GSM8K JSONL loader rejects malformed JSON with path and line context" do
     path = tmp_path("bad-gsm8k.jsonl")
@@ -45,22 +45,22 @@ defmodule DatasetsContractTest do
     File.write!(hotpot_path, ~s({"question":"q","context":["c1"],"answer":"a"}\n))
     File.write!(math_path, ~s({"problem":"1+1","solution":"2","answer":"2"}\n))
 
-    assert [%Dachshund.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
-    assert Dachshund.Example.to_map(Dachshund.Example.inputs(gsm8k)) == %{question: "2+2?"}
+    assert [%DSEx.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
+    assert DSEx.Example.to_map(DSEx.Example.inputs(gsm8k)) == %{question: "2+2?"}
 
-    assert [%Dachshund.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
+    assert [%DSEx.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
 
-    assert Dachshund.Example.to_map(Dachshund.Example.inputs(hotpot)) == %{
+    assert DSEx.Example.to_map(DSEx.Example.inputs(hotpot)) == %{
              question: "q",
              context: ["c1"]
            }
 
-    assert [%Dachshund.Example{} = math] = Datasets.MATH.load(math_path)
-    assert Dachshund.Example.to_map(Dachshund.Example.inputs(math)) == %{problem: "1+1"}
+    assert [%DSEx.Example{} = math] = Datasets.MATH.load(math_path)
+    assert DSEx.Example.to_map(DSEx.Example.inputs(math)) == %{problem: "1+1"}
 
     colors = Datasets.Colors.load([%Datasets.Colors.Record{input: "red", label: "warm"}])
-    assert [%Dachshund.Example{} = color] = colors
-    assert Dachshund.Example.to_map(Dachshund.Example.inputs(color)) == %{input: "red"}
+    assert [%DSEx.Example{} = color] = colors
+    assert DSEx.Example.to_map(DSEx.Example.inputs(color)) == %{input: "red"}
   after
     cleanup_tmp("typed-gsm8k.jsonl")
     cleanup_tmp("typed-hotpot.jsonl")
@@ -68,7 +68,7 @@ defmodule DatasetsContractTest do
   end
 
   defp tmp_path(name),
-    do: Path.join(System.tmp_dir!(), "dachshund-#{:erlang.phash2(self())}-#{name}")
+    do: Path.join(System.tmp_dir!(), "dsex-#{:erlang.phash2(self())}-#{name}")
 
   defp cleanup_tmp(name), do: File.rm(tmp_path(name))
 end

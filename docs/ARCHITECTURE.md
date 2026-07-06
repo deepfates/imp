@@ -15,12 +15,12 @@ Example / inputs
 
 ## Public Facade
 
-`Dachshund` in `lib/dachshund.ex` is the canonical public entry point:
+`DSEx` in `lib/dsex.ex` is the canonical public entry point:
 
-- `Dachshund.configure/1`, `Dachshund.context/2`
-- `Dachshund.signature/2`, `Dachshund.example/1`, `Dachshund.prediction/1`
-- `Dachshund.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
-- `Dachshund.call/2`
+- `DSEx.configure/1`, `DSEx.context/2`
+- `DSEx.signature/2`, `DSEx.example/1`, `DSEx.prediction/1`
+- `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
+- `DSEx.call/2`
 - provider helpers: `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
 
 Use the facade for application code. Use deeper modules when you need direct
@@ -28,7 +28,7 @@ control in tests, docs, or advanced systems.
 
 ## Core Data
 
-### `Dachshund.Signature`
+### `DSEx.Signature`
 
 Defines input and output fields. String field names from external data remain
 strings unless the atom already exists, which prevents atom exhaustion.
@@ -42,7 +42,7 @@ Important functions:
 - `dump/1`, `load/1`
 - `json_schema/1`
 
-### `Dachshund.Example`
+### `DSEx.Example`
 
 Stores train/dev/test rows and optional input keys.
 
@@ -53,7 +53,7 @@ Important functions:
 - `inputs/1`, `labels/1`
 - `get/3`, `fetch!/2`, `put/3`, `delete/2`
 
-### `Dachshund.Prediction`
+### `DSEx.Prediction`
 
 Stores model outputs plus completions, score, and metadata.
 
@@ -66,21 +66,21 @@ Important functions:
 
 ## Program Modules
 
-All major program structs implement the `Dachshund.Module` behaviour.
+All major program structs implement the `DSEx.Module` behaviour.
 
 | Module | Purpose |
 | --- | --- |
-| `Dachshund.Predict.Predict` | Basic signature-to-output LM call. |
-| `Dachshund.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
-| `Dachshund.Predict.ReAct` | Simple one-shot tool call. |
-| `Dachshund.Predict.ReActV2` | Iterative provider-tool-call ReAct with reserved `submit`. |
-| `Dachshund.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
-| `Dachshund.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
-| `Dachshund.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
-| `Dachshund.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
-| `Dachshund.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
-| `Dachshund.Predict.Refine` | Repeated attempts with reward threshold. |
-| `Dachshund.Predict.Parallel` | Parallel map helpers. |
+| `DSEx.Predict.Predict` | Basic signature-to-output LM call. |
+| `DSEx.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
+| `DSEx.Predict.ReAct` | Simple one-shot tool call. |
+| `DSEx.Predict.ReActV2` | Iterative provider-tool-call ReAct with reserved `submit`. |
+| `DSEx.Predict.ProgramOfThought` | LM emits safe arithmetic/code expression, then answer is parsed. |
+| `DSEx.Predict.CodeAct` | CodeAct-style wrapper over the BEAM-safe sandbox. |
+| `DSEx.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
+| `DSEx.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
+| `DSEx.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
+| `DSEx.Predict.Refine` | Repeated attempts with reward threshold. |
+| `DSEx.Predict.Parallel` | Parallel map helpers. |
 
 ## Adapters
 
@@ -93,55 +93,55 @@ parse(signature, raw, opts) :: {:ok, prediction} | {:error, reason}
 
 Available adapters:
 
-- `Dachshund.Adapter.Chat`
-- `Dachshund.Adapter.JSON`
-- `Dachshund.Adapter.XML`
-- `Dachshund.Adapter.TwoStep`
-- `Dachshund.Adapter.BAML`
+- `DSEx.Adapter.Chat`
+- `DSEx.Adapter.JSON`
+- `DSEx.Adapter.XML`
+- `DSEx.Adapter.TwoStep`
+- `DSEx.Adapter.BAML`
 
 `JSON` and schema-constrained signatures are the best fit when the output shape
 matters more than prose flexibility.
 
 ## LMs And Providers
 
-`Dachshund.LM` is a small behaviour. Tests usually use:
+`DSEx.LM` is a small behaviour. Tests usually use:
 
 ```elixir
-%{module: Dachshund.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
+%{module: DSEx.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
 ```
 
 Production clients are OpenAI-compatible HTTP wrappers:
 
-- `Dachshund.Clients.OpenAI`
-- `Dachshund.Clients.LiteLLM`
-- `Dachshund.Clients.Local`
-- `Dachshund.Clients.Databricks`
+- `DSEx.Clients.OpenAI`
+- `DSEx.Clients.LiteLLM`
+- `DSEx.Clients.Local`
+- `DSEx.Clients.Databricks`
 
-The underlying transport is injectable via `Dachshund.HTTP`, which is how provider
+The underlying transport is injectable via `DSEx.HTTP`, which is how provider
 contracts are tested without live credentials.
 
 ## Retrieval And Datasets
 
 Retrievers:
 
-- `Dachshund.Retrieve.Memory`
-- `Dachshund.Retrievers.KNN`
-- `Dachshund.Retrievers.HTTP`
-- `Dachshund.Retrievers.Weaviate`
-- `Dachshund.Retrievers.Databricks`
+- `DSEx.Retrieve.Memory`
+- `DSEx.Retrievers.KNN`
+- `DSEx.Retrievers.HTTP`
+- `DSEx.Retrievers.Weaviate`
+- `DSEx.Retrievers.Databricks`
 
 Datasets:
 
-- `Dachshund.Datasets.from_records/3`
+- `DSEx.Datasets.from_records/3`
 - `jsonl/3`, `csv/3`
 - `GSM8K`, `HotPotQA`, `MATH`, `Colors`
-- `Dachshund.Datasets.Dataset` split container
+- `DSEx.Datasets.Dataset` split container
 
 ## Evaluation
 
-`Dachshund.Evaluate` runs a program over a dev set with a metric.
+`DSEx.Evaluate` runs a program over a dev set with a metric.
 
-Built-in metrics live in `Dachshund.Metrics`:
+Built-in metrics live in `DSEx.Metrics`:
 
 - exact match
 - semantic-ish F1 helpers
@@ -149,7 +149,7 @@ Built-in metrics live in `Dachshund.Metrics`:
 
 ## Optimization
 
-Metric-driven optimizers live under `Dachshund.Optimizer.*`:
+Metric-driven optimizers live under `DSEx.Optimizer.*`:
 
 - `LabeledFewShot`
 - `BootstrapFewShot`
@@ -162,23 +162,23 @@ Metric-driven optimizers live under `Dachshund.Optimizer.*`:
 - `BetterTogether`
 - `BootstrapFinetune`, `GRPO`
 
-V2 arbitrary artifact optimization lives under `Dachshund.Optimize.*`:
+V2 arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 
-- `Dachshund.Optimize.Anything`
-- `Dachshund.Optimize.GEPA`
+- `DSEx.Optimize.Anything`
+- `DSEx.Optimize.GEPA`
 
 ## Agents, Tools, MCP
 
-`Dachshund.Tool` wraps callable functionality. `Dachshund.Agent` composes tools, child
+`DSEx.Tool` wraps callable functionality. `DSEx.Agent` composes tools, child
 agents, memory/context, policies, and traces.
 
-`Dachshund.MCP` imports in-process or HTTP-discovered tool catalogs into `Dachshund.Tool`
+`DSEx.MCP` imports in-process or HTTP-discovered tool catalogs into `DSEx.Tool`
 values. The HTTP client supports deterministic transport-backed tests and
 remote `tools/list` / `tools/call` style flows.
 
 ## RLM
 
-`Dachshund.Predict.RLM` is intentionally not RAG. It gives the controller LM:
+`DSEx.Predict.RLM` is intentionally not RAG. It gives the controller LM:
 
 - signature metadata
 - variable metadata and previews
@@ -199,7 +199,7 @@ execution. That is a deliberate production translation.
 
 ## Persistence
 
-`Dachshund.Saving` saves portable program state. It does not persist secrets. Loading
+`DSEx.Saving` saves portable program state. It does not persist secrets. Loading
 an HTTP LM requires explicit credential rebinding rather than silently capturing
 ambient environment credentials.
 

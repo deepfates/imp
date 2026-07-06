@@ -1,8 +1,8 @@
 defmodule OptimizeGEPATest do
   use ExUnit.Case, async: true
 
-  alias Dachshund.Optimize.Anything
-  alias Dachshund.Optimize.GEPA
+  alias DSEx.Optimize.Anything
+  alias DSEx.Optimize.GEPA
 
   test "pareto frontier keeps candidates with complementary per-example strengths" do
     candidates = [
@@ -88,7 +88,7 @@ defmodule OptimizeGEPATest do
     artifact = Anything.new_artifact(:prompt, "Base")
 
     reflection_lm = %{
-      module: Dachshund.LM.Fake,
+      module: DSEx.LM.Fake,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:gepa_reflection_prompt, Enum.map_join(messages, "\n", & &1.content))

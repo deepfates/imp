@@ -15,8 +15,8 @@ Statuses:
 
 | ID | Priority | Requirement | Status | Evidence | Next action |
 | --- | --- | --- | --- | --- | --- |
-| API-001 | P0 | Dachshund's public surface is enforced in CI. | PROVEN | `.github/workflows/ci.yml` runs `mix production.check` and `mix v2.check`; `mix production.check` runs the full test suite, including `test/public_surface_test.exs`; `mix public_surface.check` is available as a focused gate. | Split live provider gates into an opt-in scheduled workflow before Hex release. |
-| CORE-001 | P0 | Signatures, examples, predictions, settings, and modules behave as stable public API. | PROVEN | `dachshund_test.exs`, `production_adapter_persistence_test.exs` | Add docs examples before Hex release. |
+| API-001 | P0 | DSEx's public surface is enforced in CI. | PROVEN | `.github/workflows/ci.yml` runs `mix production.check` and `mix v2.check`; `mix production.check` runs the full test suite, including `test/public_surface_test.exs`; `mix public_surface.check` is available as a focused gate. | Split live provider gates into an opt-in scheduled workflow before Hex release. |
+| CORE-001 | P0 | Signatures, examples, predictions, settings, and modules behave as stable public API. | PROVEN | `dsex_test.exs`, `production_adapter_persistence_test.exs` | Add docs examples before Hex release. |
 | ADAPT-001 | P0 | Chat/JSON/XML/two-step adapters parse required fields, type coercion, missing fields, and fenced JSON. | PROVEN | `production_adapter_persistence_test.exs`, `completion_surface_test.exs` | Add multimodal binary fixture tests. |
 | LM-001 | P0 | OpenAI-compatible provider supports non-streaming, structured JSON, retries, and provider tool-call normalization. | PROVEN | `live_provider_test.exs`, `provider_tool_call_test.exs`, `production_hardening_test.exs` | Add live streaming once provider/account supports it reliably. |
 | STREAM-001 | P1 | Provider SSE streaming is parsed into stable stream events and exposed through program streaming. | PROVEN | `provider_streaming_test.exs` | Add live streaming gate. |
@@ -28,14 +28,14 @@ Statuses:
 | DATA-001 | P1 | Dataset loaders cover JSONL/CSV/GSM8K/HotPotQA/MATH/Colors and reject malformed rows clearly. | PROVEN | `test/datasets_contract_test.exs` covers malformed JSONL, missing required input keys, ragged CSV rows, and typed GSM8K/HotPotQA/MATH/Colors ingestion. | Extend with fixture snapshots for newly added upstream datasets. |
 | SAVE-001 | P0 | Program save/load is JSON-safe, rejects unsupported types, preserves adapter/provider config, and does not persist secrets. | PROVEN | `production_adapter_persistence_test.exs`, `production_hardening_test.exs` | Add versioned state migration tests. |
 | ERR-001 | P0 | Provider errors, retryable failures, parse errors, and unsupported operations are explicit. | PROVEN | `production_hardening_test.exs`, adapter tests | Broaden error taxonomy to match every upstream LM error subtype. |
-| RLM-001 | P0 | `Dachshund.Predict.RLM` implements the RLM philosophy: sandbox variables, iterative controller loop, sub-LM calls, budgets, tools, persistent state, and structured submit. | PROVEN | `rlm_test.exs` covers sandbox eval, structured submit, sub-LM budget enforcement, large-context metadata/preview instead of full-context prompt stuffing, persistent assignment, tool actions, tool policy denial, and wall-clock budget enforcement; source-backed correction from incorrect RAG wrapper to constrained BEAM RLM loop. | Add multimodal RLM media fixtures when provider media contracts stabilize. |
+| RLM-001 | P0 | `DSEx.Predict.RLM` implements the RLM philosophy: sandbox variables, iterative controller loop, sub-LM calls, budgets, tools, persistent state, and structured submit. | PROVEN | `rlm_test.exs` covers sandbox eval, structured submit, sub-LM budget enforcement, large-context metadata/preview instead of full-context prompt stuffing, persistent assignment, tool actions, tool policy denial, and wall-clock budget enforcement; source-backed correction from incorrect RAG wrapper to constrained BEAM RLM loop. | Add multimodal RLM media fixtures when provider media contracts stabilize. |
 | SEC-001 | P0 | External input handling is safe from atom exhaustion, credential exfiltration through saved programs, and unsafe tool execution defaults. | PROVEN | `production_hardening_test.exs` covers saved HTTP LM loads without ambient credential rebinding and unknown external Example/Prediction/report/signature keys staying strings; `rg` finds no `String.to_atom/1` sites in `lib`; `react_v2_contract_test.exs` covers submit schema validation and ReAct-level tool policy denial; `agent_runtime_test.exs` covers explicit tool policy denial and trace redaction. | Continue adding provider-specific secret redaction fixtures as new clients are added. |
 | DOC-001 | P1 | Production docs describe proven gates and do not claim unresolved requirements as complete. | PROVEN | `PRODUCTION.md`, this audit | Keep final answers aligned with audit status. |
 
 ## Current Verdict
 
 The deterministic production gate is expected to pass when run locally. This
-does not mean Dachshund is a byte-for-byte clone of any Python runtime; it means every
+does not mean DSEx is a byte-for-byte clone of any Python runtime; it means every
 P0/P1 production requirement above is currently backed by executable evidence
 or checked audit artifacts. Live provider gates remain opt-in because they
 depend on local credentials and account state.

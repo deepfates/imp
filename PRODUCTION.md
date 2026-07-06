@@ -13,7 +13,7 @@ The deterministic gate runs:
 
 - formatting check
 - compilation with warnings as errors
-- Dachshund public surface check
+- DSEx public surface check
 - production audit structural check
 - full non-live test suite
 

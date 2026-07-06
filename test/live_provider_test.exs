@@ -2,23 +2,23 @@ defmodule LiveProviderTest do
   use ExUnit.Case
 
   @tag :live
-  test "OpenAI-compatible live provider completes a Dachshund prediction" do
+  test "OpenAI-compatible live provider completes a DSEx prediction" do
     api_key = System.get_env("OPENAI_API_KEY")
     model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
 
     assert is_binary(api_key) and byte_size(api_key) > 0
 
-    lm = Dachshund.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 20])
-    program = Dachshund.predict("question -> answer", lm: lm)
+    lm = DSEx.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 20])
+    program = DSEx.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
-             Dachshund.Predict.Predict.call(program, %{
+             DSEx.Predict.Predict.call(program, %{
                question: "Reply with exactly this single word and no punctuation: pong"
              })
 
     answer =
       prediction
-      |> Dachshund.Prediction.get(:answer, "")
+      |> DSEx.Prediction.get(:answer, "")
       |> to_string()
       |> String.downcase()
 
@@ -32,17 +32,17 @@ defmodule LiveProviderTest do
 
     assert is_binary(api_key) and byte_size(api_key) > 0
 
-    lm = Dachshund.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 80])
+    lm = DSEx.Clients.OpenAI.new(model, opts: [temperature: 0, max_completion_tokens: 80])
 
     program =
-      Dachshund.predict("question -> answer, score: int", lm: lm, adapter: Dachshund.Adapter.JSON)
+      DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
 
     assert {:ok, prediction} =
-             Dachshund.Predict.Predict.call(program, %{
+             DSEx.Predict.Predict.call(program, %{
                question: "Return only a JSON object. The answer must be pong and score must be 7."
              })
 
-    assert Dachshund.Prediction.get(prediction, :answer) == "pong"
-    assert Dachshund.Prediction.get(prediction, :score) == 7
+    assert DSEx.Prediction.get(prediction, :answer) == "pong"
+    assert DSEx.Prediction.get(prediction, :score) == 7
   end
 end

@@ -1,7 +1,7 @@
 defmodule SchemaConstraintsTest do
   use ExUnit.Case, async: true
 
-  alias Dachshund.Signature.Field
+  alias DSEx.Signature.Field
 
   test "validates enum numeric string array object optional and nested constraints" do
     fields = [
@@ -31,16 +31,16 @@ defmodule SchemaConstraintsTest do
     ]
 
     valid = %{status: "ok", score: 0.5, code: "AB", tags: ["a", "b"], meta: %{count: 2}}
-    assert :ok = Dachshund.Schema.validate_fields(fields, valid)
+    assert :ok = DSEx.Schema.validate_fields(fields, valid)
 
     invalid = %{status: "bad", score: 2, code: "abcde", tags: ["c"], meta: %{count: 0}}
-    assert {:error, errors} = Dachshund.Schema.validate_fields(fields, invalid)
+    assert {:error, errors} = DSEx.Schema.validate_fields(fields, invalid)
     assert Enum.map(errors, & &1.rule) == [:enum, :max, :max_length, :pattern, :enum, :min]
   end
 
   test "exports stable JSON schema from signature outputs" do
     signature =
-      Dachshund.Signature.new(%{
+      DSEx.Signature.new(%{
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},
@@ -55,7 +55,7 @@ defmodule SchemaConstraintsTest do
         ]
       })
 
-    assert Dachshund.Signature.json_schema(signature) == %{
+    assert DSEx.Signature.json_schema(signature) == %{
              "type" => "object",
              "required" => ["answer", "confidence", "items"],
              "properties" => %{
@@ -72,7 +72,7 @@ defmodule SchemaConstraintsTest do
 
   test "JSON adapter returns retry feedback for constraint failures" do
     signature =
-      Dachshund.Signature.new(%{
+      DSEx.Signature.new(%{
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["Paris"]}},
@@ -80,8 +80,8 @@ defmodule SchemaConstraintsTest do
         ]
       })
 
-    assert {:error, %Dachshund.AdapterParseError{} = error} =
-             Dachshund.Adapter.JSON.parse(signature, ~s({"answer":"Lyon","confidence":0.2}), [])
+    assert {:error, %DSEx.AdapterParseError{} = error} =
+             DSEx.Adapter.JSON.parse(signature, ~s({"answer":"Lyon","confidence":0.2}), [])
 
     assert error.message =~ "Validation failed"
     assert error.message =~ "answer"
@@ -98,9 +98,9 @@ defmodule SchemaConstraintsTest do
       )
     ]
 
-    assert :ok = Dachshund.Schema.validate_fields(fields, %{flag: false, meta: %{enabled: false}})
+    assert :ok = DSEx.Schema.validate_fields(fields, %{flag: false, meta: %{enabled: false}})
 
-    assert {:error, errors} = Dachshund.Schema.validate_fields(fields, %{meta: %{enabled: false}})
+    assert {:error, errors} = DSEx.Schema.validate_fields(fields, %{meta: %{enabled: false}})
     assert [%{field: :flag, rule: :required}] = errors
   end
 end

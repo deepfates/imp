@@ -1,61 +1,61 @@
-# Dachshund 03: Agents, Tools, MCP, And RLM
+# DSEx 03: Agents, Tools, MCP, And RLM
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dachshund, path: repo}])
+Mix.install([{:dsex, path: repo}])
 ```
 
 ## Tools
 
 ```elixir
 lookup =
-  Dachshund.Tool.new(:lookup, "lookup a fact", fn
+  DSEx.Tool.new(:lookup, "lookup a fact", fn
     %{query: "capital-france"} -> "Paris"
     %{"query" => "capital-france"} -> "Paris"
   end)
 
-Dachshund.Tool.call(lookup, %{query: "capital-france"})
+DSEx.Tool.call(lookup, %{query: "capital-france"})
 ```
 
 ## Agent Runtime
 
 ```elixir
 agent =
-  Dachshund.Agent.new(
+  DSEx.Agent.new(
     :qa_agent,
     fn agent, %{query: query}, runtime ->
-      Dachshund.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
+      DSEx.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
     end,
     tools: [lookup],
     tool_policy: [:lookup]
   )
 
-{:ok, output, runtime} = Dachshund.Agent.run(agent, %{query: "capital-france"})
+{:ok, output, runtime} = DSEx.Agent.run(agent, %{query: "capital-france"})
 {output, runtime.traces}
 ```
 
 Incremental trace events:
 
 ```elixir
-Dachshund.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
+DSEx.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
 ```
 
 Tool policy denial:
 
 ```elixir
 locked =
-  Dachshund.Agent.new(:locked, fn agent, _input, runtime ->
-    Dachshund.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
+  DSEx.Agent.new(:locked, fn agent, _input, runtime ->
+    DSEx.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
   end, tools: [lookup], tool_policy: [])
 
-Dachshund.Agent.run(locked, %{})
+DSEx.Agent.run(locked, %{})
 ```
 
 ## MCP Catalog Import
 
 ```elixir
 catalog =
-  Dachshund.MCP.Catalog.new([
+  DSEx.MCP.Catalog.new([
     %{
       name: :remote_lookup,
       description: "lookup through an imported catalog",
@@ -64,15 +64,15 @@ catalog =
     }
   ])
 
-[tool] = Dachshund.MCP.import_tools(catalog)
-Dachshund.Tool.call(tool, %{key: "capital"})
+[tool] = DSEx.MCP.import_tools(catalog)
+DSEx.Tool.call(tool, %{key: "capital"})
 ```
 
 ## ReActV2
 
 ```elixir
 lm = %{
-  module: Dachshund.LM.Fake,
+  module: DSEx.LM.Fake,
   opts: [
     handler: fn _messages, _opts ->
       %{
@@ -85,9 +85,9 @@ lm = %{
   ]
 }
 
-react = Dachshund.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
-{:ok, pred} = Dachshund.call(react, %{question: "Capital of France?"})
-Dachshund.Prediction.to_map(pred)
+react = DSEx.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
+{:ok, pred} = DSEx.call(react, %{question: "Capital of France?"})
+DSEx.Prediction.to_map(pred)
 ```
 
 ## RLM
@@ -103,7 +103,7 @@ actions = [
 ]
 
 controller_lm = %{
-  module: Dachshund.LM.Fake,
+  module: DSEx.LM.Fake,
   opts: [
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_actions)
@@ -116,7 +116,7 @@ controller_lm = %{
 Process.put(:rlm_actions, actions)
 
 rlm =
-  Dachshund.rlm("context, question -> answer",
+  DSEx.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 5,
@@ -125,24 +125,24 @@ rlm =
   )
 
 {:ok, pred} =
-  Dachshund.call(rlm, %{
+  DSEx.call(rlm, %{
     context: String.duplicate("large context ", 200),
     question: "What is the capital?"
   })
 
 Process.delete(:rlm_actions)
 
-{Dachshund.Prediction.to_map(pred), pred.metadata.rlm_trace}
+{DSEx.Prediction.to_map(pred), pred.metadata.rlm_trace}
 ```
 
 ## RLM Budget Failure
 
 ```elixir
 loop_lm = %{
-  module: Dachshund.LM.Fake,
+  module: DSEx.LM.Fake,
   opts: [handler: fn _messages, _opts -> %{action: "eval", code: "1 + 1"} end]
 }
 
-rlm = Dachshund.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
-Dachshund.call(rlm, %{question: "loop?"})
+rlm = DSEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
+DSEx.call(rlm, %{question: "loop?"})
 ```
