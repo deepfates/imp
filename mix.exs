@@ -22,7 +22,7 @@ defmodule DSEx.MixProject do
           "docs/V2.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "docs/COVERAGE_MATRIX.md",
-          "docs/COMPLETION_PLAN.md",
+          "docs/RELEASE_CRITERIA.md",
           "livebooks/01_programming_not_prompting.livemd",
           "livebooks/02_evaluate_and_optimize.livemd",
           "livebooks/03_agents_tools_mcp_rlm.livemd",

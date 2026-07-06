@@ -24,8 +24,8 @@ alongside the code and tests, not instead of them.
    supervision/runtime boundaries.
 10. [Coverage Matrix](COVERAGE_MATRIX.md): the release truth table mapping
     upstream concepts to DSEx surfaces, tests, docs, and V3 decisions.
-11. [Completion Plan](COMPLETION_PLAN.md): release-blocking V3 criteria and
-    the external references used to define production readiness.
+11. [Release Criteria](RELEASE_CRITERIA.md): production gate criteria and the
+    external references used to define release readiness.
 
 ## Livebooks
 

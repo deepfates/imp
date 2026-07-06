@@ -236,4 +236,5 @@ The production and V2 gates are not docs-only promises:
 
 - `mix production.check`
 - `mix v2.check`
+- `mix integration.check`
 - `LIVE_PROVIDER=1 mix live.check`

@@ -110,10 +110,11 @@ The codebase should be judged by gates, not vibes:
 ```sh
 mix production.check
 mix v2.check
+mix integration.check
 LIVE_PROVIDER=1 mix live.check
 ```
 
-The first two are deterministic. The live gate is opt-in because provider
-credentials and account state are operational concerns. See
+The first three are deterministic or local-only. The live gate is opt-in because
+provider credentials and account state are operational concerns. See
 [Production Operations](PRODUCTION_OPERATIONS.md) for the current gate
 contract.

@@ -1,7 +1,6 @@
-# DSEx V3 Completion Plan
+# DSEx Release Criteria
 
-This document records the release-blocking plan for turning the current DSEx V2
-work into a production-ready DSEx V3.
+This document records the release criteria for a production-ready DSEx build.
 
 The central standard is simple: DSEx should feel like an Elixir-native system
 from a world where declarative self-improving programs were designed on the
@@ -11,7 +10,7 @@ production caveats.
 
 ## References
 
-The completion work is grounded in:
+The release standard is grounded in:
 
 - DSPy's public surface: signatures, modules, adapters, evaluation,
   optimizers, primitives, tools, MCP, cache, deployment, streaming, async,
@@ -29,9 +28,9 @@ The completion work is grounded in:
   optimized with per-task/per-metric feedback and Pareto-aware search:
   <https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/>
 
-## Release Blockers
+## Release Scope
 
-The release-blocking work is tracked under ticket `de-vwsu`.
+The V3 release scope is tracked under ticket `de-vwsu`.
 
 | Ticket | Work | Release Meaning |
 | --- | --- | --- |
@@ -46,18 +45,13 @@ The release-blocking work is tracked under ticket `de-vwsu`.
 
 ## Gate Model
 
-The current gates remain necessary:
+Required gates:
 
 ```sh
 mix production.check
 mix v2.check
-LIVE_PROVIDER=1 mix live.check
-```
-
-V3 completion should add a local integration gate:
-
-```sh
 mix integration.check
+LIVE_PROVIDER=1 mix live.check
 ```
 
 Stateful or paid external workflows have explicit opt-in gates instead of being

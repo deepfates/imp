@@ -37,7 +37,7 @@ Status values:
 | Async/concurrency | DSEx-native | `DSEx.Clients.HTTPLM.generate_async/3`, `DSEx.Predict.Parallel` | `test/production_hardening_test.exs` | Live orchestration test covers `Parallel` | `docs/API_GUIDE.md`, `docs/ARCHITECTURE.md` | Keep Task-based interface; runtime hardening owned by `de-qvwf` |
 | Cache | Implemented | `DSEx.Cache`, HTTPLM cache path | `test/production_hardening_test.exs`, `test/public_surface_test.exs` | Live cache behaviour is not required for V3 | `docs/API_GUIDE.md`, `docs/ARCHITECTURE.md` | Add observability events under `de-x02m` |
 | Multimodal primitives | Implemented | `DSEx.Adapters.Types` | `test/multimodal_adapter_test.exs` | Live multimodal provider proof is not required for V3 unless docs claim it | `docs/API_GUIDE.md` | Keep as encoding/decoding primitives, not a broad multimodal benchmark claim |
-| Option validation and runtime dependencies | Implemented | option validation helper, network-facing constructors, runtime deps in `mix.exs` | `test/production_hardening_test.exs` | Integration gate still owned by `de-i8cc` / `de-wrnz` | `docs/ARCHITECTURE.md`, `docs/COMPLETION_PLAN.md` | Keep dependency set small and justified |
+| Option validation and runtime dependencies | Implemented | option validation helper, network-facing constructors, runtime deps in `mix.exs` | `test/production_hardening_test.exs` | Covered by deterministic gate and exercised by integration tests | `docs/ARCHITECTURE.md`, `docs/RELEASE_CRITERIA.md` | Keep dependency set small and justified |
 
 ## Program Modules
 
@@ -90,8 +90,8 @@ Status values:
 | Production gate | Implemented | `mix production.check` | `test/gate_contract_test.exs` | Runs locally | `docs/PRODUCTION_OPERATIONS.md` | Keep |
 | V2 gate | Implemented | `mix v2.check` | `test/gate_contract_test.exs`, `test/v2_benchmark_test.exs` | Runs locally | `docs/PRODUCTION_OPERATIONS.md`, `docs/V2.md` | Keep |
 | Live inference gate | Implemented | `mix live.check` | `test/gate_contract_test.exs` | `LIVE_PROVIDER=1 mix live.check` | `README.md`, `docs/PRODUCTION_OPERATIONS.md` | Keep as paid live inference gate |
-| Local integration gate | Implemented | `mix integration.check`, `test/integration` | `test/gate_contract_test.exs`, `test/integration/gate_contract_test.exs` | Local service E2E covers provider HTTP, retriever HTTP, MCP HTTP, MCP stdio, and save/load/rebind | `docs/PRODUCTION_OPERATIONS.md`, `docs/COMPLETION_PLAN.md` | Keep and expand only when the production surface grows |
-| Optional live stateful gates | Implemented | `mix live.training.check`, `mix live.retriever.check`, `mix live.mcp.check` | Gate-contract tests under `test/live_*` | Real external coverage required only for production claims: `de-wrnz` | `docs/PRODUCTION_OPERATIONS.md`, `docs/COMPLETION_PLAN.md` | Keep opt-in and explicit |
+| Local integration gate | Implemented | `mix integration.check`, `test/integration` | `test/gate_contract_test.exs`, `test/integration/gate_contract_test.exs` | Local service E2E covers provider HTTP, retriever HTTP, MCP HTTP, MCP stdio, and save/load/rebind | `docs/PRODUCTION_OPERATIONS.md`, `docs/RELEASE_CRITERIA.md` | Keep and expand only when the production surface grows |
+| Optional live stateful gates | Implemented | `mix live.training.check`, `mix live.retriever.check`, `mix live.mcp.check` | Gate-contract tests under `test/live_*` | Real external coverage required only for production claims | `docs/PRODUCTION_OPERATIONS.md`, `docs/RELEASE_CRITERIA.md` | Keep opt-in and explicit |
 | Documentation and Livebooks | Release blocker | `docs/*`, `livebooks/*`, ExDoc extras | `mix docs` via `production.check` | Runnable-mode proof required under `de-t7s8` | `docs/README.md` | Final product pass under `de-t7s8` |
 
 ## Intentional Deviations From Python DSPy
