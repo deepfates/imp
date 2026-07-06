@@ -5,6 +5,8 @@ defmodule DSEx.LM do
 
   @callback generate(messages :: list(map()), opts :: keyword()) ::
               {:ok, map() | binary() | DSEx.Prediction.t()} | {:error, term()}
+  @callback stream(lm :: term(), messages :: list(map()), opts :: keyword()) :: Enumerable.t()
+  @optional_callbacks stream: 3
 
   def generate(lm, messages, opts \\ [])
   def generate(module, messages, opts) when is_atom(module), do: module.generate(messages, opts)

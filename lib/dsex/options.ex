@@ -5,7 +5,7 @@ defmodule DSEx.Options do
     NimbleOptions.validate!(opts, schema)
   rescue
     error in NimbleOptions.ValidationError ->
-      raise ArgumentError, "#{context}: #{Exception.message(error)}"
+      reraise ArgumentError, [message: "#{context}: #{Exception.message(error)}"], __STACKTRACE__
   end
 
   def validate!(opts, _schema, context) do

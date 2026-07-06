@@ -160,6 +160,60 @@ Runtime dependencies are deliberately justified and production-oriented:
 - `ExDoc` is dev/test only and is part of the production gate because generated
   docs are treated as release artifacts.
 
+### Dependency Posture
+
+DSEx is intentionally not autarkic. It brings in ecosystem dependencies when
+the dependency owns a fast-moving or operationally specialized boundary better
+than DSEx can:
+
+- provider APIs, model catalogs, transport, retries, streaming, and structured
+  output negotiation belong to `ReqLLM`;
+- JSON, option validation, and telemetry use established libraries;
+- test-only dependencies may be added for stronger contracts, property tests,
+  static analysis, and local-service harnesses.
+
+DSEx keeps code in core when the behavior is part of declarative
+self-improving programming itself: signatures, adapters, prediction structs,
+module composition, evaluation, optimization, traces, saving, sandbox policy,
+and the Elixir-facing public API. A dependency should either remove operational
+risk, align DSEx with normal OTP practice, or provide test evidence that would
+be hard to maintain in bespoke code.
+
+Direct `DSEx.Clients.HTTPLM` remains appropriate for:
+
+- focused OpenAI-compatible contract tests;
+- local model servers with intentionally tiny wire requirements;
+- deployments that need a narrow injectable transport surface;
+- regression tests around credential binding, timeouts, and saved-state
+  security.
+
+Production application code should prefer `DSEx.req_llm/2` unless there is a
+specific reason to own the wire contract directly.
+
+### OTP Runtime Boundary
+
+DSEx is an OTP application, but most program values are ordinary immutable
+structs. The supervised runtime boundary currently owns:
+
+- `DSEx.Settings`, an Agent for global defaults plus process-local overrides;
+- `DSEx.Cache`, an ETS-backed cache process and table;
+- `DSEx.TaskSupervisor`, the named task supervisor used by provider async,
+  agent event streaming, and parallel prediction fan-out.
+
+In production releases, start the `:dsex` application under the host
+supervision tree. Mix does this automatically for normal applications, but
+embedded or script-style users should call `Application.ensure_all_started(:dsex)`
+before relying on global settings or cache behavior. DSEx keeps lazy-start
+fallbacks for library ergonomics, but the supervised path is the production
+posture.
+
+Long-running or fan-out work should have an OTP owner. DSEx routes its built-in
+async helpers through `DSEx.Tasks`, which uses `DSEx.TaskSupervisor` when the
+application is running and falls back to plain `Task` only for script-style
+library use before supervised startup. That keeps cancellation, crash
+reporting, telemetry context, and shutdown behavior visible to the host system
+in production.
+
 Runtime boundaries emit redacted telemetry events for LM calls, streaming
 chunks, adapter parse retries/failures, cache hits/misses, tool calls,
 retrievers, MCP requests, training jobs, and optimizer trials.

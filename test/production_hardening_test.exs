@@ -43,9 +43,13 @@ defmodule ProductionHardeningTest do
     DSEx.Cache.clear()
     Process.delete(:flaky_count)
 
-    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
-      send(self(), {:telemetry, event, measurements, metadata})
-    end)
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :start],
+        [:dsex, :lm, :stop],
+        [:dsex, :cache, :miss],
+        [:dsex, :cache, :hit]
+      ])
 
     lm =
       DSEx.Clients.OpenAI.new("gpt-test",
@@ -65,13 +69,12 @@ defmodule ProductionHardeningTest do
 
     assert {:ok, "Answer: recovered"} = Task.await(task)
 
-    assert_received {:telemetry, [:dsex, :lm, :start], _, %{lm: %{model: "gpt-test"}}}
-    assert_received {:telemetry, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
-    assert_received {:telemetry, [:dsex, :cache, :miss], %{count: 1}, %{key: _}}
-    assert_received {:telemetry, [:dsex, :cache, :hit], %{count: 1}, %{key: _}}
+    assert_received {^ref, [:dsex, :lm, :start], _, %{lm: %{model: "gpt-test"}}}
+    assert_received {^ref, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
+    assert_received {^ref, [:dsex, :cache, :miss], %{count: 1}, %{key: _}}
+    assert_received {^ref, [:dsex, :cache, :hit], %{count: 1}, %{key: _}}
     assert is_integer(duration)
   after
-    Process.delete(:dsex_telemetry_handler)
     Process.delete(:flaky_count)
   end
 
@@ -408,19 +411,15 @@ defmodule ProductionHardeningTest do
   end
 
   test "tool telemetry redacts secret-shaped metadata" do
-    Process.put(:dsex_telemetry_handler, fn event, _measurements, metadata ->
-      send(self(), {:telemetry, event, metadata})
-    end)
+    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :tool, :start]])
 
     tool = DSEx.Tool.new(:secret_tool, "echo", fn input -> input end)
 
     assert %{"api_key" => "sk-live-secret"} =
              DSEx.Tool.call(tool, %{"api_key" => "sk-live-secret"})
 
-    assert_received {:telemetry, [:dsex, :tool, :start], metadata}
+    assert_received {^ref, [:dsex, :tool, :start], _, metadata}
     assert metadata.arguments["api_key"] == "[REDACTED]"
-  after
-    Process.delete(:dsex_telemetry_handler)
   end
 
   test "redaction covers common compound secret keys" do

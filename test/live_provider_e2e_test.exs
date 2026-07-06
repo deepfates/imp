@@ -53,7 +53,7 @@ defmodule LiveProviderE2ETest do
 
     text = chunks |> Enum.join() |> String.downcase()
 
-    assert length(chunks) > 0
+    assert chunks != []
     assert String.contains?(text, "pong")
   end
 

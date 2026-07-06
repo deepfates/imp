@@ -30,6 +30,56 @@ LIVE_RETRIEVER=1 mix live.retriever.check
 LIVE_MCP=1 mix live.mcp.check
 ```
 
+## Runtime Posture
+
+Production applications should run DSEx as an OTP application:
+
+```elixir
+Application.ensure_all_started(:dsex)
+```
+
+Normal Mix releases and applications start dependencies automatically. The
+explicit call matters for embedded scripts, Livebook setup cells, and unusual
+host runtimes. DSEx keeps lazy-start fallbacks for ergonomics, but the release
+posture is supervised startup.
+
+Supervised DSEx runtime state:
+
+- `DSEx.Settings` owns global defaults. Prefer `DSEx.context/2` for scoped
+  overrides in concurrent code and tests.
+- `DSEx.Cache` owns the ETS table used by the built-in response cache.
+- `DSEx.TaskSupervisor` owns DSEx async helpers, including provider async,
+  agent event streaming, and parallel prediction fan-out through `DSEx.Tasks`.
+- host applications still own higher-level orchestration lifetimes and
+  cancellation policy.
+
+Calling settings/cache APIs before `:dsex` is started attempts to start the
+application, so lazy library use and supervised app use share the same ownership
+path. Global settings are intentionally mutable and node-local. Use
+`DSEx.context/2` for request, test, or task scoped overrides; those overrides
+live in the calling process and are restored after the function returns.
+
+Cache entries live in an ETS table owned by `DSEx.Cache`. A cache owner
+crash/restart recreates the table and loses cached values by design.
+`fetch_or_store/2` is best-effort under concurrent misses and does not provide
+single-flight locking.
+
+Provider access should normally use `DSEx.req_llm/2`, which delegates provider
+catalogs, Req/Finch transport, streaming, structured-output negotiation, and
+provider-specific option translation to `ReqLLM`. Use direct `DSEx.openai/2`
+or `DSEx.Clients.HTTPLM` when you need a narrow OpenAI-compatible contract for
+local servers, transport injection, or credential-binding regression tests.
+
+Dependency policy:
+
+- runtime dependencies must own a real operational boundary or a stable
+  primitive DSEx should not reimplement;
+- test/dev dependencies are encouraged when they strengthen contracts,
+  property coverage, local integration harnesses, or static review without
+  bloating production runtime;
+- docs and gate claims must name which paths are live-proven, deterministic
+  only, or reserved.
+
 ## What The Gates Prove
 
 `mix production.check` runs:

@@ -1,5 +1,17 @@
 defmodule DSEx.Cache do
-  @moduledoc "Small ETS-backed cache for DSEx's configurable cache concept."
+  @moduledoc """
+  Small ETS-backed cache for DSEx's configurable cache concept.
+
+  In normal production use the DSEx OTP application supervises the cache owner process.
+  The ETS table is public for fast concurrent reads and writes, but its lifecycle
+  belongs to that owner process. If the owner crashes, the table is recreated by
+  the restarted process and cached values are intentionally lost. Calling cache
+  functions before the application is started attempts to start the application.
+
+  `fetch_or_store/2` is a best-effort cache helper, not a single-flight lock:
+  concurrent misses for the same key may evaluate the supplied function more than
+  once, and the last writer wins.
+  """
 
   use GenServer
 
@@ -62,13 +74,20 @@ defmodule DSEx.Cache do
   defp ensure_table do
     case :ets.whereis(@table) do
       :undefined ->
-        case start_link([]) do
-          {:ok, _pid} -> :ok
-          {:error, {:already_started, _pid}} -> :ok
+        case Application.ensure_all_started(:dsex) do
+          {:ok, _apps} -> :ok
+          {:error, _reason} -> start_unlinked()
         end
 
       _tid ->
         :ok
+    end
+  end
+
+  defp start_unlinked do
+    case GenServer.start(__MODULE__, [], name: __MODULE__) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
     end
   end
 end

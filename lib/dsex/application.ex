@@ -9,7 +9,8 @@ defmodule DSEx.Application do
   def start(_type, _args) do
     children = [
       DSEx.Settings,
-      DSEx.Cache
+      DSEx.Cache,
+      {Task.Supervisor, name: DSEx.TaskSupervisor}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

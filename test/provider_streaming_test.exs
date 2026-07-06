@@ -18,9 +18,12 @@ defmodule ProviderStreamingTest do
   end
 
   test "HTTP LM parses OpenAI-style SSE streaming chunks" do
-    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
-      send(self(), {:telemetry, event, measurements, metadata})
-    end)
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :stream, :start],
+        [:dsex, :lm, :stream, :chunk],
+        [:dsex, :lm, :stream, :stop]
+      ])
 
     lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test", transport: SSETransport)
     messages = [%{role: :user, content: "say pong"}]
@@ -29,14 +32,11 @@ defmodule ProviderStreamingTest do
 
     assert Enum.map(events, & &1.chunk) |> Enum.reject(&is_nil/1) == ["po", "ng"]
     assert Enum.any?(events, & &1.done)
-    assert_received {:telemetry, [:dsex, :lm, :stream, :start], _, %{lm: %{model: "gpt-test"}}}
+    assert_received {^ref, [:dsex, :lm, :stream, :start], _, %{lm: %{model: "gpt-test"}}}
 
-    assert_received {:telemetry, [:dsex, :lm, :stream, :chunk], %{count: 1},
-                     %{chunk: %{chunk: "po"}}}
+    assert_received {^ref, [:dsex, :lm, :stream, :chunk], %{count: 1}, %{chunk: %{chunk: "po"}}}
 
-    assert_received {:telemetry, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
-  after
-    Process.delete(:dsex_telemetry_handler)
+    assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
   end
 
   test "DSEx.Streaming can use provider stream for Predict programs" do

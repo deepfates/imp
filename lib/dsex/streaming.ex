@@ -56,6 +56,14 @@ defmodule DSEx.Streaming do
     end
   end
 
+  defp stream_lm(module, messages, opts) when is_atom(module) do
+    if function_exported?(module, :stream, 3) do
+      module.stream(module, messages, opts)
+    else
+      DSEx.Clients.HTTPLM.stream(module, messages, opts)
+    end
+  end
+
   def collect(program, inputs, opts \\ []) do
     program
     |> stream(inputs, opts)

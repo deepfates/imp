@@ -8,11 +8,6 @@ defmodule DSEx.Telemetry do
       apply(:telemetry, :execute, [event, measurements, metadata])
     end
 
-    case Process.get(:dsex_telemetry_handler) do
-      fun when is_function(fun, 3) -> fun.(event, measurements, metadata)
-      _other -> :ok
-    end
-
     :ok
   end
 

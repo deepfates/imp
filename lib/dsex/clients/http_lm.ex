@@ -70,7 +70,7 @@ defmodule DSEx.Clients.HTTPLM do
   end
 
   def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
-    Task.async(fn -> generate(lm, messages, opts) end)
+    DSEx.Tasks.async(fn -> generate(lm, messages, opts) end)
   end
 
   def cache_key(%__MODULE__{} = lm, messages, opts) do
@@ -153,6 +153,7 @@ defmodule DSEx.Clients.HTTPLM do
     end
   end
 
+  @impl true
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
     {body, headers} = request(lm, messages, Keyword.put(opts, :stream, true))
     request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])

@@ -67,9 +67,10 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
-    Task.async(fn -> generate(lm, messages, opts) end)
+    DSEx.Tasks.async(fn -> generate(lm, messages, opts) end)
   end
 
+  @impl true
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
     opts = lm.opts |> Keyword.merge(opts) |> normalize_opts()
 

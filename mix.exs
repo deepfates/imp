@@ -30,6 +30,7 @@ defmodule DSEx.MixProject do
         ]
       ],
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       aliases: aliases()
     ]
@@ -53,7 +54,8 @@ defmodule DSEx.MixProject do
         "live.check": :test,
         "live.training.check": :test,
         "live.retriever.check": :test,
-        "live.mcp.check": :test
+        "live.mcp.check": :test,
+        "quality.check": :test
       ]
     ]
   end
@@ -65,9 +67,17 @@ defmodule DSEx.MixProject do
       {:nimble_options, "~> 1.1"},
       {:req_llm, "~> 1.17"},
       {:telemetry, "~> 1.3"},
+      {:bandit, "~> 1.0", only: :test},
+      {:plug, "~> 1.15", only: :test},
+      {:mox, "~> 1.2", only: :test},
+      {:stream_data, "~> 1.1", only: :test},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp package do
     [
@@ -106,6 +116,9 @@ defmodule DSEx.MixProject do
       ],
       "live.mcp.check": [
         "test --only live_mcp test/live_mcp"
+      ],
+      "quality.check": [
+        "credo --only warning"
       ]
     ]
   end

@@ -55,9 +55,11 @@ defmodule ExternalRetrieverTest do
   end
 
   test "Databricks retriever builds vector-search request and maps rows" do
-    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
-      send(self(), {:telemetry, event, measurements, metadata})
-    end)
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :retriever, :start],
+        [:dsex, :retriever, :stop]
+      ])
 
     retriever =
       DSEx.Retrievers.Databricks.new(
@@ -77,14 +79,11 @@ defmodule ExternalRetrieverTest do
     assert {"authorization", "Bearer dbc-token"} in headers
     assert body["query_text"] == "capital France"
     assert body["num_results"] == 1
-    assert_received {:telemetry, [:dsex, :retriever, :start], _, %{query: "capital France"}}
+    assert_received {^ref, [:dsex, :retriever, :start], _, %{query: "capital France"}}
 
-    assert_received {:telemetry, [:dsex, :retriever, :stop], %{duration: duration},
-                     %{result: :ok}}
+    assert_received {^ref, [:dsex, :retriever, :stop], %{duration: duration}, %{result: :ok}}
 
     assert is_integer(duration)
-  after
-    Process.delete(:dsex_telemetry_handler)
   end
 
   test "Databricks retriever does not bind ambient token to explicit endpoints" do
