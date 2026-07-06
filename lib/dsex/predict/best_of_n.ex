@@ -29,11 +29,7 @@ defmodule DSEx.Predict.BestOfN do
   end
 
   defp score(metric, prediction) do
-    case metric.(%DSEx.Example{}, prediction) do
-      true -> 1.0
-      false -> 0.0
-      value when is_number(value) -> value
-    end
+    metric.(%DSEx.Example{}, prediction) |> DSEx.Metrics.score()
   end
 
   defp attach_feedback(prediction, nil, _predictions), do: prediction

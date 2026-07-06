@@ -19,7 +19,7 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
         inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
 
         case program.__struct__.call(program, inputs) do
-          {:ok, prediction} -> truthy?(optimizer.metric.(example, prediction))
+          {:ok, prediction} -> optimizer.metric.(example, prediction) |> DSEx.Metrics.pass?()
           {:error, _reason} -> false
         end
       end)
@@ -35,5 +35,4 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
     do: %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
 
   defp put_demos(program, _demos), do: program
-  defp truthy?(value), do: value in [true, 1, 1.0] or (is_number(value) and value > 0)
 end

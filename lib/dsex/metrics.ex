@@ -1,6 +1,57 @@
 defmodule DSEx.Metrics do
   @moduledoc "Common evaluation metrics."
 
+  defmodule Result do
+    @moduledoc "Normalized metric result with numeric score and optional feedback."
+    defstruct score: 0.0, passed?: false, feedback: nil, metadata: %{}
+  end
+
+  def normalize_result(%Result{} = result), do: result
+
+  def normalize_result(%DSEx.Prediction{} = prediction) do
+    score = DSEx.Prediction.get(prediction, :score, prediction.score || 0.0)
+
+    %Result{
+      score: numeric_score(score),
+      passed?: passed?(score),
+      feedback: DSEx.Prediction.get(prediction, :feedback),
+      metadata: prediction.metadata
+    }
+  end
+
+  def normalize_result(%{} = result) do
+    score = Map.get(result, :score, Map.get(result, "score", 0.0))
+
+    %Result{
+      score: numeric_score(score),
+      passed?: Map.get(result, :passed?, Map.get(result, "passed", passed?(score))),
+      feedback: Map.get(result, :feedback, Map.get(result, "feedback")),
+      metadata: Map.get(result, :metadata, Map.get(result, "metadata", %{}))
+    }
+  end
+
+  def normalize_result(value) when is_boolean(value),
+    do: %Result{score: numeric_score(value), passed?: value}
+
+  def normalize_result(value) when is_number(value),
+    do: %Result{score: value * 1.0, passed?: value > 0}
+
+  def normalize_result(value),
+    do: %Result{score: 0.0, passed?: false, feedback: {:invalid_metric_result, value}}
+
+  def score(value), do: normalize_result(value).score
+  def pass?(value), do: normalize_result(value).passed?
+  def feedback(value), do: normalize_result(value).feedback
+
+  defp numeric_score(true), do: 1.0
+  defp numeric_score(false), do: 0.0
+  defp numeric_score(value) when is_number(value), do: value * 1.0
+  defp numeric_score(_value), do: 0.0
+
+  defp passed?(value) when is_boolean(value), do: value
+  defp passed?(value) when is_number(value), do: value > 0
+  defp passed?(_value), do: false
+
   def normalize_text(value) do
     value
     |> to_string()

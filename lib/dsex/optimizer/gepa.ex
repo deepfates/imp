@@ -81,7 +81,7 @@ defmodule DSEx.Optimizer.GEPA do
           {:ok, prediction} =
             DSEx.call(candidate, DSEx.Example.inputs(example) |> DSEx.Example.to_map())
 
-          if metric.(example, prediction), do: 1.0, else: 0.0
+          metric.(example, prediction) |> DSEx.Metrics.score()
         end)
 
       %{

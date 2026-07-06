@@ -104,6 +104,11 @@ report = DSEx.Evaluate.run(evaluator, program)
 report.score
 ```
 
+Metrics may return booleans, numbers, maps with `:score` / `:feedback`, or a
+`DSEx.Prediction` carrying score and feedback. DSEx normalizes those returns
+into row scores, pass/fail state, feedback, and metric metadata. Arity-3 metrics
+receive the prediction trace as their third argument.
+
 ## Optimize A Program
 
 ```elixir

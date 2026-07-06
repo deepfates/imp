@@ -158,6 +158,12 @@ Built-in metrics live in `DSEx.Metrics`:
 
 - exact match
 - semantic-ish F1 helpers
+
+Metric returns are normalized by `DSEx.Metrics.normalize_result/1`. Metrics may
+return booleans, numbers, maps with score/feedback, or predictions. Evaluation
+rows preserve normalized score, pass/fail state, feedback, metric metadata, and
+program errors. Arity-3 metrics receive the prediction trace as their third
+argument.
 - custom functions of arity 2 or 3
 
 ## Optimization

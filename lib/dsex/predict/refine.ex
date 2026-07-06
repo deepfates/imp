@@ -21,7 +21,7 @@ defmodule DSEx.Predict.Refine do
         {:ok, prediction} = ok ->
           history = history ++ [%{attempt: attempt, prediction: prediction}]
 
-          if refine.metric.(%DSEx.Example{}, prediction),
+          if refine.metric.(%DSEx.Example{}, prediction) |> DSEx.Metrics.pass?(),
             do: {:halt, ok},
             else: {:cont, {:ok, prediction, history}}
 
