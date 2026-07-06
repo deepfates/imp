@@ -39,6 +39,40 @@ defmodule ProductionHardeningTest do
     assert Process.get(:flaky_count) == 2
   end
 
+  test "HTTP LM supports content-addressed cache async calls and telemetry hooks" do
+    DSEx.Cache.clear()
+    Process.delete(:flaky_count)
+
+    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
+      send(self(), {:telemetry, event, measurements, metadata})
+    end)
+
+    lm =
+      DSEx.Clients.OpenAI.new("gpt-test",
+        api_key: "sk-test",
+        transport: FlakyTransport,
+        opts: [cache: true, num_retries: 1, retry_backoff_ms: 0]
+      )
+
+    messages = [%{role: :user, content: "cache me"}]
+
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
+    assert Process.get(:flaky_count) == 2
+
+    task =
+      DSEx.Clients.HTTPLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
+
+    assert {:ok, "Answer: recovered"} = Task.await(task)
+
+    assert_received {:telemetry, [:dsex, :lm, :start], _, %{lm: %{model: "gpt-test"}}}
+    assert_received {:telemetry, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
+    assert is_integer(duration)
+  after
+    Process.delete(:dsex_telemetry_handler)
+    Process.delete(:flaky_count)
+  end
+
   @tag capture_log: true
   test "default httpc transport verifies TLS peer certificates" do
     assert Keyword.fetch!(DSEx.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer

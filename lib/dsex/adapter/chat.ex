@@ -28,7 +28,13 @@ defmodule DSEx.Adapter.Chat do
         Map.take(parsed, outputs)
       end
 
-    build_prediction(signature, fields)
+    case build_prediction(signature, fields) do
+      {:ok, prediction} ->
+        {:ok, prediction}
+
+      {:error, _reason} = error ->
+        parse_json_fallback(signature, text, error)
+    end
   end
 
   def parse(_signature, raw, _opts), do: {:error, {:unsupported_lm_output, raw}}
@@ -130,7 +136,10 @@ defmodule DSEx.Adapter.Chat do
   defp render_inputs(signature, inputs) do
     signature.inputs
     |> Enum.map(fn field ->
-      "#{field.prefix} #{format_value(fetch_field(inputs, field.name))}"
+      """
+      [[ ## #{field.name} ## ]]
+      #{format_value(fetch_field(inputs, field.name))}
+      """
     end)
     |> Enum.join("\n")
   end
@@ -162,16 +171,42 @@ defmodule DSEx.Adapter.Chat do
       |> DSEx.Signature.output_names()
       |> Map.new(fn name -> {name |> to_string() |> String.downcase(), name} end)
 
-    Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
-    |> Enum.reduce(%{}, fn [_line, key, value], acc ->
-      key =
-        key |> String.trim() |> String.downcase() |> String.replace(" ", "_")
+    delimiter_fields =
+      Regex.scan(
+        ~r/\[\[\s*##\s*([A-Za-z_][A-Za-z0-9_]*)\s*##\s*\]\]\s*(.*?)(?=\n\[\[\s*##|\z)/s,
+        text
+      )
+      |> Enum.reduce(%{}, fn [_line, key, value], acc ->
+        key = key |> String.trim() |> String.downcase()
 
-      case Map.fetch(allowed, key) do
-        {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
-        :error -> acc
-      end
-    end)
+        case Map.fetch(allowed, key) do
+          {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
+          :error -> acc
+        end
+      end)
+
+    labelled_fields =
+      Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
+      |> Enum.reduce(%{}, fn [_line, key, value], acc ->
+        key =
+          key |> String.trim() |> String.downcase() |> String.replace(" ", "_")
+
+        case Map.fetch(allowed, key) do
+          {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
+          :error -> acc
+        end
+      end)
+
+    Map.merge(labelled_fields, delimiter_fields)
+  end
+
+  defp parse_json_fallback(signature, text, original_error) do
+    with {:ok, decoded} <- Jason.decode(String.trim(text)),
+         true <- is_map(decoded) do
+      build_prediction(signature, decoded)
+    else
+      _other -> original_error
+    end
   end
 
   defp existing_atom(name) do

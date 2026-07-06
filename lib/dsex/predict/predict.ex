@@ -34,8 +34,10 @@ defmodule DSEx.Predict.Predict do
          adapter <- resolve_adapter(predict),
          inputs <- Map.new(inputs),
          messages <- adapter.format(predict.signature, inputs, demos: predict.demos),
-         {:ok, raw} <- DSEx.LM.generate(lm, messages, predict.config),
-         {:ok, prediction} <- adapter.parse(predict.signature, raw, []) do
+         lm_opts <- adapter_lm_opts(adapter, predict.signature, predict.config),
+         {:ok, raw} <- DSEx.LM.generate(lm, messages, lm_opts),
+         {:ok, prediction} <-
+           parse_with_retry(adapter, predict.signature, raw, messages, lm, lm_opts) do
       {:ok, add_trace(prediction, messages, raw)}
     end
   end
@@ -67,6 +69,36 @@ defmodule DSEx.Predict.Predict do
 
   defp require_lm(nil), do: {:error, :lm_not_configured}
   defp require_lm(lm), do: {:ok, lm}
+
+  defp adapter_lm_opts(adapter, signature, config) do
+    if function_exported?(adapter, :lm_opts, 2) do
+      Keyword.merge(config, adapter.lm_opts(signature, config))
+    else
+      config
+    end
+  end
+
+  defp parse_with_retry(adapter, signature, raw, messages, lm, opts) do
+    case adapter.parse(signature, raw, []) do
+      {:ok, prediction} ->
+        {:ok, prediction}
+
+      {:error, %DSEx.AdapterParseError{} = error} ->
+        if Keyword.get(opts, :json_retries, 0) > 0 do
+          retry_messages = messages ++ [%{role: :user, content: error.message}]
+          retry_opts = Keyword.update!(opts, :json_retries, &(&1 - 1))
+
+          with {:ok, raw} <- DSEx.LM.generate(lm, retry_messages, retry_opts) do
+            adapter.parse(signature, raw, [])
+          end
+        else
+          {:error, error}
+        end
+
+      error ->
+        error
+    end
+  end
 
   defp resolve_lm(%__MODULE__{dynamic_lm?: true}), do: DSEx.Settings.get().lm
   defp resolve_lm(%__MODULE__{lm: lm}), do: lm

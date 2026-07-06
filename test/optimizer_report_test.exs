@@ -68,4 +68,28 @@ defmodule OptimizerReportTest do
     assert report.best_score == 1.0
     assert Enum.any?(report.candidates, &(&1.instruction == "Always answer Paris."))
   end
+
+  test "instruction proposer accepts LM-generated scored candidates" do
+    lm = %{
+      module: DSEx.LM.Fake,
+      opts: [
+        handler: fn messages, _opts ->
+          send(self(), {:proposer_messages, messages})
+          ~s(["Always answer Paris.", "Mention evidence."])
+        end
+      ]
+    }
+
+    {train, _dev} = sets()
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    assert ["Always answer Paris.", "Mention evidence."] =
+             DSEx.Optimizer.InstructionSearch.candidate_instructions(program, train,
+               lm: lm,
+               scores: [%{score: 1.0}]
+             )
+
+    assert_received {:proposer_messages, messages}
+    assert Enum.map_join(messages, "\n", & &1.content) =~ "scored_examples"
+  end
 end

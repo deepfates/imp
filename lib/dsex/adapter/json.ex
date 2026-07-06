@@ -14,6 +14,24 @@ defmodule DSEx.Adapter.JSON do
     [%{role: :system, content: "Return a JSON object with keys: #{schema}"} | messages]
   end
 
+  def lm_opts(signature, opts) do
+    cond do
+      Keyword.get(opts, :native_json_schema) ->
+        [
+          response_format: %{
+            type: "json_schema",
+            json_schema: %{name: "dsex_output", schema: DSEx.Signature.json_schema(signature)}
+          }
+        ]
+
+      Keyword.get(opts, :response_format) ->
+        []
+
+      true ->
+        [response_format: %{type: "json_object"}]
+    end
+  end
+
   @impl true
   def parse(signature, raw, opts) when is_map(raw),
     do: DSEx.Adapter.Chat.parse(signature, raw, opts)

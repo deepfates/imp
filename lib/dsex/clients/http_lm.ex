@@ -50,18 +50,59 @@ defmodule DSEx.Clients.HTTPLM do
   end
 
   defp generate_live(%__MODULE__{} = lm, messages, opts) do
+    opts = Keyword.merge(lm.opts, opts)
+    cache_key = cache_key(lm, messages, opts)
+
+    if Keyword.get(opts, :cache, false) do
+      DSEx.Cache.fetch_or_store(cache_key, fn -> generate_uncached(lm, messages, opts) end)
+    else
+      generate_uncached(lm, messages, opts)
+    end
+  end
+
+  def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
+    Task.async(fn -> generate(lm, messages, opts) end)
+  end
+
+  def cache_key(%__MODULE__{} = lm, messages, opts) do
+    opts =
+      opts
+      |> Keyword.drop([:api_key, :headers, :transport, :http_opts, :request_opts])
+      |> Enum.sort()
+
+    {:lm_response,
+     :crypto.hash(
+       :sha256,
+       :erlang.term_to_binary({lm.provider, lm.model, lm.base_url, lm.path, messages, opts})
+     )
+     |> Base.encode16(case: :lower)}
+  end
+
+  defp generate_uncached(%__MODULE__{} = lm, messages, opts) do
+    started = System.monotonic_time()
+
+    DSEx.Telemetry.execute([:dsex, :lm, :start], %{system_time: System.system_time()}, %{
+      lm: redact_lm(lm)
+    })
+
     {body, headers} = request(lm, messages, opts)
 
     request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
 
-    with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           post_with_retries(lm, headers, body, request_opts, retry_config(opts)),
-         {:ok, decoded} <- Jason.decode(response) do
-      {:ok, extract_content(decoded)}
-    else
-      {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
-      {:error, reason} -> {:error, reason}
-    end
+    result =
+      with {:ok, %{status: status, body: response}} when status in 200..299 <-
+             post_with_retries(lm, headers, body, request_opts, retry_config(opts)),
+           {:ok, decoded} <- Jason.decode(response) do
+        {:ok, extract_content(decoded)}
+      else
+        {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
+        {:error, reason} -> {:error, reason}
+      end
+
+    duration = System.monotonic_time() - started
+    metadata = %{lm: redact_lm(lm), result: elem(result, 0)}
+    DSEx.Telemetry.execute([:dsex, :lm, :stop], %{duration: duration}, metadata)
+    result
   end
 
   defp test_mode_action(%__MODULE__{} = lm, messages, opts) do
@@ -108,7 +149,21 @@ defmodule DSEx.Clients.HTTPLM do
     payload =
       lm.opts
       |> Keyword.merge(opts)
-      |> Keyword.drop([:api_key, :base_url, :transport, :headers, :provider, :path])
+      |> Keyword.drop([
+        :api_key,
+        :base_url,
+        :transport,
+        :headers,
+        :provider,
+        :path,
+        :cache,
+        :json_retries,
+        :mock_response,
+        :test_mode,
+        :native_json_schema,
+        :http_opts,
+        :request_opts
+      ])
       |> Map.new()
       |> Map.merge(%{model: lm.model, messages: Enum.map(messages, &encode_message/1)})
 
@@ -288,6 +343,9 @@ defmodule DSEx.Clients.HTTPLM do
 
   defp auth_headers(%__MODULE__{api_key: nil}), do: []
   defp auth_headers(%__MODULE__{api_key: key}), do: [{"authorization", "Bearer #{key}"}]
+
+  defp redact_lm(%__MODULE__{} = lm),
+    do: %{provider: lm.provider, model: lm.model, base_url: lm.base_url, path: lm.path}
 
   defp default_base_url(:openai),
     do: System.get_env("OPENAI_BASE_URL") || "https://api.openai.com/v1"

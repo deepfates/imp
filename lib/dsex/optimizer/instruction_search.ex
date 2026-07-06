@@ -60,26 +60,7 @@ defmodule DSEx.Optimizer.InstructionSearch do
   def current_instruction(_program), do: nil
 
   def candidate_instructions(program, trainset, opts \\ []) do
-    base = current_instruction(program) || "Complete the task."
-    labels = infer_labels(trainset)
-
-    [
-      base,
-      base <> "\nBe concise and exact.",
-      base <> "\nUse the demonstrations as ground truth patterns.",
-      base <> "\nReturn only fields requested by the signature.",
-      "Solve the task by matching inputs to outputs. Expected labels include: #{labels}."
-    ] ++ Keyword.get(opts, :extra_instructions, [])
-  end
-
-  defp infer_labels(trainset) do
-    trainset
-    |> Enum.flat_map(fn example ->
-      example |> DSEx.Example.labels() |> DSEx.Example.to_map() |> Map.keys()
-    end)
-    |> Enum.uniq()
-    |> Enum.map(&to_string/1)
-    |> Enum.join(", ")
+    DSEx.Optimizer.InstructionProposer.propose(program, trainset, opts)
   end
 
   defp maybe_put_demos(program, []), do: program

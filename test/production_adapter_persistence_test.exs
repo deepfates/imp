@@ -47,6 +47,41 @@ defmodule ProductionAdapterPersistenceTest do
              DSEx.Adapter.JSON.parse(signature, ~s({"answer": "Paris"}), [])
   end
 
+  test "chat adapter parses delimited output and falls back to JSON" do
+    signature = DSEx.signature("question -> answer: string, score: number")
+
+    assert {:ok, delimited} =
+             DSEx.Adapter.Chat.parse(
+               signature,
+               """
+               [[ ## answer ## ]]
+               Paris
+               [[ ## score ## ]]
+               1.0
+               """,
+               []
+             )
+
+    assert DSEx.Prediction.get(delimited, :answer) == "Paris"
+    assert DSEx.Prediction.get(delimited, :score) == 1.0
+
+    assert {:ok, json} =
+             DSEx.Adapter.Chat.parse(signature, ~s({"answer":"Paris","score":1.0}), [])
+
+    assert DSEx.Prediction.get(json, :score) == 1.0
+  end
+
+  test "JSON adapter supplies provider response format options and retry feedback" do
+    signature = DSEx.signature("question -> answer: string")
+
+    assert [response_format: %{type: "json_object"}] = DSEx.Adapter.JSON.lm_opts(signature, [])
+
+    assert [response_format: %{type: "json_schema", json_schema: %{schema: schema}}] =
+             DSEx.Adapter.JSON.lm_opts(signature, native_json_schema: true)
+
+    assert schema["required"] == ["answer"]
+  end
+
   test "save/load preserves adapter and HTTP provider configuration" do
     lm =
       DSEx.Clients.OpenAI.new("gpt-test",
