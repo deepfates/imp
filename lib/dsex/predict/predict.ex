@@ -62,6 +62,7 @@ defmodule DSEx.Predict.Predict do
   end
 
   defp dump_lm(%DSEx.Clients.HTTPLM{} = lm), do: DSEx.Clients.HTTPLM.dump(lm)
+  defp dump_lm(%DSEx.Clients.ReqLLM{} = lm), do: DSEx.Clients.ReqLLM.dump(lm)
   defp dump_lm(_lm), do: nil
 
   defp encode_keyword(values) when is_list(values),

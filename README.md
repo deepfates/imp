@@ -26,6 +26,11 @@ datasets, streaming, persistence, sandboxed program-of-thought, evaluation,
 agents, MCP-style tool import, schema constraints, optimize-anything flows,
 GEPA-inspired Pareto mechanics, and metric-driven optimizers.
 
+For production LMs, prefer `DSEx.req_llm/2` when possible. It delegates provider
+resolution, Req/Finch transport, streaming, and provider option translation to
+the Elixir `req_llm` ecosystem while DSEx keeps signatures, adapters,
+optimizers, evaluation, traces, and persistence.
+
 See [Prior Art](docs/PRIOR_ART.md) for lineage and independence from DSPy,
 Ax, and GEPA/optimize_anything.
 
@@ -48,4 +53,5 @@ See [Production Operations](docs/PRODUCTION_OPERATIONS.md) for the current gate
 contract. The integration gate validates local service boundaries; the live gate
 validates prediction, structured JSON, chain-of-thought, streaming, ReActV2 tool
 calls, orchestration wrappers, and program-of-thought sandbox execution against a
-real OpenAI-compatible provider using local `.env` credentials.
+real provider using local `.env` credentials, including the ReqLLM-backed DSEx
+client path.

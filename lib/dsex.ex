@@ -78,6 +78,9 @@ defmodule DSEx do
   @doc "Creates an OpenAI-compatible LM client."
   def openai(model, opts \\ []), do: DSEx.Clients.OpenAI.new(model, opts)
 
+  @doc "Creates a ReqLLM-backed multi-provider LM client."
+  def req_llm(model_spec, opts \\ []), do: DSEx.Clients.ReqLLM.new(model_spec, opts)
+
   @doc "Creates a LiteLLM-compatible LM client."
   def litellm(model, opts \\ []), do: DSEx.Clients.LiteLLM.new(model, opts)
 

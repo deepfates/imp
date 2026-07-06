@@ -24,7 +24,18 @@ are called, so a later `DSEx.configure/1` or scoped `DSEx.context/2` affects
 existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
 runtime dependency.
 
-For a live OpenAI-compatible provider:
+For production provider access, prefer the ReqLLM-backed client:
+
+```elixir
+lm = DSEx.req_llm("openai:gpt-4o-mini", temperature: 0)
+DSEx.configure(lm: lm)
+```
+
+This delegates provider/model lookup, Req/Finch transport, streaming, and
+provider option translation to the Elixir `req_llm` ecosystem. DSEx still owns
+the signature, adapter, optimizer, evaluation, and trace vocabulary.
+
+For a direct OpenAI-compatible provider surface:
 
 ```elixir
 lm = DSEx.openai("gpt-4o-mini", opts: [temperature: 0])

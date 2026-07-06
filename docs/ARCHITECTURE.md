@@ -21,7 +21,7 @@ Example / inputs
 - `DSEx.signature/2`, `DSEx.example/1`, `DSEx.prediction/1`
 - `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
 - `DSEx.call/2`
-- provider helpers: `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
+- provider helpers: `req_llm/2`, `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
 
 Use the facade for application code. Use deeper modules when you need direct
 control in tests, docs, or advanced systems.
@@ -112,7 +112,19 @@ matters more than prose flexibility.
 %{module: DSEx.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
 ```
 
-Production clients are OpenAI-compatible HTTP wrappers:
+The preferred production client is:
+
+- `DSEx.Clients.ReqLLM`
+
+`DSEx.Clients.ReqLLM` delegates provider/model lookup, Req/Finch transport,
+streaming, tool/schema option translation, and response normalization to the
+Elixir `req_llm` ecosystem. DSEx keeps the declarative programming layer:
+signatures, adapters, modules, optimizers, evaluation, traces, persistence, and
+redacted telemetry.
+
+DSEx also keeps direct OpenAI-compatible HTTP wrappers for local servers,
+focused contract tests, and deployments that need a very small injectable wire
+surface:
 
 - `DSEx.Clients.OpenAI`
 - `DSEx.Clients.LiteLLM`
@@ -126,17 +138,23 @@ Provider clients use real transport by default. Deterministic provider-contract
 tests must opt into `DSEX_TEST_MODE=mock`, `DSEX_TEST_MODE=fallback`, or a
 constructor-level `test_mode:`.
 
-Provider streaming is transport-dependent. Transports that implement
-`DSEx.HTTP.stream/4` can deliver incremental chunks. Transports that only
-implement `post/4`, including the default `:httpc` transport, expose a buffered
-body that DSEx can parse as stream events but cannot make incrementally arrive.
+Provider streaming is client-dependent. The ReqLLM-backed client streams through
+ReqLLM's Finch/SSE machinery and maps `ReqLLM.StreamChunk` values into the DSEx
+streaming vocabulary. Direct `DSEx.HTTP` transports that implement `stream/4`
+can also deliver incremental chunks. Transports that only implement `post/4`,
+including the default `:httpc` transport, expose a buffered body that DSEx can
+parse as stream events but cannot make incrementally arrive.
 
-Runtime dependencies are deliberately small and production-oriented:
+Runtime dependencies are deliberately justified and production-oriented:
 
 - `Jason` is the JSON boundary for providers, adapters, datasets, reports, and
   saved state.
 - `NimbleOptions` validates network-facing and provider-facing constructor
   options so typos fail before a live request or training job is submitted.
+- `ReqLLM` is the provider ecosystem boundary. It brings Req/Finch transport,
+  streaming, provider registries, model metadata, structured-output support, and
+  provider-specific option translation so DSEx does not need to own those
+  fast-moving concerns itself.
 - `:telemetry` is the stable observability boundary. DSEx keeps a tiny wrapper
   in `DSEx.Telemetry` so tests can also attach process-local handlers.
 - `ExDoc` is dev/test only and is part of the production gate because generated

@@ -94,6 +94,18 @@ defmodule DSEx.Saving do
 
   defp decode_lm(nil), do: nil
 
+  defp decode_lm(%{provider: :req_llm, model: model} = state) do
+    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, :opts, [])))
+  end
+
+  defp decode_lm(%{"provider" => "req_llm", "model" => model} = state) do
+    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, "opts", [])))
+  end
+
+  defp decode_lm(%{"provider" => :req_llm, "model" => model} = state) do
+    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, "opts", [])))
+  end
+
   defp decode_lm(%{"provider" => provider, "model" => model} = state) do
     provider = decode_provider(provider)
 
@@ -123,6 +135,8 @@ defmodule DSEx.Saving do
       "num_retries" -> :num_retries
       "retry_backoff_ms" -> :retry_backoff_ms
       "max_completion_tokens" -> :max_completion_tokens
+      "receive_timeout" -> :receive_timeout
+      "provider_options" -> :provider_options
       other -> other
     end
   end

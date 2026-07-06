@@ -45,11 +45,15 @@ defmodule DSEx.Streaming do
     lm = if program.dynamic_lm?, do: settings.lm, else: program.lm || settings.lm
     messages = adapter.format(program.signature, inputs, demos: program.demos)
 
-    lm
-    |> DSEx.Clients.HTTPLM.stream(
-      messages,
-      Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream]))
-    )
+    stream_lm(lm, messages, Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream])))
+  end
+
+  defp stream_lm(%module{} = lm, messages, opts) do
+    if function_exported?(module, :stream, 3) do
+      module.stream(lm, messages, opts)
+    else
+      DSEx.Clients.HTTPLM.stream(lm, messages, opts)
+    end
   end
 
   def collect(program, inputs, opts \\ []) do

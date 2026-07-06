@@ -63,6 +63,7 @@ defmodule DSEx.MixProject do
     [
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
+      {:req_llm, "~> 1.17"},
       {:telemetry, "~> 1.3"},
       {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]

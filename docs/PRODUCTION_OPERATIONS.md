@@ -58,10 +58,11 @@ The current integration gate proves:
 - HTTP MCP initialize, discovery, and tool-call flow through a local JSON-RPC server
 - stdio MCP discovery and tool-call flow through a trusted local executable
 
-The live provider tests prove a real OpenAI-compatible provider can execute:
+The live provider tests prove a real provider can execute:
 
 - basic `Predict`
 - JSON `Predict` with schema validation and retry feedback
+- basic `Predict` through the ReqLLM-backed DSEx client
 - `ChainOfThought` with required reasoning
 - provider streaming through `DSEx.Streaming`
 - `ReActV2` function-tool calls plus reserved `submit`
