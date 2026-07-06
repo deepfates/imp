@@ -1,12 +1,12 @@
 defmodule DSEx.Optimizer.BootstrapFinetune do
   @moduledoc "Creates provider training jobs from bootstrapped demonstrations."
 
-  defstruct [:metric, trainer: DSEx.Clients.LocalTrainer, max_demos: 32]
+  defstruct [:metric, :trainer, max_demos: 32]
 
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
-      trainer: Keyword.get(opts, :trainer, DSEx.Clients.LocalTrainer),
+      trainer: Keyword.get(opts, :trainer),
       max_demos: Keyword.get(opts, :max_demos, 32)
     }
   end
@@ -21,9 +21,15 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
     demos = get_demos(compiled)
     lm = get_lm(compiled)
 
-    case DSEx.Clients.Trainer.finetune(optimizer.trainer, lm || %{}, demos, []) do
-      {:ok, job} -> %{program: compiled, job: job}
-      {:error, reason} -> %{program: compiled, error: reason}
+    case optimizer.trainer do
+      nil ->
+        %{program: compiled, error: :trainer_required}
+
+      trainer ->
+        case DSEx.Clients.Trainer.finetune(trainer, lm || %{}, demos, []) do
+          {:ok, job} -> %{program: compiled, job: job}
+          {:error, reason} -> %{program: compiled, error: reason}
+        end
     end
   end
 

@@ -239,8 +239,9 @@ policies for anything with side effects.
 ## Provider Training
 
 `BootstrapFinetune` and `GRPO` build provider training jobs when a real trainer
-backend is supplied. The default local trainer returns `{:error,
-:not_implemented}`.
+backend is supplied. They do not train models in-process, and they do not
+pretend to have a local training backend. Calling them without a trainer returns
+`:trainer_required`.
 
 ```elixir
 trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")

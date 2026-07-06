@@ -367,18 +367,3 @@ defmodule DSEx.Clients.DatabricksTrainer do
     end
   end
 end
-
-defmodule DSEx.Clients.LocalTrainer do
-  @moduledoc """
-  Honest local trainer stub.
-
-  DSEx does not train models in-process. Use a provider trainer such as
-  `DSEx.Clients.OpenAITrainer` or `DSEx.Clients.DatabricksTrainer` when a real
-  backend exists.
-  """
-
-  @behaviour DSEx.Clients.Trainer
-
-  @impl true
-  def finetune(_lm, _examples, _opts), do: {:error, :not_implemented}
-end

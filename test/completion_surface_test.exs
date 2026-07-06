@@ -164,7 +164,7 @@ defmodule CompletionSurfaceTest do
            end)
   end
 
-  test "finetuning and GRPO are honest stubs without a real trainer backend" do
+  test "finetuning and GRPO require an explicit trainer backend" do
     lm = DSEx.Clients.Local.new("tiny", transport: Transport)
     program = DSEx.predict("question -> answer", lm: lm)
     metric = DSEx.Metrics.exact_match(:answer)
@@ -177,13 +177,13 @@ defmodule CompletionSurfaceTest do
       DSEx.Optimizer.BootstrapFinetune.new(metric)
       |> DSEx.Optimizer.BootstrapFinetune.compile(program, trainset)
 
-    assert %{program: %DSEx.Predict.Predict{}, error: :not_implemented} = result
+    assert %{program: %DSEx.Predict.Predict{}, error: :trainer_required} = result
 
     reward = fn example ->
       if DSEx.Example.get(example, :answer) == "4", do: 1.0, else: 0.0
     end
 
-    assert {:error, :not_implemented} =
+    assert {:error, :trainer_required} =
              DSEx.Optimizer.GRPO.new(reward)
              |> DSEx.Optimizer.GRPO.compile(program, trainset)
   end

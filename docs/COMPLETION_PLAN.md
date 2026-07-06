@@ -38,7 +38,7 @@ The release-blocking work is tracked under ticket `de-vwsu`.
 | `de-5dt5` | Canonical upstream coverage matrix | A public truth table maps each DSPy/Ax/optimize_anything concept to DSEx status, tests, docs, and intentional deviations. |
 | `de-qvwf` | Dependency and runtime hardening | Runtime choices are idiomatic Elixir and justified: HTTP, option validation, telemetry, and test infrastructure are no longer ad hoc. |
 | `de-i8cc` | Split release gates by proof level | Deterministic, local integration, live inference, and costly/stateful live workflows have separate gates. |
-| `de-ld5r` | Remove or complete production stubs | Production-facing APIs do not hide `:not_implemented` paths or call stubs success. |
+| `de-ld5r` | Remove unsupported production fallbacks | Production-facing APIs require real backends instead of treating unsupported behavior as success. |
 | `de-wrnz` | External integration E2E coverage | MCP, retrievers, save/load/rebind/deploy, and optional provider workflows are exercised end to end. |
 | `de-2iou` | Metric/evaluation contract parity | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal. |
 | `de-x02m` | Production observability and trace model | Telemetry events make DSEx inspectable without leaking secrets. |
@@ -70,7 +70,7 @@ LIVE_MCP=1 mix live.mcp.check
 ```
 
 If DSEx does not support one of those workflows as production surface, the API
-and docs must say so directly rather than presenting an honest stub as a
+and docs must say so directly rather than presenting unsupported behavior as a
 complete feature.
 
 ## Completion Criteria
@@ -86,4 +86,3 @@ DSEx V3 is complete when:
 7. Any public production claim about training, retrievers, or MCP is backed by
    an integration/live gate, or the claim is removed.
 8. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
-

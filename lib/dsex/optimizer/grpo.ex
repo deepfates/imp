@@ -1,13 +1,15 @@
 defmodule DSEx.Optimizer.GRPO do
   @moduledoc "Provider-neutral GRPO job builder for reinforcement-style training."
 
-  defstruct [:reward_fn, trainer: DSEx.Clients.LocalTrainer]
+  defstruct [:reward_fn, :trainer]
 
   def new(reward_fn, opts \\ []),
     do: %__MODULE__{
       reward_fn: reward_fn,
-      trainer: Keyword.get(opts, :trainer, DSEx.Clients.LocalTrainer)
+      trainer: Keyword.get(opts, :trainer)
     }
+
+  def compile(%__MODULE__{trainer: nil}, _program, _trainset), do: {:error, :trainer_required}
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     enriched =
