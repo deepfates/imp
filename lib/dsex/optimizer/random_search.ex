@@ -44,8 +44,14 @@ defmodule DSEx.Optimizer.RandomSearch do
   end
 
   defp evaluate_candidate(evaluator, candidate, metadata) do
-    result = DSEx.Evaluate.run(evaluator, candidate)
-    {:ok, result.score, candidate, metadata}
+    DSEx.Telemetry.span(
+      [:dsex, :optimizer, :trial],
+      Map.merge(%{optimizer: :random_search}, metadata),
+      fn ->
+        result = DSEx.Evaluate.run(evaluator, candidate)
+        {:ok, result.score, candidate, metadata}
+      end
+    )
   rescue
     error -> {:error, error, metadata}
   end

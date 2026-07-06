@@ -94,12 +94,18 @@ defmodule DSEx.MCP do
 
     defp post_json(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
-      DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+
+      DSEx.Telemetry.span([:dsex, :mcp, :http], %{url: client.url, method: method}, fn ->
+        DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+      end)
     end
 
     defp post_notification(client, method, params) do
       body = %{"jsonrpc" => "2.0", "method" => method, "params" => params}
-      DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+
+      DSEx.Telemetry.span([:dsex, :mcp, :http], %{url: client.url, method: method}, fn ->
+        DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
+      end)
     end
 
     defp headers(client),
@@ -213,14 +219,20 @@ defmodule DSEx.MCP do
 
     defp request(port, method, params, timeout) do
       id = next_id()
-      Port.command(port, encode(method, params, id))
-      read_response(port, id, "", timeout)
+
+      DSEx.Telemetry.span([:dsex, :mcp, :stdio], %{method: method}, fn ->
+        Port.command(port, encode(method, params, id))
+        read_response(port, id, "", timeout)
+      end)
     end
 
     defp notify(port, method, params) do
       body = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params}) <> "\n"
-      Port.command(port, body)
-      :ok
+
+      DSEx.Telemetry.span([:dsex, :mcp, :stdio], %{method: method}, fn ->
+        Port.command(port, body)
+        :ok
+      end)
     end
 
     defp read_response(port, id, buffer, timeout) do
@@ -325,20 +337,26 @@ defmodule DSEx.MCP do
     defp rpc(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
 
-      with {:ok, %{status: status, body: response}} when status in 200..299 <-
-             DSEx.HTTP.post(
-               client.transport,
-               client.url,
-               headers(client),
-               Jason.encode!(body),
-               []
-             ),
-           {:ok, decoded} <- decode_body(response) do
-        {:ok, decoded}
-      else
-        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-        {:error, reason} -> {:error, reason}
-      end
+      DSEx.Telemetry.span(
+        [:dsex, :mcp, :streamable_http],
+        %{url: client.url, method: method},
+        fn ->
+          with {:ok, %{status: status, body: response}} when status in 200..299 <-
+                 DSEx.HTTP.post(
+                   client.transport,
+                   client.url,
+                   headers(client),
+                   Jason.encode!(body),
+                   []
+                 ),
+               {:ok, decoded} <- decode_body(response) do
+            {:ok, decoded}
+          else
+            {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+            {:error, reason} -> {:error, reason}
+          end
+        end
+      )
     end
 
     defp decode_body(body) do

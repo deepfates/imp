@@ -12,7 +12,9 @@ defmodule DSEx.Tool do
     }
   end
 
-  def call(%__MODULE__{run: run}, arg), do: run.(arg)
+  def call(%__MODULE__{run: run} = tool, arg) do
+    DSEx.Telemetry.span([:dsex, :tool], %{tool: tool.name, arguments: arg}, fn -> run.(arg) end)
+  end
 
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)

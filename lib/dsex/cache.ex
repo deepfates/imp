@@ -43,8 +43,13 @@ defmodule DSEx.Cache do
 
   def fetch_or_store(key, fun) when is_function(fun, 0) do
     case get(key, :__missing__) do
-      :__missing__ -> put(key, fun.())
-      value -> value
+      :__missing__ ->
+        DSEx.Telemetry.execute([:dsex, :cache, :miss], %{count: 1}, %{key: key})
+        put(key, fun.())
+
+      value ->
+        DSEx.Telemetry.execute([:dsex, :cache, :hit], %{count: 1}, %{key: key})
+        value
     end
   end
 

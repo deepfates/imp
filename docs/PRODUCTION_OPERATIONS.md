@@ -108,6 +108,25 @@ Operational advice:
 - treat MCP, retriever, training, and provider URLs as trusted configuration;
   DSEx does not provide a network egress sandbox or private-IP SSRF guard
 
+## Telemetry Events
+
+DSEx emits redacted `:telemetry` events through `DSEx.Telemetry`.
+
+Stable event families:
+
+- `[:dsex, :lm, :start | :stop]`
+- `[:dsex, :lm, :stream, :start | :chunk | :stop]`
+- `[:dsex, :adapter, :parse, :retry | :error]`
+- `[:dsex, :cache, :hit | :miss]`
+- `[:dsex, :tool, :start | :stop | :exception]`
+- `[:dsex, :retriever, :start | :stop | :exception]`
+- `[:dsex, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
+- `[:dsex, :training, :submit | :refresh, :start | :stop | :exception]`
+- `[:dsex, :optimizer, :trial, :start | :stop | :exception]`
+
+Event metadata is redacted before dispatch. Secret-shaped values and common
+secret keys are replaced with `[REDACTED]`.
+
 ## Live Provider Setup
 
 Typical `.env`:

@@ -66,6 +66,10 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "OpenAI trainer submits job and refreshes lifecycle status" do
+    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
+      send(self(), {:telemetry, event, measurements, metadata})
+    end)
+
     lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
 
     trainer =
@@ -96,6 +100,10 @@ defmodule ProviderTrainingLifecycleTest do
     assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
     assert refreshed.status == :succeeded
     assert refreshed.result_model == "ft:gpt-test:org:abc"
+    assert_received {:telemetry, [:dsex, :training, :submit, :start], _, %{provider: :openai}}
+    assert_received {:telemetry, [:dsex, :training, :refresh, :start], _, %{job_id: "ftjob_123"}}
+  after
+    Process.delete(:dsex_telemetry_handler)
   end
 
   test "OpenAI trainer requires an uploaded training file id" do

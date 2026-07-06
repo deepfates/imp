@@ -47,23 +47,29 @@ defmodule DSEx.Clients.TrainingJob do
   def refresh(%__MODULE__{status_url: nil} = job), do: {:ok, job}
 
   def refresh(%__MODULE__{} = job) do
-    body = Jason.encode!(%{job_id: job.id})
-    headers = [{"content-type", "application/json"}] ++ auth_headers(job.api_key)
+    DSEx.Telemetry.span(
+      [:dsex, :training, :refresh],
+      %{provider: job.provider, job_id: job.id},
+      fn ->
+        body = Jason.encode!(%{job_id: job.id})
+        headers = [{"content-type", "application/json"}] ++ auth_headers(job.api_key)
 
-    with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           DSEx.HTTP.post(
-             job.transport || DSEx.HTTP.Hackneyless,
-             job.status_url,
-             headers,
-             body,
-             []
-           ),
-         {:ok, decoded} <- Jason.decode(response) do
-      {:ok, merge_status(job, decoded)}
-    else
-      {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-      {:error, reason} -> {:error, reason}
-    end
+        with {:ok, %{status: status, body: response}} when status in 200..299 <-
+               DSEx.HTTP.post(
+                 job.transport || DSEx.HTTP.Hackneyless,
+                 job.status_url,
+                 headers,
+                 body,
+                 []
+               ),
+             {:ok, decoded} <- Jason.decode(response) do
+          {:ok, merge_status(job, decoded)}
+        else
+          {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+    )
   end
 
   def complete(%__MODULE__{} = job, result_model),
@@ -172,22 +178,28 @@ defmodule DSEx.Clients.HTTPTrainer do
   end
 
   def finetune(%__MODULE__{} = trainer, lm, examples, opts) do
-    with {:ok, payload} <- build_payload(trainer, lm, examples, opts) do
-      body = Jason.encode!(payload)
+    DSEx.Telemetry.span(
+      [:dsex, :training, :submit],
+      %{provider: trainer.provider, model: Map.get(lm, :model)},
+      fn ->
+        with {:ok, payload} <- build_payload(trainer, lm, examples, opts) do
+          body = Jason.encode!(payload)
 
-      headers =
-        [{"content-type", "application/json"}] ++
-          auth_headers(trainer.api_key) ++ trainer.headers
+          headers =
+            [{"content-type", "application/json"}] ++
+              auth_headers(trainer.api_key) ++ trainer.headers
 
-      with {:ok, %{status: status, body: response}} when status in 200..299 <-
-             DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts),
-           {:ok, decoded} <- Jason.decode(response) do
-        {:ok, trainer.response_mapper.(trainer, lm, examples, decoded)}
-      else
-        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-        {:error, reason} -> {:error, reason}
+          with {:ok, %{status: status, body: response}} when status in 200..299 <-
+                 DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts),
+               {:ok, decoded} <- Jason.decode(response) do
+            {:ok, trainer.response_mapper.(trainer, lm, examples, decoded)}
+          else
+            {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+            {:error, reason} -> {:error, reason}
+          end
+        end
       end
-    end
+    )
   end
 
   def finetune(trainer, lm, examples, opts) when is_map(trainer) do

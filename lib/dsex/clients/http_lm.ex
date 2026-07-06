@@ -157,9 +157,36 @@ defmodule DSEx.Clients.HTTPLM do
     {body, headers} = request(lm, messages, Keyword.put(opts, :stream, true))
     request_opts = Keyword.take(opts, [:timeout, :http_opts, :request_opts])
 
+    DSEx.Telemetry.execute([:dsex, :lm, :stream, :start], %{system_time: System.system_time()}, %{
+      lm: redact_lm(lm)
+    })
+
     lm.transport
     |> DSEx.HTTP.stream(endpoint(lm), headers, body, request_opts)
-    |> Stream.flat_map(&parse_stream_chunk/1)
+    |> Stream.flat_map(fn chunk ->
+      parsed = parse_stream_chunk(chunk)
+
+      Enum.each(parsed, fn value ->
+        DSEx.Telemetry.execute([:dsex, :lm, :stream, :chunk], %{count: 1}, %{
+          lm: redact_lm(lm),
+          chunk: value
+        })
+      end)
+
+      parsed
+    end)
+    |> Stream.concat(
+      Stream.resource(
+        fn -> :emit end,
+        fn
+          :emit ->
+            DSEx.Telemetry.execute([:dsex, :lm, :stream, :stop], %{count: 1}, %{lm: redact_lm(lm)})
+
+            {:halt, :done}
+        end,
+        fn _ -> :ok end
+      )
+    )
   end
 
   defp request(%__MODULE__{} = lm, messages, opts) do

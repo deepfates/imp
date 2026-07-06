@@ -55,6 +55,10 @@ defmodule ExternalRetrieverTest do
   end
 
   test "Databricks retriever builds vector-search request and maps rows" do
+    Process.put(:dsex_telemetry_handler, fn event, measurements, metadata ->
+      send(self(), {:telemetry, event, measurements, metadata})
+    end)
+
     retriever =
       DSEx.Retrievers.Databricks.new(
         "https://dbc.example/api/2.0/vector-search/indexes/i/query",
@@ -73,6 +77,14 @@ defmodule ExternalRetrieverTest do
     assert {"authorization", "Bearer dbc-token"} in headers
     assert body["query_text"] == "capital France"
     assert body["num_results"] == 1
+    assert_received {:telemetry, [:dsex, :retriever, :start], _, %{query: "capital France"}}
+
+    assert_received {:telemetry, [:dsex, :retriever, :stop], %{duration: duration},
+                     %{result: :ok}}
+
+    assert is_integer(duration)
+  after
+    Process.delete(:dsex_telemetry_handler)
   end
 
   test "generic HTTP retriever rejects unsupported methods explicitly" do

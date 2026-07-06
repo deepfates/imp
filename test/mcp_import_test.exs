@@ -141,6 +141,10 @@ defmodule MCPImportTest do
   end
 
   test "HTTP MCP client discovers tools through injectable transport" do
+    Process.put(:dsex_telemetry_handler, fn event, _measurements, metadata ->
+      send(self(), {:telemetry, event, metadata})
+    end)
+
     client = MCP.HTTPClient.new("https://mcp.example/tools", transport: MCPTransport)
 
     [tool] = MCP.import_tools(client)
@@ -157,8 +161,12 @@ defmodule MCPImportTest do
     assert list_request.body["jsonrpc"] == "2.0"
     assert list_request.body["method"] == "tools/list"
     assert call_request.body["method"] == "tools/call"
+    assert_received {:telemetry, [:dsex, :mcp, :http, :start], %{method: "initialize"}}
+    assert_received {:telemetry, [:dsex, :mcp, :http, :start], %{method: "tools/list"}}
+    assert_received {:telemetry, [:dsex, :mcp, :http, :start], %{method: "tools/call"}}
   after
     Process.delete(:mcp_requests)
+    Process.delete(:dsex_telemetry_handler)
   end
 
   test "stdio MCP client encodes JSON-RPC lines for process transports" do

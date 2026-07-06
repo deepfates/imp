@@ -67,6 +67,8 @@ defmodule ProductionHardeningTest do
 
     assert_received {:telemetry, [:dsex, :lm, :start], _, %{lm: %{model: "gpt-test"}}}
     assert_received {:telemetry, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
+    assert_received {:telemetry, [:dsex, :cache, :miss], %{count: 1}, %{key: _}}
+    assert_received {:telemetry, [:dsex, :cache, :hit], %{count: 1}, %{key: _}}
     assert is_integer(duration)
   after
     Process.delete(:dsex_telemetry_handler)
@@ -358,6 +360,22 @@ defmodule ProductionHardeningTest do
   after
     Process.delete(:code_redaction_actions)
     Process.delete(:rlm_redaction_actions)
+  end
+
+  test "tool telemetry redacts secret-shaped metadata" do
+    Process.put(:dsex_telemetry_handler, fn event, _measurements, metadata ->
+      send(self(), {:telemetry, event, metadata})
+    end)
+
+    tool = DSEx.Tool.new(:secret_tool, "echo", fn input -> input end)
+
+    assert %{"api_key" => "sk-live-secret"} =
+             DSEx.Tool.call(tool, %{"api_key" => "sk-live-secret"})
+
+    assert_received {:telemetry, [:dsex, :tool, :start], metadata}
+    assert metadata.arguments["api_key"] == "[REDACTED]"
+  after
+    Process.delete(:dsex_telemetry_handler)
   end
 
   test "examples and predictions do not intern arbitrary external keys" do

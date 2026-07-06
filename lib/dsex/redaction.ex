@@ -7,6 +7,12 @@ defmodule DSEx.Redaction do
 
   def redact(value, keys \\ @default_redact_keys)
 
+  def redact(value, keys) when is_struct(value) do
+    value
+    |> Map.from_struct()
+    |> redact(keys)
+  end
+
   def redact(value, keys) when is_map(value) do
     Map.new(value, fn {key, nested} ->
       if redacted_key?(key, keys), do: {key, "[REDACTED]"}, else: {key, redact(nested, keys)}

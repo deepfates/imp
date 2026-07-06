@@ -41,17 +41,19 @@ defmodule DSEx.Retrievers.HTTP do
   end
 
   def retrieve(%__MODULE__{} = retriever, query, opts) do
-    body = retriever.body_builder.(query, opts) |> Jason.encode!()
-    headers = [{"content-type", "application/json"} | retriever.headers]
+    DSEx.Telemetry.span([:dsex, :retriever], %{url: retriever.url, query: query}, fn ->
+      body = retriever.body_builder.(query, opts) |> Jason.encode!()
+      headers = [{"content-type", "application/json"} | retriever.headers]
 
-    with {:ok, %{status: status, body: response}} when status in 200..299 <-
-           DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, opts),
-         {:ok, decoded} <- Jason.decode(response) do
-      {:ok, retriever.response_mapper.(decoded)}
-    else
-      {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-      {:error, reason} -> {:error, reason}
-    end
+      with {:ok, %{status: status, body: response}} when status in 200..299 <-
+             DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, opts),
+           {:ok, decoded} <- Jason.decode(response) do
+        {:ok, retriever.response_mapper.(decoded)}
+      else
+        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
   end
 
   defp default_body(query, opts), do: %{query: query, k: Keyword.get(opts, :k, 3)}

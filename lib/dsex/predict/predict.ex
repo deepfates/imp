@@ -85,6 +85,12 @@ defmodule DSEx.Predict.Predict do
 
       {:error, %DSEx.AdapterParseError{} = error} ->
         if Keyword.get(opts, :json_retries, 0) > 0 do
+          DSEx.Telemetry.execute([:dsex, :adapter, :parse, :retry], %{count: 1}, %{
+            adapter: adapter,
+            signature: DSEx.Signature.to_spec(signature),
+            error: error.message
+          })
+
           retry_messages = messages ++ [%{role: :user, content: error.message}]
           retry_opts = Keyword.update!(opts, :json_retries, &(&1 - 1))
 
@@ -92,10 +98,22 @@ defmodule DSEx.Predict.Predict do
             adapter.parse(signature, raw, [])
           end
         else
+          DSEx.Telemetry.execute([:dsex, :adapter, :parse, :error], %{count: 1}, %{
+            adapter: adapter,
+            signature: DSEx.Signature.to_spec(signature),
+            error: error.message
+          })
+
           {:error, error}
         end
 
       error ->
+        DSEx.Telemetry.execute([:dsex, :adapter, :parse, :error], %{count: 1}, %{
+          adapter: adapter,
+          signature: DSEx.Signature.to_spec(signature),
+          error: error
+        })
+
         error
     end
   end

@@ -133,6 +133,10 @@ Runtime dependencies are deliberately small and production-oriented:
 - `ExDoc` is dev/test only and is part of the production gate because generated
   docs are treated as release artifacts.
 
+Runtime boundaries emit redacted telemetry events for LM calls, streaming
+chunks, adapter parse retries/failures, cache hits/misses, tool calls,
+retrievers, MCP requests, training jobs, and optimizer trials.
+
 ## Retrieval And Datasets
 
 Retrievers:
