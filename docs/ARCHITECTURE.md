@@ -194,8 +194,7 @@ The controller may return actions:
 - `llm_query`
 - `submit`
 
-The implementation uses the BEAM-safe sandbox instead of arbitrary Python/Deno
-execution. That is a deliberate production translation.
+The implementation uses a BEAM-safe sandbox for production control.
 
 ## Persistence
 

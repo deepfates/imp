@@ -15,7 +15,7 @@ mix v2.check
 ```
 
 These gates are the project contract. They check formatting, compilation,
-public-surface tests, audit rows, and deterministic tests.
+public-surface tests and deterministic gates.
 
 ## Security Posture
 

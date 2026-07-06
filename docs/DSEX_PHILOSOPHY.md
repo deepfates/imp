@@ -97,6 +97,12 @@ programs, or arbitrary text artifacts.
 | Optimizers | `DSEx.Optimizer.*`, `DSEx.Optimize.*` |
 | Tools/agents/MCP | `DSEx.Tool`, `DSEx.Agent`, `DSEx.MCP` |
 
+## Vocabulary
+
+Use `DSEx` for application examples and `DSEx.*` for implementation modules.
+There is no parallel namespace. Prefer “program”, “signature”,
+“prediction”, “metric”, and “optimizer” over prompt-engineering vocabulary.
+
 ## Production Principle
 
 The codebase should be judged by gates, not vibes:
@@ -108,4 +114,6 @@ LIVE_PROVIDER=1 mix test --include live test/live_provider_test.exs
 ```
 
 The first two are deterministic. The live gate is opt-in because provider
-credentials and account state are operational concerns.
+credentials and account state are operational concerns. See
+[Production Operations](PRODUCTION_OPERATIONS.md) for the current gate
+contract.

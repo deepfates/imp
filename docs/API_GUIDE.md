@@ -93,6 +93,10 @@ report.score
 ## Optimize A Program
 
 ```elixir
+trainset = [
+  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.Example.with_inputs(:question)
+]
+
 optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
 compiled = DSEx.Optimizer.RandomSearch.compile(optimizer, program, trainset, devset)
 
@@ -201,6 +205,22 @@ tools = DSEx.MCP.import_tools(client)
 ## RLM
 
 ```elixir
+lookup =
+  DSEx.Tool.new(:lookup, "lookup a fact", fn
+    %{"key" => "priority"} -> "Prefer concise answers backed by evidence."
+  end)
+
+controller_lm = %{
+  module: DSEx.LM.Fake,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{action: "submit", result: %{answer: "Prefer concise answers backed by evidence."}}
+    end
+  ]
+}
+
+long_context = "priority: concise answers backed by evidence"
+
 rlm =
   DSEx.rlm("context, question -> answer",
     lm: controller_lm,

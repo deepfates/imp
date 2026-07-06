@@ -6,8 +6,8 @@ defmodule DSEx.Predict.RLM do
   for large or awkward contexts: inputs are exposed as sandbox variables and a
   controller LM iteratively chooses actions until it submits structured output.
 
-  This BEAM implementation intentionally uses the local arithmetic sandbox
-  instead of an arbitrary Python/Deno REPL. Supported controller actions are:
+  This implementation uses a BEAM-safe sandbox for production control.
+  Supported controller actions are:
 
   - `%{action: "eval", code: "x + 1"}` to evaluate a safe expression.
   - `%{action: "llm_query", signature: "...", inputs: %{...}}` to call a sub-LM.

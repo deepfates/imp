@@ -7,6 +7,9 @@ Mix.install([{:dsex, path: repo}])
 
 ## Tools
 
+Tools are ordinary named functions with metadata. Agents, ReActV2, and RLM all
+use the same tool struct, which keeps policy and tracing consistent.
+
 ```elixir
 lookup =
   DSEx.Tool.new(:lookup, "lookup a fact", fn
@@ -18,6 +21,10 @@ DSEx.Tool.call(lookup, %{query: "capital-france"})
 ```
 
 ## Agent Runtime
+
+An agent is an Elixir function plus a runtime. The runtime records traces,
+enforces tool policy, and provides the place where more advanced systems can add
+memory or child-agent calls.
 
 ```elixir
 agent =
@@ -53,6 +60,9 @@ DSEx.Agent.run(locked, %{})
 
 ## MCP Catalog Import
 
+Catalog import turns external tool descriptions into DSEx tools so the rest of
+the system does not care whether a tool was handwritten or discovered.
+
 ```elixir
 catalog =
   DSEx.MCP.Catalog.new([
@@ -69,6 +79,9 @@ DSEx.Tool.call(tool, %{key: "capital"})
 ```
 
 ## ReActV2
+
+ReActV2 is the provider-tool-call path: the LM proposes tool calls and then
+submits a final signature-shaped answer through the reserved `submit` tool.
 
 ```elixir
 lm = %{

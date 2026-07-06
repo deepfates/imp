@@ -1,5 +1,5 @@
 defmodule DSEx.Optimizer.Report do
-  @moduledoc "Optimizer candidate history and audit metadata."
+  @moduledoc "Optimizer candidate history and diagnostic metadata."
 
   defstruct optimizer: nil,
             best_score: nil,

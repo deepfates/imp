@@ -17,19 +17,13 @@ defmodule DSEx.MixProject do
           "docs/README.md",
           "docs/DSEX_PHILOSOPHY.md",
           "docs/ARCHITECTURE.md",
-          "docs/TERMINOLOGY.md",
           "docs/API_GUIDE.md",
+          "docs/V2.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "livebooks/01_programming_not_prompting.livemd",
           "livebooks/02_evaluate_and_optimize.livemd",
           "livebooks/03_agents_tools_mcp_rlm.livemd",
-          "livebooks/04_production_and_live_provider.livemd",
-          "TELOS.md",
-          "PRODUCTION.md",
-          "PRODUCTION_AUDIT.md",
-          "ECOSYSTEM_COVERAGE.md",
-          "V2.md",
-          "V2_ROADMAP.md"
+          "livebooks/04_production_and_live_provider.livemd"
         ]
       ],
       start_permanent: Mix.env() == :prod,
@@ -50,8 +44,6 @@ defmodule DSEx.MixProject do
     [
       preferred_envs: [
         "production.check": :test,
-        "production.audit": :test,
-        "v2.audit": :test,
         "v2.check": :test,
         "public_surface.check": :test
       ]
@@ -81,15 +73,11 @@ defmodule DSEx.MixProject do
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "production.audit",
         "test"
       ],
-      "production.audit": ["run scripts/check_production_audit.exs"],
-      "v2.audit": ["run scripts/check_v2_audit.exs"],
       "v2.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "v2.audit",
         "test --include v2"
       ]
     ]

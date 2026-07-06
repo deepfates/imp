@@ -7,14 +7,20 @@ alongside the code and tests, not instead of them.
 
 1. [Philosophy](DSEX_PHILOSOPHY.md): the Elixir-native model of declarative
    self-improving programs.
-2. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
-   supervision/runtime boundaries.
-3. [Terminology](TERMINOLOGY.md): the canonical vocabulary for an Elixir-native
-   DSEx project.
-4. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
+2. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
    adapters, optimizers, agents, RLM, MCP, persistence, and providers.
-5. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
+3. [Livebook 01](../livebooks/01_programming_not_prompting.livemd):
+   signatures, predictions, examples, and schema-constrained output.
+4. [Livebook 02](../livebooks/02_evaluate_and_optimize.livemd): evaluation,
+   optimizer reports, and artifact optimization.
+5. [Livebook 03](../livebooks/03_agents_tools_mcp_rlm.livemd): tools, agents,
+   MCP-style catalogs, ReActV2, and RLM.
+6. [Advanced DSEx](V2.md): artifact optimization, GEPA, agents, MCP, schemas,
+   and deterministic benchmark fixtures.
+7. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
    security posture, and release discipline.
+8. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
+   supervision/runtime boundaries.
 
 ## Livebooks
 
