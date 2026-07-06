@@ -37,8 +37,15 @@ LIVE_PROVIDER=1 mix live.check
 - V2 positive controls and negative controls, including reward-encoding
   program-optimization fixtures
 
-The live provider test proves a real OpenAI-compatible provider can execute the
-basic program and structured-output path with local credentials.
+The live provider tests prove a real OpenAI-compatible provider can execute:
+
+- basic `Predict`
+- schema-constrained JSON `Predict`
+- `ChainOfThought` with required reasoning
+- provider streaming through `DSEx.Streaming`
+- `ReActV2` function-tool calls plus reserved `submit`
+- orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
+- `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
 ## What The Gates Do Not Prove
 
@@ -46,6 +53,7 @@ They do not prove:
 
 - every possible provider feature or future model response shape
 - every provider-specific feature is live-tested
+- live training jobs, MCP servers, or external retriever services
 - credentials are safe if a local `.env` has leaked elsewhere
 
 ## Secret Handling

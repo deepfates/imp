@@ -25,7 +25,7 @@ defmodule DSEx.Predict.ReActV2 do
         ),
         DSEx.Signature.Field.new(%{name: :tool_calls, type: :array}, :output)
       ],
-      instructions: signature.instructions
+      instructions: react_instructions(signature.instructions)
     }
 
     react_opts =
@@ -40,6 +40,19 @@ defmodule DSEx.Predict.ReActV2 do
       max_iters: Keyword.get(opts, :max_iters, 20),
       tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
+  end
+
+  defp react_instructions(instructions) do
+    """
+    #{instructions}
+
+    You are running an iterative tool-use loop.
+    Use the supplied provider tools when a tool is needed.
+    Read the history field before choosing the next action.
+    If history already contains the information needed for the final answer,
+    call the reserved submit tool with the required output fields.
+    Do not repeat a tool call when its result is already present in history.
+    """
   end
 
   @impl true

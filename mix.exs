@@ -83,7 +83,9 @@ defmodule DSEx.MixProject do
         "compile --warnings-as-errors",
         "test --include v2"
       ],
-      "live.check": ["test --include live test/live_provider_test.exs"]
+      "live.check": [
+        "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
+      ]
     ]
   end
 end

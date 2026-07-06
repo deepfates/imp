@@ -18,7 +18,7 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"live.check") == [
-             "test --include live test/live_provider_test.exs"
+             "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
            ]
   end
 end

@@ -44,5 +44,7 @@ LIVE_PROVIDER=1 mix live.check
 ```
 
 See [Production Operations](docs/PRODUCTION_OPERATIONS.md) for the current gate
-contract. The live gate validates basic and structured JSON prediction against
-a real OpenAI-compatible provider using local `.env` credentials.
+contract. The live gate validates prediction, structured JSON, chain-of-thought,
+streaming, ReActV2 tool calls, orchestration wrappers, and program-of-thought
+sandbox execution against a real OpenAI-compatible provider using local `.env`
+credentials.
