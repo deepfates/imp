@@ -56,6 +56,9 @@ defmodule DSEx.Streaming do
     end
   end
 
+  defp stream_lm(nil, _messages, _opts),
+    do: [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, :lm_not_configured}, done: true}]
+
   defp stream_lm(module, messages, opts) when is_atom(module) do
     if function_exported?(module, :stream, 3) do
       module.stream(module, messages, opts)
@@ -64,12 +67,42 @@ defmodule DSEx.Streaming do
     end
   end
 
+  defp stream_lm(%{module: module, opts: lm_opts} = lm, messages, opts) do
+    opts = Keyword.merge(lm_opts, opts)
+
+    if function_exported?(module, :stream, 3) do
+      module.stream(lm, messages, opts)
+    else
+      generate_once(lm, messages, opts)
+    end
+  end
+
+  defp stream_lm(fun, messages, opts) when is_function(fun, 2),
+    do: generate_once(fun, messages, opts)
+
+  defp generate_once(lm, messages, opts) do
+    case DSEx.LM.generate(lm, messages, opts) do
+      {:ok, value} ->
+        [%DSEx.Streaming.Messages.StreamResponse{chunk: stream_value(value)}]
+
+      {:error, reason} ->
+        [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
+    end
+  end
+
+  defp stream_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
+  defp stream_value(value), do: value
+
   def collect(program, inputs, opts \\ []) do
     program
     |> stream(inputs, opts)
     |> Enum.reject(&match?({:error, _}, &1))
-    |> Enum.join()
+    |> Enum.map_join(&collect_value/1)
   end
+
+  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: nil}), do: ""
+  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: chunk}), do: to_string(chunk)
+  defp collect_value(value), do: to_string(value)
 
   @doc """
   Parses provider chunks into incremental typed field updates.
@@ -94,7 +127,7 @@ defmodule DSEx.Streaming do
   end
 
   defp call_once(program, inputs) do
-    case program.__struct__.call(program, inputs) do
+    case DSEx.Module.call(program, inputs) do
       {:ok, prediction} ->
         {:ok, prediction |> DSEx.Prediction.to_map() |> Map.values() |> Enum.join("")}
 

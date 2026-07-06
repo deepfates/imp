@@ -18,7 +18,7 @@ defmodule DSEx.Optimizer.Ensemble.Program do
           program.programs
       end
 
-    outputs = Enum.map(programs, & &1.__struct__.call(&1, inputs))
+    outputs = Enum.map(programs, &DSEx.Module.call(&1, inputs))
 
     if program.ensemble.reduce_fn do
       predictions =

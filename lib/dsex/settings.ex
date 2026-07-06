@@ -54,6 +54,21 @@ defmodule DSEx.Settings do
     end
   end
 
+  @doc false
+  def context_stack, do: Process.get(@context_key, [])
+
+  @doc false
+  def with_context_stack(stack, fun) when is_list(stack) and is_function(fun, 0) do
+    previous = Process.get(@context_key, [])
+    Process.put(@context_key, stack)
+
+    try do
+      fun.()
+    after
+      Process.put(@context_key, previous)
+    end
+  end
+
   defp ensure_started do
     case Process.whereis(@name) do
       nil -> start_application_or_agent()
@@ -66,8 +81,12 @@ defmodule DSEx.Settings do
       {:ok, _apps} ->
         :ok
 
-      {:error, _reason} ->
-        start_unlinked()
+      {:error, reason} ->
+        if Application.spec(:dsex) do
+          raise "failed to start :dsex application for DSEx.Settings: #{inspect(reason)}"
+        else
+          start_unlinked()
+        end
     end
   end
 

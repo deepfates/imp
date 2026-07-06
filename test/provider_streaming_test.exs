@@ -74,4 +74,28 @@ defmodule ProviderStreamingTest do
              |> DSEx.Clients.HTTPLM.stream([%{role: :user, content: "stream"}])
              |> Enum.reject(& &1.done)
   end
+
+  test "provider stream accepts LM map shape through generate fallback" do
+    program =
+      DSEx.predict("question -> answer",
+        lm: %{
+          module: DSEx.LM.Fake,
+          opts: [handler: fn _messages, _opts -> %{answer: "mapped"} end]
+        }
+      )
+
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: %{answer: "mapped"}}] =
+             program
+             |> DSEx.Streaming.stream(%{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+  end
+
+  test "provider stream reports missing LM as a stream error" do
+    program = DSEx.predict("question -> answer", lm: nil)
+
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, :lm_not_configured}}] =
+             program
+             |> DSEx.Streaming.stream(%{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+  end
 end

@@ -18,7 +18,7 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
       |> Enum.filter(fn example ->
         inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
 
-        case program.__struct__.call(program, inputs) do
+        case DSEx.Module.call(program, inputs) do
           {:ok, prediction} -> optimizer.metric.(example, prediction) |> DSEx.Metrics.pass?()
           {:error, _reason} -> false
         end

@@ -5,7 +5,7 @@ defmodule DSEx.Predict.Parallel do
     concurrency = Keyword.get(opts, :max_concurrency, System.schedulers_online())
 
     inputs
-    |> DSEx.Tasks.async_stream(&program.__struct__.call(program, &1),
+    |> DSEx.Tasks.async_stream(&DSEx.Module.call(program, &1),
       max_concurrency: concurrency,
       timeout: Keyword.get(opts, :timeout, 30_000),
       on_timeout: Keyword.get(opts, :on_timeout, :kill_task)

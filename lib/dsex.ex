@@ -65,15 +65,7 @@ defmodule DSEx do
   def rlm(signature, opts \\ []), do: DSEx.Predict.RLM.new(signature, opts)
 
   @doc "Calls any DSEx program struct."
-  def call(%module{} = program, inputs) do
-    if function_exported?(module, :call, 2) do
-      module.call(program, inputs)
-    else
-      {:error, {:not_callable, module}}
-    end
-  end
-
-  def call(other, _inputs), do: {:error, {:not_callable, other}}
+  defdelegate call(program, inputs), to: DSEx.Module
 
   @doc "Creates an OpenAI-compatible LM client."
   def openai(model, opts \\ []), do: DSEx.Clients.OpenAI.new(model, opts)

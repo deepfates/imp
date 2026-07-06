@@ -1,7 +1,7 @@
 defmodule GateContractTest do
   use ExUnit.Case, async: true
 
-  test "production gates encode the release contract" do
+  test "production gate aliases stay wired to the documented release commands" do
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
 
     assert Keyword.fetch!(aliases, :"production.check") == [

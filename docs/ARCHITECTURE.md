@@ -197,8 +197,10 @@ structs. The supervised runtime boundary currently owns:
 
 - `DSEx.Settings`, an Agent for global defaults plus process-local overrides;
 - `DSEx.Cache`, an ETS-backed cache process and table;
-- `DSEx.TaskSupervisor`, the named task supervisor used by provider async,
-  agent event streaming, and parallel prediction fan-out.
+- `DSEx.TaskSupervisor`, the named task supervisor used by linked provider
+  async and parallel prediction fan-out;
+- `DSEx.UnlinkedTaskSupervisor`, the named task supervisor used by unlinked
+  event workers such as agent event streaming.
 
 In production releases, start the `:dsex` application under the host
 supervision tree. Mix does this automatically for normal applications, but
@@ -208,11 +210,11 @@ fallbacks for library ergonomics, but the supervised path is the production
 posture.
 
 Long-running or fan-out work should have an OTP owner. DSEx routes its built-in
-async helpers through `DSEx.Tasks`, which uses `DSEx.TaskSupervisor` when the
-application is running and falls back to plain `Task` only for script-style
-library use before supervised startup. That keeps cancellation, crash
-reporting, telemetry context, and shutdown behavior visible to the host system
-in production.
+async helpers through `DSEx.Tasks`, which uses linked and unlinked named task
+supervisors when the application is running and falls back to plain task
+helpers only for script-style library use before supervised startup. That keeps
+cancellation, crash reporting, telemetry context, and shutdown behavior visible
+to the host system in production.
 
 Runtime boundaries emit redacted telemetry events for LM calls, streaming
 chunks, adapter parse retries/failures, cache hits/misses, tool calls,

@@ -76,7 +76,7 @@ defmodule DSEx.Cache do
       :undefined ->
         case Application.ensure_all_started(:dsex) do
           {:ok, _apps} -> :ok
-          {:error, _reason} -> start_unlinked()
+          {:error, reason} -> handle_start_error(reason)
         end
 
       _tid ->
@@ -88,6 +88,14 @@ defmodule DSEx.Cache do
     case GenServer.start(__MODULE__, [], name: __MODULE__) do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
+    end
+  end
+
+  defp handle_start_error(reason) do
+    if Application.spec(:dsex) do
+      raise "failed to start :dsex application for DSEx.Cache: #{inspect(reason)}"
+    else
+      start_unlinked()
     end
   end
 end

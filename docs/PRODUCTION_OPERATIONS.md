@@ -38,16 +38,23 @@ Application.ensure_all_started(:dsex)
 
 Normal Mix releases and applications start dependencies automatically. The
 explicit call matters for embedded scripts, Livebook setup cells, and unusual
-host runtimes. DSEx keeps lazy-start fallbacks for ergonomics, but the release
-posture is supervised startup.
+host runtimes. DSEx keeps lazy-start fallbacks only for script-style contexts
+where the OTP application spec is unavailable. If the `:dsex` application is
+available but fails to start, DSEx raises instead of creating shadow runtime
+state outside supervision.
 
 Supervised DSEx runtime state:
 
 - `DSEx.Settings` owns global defaults. Prefer `DSEx.context/2` for scoped
-  overrides in concurrent code and tests.
+  overrides in request code and tests. Plain BEAM tasks keep ordinary
+  process-local semantics; DSEx-owned fan-out through `DSEx.Tasks`,
+  `Parallel`, provider async, and agent event streams inherits the caller's
+  DSEx context.
 - `DSEx.Cache` owns the ETS table used by the built-in response cache.
-- `DSEx.TaskSupervisor` owns DSEx async helpers, including provider async,
-  agent event streaming, and parallel prediction fan-out through `DSEx.Tasks`.
+- `DSEx.TaskSupervisor` owns linked DSEx async helpers, including provider
+  async and parallel prediction fan-out through `DSEx.Tasks`.
+- `DSEx.UnlinkedTaskSupervisor` owns unlinked event workers, including agent
+  event streaming.
 - host applications still own higher-level orchestration lifetimes and
   cancellation policy.
 

@@ -109,6 +109,32 @@ defmodule DSExTest do
     assert DSEx.get(prediction, :answer) == "global"
   end
 
+  test "DSEx-owned task fan-out inherits context settings" do
+    global = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
+    }
+
+    local = %{
+      module: DSEx.LM.Fake,
+      opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
+    }
+
+    DSEx.configure(lm: global)
+    program = DSEx.predict("question -> answer")
+
+    results =
+      DSEx.context([lm: local], fn ->
+        DSEx.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}],
+          max_concurrency: 2
+        )
+      end)
+
+    assert [{:ok, first}, {:ok, second}] = results
+    assert DSEx.get(first, :answer) == "local"
+    assert DSEx.get(second, :answer) == "local"
+  end
+
   test "RLM controller LM resolves settings dynamically" do
     first = %{
       module: DSEx.LM.Fake,

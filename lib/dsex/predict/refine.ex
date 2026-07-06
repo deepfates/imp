@@ -17,7 +17,7 @@ defmodule DSEx.Predict.Refine do
                                                                               history} ->
       inputs = maybe_add_hint(inputs, refine.feedback_fn, history)
 
-      case refine.program.__struct__.call(refine.program, inputs) do
+      case DSEx.Module.call(refine.program, inputs) do
         {:ok, prediction} = ok ->
           history = history ++ [%{attempt: attempt, prediction: prediction}]
 

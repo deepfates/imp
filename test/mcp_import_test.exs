@@ -243,6 +243,61 @@ defmodule MCPImportTest do
              Jason.decode!(line)
   end
 
+  test "stdio MCP client returns JSON-RPC errors as tool errors" do
+    script =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex_mcp_stdio_error_#{System.unique_integer([:positive])}.exs"
+      )
+
+    File.write!(script, """
+    import json
+    import sys
+
+    for line in sys.stdin:
+        request = json.loads(line)
+        method = request.get("method")
+        response = None
+
+        if method == "initialize":
+            response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {}}
+        elif method == "tools/list":
+            response = {
+                "jsonrpc": "2.0",
+                "id": request.get("id"),
+                "result": {
+                    "tools": [
+                        {
+                            "name": "stdio_fail",
+                            "description": "fails through stdio",
+                            "input_schema": {"type": "object"},
+                        }
+                    ]
+                },
+            }
+        elif method == "tools/call":
+            response = {
+                "jsonrpc": "2.0",
+                "id": request.get("id"),
+                "error": {"code": -32001, "message": "stdio failed"},
+            }
+
+        if response is not None:
+            sys.stdout.write(json.dumps(response) + "\\n")
+            sys.stdout.flush()
+    """)
+
+    on_exit(fn -> File.rm(script) end)
+
+    [tool] =
+      System.find_executable("python3")
+      |> MCP.StdioClient.new(args: [script])
+      |> MCP.import_tools()
+
+    assert {:error, {:json_rpc_error, %{"code" => -32_001, "message" => "stdio failed"}}} =
+             DSEx.Tool.call(tool, %{})
+  end
+
   test "streamable HTTP MCP client sends session headers and decodes SSE data" do
     client =
       MCP.StreamableHTTPClient.new("https://mcp.example/stream",

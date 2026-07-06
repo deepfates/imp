@@ -13,7 +13,7 @@ defmodule DSEx.Predict.BestOfN do
 
   def call(%__MODULE__{} = best, inputs) do
     1..best.n
-    |> Enum.map(fn _ -> best.program.__struct__.call(best.program, inputs) end)
+    |> Enum.map(fn _ -> DSEx.Module.call(best.program, inputs) end)
     |> Enum.filter(&match?({:ok, _}, &1))
     |> Enum.map(fn {:ok, prediction} -> prediction end)
     |> case do

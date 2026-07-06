@@ -15,6 +15,13 @@ defmodule DSEx.MCP do
     def list_tools(%__MODULE__{tools: tools}), do: tools
   end
 
+  @doc false
+  def json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
+  def json_rpc_result(%{"result" => result}), do: {:ok, result}
+  def json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
+  def json_rpc_result(%{result: result}), do: {:ok, result}
+  def json_rpc_result(other), do: {:ok, other}
+
   defmodule HTTPClient do
     @moduledoc "JSON-RPC 2.0 transport-backed MCP-style catalog client."
 
@@ -84,7 +91,7 @@ defmodule DSEx.MCP do
         with {:ok, %{status: status, body: response}} when status in 200..299 <-
                post_json(client, "tools/call", %{"name" => name, "arguments" => arguments}),
              {:ok, decoded} <- Jason.decode(response),
-             {:ok, result} <- json_rpc_result(decoded) do
+             {:ok, result} <- DSEx.MCP.json_rpc_result(decoded) do
           result
         else
           {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
@@ -92,12 +99,6 @@ defmodule DSEx.MCP do
         end
       end)
     end
-
-    defp json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
-    defp json_rpc_result(%{"result" => result}), do: {:ok, result}
-    defp json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
-    defp json_rpc_result(%{result: result}), do: {:ok, result}
-    defp json_rpc_result(other), do: {:ok, other}
 
     defp post_json(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
@@ -199,8 +200,9 @@ defmodule DSEx.MCP do
                    "tools/call",
                    %{"name" => name, "arguments" => arguments},
                    client.timeout
-                 ) do
-            Map.get(decoded, "result", decoded)
+                 ),
+               {:ok, result} <- DSEx.MCP.json_rpc_result(decoded) do
+            result
           end
         after
           safe_close(port)
@@ -265,7 +267,7 @@ defmodule DSEx.MCP do
       |> String.split("\n", trim: true)
       |> Enum.find_value(:more, fn line ->
         case Jason.decode(line) do
-          {:ok, %{"id" => ^id, "error" => error}} -> {:error, error}
+          {:ok, %{"id" => ^id, "error" => error}} -> {:error, {:json_rpc_error, error}}
           {:ok, %{"id" => ^id} = decoded} -> {:ok, decoded}
           _other -> false
         end
@@ -336,17 +338,11 @@ defmodule DSEx.MCP do
       Map.put(tool, "run", fn arguments ->
         with {:ok, decoded} <-
                rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}),
-             {:ok, result} <- json_rpc_result(decoded) do
+             {:ok, result} <- DSEx.MCP.json_rpc_result(decoded) do
           result
         end
       end)
     end
-
-    defp json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
-    defp json_rpc_result(%{"result" => result}), do: {:ok, result}
-    defp json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
-    defp json_rpc_result(%{result: result}), do: {:ok, result}
-    defp json_rpc_result(other), do: {:ok, other}
 
     defp rpc(client, method, params) do
       body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}

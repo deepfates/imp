@@ -263,7 +263,11 @@ pretend to have a local training backend. Calling them without a trainer returns
 trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
 ```
 
-`OpenAITrainer` submits a fine-tuning job for an already uploaded provider file.
+`OpenAITrainer` and `DatabricksTrainer` are provider-specific constructor
+modules that return configured `%DSEx.Clients.HTTPTrainer{}` values. Pattern
+match on `provider: :openai` or `provider: :databricks` when you need to inspect
+the returned trainer. `OpenAITrainer` submits a fine-tuning job for an already
+uploaded provider file.
 It does not upload examples itself.
 
 ## RLM

@@ -15,7 +15,7 @@ defmodule DSEx.Optimizer.KNNFewShot.Program do
         demos
       )
 
-    compiled.__struct__.call(compiled, inputs)
+    DSEx.Module.call(compiled, inputs)
   end
 end
 
