@@ -28,7 +28,7 @@ test signals. The repo includes provider clients, adapters, programs,
 retrievers, datasets, streaming, persistence, sandboxed program-of-thought,
 evaluation, and metric-driven optimizers.
 
-See [V2.md](V2.md) for the experimental V2 surface: optimize-anything,
+See [V2.md](V2.md) for the V2 surface: optimize-anything,
 GEPA-inspired Pareto mechanics, agents, MCP-style tool import, schema
 constraints, and deterministic smoke fixtures.
 
