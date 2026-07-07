@@ -12,24 +12,7 @@ defmodule DSEx.MixProject do
       package: package(),
       docs: [
         main: "DSEx",
-        extras: [
-          "README.md",
-          "docs/README.md",
-          "docs/DSEX_PHILOSOPHY.md",
-          "docs/PRIOR_ART.md",
-          "docs/ARCHITECTURE.md",
-          "docs/API_GUIDE.md",
-          "docs/ADVANCED.md",
-          "docs/BENCHMARK_TRUTH.md",
-          "docs/PARITY_VALIDATION_PROGRAM.md",
-          "docs/PRODUCTION_OPERATIONS.md",
-          "docs/COVERAGE_MATRIX.md",
-          "docs/RELEASE_CRITERIA.md",
-          "livebooks/01_programming_not_prompting.livemd",
-          "livebooks/02_evaluate_and_optimize.livemd",
-          "livebooks/03_agents_tools_mcp_rlm.livemd",
-          "livebooks/04_production_and_live_provider.livemd"
-        ]
+        extras: ["README.md"] ++ product_docs() ++ livebooks()
       ],
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -50,6 +33,7 @@ defmodule DSEx.MixProject do
     [
       preferred_envs: [
         "production.check": :test,
+        "evidence.check": :test,
         "public_surface.check": :test,
         "integration.check": :test,
         "protocol.check": :test,
@@ -111,13 +95,34 @@ defmodule DSEx.MixProject do
         Path.wildcard("lib/dsex/benchmark_truth/**/*.ex")
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
-      Path.wildcard("docs/*.md") ++
-      Path.wildcard("livebooks/*.livemd") ++
+      product_docs() ++
+      livebooks() ++
       [
         ".formatter.exs",
         "README.md",
         "mix.exs"
       ]
+  end
+
+  defp product_docs do
+    [
+      "docs/README.md",
+      "docs/DSEX_PHILOSOPHY.md",
+      "docs/PRIOR_ART.md",
+      "docs/ARCHITECTURE.md",
+      "docs/API_GUIDE.md",
+      "docs/ADVANCED.md",
+      "docs/PRODUCTION_OPERATIONS.md"
+    ]
+  end
+
+  defp livebooks do
+    [
+      "livebooks/01_programming_not_prompting.livemd",
+      "livebooks/02_evaluate_and_optimize.livemd",
+      "livebooks/03_agents_tools_mcp_rlm.livemd",
+      "livebooks/04_production_and_live_provider.livemd"
+    ]
   end
 
   defp aliases do
@@ -126,13 +131,16 @@ defmodule DSEx.MixProject do
       "production.check": [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
+        "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
+        "package.check",
+        "docs"
+      ],
+      "evidence.check": [
         "benchmark.truth.check",
         "benchmark.trace.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
-        "benchmark.rag_tool_agent.check",
-        "docs"
+        "benchmark.rag_tool_agent.check"
       ],
       "integration.check": [
         "test --only integration test/integration"

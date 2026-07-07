@@ -392,7 +392,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       required_lanes
       |> Enum.flat_map(fn {lane, status} ->
         cond do
-          status["full_evidence"] == true ->
+          status["satisfied"] == true ->
             []
 
           status["present"] == true ->
@@ -402,10 +402,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
                 "lane" => lane,
                 "status" => status["best_status"],
                 "models" => status["models"] || [],
+                "best_model" => status["best_model"],
+                "policy" => status["policy"],
                 "coverage" => status["coverage"],
                 "cost" => status["cost"],
                 "message" =>
-                  "#{lane} is present but does not yet have fresh full-evidence parity."
+                  "#{lane} is present but does not yet satisfy its live release-evidence policy."
               }
             ]
 
@@ -416,6 +418,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
                 "lane" => lane,
                 "status" => status["best_status"] || "missing",
                 "models" => status["models"] || [],
+                "best_model" => status["best_model"],
+                "policy" => status["policy"],
                 "coverage" => status["coverage"],
                 "cost" => status["cost"],
                 "message" => "#{lane} is missing from the live matched-model matrix."

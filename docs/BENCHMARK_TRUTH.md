@@ -186,7 +186,7 @@ models remains covered by the live matched-model lane.
 ## Run Live Benchmark Smoke
 
 ```sh
-OPENAI_API_KEY=... OPENAI_MODEL=gpt-4o-mini mix benchmark.live.check
+OPENAI_API_KEY=... OPENAI_MODEL=... mix benchmark.live.check
 ```
 
 This fetches two fresh rows from GSM8K and HotPotQA, runs DSEx programs against
@@ -252,6 +252,25 @@ mix dsex.benchmark.parity \
   --models gpt-5.5,gpt-5.4-mini
 ```
 
+OpenAI is the default parity provider. For another provider, make both sides
+explicit so the artifact proves a matched operational path instead of an
+accidental OpenAI-shaped comparison:
+
+```sh
+ANTHROPIC_API_KEY=... mix dsex.benchmark.parity \
+  --gsm8k benchmarks/data/gsm8k-test-0-200.jsonl \
+  --hotpotqa benchmarks/data/hotpotqa-validation-0-200.jsonl \
+  --max-examples 200 \
+  --model anthropic:claude-haiku-4-5 \
+  --dspy-model anthropic/claude-haiku-4-5 \
+  --api-key-env ANTHROPIC_API_KEY
+```
+
+The DSEx side takes a ReqLLM model spec such as `anthropic:...` or
+`google:...`; the DSPy side takes the matching LiteLLM/DSPy model name such as
+`anthropic/...` or `gemini/...`. The artifact records both wire API families so
+the live matrix can reject endpoint mismatches.
+
 The intentionally expensive full live row lane is:
 
 ```sh
@@ -274,18 +293,33 @@ This consumes existing `dsex-dspy-parity-campaign-*.json` artifacts and writes
 `live-matched-model-matrix-*.json`. It is the canonical answer to "which
 provider/model lanes have actually been proven?" It groups by provider and
 model, skips malformed historical artifacts, tags current low-cost, frontier,
-and historical/research-style lanes, and reports whether each lane has fresh
-full-evidence parity.
+and historical/research-style lanes, and reports whether each lane satisfies
+its release-evidence policy.
 
-The matrix is intentionally an evidence index, not a benchmark runner. If it
-reports smoke coverage, missing historical/research coverage, stale prompt
-contracts, or incomplete row coverage, DSEx has not yet proven live matched
-model parity. Each model row and live-lane blocker reports covered rows,
+Lane tags are model-family evidence buckets, not vendor commitments. Current
+low-cost includes small/mini/nano/Haiku/Flash/Lite-style models; frontier sanity
+includes current flagship-style GPT, Claude Sonnet/Opus, and Gemini Pro models;
+historical/research-style includes legacy GPT-3.5/Davinci, Claude 3-era, Gemini
+1.x, or explicitly research/legacy-labeled models.
+
+The matrix is intentionally an evidence index, not a benchmark runner.
+`current_low_cost` requires one full accepted canonical campaign. Frontier and
+historical/research lanes require fresh matched research samples: enough rows
+to expose provider drift without pretending every flagship or legacy model must
+pay the full canonical cost. If the matrix reports smoke coverage, stale prompt
+contracts, incomplete current low-cost coverage, or unsatisfied research-sample
+lanes, DSEx has not yet proven live matched model parity. Each model row and
+live-lane blocker reports covered rows,
 remaining rows, percent coverage, and estimated remaining/full DSEx-plus-DSPy
 tokens so staged campaigns can be planned from the dashboard instead of hand
 calculated. Cost is token-only by default; set
 `DSEX_BENCH_INPUT_USD_PER_1M` and `DSEX_BENCH_OUTPUT_USD_PER_1M` when you want
 the matrix to include USD estimates from current provider pricing.
+
+When a lane has multiple candidate models, the lane-level `coverage` and `cost`
+headline the strongest candidate because one satisfying model is sufficient for
+that lane. The same objects retain a nested `cumulative` summary so operator
+dashboards can still see total evidence and spend across all candidates.
 
 The selected artifact for a model must also carry the current DSEx benchmark
 prompt contract compiled into the benchmark truth runner. Older artifacts
@@ -342,6 +376,10 @@ mix dsex.benchmark.parity.campaign \
   --reasoning-effort low
 ```
 
+For non-OpenAI campaign lanes, use the provider-qualified ReqLLM model as
+`--model`, the matching DSPy/LiteLLM model as `--dspy-model`, and the relevant
+`--api-key-env`. The campaign driver forwards those settings to every chunk.
+
 `--chunks` limits how many new chunks this invocation may run.
 `--target-coverage` limits the total campaign coverage to reach before
 stopping. When both are present, the runner aggregates current evidence before
@@ -350,6 +388,13 @@ for the chunk when the target is near, and stops as soon as the aggregate has
 reached the requested paired-row coverage. This is the preferred way to run
 staged live campaigns because the stopping condition is evidence coverage, not a
 hand-counted number of offsets.
+
+If a live chunk produces runner/API errors and accepted coverage does not
+advance, the campaign runner halts instead of continuing to spend provider
+calls. This is intentional: quota/rate-limit failures are incomplete evidence,
+not negative benchmark rows. Fix provider quota/credentials or switch to a
+matched provider/model lane, then rerun the same campaign id to continue from
+the earliest missing accepted row.
 
 Use `--dspy-model responses/<model>` for GPT-5-family endpoint-equivalent
 campaigns. DSEx reaches the provider through ReqLLM's OpenAI Responses route;
@@ -382,10 +427,15 @@ mix dsex.benchmark.parity.aggregate \
 The aggregator counts each `(task, absolute_index)` once, so overlapping smoke
 or retry chunks cannot inflate coverage. It also scopes reports by DSEx provider
 and model, so historical direct-client artifacts cannot be mixed into ReqLLM
-campaigns. It reports:
+campaigns. Runner/API error rows are incomplete evidence: they are not included
+in coverage or scores, and a newer incomplete row cannot replace an older
+complete row for the same canonical index. This matters for quota/rate-limit
+failures, where an attempted chunk may produce row shells without valid model
+answers. Those rows stay rerunnable and appear as `runner_error_rows` and
+missing ranges instead of being treated as both-failed parity rows. It reports:
 
 - total covered rows versus canonical expected rows
-- per-task covered rows and missing ranges
+- per-task covered rows, missing ranges, incomplete rows, and runner-error rows
 - weighted DSEx/DSPy scores from row-level pass/fail outcomes
 - aggregate and task score gaps
 - latency ratio from covered chunk artifacts
@@ -418,7 +468,10 @@ rather than DSEx adapter parsing or metric evaluation. Large DSEx-vs-DSPy
 nonzero `json_fallbacks` or `parse_retries` point toward adapter recovery work.
 `runtime_shape.coverage.complete` must be true before treating shape ratios as a
 full-campaign comparison; otherwise they are partial diagnostics from the rows
-where both runtimes exposed comparable instrumentation.
+where both runtimes exposed comparable instrumentation. The live matrix ranks
+complete instrumentation/runtime-shape evidence ahead of larger nominal coverage
+when selecting the representative artifact for a model lane, because inflated
+coverage from quota-tainted or otherwise incomplete chunks is not release proof.
 Review `dspy_instrumentation.message_chars_sources` before using shape ratios
 for fine-grained prompt work: `lm_history` is exact sidecar evidence, while
 `row_estimate` is deterministic diagnostic evidence for rows whose DSPy history

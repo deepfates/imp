@@ -102,7 +102,7 @@ def main() -> int:
         "campaign_id": args.campaign_id,
         "python": platform.python_version(),
         "dspy_version": getattr(dspy, "__version__", "unknown"),
-        "model": {"provider": "dspy.LM", "model": f"openai/{args.model}"},
+        "model": {"provider": "dspy.LM", "model": dspy_lm_name(args.model)},
         "generation": generation_metadata(
             args.model, args.temperature, args.max_tokens, args.reasoning_effort
         ),
@@ -140,8 +140,14 @@ def configure_dspy(
     if reasoning_effort:
         lm_args["reasoning_effort"] = reasoning_effort
 
-    lm = dspy.LM(f"openai/{model}", **lm_args)
+    lm = dspy.LM(dspy_lm_name(model), **lm_args)
     dspy.configure(lm=lm)
+
+
+def dspy_lm_name(model: str) -> str:
+    if "/" in model:
+        return model
+    return f"openai/{model}"
 
 
 def generation_metadata(
@@ -219,6 +225,11 @@ def dspy_responses_model(model: str) -> bool:
 
 
 def wire_api(model: str) -> str:
+    normalized = model.lower().strip("/")
+    if normalized.startswith("anthropic/"):
+        return "litellm_anthropic_messages"
+    if normalized.startswith("gemini/") or normalized.startswith("google/"):
+        return "litellm_google_generate_content"
     if dspy_responses_model(model):
         return "openai_responses"
     if dspy_reasoning_model(model):

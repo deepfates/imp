@@ -111,7 +111,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
   end
 
   defp program(:hotpotqa, lm) do
-    "question, context -> answer: short_span \"short exact answer\""
+    "question, context -> answer: string \"short exact answer\""
     |> DSEx.signature(DSEx.BenchmarkTruth.Contract.hotpotqa_instruction())
     |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
   end
@@ -574,7 +574,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp safe_json(nil), do: nil
   defp safe_json(value) when is_binary(value) or is_number(value) or is_boolean(value), do: value
   defp safe_json(value) when is_atom(value), do: Atom.to_string(value)
-  defp safe_json(value) when is_list(value), do: Enum.map(value, &safe_json/1)
+
+  defp safe_json(value) when is_list(value) do
+    if proper_list?(value), do: Enum.map(value, &safe_json/1), else: inspect(value)
+  end
+
   defp safe_json(value) when is_tuple(value), do: value |> Tuple.to_list() |> safe_json()
 
   defp safe_json(%module{} = value),
@@ -588,6 +592,13 @@ defmodule DSEx.BenchmarkTruth.Runner do
     do: Map.new(value, fn {k, v} -> {to_string(k), safe_json(v)} end)
 
   defp safe_json(value), do: inspect(value)
+
+  defp proper_list?(value) when is_list(value), do: do_proper_list?(value)
+  defp proper_list?(_value), do: false
+
+  defp do_proper_list?([]), do: true
+  defp do_proper_list?([_head | tail]), do: do_proper_list?(tail)
+  defp do_proper_list?(_tail), do: false
 
   defp average([]), do: 0.0
   defp average(scores), do: Enum.sum(scores) / length(scores)

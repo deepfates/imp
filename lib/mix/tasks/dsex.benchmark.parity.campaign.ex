@@ -32,6 +32,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
         strict: [
           model: :string,
           dspy_model: :string,
+          api_key_env: :string,
           gsm8k: :string,
           hotpotqa: :string,
           chunk_size: :integer,
@@ -76,13 +77,28 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
           chunk_plan = next_chunk_plan(aggregate, dataset_paths(opts))
           chunk_size = planned_chunk_size(aggregate, chunk_plan, opts)
           chunk_opts = Keyword.put(opts, :chunk_size, chunk_size)
+          before_coverage = coverage(aggregate)
 
           Mix.shell().info(
             "running chunk #{chunk_index}/#{chunks} for #{model}: #{chunk_plan_summary(chunk_plan)} max_examples=#{chunk_size}"
           )
 
           run_chunk!(chunk_opts, model, campaign_id, chunk_plan, out_dir)
-          {:cont, aggregate!(model, out_dir, campaign_id)}
+          next_aggregate = aggregate!(model, out_dir, campaign_id)
+
+          if halt_after_chunk?(
+               before_coverage,
+               coverage(next_aggregate),
+               latest_chunk_has_runner_errors?(model, out_dir, campaign_id)
+             ) do
+            Mix.shell().info(
+              "campaign halted after runner/API errors produced no accepted coverage advance; fix provider quota/credentials or rerun later"
+            )
+
+            {:halt, next_aggregate}
+          else
+            {:cont, next_aggregate}
+          end
       end
     end)
   end
@@ -96,6 +112,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   end
 
   defp coverage(aggregate), do: get_in(aggregate, ["coverage", "covered"]) || 0
+
+  @doc false
+  def halt_after_chunk?(before_coverage, after_coverage, runner_errors?) do
+    runner_errors? and after_coverage <= before_coverage
+  end
 
   @doc false
   def planned_chunk_size(aggregate, chunk_plan, opts) do
@@ -242,6 +263,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       runner_order_args(opts, offset) ++
       generation_args(opts) ++
       dspy_model_args(opts) ++
+      api_key_env_args(opts) ++
       dataset_args(chunk_plan) ++
       python_args(opts)
   end
@@ -273,6 +295,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   defp dspy_model_args(opts) do
     []
     |> maybe_arg("--dspy-model", Keyword.get(opts, :dspy_model))
+  end
+
+  defp api_key_env_args(opts) do
+    []
+    |> maybe_arg("--api-key-env", Keyword.get(opts, :api_key_env))
   end
 
   defp maybe_arg(args, _name, nil), do: args
@@ -330,6 +357,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       end
     end)
   end
+
+  defp latest_chunk_has_runner_errors?(model, out_dir, campaign_id) do
+    model
+    |> campaign_reports(out_dir, campaign_id)
+    |> Enum.sort()
+    |> List.last()
+    |> case do
+      nil ->
+        false
+
+      path ->
+        path
+        |> File.read!()
+        |> Jason.decode!()
+        |> Map.get("tasks", [])
+        |> Enum.any?(fn task ->
+          positive_error_count?(task["dsex_errors"]) or positive_error_count?(task["dspy_errors"])
+        end)
+    end
+  end
+
+  defp positive_error_count?(errors) when is_integer(errors), do: errors > 0
+  defp positive_error_count?([_head | _tail]), do: true
+  defp positive_error_count?([]), do: false
+  defp positive_error_count?(_errors), do: false
 
   defp default_campaign_id(model), do: "req_llm-#{model_slug(model)}-#{timestamp_slug()}"
 

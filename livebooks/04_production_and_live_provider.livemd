@@ -16,7 +16,7 @@ mix protocol.check
 ```
 
 These gates are the local project contract. They check formatting, compilation,
-public-surface tests, deterministic gates, local service integration, and
+deterministic tests, package shape, docs, local service integration, and
 provider-compatible protocol behavior.
 
 ## Security Posture
@@ -53,17 +53,17 @@ runtime.traces
 
 ## Optional Live Provider
 
-This cell expects `OPENAI_API_KEY` to be present in your environment. Do not
-paste secrets into the notebook.
+This cell expects `OPENAI_API_KEY` and `OPENAI_MODEL` to be present in your
+environment. Do not paste secrets into the notebook.
 
 ```elixir
-if System.get_env("OPENAI_API_KEY") do
-  model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+  model = System.fetch_env!("OPENAI_MODEL")
   lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 40)
   program = DSEx.predict("question -> answer", lm: lm)
   DSEx.call(program, %{question: "Reply with exactly: pong"})
 else
-  {:skip, "Set OPENAI_API_KEY before running the live provider cell."}
+  {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live provider cell."}
 end
 ```
 

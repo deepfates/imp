@@ -82,8 +82,8 @@ program = DSEx.predict(signature)
 | Optimization | `DSEx.Optimizer.*` | Better demos, instructions, and program variants |
 | Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
 | Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
-| Advanced loops | CodeAct, program-of-thought, RLM | Sandboxed code/tool/recurse workflows for harder tasks |
-| Operations | `mix production.check` | Local gates for tests, traces, benchmarks, docs, and drift |
+| Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |
+| Operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, and docs |
 
 ## Installation
 
@@ -193,7 +193,6 @@ Start here:
 - [API Guide](docs/API_GUIDE.md)
 - [Philosophy](docs/DSEX_PHILOSOPHY.md)
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md)
-- [Parity Validation Program](docs/PARITY_VALIDATION_PROGRAM.md)
 
 The `livebooks/` directory contains runnable tutorials:
 
@@ -204,14 +203,15 @@ The `livebooks/` directory contains runnable tutorials:
 
 ## Validation
 
-The everyday local gate is:
+The everyday local gate proves the package is shippable without spending
+provider tokens or depending on external datasets:
 
 ```sh
 mix production.check
 ```
 
-It runs formatting, compilation, deterministic tests, benchmark integrity,
-golden traces, optimizer lift, overhead checks, RAG/tool/agent checks, and docs.
+It runs formatting, compilation with warnings as errors, deterministic tests,
+package-boundary checks, and ExDoc generation.
 
 Provider-backed checks are opt-in because they use live credentials:
 
@@ -219,10 +219,9 @@ Provider-backed checks are opt-in because they use live credentials:
 LIVE_PROVIDER=1 mix live.check
 ```
 
-DSEx also includes a DSEx-vs-DSPy parity program over real benchmark datasets.
-Those artifacts are evidence, not marketing copy: they are meant to catch drift
-in prompts, adapters, metrics, latency, and provider behavior before claims are
-made.
+Maintainer evidence commands for benchmark truth, golden traces, optimizer
+lift, and parity research live behind `mix evidence.check` and the benchmark
+Mix tasks. They are release evidence, not the normal product workflow.
 
 ## Why Elixir?
 

@@ -127,6 +127,43 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(opts, :top_p)
   end
 
+  test "ReqLLM client translates native JSON schema options for Anthropic" do
+    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ObjectStub)
+
+    program =
+      DSEx.predict("question -> answer, score: int",
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [native_json_schema: true]
+      )
+
+    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", _messages, opts}
+
+    provider_options = Keyword.fetch!(opts, :provider_options)
+    refute Keyword.has_key?(provider_options, :response_format)
+    assert Keyword.fetch!(provider_options, :anthropic_beta) == ["structured-outputs-2025-11-13"]
+    assert get_in(provider_options, [:output_format, :type]) == "json_schema"
+    assert get_in(provider_options, [:output_format, :schema, "type"]) == "object"
+  end
+
+  test "ReqLLM client drops OpenAI-only JSON object hints for Anthropic" do
+    lm =
+      DSEx.req_llm("anthropic:claude-sonnet-4-6",
+        test_pid: self(),
+        req_module: TextStub,
+        response_format: %{type: "json_object"}
+      )
+
+    program = DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+
+    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", _messages, opts}
+
+    refute Keyword.has_key?(opts, :response_format)
+    refute Keyword.has_key?(Keyword.get(opts, :provider_options, []), :response_format)
+  end
+
   test "ReqLLM tool calls return DSEx ReAct-compatible tool call payloads" do
     lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStub)
 

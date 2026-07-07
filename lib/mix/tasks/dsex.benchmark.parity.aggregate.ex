@@ -17,6 +17,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
   @full_lengths %{"gsm8k" => 1319, "hotpotqa" => 7405}
   @max_disagreement_examples 20
   @max_sample_chars 500
+  @evidence_policy_version 2
 
   @impl true
   def run(args) do
@@ -164,6 +165,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "campaign_id" => campaign_id,
       "provider" => provider,
       "model" => model,
+      "evidence_policy" => evidence_policy(),
       "source_reports" => source_reports(reports),
       "generation" => generation,
       "runner_order" => runner_order_summary(reports),
@@ -211,19 +213,36 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     }
   end
 
+  defp evidence_policy do
+    %{
+      "version" => @evidence_policy_version,
+      "runner_error_rows" => "incomplete",
+      "answerless_unindexed_runner_errors" => "incomplete",
+      "newer_incomplete_overwrites_complete" => false,
+      "coverage_unit" => "accepted_complete_row"
+    }
+  end
+
   defp rows_by_task(reports) do
     Enum.reduce(reports, %{}, fn report, acc ->
       Enum.reduce(report["tasks"] || [], acc, fn task, task_acc ->
         task_name = task["task"]
         offset = task["offset"] || 0
         generated_at = report["generated_at"] || ""
+        dsex_error_indexes = task_error_indexes(task["dsex_errors"] || [])
+        dspy_error_indexes = task_error_indexes(task["dspy_errors"] || [])
 
         task_rows =
           task
           |> Map.get("row_agreement", [])
           |> Enum.map(fn row ->
             absolute_index = row["absolute_index"] || offset + row["index"]
-            {absolute_index, row_record(report, task, row, absolute_index, generated_at)}
+
+            {absolute_index,
+             row_record(report, task, row, absolute_index, generated_at,
+               dsex_error?: task_error_at?(dsex_error_indexes, row, "dsex"),
+               dspy_error?: task_error_at?(dspy_error_indexes, row, "dspy")
+             )}
           end)
 
         Map.update(task_acc, task_name, Map.new(task_rows), fn existing ->
@@ -235,13 +254,36 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     end)
   end
 
-  defp row_record(report, task, row, absolute_index, generated_at) do
+  defp task_error_indexes(errors) when is_list(errors) do
+    errors
+    |> Enum.map(& &1["index"])
+    |> Enum.filter(&is_integer/1)
+    |> MapSet.new()
+  end
+
+  defp task_error_indexes(errors) when is_integer(errors) and errors > 0, do: :answerless
+  defp task_error_indexes(_errors), do: MapSet.new()
+
+  defp task_error_at?(:answerless, row, runtime), do: is_nil(row["#{runtime}_answer"])
+
+  defp task_error_at?(%MapSet{} = indexes, row, _runtime),
+    do: MapSet.member?(indexes, row["index"])
+
+  defp row_record(report, task, row, absolute_index, generated_at, opts) do
+    dsex_error? = Keyword.fetch!(opts, :dsex_error?)
+    dspy_error? = Keyword.fetch!(opts, :dspy_error?)
+
+    row_evidence_complete? =
+      row["row_evidence_complete"] != false and not dsex_error? and not dspy_error?
+
     %{
       "absolute_index" => absolute_index,
       "index" => row["index"],
       "dsex_row_present" => row["dsex_row_present"] != false,
       "dspy_row_present" => row["dspy_row_present"] != false,
-      "row_evidence_complete" => row["row_evidence_complete"] != false,
+      "row_evidence_complete" => row_evidence_complete?,
+      "dsex_runner_error" => dsex_error?,
+      "dspy_runner_error" => dspy_error?,
       "dsex_passed" => row["dsex_passed"] == true,
       "dspy_passed" => row["dspy_passed"] == true,
       "pass_agreement" => row["pass_agreement"] == true,
@@ -265,7 +307,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
   end
 
   defp newest(old, row) do
-    if row["source_generated_at"] >= old["source_generated_at"], do: row, else: old
+    cond do
+      old["row_evidence_complete"] == true and row["row_evidence_complete"] != true ->
+        old
+
+      old["row_evidence_complete"] != true and row["row_evidence_complete"] == true ->
+        row
+
+      row["source_generated_at"] >= old["source_generated_at"] ->
+        row
+
+      true ->
+        old
+    end
   end
 
   defp task_summary(task, expected, rows) do
@@ -277,6 +331,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     row_values = Enum.map(canonical_rows, &elem(&1, 1))
     complete_rows = Enum.filter(row_values, & &1["row_evidence_complete"])
     incomplete_rows = length(row_values) - length(complete_rows)
+
+    runner_error_rows =
+      Enum.count(
+        row_values,
+        &(&1["dsex_runner_error"] == true or &1["dspy_runner_error"] == true)
+      )
+
     out_of_range_count = length(out_of_range_rows)
     covered = length(complete_rows)
     dsex_passes = Enum.count(complete_rows, & &1["dsex_passed"])
@@ -293,6 +354,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
         "full" => covered == expected and incomplete_rows == 0 and out_of_range_count == 0,
         "missing_ranges" => missing_ranges(complete_indexes(canonical_rows), expected),
         "incomplete_rows" => incomplete_rows,
+        "runner_error_rows" => runner_error_rows,
         "out_of_range_rows" => out_of_range_count
       },
       "dsex_score" => dsex_score,
@@ -861,6 +923,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
 
   defp wire_api_family("litellm_chat_completion_with_max_completion_tokens"),
     do: "openai_chat_completions"
+
+  defp wire_api_family("anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("litellm_anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("google_generate_content"), do: "google_generate_content"
+  defp wire_api_family("litellm_google_generate_content"), do: "google_generate_content"
 
   defp wire_api_family(other), do: other
 

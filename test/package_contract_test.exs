@@ -1,6 +1,8 @@
 defmodule PackageContractTest do
   use ExUnit.Case, async: false
 
+  @moduletag :package
+
   @product_files [
     "lib/dsex.ex",
     "lib/dsex/clients/req_llm.ex",
@@ -20,6 +22,10 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
+    "docs/BENCHMARK_TRUTH.md",
+    "docs/COVERAGE_MATRIX.md",
+    "docs/PARITY_VALIDATION_PROGRAM.md",
+    "docs/RELEASE_CRITERIA.md",
     "lib/dsex/benchmarks.ex",
     "lib/dsex/test_mode.ex",
     "lib/dsex/lm/fake.ex",

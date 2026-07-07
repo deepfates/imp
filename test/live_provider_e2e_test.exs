@@ -5,9 +5,10 @@ defmodule LiveProviderE2ETest do
 
   defp live_lm(opts \\ []) do
     api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+    model = System.get_env("OPENAI_MODEL")
 
     assert is_binary(api_key) and byte_size(api_key) > 0
+    assert is_binary(model) and byte_size(model) > 0
 
     DSEx.req_llm(
       "openai:#{model}",

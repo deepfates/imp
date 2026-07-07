@@ -7,13 +7,17 @@ defmodule GateContractTest do
     assert Keyword.fetch!(aliases, :"production.check") == [
              "format --check-formatted",
              "compile --warnings-as-errors",
-             "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
+             "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
+             "package.check",
+             "docs"
+           ]
+
+    assert Keyword.fetch!(aliases, :"evidence.check") == [
              "benchmark.truth.check",
              "benchmark.trace.check",
              "benchmark.overhead.check",
              "benchmark.optimizer_lift.check",
-             "benchmark.rag_tool_agent.check",
-             "docs"
+             "benchmark.rag_tool_agent.check"
            ]
 
     retired_gate = String.to_atom("v2" <> ".check")

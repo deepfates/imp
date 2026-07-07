@@ -4,19 +4,17 @@ This document is the authoritative release gate contract for DSEx.
 
 ## Required Gates
 
-Run from a clean tree:
+Run from a clean tree before shipping ordinary product changes:
 
 ```sh
 mix production.check
 mix integration.check
 mix protocol.check
-mix benchmark.truth.check
-mix benchmark.trace.check
 mix package.check
 mix quality.check
 ```
 
-With live credentials:
+With live provider credentials, run the opt-in provider smoke gate:
 
 ```sh
 set -a
@@ -25,11 +23,16 @@ set +a
 LIVE_PROVIDER=1 mix live.check
 ```
 
-Live provider inference is opt-in because it requires external credentials:
+Maintainer evidence for benchmarks and parity is separate from the production
+gate:
 
 ```sh
-LIVE_PROVIDER=1 mix live.check
+mix evidence.check
 ```
+
+Use benchmark evidence when changing prompts, adapters, metrics, optimizers, or
+claims about DSEx-vs-DSPy parity. Do not make paid live campaigns part of the
+default product workflow.
 
 ## Runtime Posture
 
@@ -93,12 +96,12 @@ Dependency policy:
 
 - format check
 - compile with warnings as errors
-- the deterministic non-live, non-integration test suite, including the public
-  surface contract, benchmark positive controls, and benchmark negative controls
-- benchmark truth fixture harness tests through `mix benchmark.truth.check`
-- provider-free DSEx-vs-DSPy golden trace parity through
-  `mix benchmark.trace.check`
+- the deterministic non-live, non-integration, non-protocol test suite
+- package-boundary checks through `mix package.check`
 - documentation generation with ExDoc
+
+It intentionally does not run paid provider calls, dataset fetches, long
+campaigns, or parity dashboards.
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other
@@ -131,6 +134,15 @@ before merge, not only during local release preparation.
 installable package contains product modules, docs, and Livebooks while
 excluding local benchmark evidence tasks, historical compatibility modules, and
 test-only support.
+
+`mix evidence.check` runs deterministic maintainer evidence:
+
+- benchmark truth fixture harness tests through `mix benchmark.truth.check`
+- provider-free DSEx-vs-DSPy golden trace parity through
+  `mix benchmark.trace.check`
+- overhead checks through `mix benchmark.overhead.check`
+- optimizer lift checks through `mix benchmark.optimizer_lift.check`
+- RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
 
 The live provider tests prove a real provider can execute:
 
@@ -239,7 +251,7 @@ Typical `.env`:
 
 ```sh
 OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=...
 ```
 
 Run:
@@ -273,11 +285,10 @@ Public surface failure:
 mix public_surface.check
 ```
 
-Benchmark failure:
+Maintainer evidence failure:
 
 ```sh
-mix test test/benchmark_test.exs
-mix benchmark.truth.check
+mix evidence.check
 ```
 
 Local integration failure:

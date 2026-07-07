@@ -277,7 +277,6 @@ defmodule DSEx.Clients.ReqLLM do
     ])
     |> rename_timeout()
     |> normalize_numeric_opts()
-    |> normalize_response_format()
     |> normalize_tools()
   end
 
@@ -299,16 +298,51 @@ defmodule DSEx.Clients.ReqLLM do
     |> Enum.reject(&match?({_key, nil}, &1))
   end
 
-  defp normalize_response_format(opts) do
+  defp normalize_response_format(opts, model) do
     case Keyword.pop(opts, :response_format) do
       {nil, opts} ->
         opts
 
       {format, opts} ->
+        put_response_format(opts, model, format)
+    end
+  end
+
+  defp put_response_format(opts, model, format) do
+    cond do
+      anthropic_model?(model) ->
+        put_anthropic_response_format(opts, format)
+
+      true ->
         Keyword.update(opts, :provider_options, [response_format: format], fn provider_opts ->
           Keyword.put(provider_opts, :response_format, format)
         end)
     end
+  end
+
+  defp put_anthropic_response_format(opts, %{type: "json_schema", json_schema: json_schema}) do
+    schema = json_schema[:schema] || json_schema["schema"] || json_schema
+
+    Keyword.update(
+      opts,
+      :provider_options,
+      [
+        anthropic_beta: ["structured-outputs-2025-11-13"],
+        output_format: %{type: "json_schema", schema: schema}
+      ],
+      fn provider_opts ->
+        provider_opts
+        |> Keyword.update(:anthropic_beta, ["structured-outputs-2025-11-13"], fn betas ->
+          ["structured-outputs-2025-11-13" | List.wrap(betas)]
+        end)
+        |> Keyword.put(:output_format, %{type: "json_schema", schema: schema})
+        |> Keyword.delete(:response_format)
+      end
+    )
+  end
+
+  defp put_anthropic_response_format(opts, _format) do
+    Keyword.update(opts, :provider_options, [], &Keyword.delete(&1, :response_format))
   end
 
   defp normalize_tools(opts) do
@@ -318,6 +352,8 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   defp normalize_provider_profile_opts(opts, model) do
+    opts = normalize_response_format(opts, model)
+
     if openai_reasoning_model?(model) do
       opts
       |> rename_max_tokens_for_reasoning()
@@ -351,6 +387,13 @@ defmodule DSEx.Clients.ReqLLM do
       String.match?(model, ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/) or
         String.contains?(model, "reasoning")
     end)
+  end
+
+  defp anthropic_model?(model) do
+    model
+    |> to_string()
+    |> String.downcase()
+    |> String.starts_with?("anthropic:")
   end
 
   defp normalize_tool(%ReqLLM.Tool{} = tool), do: tool

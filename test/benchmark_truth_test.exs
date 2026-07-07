@@ -177,13 +177,42 @@ defmodule BenchmarkTruthTest do
     assert row["diagnostic"]["trace"]["messages"] != []
     [system | _rest] = row["diagnostic"]["trace"]["messages"]
     assert system["content"] =~ "`answer` (str): short exact answer"
-    assert system["content"] =~ "Must be a concise exact answer span"
+    refute system["content"] =~ "Must be a concise exact answer span"
     assert system["content"] =~ "For yes/no questions, answer exactly yes or no."
     assert system["content"] =~ "Return the canonical exact answer span from the context."
     assert system["content"] =~ "Do not abbreviate locations, titles, names, dates, or quantities"
     assert row["metric_metadata"]["task_metric"] == "hotpotqa_exact_match"
     assert row["metric_metadata"]["official_hotpotqa_em"] == false
     assert is_number(row["metric_metadata"]["official_hotpotqa_f1"])
+  end
+
+  test "HotPotQA benchmark treats verbose wrong answers as metric failures, not parse errors" do
+    out_dir = tmp_dir("hotpotqa-verbose-answer")
+
+    verbose_answer =
+      "United States Ambassador to Ghana and to Czechoslovakia, and Chief of Protocol of the United States"
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")],
+        out_dir: out_dir,
+        max_examples: 1,
+        lm: %{
+          module: DSEx.LM.Static,
+          opts: [handler: fn _messages, _opts -> %{answer: verbose_answer} end]
+        },
+        optimizer_comparisons: false
+      )
+
+    [task] = result.report["tasks"]
+    [row] = task["rows"]
+
+    refute row["passed"]
+    assert row["error"] == nil
+    assert row["prediction"][:answer] == verbose_answer
+    assert task["errors"] == []
+    assert row["metric_metadata"]["task_metric"] == "hotpotqa_exact_match"
+    assert row["metric_metadata"]["official_hotpotqa_em"] == false
   end
 
   test "benchmark truth diagnostics include traces for adapter parse failures" do
@@ -212,6 +241,29 @@ defmodule BenchmarkTruthTest do
     assert row["error"]["reason"] == ["error", ["missing_output_fields", ["answer"]]]
     assert row["diagnostic"]["trace"]["raw"] =~ "I forgot the answer field."
     assert row["diagnostic"]["trace"]["messages"] != []
+  end
+
+  test "benchmark truth reports provider errors with improper-list terms" do
+    out_dir = tmp_dir("improper-list-error")
+    improper_reason = [:provider_error | "messages"]
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
+        out_dir: out_dir,
+        max_examples: 1,
+        lm: fn _messages, _opts -> {:error, improper_reason} end,
+        optimizer_comparisons: false
+      )
+
+    [task] = result.report["tasks"]
+    [row] = task["rows"]
+
+    refute row["passed"]
+    assert row["error"] == inspect(improper_reason)
+    assert [%{"reason" => reason}] = task["errors"]
+    assert reason == inspect(improper_reason)
+    assert File.exists?(result.out_path)
   end
 
   test "benchmark truth rows include DSEx runtime instrumentation" do
@@ -445,6 +497,44 @@ defmodule BenchmarkTruthTest do
     assert output =~ "ok"
   end
 
+  test "DSPy parity runner keeps provider-qualified model names intact" do
+    runner_path = Path.expand("../scripts/dspy_parity_runner.py", __DIR__)
+
+    python = """
+    import importlib.util
+    import sys
+    import types
+
+    fake = types.ModuleType("dspy")
+    fake.__version__ = "fake"
+    fake.settings = types.SimpleNamespace(lm=None)
+    fake.Signature = type("Signature", (), {})
+    fake.Module = type("Module", (), {})
+    fake.ChainOfThought = lambda signature: None
+    fake.Predict = lambda signature: None
+    fake.InputField = lambda *args, **kwargs: None
+    fake.OutputField = lambda *args, **kwargs: None
+    fake.LM = lambda *args, **kwargs: None
+    fake.configure = lambda **kwargs: None
+    sys.modules["dspy"] = fake
+
+    spec = importlib.util.spec_from_file_location("dspy_parity_runner", #{Jason.encode!(runner_path)})
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    assert runner.dspy_lm_name("gpt-5.4-mini") == "openai/gpt-5.4-mini"
+    assert runner.dspy_lm_name("responses/gpt-5.4-mini") == "responses/gpt-5.4-mini"
+    assert runner.dspy_lm_name("anthropic/claude-haiku-4-5") == "anthropic/claude-haiku-4-5"
+    assert runner.wire_api("anthropic/claude-haiku-4-5") == "litellm_anthropic_messages"
+    assert runner.wire_api("gemini/gemini-3-flash-preview") == "litellm_google_generate_content"
+    print("ok")
+    """
+
+    {output, status} = System.cmd("python3", ["-c", python], stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ "ok"
+  end
+
   test "parity task parses reasoning effort option" do
     assert {[reasoning_effort: "low"], [], []} =
              Mix.Tasks.Dsex.Benchmark.Parity.parse_args(["--reasoning-effort", "low"])
@@ -459,6 +549,37 @@ defmodule BenchmarkTruthTest do
     assert Keyword.fetch!(generation_opts, :temperature) == 0.0
     assert Keyword.fetch!(generation_opts, :max_tokens) == 700
     assert Keyword.fetch!(generation_opts, :reasoning_effort) == "low"
+  end
+
+  test "parity task supports explicit matched non-OpenAI provider specs" do
+    assert {[model: "anthropic:claude-haiku-4-5", api_key_env: "ANTHROPIC_API_KEY"], [], []} =
+             Mix.Tasks.Dsex.Benchmark.Parity.parse_args([
+               "--model",
+               "anthropic:claude-haiku-4-5",
+               "--api-key-env",
+               "ANTHROPIC_API_KEY"
+             ])
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.api_key_env(api_key_env: "ANTHROPIC_API_KEY") ==
+             "ANTHROPIC_API_KEY"
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.dsex_model_spec([], "gpt-5.4-mini") ==
+             "openai:gpt-5.4-mini"
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.dsex_model_spec(
+             [],
+             "anthropic:claude-haiku-4-5"
+           ) == "anthropic:claude-haiku-4-5"
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.default_dspy_model(
+             "anthropic:claude-haiku-4-5",
+             "anthropic:claude-haiku-4-5"
+           ) == "anthropic/claude-haiku-4-5"
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.default_dspy_model(
+             "openai:gpt-5.4-mini",
+             "gpt-5.4-mini"
+           ) == "gpt-5.4-mini"
   end
 
   test "parity aggregate deduplicates overlapping chunks and reports coverage gaps" do
@@ -627,6 +748,51 @@ defmodule BenchmarkTruthTest do
     assert effective["dspy_wire_endpoint_families"] == ["openai_chat_completions"]
   end
 
+  test "parity aggregate treats ReqLLM and LiteLLM Anthropic labels as one endpoint family" do
+    out_dir = tmp_dir("parity-aggregate-wire-api-anthropic-family")
+
+    write_parity_report(
+      out_dir,
+      "anthropic-family.json",
+      "2026-07-06T00:00:00Z",
+      0,
+      [true],
+      generation: %{
+        "temperature" => 0.0,
+        "max_tokens" => 700,
+        "dsex" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "anthropic_messages"
+        },
+        "dspy" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "litellm_anthropic_messages"
+        }
+      }
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+
+    effective =
+      campaign_path |> File.read!() |> Jason.decode!() |> get_in(["generation", "effective"])
+
+    assert effective["wire_api_complete"]
+    assert effective["wire_api_matched"]
+    assert effective["dsex_wire_endpoint_families"] == ["anthropic_messages"]
+    assert effective["dspy_wire_endpoint_families"] == ["anthropic_messages"]
+  end
+
   test "parity aggregate marks runtime shape incomplete when DSPy history is partial" do
     out_dir = tmp_dir("parity-aggregate-partial-runtime-shape")
 
@@ -791,6 +957,120 @@ defmodule BenchmarkTruthTest do
     assert gsm8k["dspy_passes"] == 0
     refute campaign["coverage"]["full"]
     refute campaign["parity"]["full_parity"]
+  end
+
+  test "parity aggregate treats runner error rows as incomplete and preserves older complete evidence" do
+    out_dir = tmp_dir("parity-aggregate-runner-errors")
+
+    write_parity_rows(out_dir, "older-complete.json", [complete_row(0, true)])
+
+    failed_row =
+      complete_row(0, false)
+      |> Map.merge(%{
+        "dsex_answer" => nil,
+        "dspy_answer" => nil,
+        "dsex_instrumentation" => %{"lm_calls" => 1},
+        "dspy_instrumentation" => %{"lm_calls" => 1}
+      })
+
+    failed_report = %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-06T00:01:00Z",
+      "campaign_id" => nil,
+      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
+      "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
+      "tasks" => [
+        %{
+          "task" => "gsm8k",
+          "offset" => 0,
+          "examples" => 1,
+          "dsex_duration_ms" => 10.0,
+          "dspy_duration_ms" => 20.0,
+          "dsex_errors" => [%{"index" => 0, "reason" => "insufficient_quota"}],
+          "dspy_errors" => [%{"index" => 0, "reason" => "insufficient_quota"}],
+          "row_agreement" => [failed_row]
+        }
+      ],
+      "evidence" => %{"examples" => 1}
+    }
+
+    File.write!(
+      Path.join(out_dir, "newer-runner-error.json"),
+      Jason.encode!(failed_report, pretty: true) <> "\n"
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+    gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
+
+    assert gsm8k["coverage"]["covered"] == 1
+    assert gsm8k["coverage"]["runner_error_rows"] == 0
+    assert gsm8k["dsex_passes"] == 1
+    assert gsm8k["dspy_passes"] == 1
+    assert gsm8k["disagreements"]["count"] == 0
+  end
+
+  test "parity aggregate treats unindexed runner error counts as incomplete evidence" do
+    out_dir = tmp_dir("parity-aggregate-runner-error-counts")
+
+    report = %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-06T00:00:00Z",
+      "campaign_id" => nil,
+      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
+      "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
+      "tasks" => [
+        %{
+          "task" => "gsm8k",
+          "offset" => 0,
+          "examples" => 1,
+          "dsex_duration_ms" => 10.0,
+          "dspy_duration_ms" => 20.0,
+          "dsex_errors" => 1,
+          "dspy_errors" => 1,
+          "row_agreement" => [
+            complete_row(0, false)
+            |> Map.put("dsex_answer", nil)
+            |> Map.put("dspy_answer", nil)
+          ]
+        }
+      ],
+      "evidence" => %{"examples" => 1}
+    }
+
+    File.write!(Path.join(out_dir, "runner-error-counts.json"), Jason.encode!(report) <> "\n")
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+    gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
+
+    assert gsm8k["coverage"]["covered"] == 0
+    assert gsm8k["coverage"]["incomplete_rows"] == 1
+    assert gsm8k["coverage"]["runner_error_rows"] == 1
   end
 
   test "parity aggregate refuses to mix provider identities" do
@@ -1075,6 +1355,53 @@ defmodule BenchmarkTruthTest do
     assert analysis["summary"]["pass_disagreements"] == 3
   end
 
+  test "HotPotQA analysis excludes answerless runner error rows" do
+    out_dir = tmp_dir("hotpot-analysis-runner-errors")
+    data_path = Path.join(out_dir, "hotpotqa.jsonl")
+
+    File.write!(data_path, """
+    {"question":"How much?","answer":"$10.5 million","context":"x","source_task":"hotpotqa"}
+    {"question":"Are both magazines?","answer":"yes","context":"x","source_task":"hotpotqa"}
+    {"question":"Which city?","answer":"Paris France","context":"x","source_task":"hotpotqa"}
+    {"question":"Who?","answer":"Todd Fisher","context":"x","source_task":"hotpotqa"}
+    """)
+
+    write_hotpotqa_analysis_report(out_dir, "dsex-dspy-parity-directory.json",
+      extra_task_fields: %{"dsex_errors" => 1, "dspy_errors" => 1},
+      extra_rows: [
+        %{
+          "index" => 3,
+          "absolute_index" => 3,
+          "dsex_passed" => false,
+          "dspy_passed" => false,
+          "pass_agreement" => true,
+          "answer_agreement" => true,
+          "dsex_answer" => nil,
+          "dspy_answer" => nil
+        }
+      ]
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis.run([
+        "--in",
+        out_dir,
+        "--out",
+        out_dir,
+        "--campaign-id",
+        "analysis-run",
+        "--hotpotqa",
+        data_path
+      ])
+    end)
+
+    [analysis_path] = Path.wildcard(Path.join(out_dir, "hotpotqa-disagreement-analysis-*.json"))
+    analysis = analysis_path |> File.read!() |> Jason.decode!()
+
+    assert analysis["coverage"] == %{"covered" => 3, "disagreements" => 3}
+    assert analysis["summary"]["rows"] == 3
+  end
+
   test "campaign planner advances only runnable datasets at the next missing offset" do
     aggregate = %{
       "next_chunks" => [
@@ -1115,6 +1442,7 @@ defmodule BenchmarkTruthTest do
       Mix.Tasks.Dsex.Benchmark.Parity.Campaign.chunk_args(
         [
           dspy_model: "responses/gpt-5.4-mini",
+          api_key_env: "OPENAI_API_KEY",
           chunk_size: 50,
           max_concurrency: 8,
           temperature: 0.0,
@@ -1143,6 +1471,14 @@ defmodule BenchmarkTruthTest do
     assert "--model" in args
     assert "--runner-order" in args
     assert "--gsm8k" in args
+    assert "--api-key-env" in args
+  end
+
+  test "campaign halt decision stops runner-error chunks with no accepted coverage gain" do
+    refute Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 150, true)
+    refute Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, false)
+    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, true)
+    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 90, true)
   end
 
   test "campaign target coverage shrinks chunk size to the next useful live slice" do
@@ -1256,6 +1592,36 @@ defmodule BenchmarkTruthTest do
       "tasks" => []
     })
 
+    write_campaign_artifact(in_dir, "mini-inflated-incomplete.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-5.4-mini",
+      "generated_at" => "2026-07-07T00:02:00Z",
+      "coverage" => %{"covered" => 30, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => [
+        %{
+          "task" => "gsm8k",
+          "dsex_instrumentation" => %{
+            "coverage" => %{
+              "instrumented_rows" => 20,
+              "total_rows" => 30,
+              "complete" => false
+            }
+          },
+          "runtime_shape" => %{
+            "coverage" => %{
+              "total_rows" => 30,
+              "message_chars_comparable_rows" => 20,
+              "raw_chars_comparable_rows" => 20,
+              "complete" => false
+            }
+          }
+        }
+      ]
+    })
+
     write_campaign_artifact(in_dir, "historical.json", %{
       "provider" => "req_llm",
       "model" => "gpt-3.5-turbo-legacy",
@@ -1304,7 +1670,9 @@ defmodule BenchmarkTruthTest do
     assert required["current_low_cost"]["present"]
     assert required["frontier_sanity"]["present"]
     assert required["historical_research"]["full_evidence"]
+    assert required["historical_research"]["satisfied"]
     refute required["frontier_sanity"]["full_evidence"]
+    refute required["frontier_sanity"]["satisfied"]
     assert required["current_low_cost"]["best_status"] == "smoke"
     assert required["current_low_cost"]["models"] == ["gpt-5.4-mini"]
     assert required["current_low_cost"]["coverage"]["remaining_rows"] == 8704
@@ -1394,7 +1762,194 @@ defmodule BenchmarkTruthTest do
     assert Enum.any?(matrix["models"], &(&1["cost"]["estimated_total_tokens"] > 0))
   end
 
-  test "live matrix prefers wider coverage over narrower complete runtime-shape diagnostics" do
+  test "live matrix applies lane-specific release policies" do
+    out_dir = tmp_dir("live-matrix-lane-policy")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "current-sample.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-5.4-mini",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_campaign_artifact(in_dir, "frontier-sample.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => Map.put(sample_parity(), "max_task_score_gap", 0.010000000000000009),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_campaign_artifact(in_dir, "historical-sample.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-3.5-turbo-legacy",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    required = matrix["summary"]["required_lanes"]
+
+    refute matrix["summary"]["matrix_complete"]
+    refute required["current_low_cost"]["satisfied"]
+    assert required["current_low_cost"]["policy"]["required_scale"] == "full"
+    assert required["frontier_sanity"]["satisfied"]
+    assert required["frontier_sanity"]["policy"]["required_scale"] == "research_sample"
+    assert required["historical_research"]["satisfied"]
+    assert required["historical_research"]["policy"]["required_scale"] == "research_sample"
+  end
+
+  test "live matrix tags modern non-OpenAI model lanes" do
+    out_dir = tmp_dir("live-matrix-non-openai-lanes")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "haiku.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-haiku-4-5",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => [
+        %{
+          "task" => "gsm8k",
+          "runtime_shape" => %{
+            "coverage" => %{
+              "total_rows" => 1,
+              "message_chars_comparable_rows" => 1,
+              "raw_chars_comparable_rows" => 1,
+              "complete" => true
+            },
+            "message_chars_ratio_dsex_over_dspy_mean" => 1.0,
+            "raw_chars_ratio_dsex_over_dspy_mean" => 0.5
+          }
+        },
+        %{
+          "task" => "hotpotqa",
+          "runtime_shape" => %{
+            "coverage" => %{
+              "total_rows" => 0,
+              "message_chars_comparable_rows" => 0,
+              "raw_chars_comparable_rows" => 0,
+              "complete" => false
+            }
+          }
+        }
+      ]
+    })
+
+    write_campaign_artifact(in_dir, "mini.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-5.4-mini",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 20, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_campaign_artifact(in_dir, "sonnet.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_campaign_artifact(in_dir, "historical-gemini.json", %{
+      "provider" => "req_llm",
+      "model" => "gemini/gemini-1.5-pro",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    required = matrix["summary"]["required_lanes"]
+
+    assert required["current_low_cost"]["present"]
+
+    assert required["current_low_cost"]["models"] == [
+             "anthropic:claude-haiku-4-5",
+             "gpt-5.4-mini"
+           ]
+
+    assert required["current_low_cost"]["best_model"] == "gpt-5.4-mini"
+    assert required["current_low_cost"]["coverage"]["covered_rows"] == 20
+    assert required["current_low_cost"]["coverage"]["expected_rows"] == 8724
+    assert required["current_low_cost"]["coverage"]["candidate_count"] == 2
+    assert required["current_low_cost"]["coverage"]["cumulative"]["covered_rows"] == 21
+    assert required["current_low_cost"]["coverage"]["cumulative"]["expected_rows"] == 17_448
+
+    assert required["frontier_sanity"]["present"]
+    assert required["frontier_sanity"]["models"] == ["anthropic:claude-sonnet-4-6"]
+    assert required["historical_research"]["present"]
+    assert required["historical_research"]["models"] == ["gemini/gemini-1.5-pro"]
+
+    assert Enum.find(matrix["models"], &(&1["model"] == "anthropic:claude-haiku-4-5"))[
+             "lane_tags"
+           ] == ["current_low_cost"]
+
+    assert Enum.find(matrix["models"], &(&1["model"] == "anthropic:claude-sonnet-4-6"))[
+             "lane_tags"
+           ] == ["frontier_sanity"]
+
+    haiku = Enum.find(matrix["models"], &(&1["model"] == "anthropic:claude-haiku-4-5"))
+    assert haiku["runtime_shape"]["complete"]
+    assert haiku["runtime_shape"]["tasks_with_runtime_shape"] == 1
+    assert Map.has_key?(haiku["runtime_shape"]["by_task"], "gsm8k")
+    refute Map.has_key?(haiku["runtime_shape"]["by_task"], "hotpotqa")
+
+    assert Enum.find(matrix["models"], &(&1["model"] == "gemini/gemini-1.5-pro"))[
+             "lane_tags"
+           ] == ["historical_research"]
+  end
+
+  test "live matrix prefers complete runtime-shape diagnostics over wider incomplete coverage" do
     out_dir = tmp_dir("live-matrix-coverage-rank")
     in_dir = Path.join(out_dir, "campaigns")
     matrix_dir = Path.join(out_dir, "matrix")
@@ -1457,9 +2012,60 @@ defmodule BenchmarkTruthTest do
     [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
     [mini] = matrix_path |> File.read!() |> Jason.decode!() |> Map.fetch!("models")
 
-    assert mini["coverage"]["covered"] == 300
-    assert mini["artifact"]["path"] =~ "wide-partial-shape.json"
-    refute mini["runtime_shape"]["complete"]
+    assert mini["coverage"]["covered"] == 12
+    assert mini["artifact"]["path"] =~ "narrow-complete-shape.json"
+    assert mini["runtime_shape"]["complete"]
+  end
+
+  test "live matrix prefers current evidence policy over stale higher coverage" do
+    out_dir = tmp_dir("live-matrix-evidence-policy-rank")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    base = %{
+      "provider" => "req_llm",
+      "model" => "gpt-5.4-mini",
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => instrumented_task_pair(6)
+    }
+
+    write_campaign_artifact(
+      in_dir,
+      "old-policy-higher-coverage.json",
+      Map.merge(base, %{
+        "generated_at" => "2026-07-07T00:00:00Z",
+        "coverage" => %{"covered" => 300, "expected" => 8724, "full" => false}
+      })
+    )
+
+    write_campaign_artifact(
+      in_dir,
+      "current-policy-lower-coverage.json",
+      Map.merge(base, %{
+        "generated_at" => "2026-07-07T00:01:00Z",
+        "coverage" => %{"covered" => 250, "expected" => 8724, "full" => false},
+        "evidence_policy" => current_evidence_policy()
+      })
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    [mini] = matrix_path |> File.read!() |> Jason.decode!() |> Map.fetch!("models")
+
+    assert mini["coverage"]["covered"] == 250
+    assert mini["artifact"]["path"] =~ "current-policy-lower-coverage.json"
+    assert mini["proof"]["evidence_policy_current"]
   end
 
   test "live matrix accepts shell-expanded input files after --in" do
@@ -1605,7 +2211,7 @@ defmodule BenchmarkTruthTest do
     assert model["latency"]["latency_ratio_dsex_over_dspy"] == 1.35
   end
 
-  test "live matrix keeps larger coverage visible even when diagnostics are partial" do
+  test "live matrix prefers instrumented rerun over larger uninstrumented coverage" do
     out_dir = tmp_dir("live-matrix-instrumented-rerun")
     in_dir = Path.join(out_dir, "campaigns")
     matrix_dir = Path.join(out_dir, "matrix")
@@ -1713,10 +2319,10 @@ defmodule BenchmarkTruthTest do
     [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
     [model] = matrix_path |> File.read!() |> Jason.decode!() |> Map.fetch!("models")
 
-    assert model["artifact"]["path"] =~ "larger-uninstrumented.json"
-    assert model["coverage"]["covered"] == 500
-    refute model["dsex_instrumentation"]["coverage"]["complete"]
-    refute model["runtime_shape"]["complete"]
+    assert model["artifact"]["path"] =~ "smaller-instrumented.json"
+    assert model["coverage"]["covered"] == 150
+    assert model["dsex_instrumentation"]["coverage"]["complete"]
+    assert model["runtime_shape"]["complete"]
   end
 
   test "live matrix prefers current prompt contract over larger obsolete reruns" do
@@ -1788,6 +2394,72 @@ defmodule BenchmarkTruthTest do
     assert model["coverage"]["covered"] == 100
     assert model["proof"]["prompt_contract_current"]
     assert model["proof"]["prompt_contract"] == current_prompt_contract()
+  end
+
+  test "live matrix lane summaries prefer current proof over stale larger low-cost coverage" do
+    out_dir = tmp_dir("live-matrix-lane-current-proof-rank")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    obsolete_generation =
+      put_in(
+        matched_effective_generation(),
+        ["value", "prompt_contract"],
+        %{
+          "dsex_req_llm" => "dsex-chat-template-v6-canonical-answer",
+          "python_dspy" => "dspy-signature-chat-20260707-canonical-answer"
+        }
+      )
+
+    shared = %{
+      "provider" => "req_llm",
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "evidence_policy" => current_evidence_policy(),
+      "tasks" => instrumented_task_pair(50)
+    }
+
+    write_campaign_artifact(
+      in_dir,
+      "larger-obsolete-mini.json",
+      Map.merge(shared, %{
+        "model" => "gpt-5.4-mini",
+        "generated_at" => "2026-07-07T00:00:00Z",
+        "coverage" => %{"covered" => 7930, "expected" => 8724, "full" => false},
+        "generation" => obsolete_generation
+      })
+    )
+
+    write_campaign_artifact(
+      in_dir,
+      "current-haiku.json",
+      Map.merge(shared, %{
+        "model" => "anthropic:claude-haiku-4-5",
+        "generated_at" => "2026-07-07T00:01:00Z",
+        "coverage" => %{"covered" => 1000, "expected" => 8724, "full" => false},
+        "generation" => matched_effective_generation()
+      })
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    low_cost = matrix["summary"]["required_lanes"]["current_low_cost"]
+
+    assert low_cost["best_model"] == "anthropic:claude-haiku-4-5"
+    assert low_cost["coverage"]["best_model"] == "anthropic:claude-haiku-4-5"
+    assert low_cost["coverage"]["covered_rows"] == 1000
+    assert low_cost["coverage"]["remaining_rows"] == 7724
+    refute low_cost["satisfied"]
   end
 
   test "live matrix freshness uses artifact generated_at before file mtime" do
@@ -2239,7 +2911,7 @@ defmodule BenchmarkTruthTest do
     File.write!(Path.join(out_dir, name), Jason.encode!(report, pretty: true) <> "\n")
   end
 
-  defp write_hotpotqa_analysis_report(out_dir, name) do
+  defp write_hotpotqa_analysis_report(out_dir, name, opts \\ []) do
     rows = [
       %{
         "index" => 0,
@@ -2285,14 +2957,11 @@ defmodule BenchmarkTruthTest do
       }
     ]
 
-    report = %{
-      "schema_version" => 1,
-      "generated_at" => "2026-07-06T00:00:00Z",
-      "campaign_id" => "analysis-run",
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
-      "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
-      "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
-      "tasks" => [
+    rows = rows ++ Keyword.get(opts, :extra_rows, [])
+    extra_task_fields = Keyword.get(opts, :extra_task_fields, %{})
+
+    task =
+      Map.merge(
         %{
           "task" => "hotpotqa",
           "offset" => 0,
@@ -2300,8 +2969,18 @@ defmodule BenchmarkTruthTest do
           "dsex_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows
-        }
-      ],
+        },
+        extra_task_fields
+      )
+
+    report = %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-06T00:00:00Z",
+      "campaign_id" => "analysis-run",
+      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
+      "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
+      "tasks" => [task],
       "evidence" => %{"examples" => length(rows)}
     }
 
@@ -2337,8 +3016,30 @@ defmodule BenchmarkTruthTest do
     }
   end
 
+  defp sample_parity do
+    %{
+      "full_parity" => false,
+      "full_coverage" => false,
+      "latency_parity" => true,
+      "aggregate_gap" => 0.0,
+      "max_task_score_gap" => 0.0,
+      "strict_aggregate_gap" => 0.01,
+      "strict_task_gap" => 0.01
+    }
+  end
+
   defp current_prompt_contract do
     DSEx.BenchmarkTruth.Contract.current_prompt_contract()
+  end
+
+  defp current_evidence_policy do
+    %{
+      "version" => 2,
+      "runner_error_rows" => "incomplete",
+      "answerless_unindexed_runner_errors" => "incomplete",
+      "newer_incomplete_overwrites_complete" => false,
+      "coverage_unit" => "accepted_complete_row"
+    }
   end
 
   defp instrumented_task_pair(rows_per_task) do

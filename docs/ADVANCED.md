@@ -125,11 +125,10 @@ helpers as application APIs:
 
 ```sh
 mix production.check
-mix benchmark.truth.check
-mix benchmark.dashboard
+mix evidence.check
 ```
 
-The deterministic production fixture covers:
+The deterministic evidence fixtures cover:
 
 - Ax-style structured extraction with schema constraints.
 - Agent/tool execution with trace evidence.
@@ -153,5 +152,4 @@ contracts and tested through injectable transports.
 
 For real dataset benchmark evidence, use the commands in `BENCHMARK_TRUTH.md`.
 That lane fetches canonical GSM8K/HotPotQA rows, writes manifests and result
-artifacts, and keeps research evidence separate from deterministic
-production-gate fixtures.
+artifacts, and keeps research evidence separate from the normal product gate.

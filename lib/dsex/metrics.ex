@@ -53,14 +53,31 @@ defmodule DSEx.Metrics do
   defp passed?(_value), do: false
 
   def normalize_text(value) do
-    value
-    |> to_string()
-    |> String.downcase()
-    |> String.replace(~r/[^\p{L}\p{N}\s]/u, " ")
-    |> String.split()
+    text = value |> to_string() |> String.downcase()
+
+    text
+    |> normalized_tokens()
     |> Enum.reject(&(&1 in ["a", "an", "the"]))
     |> Enum.join(" ")
   end
+
+  defp normalized_tokens(text) do
+    if ascii_word_space?(text) do
+      String.split(text)
+    else
+      text
+      |> String.replace(~r/[^\p{L}\p{N}\s]/u, " ")
+      |> String.split()
+    end
+  end
+
+  defp ascii_word_space?(<<>>), do: true
+
+  defp ascii_word_space?(<<char, rest::binary>>)
+       when char in ?a..?z or char in ?0..?9 or char in [?\s, ?\t, ?\n, ?\r],
+       do: ascii_word_space?(rest)
+
+  defp ascii_word_space?(_text), do: false
 
   def em(prediction, answers) when is_list(answers),
     do: Enum.any?(answers, &(normalize_text(prediction) == normalize_text(&1)))

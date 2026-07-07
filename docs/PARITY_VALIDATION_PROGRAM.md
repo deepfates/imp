@@ -98,6 +98,12 @@ Model lanes:
 - historical/research-style lane: where still available, a model family close
   to models used in DSPy examples/papers, or an explicit unavailable note
 
+These lanes are intentionally cross-provider. Small/mini/nano/Haiku/Flash/Lite
+models can satisfy the current low-cost bucket; current flagship GPT,
+Claude Sonnet/Opus, and Gemini Pro models can satisfy frontier sanity; legacy
+GPT-3.5/Davinci, Claude 3-era, Gemini 1.x, or explicitly research/legacy
+models can satisfy the historical/research-style bucket.
+
 Dataset/task lanes:
 
 - GSM8K math with ChainOfThought
@@ -110,6 +116,9 @@ Required controls:
 
 - same input rows, offsets, and digests
 - same model id and provider
+- provider-explicit configuration when the lane is not OpenAI: DSEx uses the
+  ReqLLM model spec, DSPy uses the matching LiteLLM/DSPy model name, and the
+  artifact records matched wire API families
 - current DSEx benchmark prompt/signature contract for every selected model
   lane
 - same temperature and token limits, or explicit documented provider limits
@@ -128,20 +137,30 @@ mix benchmark.live_matrix
 This command does not call providers. It aggregates existing
 `dsex-dspy-parity-campaign-*.json` artifacts into a
 `live-matched-model-matrix-*.json` report, grouped by provider/model identity.
-The matrix marks whether DSEx has fresh full-evidence coverage for:
+The matrix marks whether DSEx has release-quality evidence for:
 
-- a current low-cost lane
-- a frontier sanity lane
-- a historical/research-style lane, or an explicit missing lane
+- a current low-cost lane with full accepted canonical coverage
+- a frontier sanity lane with a fresh matched research sample
+- a historical/research-style lane with a fresh matched research sample, or an
+  explicit missing/unavailable note
 
 The dashboard consumes this matrix. A smoke matrix is useful wiring evidence,
-but it is not live parity. The lane passes only when the required model lanes
-have fresh full campaign artifacts with complete coverage, current prompt
-contracts, score/error parity, latency ratios, and cost reporting.
+but it is not live parity. A lane passes only when its policy is met with
+current prompt contracts, matched effective generation, score/error parity,
+latency ratios, and cost reporting.
+When several models are present in one lane, the lane summary reports the
+strongest candidate as the headline `coverage`/`cost` path and keeps
+cross-candidate totals under `cumulative`; release blockers should point at the
+candidate most likely to close the lane.
 
 Pass condition:
 
-- full-row lanes cover every canonical row they claim to cover
+- the current low-cost lane covers every canonical row with accepted row
+  evidence, not only attempted provider calls
+- frontier and historical/research-style lanes reach the configured research
+  sample size with matched generation and strict score/latency parity
+- runner/API error rows, including quota/rate-limit rows with null answers, are
+  counted as incomplete evidence and remain rerunnable
 - aggregate and per-task score gaps are within configured thresholds
 - error-rate deltas are within threshold
 - latency ratio is reported and meets the threshold for operational parity
@@ -153,6 +172,10 @@ Pass condition:
   to tell whether latency gaps come from provider/model time, prompt/output
   shape, or local DSEx overhead and adapter recovery. DSPy prompt-shape
   summaries must preserve `message_chars_sources` so exact LM-history evidence
+  can be separated from deterministic row-shape estimates. The matrix selects a
+  complete-instrumentation/runtime-shape artifact over a larger incomplete
+  artifact for the same provider/model identity; nominal coverage from
+  quota-tainted chunks is not release proof.
   and deterministic row-estimated fallback evidence remain distinguishable.
 
 Ticket: `de-ztx7`.
@@ -364,7 +387,8 @@ DSEx has full parity evidence only when:
 
 1. Golden trace parity is complete.
 2. Live matched-model parity has at least one full current low-cost lane, one
-   frontier sanity lane, and one historical/research-style lane.
+   matched research-sample frontier sanity lane, and one matched
+   research-sample historical/research-style lane.
 3. Optimizer lift parity passes for every optimizer DSEx exposes as production
    surface.
 4. RAG/tool/agent production semantics pass deterministic and live slices.

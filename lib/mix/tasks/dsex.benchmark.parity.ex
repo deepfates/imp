@@ -6,7 +6,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2
 
   The task expects Python DSPy to be installed. By default it uses
-  `tmp/dspy-parity-venv/bin/python` when present.
+  `tmp/dspy-parity-venv/bin/python` when present. OpenAI remains the default
+  provider; pass an explicit ReqLLM model spec and matching DSPy/LiteLLM model
+  when validating another provider.
+
+      mix dsex.benchmark.parity --model anthropic:claude-haiku-4-5 \\
+        --dspy-model anthropic/claude-haiku-4-5 --api-key-env ANTHROPIC_API_KEY
   """
 
   use Mix.Task
@@ -29,7 +34,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       Mix.raise("provide at least one dataset path with --gsm8k or --hotpotqa")
     end
 
-    api_key = System.get_env("OPENAI_API_KEY") || Mix.raise("OPENAI_API_KEY is required")
+    api_key_env = api_key_env(opts)
+    api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
     models = models(opts, api_key)
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
     max_examples = Keyword.get(opts, :max_examples, 20)
@@ -46,6 +52,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         tasks,
         model,
         api_key,
+        api_key_env,
         max_examples,
         max_concurrency,
         generation_opts,
@@ -62,6 +69,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          tasks,
          model,
          api_key,
+         api_key_env,
          max_examples,
          max_concurrency,
          generation_opts,
@@ -70,7 +78,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          runner_order,
          out_dir
        ) do
-    dspy_model = dspy_model || model
+    dsex_model = dsex_model_spec(opts, model)
+    dspy_model = dspy_model || default_dspy_model(dsex_model, model)
 
     {dsex, dspy_path} =
       case runner_order do
@@ -80,6 +89,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               opts,
               tasks,
               model,
+              dsex_model,
               api_key,
               max_examples,
               max_concurrency,
@@ -97,6 +107,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               max_concurrency,
               generation_opts,
               dspy_model,
+              api_key_env,
               campaign_id,
               out_dir
             )
@@ -113,6 +124,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               max_concurrency,
               generation_opts,
               dspy_model,
+              api_key_env,
               campaign_id,
               out_dir
             )
@@ -122,6 +134,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               opts,
               tasks,
               model,
+              dsex_model,
               api_key,
               max_examples,
               max_concurrency,
@@ -155,6 +168,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          opts,
          tasks,
          model,
+         dsex_model,
          api_key,
          max_examples,
          max_concurrency,
@@ -165,9 +179,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     DSEx.BenchmarkTruth.run(
       tasks: tasks,
       mode: :live,
-      lm: DSEx.req_llm("openai:#{model}", Keyword.merge([api_key: api_key], generation_opts)),
-      model: %{provider: "req_llm", model: model},
-      generation: generation_metadata(model, generation_opts, "dsex_req_llm"),
+      lm: DSEx.req_llm(dsex_model, Keyword.merge([api_key: api_key], generation_opts)),
+      model: %{provider: "req_llm", model: model, model_spec: dsex_model},
+      generation: generation_metadata(dsex_model, generation_opts, "dsex_req_llm"),
       campaign_id: campaign_id,
       out_dir: out_dir,
       offset: Keyword.get(opts, :offset, 0),
@@ -212,7 +226,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         out: :string,
         model: :string,
         models: :string,
+        dsex_model: :string,
         dspy_model: :string,
+        api_key_env: :string,
         campaign_id: :string,
         temperature: :float,
         max_tokens: :integer,
@@ -232,6 +248,33 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       ]
 
     maybe_keyword(generation, :reasoning_effort, Keyword.get(opts, :reasoning_effort))
+  end
+
+  @doc false
+  def api_key_env(opts), do: Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
+
+  @doc false
+  def dsex_model_spec(opts, model) do
+    Keyword.get(opts, :dsex_model) || System.get_env("DSEX_MODEL") ||
+      provider_prefixed_model(model)
+  end
+
+  @doc false
+  def provider_prefixed_model(model) do
+    model = to_string(model)
+
+    if String.contains?(model, ":"),
+      do: model,
+      else: "openai:#{model}"
+  end
+
+  @doc false
+  def default_dspy_model(dsex_model, model) do
+    case String.split(to_string(dsex_model), ":", parts: 2) do
+      ["openai", _model_id] -> model
+      [provider, model_id] -> "#{provider}/#{model_id}"
+      _other -> model
+    end
   end
 
   defp maybe_keyword(opts, _key, nil), do: opts
@@ -302,6 +345,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          max_concurrency,
          generation_opts,
          dspy_model,
+         api_key_env,
          campaign_id,
          out_dir
        ) do
@@ -319,7 +363,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         "--temperature",
         to_string(Keyword.fetch!(generation_opts, :temperature)),
         "--max-tokens",
-        to_string(Keyword.fetch!(generation_opts, :max_tokens))
+        to_string(Keyword.fetch!(generation_opts, :max_tokens)),
+        "--api-key-env",
+        api_key_env
       ] ++
         reasoning_effort_args(generation_opts) ++
         [
@@ -486,15 +532,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
   defp wire_api(model, "dsex_req_llm") do
     model = model |> to_string() |> String.downcase()
 
-    if reasoning_model?(model) or String.match?(model, ~r/(gpt-4o|gpt-4\.1)/),
-      do: "openai_responses",
-      else: "openai_chat_completions"
+    cond do
+      String.starts_with?(model, "anthropic:") ->
+        "anthropic_messages"
+
+      String.starts_with?(model, "google:") ->
+        "google_generate_content"
+
+      reasoning_model?(model) or String.match?(model, ~r/(gpt-4o|gpt-4\.1)/) ->
+        "openai_responses"
+
+      true ->
+        "openai_chat_completions"
+    end
   end
 
   defp wire_api(model, "python_dspy") do
     model = model |> to_string() |> String.downcase()
 
     cond do
+      String.starts_with?(model, "anthropic/") ->
+        "litellm_anthropic_messages"
+
+      String.starts_with?(model, "gemini/") or String.starts_with?(model, "google/") ->
+        "litellm_google_generate_content"
+
       dspy_responses_model?(model) ->
         "openai_responses"
 

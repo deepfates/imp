@@ -95,11 +95,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis do
       |> Enum.filter(&(&1["task"] == "hotpotqa"))
       |> Enum.reduce(acc, fn task, task_acc ->
         offset = task["offset"] || 0
+        dsex_error_indexes = task_error_indexes(task["dsex_errors"] || [])
+        dspy_error_indexes = task_error_indexes(task["dspy_errors"] || [])
 
         task
         |> Map.get("row_agreement", [])
         |> Enum.reduce(task_acc, fn row, row_acc ->
           absolute_index = row["absolute_index"] || offset + row["index"]
+          dsex_error? = task_error_at?(dsex_error_indexes, row, "dsex")
+          dspy_error? = task_error_at?(dspy_error_indexes, row, "dspy")
 
           record =
             row
@@ -121,13 +125,32 @@ defmodule Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis do
               "source_generated_at" => generated_at
             })
 
-          Map.update(row_acc, absolute_index, record, fn old ->
-            if generated_at >= old["source_generated_at"], do: record, else: old
-          end)
+          if dsex_error? or dspy_error? do
+            row_acc
+          else
+            Map.update(row_acc, absolute_index, record, fn old ->
+              if generated_at >= old["source_generated_at"], do: record, else: old
+            end)
+          end
         end)
       end)
     end)
   end
+
+  defp task_error_indexes(errors) when is_list(errors) do
+    errors
+    |> Enum.map(& &1["index"])
+    |> Enum.filter(&is_integer/1)
+    |> MapSet.new()
+  end
+
+  defp task_error_indexes(errors) when is_integer(errors) and errors > 0, do: :answerless
+  defp task_error_indexes(_errors), do: MapSet.new()
+
+  defp task_error_at?(:answerless, row, runtime), do: is_nil(row["#{runtime}_answer"])
+
+  defp task_error_at?(%MapSet{} = indexes, row, _runtime),
+    do: MapSet.member?(indexes, row["index"])
 
   defp load_gold(path) do
     path

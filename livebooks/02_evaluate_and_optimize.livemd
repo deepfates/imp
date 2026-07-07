@@ -152,10 +152,9 @@ report.best
 ## Deterministic Advanced Benchmarks
 
 These fixtures are a compact regression check for advanced DSEx behavior. They
-belong in production gates rather than application code. Run them through the
-release gate when you want evidence that the optimizer and artifact examples
-still behave as expected:
+are maintainer evidence rather than application code. Run them when you want
+evidence that the optimizer and artifact examples still behave as expected:
 
 ```sh
-mix production.check
+mix evidence.check
 ```

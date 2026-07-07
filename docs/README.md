@@ -27,29 +27,13 @@ credentials.
 
 - [01 Programming, Not Prompting](../livebooks/01_programming_not_prompting.livemd)
 - [02 Evaluate And Optimize](../livebooks/02_evaluate_and_optimize.livemd)
-- [03 Agents, Tools, MCP, RLM](../livebooks/03_agents_tools_mcp_rlm.livemd)
+- [03 Agents, Tools, MCP, Recursive Control](../livebooks/03_agents_tools_mcp_rlm.livemd)
 - [04 Production And Live Provider](../livebooks/04_production_and_live_provider.livemd)
 
 ## Operate It
 
 - [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
-  redaction, security posture, and release discipline.
-- [Benchmark Truth](BENCHMARK_TRUTH.md): real-dataset benchmark artifacts,
-  manifests, integrity checks, and live-provider evidence.
-
-## Validate Claims
-
-These documents are mostly for maintainers, reviewers, and release decisions.
-They are useful when you want to audit DSEx claims, but they are not required
-for normal application use.
-
-- [Parity Validation Program](PARITY_VALIDATION_PROGRAM.md): the evidence
-  standard for DSEx-vs-DSPy semantic parity, optimizer lift, production
-  behavior, and provider-free performance claims.
-- [Coverage Matrix](COVERAGE_MATRIX.md): upstream concept coverage mapped to
-  DSEx surfaces, tests, docs, and production decisions.
-- [Release Criteria](RELEASE_CRITERIA.md): release gates and external
-  references used to define readiness.
+  redaction, security posture, package shape, and release discipline.
 
 ## First Things To Try
 
@@ -58,3 +42,11 @@ for normal application use.
 3. Open [Livebook 01](../livebooks/01_programming_not_prompting.livemd).
 4. Add one metric and one tiny dev set.
 5. Run `mix production.check` before trusting a change.
+
+## Maintainer Evidence
+
+The repository also keeps internal benchmark and release-evidence notes under
+`docs/BENCHMARK_TRUTH.md`, `docs/PARITY_VALIDATION_PROGRAM.md`,
+`docs/COVERAGE_MATRIX.md`, and `docs/RELEASE_CRITERIA.md`. They are useful for
+maintainers and reviewers, but they are intentionally not part of the packaged
+user manual.

@@ -1,7 +1,7 @@
 defmodule DSEx.BenchmarkTruth.Contract do
   @moduledoc false
 
-  @dsex_prompt_contract "dsex-chat-template-v6-canonical-answer"
+  @dsex_prompt_contract "dsex-chat-template-v7-canonical-answer"
   @dspy_prompt_contract "dspy-signature-chat-20260707-canonical-answer"
 
   @hotpotqa_instruction "Answer using the provided context. Return the canonical exact answer span from the context. For yes/no questions, answer exactly yes or no. Do not abbreviate locations, titles, names, dates, or quantities when the question asks for the full entity."

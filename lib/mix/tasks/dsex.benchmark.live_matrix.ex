@@ -16,6 +16,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   @default_in "benchmarks/results/dsex-dspy-parity-campaign-*.json"
   @default_out "tmp/live-matrix"
   @current_prompt_contract DSEx.BenchmarkTruth.Contract.current_prompt_contract()
+  @current_evidence_policy_version 2
 
   @impl true
   def run(args) do
@@ -127,6 +128,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     generation_matched = if generation["matched"], do: 1, else: 0
     wire_api_matched = if generation["wire_api_matched"], do: 1, else: 0
     prompt_contract_current = if generation["prompt_contract_current"], do: 1, else: 0
+    evidence_policy_current = if current_evidence_policy?(artifact), do: 1, else: 0
     instrumentation_complete = if artifact_instrumentation_complete?(artifact), do: 1, else: 0
     runtime_shape_complete = if artifact_runtime_shape_complete?(artifact), do: 1, else: 0
     fresh = if fresh?(artifact, max_age_hours), do: 1, else: 0
@@ -136,9 +138,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       full_coverage,
       generation_consistent,
       prompt_contract_current,
-      coverage,
+      evidence_policy_current,
       instrumentation_complete,
       runtime_shape_complete,
+      coverage,
       generation_complete,
       generation_matched,
       wire_api_matched,
@@ -158,6 +161,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     get_in(model_runtime_shape_summary(artifact["tasks"] || []), ["complete"]) == true
   end
 
+  defp current_evidence_policy?(artifact) do
+    get_in(artifact, ["evidence_policy", "version"]) == @current_evidence_policy_version
+  end
+
   defp valid_identity?(%{"provider" => provider, "model" => model})
        when is_binary(provider) and is_binary(model),
        do: true
@@ -167,7 +174,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   defp matrix_report(artifacts, max_age_hours, skipped_malformed, campaign_ids) do
     models = Enum.map(artifacts, &model_row(&1, max_age_hours))
     required = required_lanes(models)
-    complete = Enum.all?(required, fn {_lane, row} -> row["present"] and row["full_evidence"] end)
+    complete = Enum.all?(required, fn {_lane, row} -> row["satisfied"] == true end)
 
     %{
       "schema_version" => 1,
@@ -187,7 +194,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "runtime_shape" => matrix_runtime_shape_summary(models),
         "disagreements" => matrix_disagreement_summary(models),
         "note" =>
-          "Live matrix is complete only when current low-cost, frontier sanity, and historical/research-style lanes have fresh full-evidence campaign artifacts."
+          "Live matrix is complete only when required lanes satisfy their lane-specific release policies: full current low-cost coverage plus matched research-sample frontier and historical/research evidence."
       },
       "models" => models
     }
@@ -225,6 +232,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "proof" => %{
         "fresh" => fresh,
         "full_parity" => full_parity,
+        "evidence_policy_current" => current_evidence_policy?(artifact),
+        "evidence_policy" => artifact["evidence_policy"],
         "requested_generation_consistent" => generation_proof["requested_consistent"],
         "effective_generation_complete" => generation_proof["complete"],
         "effective_generation_matched" => generation_proof["matched"],
@@ -347,6 +356,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
   defp wire_api_family("litellm_chat_completion_with_max_completion_tokens"),
     do: "openai_chat_completions"
+
+  defp wire_api_family("anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("litellm_anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("google_generate_content"), do: "google_generate_content"
+  defp wire_api_family("litellm_google_generate_content"), do: "google_generate_content"
 
   defp wire_api_family(other), do: other
 
@@ -512,6 +526,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       tasks
       |> Enum.map(fn task -> {task["task"], task["runtime_shape"] || %{}} end)
       |> Enum.reject(fn {_task, summary} -> summary == %{} end)
+      |> Enum.reject(fn {_task, summary} -> get_in(summary, ["coverage", "total_rows"]) == 0 end)
 
     message_ratios =
       summaries
@@ -628,16 +643,116 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
   defp required_lane(models, tag) do
     candidates = Enum.filter(models, &(tag in &1["lane_tags"]))
+    best = best_lane_candidate(candidates)
+    policy = lane_policy(tag)
+    satisfied = Enum.any?(candidates, &lane_candidate_satisfies?(&1, policy))
 
     %{
       "present" => candidates != [],
+      "satisfied" => satisfied,
+      "policy" => policy,
       "full_evidence" => Enum.any?(candidates, & &1["full_evidence"]),
       "models" => Enum.map(candidates, & &1["model"]),
+      "best_model" => best && best["model"],
       "best_status" => best_status(candidates),
-      "coverage" => lane_coverage_progress(candidates),
-      "cost" => lane_cost_progress(candidates)
+      "coverage" => lane_coverage_progress(candidates, best),
+      "cost" => lane_cost_progress(candidates, best)
     }
   end
+
+  defp lane_policy("current_low_cost") do
+    %{
+      "required_scale" => "full",
+      "description" =>
+        "At least one current low-cost model must have full accepted canonical benchmark coverage with current prompt and matched effective generation evidence."
+    }
+  end
+
+  defp lane_policy("frontier_sanity") do
+    %{
+      "required_scale" => "research_sample",
+      "min_accepted_rows" => 200,
+      "description" =>
+        "At least one current frontier model must have a fresh matched research sample with score, latency, prompt-contract, and generation proof."
+    }
+  end
+
+  defp lane_policy("historical_research") do
+    %{
+      "required_scale" => "research_sample",
+      "min_accepted_rows" => 200,
+      "description" =>
+        "At least one historical or research-style model must have a fresh matched research sample, or the release must explicitly document unavailability outside this matrix."
+    }
+  end
+
+  defp lane_policy(_tag), do: %{"required_scale" => "full"}
+
+  defp lane_candidate_satisfies?(model, %{"required_scale" => "full"}) do
+    model["full_evidence"] == true
+  end
+
+  defp lane_candidate_satisfies?(model, %{"required_scale" => "research_sample"} = policy) do
+    min_rows = policy["min_accepted_rows"] || 200
+
+    model["full_evidence"] == true or
+      (base_release_proof?(model) and
+         (get_in(model, ["coverage_progress", "covered_rows"]) || 0) >= min_rows and
+         score_parity?(model["parity"]) and
+         get_in(model, ["parity", "latency_parity"]) == true)
+  end
+
+  defp base_release_proof?(model) do
+    proof = model["proof"] || %{}
+
+    model["fresh"] == true and
+      proof["requested_generation_consistent"] == true and
+      proof["effective_generation_complete"] == true and
+      proof["effective_generation_matched"] == true and
+      proof["wire_api_matched"] == true and
+      proof["prompt_contract_current"] == true
+  end
+
+  defp score_parity?(%{} = parity) do
+    aggregate_gap = parity["aggregate_gap"]
+    max_task_gap = parity["max_task_score_gap"]
+    strict_aggregate_gap = parity["strict_aggregate_gap"] || 0.01
+    strict_task_gap = parity["strict_task_gap"] || 0.01
+
+    is_number(aggregate_gap) and is_number(max_task_gap) and
+      within?(abs(aggregate_gap), strict_aggregate_gap) and
+      within?(abs(max_task_gap), strict_task_gap)
+  end
+
+  defp score_parity?(_parity), do: false
+
+  defp within?(value, threshold), do: value <= threshold + 1.0e-12
+
+  defp best_lane_candidate([]), do: nil
+
+  defp best_lane_candidate(candidates) do
+    Enum.max_by(candidates, &lane_candidate_rank/1)
+  end
+
+  defp lane_candidate_rank(model) do
+    proof = model["proof"] || %{}
+
+    {
+      if(model["full_evidence"], do: 1, else: 0),
+      if(proof["prompt_contract_current"], do: 1, else: 0),
+      if(proof["evidence_policy_current"], do: 1, else: 0),
+      if(base_release_proof?(model), do: 1, else: 0),
+      status_rank(model["status"]),
+      if(model["fresh"], do: 1, else: 0),
+      get_in(model, ["coverage_progress", "covered_rows"]) || 0,
+      model["model"] || ""
+    }
+  end
+
+  defp status_rank("full"), do: 3
+  defp status_rank("research_sample"), do: 2
+  defp status_rank("smoke"), do: 1
+  defp status_rank(_status), do: 0
 
   defp best_status([]), do: "missing"
 
@@ -668,13 +783,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     end
   end
 
-  defp current_low_cost_model?(model), do: String.match?(model, ~r/(mini|nano|small)/)
+  defp current_low_cost_model?(model),
+    do: String.match?(model, ~r/(mini|nano|small|haiku|flash|lite)/)
 
   defp frontier_sanity_model?(model),
-    do: String.match?(model, ~r/gpt-(5(\.|$)|4\.1|4o|4$)/)
+    do: String.match?(model, ~r/(gpt-(5(\.|$)|4\.1|4o|4$)|claude-(sonnet|opus)|gemini.*pro)/)
 
   defp historical_research_model?(model),
-    do: String.match?(model, ~r/(3\.5|davinci|legacy|research)/)
+    do: String.match?(model, ~r/(3\.5|davinci|legacy|research|claude-3-|gemini-1\.)/)
 
   defp cost_estimate(artifact) do
     covered = get_in(artifact, ["coverage", "covered"]) || 0
@@ -760,7 +876,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
   defp coverage_progress(_coverage), do: coverage_progress(%{})
 
-  defp lane_coverage_progress([]) do
+  defp lane_coverage_progress([], _best) do
     %{
       "covered_rows" => 0,
       "expected_rows" => 0,
@@ -771,18 +887,22 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     }
   end
 
-  defp lane_coverage_progress(models) do
+  defp lane_coverage_progress(models, best) do
+    best_progress = (best && best["coverage_progress"]) || lane_coverage_progress([], nil)
     covered = sum_model_coverage(models, "covered_rows")
     expected = sum_model_coverage(models, "expected_rows")
 
-    %{
+    best_progress
+    |> Map.put("best_model", best && best["model"])
+    |> Map.put("candidate_count", length(models))
+    |> Map.put("cumulative", %{
       "covered_rows" => covered,
       "expected_rows" => expected,
       "remaining_rows" => max(expected - covered, 0),
       "coverage_fraction" => ratio(covered, expected),
       "coverage_percent" => percent(covered, expected),
       "full" => expected > 0 and covered >= expected
-    }
+    })
   end
 
   defp sum_model_coverage(models, key) do
@@ -791,7 +911,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     |> Enum.sum()
   end
 
-  defp lane_cost_progress(models) do
+  defp lane_cost_progress(models, best) do
     if models == [] do
       %{
         "estimated_remaining_total_tokens" => 0,
@@ -801,7 +921,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "status" => "token_estimate"
       }
     else
-      %{
+      best_cost = (best && best["cost"]) || %{}
+
+      best_cost
+      |> Map.put("best_model", best && best["model"])
+      |> Map.put("candidate_count", length(models))
+      |> Map.put("cumulative", %{
         "estimated_remaining_total_tokens" =>
           sum_model_cost(models, "estimated_remaining_total_tokens"),
         "estimated_full_total_tokens" => sum_model_cost(models, "estimated_full_total_tokens"),
@@ -812,7 +937,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
             do: "estimated_usd",
             else: "token_estimate"
           )
-      }
+      })
     end
   end
 

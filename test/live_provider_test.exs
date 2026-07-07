@@ -4,9 +4,10 @@ defmodule LiveProviderTest do
   @tag :live
   test "ReqLLM-backed live provider completes a DSEx prediction" do
     api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+    model = System.get_env("OPENAI_MODEL")
 
     assert is_binary(api_key) and byte_size(api_key) > 0
+    assert is_binary(model) and byte_size(model) > 0
 
     lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 20)
     program = DSEx.predict("question -> answer", lm: lm)
@@ -28,9 +29,10 @@ defmodule LiveProviderTest do
   @tag :live
   test "ReqLLM-backed live provider completes structured JSON prediction" do
     api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+    model = System.get_env("OPENAI_MODEL")
 
     assert is_binary(api_key) and byte_size(api_key) > 0
+    assert is_binary(model) and byte_size(model) > 0
 
     lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 80)
 
@@ -49,9 +51,10 @@ defmodule LiveProviderTest do
   @tag :live
   test "ReqLLM-backed live provider accepts native JSON schema response format" do
     api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
+    model = System.get_env("OPENAI_MODEL")
 
     assert is_binary(api_key) and byte_size(api_key) > 0
+    assert is_binary(model) and byte_size(model) > 0
 
     lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 80)
 
