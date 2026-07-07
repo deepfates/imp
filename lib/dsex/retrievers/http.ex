@@ -42,18 +42,65 @@ defmodule DSEx.Retrievers.HTTP do
 
   def retrieve(%__MODULE__{} = retriever, query, opts) do
     DSEx.Telemetry.span([:dsex, :retriever], %{url: retriever.url, query: query}, fn ->
-      body = retriever.body_builder.(query, opts) |> Jason.encode!()
-      headers = [{"content-type", "application/json"} | retriever.headers]
-
-      with {:ok, %{status: status, body: response}} when status in 200..299 <-
-             DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, opts),
-           {:ok, decoded} <- Jason.decode(response) do
-        {:ok, retriever.response_mapper.(decoded)}
-      else
-        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-        {:error, reason} -> {:error, reason}
-      end
+      submit_retrieval(retriever, query, opts)
     end)
+  end
+
+  defp submit_retrieval(%__MODULE__{} = retriever, query, opts) do
+    with {:ok, body} <- build_body(retriever, query, opts),
+         headers <- [{"content-type", "application/json"} | retriever.headers],
+         {:ok, response} <- post_retrieval(retriever, headers, body, opts),
+         {:ok, decoded} <- decode_response(response),
+         {:ok, docs} <- map_response(retriever, decoded) do
+      {:ok, docs}
+    end
+  end
+
+  defp build_body(retriever, query, opts) do
+    payload = retriever.body_builder.(query, opts)
+    {:ok, Jason.encode!(payload)}
+  rescue
+    error -> {:error, {:invalid_retriever_request, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:invalid_retriever_request, inspect({kind, reason})}}
+  end
+
+  defp post_retrieval(retriever, headers, body, opts) do
+    case DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, opts) do
+      {:ok, %{status: status, body: response}} when status in 200..299 ->
+        {:ok, response}
+
+      {:ok, %{status: status, body: response}} ->
+        {:error, {:http_error, status, response}}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_retriever_transport_response, other}}
+    end
+  rescue
+    error -> {:error, {:retriever_transport_failed, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:retriever_transport_failed, inspect({kind, reason})}}
+  end
+
+  defp decode_response(response) do
+    case Jason.decode(response) do
+      {:ok, decoded} -> {:ok, decoded}
+      {:error, reason} -> {:error, {:invalid_retriever_response, Exception.message(reason)}}
+    end
+  end
+
+  defp map_response(retriever, decoded) do
+    case retriever.response_mapper.(decoded) do
+      docs when is_list(docs) -> {:ok, docs}
+      other -> {:error, {:invalid_retriever_result, other}}
+    end
+  rescue
+    error -> {:error, {:invalid_retriever_result, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:invalid_retriever_result, inspect({kind, reason})}}
   end
 
   defp default_body(query, opts), do: %{query: query, k: Keyword.get(opts, :k, 3)}

@@ -38,6 +38,27 @@ defmodule ExternalRetrieverTest do
     end
   end
 
+  defmodule RaisingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts), do: raise("retriever transport exploded")
+  end
+
+  defmodule InvalidJSONTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts), do: {:ok, %{status: 200, headers: [], body: "nope"}}
+  end
+
+  defmodule InvalidShapeTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts), do: :not_an_http_response
+  end
+
   test "Weaviate retriever builds GraphQL request and maps documents" do
     retriever =
       DSEx.Retrievers.Weaviate.new("https://weaviate.example", "Passage",
@@ -121,5 +142,64 @@ defmodule ExternalRetrieverTest do
 
     assert {:error, {:unsupported_http_method, :get}} =
              DSEx.Retrieve.retrieve(retriever, "capital France")
+  end
+
+  test "retriever facade reports callback crashes and invalid results" do
+    assert {:error, {:retriever_failed, :anonymous_retriever, "retriever exploded"}} =
+             DSEx.Retrieve.retrieve(fn _query, _opts -> raise "retriever exploded" end, "q")
+
+    assert {:error, {:invalid_retriever_result, :not_docs}} =
+             DSEx.Retrieve.retrieve(fn _query, _opts -> {:ok, :not_docs} end, "q")
+
+    assert {:error, {:not_a_retriever, String}} = DSEx.Retrieve.retrieve(String, "q")
+  end
+
+  test "memory retriever clamps negative k to no documents" do
+    retriever = DSEx.Retrieve.Memory.new([%{text: "Paris"}], k: -2)
+    assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris")
+    assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris", k: -1)
+  end
+
+  test "generic HTTP retriever reports request transport decode and mapper failures" do
+    bad_request =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        body_builder: fn _query, _opts -> raise "bad body" end
+      )
+
+    assert {:error, {:invalid_retriever_request, "bad body"}} =
+             DSEx.Retrieve.retrieve(bad_request, "capital France")
+
+    bad_transport =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search", transport: RaisingTransport)
+
+    assert {:error, {:retriever_transport_failed, "retriever transport exploded"}} =
+             DSEx.Retrieve.retrieve(bad_transport, "capital France")
+
+    invalid_json =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        transport: InvalidJSONTransport
+      )
+
+    assert {:error, {:invalid_retriever_response, reason}} =
+             DSEx.Retrieve.retrieve(invalid_json, "capital France")
+
+    assert reason =~ "unexpected byte"
+
+    invalid_shape =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        transport: InvalidShapeTransport
+      )
+
+    assert {:error, {:invalid_retriever_transport_response, :not_an_http_response}} =
+             DSEx.Retrieve.retrieve(invalid_shape, "capital France")
+
+    bad_mapper =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        transport: DatabricksTransport,
+        response_mapper: fn _decoded -> raise "mapper exploded" end
+      )
+
+    assert {:error, {:invalid_retriever_result, "mapper exploded"}} =
+             DSEx.Retrieve.retrieve(bad_mapper, "capital France")
   end
 end
