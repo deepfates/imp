@@ -75,6 +75,13 @@ defmodule ProviderTrainingLifecycleTest do
     end
   end
 
+  defmodule InvalidShapeTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts), do: :not_an_http_response
+  end
+
   defp examples do
     [
       DSEx.example(question: "2+2?", answer: "4") |> DSEx.Example.with_inputs(:question)
@@ -196,6 +203,32 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:error, {:invalid_training_job, "mapper exploded"}} =
              DSEx.Clients.Trainer.finetune(mapper_trainer, lm, examples(), [])
+  end
+
+  test "training job refresh reports transport decode and shape failures" do
+    base =
+      DSEx.Clients.TrainingJob.new(%{
+        id: "job_1",
+        provider: :test,
+        status_url: "https://trainer.example/jobs/job_1"
+      })
+
+    raising = %{base | transport: RaisingTrainingTransport}
+
+    assert {:error, {:training_refresh_failed, "transport exploded"}} =
+             DSEx.Clients.TrainingJob.refresh(raising)
+
+    invalid_json = %{base | transport: InvalidJSONTrainingTransport}
+
+    assert {:error, {:invalid_training_refresh_response, reason}} =
+             DSEx.Clients.TrainingJob.refresh(invalid_json)
+
+    assert reason =~ "unexpected byte"
+
+    invalid_shape = %{base | transport: InvalidShapeTrainingTransport}
+
+    assert {:error, {:invalid_training_refresh_response, :not_an_http_response}} =
+             DSEx.Clients.TrainingJob.refresh(invalid_shape)
   end
 
   test "OpenAI trainer custom base URL does not bind ambient API key implicitly" do

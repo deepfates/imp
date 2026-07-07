@@ -51,23 +51,7 @@ defmodule DSEx.Clients.TrainingJob do
       [:dsex, :training, :refresh],
       %{provider: job.provider, job_id: job.id},
       fn ->
-        body = Jason.encode!(%{job_id: job.id})
-        headers = [{"content-type", "application/json"}] ++ auth_headers(job.api_key)
-
-        with {:ok, %{status: status, body: response}} when status in 200..299 <-
-               DSEx.HTTP.post(
-                 job.transport || DSEx.HTTP.Hackneyless,
-                 job.status_url,
-                 headers,
-                 body,
-                 []
-               ),
-             {:ok, decoded} <- Jason.decode(response) do
-          {:ok, merge_status(job, decoded)}
-        else
-          {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-          {:error, reason} -> {:error, reason}
-        end
+        refresh_status(job)
       end
     )
   end
@@ -77,6 +61,48 @@ defmodule DSEx.Clients.TrainingJob do
 
   def fail(%__MODULE__{} = job, reason),
     do: %{job | status: :failed, metadata: Map.put(job.metadata, :error, reason)}
+
+  defp refresh_status(%__MODULE__{} = job) do
+    body = Jason.encode!(%{job_id: job.id})
+    headers = [{"content-type", "application/json"}] ++ auth_headers(job.api_key)
+
+    case DSEx.HTTP.post(
+           job.transport || DSEx.HTTP.Hackneyless,
+           job.status_url,
+           headers,
+           body,
+           []
+         ) do
+      {:ok, %{status: status, body: response}} when status in 200..299 ->
+        decode_status_response(job, response)
+
+      {:ok, %{status: status, body: response}} ->
+        {:error, {:http_error, status, response}}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_training_refresh_response, other}}
+    end
+  rescue
+    error -> {:error, {:training_refresh_failed, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:training_refresh_failed, inspect({kind, reason})}}
+  end
+
+  defp decode_status_response(job, response) do
+    case Jason.decode(response) do
+      {:ok, decoded} when is_map(decoded) ->
+        {:ok, merge_status(job, decoded)}
+
+      {:ok, decoded} ->
+        {:error, {:invalid_training_refresh_response, decoded}}
+
+      {:error, reason} ->
+        {:error, {:invalid_training_refresh_response, Exception.message(reason)}}
+    end
+  end
 
   defp merge_status(job, decoded) do
     %{
