@@ -265,14 +265,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   end
 
   defp live_matched_model_lane(matrix_dir, campaign_dir, max_age_hours) do
-    case live_matrix_lane(matrix_dir, max_age_hours) do
+    matrix_globs = [
+      Path.join(matrix_dir, "live-matched-model-matrix-*.json"),
+      Path.join(campaign_dir, "live-matched-model-matrix-*.json")
+    ]
+
+    case live_matrix_lane(matrix_globs, max_age_hours) do
       {:ok, lane} -> lane
       {:error, _reason} -> live_campaign_lane(campaign_dir, max_age_hours)
     end
   end
 
-  defp live_matrix_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "live-matched-model-matrix-*.json")),
+  defp live_matrix_lane(globs, max_age_hours) do
+    with {:ok, path} <- latest(globs),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "matrix_complete"]) == true
 
@@ -481,8 +486,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   defp status(true, _full_evidence, scale, true) when scale in ["smoke", "sample"], do: scale
   defp status(true, _full_evidence, _scale, true), do: "passing"
 
-  defp latest(glob) do
-    case Path.wildcard(glob) do
+  defp latest(glob) when is_binary(glob), do: latest([glob])
+
+  defp latest(globs) do
+    paths =
+      globs
+      |> Enum.flat_map(&Path.wildcard/1)
+      |> Enum.uniq()
+
+    case paths do
       [] -> {:error, :missing}
       paths -> {:ok, Enum.max_by(paths, &mtime_unix!/1)}
     end

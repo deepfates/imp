@@ -354,7 +354,99 @@ defmodule DashboardTest do
     end
   end
 
+  test "dashboard uses the freshest live matrix across canonical output dirs" do
+    root = tmp_dir("dashboard-freshest-live-matrix")
+    live_matrix_dir = Path.join(root, "tmp-live-matrix")
+    results_dir = Path.join(root, "results")
+    out_dir = Path.join(root, "out")
+
+    Enum.each([live_matrix_dir, results_dir, out_dir], &File.mkdir_p!/1)
+
+    stale_path = Path.join(live_matrix_dir, "live-matched-model-matrix-20260707T000000Z.json")
+
+    write_json!(stale_path, live_matrix_artifact(100, 1.1455, "stale-matrix"))
+    File.touch!(stale_path, {{2026, 1, 1}, {0, 0, 0}})
+
+    fresh_path = Path.join(results_dir, "live-matched-model-matrix-20260707T000100Z.json")
+
+    write_json!(fresh_path, live_matrix_artifact(2300, 26.3641, "fresh-matrix"))
+    File.touch!(fresh_path, {{2026, 1, 1}, {0, 1, 0}})
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--live-matrix-dir",
+        live_matrix_dir,
+        "--results-dir",
+        results_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+    live_lane = dashboard["lanes"]["live_matched_model"]
+
+    assert live_lane["artifact"]["path"] == fresh_path
+
+    assert live_lane["summary"]["required_lanes"]["current_low_cost"]["coverage"][
+             "covered_rows"
+           ] == 2300
+
+    assert live_lane["summary"]["required_lanes"]["current_low_cost"]["coverage"][
+             "coverage_percent"
+           ] == 26.3641
+  end
+
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp live_matrix_artifact(covered_rows, coverage_percent, run_id) do
+    %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "summary" => %{
+        "models" => 1,
+        "full_parity_models" => 0,
+        "matrix_complete" => false,
+        "dsex_instrumentation" => %{"complete" => true},
+        "runtime_shape" => %{"complete" => true},
+        "disagreements" => %{"count" => 0},
+        "prompt_contract" => %{"complete" => true},
+        "required_lanes" => %{
+          "current_low_cost" => %{
+            "present" => true,
+            "full_evidence" => false,
+            "models" => ["gpt-5.4-mini"],
+            "best_status" => "research_sample",
+            "coverage" => %{
+              "covered_rows" => covered_rows,
+              "expected_rows" => 8724,
+              "remaining_rows" => 8724 - covered_rows,
+              "coverage_percent" => coverage_percent,
+              "full" => false
+            },
+            "cost" => %{"status" => "token_estimate"}
+          },
+          "frontier_sanity" => %{
+            "present" => false,
+            "full_evidence" => false,
+            "models" => [],
+            "best_status" => "missing"
+          },
+          "historical_research" => %{
+            "present" => false,
+            "full_evidence" => false,
+            "models" => [],
+            "best_status" => "missing"
+          }
+        },
+        "run_id" => run_id
+      }
+    }
+  end
 
   defp tmp_dir(name) do
     path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")

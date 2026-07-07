@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   @shortdoc "Aggregate live matched-model parity campaigns into a matrix"
 
   @default_in "benchmarks/results/dsex-dspy-parity-campaign-*.json"
-  @default_out "benchmarks/results"
+  @default_out "tmp/live-matrix"
   @current_prompt_contract DSEx.BenchmarkTruth.Contract.current_prompt_contract()
 
   @impl true
