@@ -59,6 +59,22 @@ defmodule ProviderTrainingLifecycleTest do
     end
   end
 
+  defmodule RaisingTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts), do: raise("transport exploded")
+  end
+
+  defmodule InvalidJSONTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts) do
+      {:ok, %{status: 200, headers: [], body: "not json"}}
+    end
+  end
+
   defp examples do
     [
       DSEx.example(question: "2+2?", answer: "4") |> DSEx.Example.with_inputs(:question)
@@ -118,6 +134,68 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:error, :openai_training_file_required} =
              DSEx.Clients.Trainer.finetune(trainer, lm, examples(), [])
+  end
+
+  test "trainer dispatch reports callback crashes and invalid callback results" do
+    lm = DSEx.req_llm("gpt-test")
+
+    assert {:error, {:trainer_failed, :anonymous_trainer, "trainer exploded"}} =
+             DSEx.Clients.Trainer.finetune(
+               fn _lm, _examples, _opts -> raise "trainer exploded" end,
+               lm,
+               examples(),
+               []
+             )
+
+    assert {:error, {:invalid_trainer_result, :not_a_job}} =
+             DSEx.Clients.Trainer.finetune(
+               fn _lm, _examples, _opts -> {:ok, :not_a_job} end,
+               lm,
+               examples(),
+               []
+             )
+
+    assert {:error, {:not_a_trainer, String}} =
+             DSEx.Clients.Trainer.finetune(String, lm, examples(), [])
+  end
+
+  test "HTTP trainer reports payload transport decode and mapper failures" do
+    lm = DSEx.req_llm("gpt-test")
+
+    payload_trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        payload_builder: fn _lm, _examples, _opts -> raise "payload exploded" end
+      )
+
+    assert {:error, {:invalid_training_payload, "payload exploded"}} =
+             DSEx.Clients.Trainer.finetune(payload_trainer, lm, examples(), [])
+
+    transport_trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: RaisingTrainingTransport
+      )
+
+    assert {:error, {:training_transport_failed, "transport exploded"}} =
+             DSEx.Clients.Trainer.finetune(transport_trainer, lm, examples(), [])
+
+    invalid_json_trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: InvalidJSONTrainingTransport
+      )
+
+    assert {:error, {:invalid_training_response, reason}} =
+             DSEx.Clients.Trainer.finetune(invalid_json_trainer, lm, examples(), [])
+
+    assert reason =~ "unexpected byte"
+
+    mapper_trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: DatabricksTrainingTransport,
+        response_mapper: fn _trainer, _lm, _examples, _decoded -> raise "mapper exploded" end
+      )
+
+    assert {:error, {:invalid_training_job, "mapper exploded"}} =
+             DSEx.Clients.Trainer.finetune(mapper_trainer, lm, examples(), [])
   end
 
   test "OpenAI trainer custom base URL does not bind ambient API key implicitly" do

@@ -123,18 +123,49 @@ defmodule DSEx.Clients.Trainer do
 
   def finetune(provider, lm, examples, opts \\ [])
 
-  def finetune(module, lm, examples, opts) when is_atom(module),
-    do: module.finetune(lm, examples, opts)
-
-  def finetune(%module{} = trainer, lm, examples, opts) do
-    if function_exported?(module, :finetune, 4) do
-      module.finetune(trainer, lm, examples, opts)
+  def finetune(module, lm, examples, opts) when is_atom(module) do
+    if function_exported?(module, :finetune, 3) do
+      call_trainer(fn -> module.finetune(lm, examples, opts) end, module)
     else
       {:error, {:not_a_trainer, module}}
     end
   end
 
-  def finetune(fun, lm, examples, opts) when is_function(fun, 3), do: fun.(lm, examples, opts)
+  def finetune(%module{} = trainer, lm, examples, opts) do
+    if function_exported?(module, :finetune, 4) do
+      call_trainer(fn -> module.finetune(trainer, lm, examples, opts) end, module)
+    else
+      {:error, {:not_a_trainer, module}}
+    end
+  end
+
+  def finetune(fun, lm, examples, opts) when is_function(fun, 3) do
+    call_trainer(fn -> fun.(lm, examples, opts) end, fun)
+  end
+
+  def finetune(provider, _lm, _examples, _opts), do: {:error, {:not_a_trainer, provider}}
+
+  defp call_trainer(fun, trainer) do
+    case fun.() do
+      {:ok, %DSEx.Clients.TrainingJob{}} = success -> success
+      {:error, _reason} = error -> error
+      {:ok, other} -> {:error, {:invalid_trainer_result, other}}
+      other -> {:error, {:invalid_trainer_result, other}}
+    end
+  rescue
+    error -> {:error, {:trainer_failed, trainer_name(trainer), error_message(error)}}
+  catch
+    kind, reason ->
+      {:error, {:trainer_failed, trainer_name(trainer), error_message({kind, reason})}}
+  end
+
+  defp trainer_name(trainer) when is_atom(trainer), do: trainer
+  defp trainer_name(fun) when is_function(fun), do: :anonymous_trainer
+  defp trainer_name(%module{}), do: module
+  defp trainer_name(other), do: other
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
 
 defmodule DSEx.Clients.HTTPTrainer do
@@ -182,22 +213,7 @@ defmodule DSEx.Clients.HTTPTrainer do
       [:dsex, :training, :submit],
       %{provider: trainer.provider, model: Map.get(lm, :model)},
       fn ->
-        with {:ok, payload} <- build_payload(trainer, lm, examples, opts) do
-          body = Jason.encode!(payload)
-
-          headers =
-            [{"content-type", "application/json"}] ++
-              auth_headers(trainer.api_key) ++ trainer.headers
-
-          with {:ok, %{status: status, body: response}} when status in 200..299 <-
-                 DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts),
-               {:ok, decoded} <- Jason.decode(response) do
-            {:ok, trainer.response_mapper.(trainer, lm, examples, decoded)}
-          else
-            {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-            {:error, reason} -> {:error, reason}
-          end
-        end
+        submit(trainer, lm, examples, opts)
       end
     )
   end
@@ -223,6 +239,66 @@ defmodule DSEx.Clients.HTTPTrainer do
     end
   rescue
     error -> {:error, {:invalid_training_payload, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:invalid_training_payload, inspect({kind, reason})}}
+  end
+
+  defp submit(%__MODULE__{} = trainer, lm, examples, opts) do
+    with {:ok, payload} <- build_payload(trainer, lm, examples, opts),
+         {:ok, body} <- encode_payload(payload),
+         headers <-
+           [{"content-type", "application/json"}] ++
+             auth_headers(trainer.api_key) ++ trainer.headers,
+         {:ok, response} <- post_training(trainer, body, headers, opts),
+         {:ok, decoded} <- decode_training_response(response),
+         {:ok, job} <- map_training_response(trainer, lm, examples, decoded) do
+      {:ok, job}
+    end
+  end
+
+  defp encode_payload(payload) do
+    {:ok, Jason.encode!(payload)}
+  rescue
+    error -> {:error, {:invalid_training_payload, Exception.message(error)}}
+  end
+
+  defp post_training(trainer, body, headers, opts) do
+    case DSEx.HTTP.post(trainer.transport, trainer.submit_url, headers, body, opts) do
+      {:ok, %{status: status, body: response}} when status in 200..299 ->
+        {:ok, response}
+
+      {:ok, %{status: status, body: response}} ->
+        {:error, {:http_error, status, response}}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_training_transport_response, other}}
+    end
+  rescue
+    error -> {:error, {:training_transport_failed, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:training_transport_failed, inspect({kind, reason})}}
+  end
+
+  defp decode_training_response(response) do
+    case Jason.decode(response) do
+      {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
+      {:ok, decoded} -> {:error, {:invalid_training_response, decoded}}
+      {:error, reason} -> {:error, {:invalid_training_response, Exception.message(reason)}}
+    end
+  end
+
+  defp map_training_response(trainer, lm, examples, decoded) do
+    case trainer.response_mapper.(trainer, lm, examples, decoded) do
+      %DSEx.Clients.TrainingJob{} = job -> {:ok, job}
+      other -> {:error, {:invalid_training_job, other}}
+    end
+  rescue
+    error -> {:error, {:invalid_training_job, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:invalid_training_job, inspect({kind, reason})}}
   end
 
   defp default_response(trainer, lm, examples, decoded) do
