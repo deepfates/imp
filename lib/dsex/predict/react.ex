@@ -1,5 +1,32 @@
 defmodule DSEx.Predict.ReAct do
-  @moduledoc "Iterative provider-tool-call ReAct program with a reserved submit step."
+  @moduledoc """
+  Iterative provider-tool-call ReAct program with a reserved submit step.
+
+  ReAct lets the LM choose from an explicit tool catalog, append observations to
+  history, and eventually call the reserved `submit` tool with the signature's
+  required output fields.
+
+  Use it when the model must gather information or perform bounded actions
+  before answering. Keep the tool policy narrow in production:
+
+      lookup = DSEx.tool(:lookup, "lookup facts", fn %{query: query} -> query end)
+
+      program =
+        DSEx.react("question -> answer", [lookup],
+          tool_policy: [:lookup, :submit],
+          max_iters: 4
+        )
+
+  Failure semantics are explicit:
+
+  - unknown model-selected tools return `{:error, {:unknown_tool, name}}`;
+  - denied tools return `{:error, {:tool_denied, name}}`;
+  - tool crashes return `{:error, {:tool_error, name, reason}}`;
+  - tool-policy crashes return `{:error, {:tool_policy_error, name, reason}}`;
+  - missing final fields return `{:error, {:missing_output_fields, fields}}`.
+
+  Tool call history is redacted before it is attached to the final prediction.
+  """
 
   @behaviour DSEx.Module
 
@@ -80,11 +107,11 @@ defmodule DSEx.Predict.ReAct do
           {events, final} = execute_calls(agent, List.wrap(calls))
           history = history ++ events
 
-          denied = Enum.find(events, &match?(%{result: {:error, {:tool_denied, _name}}}, &1))
+          error = Enum.find(events, &match?(%{result: {:error, _reason}}, &1))
 
           cond do
-            denied ->
-              denied.result
+            error ->
+              error.result
 
             final ->
               final = Map.merge(final, %{history: history, termination_reason: :submit})
@@ -100,21 +127,15 @@ defmodule DSEx.Predict.ReAct do
 
   defp execute_calls(agent, calls) do
     Enum.reduce_while(calls, {[], nil}, fn call, {events, final} ->
-      name = normalize_tool_name(agent.tools, Map.get(call, :name) || Map.get(call, "name"))
+      requested_name = Map.get(call, :name) || Map.get(call, "name")
+      name = normalize_tool_name(agent.tools, requested_name)
 
       args =
         (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
            %{})
         |> normalize_args()
 
-      tool = if name, do: Map.get(agent.tools, name)
-
-      result =
-        cond do
-          is_nil(tool) -> {:error, :unknown_tool}
-          not authorized_tool?(agent.tool_policy, name, args) -> {:error, {:tool_denied, name}}
-          true -> DSEx.Tool.call(tool, args)
-        end
+      result = execute_tool_call(agent, name, requested_name, args)
 
       event = DSEx.Redaction.redact(%{tool: name, arguments: args, result: result})
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
@@ -127,18 +148,56 @@ defmodule DSEx.Predict.ReAct do
     end)
   end
 
-  defp authorized_tool?(:allow, _name, _args), do: true
-  defp authorized_tool?(allowed, name, _args) when is_list(allowed), do: name in allowed
+  defp execute_tool_call(_agent, nil, requested_name, _args),
+    do: {:error, {:unknown_tool, requested_name}}
 
-  defp authorized_tool?(policy, name, args) when is_function(policy, 2) do
-    case policy.(name, args) do
-      true -> true
-      :ok -> true
-      _other -> false
+  defp execute_tool_call(agent, name, _requested_name, args),
+    do: execute_tool_call(agent, name, args)
+
+  defp execute_tool_call(agent, name, args) do
+    case authorize_tool(agent.tool_policy, name, args) do
+      :ok ->
+        call_tool(Map.fetch!(agent.tools, name), args)
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp authorized_tool?(policy, name, _args), do: name in List.wrap(policy)
+  defp call_tool(tool, args) do
+    DSEx.Tool.call(tool, args)
+  rescue
+    exception ->
+      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+  catch
+    kind, reason ->
+      {:error, {:tool_error, tool.name, {kind, reason}}}
+  end
+
+  defp authorize_tool(:allow, _name, _args), do: :ok
+
+  defp authorize_tool(allowed, name, _args) when is_list(allowed) do
+    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
+  end
+
+  defp authorize_tool(policy, name, args) when is_function(policy, 2) do
+    try do
+      case policy.(name, args) do
+        true -> :ok
+        :ok -> :ok
+        {:error, reason} -> {:error, reason}
+        _other -> {:error, {:tool_denied, name}}
+      end
+    rescue
+      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
+    catch
+      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
+    end
+  end
+
+  defp authorize_tool(policy, name, _args) do
+    if name in List.wrap(policy), do: :ok, else: {:error, {:tool_denied, name}}
+  end
 
   defp project_outputs(signature, prediction) do
     fields =

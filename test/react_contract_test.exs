@@ -67,6 +67,63 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "unknown LM-selected tools fail immediately instead of spinning to max iterations" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: "external_tool", arguments: %{query: "x"}}]}
+        end
+      ]
+    }
+
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 3)
+
+    assert {:error, {:unknown_tool, "external_tool"}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "tool exceptions become structured ReAct errors" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
+    agent = DSEx.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
+
+    assert {:error, {:tool_error, :lookup, "provider exploded"}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "tool policy exceptions become structured ReAct errors" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
+    policy = fn _name, _args -> raise "policy broke" end
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        tool_policy: policy,
+        max_iters: 3
+      )
+
+    assert {:error, {:tool_policy_error, :lookup, "policy broke"}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
   test "submit short-circuits later provider tool calls" do
     parent = self()
 
