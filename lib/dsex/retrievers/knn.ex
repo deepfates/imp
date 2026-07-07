@@ -6,7 +6,7 @@ defmodule DSEx.Retrievers.KNN do
   def new(examples, opts \\ []) do
     %__MODULE__{
       examples: examples,
-      k: Keyword.get(opts, :k, 3),
+      k: non_negative_integer(Keyword.get(opts, :k, 3)),
       field: Keyword.get(opts, :field, :question)
     }
   end
@@ -31,4 +31,7 @@ defmodule DSEx.Retrievers.KNN do
       Regex.scan(~r/[a-z0-9]+/i, to_string(text))
       |> List.flatten()
       |> Enum.map(&String.downcase/1)
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

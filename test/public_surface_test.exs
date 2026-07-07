@@ -90,7 +90,10 @@ defmodule PublicSurfaceTest do
       DSEx.Optimizer.KNNFewShot.new(1, trainset)
       |> DSEx.Optimizer.KNNFewShot.compile(program)
 
-    assert {:ok, _} = DSEx.Optimizer.KNNFewShot.Program.call(knn, %{question: "2+2?"})
+    assert {:ok, knn_pred} = DSEx.Optimizer.KNNFewShot.Program.call(knn, %{question: "2+2?"})
+    assert knn_pred.metadata.knn_few_shot.demo_count == 1
+    assert [demo] = knn_pred.metadata.knn_few_shot.demos
+    assert DSEx.Example.get(demo, :question) == "2+2?"
 
     ensemble =
       DSEx.Optimizer.Ensemble.new(
@@ -114,6 +117,29 @@ defmodule PublicSurfaceTest do
       DSEx.Optimizer.BetterTogether.compile(better, program, trainset, trainset, strategy: "p")
 
     assert {:ok, _} = DSEx.Predict.Predict.call(compiled, %{question: "2+2?"})
+  end
+
+  test "knn few-shot reports retrieval failures and clamps negative k" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    broken =
+      DSEx.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
+      |> DSEx.Optimizer.KNNFewShot.compile(program)
+
+    assert {:error, {:knn_few_shot_retrieval_failed, reason}} =
+             DSEx.Optimizer.KNNFewShot.Program.call(broken, %{question: "2+2?"})
+
+    assert String.contains?(reason, "Enumerable")
+
+    empty =
+      DSEx.Optimizer.KNNFewShot.new(-2, [
+        DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+      ])
+      |> DSEx.Optimizer.KNNFewShot.compile(program)
+
+    assert {:ok, prediction} = DSEx.Optimizer.KNNFewShot.Program.call(empty, %{question: "2+2?"})
+    assert prediction.metadata.knn_few_shot.demo_count == 0
   end
 
   test "ensemble captures child failures and reducer failures as structured results" do
