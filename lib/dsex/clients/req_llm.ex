@@ -88,11 +88,7 @@ defmodule DSEx.Clients.ReqLLM do
       lm: redact_lm(lm)
     })
 
-    result =
-      with {:ok, response} <-
-             lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
-        {:ok, from_response(response)}
-      end
+    result = do_generate_uncached(lm, messages, opts)
 
     DSEx.Telemetry.execute([:dsex, :lm, :stop], %{duration: System.monotonic_time() - started}, %{
       lm: redact_lm(lm),
@@ -100,6 +96,23 @@ defmodule DSEx.Clients.ReqLLM do
     })
 
     result
+  end
+
+  defp do_generate_uncached(lm, messages, opts) do
+    case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
+      {:ok, response} ->
+        {:ok, from_response(response)}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_req_llm_response, inspect(other)}}
+    end
+  rescue
+    error -> {:error, {:req_llm_generate_failed, error_message(error)}}
+  catch
+    kind, reason -> {:error, {:req_llm_generate_failed, error_message({kind, reason})}}
   end
 
   def cache_key(%__MODULE__{} = lm, messages, opts) do
@@ -132,7 +145,7 @@ defmodule DSEx.Clients.ReqLLM do
       lm: redact_lm(lm)
     })
 
-    case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
+    case safe_stream(lm, messages, opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} ->
         response.stream
         |> Stream.flat_map(&from_stream_chunk/1)
@@ -146,6 +159,19 @@ defmodule DSEx.Clients.ReqLLM do
           }
         ]
     end
+  end
+
+  defp safe_stream(lm, messages, opts) do
+    case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
+      {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
+      {:ok, other} -> {:error, {:invalid_req_llm_stream, inspect(other)}}
+      {:error, reason} -> {:error, reason}
+      other -> {:error, {:invalid_req_llm_stream, inspect(other)}}
+    end
+  rescue
+    error -> {:error, {:req_llm_stream_failed, error_message(error)}}
+  catch
+    kind, reason -> {:error, {:req_llm_stream_failed, error_message({kind, reason})}}
   end
 
   def dump(%__MODULE__{} = lm) do
@@ -469,4 +495,7 @@ defmodule DSEx.Clients.ReqLLM do
   defp encode_model(model), do: model
 
   defp redact_lm(%__MODULE__{model: model}), do: %{provider: :req_llm, model: model}
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end

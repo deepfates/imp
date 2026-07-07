@@ -67,6 +67,15 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule FailingStub do
+    def generate_text(_model, _messages, _opts), do: raise("transport exploded")
+    def stream_text(_model, _messages, _opts), do: throw(:stream_exploded)
+  end
+
+  defmodule InvalidStub do
+    def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
+  end
+
   test "ReqLLM client drives DSEx prediction and translates JSON/schema options" do
     lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
 
@@ -203,6 +212,27 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+  end
+
+  test "ReqLLM client reports provider module failures without crashing callers" do
+    lm = DSEx.req_llm("openai:gpt-test", req_module: FailingStub)
+
+    assert {:error, {:req_llm_generate_failed, "transport exploded"}} =
+             DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:req_llm_stream_failed, "{:throw, :stream_exploded}"}},
+               done: true
+             }
+           ] = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+  end
+
+  test "ReqLLM client reports invalid provider module return shapes" do
+    lm = DSEx.req_llm("openai:gpt-test", req_module: InvalidStub)
+
+    assert {:error, {:invalid_req_llm_response, ":not_a_req_llm_response"}} =
+             DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
   end
 
   test "save/load preserves ReqLLM-backed programs without serializing credentials" do
