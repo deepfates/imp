@@ -164,6 +164,9 @@ defmodule BenchmarkTruthTest do
     assert gsm8k["dsex_passes"] == 3
     assert gsm8k["dspy_passes"] == 3
     assert [%{"from" => 3, "to" => 1318} | _] = gsm8k["coverage"]["missing_ranges"]
+
+    assert %{"task" => "gsm8k", "next_offset" => 3} =
+             Enum.find(campaign["next_chunks"], &(&1["task"] == "gsm8k"))
   end
 
   defp read_jsonl(text) do

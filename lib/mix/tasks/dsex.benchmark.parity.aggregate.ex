@@ -125,6 +125,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
           )
       },
       "tasks" => task_reports,
+      "next_chunks" => next_chunks(task_reports),
       "parity" => %{
         "full_parity" =>
           full_coverage? and within?(aggregate_gap, strict_aggregate_gap) and
@@ -220,6 +221,18 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "dsex_duration_ms" => summed_unique_task_duration(row_values, "dsex_duration_ms"),
       "dspy_duration_ms" => summed_unique_task_duration(row_values, "dspy_duration_ms")
     }
+  end
+
+  defp next_chunks(task_reports) do
+    Enum.map(task_reports, fn task ->
+      next_range = List.first(task["coverage"]["missing_ranges"])
+
+      %{
+        "task" => task["task"],
+        "next_offset" => next_range && next_range["from"],
+        "remaining" => task["coverage"]["expected"] - task["coverage"]["covered"]
+      }
+    end)
   end
 
   defp count_ratio(rows, key) do
