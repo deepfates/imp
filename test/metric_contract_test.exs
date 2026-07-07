@@ -71,6 +71,44 @@ defmodule MetricContractTest do
     assert length(result.rows) == 1
   end
 
+  test "Evaluate records program crashes and invalid returns as failed rows" do
+    metric = fn _example, _prediction -> true end
+
+    raising = %Program{handler: fn _inputs -> raise "program exploded" end}
+
+    raised =
+      [example("one", "1")]
+      |> DSEx.Evaluate.new(metric, failure_score: -1.0)
+      |> DSEx.Evaluate.run(raising)
+
+    assert raised.score == -1.0
+    assert [%{reason: {:program_error, "program exploded"}}] = raised.errors
+    assert [%{error: {:program_error, "program exploded"}, prediction: nil}] = raised.rows
+
+    invalid = %Program{handler: fn _inputs -> :not_a_module_result end}
+
+    result =
+      [example("one", "1")]
+      |> DSEx.Evaluate.new(metric)
+      |> DSEx.Evaluate.run(invalid)
+
+    assert [%{reason: {:invalid_program_result, ":not_a_module_result"}}] = result.errors
+  end
+
+  test "Evaluate records metric throws as metric feedback" do
+    program = %Program{handler: fn _inputs -> {:ok, DSEx.prediction(answer: "Paris")} end}
+    metric = fn _example, _prediction -> throw(:bad_metric) end
+
+    result =
+      [example("capital?", "Paris")]
+      |> DSEx.Evaluate.new(metric)
+      |> DSEx.Evaluate.run(program)
+
+    assert result.score == 0.0
+    assert result.errors == []
+    assert [%{feedback: {:metric_error, "{:throw, :bad_metric}"}, passed?: false}] = result.rows
+  end
+
   test "token F1 counts duplicate overlap like extractive QA metrics" do
     assert DSEx.Metrics.f1("alpha alpha beta", "alpha beta beta") == 2 / 3
   end

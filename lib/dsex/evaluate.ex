@@ -34,6 +34,8 @@ defmodule DSEx.Evaluate do
 
   Metrics may return booleans, numbers, maps with `:score` and `:feedback`, or
   `%DSEx.Metrics.Result{}`. Arity-3 metrics also receive the prediction trace.
+  Program and metric failures are recorded as failed rows so optimizers can keep
+  searching and report diagnostics.
   """
 
   defstruct [:devset, :metric, display_progress: false, failure_score: 0.0, max_errors: :infinity]
@@ -101,11 +103,25 @@ defmodule DSEx.Evaluate do
   end
 
   defp call_program(%module{} = program, inputs) do
-    cond do
-      function_exported?(module, :call, 2) -> module.call(program, inputs)
-      true -> {:error, {:not_a_program, module}}
+    result =
+      cond do
+        function_exported?(module, :call, 2) -> module.call(program, inputs)
+        true -> {:error, {:not_a_program, module}}
+      end
+
+    case result do
+      {:ok, %DSEx.Prediction{} = prediction} -> {:ok, prediction}
+      {:ok, other} -> {:error, {:invalid_program_prediction, inspect(other)}}
+      {:error, reason} -> {:error, reason}
+      other -> {:error, {:invalid_program_result, inspect(other)}}
     end
+  rescue
+    error -> {:error, {:program_error, error_message(error)}}
+  catch
+    kind, reason -> {:error, {:program_error, error_message({kind, reason})}}
   end
+
+  defp call_program(other, _inputs), do: {:error, {:not_a_program, other}}
 
   defp metric_result(metric, example, prediction) when is_function(metric, 2),
     do: metric |> apply_metric([example, prediction]) |> DSEx.Metrics.normalize_result()
@@ -122,8 +138,15 @@ defmodule DSEx.Evaluate do
     error ->
       %{
         score: 0.0,
-        feedback: {:metric_error, Exception.message(error)},
+        feedback: {:metric_error, error_message(error)},
         metadata: %{error: error}
+      }
+  catch
+    kind, reason ->
+      %{
+        score: 0.0,
+        feedback: {:metric_error, error_message({kind, reason})},
+        metadata: %{error: {kind, reason}}
       }
   end
 
@@ -135,4 +158,7 @@ defmodule DSEx.Evaluate do
 
   defp too_many_errors?(_errors, :infinity), do: false
   defp too_many_errors?(errors, max_errors), do: length(errors) > max_errors
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
