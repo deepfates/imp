@@ -52,6 +52,43 @@ defmodule OptimizerReportTest do
     assert Enum.all?(report.candidates, &Map.has_key?(&1, :score))
   end
 
+  test "labeled few-shot reports selected demonstrations without scoring them" do
+    {train, _dev} = sets()
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, train)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :labeled_few_shot
+    assert report.best_score == nil
+    assert report.candidate_count == 1
+    assert report.metadata.requested_k == 1
+    assert report.metadata.selected_count == 1
+    assert [%{index: 0, selected?: true, example: example}] = report.candidates
+    assert DSEx.Example.get(example, :answer) == "Paris"
+    assert length(compiled.demos) == 1
+  end
+
+  test "labeled few-shot reports trainset enumeration failures" do
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, :not_an_enumerable_trainset)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :labeled_few_shot
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert [%{stage: :trainset, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+    assert compiled.demos == []
+  end
+
   test "random search treats zero requested trials as a baseline-only compile" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
