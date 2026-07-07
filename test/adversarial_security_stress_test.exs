@@ -10,11 +10,32 @@ defmodule AdversarialSecurityStressTest do
     end
   end
 
+  defmodule ExplodingProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, :raise), do: raise("parallel exploded")
+    def call(%__MODULE__{}, :throw), do: throw(:parallel_thrown)
+    def call(%__MODULE__{}, :invalid), do: :not_a_module_result
+    def call(%__MODULE__{}, value), do: {:ok, value}
+  end
+
   test "parallel prediction timeouts kill slow tasks without exiting the caller" do
     assert [{:error, :timeout}, {:ok, 0}] =
              DSEx.Predict.Parallel.map(%SlowProgram{}, [50, 0],
                max_concurrency: 2,
                timeout: 5
+             )
+  end
+
+  test "parallel prediction records per-input crashes and invalid returns" do
+    assert [
+             {:ok, :ok},
+             {:error, {:parallel_program_failed, "parallel exploded"}},
+             {:error, {:parallel_program_failed, "{:throw, :parallel_thrown}"}},
+             {:error, {:invalid_parallel_result, ":not_a_module_result"}}
+           ] =
+             DSEx.Predict.Parallel.map(%ExplodingProgram{}, [:ok, :raise, :throw, :invalid],
+               max_concurrency: 0
              )
   end
 
