@@ -1,6 +1,14 @@
 defmodule PublicSurfaceTest do
   use ExUnit.Case
 
+  defmodule ExplodingProgram do
+    @behaviour DSEx.Module
+    defstruct []
+
+    @impl true
+    def call(%__MODULE__{}, _inputs), do: raise("program exploded")
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -106,6 +114,42 @@ defmodule PublicSurfaceTest do
       DSEx.Optimizer.BetterTogether.compile(better, program, trainset, trainset, strategy: "p")
 
     assert {:ok, _} = DSEx.Predict.Predict.call(compiled, %{question: "2+2?"})
+  end
+
+  test "ensemble captures child failures and reducer failures as structured results" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    ensemble =
+      DSEx.Optimizer.Ensemble.new()
+      |> DSEx.Optimizer.Ensemble.compile([program, %ExplodingProgram{}])
+
+    assert {:ok, prediction} =
+             DSEx.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
+
+    assert [{:ok, %DSEx.Prediction{}}, {:error, {:ensemble_program_failed, "program exploded"}}] =
+             DSEx.Prediction.get(prediction, :outputs)
+
+    reducer =
+      DSEx.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> raise "reducer exploded" end)
+      |> DSEx.Optimizer.Ensemble.compile([program])
+
+    assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %DSEx.Prediction{}}]}} =
+             DSEx.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
+  end
+
+  test "ensemble reducer can return plain prediction fields" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    ensemble =
+      DSEx.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> %{answer: "4"} end)
+      |> DSEx.Optimizer.Ensemble.compile([program])
+
+    assert {:ok, prediction} =
+             DSEx.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "4"
   end
 
   test "evaluation metrics, auto-evaluation, streaming messages, datasets, cache, and core structs work" do
