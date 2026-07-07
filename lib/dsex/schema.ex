@@ -180,9 +180,16 @@ defmodule DSEx.Schema do
   defp maybe_max_length(errors, _field, _value, _constraints), do: errors
 
   defp maybe_pattern(errors, field, value, %{pattern: pattern}) do
-    if Regex.match?(Regex.compile!(pattern), value),
-      do: errors,
-      else: errors ++ [error(field, :pattern, "must match #{pattern}")]
+    case Regex.compile(pattern) do
+      {:ok, regex} ->
+        if Regex.match?(regex, value),
+          do: errors,
+          else: errors ++ [error(field, :pattern, "must match #{pattern}")]
+
+      {:error, {reason, _at}} ->
+        errors ++
+          [error(field, :pattern, "has invalid regex pattern #{inspect(pattern)}: #{reason}")]
+    end
   end
 
   defp maybe_pattern(errors, _field, _value, _constraints), do: errors

@@ -140,6 +140,17 @@ defmodule SchemaConstraintsTest do
     assert DSEx.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
   end
 
+  test "invalid regex constraints become validation errors instead of crashes" do
+    fields = [
+      Field.new(%{name: :code, type: :string, constraints: %{pattern: "["}}, :output)
+    ]
+
+    assert {:error, [%{field: :code, rule: :pattern, message: message}]} =
+             DSEx.Schema.validate_fields(fields, %{code: "ABC"})
+
+    assert message =~ "invalid regex pattern"
+  end
+
   test "JSON adapter returns retry feedback for constraint failures" do
     signature =
       DSEx.Signature.new(%{
