@@ -1,5 +1,13 @@
 defmodule DSEx.Saving do
-  @moduledoc "JSON save/load helpers for portable program state."
+  @moduledoc """
+  JSON save/load helpers for portable program state.
+
+  Saved programs are treated as an external trust boundary. Loading validates the
+  artifact shape, allowlists adapters and provider clients, and never restores
+  credentials from disk.
+  """
+
+  @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
 
   def save!(program, path) do
     path
@@ -24,18 +32,16 @@ defmodule DSEx.Saving do
     predict |> dump() |> Map.put("type", "chain_of_thought")
   end
 
-  def load(
-        %{
-          "type" => "predict",
-          "signature" => signature,
-          "demos" => demos,
-          "config" => config,
-          "metadata" => metadata
-        } = state
-      ) do
+  def load(%{"type" => "predict"} = state) do
+    require_keys!(state, @predict_required_keys)
+    signature = Map.fetch!(state, "signature")
+    demos = require_list!(state, "demos")
+    config = Map.fetch!(state, "config")
+    metadata = require_map!(state, "metadata")
+
     opts =
       [
-        demos: Enum.map(demos, &DSEx.Example.new/1),
+        demos: Enum.map(demos, &load_demo!/1),
         config: decode_config(config),
         metadata: metadata
       ]
@@ -52,6 +58,14 @@ defmodule DSEx.Saving do
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved DSEx program type: #{inspect(type)}"
+  end
+
+  def load(state) when is_map(state) do
+    raise ArgumentError, "saved DSEx program is missing required key \"type\""
+  end
+
+  def load(state) do
+    raise ArgumentError, "saved DSEx program must be a map, got: #{inspect(state)}"
   end
 
   defp maybe_put_adapter(opts, %{"dynamic_adapter" => true}), do: opts
@@ -73,11 +87,16 @@ defmodule DSEx.Saving do
     Enum.map(config, fn
       {k, v} -> {decode_config_key(k), v}
       [k, v] -> {decode_config_key(k), v}
+      other -> raise ArgumentError, "invalid saved DSEx config entry: #{inspect(other)}"
     end)
   end
 
   defp decode_config(config) when is_map(config),
     do: Enum.map(config, fn {k, v} -> {decode_config_key(k), v} end)
+
+  defp decode_config(config) do
+    raise ArgumentError, "saved DSEx config must be a map or list, got: #{inspect(config)}"
+  end
 
   defp decode_adapter(nil), do: DSEx.Adapter.Chat
 
@@ -110,6 +129,15 @@ defmodule DSEx.Saving do
           "unsupported saved DSEx provider: #{inspect(provider)}; saved provider clients must use req_llm"
   end
 
+  defp decode_lm(%{provider: provider}) do
+    raise ArgumentError,
+          "unsupported saved DSEx provider: #{inspect(provider)}; saved provider clients must use req_llm"
+  end
+
+  defp decode_lm(lm) do
+    raise ArgumentError, "invalid saved DSEx LM client: #{inspect(lm)}"
+  end
+
   defp decode_config_key(key) when is_atom(key), do: key
 
   defp decode_config_key(key) do
@@ -131,5 +159,38 @@ defmodule DSEx.Saving do
       "provider_options" -> :provider_options
       other -> other
     end
+  end
+
+  defp require_keys!(state, keys) do
+    missing = Enum.reject(keys, &Map.has_key?(state, &1))
+
+    case missing do
+      [] ->
+        :ok
+
+      _ ->
+        raise ArgumentError,
+              "saved DSEx #{Map.get(state, "type", "program")} is missing required keys: #{inspect(missing)}"
+    end
+  end
+
+  defp require_list!(state, key) do
+    case Map.fetch!(state, key) do
+      value when is_list(value) -> value
+      value -> raise ArgumentError, "saved DSEx #{key} must be a list, got: #{inspect(value)}"
+    end
+  end
+
+  defp require_map!(state, key) do
+    case Map.fetch!(state, key) do
+      value when is_map(value) -> value
+      value -> raise ArgumentError, "saved DSEx #{key} must be a map, got: #{inspect(value)}"
+    end
+  end
+
+  defp load_demo!(demo) when is_map(demo) or is_list(demo), do: DSEx.Example.new(demo)
+
+  defp load_demo!(demo) do
+    raise ArgumentError, "saved DSEx demo must be a map or keyword list, got: #{inspect(demo)}"
   end
 end

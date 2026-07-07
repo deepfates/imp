@@ -253,6 +253,46 @@ defmodule ProductionHardeningTest do
     end
   end
 
+  test "saving rejects malformed program artifacts with explicit errors" do
+    assert_raise ArgumentError, ~r/saved DSEx program must be a map/, fn ->
+      DSEx.Saving.load(["not", "a", "map"])
+    end
+
+    assert_raise ArgumentError, ~r/missing required key "type"/, fn ->
+      DSEx.Saving.load(%{})
+    end
+
+    base = %{
+      "type" => "predict",
+      "signature" => DSEx.Signature.dump(DSEx.Signature.new("question -> answer")),
+      "demos" => [],
+      "config" => [],
+      "metadata" => %{},
+      "adapter" => "Elixir.DSEx.Adapter.Chat",
+      "lm" => nil
+    }
+
+    assert_raise ArgumentError, ~r/missing required keys: \["signature"\]/, fn ->
+      base |> Map.delete("signature") |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved DSEx demos must be a list/, fn ->
+      base |> Map.put("demos", %{"bad" => true}) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved DSEx demo must be a map or keyword list/, fn ->
+      base |> Map.put("demos", ["bad"]) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/invalid saved DSEx config entry/, fn ->
+      base |> Map.put("config", [:temperature]) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/invalid saved DSEx LM client/, fn ->
+      base |> Map.put("lm", %{"model" => "missing-provider"}) |> DSEx.Saving.load()
+    end
+  end
+
   test "loading saved non-ReqLLM provider clients fails closed" do
     previous = System.get_env("OPENAI_API_KEY")
     Process.put(:previous_openai_api_key, previous)
