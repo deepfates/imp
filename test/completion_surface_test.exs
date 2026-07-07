@@ -67,6 +67,76 @@ defmodule CompletionSurfaceTest do
     Process.delete(:code_act_actions)
   end
 
+  test "CodeAct fails immediately on unknown denied or crashing tools with traces" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:code_act_failure_actions)
+          Process.put(:code_act_failure_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:code_act_failure_actions, [%{tool: "missing", arguments: %{}}])
+    unknown = DSEx.Predict.CodeAct.new("question -> answer", [], lm: lm)
+
+    assert {:error,
+            {:code_act_tool_error, {:unknown_tool, "missing"},
+             [%{action: :tool, output: {:error, {:unknown_tool, "missing"}}}]}} =
+             DSEx.Predict.CodeAct.call(unknown, %{question: "q"})
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> "should not run" end)
+    Process.put(:code_act_failure_actions, [%{tool: "lookup", arguments: %{}}])
+
+    denied =
+      DSEx.Predict.CodeAct.new("question -> answer", [lookup],
+        lm: lm,
+        tool_policy: [],
+        max_iters: 2
+      )
+
+    assert {:error,
+            {:code_act_tool_error, {:tool_denied, :lookup},
+             [%{action: :tool, output: {:error, {:tool_denied, :lookup}}}]}} =
+             DSEx.Predict.CodeAct.call(denied, %{question: "q"})
+
+    boom = DSEx.Tool.new(:boom, "boom", fn _args -> raise "tool exploded" end)
+    Process.put(:code_act_failure_actions, [%{tool: "boom", arguments: %{}}])
+    crashing = DSEx.Predict.CodeAct.new("question -> answer", [boom], lm: lm, max_iters: 2)
+
+    assert {:error,
+            {:code_act_tool_error, {:tool_error, :boom, "tool exploded"},
+             [%{action: :tool, output: {:error, {:tool_error, :boom, "tool exploded"}}}]}} =
+             DSEx.Predict.CodeAct.call(crashing, %{question: "q"})
+  after
+    Process.delete(:code_act_failure_actions)
+  end
+
+  test "CodeAct sandbox rejection includes redacted trace context" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{program: "System.cmd(\"echo\", [])"}
+        end
+      ]
+    }
+
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: 1)
+
+    assert {:error, {:code_act_sandbox_error, {:unsafe_ast, _ast}, [trace]}} =
+             DSEx.Predict.CodeAct.call(code_act, %{question: "q"})
+
+    assert %{
+             action: :program,
+             input: "System.cmd(\"echo\", [])",
+             output: {:error, {:unsafe_ast, _}}
+           } =
+             trace
+  end
+
   test "streaming exposes predictions as an enumerable" do
     lm = %{
       module: DSEx.LM.Static,

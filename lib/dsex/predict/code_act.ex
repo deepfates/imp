@@ -5,17 +5,28 @@ defmodule DSEx.Predict.CodeAct do
   Each step asks the underlying ProgramOfThought planner for either a safe
   `program` expression to evaluate or a `tool` plus `arguments` to observe
   before the next step.
+
+  Tool execution is policy-gated like ReAct and Agent:
+
+      DSEx.code_act("question -> answer", [lookup],
+        tool_policy: [:lookup],
+        max_iters: 4
+      )
+
+  Unknown, denied, or crashing tools return structured errors with the redacted
+  trace accumulated so far.
   """
 
   @behaviour DSEx.Module
 
-  defstruct [:program_of_thought, tools: %{}, max_iters: 5]
+  defstruct [:program_of_thought, tools: %{}, max_iters: 5, tool_policy: :allow]
 
   def new(signature, tools \\ [], opts \\ []) do
     %__MODULE__{
       program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, opts),
       tools: tools |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
-      max_iters: Keyword.get(opts, :max_iters, 5)
+      max_iters: Keyword.get(opts, :max_iters, 5),
+      tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
   end
 
@@ -40,12 +51,18 @@ defmodule DSEx.Predict.CodeAct do
           arguments = DSEx.Prediction.get(prediction, :arguments, %{})
           {result, trace} = call_tool(code_act, tool, arguments, trace, iteration)
 
-          next_inputs =
-            inputs
-            |> Map.put(:observation, result)
-            |> Map.put(:code_act_history, Enum.reverse(trace))
+          case result do
+            {:error, reason} ->
+              {:error, {:code_act_tool_error, reason, Enum.reverse(trace)}}
 
-          run_loop(code_act, next_inputs, trace, iteration + 1)
+            _value ->
+              next_inputs =
+                inputs
+                |> Map.put(:observation, result)
+                |> Map.put(:code_act_history, Enum.reverse(trace))
+
+              run_loop(code_act, next_inputs, trace, iteration + 1)
+          end
 
         is_binary(program) ->
           case DSEx.Sandbox.eval(program, inputs) do
@@ -58,7 +75,8 @@ defmodule DSEx.Predict.CodeAct do
               {:ok, prediction}
 
             {:error, reason} ->
-              {:error, reason}
+              trace = trace_event(trace, iteration, :program, program, {:error, reason})
+              {:error, {:code_act_sandbox_error, reason, Enum.reverse(trace)}}
           end
 
         true ->
@@ -69,11 +87,58 @@ defmodule DSEx.Predict.CodeAct do
 
   defp call_tool(%__MODULE__{} = code_act, tool_name, arguments, trace, iteration) do
     normalized = normalize_tool_name(code_act.tools, tool_name)
-    tool = if normalized, do: Map.get(code_act.tools, normalized)
-    result = if tool, do: DSEx.Tool.call(tool, arguments), else: {:error, :unknown_tool}
+    result = execute_tool_call(code_act, normalized, tool_name, arguments)
 
     {result,
      trace_event(trace, iteration, :tool, %{name: normalized, arguments: arguments}, result)}
+  end
+
+  defp execute_tool_call(_code_act, nil, requested_name, _arguments),
+    do: {:error, {:unknown_tool, requested_name}}
+
+  defp execute_tool_call(code_act, name, _requested_name, arguments) do
+    case authorize_tool(code_act.tool_policy, name, arguments) do
+      :ok ->
+        call_known_tool(Map.fetch!(code_act.tools, name), arguments)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp call_known_tool(tool, arguments) do
+    DSEx.Tool.call(tool, arguments)
+  rescue
+    exception ->
+      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+  catch
+    kind, reason ->
+      {:error, {:tool_error, tool.name, {kind, reason}}}
+  end
+
+  defp authorize_tool(:allow, _name, _arguments), do: :ok
+
+  defp authorize_tool(allowed, name, _arguments) when is_list(allowed) do
+    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
+  end
+
+  defp authorize_tool(policy, name, arguments) when is_function(policy, 2) do
+    try do
+      case policy.(name, arguments) do
+        true -> :ok
+        :ok -> :ok
+        {:error, reason} -> {:error, reason}
+        _other -> {:error, {:tool_denied, name}}
+      end
+    rescue
+      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
+    catch
+      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
+    end
+  end
+
+  defp authorize_tool(policy, name, _arguments) do
+    if name in List.wrap(policy), do: :ok, else: {:error, {:tool_denied, name}}
   end
 
   defp trace_event(trace, iteration, action, input, output) do
