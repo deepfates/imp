@@ -16,6 +16,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
     out_dir = Keyword.get(opts, :out_dir, @default_out_dir)
     offset = Keyword.get(opts, :offset, 0)
     max_examples = Keyword.get(opts, :max_examples, 20)
+    max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     lm = Keyword.get(opts, :lm)
     model = Keyword.get(opts, :model)
     optimizer_comparisons? = Keyword.get(opts, :optimizer_comparisons, true)
@@ -25,7 +26,17 @@ defmodule DSEx.BenchmarkTruth.Runner do
     task_results =
       tasks
       |> Enum.map(fn {task, path} ->
-        run_task(task, path, mode, offset, max_examples, lm, model, optimizer_comparisons?)
+        run_task(
+          task,
+          path,
+          mode,
+          offset,
+          max_examples,
+          max_concurrency,
+          lm,
+          model,
+          optimizer_comparisons?
+        )
       end)
 
     report = %{
@@ -47,7 +58,17 @@ defmodule DSEx.BenchmarkTruth.Runner do
     %{report: report, out_path: out_path}
   end
 
-  defp run_task(task, path, mode, offset, max_examples, lm, model, optimizer_comparisons?) do
+  defp run_task(
+         task,
+         path,
+         mode,
+         offset,
+         max_examples,
+         max_concurrency,
+         lm,
+         model,
+         optimizer_comparisons?
+       ) do
     examples =
       task
       |> load_examples(path)
@@ -57,7 +78,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
     effective_lm = lm || fixture_lm(task, examples)
     program = program(task, effective_lm)
     metric = metric(task)
-    {duration_us, result} = timed(fn -> evaluate(program, examples, metric) end)
+    {duration_us, result} = timed(fn -> evaluate(program, examples, metric, max_concurrency) end)
 
     optimizer_comparisons =
       if optimizer_comparisons?,
@@ -72,6 +93,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "model" => safe_json(model),
       "offset" => offset,
       "examples" => length(examples),
+      "max_concurrency" => max_concurrency,
       "score" => result.score,
       "duration_ms" => us_to_ms(duration_us),
       "optimizer_comparisons" => optimizer_comparisons,
@@ -116,57 +138,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
     end
   end
 
-  defp evaluate(program, examples, metric) do
+  defp evaluate(program, examples, metric, max_concurrency) when max_concurrency <= 1 do
     {rows, errors} =
       examples
       |> Enum.with_index()
-      |> Enum.map(fn {example, index} ->
-        inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
-
-        {duration_us, outcome} =
-          timed(fn ->
-            with {:ok, prediction} <- DSEx.Module.call(program, inputs) do
-              result =
-                metric
-                |> apply_metric(example, prediction)
-                |> DSEx.Metrics.normalize_result()
-
-              {:ok, prediction, result}
-            end
-          end)
-
-        row =
-          case outcome do
-            {:ok, prediction, result} ->
-              %{
-                index: index,
-                example: example,
-                prediction: prediction,
-                score: result.score,
-                passed?: result.passed?,
-                feedback: result.feedback,
-                metric_metadata: result.metadata,
-                error: nil,
-                duration_us: duration_us
-              }
-
-            {:error, reason} ->
-              %{
-                index: index,
-                example: example,
-                prediction: nil,
-                score: 0.0,
-                passed?: false,
-                feedback: nil,
-                metric_metadata: %{},
-                error: reason,
-                duration_us: duration_us
-              }
-          end
-
-        error = if row.error, do: %{index: index, reason: row.error}, else: nil
-        {row, error}
-      end)
+      |> Enum.map(fn {example, index} -> evaluate_row(program, example, metric, index) end)
       |> Enum.unzip()
 
     errors = Enum.reject(errors, &is_nil/1)
@@ -176,6 +152,76 @@ defmodule DSEx.BenchmarkTruth.Runner do
       rows: rows,
       errors: errors
     }
+  end
+
+  defp evaluate(program, examples, metric, max_concurrency) do
+    {rows, errors} =
+      examples
+      |> Enum.with_index()
+      |> Task.async_stream(
+        fn {example, index} -> evaluate_row(program, example, metric, index) end,
+        max_concurrency: max_concurrency,
+        timeout: :infinity,
+        ordered: true
+      )
+      |> Enum.map(fn {:ok, value} -> value end)
+      |> Enum.unzip()
+
+    errors = Enum.reject(errors, &is_nil/1)
+
+    %DSEx.Evaluate.Result{
+      score: average(Enum.map(rows, & &1.score)),
+      rows: rows,
+      errors: errors
+    }
+  end
+
+  defp evaluate_row(program, example, metric, index) do
+    inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
+
+    {duration_us, outcome} =
+      timed(fn ->
+        with {:ok, prediction} <- DSEx.Module.call(program, inputs) do
+          result =
+            metric
+            |> apply_metric(example, prediction)
+            |> DSEx.Metrics.normalize_result()
+
+          {:ok, prediction, result}
+        end
+      end)
+
+    row =
+      case outcome do
+        {:ok, prediction, result} ->
+          %{
+            index: index,
+            example: example,
+            prediction: prediction,
+            score: result.score,
+            passed?: result.passed?,
+            feedback: result.feedback,
+            metric_metadata: result.metadata,
+            error: nil,
+            duration_us: duration_us
+          }
+
+        {:error, reason} ->
+          %{
+            index: index,
+            example: example,
+            prediction: nil,
+            score: 0.0,
+            passed?: false,
+            feedback: nil,
+            metric_metadata: %{},
+            error: reason,
+            duration_us: duration_us
+          }
+      end
+
+    error = if row.error, do: %{index: index, reason: row.error}, else: nil
+    {row, error}
   end
 
   defp apply_metric(metric, example, prediction) when is_function(metric, 2),

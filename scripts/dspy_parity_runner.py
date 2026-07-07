@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
@@ -60,6 +61,7 @@ def main() -> int:
     parser.add_argument("--hotpotqa")
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--max-examples", type=int, default=20)
+    parser.add_argument("--max-concurrency", type=int, default=1)
     parser.add_argument("--out", default="benchmarks/results")
     parser.add_argument("--model", default=os.environ.get("OPENAI_MODEL", "gpt-5.5"))
     parser.add_argument("--temperature", type=float, default=1.0)
@@ -75,9 +77,9 @@ def main() -> int:
 
     tasks: List[Dict[str, Any]] = []
     if args.gsm8k:
-        tasks.append(run_task("gsm8k", args.gsm8k, args.offset, args.max_examples))
+        tasks.append(run_task("gsm8k", args.gsm8k, args.offset, args.max_examples, args.max_concurrency))
     if args.hotpotqa:
-        tasks.append(run_task("hotpotqa", args.hotpotqa, args.offset, args.max_examples))
+        tasks.append(run_task("hotpotqa", args.hotpotqa, args.offset, args.max_examples, args.max_concurrency))
     if not tasks:
         raise SystemExit("provide --gsm8k or --hotpotqa")
 
@@ -114,16 +116,19 @@ def configure_dspy(model: str, api_key: str, temperature: Optional[float]) -> No
     dspy.configure(lm=lm)
 
 
-def run_task(task: str, path: str, offset: int, max_examples: int) -> Dict[str, Any]:
+def run_task(task: str, path: str, offset: int, max_examples: int, max_concurrency: int) -> Dict[str, Any]:
     rows = read_jsonl(path)[offset : offset + max_examples]
-    program = GSM8KProgram() if task == "gsm8k" else HotPotQAProgram()
     metric = gsm8k_metric if task == "gsm8k" else hotpotqa_metric
     started = time.perf_counter()
 
-    result_rows = [
-        run_row(task, program, metric, index, row)
-        for index, row in enumerate(rows)
-    ]
+    indexed_rows = list(enumerate(rows))
+    if max_concurrency <= 1:
+        result_rows = [run_row(task, metric, index, row) for index, row in indexed_rows]
+    else:
+        with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
+            result_rows = list(
+                executor.map(lambda item: run_row(task, metric, item[0], item[1]), indexed_rows)
+            )
 
     duration_ms = (time.perf_counter() - started) * 1000
     return {
@@ -132,6 +137,7 @@ def run_task(task: str, path: str, offset: int, max_examples: int) -> Dict[str, 
         "sha256": file_sha256(path),
         "offset": offset,
         "examples": len(rows),
+        "max_concurrency": max_concurrency,
         "score": average([row["score"] for row in result_rows]),
         "duration_ms": round(duration_ms, 3),
         "errors": [row["error"] for row in result_rows if row["error"] is not None],
@@ -141,13 +147,13 @@ def run_task(task: str, path: str, offset: int, max_examples: int) -> Dict[str, 
 
 def run_row(
     task: str,
-    program: dspy.Module,
     metric: Callable[[Dict[str, Any], Any], bool],
     index: int,
     row: Dict[str, Any],
 ) -> Dict[str, Any]:
     started = time.perf_counter()
     try:
+        program = GSM8KProgram() if task == "gsm8k" else HotPotQAProgram()
         if task == "gsm8k":
             prediction = program(question=row["question"])
         else:

@@ -161,6 +161,11 @@ the decisive artifact: it deduplicates overlapping chunks by absolute row index,
 reports missing ranges, computes weighted scores, and refuses `full_parity`
 unless the complete canonical row range is covered.
 
+Use `--max-concurrency` on parity chunks, or
+`mix dsex.benchmark.parity.campaign --chunks N --max-concurrency N`, to improve
+wall-clock time without changing the evidence standard. Concurrency must be
+chosen within provider rate limits and is recorded in chunk artifacts.
+
 ## What The Gates Do Not Prove
 
 They do not prove:

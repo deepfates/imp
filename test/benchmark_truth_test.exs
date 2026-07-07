@@ -160,6 +160,7 @@ defmodule BenchmarkTruthTest do
     assert campaign["coverage"]["covered"] == 3
     refute campaign["coverage"]["full"]
     refute campaign["parity"]["full_parity"]
+    assert campaign["parity"]["latency_parity"]
     assert gsm8k["coverage"]["covered"] == 3
     assert gsm8k["dsex_passes"] == 3
     assert gsm8k["dspy_passes"] == 3

@@ -26,6 +26,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
           hotpotqa: :string,
           offset: :integer,
           max_examples: :integer,
+          max_concurrency: :integer,
           out: :string,
           model: :string,
           models: :string,
@@ -45,14 +46,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     models = models(opts, api_key)
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
     max_examples = Keyword.get(opts, :max_examples, 20)
+    max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     File.mkdir_p!(out_dir)
 
     Enum.each(models, fn model ->
-      run_model!(opts, tasks, model, api_key, max_examples, out_dir)
+      run_model!(opts, tasks, model, api_key, max_examples, max_concurrency, out_dir)
     end)
   end
 
-  defp run_model!(opts, tasks, model, api_key, max_examples, out_dir) do
+  defp run_model!(opts, tasks, model, api_key, max_examples, max_concurrency, out_dir) do
     dsex =
       DSEx.BenchmarkTruth.run(
         tasks: tasks,
@@ -62,6 +64,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         out_dir: out_dir,
         offset: Keyword.get(opts, :offset, 0),
         max_examples: max_examples,
+        max_concurrency: max_concurrency,
         optimizer_comparisons: false
       )
 
@@ -72,6 +75,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         model,
         Keyword.get(opts, :offset, 0),
         max_examples,
+        max_concurrency,
         out_dir
       )
 
@@ -156,7 +160,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     if String.contains?(path, "/"), do: Path.expand(path), else: path
   end
 
-  defp run_dspy!(python, tasks, model, offset, max_examples, out_dir) do
+  defp run_dspy!(python, tasks, model, offset, max_examples, max_concurrency, out_dir) do
     args =
       [
         "scripts/dspy_parity_runner.py",
@@ -166,6 +170,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         to_string(offset),
         "--max-examples",
         to_string(max_examples),
+        "--max-concurrency",
+        to_string(max_concurrency),
         "--out",
         out_dir
       ] ++
@@ -222,6 +228,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       "task" => task,
       "offset" => max((dsex && dsex["offset"]) || 0, (dspy && dspy["offset"]) || 0),
       "examples" => max((dsex && dsex["examples"]) || 0, (dspy && dspy["examples"]) || 0),
+      "max_concurrency" =>
+        max((dsex && dsex["max_concurrency"]) || 1, (dspy && dspy["max_concurrency"]) || 1),
       "dsex_score" => dsex && dsex["score"],
       "dspy_score" => dspy && dspy["score"],
       "score_delta" => score_delta(dsex, dspy),

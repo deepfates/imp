@@ -24,6 +24,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
           hotpotqa: :string,
           offset: :integer,
           max_examples: :integer,
+          max_concurrency: :integer,
           out: :string,
           live: :boolean,
           model: :string
@@ -48,7 +49,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
         model: model_metadata(mode, opts),
         out_dir: Keyword.get(opts, :out, "benchmarks/results"),
         offset: Keyword.get(opts, :offset, 0),
-        max_examples: Keyword.get(opts, :max_examples, 20)
+        max_examples: Keyword.get(opts, :max_examples, 20),
+        max_concurrency: Keyword.get(opts, :max_concurrency, 1)
       )
 
     Mix.shell().info("benchmark truth report: #{result.out_path}")

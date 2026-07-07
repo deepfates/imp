@@ -25,7 +25,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
           out: :string,
           model: :string,
           strict_task_gap: :float,
-          strict_aggregate_gap: :float
+          strict_aggregate_gap: :float,
+          max_latency_ratio: :float
         ]
       )
 
@@ -48,7 +49,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     aggregate =
       aggregate_reports(reports,
         strict_task_gap: Keyword.get(opts, :strict_task_gap, 0.01),
-        strict_aggregate_gap: Keyword.get(opts, :strict_aggregate_gap, 0.01)
+        strict_aggregate_gap: Keyword.get(opts, :strict_aggregate_gap, 0.01),
+        max_latency_ratio: Keyword.get(opts, :max_latency_ratio, 1.5)
       )
 
     out_path =
@@ -99,7 +101,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     aggregate_gap = abs(score_delta)
     strict_task_gap = Keyword.fetch!(opts, :strict_task_gap)
     strict_aggregate_gap = Keyword.fetch!(opts, :strict_aggregate_gap)
+    max_latency_ratio = Keyword.fetch!(opts, :max_latency_ratio)
     full_coverage? = covered == expected
+
+    latency_ratio =
+      ratio(
+        Enum.sum(Enum.map(task_reports, & &1["dsex_duration_ms"])),
+        Enum.sum(Enum.map(task_reports, & &1["dspy_duration_ms"]))
+      )
 
     %{
       "schema_version" => 1,
@@ -118,21 +127,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
         "score_delta" => score_delta,
         "dsex_duration_ms" => Enum.sum(Enum.map(task_reports, & &1["dsex_duration_ms"])),
         "dspy_duration_ms" => Enum.sum(Enum.map(task_reports, & &1["dspy_duration_ms"])),
-        "latency_ratio_dsex_over_dspy" =>
-          ratio(
-            Enum.sum(Enum.map(task_reports, & &1["dsex_duration_ms"])),
-            Enum.sum(Enum.map(task_reports, & &1["dspy_duration_ms"]))
-          )
+        "latency_ratio_dsex_over_dspy" => latency_ratio
       },
       "tasks" => task_reports,
       "next_chunks" => next_chunks(task_reports),
       "parity" => %{
         "full_parity" =>
           full_coverage? and within?(aggregate_gap, strict_aggregate_gap) and
-            within?(max_task_gap, strict_task_gap),
+            within?(max_task_gap, strict_task_gap) and
+            latency_within?(latency_ratio, max_latency_ratio),
         "full_coverage" => full_coverage?,
+        "latency_parity" => latency_within?(latency_ratio, max_latency_ratio),
         "aggregate_gap" => aggregate_gap,
         "max_task_score_gap" => max_task_gap,
+        "max_latency_ratio_dsex_over_dspy" => max_latency_ratio,
         "strict_aggregate_gap" => strict_aggregate_gap,
         "strict_task_gap" => strict_task_gap,
         "note" =>
@@ -141,7 +149,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
             aggregate_gap,
             max_task_gap,
             strict_aggregate_gap,
-            strict_task_gap
+            strict_task_gap,
+            latency_ratio,
+            max_latency_ratio
           )
       }
     }
@@ -282,6 +292,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
         "path" => report["__path__"],
         "generated_at" => report["generated_at"],
         "model" => report_model(report),
+        "max_concurrency" => report_max_concurrency(report),
         "coverage" => report["evidence"]
       }
     end)
@@ -289,6 +300,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
 
   defp report_model(report),
     do: get_in(report, ["dsex", "model", "model"]) || get_in(report, ["dspy", "model", "model"])
+
+  defp report_max_concurrency(report) do
+    report
+    |> Map.get("tasks", [])
+    |> Enum.map(&(&1["max_concurrency"] || 1))
+    |> Enum.max(fn -> 1 end)
+  end
 
   defp one_model!([model]), do: model
 
@@ -298,24 +316,51 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     )
   end
 
-  defp parity_note(false, _aggregate_gap, _max_task_gap, _strict_aggregate_gap, _strict_task_gap) do
+  defp parity_note(
+         false,
+         _aggregate_gap,
+         _max_task_gap,
+         _strict_aggregate_gap,
+         _strict_task_gap,
+         _latency_ratio,
+         _max_latency_ratio
+       ) do
     "Full parity cannot be claimed because not every canonical benchmark row is covered."
   end
 
-  defp parity_note(true, aggregate_gap, max_task_gap, strict_aggregate_gap, strict_task_gap)
+  defp parity_note(
+         true,
+         aggregate_gap,
+         max_task_gap,
+         strict_aggregate_gap,
+         strict_task_gap,
+         latency_ratio,
+         max_latency_ratio
+       )
        when aggregate_gap <= strict_aggregate_gap + 1.0e-12 and
-              max_task_gap <= strict_task_gap + 1.0e-12 do
+              max_task_gap <= strict_task_gap + 1.0e-12 and
+              (is_nil(latency_ratio) or latency_ratio <= max_latency_ratio + 1.0e-12) do
     "Full coverage and strict score parity passed."
   end
 
-  defp parity_note(true, _aggregate_gap, _max_task_gap, _strict_aggregate_gap, _strict_task_gap) do
-    "Full coverage passed, but strict score parity did not."
+  defp parity_note(
+         true,
+         _aggregate_gap,
+         _max_task_gap,
+         _strict_aggregate_gap,
+         _strict_task_gap,
+         _latency_ratio,
+         _max_latency_ratio
+       ) do
+    "Full coverage passed, but strict score or latency parity did not."
   end
 
   defp safe_div(_numerator, 0), do: 0.0
   defp safe_div(numerator, denominator), do: numerator / denominator
 
   defp within?(value, threshold), do: value <= threshold + 1.0e-12
+  defp latency_within?(nil, _threshold), do: true
+  defp latency_within?(value, threshold), do: value <= threshold + 1.0e-12
 
   defp ratio(_left, 0), do: nil
   defp ratio(left, right), do: Float.round(left / right, 3)

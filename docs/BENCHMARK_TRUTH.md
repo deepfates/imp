@@ -148,11 +148,29 @@ mix dsex.benchmark.parity \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --offset 0 \
   --max-examples 100 \
+  --max-concurrency 8 \
   --model gpt-5.4-mini
 ```
 
 Chunked runs avoid losing an entire benchmark to one network interruption. A
 full parity claim still requires covering the complete row range.
+
+To advance a campaign without babysitting each offset:
+
+```sh
+mix dsex.benchmark.parity.campaign \
+  --model gpt-5.4-mini \
+  --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
+  --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
+  --chunk-size 100 \
+  --chunks 5 \
+  --max-concurrency 8
+```
+
+Concurrency improves wall-clock time by issuing independent row calls in
+parallel on both the DSEx and Python DSPy sides. It does not reduce the number
+of benchmark rows or provider calls, and reports record `max_concurrency` so
+serial and concurrent artifacts are auditable.
 
 Aggregate chunk artifacts into a campaign report:
 
@@ -172,8 +190,11 @@ or retry chunks cannot inflate coverage. It reports:
 - latency ratio from covered chunk artifacts
 - explicit `full_parity: true/false`
 
-`full_parity` is false unless every canonical row is covered and both aggregate
-and per-task score gaps are within the configured strict thresholds.
+`full_parity` is false unless every canonical row is covered, aggregate and
+per-task score gaps are within the configured strict thresholds, and the
+DSEx/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
+(`1.5` by default). Latency is part of the decision because parity is about
+operational behavior, not only answer quality.
 
 ## Evidence Standard
 
