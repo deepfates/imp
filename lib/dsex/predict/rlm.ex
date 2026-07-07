@@ -16,6 +16,10 @@ defmodule DSEx.Predict.RLM do
 
   The loop enforces `max_iterations` and `max_llm_calls` budgets and stores an
   interpretable trajectory in prediction metadata.
+
+  Tool execution is policy-gated. Unknown, denied, crashing, or policy-crashing
+  tool actions return `{:error, {:rlm_tool_error, reason, trace}}` with the
+  redacted trajectory accumulated so far.
   """
 
   @behaviour DSEx.Module
@@ -234,16 +238,10 @@ defmodule DSEx.Predict.RLM do
   end
 
   defp step(%__MODULE__{} = rlm, %{"action" => "tool"} = action, state, iteration) do
-    name = normalize_tool_name(rlm.tools, Map.get(action, "name"))
+    requested_name = Map.get(action, "name")
+    name = normalize_tool_name(rlm.tools, requested_name)
     args = Map.get(action, "arguments", Map.get(action, "args", %{}))
-    tool = if name, do: Map.get(rlm.tools, name)
-
-    result =
-      cond do
-        is_nil(tool) -> {:error, :unknown_tool}
-        not authorized_tool?(rlm.tool_policy, name, args) -> {:error, {:tool_denied, name}}
-        true -> DSEx.Tool.call(tool, args)
-      end
+    result = execute_tool_call(rlm, name, requested_name, args)
 
     state =
       state
@@ -251,7 +249,7 @@ defmodule DSEx.Predict.RLM do
       |> trace(iteration, :tool, action, result)
 
     case result do
-      {:error, {:tool_denied, _name}} -> result
+      {:error, reason} -> {:error, {:rlm_tool_error, reason, Enum.reverse(state.trace)}}
       _other -> {:cont, state}
     end
   end
@@ -357,18 +355,53 @@ defmodule DSEx.Predict.RLM do
     end)
   end
 
-  defp authorized_tool?(:allow, _name, _args), do: true
-  defp authorized_tool?(allowed, name, _args) when is_list(allowed), do: name in allowed
+  defp execute_tool_call(_rlm, nil, requested_name, _args),
+    do: {:error, {:unknown_tool, requested_name}}
 
-  defp authorized_tool?(policy, name, args) when is_function(policy, 2) do
-    case policy.(name, args) do
-      true -> true
-      :ok -> true
-      _other -> false
+  defp execute_tool_call(rlm, name, _requested_name, args) do
+    case authorize_tool(rlm.tool_policy, name, args) do
+      :ok ->
+        call_known_tool(Map.fetch!(rlm.tools, name), args)
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp authorized_tool?(policy, name, _args), do: name in List.wrap(policy)
+  defp call_known_tool(tool, args) do
+    DSEx.Tool.call(tool, args)
+  rescue
+    exception ->
+      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+  catch
+    kind, reason ->
+      {:error, {:tool_error, tool.name, {kind, reason}}}
+  end
+
+  defp authorize_tool(:allow, _name, _args), do: :ok
+
+  defp authorize_tool(allowed, name, _args) when is_list(allowed) do
+    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
+  end
+
+  defp authorize_tool(policy, name, args) when is_function(policy, 2) do
+    try do
+      case policy.(name, args) do
+        true -> :ok
+        :ok -> :ok
+        {:error, reason} -> {:error, reason}
+        _other -> {:error, {:tool_denied, name}}
+      end
+    rescue
+      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
+    catch
+      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
+    end
+  end
+
+  defp authorize_tool(policy, name, _args) do
+    if name in List.wrap(policy), do: :ok, else: {:error, {:tool_denied, name}}
+  end
 
   defp check_time_budget(%__MODULE__{max_time_ms: nil}, _state), do: :ok
 

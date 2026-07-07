@@ -155,7 +155,7 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_recurse_actions)
   end
 
-  test "RLM enforces tool policy and wall-clock budget" do
+  test "RLM tool failures stop with structured trace-bearing errors" do
     denied_lm = %{
       module: DSEx.LM.Static,
       opts: [
@@ -172,9 +172,70 @@ defmodule RLMPublicSurfaceTest do
         tool_policy: []
       )
 
-    assert {:error, {:tool_denied, :lookup}} =
+    assert {:error, {:rlm_tool_error, {:tool_denied, :lookup}, [denied_trace]}} =
              DSEx.Predict.RLM.call(denied, %{question: "q"})
 
+    assert %{action: :tool, output: {:error, {:tool_denied, :lookup}}} = denied_trace
+
+    unknown_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{action: "tool", name: "missing_tool", arguments: %{}}
+        end
+      ]
+    }
+
+    unknown = DSEx.Predict.RLM.new("question -> answer", lm: unknown_lm, tools: [])
+
+    assert {:error, {:rlm_tool_error, {:unknown_tool, "missing_tool"}, [unknown_trace]}} =
+             DSEx.Predict.RLM.call(unknown, %{question: "q"})
+
+    assert %{action: :tool, output: {:error, {:unknown_tool, "missing_tool"}}} = unknown_trace
+
+    crashing_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{action: "tool", name: "boom", arguments: %{}}
+        end
+      ]
+    }
+
+    boom = DSEx.Tool.new(:boom, "boom", fn _args -> raise "tool exploded" end)
+    crashing = DSEx.Predict.RLM.new("question -> answer", lm: crashing_lm, tools: [boom])
+
+    assert {:error, {:rlm_tool_error, {:tool_error, :boom, "tool exploded"}, [boom_trace]}} =
+             DSEx.Predict.RLM.call(crashing, %{question: "q"})
+
+    assert %{action: :tool, output: {:error, {:tool_error, :boom, "tool exploded"}}} =
+             boom_trace
+
+    policy_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{action: "tool", name: "lookup", arguments: %{}}
+        end
+      ]
+    }
+
+    policy =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: policy_lm,
+        tools: [lookup],
+        tool_policy: fn _name, _args -> raise "policy exploded" end
+      )
+
+    assert {:error,
+            {:rlm_tool_error, {:tool_policy_error, :lookup, "policy exploded"}, [policy_trace]}} =
+             DSEx.Predict.RLM.call(policy, %{question: "q"})
+
+    assert %{action: :tool, output: {:error, {:tool_policy_error, :lookup, "policy exploded"}}} =
+             policy_trace
+  end
+
+  test "RLM enforces wall-clock budget" do
     timeout_lm = %{
       module: DSEx.LM.Static,
       opts: [
