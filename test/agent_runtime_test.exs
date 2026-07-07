@@ -96,14 +96,93 @@ defmodule AgentRuntimeTest do
              runtime.traces
   end
 
-  @tag :capture_log
-  test "stream_events reports worker crashes as structured error events" do
+  test "tool policy exceptions become structured agent errors" do
+    tool = DSEx.Tool.new(:lookup, "lookup", fn _input -> "should not run" end)
+
+    agent =
+      Agent.new(
+        :locked,
+        fn agent, _input, runtime -> Agent.call_tool(agent, :lookup, %{}, runtime) end,
+        tools: [tool],
+        tool_policy: fn _name, _input -> raise "policy exploded" end
+      )
+
+    assert {:error, {:tool_policy_error, :lookup, "policy exploded"}, runtime} =
+             Agent.run(agent, %{})
+
+    assert [
+             %{
+               type: :tool_denied,
+               tool: :lookup,
+               error: {:tool_policy_error, :lookup, "policy exploded"}
+             },
+             %{type: :agent_error, agent: :locked}
+           ] = runtime.traces
+  end
+
+  test "handler exceptions become structured agent errors" do
+    agent =
+      Agent.new(:boom, fn _input, _runtime ->
+        raise "handler exploded"
+      end)
+
+    assert {:error, {:handler_error, :boom, "handler exploded"}, runtime} =
+             Agent.run(agent, %{})
+
+    assert [
+             %{
+               type: :agent_error,
+               agent: :boom,
+               error: {:handler_error, :boom, "handler exploded"}
+             }
+           ] =
+             runtime.traces
+  end
+
+  test "output schema failures preserve traces accumulated by the handler" do
+    tool = DSEx.Tool.new(:normalize, "normalize", fn %{text: text} -> String.downcase(text) end)
+
+    agent =
+      Agent.new(
+        :schema_checked,
+        fn agent, %{text: text}, runtime ->
+          {:ok, _output, runtime} = Agent.call_tool(agent, :normalize, %{text: text}, runtime)
+          {:ok, %{wrong: true}, runtime}
+        end,
+        tools: [tool],
+        output_schema: %{required: [:label]}
+      )
+
+    assert {:error, {:missing_required, [:label]}, runtime} =
+             Agent.run(agent, %{text: "HELLO"})
+
+    assert [
+             %{type: :tool, tool: :normalize, output: "hello"},
+             %{type: :agent_error, agent: :schema_checked, error: {:missing_required, [:label]}}
+           ] = runtime.traces
+  end
+
+  test "stream_events reports handler failures as structured error events" do
     agent =
       Agent.new(:boom, fn _inputs, _runtime ->
         raise "stream worker exploded"
       end)
 
-    assert [%{type: :error, error: {%RuntimeError{message: "stream worker exploded"}, _stack}}] =
+    assert [
+             %{
+               type: :trace,
+               event: %{
+                 type: :agent_error,
+                 agent: :boom,
+                 error: {:handler_error, :boom, "stream worker exploded"}
+               }
+             },
+             %{
+               type: :error,
+               error: {:handler_error, :boom, "stream worker exploded"},
+               traces: [%{type: :agent_error, agent: :boom}]
+             }
+           ] =
              agent
              |> Agent.stream_events(%{})
              |> Enum.to_list()

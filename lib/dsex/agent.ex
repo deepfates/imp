@@ -12,6 +12,16 @@ defmodule DSEx.Agent do
 
   Tool execution is policy-gated with `:tool_policy`, and every trace event is
   redacted through `DSEx.Agent.Runtime` before it is stored or streamed.
+
+  Agent failure boundaries are explicit:
+
+  - handler exceptions return `{:error, {:handler_error, agent_name, reason}, runtime}`;
+  - tool exceptions return `{:error, {:tool_error, tool_name, reason}, runtime}`;
+  - tool-policy exceptions return
+    `{:error, {:tool_policy_error, tool_name, reason}, runtime}`;
+  - schema failures return `{:error, {:missing_required, fields}, runtime}`.
+
+  The returned runtime preserves traces accumulated before the failure.
   """
 
   alias DSEx.Agent.Runtime
@@ -48,17 +58,38 @@ defmodule DSEx.Agent do
     }
   end
 
-  @doc "Runs an agent and returns `{:ok, output, runtime}` or `{:error, reason, runtime}`."
-  def run(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
-    with :ok <- validate(inputs, agent.input_schema),
-         {:ok, output, runtime} <- invoke_handler(agent, resolve_inputs(inputs, runtime), runtime),
-         :ok <- validate(output, agent.output_schema) do
-      {:ok, output, Runtime.trace(runtime, %{type: :agent, agent: agent.name, output: output})}
-    else
-      {:error, reason, runtime} ->
-        {:error, reason,
-         Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
+  @doc """
+  Runs an agent and returns `{:ok, output, runtime}` or `{:error, reason, runtime}`.
 
+  Handler exceptions, policy exceptions, schema failures, and tool failures are
+  returned as structured errors with redacted traces instead of escaping the
+  agent boundary.
+  """
+  def run(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
+    with :ok <- validate(inputs, agent.input_schema) do
+      inputs = resolve_inputs(inputs, runtime)
+
+      case invoke_handler(agent, inputs, runtime) do
+        {:ok, output, runtime} ->
+          case validate(output, agent.output_schema) do
+            :ok ->
+              {:ok, output,
+               Runtime.trace(runtime, %{type: :agent, agent: agent.name, output: output})}
+
+            {:error, reason} ->
+              {:error, reason,
+               Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
+          end
+
+        {:error, reason, runtime} ->
+          {:error, reason,
+           Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
+
+        {:error, reason} ->
+          {:error, reason,
+           Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
+      end
+    else
       {:error, reason} ->
         {:error, reason,
          Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
@@ -83,6 +114,12 @@ defmodule DSEx.Agent do
 
               {:error, reason,
                Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
+          catch
+            kind, reason ->
+              reason = {:tool_error, name, {kind, reason}}
+
+              {:error, reason,
+               Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
           end
 
         :error ->
@@ -96,9 +133,15 @@ defmodule DSEx.Agent do
   end
 
   defp invoke_handler(%__MODULE__{handler: handler} = agent, inputs, runtime) do
-    case :erlang.fun_info(handler, :arity) do
-      {:arity, 2} -> handler.(inputs, runtime)
-      {:arity, 3} -> handler.(agent, inputs, runtime)
+    try do
+      case :erlang.fun_info(handler, :arity) do
+        {:arity, 2} -> handler.(inputs, runtime)
+        {:arity, 3} -> handler.(agent, inputs, runtime)
+      end
+    rescue
+      exception -> {:error, {:handler_error, agent.name, Exception.message(exception)}, runtime}
+    catch
+      kind, reason -> {:error, {:handler_error, agent.name, {kind, reason}}, runtime}
     end
   end
 
@@ -110,11 +153,18 @@ defmodule DSEx.Agent do
 
   defp authorize_tool(%__MODULE__{tool_policy: policy}, name, input)
        when is_function(policy, 2) do
-    case policy.(name, input) do
-      true -> :ok
-      :ok -> :ok
-      false -> {:error, {:tool_denied, name}}
-      {:error, reason} -> {:error, reason}
+    try do
+      case policy.(name, input) do
+        true -> :ok
+        :ok -> :ok
+        false -> {:error, {:tool_denied, name}}
+        {:error, reason} -> {:error, reason}
+        _other -> {:error, {:tool_denied, name}}
+      end
+    rescue
+      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
+    catch
+      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
     end
   end
 
