@@ -31,11 +31,13 @@ defmodule DSEx.Datasets do
   end
 
   def csv(path, input_keys, opts \\ []) do
-    [header | rows] =
+    rows =
       path
       |> File.read!()
       |> String.split(~r/\R/, trim: true)
       |> Enum.map(&parse_csv_line/1)
+
+    [header | rows] = require_csv_header!(rows, path)
 
     rows
     |> Enum.with_index(2)
@@ -52,11 +54,21 @@ defmodule DSEx.Datasets do
     do: jsonl(path, [:question, :context], record: DSEx.Datasets.HotPotQA.Record)
 
   def split(examples, opts \\ []) do
-    train = Keyword.get(opts, :train, 0.8)
+    train = train_fraction!(Keyword.get(opts, :train, 0.8))
     shuffled = if Keyword.get(opts, :shuffle, true), do: Enum.shuffle(examples), else: examples
     count = floor(length(shuffled) * train)
     Enum.split(shuffled, count)
   end
+
+  defp require_csv_header!([], path) do
+    raise Error,
+      message: "invalid CSV dataset at #{path}: expected header row",
+      path: path,
+      line: 1,
+      record: nil
+  end
+
+  defp require_csv_header!(rows, _path), do: rows
 
   defp parse_csv_line(line) do
     Regex.scan(~r/(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/, line)
@@ -142,6 +154,14 @@ defmodule DSEx.Datasets do
     end
 
     :ok
+  end
+
+  defp train_fraction!(value) when is_number(value) and value >= 0 and value <= 1,
+    do: value
+
+  defp train_fraction!(value) do
+    raise ArgumentError,
+          "dataset train split must be a number between 0.0 and 1.0, got: #{inspect(value)}"
   end
 
   defp existing_keys(record),

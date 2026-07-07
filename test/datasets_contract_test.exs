@@ -36,6 +36,31 @@ defmodule DatasetsContractTest do
     cleanup_tmp("ragged.csv")
   end
 
+  test "CSV loader rejects empty files with dataset context" do
+    path = tmp_path("empty.csv")
+    File.write!(path, "")
+
+    assert_raise Datasets.Error, ~r/invalid CSV dataset .*: expected header row/, fn ->
+      Datasets.csv(path, [:question])
+    end
+  after
+    cleanup_tmp("empty.csv")
+  end
+
+  test "dataset split validates train fraction" do
+    examples = [
+      DSEx.example(question: "a", answer: "b") |> DSEx.with_inputs(:question)
+    ]
+
+    assert_raise ArgumentError, ~r/train split must be a number between 0.0 and 1.0/, fn ->
+      Datasets.split(examples, train: 1.5)
+    end
+
+    assert_raise ArgumentError, ~r/train split must be a number between 0.0 and 1.0/, fn ->
+      Datasets.Dataset.new(examples, train: -0.1)
+    end
+  end
+
   test "typed dataset records load as examples for GSM8K HotPotQA MATH and Colors" do
     gsm8k_path = tmp_path("typed-gsm8k.jsonl")
     hotpot_path = tmp_path("typed-hotpot.jsonl")
