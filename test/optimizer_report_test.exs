@@ -238,6 +238,49 @@ defmodule OptimizerReportTest do
     assert Enum.all?(report.errors, &String.contains?(&1.error, "Enumerable"))
   end
 
+  test "better together reports unknown strategy keys without crashing" do
+    {train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BetterTogether.new(%{p: DSEx.Optimizer.LabeledFewShot.new(k: 1)})
+      |> DSEx.Optimizer.BetterTogether.compile(program, train, dev, strategy: "missing")
+
+    assert {:ok, prediction} = DSEx.Predict.Predict.call(compiled, %{question: "Capital?"})
+    assert DSEx.Prediction.get(prediction, :answer) == "unknown"
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    assert report.optimizer == :better_together
+    assert report.candidate_count == 1
+
+    assert [%{key: "missing", status: :error, error: {:unknown_optimizer, "missing"}}] =
+             report.candidates
+
+    assert [%{key: "missing", error: {:unknown_optimizer, "missing"}}] = report.errors
+  end
+
+  test "better together reports invalid optimizer values without crashing" do
+    {train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BetterTogether.new(%{bad: :not_an_optimizer})
+      |> DSEx.Optimizer.BetterTogether.compile(program, train, dev, strategy: :bad)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :better_together
+
+    assert [%{key: :bad, status: :error, error: {:invalid_optimizer, :not_an_optimizer}}] =
+             report.candidates
+
+    assert [%{key: :bad, error: {:invalid_optimizer, :not_an_optimizer}}] = report.errors
+  end
+
   test "instruction proposer accepts LM-generated scored candidates" do
     lm = %{
       module: DSEx.LM.Static,
