@@ -94,6 +94,48 @@ defmodule OptimizerReportTest do
     assert Enum.all?(report.errors, &String.contains?(&1.error, "Enumerable"))
   end
 
+  test "bootstrap few-shot reports selected and rejected train examples" do
+    {train, _dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 1)
+      |> DSEx.Optimizer.BootstrapFewShot.compile(program, train)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :bootstrap_few_shot
+    assert report.best_score == 0.0
+    assert report.metadata.selected_count == 0
+    assert report.metadata.trainset_size == 1
+    assert [%{passed?: false, selected?: false} = candidate] = report.candidates
+    assert candidate.score == 0.0
+    assert report.errors == []
+    assert compiled.demos == []
+  end
+
+  test "bootstrap few-shot captures metric failures as optimizer diagnostics" do
+    {train, _dev} = sets()
+    program = DSEx.predict("question -> answer", lm: lm())
+    metric = fn _example, _prediction -> raise "metric exploded" end
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 1)
+      |> DSEx.Optimizer.BootstrapFewShot.compile(program, train)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :bootstrap_few_shot
+    assert report.metadata.selected_count == 0
+    assert [%{stage: :metric, reason: "metric exploded"}] = report.errors
+
+    assert [%{passed?: false, selected?: false, feedback: {:metric_error, "metric exploded"}}] =
+             report.candidates
+  end
+
   test "instruction search attaches candidate score report" do
     {_train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
