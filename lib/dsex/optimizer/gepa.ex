@@ -1,10 +1,11 @@
 defmodule DSEx.Optimizer.GEPA do
   @moduledoc """
-  Compatibility wrapper over `DSEx.Optimize.GEPA`.
+  Program-level GEPA optimizer for DSEx signatures.
 
-  The GEPA search implementation lives in `DSEx.Optimize.GEPA`. This module
-  adapts program instruction optimization into an artifact optimization problem
-  so DSEx does not maintain two unrelated GEPA algorithms.
+  `DSEx.Optimizer.GEPA` treats a program's instruction as the artifact under
+  search, then uses `DSEx.Optimize.GEPA` to generate reflective instruction
+  candidates. It is the DSEx-native bridge between signature programs and
+  artifact optimization, not a Python compatibility layer.
   """
 
   defstruct [:metric, feedback_fn: nil, generations: 4]
@@ -74,19 +75,23 @@ defmodule DSEx.Optimizer.GEPA do
       instruction = artifact.text
       candidate = DSEx.Optimizer.InstructionSearch.put_instruction(program, instruction)
 
-      per_example_scores =
+      {per_example_scores, failures} =
         Enum.map(examples, fn example_map ->
           example = DSEx.Example.new(example_map)
 
-          {:ok, prediction} =
-            DSEx.call(candidate, DSEx.Example.inputs(example) |> DSEx.Example.to_map())
+          case DSEx.call(candidate, DSEx.Example.inputs(example) |> DSEx.Example.to_map()) do
+            {:ok, prediction} ->
+              {metric.(example, prediction) |> DSEx.Metrics.score(), nil}
 
-          metric.(example, prediction) |> DSEx.Metrics.score()
+            {:error, reason} ->
+              {0.0, "Program call failed for #{inspect(example_map)}: #{inspect(reason)}"}
+          end
         end)
+        |> Enum.unzip()
 
       %{
         per_example_scores: per_example_scores,
-        asi: misses(examples, per_example_scores)
+        asi: failures |> Enum.reject(&is_nil/1) |> Kernel.++(misses(examples, per_example_scores))
       }
     end
   end

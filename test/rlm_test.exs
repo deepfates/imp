@@ -8,7 +8,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_actions)
@@ -35,7 +35,7 @@ defmodule RLMPublicSurfaceTest do
     context = String.duplicate("a", 40) <> hidden
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:rlm_controller_messages, messages)
@@ -61,7 +61,7 @@ defmodule RLMPublicSurfaceTest do
 
   test "RLM enforces max iteration and sub-LM budgets" do
     loop_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "eval", code: "x + 1"} end]
     }
 
@@ -69,12 +69,12 @@ defmodule RLMPublicSurfaceTest do
     assert {:error, {:rlm_max_iterations, 1, _trace}} = DSEx.Predict.RLM.call(rlm, %{x: 1})
 
     sub_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
     }
 
     query_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "llm_query", inputs: %{question: "q"}} end]
     }
 
@@ -97,7 +97,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:rlm_tool_prompt, Enum.map_join(messages, "\n", & &1.content))
@@ -131,7 +131,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_recurse_actions)
@@ -157,7 +157,7 @@ defmodule RLMPublicSurfaceTest do
 
   test "RLM enforces tool policy and wall-clock budget" do
     denied_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts -> %{action: "tool", name: "lookup", arguments: %{}} end
       ]
@@ -176,7 +176,7 @@ defmodule RLMPublicSurfaceTest do
              DSEx.Predict.RLM.call(denied, %{question: "q"})
 
     timeout_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Process.sleep(2)

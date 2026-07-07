@@ -17,7 +17,7 @@ defmodule DSExTest do
   test "parses typed signatures with descriptions and constraints" do
     signature =
       DSEx.signature(
-        ~s(question: string "User question", attempts: integer -> answer: string, confidence: number, verdict: enum[yes,no])
+        ~s(question: string "User question", attempts: integer -> answer: string, confidence: number, verdict: enum[yes,no], extract: short_span)
       )
 
     assert [
@@ -26,16 +26,23 @@ defmodule DSExTest do
            ] =
              signature.inputs
 
-    assert [%{name: :answer, type: :string}, %{name: :confidence, type: :number}, verdict] =
+    assert [
+             %{name: :answer, type: :string},
+             %{name: :confidence, type: :number},
+             verdict,
+             extract
+           ] =
              signature.outputs
 
     assert verdict.type == :string
     assert verdict.metadata.constraints.enum == ["yes", "no"]
+    assert extract.type == :string
+    assert extract.metadata.constraints.answer_shape == :short_span
 
     assert {:ok, prediction} =
              DSEx.Adapter.Chat.parse(
                signature,
-               %{answer: "ok", confidence: "0.8", verdict: "yes"},
+               %{answer: "ok", confidence: "0.8", verdict: "yes", extract: "Paris"},
                []
              )
 
@@ -44,12 +51,41 @@ defmodule DSExTest do
     assert {:error, %DSEx.AdapterParseError{message: message}} =
              DSEx.Adapter.Chat.parse(
                signature,
-               %{answer: "ok", confidence: "many", verdict: "maybe"},
+               %{answer: "ok", confidence: "many", verdict: "maybe", extract: "Paris; France"},
                []
              )
 
     assert message =~ "confidence"
     assert message =~ "verdict"
+    assert message =~ "extract"
+  end
+
+  test "builds signatures from decoded JSON-style string-key maps" do
+    signature =
+      DSEx.signature(%{
+        "instructions" => "Answer carefully.",
+        "metadata" => %{"source" => "json-config"},
+        "inputs" => [%{"name" => "question", "type" => "string"}],
+        "outputs" => [
+          %{
+            "name" => "answer",
+            "type" => "string",
+            "constraints" => %{"answerShape" => "short_span"}
+          }
+        ]
+      })
+
+    assert signature.instructions == "Answer carefully."
+    assert signature.metadata == %{"source" => "json-config"}
+    assert DSEx.Signature.input_names(signature) == [:question]
+    assert DSEx.Signature.output_names(signature) == [:answer]
+    assert hd(signature.outputs).metadata.constraints["answerShape"] == "short_span"
+  end
+
+  test "signature map constructor reports missing input output keys clearly" do
+    assert_raise ArgumentError, ~r/requires :inputs\/:outputs/, fn ->
+      DSEx.signature(%{"input" => ["question"], "output" => ["answer"]})
+    end
   end
 
   test "signature parse errors include position and suggestions" do
@@ -60,12 +96,12 @@ defmodule DSExTest do
 
   test "configured settings resolve dynamically for existing programs" do
     first = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "first"} end]
     }
 
     second = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "second"} end]
     }
 
@@ -82,12 +118,12 @@ defmodule DSExTest do
 
   test "context settings are process-local and restored" do
     global = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
     }
 
     local = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
     }
 
@@ -111,12 +147,12 @@ defmodule DSExTest do
 
   test "DSEx-owned task fan-out inherits context settings" do
     global = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
     }
 
     local = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
     }
 
@@ -137,12 +173,12 @@ defmodule DSExTest do
 
   test "RLM controller LM resolves settings dynamically" do
     first = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "first"}} end]
     }
 
     second = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "second"}} end]
     }
 
@@ -173,7 +209,7 @@ defmodule DSExTest do
   end
 
   test "predict formats through adapter and parses model output" do
-    lm = %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> "Answer: Paris" end]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> "Answer: Paris" end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
@@ -185,7 +221,7 @@ defmodule DSExTest do
 
   test "chain of thought adds reasoning before answer" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{reasoning: "math", answer: "4"} end]
     }
 
@@ -197,7 +233,7 @@ defmodule DSExTest do
   end
 
   test "evaluate scores a program against examples" do
-    lm = %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     devset = [
@@ -218,10 +254,10 @@ defmodule DSExTest do
   test "bootstrap few-shot selects successful demos" do
     handler = fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
-      if prompt =~ "answer: 6", do: %{answer: "6"}, else: %{answer: "4"}
+      if prompt =~ "[[ ## answer ## ]]\n6", do: %{answer: "6"}, else: %{answer: "4"}
     end
 
-    lm = %{module: DSEx.LM.Fake, opts: [handler: handler]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: handler]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     trainset = [
@@ -252,7 +288,7 @@ defmodule DSExTest do
     context = docs |> hd() |> Map.fetch!(:text)
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris", context: context} end]
     }
 
@@ -271,7 +307,7 @@ defmodule DSExTest do
     tool = DSEx.Tool.new(:lookup, "Lookup a value", fn %{query: "x"} -> "found x" end)
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{

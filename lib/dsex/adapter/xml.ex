@@ -26,7 +26,7 @@ defmodule DSEx.Adapter.XML do
 
     if fields == %{},
       do: DSEx.Adapter.Chat.parse(signature, raw, opts),
-      else: {:ok, DSEx.Prediction.new(fields)}
+      else: DSEx.Adapter.Chat.parse(signature, fields, opts)
   end
 
   def parse(signature, raw, opts), do: DSEx.Adapter.Chat.parse(signature, raw, opts)

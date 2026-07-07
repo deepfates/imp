@@ -43,7 +43,7 @@ defmodule ProtocolTrainingProviderLifecycleTest do
         end
       end)
 
-    lm = DSEx.Clients.OpenAI.new("gpt-training-test", api_key: "sk-live-training-test")
+    lm = DSEx.req_llm("gpt-training-test")
 
     trainer =
       DSEx.Clients.OpenAITrainer.new(

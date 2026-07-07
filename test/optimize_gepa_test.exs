@@ -91,7 +91,7 @@ defmodule OptimizeGEPATest do
     artifact = Anything.new_artifact(:prompt, "Base")
 
     reflection_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:gepa_reflection_prompt, Enum.map_join(messages, "\n", & &1.content))

@@ -13,8 +13,10 @@ jobs:
         with:
           otp-version: "28"
           elixir-version: "1.19"
+      - run: mix local.hex --force
       - run: mix deps.get
       - run: mix production.check
       - run: mix integration.check
       - run: mix protocol.check
+      - run: mix package.check
       - run: mix quality.check

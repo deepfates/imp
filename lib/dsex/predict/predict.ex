@@ -35,10 +35,19 @@ defmodule DSEx.Predict.Predict do
          inputs <- Map.new(inputs),
          messages <- adapter.format(predict.signature, inputs, demos: predict.demos),
          lm_opts <- adapter_lm_opts(adapter, predict.signature, predict.config),
-         {:ok, raw} <- DSEx.LM.generate(lm, messages, lm_opts),
-         {:ok, prediction} <-
-           parse_with_retry(adapter, predict.signature, raw, messages, lm, lm_opts) do
-      {:ok, add_trace(prediction, messages, raw)}
+         {:ok, raw} <- DSEx.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
+         {:ok, prediction, trace_messages, trace_raw} <-
+           parse_with_retry(
+             adapter,
+             predict.signature,
+             raw,
+             messages,
+             lm,
+             lm_opts,
+             inputs,
+             predict.demos
+           ) do
+      {:ok, add_trace(prediction, trace_messages, trace_raw)}
     end
   end
 
@@ -61,7 +70,6 @@ defmodule DSEx.Predict.Predict do
     }
   end
 
-  defp dump_lm(%DSEx.Clients.HTTPLM{} = lm), do: DSEx.Clients.HTTPLM.dump(lm)
   defp dump_lm(%DSEx.Clients.ReqLLM{} = lm), do: DSEx.Clients.ReqLLM.dump(lm)
   defp dump_lm(_lm), do: nil
 
@@ -81,44 +89,118 @@ defmodule DSEx.Predict.Predict do
     end
   end
 
-  defp parse_with_retry(adapter, signature, raw, messages, lm, opts) do
+  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos) do
     case adapter.parse(signature, raw, []) do
       {:ok, prediction} ->
-        {:ok, prediction}
+        {:ok, prediction, messages, raw}
 
-      {:error, %DSEx.AdapterParseError{} = error} ->
-        if Keyword.get(opts, :json_retries, 0) > 0 do
-          DSEx.Telemetry.execute([:dsex, :adapter, :parse, :retry], %{count: 1}, %{
-            adapter: adapter,
-            signature: DSEx.Signature.to_spec(signature),
-            error: error.message
-          })
+      {:error, _reason} = error ->
+        recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw)
+    end
+  end
 
-          retry_messages = messages ++ [%{role: :user, content: error.message}]
-          retry_opts = Keyword.update!(opts, :json_retries, &(&1 - 1))
+  defp recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw) do
+    cond do
+      chat_json_fallback?(adapter, opts) ->
+        retry_with_json_adapter(error, signature, lm, opts, inputs, demos, messages, raw)
 
-          with {:ok, raw} <- DSEx.LM.generate(lm, retry_messages, retry_opts) do
-            adapter.parse(signature, raw, [])
-          end
-        else
-          DSEx.Telemetry.execute([:dsex, :adapter, :parse, :error], %{count: 1}, %{
-            adapter: adapter,
-            signature: DSEx.Signature.to_spec(signature),
-            error: error.message
-          })
+      adapter_parse_error?(error) and Keyword.get(opts, :json_retries, 0) > 0 ->
+        retry_with_feedback(error, adapter, signature, messages, lm, opts, raw)
 
-          {:error, error}
+      true ->
+        emit_parse_error(adapter, signature, error)
+        parse_error(error, messages, raw)
+    end
+  end
+
+  defp chat_json_fallback?(DSEx.Adapter.Chat, opts),
+    do: Keyword.get(opts, :json_fallback, true)
+
+  defp chat_json_fallback?(_adapter, _opts), do: false
+
+  defp retry_with_json_adapter(
+         error,
+         signature,
+         lm,
+         opts,
+         inputs,
+         demos,
+         original_messages,
+         original_raw
+       ) do
+    DSEx.Telemetry.execute([:dsex, :adapter, :parse, :json_fallback], %{count: 1}, %{
+      adapter: DSEx.Adapter.Chat,
+      signature: DSEx.Signature.to_spec(signature),
+      error: parse_error_message(error)
+    })
+
+    retry_messages = DSEx.Adapter.JSON.format(signature, inputs, demos: demos)
+
+    retry_opts =
+      opts
+      |> Keyword.merge(DSEx.Adapter.JSON.lm_opts(signature, opts))
+      |> Keyword.put(:json_fallback, false)
+
+    case DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)) do
+      {:ok, retry_raw} ->
+        case DSEx.Adapter.JSON.parse(signature, retry_raw, []) do
+          {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw}
+          _retry_error -> parse_error(error, original_messages, original_raw)
         end
 
-      error ->
-        DSEx.Telemetry.execute([:dsex, :adapter, :parse, :error], %{count: 1}, %{
-          adapter: adapter,
-          signature: DSEx.Signature.to_spec(signature),
-          error: error
-        })
-
-        error
+      {:error, _reason} = lm_error ->
+        parse_error(lm_error, original_messages, original_raw)
     end
+  end
+
+  defp retry_with_feedback(
+         {:error, %DSEx.AdapterParseError{} = error},
+         adapter,
+         signature,
+         messages,
+         lm,
+         opts,
+         _raw
+       ) do
+    DSEx.Telemetry.execute([:dsex, :adapter, :parse, :retry], %{count: 1}, %{
+      adapter: adapter,
+      signature: DSEx.Signature.to_spec(signature),
+      error: error.message
+    })
+
+    retry_messages = messages ++ [%{role: :user, content: error.message}]
+    retry_opts = Keyword.update!(opts, :json_retries, &(&1 - 1))
+
+    with {:ok, retry_raw} <- DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)) do
+      case adapter.parse(signature, retry_raw, []) do
+        {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw}
+        retry_error -> parse_error(retry_error, retry_messages, retry_raw)
+      end
+    end
+  end
+
+  defp adapter_parse_error?({:error, %DSEx.AdapterParseError{}}), do: true
+  defp adapter_parse_error?(_error), do: false
+
+  defp emit_parse_error(adapter, signature, error) do
+    DSEx.Telemetry.execute([:dsex, :adapter, :parse, :error], %{count: 1}, %{
+      adapter: adapter,
+      signature: DSEx.Signature.to_spec(signature),
+      error: parse_error_message(error)
+    })
+  end
+
+  defp parse_error_message({:error, %DSEx.AdapterParseError{} = error}), do: error.message
+  defp parse_error_message(error), do: error
+
+  defp provider_lm_opts(opts), do: Keyword.drop(opts, [:json_fallback, :json_retries])
+
+  defp parse_error(error, messages, raw) do
+    {:error,
+     %{
+       reason: error,
+       trace: DSEx.Redaction.redact(%{messages: messages, raw: raw})
+     }}
   end
 
   defp resolve_lm(%__MODULE__{dynamic_lm?: true}), do: DSEx.Settings.get().lm

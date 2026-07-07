@@ -1,14 +1,21 @@
 # Benchmark Truth
 
-DSEx has two benchmark lanes.
+DSEx has two benchmark lanes plus one release-level validation program.
 
-`DSEx.Benchmarks` contains deterministic fixtures for production gates. Those
-tests prove that core mechanics keep working: structured parsing, tools,
-program optimization, and artifact optimization.
+DSEx keeps benchmark evidence behind Mix tasks instead of treating benchmark
+helpers as part of the application API. Deterministic production fixtures prove
+that core mechanics keep working: structured parsing, tools, program
+optimization, and artifact optimization.
 
-`DSEx.BenchmarkTruth` is the research-evidence lane. It runs DSEx programs over
-canonical DSPy-style dataset rows, writes auditable result JSON, and separates
-fixture-mode harness proof from live-provider evidence.
+The benchmark truth tasks are the research-evidence lane. They run DSEx
+programs over canonical DSPy-style dataset rows, write auditable result JSON,
+and separate fixture-mode harness proof from live-provider evidence.
+
+`PARITY_VALIDATION_PROGRAM.md` defines the full release evidence standard. A
+full-row live benchmark is one important lane, but it is not sufficient by
+itself. Full parity claims also require provider-free golden trace parity,
+optimizer lift parity, RAG/tool/agent semantics, and provider-free performance
+benchmarks.
 
 ## Canonical Minimum
 
@@ -37,7 +44,7 @@ For a full canonical split fetch:
 mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data
 ```
 
-`--full` currently means GSM8K test `1319` rows and HotPotQA fullwiki
+`--full` currently means GSM8K test `1319` rows and HotPotQA distractor
 validation `7405` rows. Full fetches use HuggingFace's Parquet exports by
 default so they can retrieve the canonical splits without hammering the rows
 API. Small `--length` fetches use the rows API and record every source page URL
@@ -51,6 +58,23 @@ The fetcher uses HuggingFace's datasets-server rows API and writes:
 
 Generated data lives under `benchmarks/data/` and is ignored by git. Commit
 small fixtures only when they are needed for deterministic tests.
+
+## Check Data Integrity
+
+```sh
+mix dsex.benchmark.integrity \
+  --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
+  --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
+  --out benchmarks/results \
+  --require-clean
+```
+
+This writes a `benchmark-data-integrity-*.json` artifact. The check fails on
+missing required fields and HotPotQA rows whose declared supporting-fact pages
+are absent from the flattened context. It also records non-blocking warnings
+when an extractive answer string is not present in the context. Those warnings
+are useful because they identify rows where an exact-match score may reward
+parametric knowledge rather than retrieval-grounded reasoning.
 
 ## Run Fixture Proof
 
@@ -72,6 +96,93 @@ and an oracle LM. It proves:
 
 It does not prove model quality.
 
+## Run Golden Trace Parity
+
+```sh
+mix benchmark.trace.check
+```
+
+This is the provider-free DSEx-vs-DSPy parity lane. It replays checked-in
+fixture responses through DSEx and the Python DSPy sidecar, then writes a
+`golden-trace-parity-*.json` artifact. The current corpus covers:
+
+- `Predict` with field-labelled chat output
+- `ChainOfThought`
+- typed output coercion
+- JSON adapter output
+- ReAct lookup tool trajectory normalized across DSPy trajectory fields and
+  DSEx provider tool calls
+- multi-tool ReAct trajectory normalization
+- ReAct tool-argument error status parity
+- missing-field error status parity
+- normalized prediction parity
+- retained DSEx and DSPy message histories for prompt-template review
+- DSEx semantic checks for incremental field streaming, save/load credential
+  redaction, ReqLLM cache hits, and provider text/tool-call stream chunk replay
+
+This lane is intentionally stricter and cheaper than live benchmark parity:
+prediction and expected-error parity must pass without provider nondeterminism.
+It does not claim byte-identical prompt/message-template parity; DSEx keeps an
+Elixir-native provider-tool prompt shape and records both message histories so
+template differences stay reviewable instead of hidden.
+
+## Run Provider-Free Overhead Parity
+
+```sh
+mix benchmark.overhead.check
+```
+
+This lane compares DSEx and Python DSPy without provider latency. It runs local
+runtime benchmarks for:
+
+- signature parsing
+- adapter message formatting
+- adapter response parsing
+- schema validation
+- evaluation loop throughput
+- metric normalization
+- optimizer trial scheduling
+- trace redaction and JSON serialization
+- cache hits and misses
+- concurrent orchestration
+
+The artifact reports per-case median, mean, p95, min, max, and
+`median_ratio_dsex_over_dspy`. The production gate currently enforces a
+conservative maximum ratio of `50.0` so regressions are visible without
+pretending every local path is faster. Speed claims must name the exact case and
+artifact they come from; slower paths such as cache miss overhead are evidence
+for focused optimization work, not for marketing claims.
+
+## Run Optimizer Lift Parity
+
+```sh
+mix benchmark.optimizer_lift.check
+```
+
+This provider-free lane uses a deterministic task with known baseline and
+optimum scores. The current artifact directly compares DSEx and DSPy
+`LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `COPRO`, `MIPROv2`, and
+`SIMBA` and `GEPA` lift when the installed DSPy sidecar exposes them. It records
+documented DSEx-only or intentional-deviation evidence for Elixir-native
+`InstructionSearch` and provider-side trainer workflows such as finetuning and
+GRPO. The artifact records the installed Python `dspy` package version and
+detected optimizer capabilities so the lane stays honest as the upstream runtime
+changes.
+
+## Run RAG, Tool, And Agent Parity
+
+```sh
+mix benchmark.rag_tool_agent.check
+```
+
+This provider-free lane directly compares DSEx and DSPy on deterministic RAG
+retrieval/answering and ReAct lookup-tool semantics. It also records DSEx
+production-semantics evidence for HTTP retriever protocol shape, MCP import
+through agents, tool policy denial traces, ReAct error traces, CodeAct,
+ProgramOfThought success and sandbox rejection, streaming incremental fields,
+BEAM async execution, and save/load redaction. Provider behavior over real
+models remains covered by the live matched-model lane.
+
 ## Run Live Benchmark Smoke
 
 ```sh
@@ -86,9 +197,18 @@ a live provider, and writes a result artifact under `benchmarks/results/`.
 Install Python DSPy in the local parity environment:
 
 ```sh
-python3 -m venv tmp/dspy-parity-venv
+scripts/setup_dspy_parity_env.sh
+```
+
+The setup script chooses `python3.13`, `python3.12`, `python3.11`, or
+`python3.10`, then installs current stable DSPy with the `optuna` extra needed
+by MIPROv2:
+
+```sh
+# Equivalent manual setup:
+python3.12 -m venv tmp/dspy-parity-venv
 . tmp/dspy-parity-venv/bin/activate
-python -m pip install -U pip setuptools wheel dspy-ai openai
+python -m pip install -U pip setuptools wheel "dspy[optuna]>=3.2.1,<3.3" openai
 ```
 
 Then run:
@@ -106,10 +226,14 @@ first available current model from `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`,
 The parity report records:
 
 - DSEx and DSPy versions/runtime metadata
+- benchmark prompt/signature contract identity for each runtime
+- requested and effective generation settings, including endpoint route
+  evidence
 - task scores and aggregate score delta
 - task latency and DSEx/DSPy latency ratio
 - error counts
 - row-level pass/fail agreement and answers
+- bounded disagreement examples and per-task disagreement direction counts
 - evidence scale: `smoke`, `research_sample`, or `full`
 
 This is the required lane for parity claims. DSEx-only benchmark truth proves
@@ -128,16 +252,59 @@ mix dsex.benchmark.parity \
   --models gpt-5.5,gpt-5.4-mini
 ```
 
-The intentionally expensive full lane is:
+The intentionally expensive full live row lane is:
 
 ```sh
 OPENAI_API_KEY=... mix benchmark.parity.full
 ```
 
-That command fetches GSM8K test and HotPotQA fullwiki validation in full, then
+That command fetches GSM8K test and HotPotQA distractor validation in full, then
 runs DSEx and Python DSPy over the same rows. It can take a long time and spend
-real provider money. It is the lane whose artifacts can support a full parity
-claim.
+real provider money. Its artifacts can support the live matched-model part of a
+full parity claim, but not the entire claim by themselves. Use
+`PARITY_VALIDATION_PROGRAM.md` for the complete standard.
+
+## Aggregate Live Model Matrix
+
+```sh
+mix benchmark.live_matrix
+```
+
+This consumes existing `dsex-dspy-parity-campaign-*.json` artifacts and writes
+`live-matched-model-matrix-*.json`. It is the canonical answer to "which
+provider/model lanes have actually been proven?" It groups by provider and
+model, skips malformed historical artifacts, tags current low-cost, frontier,
+and historical/research-style lanes, and reports whether each lane has fresh
+full-evidence parity.
+
+The matrix is intentionally an evidence index, not a benchmark runner. If it
+reports smoke coverage, missing historical/research coverage, stale prompt
+contracts, or incomplete row coverage, DSEx has not yet proven live matched
+model parity. Each model row and live-lane blocker reports covered rows,
+remaining rows, percent coverage, and estimated remaining/full DSEx-plus-DSPy
+tokens so staged campaigns can be planned from the dashboard instead of hand
+calculated. Cost is token-only by default; set
+`DSEX_BENCH_INPUT_USD_PER_1M` and `DSEX_BENCH_OUTPUT_USD_PER_1M` when you want
+the matrix to include USD estimates from current provider pricing.
+
+The selected artifact for a model must also carry the current DSEx benchmark
+prompt contract compiled into the benchmark truth runner. Older artifacts
+remain valuable history, but they are not release evidence after the task prompt
+or signature contract changes. The matrix exposes this as
+`summary.prompt_contract.complete`, and the dashboard reports
+`prompt_contract_incomplete` until every selected live model lane is current.
+
+When a dataset contract changes or a fresh full campaign supersedes older
+smoke evidence, filter the matrix to the intended lineage:
+
+```sh
+DSEX_BENCH_CAMPAIGN_ID=req-llm-gpt-5.4-mini-distractor-full-YYYYMMDD \
+  mix benchmark.live_matrix
+```
+
+The lower-level task also accepts `--campaign-id`. This prevents invalidated
+artifacts from winning matrix selection merely because they contain more rows
+from an older benchmark contract.
 
 For operationally safer full runs, execute fixed-size chunks with `--offset`
 and `--max-examples`, then preserve every emitted artifact:
@@ -146,6 +313,7 @@ and `--max-examples`, then preserve every emitted artifact:
 mix dsex.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
+  --campaign-id req-llm-gpt-5.4-mini-full-YYYYMMDD \
   --offset 0 \
   --max-examples 100 \
   --max-concurrency 8 \
@@ -153,19 +321,49 @@ mix dsex.benchmark.parity \
 ```
 
 Chunked runs avoid losing an entire benchmark to one network interruption. A
-full parity claim still requires covering the complete row range.
+full parity claim still requires covering the complete row range. Use one
+stable `--campaign-id` for all chunks in a fresh run; aggregation can then
+exclude older smoke artifacts instead of mixing them into the full-campaign
+claim.
 
 To advance a campaign without babysitting each offset:
 
 ```sh
 mix dsex.benchmark.parity.campaign \
   --model gpt-5.4-mini \
+  --dspy-model responses/gpt-5.4-mini \
+  --campaign-id req-llm-gpt-5.4-mini-full-YYYYMMDD \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --chunk-size 100 \
   --chunks 5 \
-  --max-concurrency 8
+  --target-coverage 1000 \
+  --max-concurrency 8 \
+  --reasoning-effort low
 ```
+
+`--chunks` limits how many new chunks this invocation may run.
+`--target-coverage` limits the total campaign coverage to reach before
+stopping. When both are present, the runner aggregates current evidence before
+each chunk, chooses the next canonical missing offset, shrinks `--max-examples`
+for the chunk when the target is near, and stops as soon as the aggregate has
+reached the requested paired-row coverage. This is the preferred way to run
+staged live campaigns because the stopping condition is evidence coverage, not a
+hand-counted number of offsets.
+
+Use `--dspy-model responses/<model>` for GPT-5-family endpoint-equivalent
+campaigns. DSEx reaches the provider through ReqLLM's OpenAI Responses route;
+the explicit DSPy model route makes LiteLLM use the same endpoint family instead
+of comparing Responses semantics against Chat Completions semantics.
+
+For reasoning models, add `--reasoning-effort low` when the parity question is
+throughput and answer-quality parity under a bounded reasoning budget. The
+campaign artifact records requested and effective reasoning effort, and
+aggregation treats different reasoning-effort settings as different generation
+contracts so latency evidence cannot be mixed accidentally.
+
+If `--campaign-id` is omitted, the campaign task creates a unique id for that
+invocation. Reuse an explicit id when resuming a long full campaign later.
 
 Concurrency improves wall-clock time by issuing independent row calls in
 parallel on both the DSEx and Python DSPy sides. It does not reduce the number
@@ -176,25 +374,55 @@ Aggregate chunk artifacts into a campaign report:
 
 ```sh
 mix dsex.benchmark.parity.aggregate \
+  --provider req_llm \
   --model gpt-5.4-mini \
   --in 'benchmarks/results/dsex-dspy-parity-gpt-5.4-mini-*.json'
 ```
 
 The aggregator counts each `(task, absolute_index)` once, so overlapping smoke
-or retry chunks cannot inflate coverage. It reports:
+or retry chunks cannot inflate coverage. It also scopes reports by DSEx provider
+and model, so historical direct-client artifacts cannot be mixed into ReqLLM
+campaigns. It reports:
 
 - total covered rows versus canonical expected rows
 - per-task covered rows and missing ranges
 - weighted DSEx/DSPy scores from row-level pass/fail outcomes
 - aggregate and task score gaps
 - latency ratio from covered chunk artifacts
+- runtime instrumentation summaries: DSEx LM call counts, LM-duration share,
+  local overhead, fallback/retry counts, prompt size, raw output size, and
+  DSPy-side input/message/raw-size diagnostics. DSPy `message_chars` records
+  its source as `lm_history` when a concurrent history entry is unambiguously
+  attributable to the row, or `row_estimate` when the runner falls back to the
+  canonical question/context shape so concurrency does not hide prompt-size
+  evidence.
 - explicit `full_parity: true/false`
 
-`full_parity` is false unless every canonical row is covered, aggregate and
-per-task score gaps are within the configured strict thresholds, and the
-DSEx/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
-(`1.5` by default). Latency is part of the decision because parity is about
-operational behavior, not only answer quality.
+`full_parity` is false unless every canonical row is covered, the prompt
+contract and effective generation settings are consistent, complete, and
+matched, aggregate and per-task score gaps are within the configured strict
+thresholds, and the DSEx/DSPy latency ratio is within the configured
+`--max-latency-ratio` threshold (`1.5` by default). Latency is part of the
+decision because parity is about operational behavior, not only answer quality.
+
+The current v4 canonical-answer campaign for `gpt-5.4-mini` is a research
+sample, not release proof: `300/8724` canonical rows are covered, aggregate gap
+is within threshold, and latency parity passes, but full coverage and current
+frontier/historical prompt-contract lanes are still missing.
+
+Use the `dsex_instrumentation`, `dspy_instrumentation`, and `runtime_shape`
+summaries before optimizing runtime code. When DSEx `lm_duration_share` is close
+to `1.0`, the observed live latency is dominated by the provider/model call
+rather than DSEx adapter parsing or metric evaluation. Large DSEx-vs-DSPy
+`message_chars` or `raw_chars` ratios point toward prompt/output shape work;
+nonzero `json_fallbacks` or `parse_retries` point toward adapter recovery work.
+`runtime_shape.coverage.complete` must be true before treating shape ratios as a
+full-campaign comparison; otherwise they are partial diagnostics from the rows
+where both runtimes exposed comparable instrumentation.
+Review `dspy_instrumentation.message_chars_sources` before using shape ratios
+for fine-grained prompt work: `lm_history` is exact sidecar evidence, while
+`row_estimate` is deterministic diagnostic evidence for rows whose DSPy history
+was ambiguous under concurrency.
 
 ## Evidence Standard
 
@@ -203,6 +431,8 @@ A credible DSEx benchmark report must include:
 - dataset manifest SHA256 digests
 - train/dev/test or offset/length split description
 - model/provider/version metadata
+- prompt/signature contract identity
+- requested and effective generation settings
 - DSEx git SHA
 - baseline score
 - optimized score
@@ -215,6 +445,7 @@ A credible DSEx benchmark report must include:
 
 The current benchmark truth runner establishes the data/result substrate, live
 smoke path, and optimizer comparison shape across the implemented prompt
-optimizers. Full benchmark parity requires larger fixed manifests, repeated
-runs, and model/provider comparison reports; tiny smoke samples are useful
-release evidence, not leaderboard claims.
+optimizers. Full benchmark parity requires the broader validation program:
+golden trace replay, live matched-model lanes, optimizer lift comparisons,
+production-semantics tests, and provider-free performance reports. Tiny smoke
+samples are useful release evidence, not leaderboard claims.

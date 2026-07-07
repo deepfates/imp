@@ -3,12 +3,12 @@ defmodule OptimizerReportTest do
 
   defp lm do
     %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
-          if prompt =~ "answer: Paris" or prompt =~ "Always answer Paris",
+          if prompt =~ "[[ ## answer ## ]]\nParis" or prompt =~ "Always answer Paris",
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
@@ -71,7 +71,7 @@ defmodule OptimizerReportTest do
 
   test "instruction proposer accepts LM-generated scored candidates" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(self(), {:proposer_messages, messages})

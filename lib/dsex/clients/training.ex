@@ -107,14 +107,14 @@ defmodule DSEx.Clients.Trainer do
   @moduledoc "Behaviour for provider-specific training backends."
 
   @callback finetune(
-              DSEx.Clients.HTTPLM.t() | term(),
+              term(),
               list(DSEx.Example.t()),
               keyword()
             ) ::
               {:ok, DSEx.Clients.TrainingJob.t()} | {:error, term()}
   @callback finetune(
               term(),
-              DSEx.Clients.HTTPLM.t() | term(),
+              term(),
               list(DSEx.Example.t()),
               keyword()
             ) ::

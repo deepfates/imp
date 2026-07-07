@@ -1,32 +1,42 @@
 defmodule ProductionHardeningTest do
   use ExUnit.Case
 
-  defmodule FlakyTransport do
-    @behaviour DSEx.HTTP
-
-    @impl true
-    def post(_url, _headers, _body, _opts) do
+  defmodule FlakyReqLLM do
+    def generate_text(model, messages, _opts) do
       count = Process.get(:flaky_count, 0)
       Process.put(:flaky_count, count + 1)
 
       if count == 0 do
-        {:ok, %{status: 503, headers: [], body: "try again"}}
+        {:error, :temporary_unavailable}
       else
         {:ok,
-         %{
-           status: 200,
-           headers: [],
-           body: Jason.encode!(%{choices: [%{message: %{content: "Answer: recovered"}}]})
+         %ReqLLM.Response{
+           id: "resp_flaky",
+           model: to_string(model),
+           context: ReqLLM.Context.new(messages),
+           message: ReqLLM.Context.assistant("Answer: recovered")
          }}
       end
     end
   end
 
-  defmodule TransientErrorTransport do
-    @behaviour DSEx.HTTP
+  defmodule StableReqLLM do
+    def generate_text(model, messages, _opts) do
+      count = Process.get(:stable_count, 0)
+      Process.put(:stable_count, count + 1)
 
-    @impl true
-    def post(_url, _headers, _body, _opts) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_stable",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant("Answer: recovered")
+       }}
+    end
+  end
+
+  defmodule TransientReqLLM do
+    def generate_text(model, messages, _opts) do
       count = Process.get(:transient_error_count, 0)
       Process.put(:transient_error_count, count + 1)
 
@@ -34,35 +44,33 @@ defmodule ProductionHardeningTest do
         {:error, :temporary_unavailable}
       else
         {:ok,
-         %{
-           status: 200,
-           headers: [],
-           body: Jason.encode!(%{choices: [%{message: %{content: "Answer: recovered"}}]})
+         %ReqLLM.Response{
+           id: "resp_transient",
+           model: to_string(model),
+           context: ReqLLM.Context.new(messages),
+           message: ReqLLM.Context.assistant("Answer: recovered")
          }}
       end
     end
   end
 
-  test "HTTP LM retries retryable provider failures" do
+  test "ReqLLM-backed LM reports provider failures without caching them" do
     Process.delete(:flaky_count)
 
-    lm =
-      DSEx.Clients.OpenAI.new("gpt-test",
-        api_key: "sk-test",
-        transport: FlakyTransport,
-        opts: [num_retries: 1, retry_backoff_ms: 0]
-      )
-
+    lm = DSEx.req_llm("openai:gpt-test", req_module: FlakyReqLLM)
     program = DSEx.predict("question -> answer", lm: lm)
+
+    assert {:error, :temporary_unavailable} =
+             DSEx.Predict.Predict.call(program, %{question: "recover?"})
 
     assert {:ok, prediction} = DSEx.Predict.Predict.call(program, %{question: "recover?"})
     assert DSEx.Prediction.get(prediction, :answer) == "recovered"
     assert Process.get(:flaky_count) == 2
   end
 
-  test "HTTP LM supports content-addressed cache async calls and telemetry hooks" do
+  test "ReqLLM-backed LM supports content-addressed cache async calls and telemetry hooks" do
     DSEx.Cache.clear()
-    Process.delete(:flaky_count)
+    Process.delete(:stable_count)
 
     ref =
       DSEx.Test.TelemetryHelpers.attach([
@@ -72,34 +80,29 @@ defmodule ProductionHardeningTest do
         [:dsex, :cache, :hit]
       ])
 
-    lm =
-      DSEx.Clients.OpenAI.new("gpt-test",
-        api_key: "sk-test",
-        transport: FlakyTransport,
-        opts: [cache: true, num_retries: 1, retry_backoff_ms: 0]
-      )
+    lm = DSEx.req_llm("openai:gpt-test", req_module: StableReqLLM)
 
     messages = [%{role: :user, content: "cache me"}]
 
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
-    assert Process.get(:flaky_count) == 2
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
+    assert Process.get(:stable_count) == 1
 
     task =
-      DSEx.Clients.HTTPLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
+      DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
 
     assert {:ok, "Answer: recovered"} = Task.await(task)
 
-    assert_received {^ref, [:dsex, :lm, :start], _, %{lm: %{model: "gpt-test"}}}
+    assert_received {^ref, [:dsex, :lm, :start], _, %{lm: %{model: "openai:gpt-test"}}}
     assert_received {^ref, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
     assert_received {^ref, [:dsex, :cache, :miss], %{count: 1}, %{key: _}}
     assert_received {^ref, [:dsex, :cache, :hit], %{count: 1}, %{key: _}}
     assert is_integer(duration)
   after
-    Process.delete(:flaky_count)
+    Process.delete(:stable_count)
   end
 
-  test "HTTP LM cache does not store transient errors" do
+  test "ReqLLM cache does not store transient errors" do
     DSEx.Cache.clear()
     Process.delete(:transient_error_count)
 
@@ -109,18 +112,13 @@ defmodule ProductionHardeningTest do
         [:dsex, :cache, :hit]
       ])
 
-    lm =
-      DSEx.Clients.OpenAI.new("gpt-test",
-        api_key: "sk-test",
-        transport: TransientErrorTransport,
-        opts: [cache: true, num_retries: 0]
-      )
+    lm = DSEx.req_llm("openai:gpt-test", req_module: TransientReqLLM)
 
     messages = [%{role: :user, content: "cache transient"}]
 
-    assert {:error, :temporary_unavailable} = DSEx.LM.generate(lm, messages, [])
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, [])
+    assert {:error, :temporary_unavailable} = DSEx.LM.generate(lm, messages, cache: true)
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
+    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
     assert Process.get(:transient_error_count) == 2
 
     assert_received {^ref, [:dsex, :cache, :miss], _, _}
@@ -212,62 +210,20 @@ defmodule ProductionHardeningTest do
     File.rm_rf!(dir)
   end
 
-  test "DSEX_TEST_MODE gates default provider transport at runtime" do
+  test "invalid test harness provider mode fails closed" do
     previous_mode = System.get_env("DSEX_TEST_MODE")
-    previous_live = System.get_env("LIVE_PROVIDER")
 
     try do
-      System.delete_env("LIVE_PROVIDER")
-      System.put_env("DSEX_TEST_MODE", "mock")
-      lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: nil)
-      assert {:ok, "Answer: mock"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
-
-      System.put_env("DSEX_TEST_MODE", "fallback")
-      assert {:ok, "Answer: mock"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
-    after
-      restore_env("DSEX_TEST_MODE", previous_mode)
-      restore_env("LIVE_PROVIDER", previous_live)
-    end
-  end
-
-  test "provider clients do not mock by default when credentials are present" do
-    previous_mode = System.get_env("DSEX_TEST_MODE")
-    previous_live = System.get_env("LIVE_PROVIDER")
-
-    try do
-      System.delete_env("DSEX_TEST_MODE")
-      System.delete_env("LIVE_PROVIDER")
-
-      lm =
-        DSEx.Clients.OpenAI.new("gpt-test",
-          api_key: "sk-test",
-          base_url: "https://api.example/v1",
-          transport: fn url, _headers, _body, _opts ->
-            send(self(), {:provider_called, url})
-
-            {:ok,
-             %{
-               status: 200,
-               headers: [],
-               body: Jason.encode!(%{choices: [%{message: %{content: "real"}}]})
-             }}
-          end
-        )
-
-      assert {:ok, "real"} = DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], [])
-      assert_received {:provider_called, "https://api.example/v1/chat/completions"}
-
       System.put_env("DSEX_TEST_MODE", "garbage")
-      assert_raise ArgumentError, ~r/unsupported DSEX_TEST_MODE/, fn -> DSEx.TestMode.mode() end
+      assert_raise ArgumentError, ~r/unsupported DSEX_TEST_MODE/, fn -> DSEx.Test.Mode.mode() end
     after
       restore_env("DSEX_TEST_MODE", previous_mode)
-      restore_env("LIVE_PROVIDER", previous_live)
     end
   end
 
   test "network-facing constructors reject unknown or malformed options" do
-    assert_raise ArgumentError, ~r/DSEx.Clients.HTTPLM\.new\/2: unknown options \[:typo\]/, fn ->
-      DSEx.Clients.OpenAI.new("gpt-test", typo: true)
+    assert_raise ArgumentError, ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/, fn ->
+      DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
     end
 
     assert_raise ArgumentError,
@@ -297,7 +253,7 @@ defmodule ProductionHardeningTest do
     end
   end
 
-  test "loading saved HTTP LM does not rebind ambient provider credentials" do
+  test "loading saved non-ReqLLM provider clients fails closed" do
     previous = System.get_env("OPENAI_API_KEY")
     Process.put(:previous_openai_api_key, previous)
     System.put_env("OPENAI_API_KEY", "sk-should-not-bind")
@@ -318,35 +274,9 @@ defmodule ProductionHardeningTest do
       }
     }
 
-    program = DSEx.Saving.load(state)
-    assert %DSEx.Clients.HTTPLM{api_key: nil, base_url: "https://evil.example"} = program.lm
-  after
-    previous = Process.get(:previous_openai_api_key)
-
-    if previous do
-      System.put_env("OPENAI_API_KEY", previous)
-    else
-      System.delete_env("OPENAI_API_KEY")
+    assert_raise ArgumentError, ~r/saved provider clients must use req_llm/, fn ->
+      DSEx.Saving.load(state)
     end
-
-    Process.delete(:previous_openai_api_key)
-  end
-
-  test "custom provider base URLs do not bind ambient credentials implicitly" do
-    previous = System.get_env("OPENAI_API_KEY")
-    Process.put(:previous_openai_api_key, previous)
-    System.put_env("OPENAI_API_KEY", "sk-should-not-bind")
-
-    lm = DSEx.Clients.OpenAI.new("gpt-test", base_url: "https://evil.example/v1")
-    assert lm.api_key == nil
-
-    explicit =
-      DSEx.Clients.OpenAI.new("gpt-test",
-        base_url: "https://trusted-proxy.example/v1",
-        api_key: "sk-explicit"
-      )
-
-    assert explicit.api_key == "sk-explicit"
   after
     previous = Process.get(:previous_openai_api_key)
 
@@ -379,7 +309,7 @@ defmodule ProductionHardeningTest do
     secret = "sk-secretvalue123"
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{answer: "saw #{secret}"}
@@ -398,7 +328,7 @@ defmodule ProductionHardeningTest do
     secret = "Bearer abcdefghijklmnop"
 
     react_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{
@@ -412,12 +342,12 @@ defmodule ProductionHardeningTest do
     }
 
     leak = DSEx.Tool.new(:leak, "leak", fn _args -> secret end)
-    react = DSEx.Predict.ReActV2.new("question -> answer", [leak], lm: react_lm)
-    assert {:ok, react_prediction} = DSEx.Predict.ReActV2.call(react, %{question: "q"})
+    react = DSEx.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
+    assert {:ok, react_prediction} = DSEx.Predict.ReAct.call(react, %{question: "q"})
     refute inspect(DSEx.Prediction.get(react_prediction, :history)) =~ secret
 
     code_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_redaction_actions)
@@ -438,7 +368,7 @@ defmodule ProductionHardeningTest do
     refute inspect(code_prediction.metadata.code_act_trace) =~ secret
 
     rlm_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_redaction_actions)
@@ -542,7 +472,7 @@ defmodule ProductionHardeningTest do
   end
 
   test "parallel maps preserve per-input success shape under concurrency" do
-    lm = %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     results =

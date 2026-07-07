@@ -1,5 +1,11 @@
-defmodule DSEx.LM.Fake do
-  @moduledoc "Deterministic LM for tests and local examples."
+defmodule DSEx.LM.Static do
+  @moduledoc """
+  Deterministic local LM for examples, tests, and offline workflows.
+
+  `DSEx.LM.Static` implements the `DSEx.LM` behaviour by calling a supplied
+  handler function. It is useful when you want to teach, test, or debug DSEx
+  program structure without reaching a provider.
+  """
 
   @behaviour DSEx.LM
 

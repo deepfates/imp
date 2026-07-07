@@ -34,6 +34,7 @@ defmodule DSEx.Schema do
         []
         |> validate_type(field, value)
         |> validate_enum(field, value, constraints)
+        |> validate_answer_shape(field, value, constraints)
         |> validate_number(field, value, constraints)
         |> validate_string(field, value, constraints)
         |> validate_array(field, value, constraints)
@@ -84,6 +85,17 @@ defmodule DSEx.Schema do
       )
 
   defp validate_enum(errors, _field, _value, _constraints), do: errors
+
+  defp validate_answer_shape(errors, field, value, %{answer_shape: shape})
+       when is_binary(value) do
+    shape = normalize_answer_shape(shape)
+
+    if valid_answer_shape?(shape, value),
+      do: errors,
+      else: errors ++ [error(field, :answer_shape, answer_shape_message(shape))]
+  end
+
+  defp validate_answer_shape(errors, _field, _value, _constraints), do: errors
 
   defp validate_number(errors, field, value, constraints) when is_number(value) do
     errors
@@ -183,6 +195,7 @@ defmodule DSEx.Schema do
 
     %{"type" => json_type(field.type)}
     |> maybe_put("enum", fetch_meta(constraints, :enum))
+    |> maybe_put("x-dsex-answerShape", fetch_meta(constraints, :answer_shape))
     |> maybe_put("minimum", fetch_meta(constraints, :min))
     |> maybe_put("maximum", fetch_meta(constraints, :max))
     |> maybe_put("minLength", fetch_meta(constraints, :min_length))
@@ -266,13 +279,66 @@ defmodule DSEx.Schema do
 
   defp normalize_constraint_value(value), do: value
 
+  defp normalize_constraint_key(:answerShape), do: :answer_shape
   defp normalize_constraint_key(key) when is_atom(key), do: key
   defp normalize_constraint_key("minLength"), do: :min_length
   defp normalize_constraint_key("maxLength"), do: :max_length
+  defp normalize_constraint_key("answerShape"), do: :answer_shape
 
   defp normalize_constraint_key(key)
-       when key in ["enum", "min", "max", "items", "properties", "type", "optional", "pattern"],
+       when key in [
+              "enum",
+              "min",
+              "max",
+              "items",
+              "properties",
+              "type",
+              "optional",
+              "pattern",
+              "answer_shape"
+            ],
        do: String.to_existing_atom(key)
 
   defp normalize_constraint_key(key), do: key
+
+  defp normalize_answer_shape(shape) when is_atom(shape), do: shape
+
+  defp normalize_answer_shape(shape) when is_binary(shape) do
+    shape
+    |> String.replace("-", "_")
+    |> String.to_existing_atom()
+  rescue
+    ArgumentError -> shape
+  end
+
+  defp valid_answer_shape?(:yes_no, value) do
+    value
+    |> DSEx.Metrics.normalize_text()
+    |> Kernel.in(["yes", "no"])
+  end
+
+  defp valid_answer_shape?(:numeric_span, value) do
+    value
+    |> String.trim()
+    |> String.match?(~r/^-?\$?\d[\d,]*(?:\.\d+)?%?$/)
+  end
+
+  defp valid_answer_shape?(:short_span, value) do
+    normalized = DSEx.Metrics.normalize_text(value)
+    tokens = String.split(normalized)
+
+    normalized != "" and length(tokens) <= 12 and not String.contains?(value, ["\n", ";"])
+  end
+
+  defp valid_answer_shape?(_shape, _value), do: true
+
+  defp answer_shape_message(:yes_no), do: "must be exactly yes or no"
+
+  defp answer_shape_message(:numeric_span),
+    do: "must be only the numeric answer span, with no words or explanation"
+
+  defp answer_shape_message(:short_span),
+    do: "must be a concise exact answer span"
+
+  defp answer_shape_message(shape), do: "must satisfy answer shape #{inspect(shape)}"
 end

@@ -3,47 +3,6 @@ defmodule LocalServiceE2ETest do
 
   @moduletag :integration
 
-  test "save/load/rebind executes a saved program against a local OpenAI-compatible server" do
-    Process.put(:previous_dsex_test_mode, System.get_env("DSEX_TEST_MODE"))
-    System.put_env("DSEX_TEST_MODE", "live")
-
-    base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
-        assert request.method == "POST"
-        assert request.path == "/chat/completions"
-
-        payload = Jason.decode!(request.body)
-        assert payload["model"] == "local-test"
-
-        {200,
-         %{
-           choices: [
-             %{message: %{content: Jason.encode!(%{answer: "local-ok"})}}
-           ]
-         }}
-      end)
-
-    lm = DSEx.Clients.Local.new("local-test", base_url: base_url, test_mode: :live)
-    program = DSEx.predict("question -> answer", lm: lm, adapter: DSEx.Adapter.JSON)
-
-    path =
-      Path.join(System.tmp_dir!(), "dsex-integration-#{System.unique_integer([:positive])}.json")
-
-    assert :ok = DSEx.Saving.save!(program, path)
-    loaded = DSEx.Saving.load!(path)
-    File.rm(path)
-
-    assert {:ok, prediction} = DSEx.call(loaded, %{question: "ping"})
-    assert DSEx.Prediction.get(prediction, :answer) == "local-ok"
-  after
-    case Process.get(:previous_dsex_test_mode) do
-      nil -> System.delete_env("DSEX_TEST_MODE")
-      mode -> System.put_env("DSEX_TEST_MODE", mode)
-    end
-
-    Process.delete(:previous_dsex_test_mode)
-  end
-
   test "HTTP retriever performs a real local HTTP request and maps documents" do
     base_url =
       DSEx.Test.LocalHTTP.start(fn request ->

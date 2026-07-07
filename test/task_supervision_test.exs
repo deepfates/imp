@@ -68,7 +68,7 @@ defmodule TaskSupervisionTest do
     program =
       DSEx.predict("question -> answer",
         lm: %{
-          module: DSEx.LM.Fake,
+          module: DSEx.LM.Static,
           opts: [handler: fn _messages, _opts -> %{answer: inspect(self())} end]
         }
       )

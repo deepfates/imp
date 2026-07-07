@@ -8,7 +8,7 @@ defmodule DSExFacadeTest do
 
   test "facade configures, builds, calls, and reads an Elixir-native program" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
@@ -21,12 +21,29 @@ defmodule DSExFacadeTest do
   end
 
   test "facade exposes examples and predictions through one reader" do
-    example = DSEx.example(question: "2+2?", answer: "4")
+    example =
+      DSEx.example(question: "2+2?", answer: "4")
+      |> DSEx.with_inputs(:question)
+
     prediction = DSEx.prediction(answer: "4")
 
     assert DSEx.get(example, :question) == "2+2?"
     assert DSEx.get(prediction, :answer) == "4"
     assert DSEx.get(prediction, :missing, :default) == :default
+    assert DSEx.to_map(prediction) == %{answer: "4"}
+    assert DSEx.to_map(DSEx.inputs(example)) == %{question: "2+2?"}
+    assert DSEx.to_map(DSEx.labels(example)) == %{answer: "4"}
+  end
+
+  test "facade attaches demos and builds tools" do
+    program = DSEx.predict("question -> answer")
+    demo = DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+
+    assert %{demos: [^demo]} = DSEx.with_demos(program, [demo])
+    assert %{demos: [^demo]} = DSEx.with_demos(DSEx.example(question: "q"), demo)
+
+    tool = DSEx.tool(:lookup, "lookup", fn %{key: "x"} -> "y" end)
+    assert DSEx.Tool.call(tool, %{key: "x"}) == "y"
   end
 
   test "call reports non-callable values instead of raising" do
@@ -35,7 +52,7 @@ defmodule DSExFacadeTest do
 
   test "canonical facade builds and calls directly" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
     }
 

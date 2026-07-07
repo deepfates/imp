@@ -73,7 +73,13 @@ defmodule DSEx.Metrics do
   def f1(prediction, answer) do
     pred_tokens = normalize_text(prediction) |> String.split()
     gold_tokens = normalize_text(answer) |> String.split()
-    common = Enum.count(pred_tokens, &(&1 in gold_tokens))
+
+    common =
+      pred_tokens
+      |> Enum.frequencies()
+      |> Enum.reduce(0, fn {token, count}, acc ->
+        acc + min(count, Enum.count(gold_tokens, &(&1 == token)))
+      end)
 
     cond do
       pred_tokens == [] or gold_tokens == [] ->
@@ -86,6 +92,48 @@ defmodule DSEx.Metrics do
         precision = common / length(pred_tokens)
         recall = common / length(gold_tokens)
         2 * precision * recall / (precision + recall)
+    end
+  end
+
+  def extractive_qa(prediction, answer, opts \\ []) do
+    exact_match? = em(prediction, answer)
+    f1_score = f1(prediction, answer)
+    metric_name = Keyword.get(opts, :metric_name, "extractive_qa_exact_match")
+
+    %Result{
+      score: if(exact_match?, do: 1.0, else: 0.0),
+      passed?: exact_match?,
+      metadata: %{
+        "task_metric" => metric_name,
+        "exact_match" => exact_match?,
+        "f1" => f1_score,
+        "answer_type" => answer_type(answer),
+        "span_relation" => span_relation(prediction, answer)
+      }
+    }
+  end
+
+  def answer_type(answer) do
+    norm = normalize_text(answer)
+
+    cond do
+      norm in ["yes", "no"] -> "yes_no"
+      String.match?(norm, ~r/^\d+(?:\s+\d+)*$/) -> "numeric"
+      String.length(norm) <= 20 -> "short_span"
+      true -> "long_span"
+    end
+  end
+
+  def span_relation(prediction, answer) do
+    pred_norm = normalize_text(prediction)
+    gold_norm = normalize_text(answer)
+
+    cond do
+      pred_norm == "" or gold_norm == "" -> "missing"
+      pred_norm == gold_norm -> "exact"
+      contains_token_sequence?(pred_norm, gold_norm) -> "overlong_span"
+      contains_token_sequence?(gold_norm, pred_norm) -> "short_span"
+      true -> "different_or_ambiguous"
     end
   end
 
@@ -102,5 +150,21 @@ defmodule DSEx.Metrics do
       context = normalize_text(DSEx.Prediction.get(prediction, context_field, ""))
       answer != "" and String.contains?(context, answer)
     end
+  end
+
+  defp contains_token_sequence?(_left, ""), do: false
+  defp contains_token_sequence?("", _right), do: false
+
+  defp contains_token_sequence?(left, right) do
+    left_tokens = String.split(left)
+    right_tokens = String.split(right)
+    right_tokens != [] and subsequence?(left_tokens, right_tokens)
+  end
+
+  defp subsequence?(tokens, sequence) when length(sequence) > length(tokens), do: false
+
+  defp subsequence?(tokens, sequence) do
+    0..(length(tokens) - length(sequence))
+    |> Enum.any?(fn index -> Enum.slice(tokens, index, length(sequence)) == sequence end)
   end
 end

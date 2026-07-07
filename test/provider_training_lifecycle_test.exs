@@ -72,7 +72,7 @@ defmodule ProviderTrainingLifecycleTest do
         [:dsex, :training, :refresh, :start]
       ])
 
-    lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
+    lm = DSEx.req_llm("gpt-test")
 
     trainer =
       DSEx.Clients.OpenAITrainer.new(
@@ -107,7 +107,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "OpenAI trainer requires an uploaded training file id" do
-    lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test")
+    lm = DSEx.req_llm("gpt-test")
 
     trainer =
       DSEx.Clients.OpenAITrainer.new(
@@ -146,7 +146,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "Databricks trainer submits expected payload and auth" do
-    lm = DSEx.Clients.Databricks.new("databricks-meta-llama", api_key: "dbc")
+    lm = DSEx.req_llm("databricks-meta-llama")
 
     trainer =
       DSEx.Clients.DatabricksTrainer.new(
@@ -175,11 +175,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "BootstrapFinetune accepts provider trainer structs" do
-    lm =
-      DSEx.Clients.OpenAI.new("gpt-test",
-        api_key: "sk-test",
-        transport: OpenAITrainingTransport
-      )
+    lm = DSEx.req_llm("gpt-test")
 
     program = DSEx.predict("question -> answer", lm: lm)
     metric = DSEx.Metrics.exact_match(:answer)

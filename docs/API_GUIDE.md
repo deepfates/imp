@@ -2,17 +2,17 @@
 
 This guide is organized around the things you build.
 
-## Configure An LM
+Most examples use the public `DSEx` facade. Reach for deeper `DSEx.*` modules
+when you need direct control over adapters, optimizers, tools, agents, or
+persistence.
 
-Use the `DSEx` facade for application code. Reach for deeper
-`DSEx.*` modules when you need direct control over adapters, optimizers,
-tools, agents, or persistence.
+## Configure An LM
 
 For deterministic examples:
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
@@ -24,10 +24,13 @@ are called, so a later `DSEx.configure/1` or scoped `DSEx.context/2` affects
 existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
 runtime dependency.
 
-For production provider access, prefer the ReqLLM-backed client:
+For production provider access, use the ReqLLM-backed client:
 
 ```elixir
-lm = DSEx.req_llm("openai:gpt-4o-mini", temperature: 0)
+model = System.fetch_env!("OPENAI_MODEL")
+api_key = System.fetch_env!("OPENAI_API_KEY")
+
+lm = DSEx.req_llm("openai:#{model}", api_key: api_key, temperature: 0)
 DSEx.configure(lm: lm)
 ```
 
@@ -35,28 +38,41 @@ This delegates provider/model lookup, Req/Finch transport, streaming, and
 provider option translation to the Elixir `req_llm` ecosystem. DSEx still owns
 the signature, adapter, optimizer, evaluation, and trace vocabulary.
 
-For a direct OpenAI-compatible provider surface:
-
-```elixir
-lm = DSEx.openai("gpt-4o-mini", opts: [temperature: 0])
-DSEx.configure(lm: lm)
-```
-
-The provider client reads `OPENAI_API_KEY` unless `api_key:` is supplied.
-
 ## Basic Predict
 
 ```elixir
-program = DSEx.predict("question -> answer")
+program =
+  "question -> answer: short_span"
+  |> DSEx.signature(
+    "Answer with the shortest correct span. Do not explain."
+  )
+  |> DSEx.predict()
+
 {:ok, pred} = DSEx.call(program, %{question: "Capital of France?"})
 DSEx.get(pred, :answer)
 ```
+
+## Which Program Shape?
+
+| Use this | When |
+| --- | --- |
+| `DSEx.predict/2` | One model call maps named inputs to named outputs. |
+| `DSEx.chain_of_thought/2` | You want a reasoning field before the final answer. |
+| `DSEx.react/3` | The model should choose tools and then submit a validated answer. |
+| `DSEx.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
+| `DSEx.code_act/3` | You want interleaved tool/code execution under a policy. |
+| `DSEx.rlm/2` | You need a bounded recursive controller for large-context exploration. |
+| `DSEx.Agent` | You want an explicit Elixir agent runtime with tools and events. |
+
+The golden path is `Predict -> Evaluate -> Add demos -> Optimize -> Tools`.
+The later sections are there when your program needs more control, not because
+every DSEx project should start with agents or recursive controllers.
 
 ## Chain Of Thought
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
 }
 
@@ -72,8 +88,6 @@ DSEx.get(pred, :answer)
 ## Schema-Constrained JSON
 
 ```elixir
-typed = DSEx.signature(~s(text: string -> sentiment: enum[positive,negative], confidence: number))
-
 signature =
   DSEx.Signature.new(%{
     inputs: [:text],
@@ -89,24 +103,34 @@ program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
 The JSON adapter validates output fields and returns retry feedback for schema
 violations.
 
+Answer-shape constraints are useful for extractive tasks:
+
+```elixir
+signature =
+  DSEx.signature(
+    "question -> verdict: yes_no, amount: numeric_span, answer: short_span",
+    "Extract only the requested answer fields."
+  )
+```
+
 ## Examples And Demos
 
 ```elixir
 demo =
   DSEx.example(question: "2+2?", answer: "4")
-  |> DSEx.Example.with_inputs(:question)
+  |> DSEx.with_inputs(:question)
 
 program =
   "question -> answer"
   |> DSEx.predict()
-  |> DSEx.Predict.Predict.with_demos([demo])
+  |> DSEx.with_demos([demo])
 ```
 
 ## Evaluate A Program
 
 ```elixir
 devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.Example.with_inputs(:question)
+  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
 
 metric = DSEx.Metrics.exact_match(:answer)
@@ -124,7 +148,7 @@ receive the prediction trace as their third argument.
 
 ```elixir
 trainset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.Example.with_inputs(:question)
+  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
 
 optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
@@ -135,11 +159,14 @@ DSEx.Optimizer.Report.fetch(compiled)
 
 Use:
 
-- `LabeledFewShot` for quick demos.
-- `BootstrapFewShot` when a teacher can generate examples.
-- `RandomSearch` for small deterministic searches.
-- `InstructionSearch`, `COPRO`, `MIPROv2`, `SIMBA` for instruction/demo search.
-- `BetterTogether` to sequence prompt and weight optimizers.
+| Optimizer | Use it when |
+| --- | --- |
+| `LabeledFewShot` | You already have good examples and want demos quickly. |
+| `BootstrapFewShot` | A teacher program can generate candidate demos. |
+| `RandomSearch` | You want a small deterministic baseline search. |
+| `InstructionSearch` / `COPRO` | Instructions are the likely bottleneck. |
+| `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
+| `BetterTogether` | You want to sequence prompt optimization and provider training. |
 
 ## Optimize Arbitrary Artifacts
 
@@ -181,11 +208,11 @@ report =
 report.best
 ```
 
-## Tools And ReActV2
+## Tools And ReAct
 
 ```elixir
 lookup =
-  DSEx.Tool.new(
+  DSEx.tool(
     :lookup,
     "lookup facts",
     fn %{query: "capital-france"} -> "Paris" end,
@@ -196,17 +223,19 @@ lookup =
     }
   )
 
-agent = DSEx.react_v2("question -> answer", [lookup], tool_policy: [:lookup, :submit])
+agent = DSEx.react("question -> answer", [lookup], tool_policy: [:lookup, :submit])
+{:ok, pred} = DSEx.call(agent, %{question: "What is the capital of France?"})
+DSEx.get(pred, :answer)
 ```
 
-`ReActV2` sends provider-style function definitions when the LM client supports
+`ReAct` sends provider-style function definitions when the LM client supports
 them. A reserved `submit` tool validates final outputs against the original
 signature.
 
 ## Agents
 
 ```elixir
-tool = DSEx.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+tool = DSEx.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
 agent =
   DSEx.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
@@ -272,14 +301,18 @@ It does not upload examples itself.
 
 ## RLM
 
+RLM is DSEx's recursive language-model controller. It is not a synonym for RAG:
+retrieval fetches context, while RLM runs a bounded loop that can assign state,
+call tools, ask subquestions, recurse, and submit a final answer.
+
 ```elixir
 lookup =
-  DSEx.Tool.new(:lookup, "lookup a fact", fn
+  DSEx.tool(:lookup, "lookup a fact", fn
     %{"key" => "priority"} -> "Prefer concise answers backed by evidence."
   end)
 
 controller_lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       %{action: "submit", result: %{answer: "Prefer concise answers backed by evidence."}}

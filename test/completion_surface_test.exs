@@ -1,43 +1,14 @@
 defmodule CompletionSurfaceTest do
   use ExUnit.Case
 
-  defmodule Transport do
-    @behaviour DSEx.HTTP
-
-    @impl true
-    def post(url, headers, body, _opts) do
-      send(self(), {:http_post, url, headers, Jason.decode!(body)})
-
-      {:ok,
-       %{
-         status: 200,
-         headers: [],
-         body: Jason.encode!(%{choices: [%{message: %{content: "Answer: shipped"}}]})
-       }}
-    end
-  end
-
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
   end
 
-  test "openai-compatible provider clients build verifiable HTTP contracts" do
-    lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk-test", transport: Transport)
-
-    assert {:ok, "Answer: shipped"} =
-             DSEx.LM.generate(lm, [%{role: :user, content: "hello"}], temperature: 0)
-
-    assert_received {:http_post, "https://api.openai.com/v1/chat/completions", headers, payload}
-    assert {"authorization", "Bearer sk-test"} in headers
-    assert payload["model"] == "gpt-test"
-    assert [%{"role" => "user", "content" => "hello"}] = payload["messages"]
-    assert payload["temperature"] == 0
-  end
-
   test "program of thought evaluates arithmetic in a safe sandbox" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{program: "x * 2 + 1"} end]
     }
 
@@ -74,7 +45,7 @@ defmodule CompletionSurfaceTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_act_actions)
@@ -98,7 +69,7 @@ defmodule CompletionSurfaceTest do
 
   test "streaming exposes predictions as an enumerable" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "beam"} end]
     }
 
@@ -138,7 +109,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "advanced optimizers return executable compiled programs" do
-    lm = %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     trainset = [
@@ -174,7 +145,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "finetuning and GRPO require an explicit trainer backend" do
-    lm = DSEx.Clients.Local.new("tiny", transport: Transport)
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
     metric = DSEx.Metrics.exact_match(:answer)
 
@@ -199,11 +170,11 @@ defmodule CompletionSurfaceTest do
 
   test "save/load, embeddings, and structured adapters work" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> ~s({"answer":"ok"}) end]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm, adapter: DSEx.Adapter.BAML)
+    program = DSEx.predict("question -> answer", lm: lm, adapter: DSEx.Adapter.JSON)
 
     path =
       Path.join(

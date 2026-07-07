@@ -33,41 +33,6 @@ defmodule MultimodalAdapterTest do
     assert Enum.at(blocks, 6) == %{type: "text", text: "because"}
   end
 
-  test "HTTP LM request encoder preserves multimodal content arrays" do
-    defmodule Transport do
-      @behaviour DSEx.HTTP
-
-      @impl true
-      def post(_url, _headers, body, _opts) do
-        send(self(), {:payload, Jason.decode!(body)})
-
-        {:ok,
-         %{
-           status: 200,
-           headers: [],
-           body: Jason.encode!(%{choices: [%{message: %{content: "ok"}}]})
-         }}
-      end
-    end
-
-    lm = DSEx.Clients.OpenAI.new("gpt-test", api_key: "sk", transport: Transport)
-
-    assert {:ok, "ok"} =
-             DSEx.Clients.HTTPLM.generate(
-               lm,
-               [
-                 %{
-                   role: :user,
-                   content: ["describe", %Types.Image{url: "https://example.com/cat.png"}]
-                 }
-               ],
-               []
-             )
-
-    assert_received {:payload, %{"messages" => [%{"content" => content}]}}
-    assert [%{"type" => "text", "text" => "describe"}, %{"type" => "image_url"}] = content
-  end
-
   test "decodes OpenAI-compatible multimodal content blocks back to adapter structs" do
     decoded =
       Types.content_from_openai([

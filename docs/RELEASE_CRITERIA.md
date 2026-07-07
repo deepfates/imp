@@ -27,10 +27,13 @@ The release standard is grounded in:
 - optimize_anything's generalization: any measurable text artifact can be
   optimized with per-task/per-metric feedback and Pareto-aware search:
   <https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/>
+- DSEx's parity validation program: golden trace parity, live matched-model
+  parity, optimizer lift, production semantics, and provider-free performance
+  evidence: `docs/PARITY_VALIDATION_PROGRAM.md`
 
 ## Release Scope
 
-The V3 release scope is tracked under ticket `de-vwsu`.
+The production release scope is tracked under ticket `de-vwsu`.
 
 | Ticket | Work | Release Meaning |
 | --- | --- | --- |
@@ -42,6 +45,7 @@ The V3 release scope is tracked under ticket `de-vwsu`.
 | `de-2iou` | Metric/evaluation contract parity | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal. |
 | `de-x02m` | Production observability and trace model | Telemetry events make DSEx inspectable without leaking secrets. |
 | `de-t7s8` | Release-grade docs, Livebooks, and examples | Documentation becomes a cohesive product manual, not historical project notes. |
+| `de-k5tf` | Full parity validation program | Release claims are backed by a dashboard covering trace parity, live matched models, optimizer lift, production semantics, and provider-free performance. |
 
 ## Gate Model
 
@@ -51,6 +55,8 @@ Required gates:
 mix production.check
 mix integration.check
 mix protocol.check
+mix benchmark.trace.check
+mix package.check
 mix quality.check
 LIVE_PROVIDER=1 mix live.check
 ```
@@ -70,19 +76,33 @@ complete feature.
 
 ## Completion Criteria
 
-DSEx V3 is complete when:
+DSEx is production complete when:
 
-1. `tk ready -T dsex` returns no V3 release blockers.
+1. `tk ready -T dsex` returns no production release blockers.
 2. `tk dep cycle` reports no cycles.
 3. `mix production.check` passes.
 4. `mix integration.check` passes.
 5. `mix protocol.check` passes.
-6. `mix quality.check` passes.
-7. GitHub Actions runs the deterministic release gates:
-   `production.check`, `integration.check`, `protocol.check`, and
-   `quality.check`.
-8. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
-9. Any public production claim about paid training, external retrievers, or
+6. `mix benchmark.trace.check` passes.
+7. `mix package.check` passes.
+8. `mix quality.check` passes.
+9. GitHub Actions runs the deterministic release gates:
+   `production.check`, `integration.check`, `protocol.check`,
+   `package.check`, and `quality.check`.
+10. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
+11. Any public production claim about paid training, external retrievers, or
    external MCP servers is backed by dedicated external-service tests, or the
    claim is removed.
-10. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+12. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+13. `mix benchmark.dashboard` produces a current
+    `parity-dashboard-*.json` artifact.
+14. `mix benchmark.dashboard.full` passes, and the dashboard reports
+    `full_parity: true`, before the release claims full DSPy parity.
+15. The parity dashboard reports `performance_claim_supported: true` before the
+    release claims DSEx is faster than DSPy on any named path.
+16. Live latency claims cite dashboard or matrix instrumentation that separates
+    provider/model time from DSEx local overhead and adapter recovery.
+17. Live matched-model claims cite artifacts whose prompt/signature contract is
+    current for every selected model lane.
+18. Any missing parity lane is reflected in public docs as a limitation, not
+    hidden behind a passing smoke benchmark.

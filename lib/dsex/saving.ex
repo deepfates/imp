@@ -87,7 +87,6 @@ defmodule DSEx.Saving do
       "Elixir.DSEx.Adapter.JSON" -> DSEx.Adapter.JSON
       "Elixir.DSEx.Adapter.XML" -> DSEx.Adapter.XML
       "Elixir.DSEx.Adapter.TwoStep" -> DSEx.Adapter.TwoStep
-      "Elixir.DSEx.Adapter.BAML" -> DSEx.Adapter.BAML
       other -> raise ArgumentError, "unsupported saved DSEx adapter: #{inspect(other)}"
     end
   end
@@ -106,16 +105,9 @@ defmodule DSEx.Saving do
     DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, "opts", [])))
   end
 
-  defp decode_lm(%{"provider" => provider, "model" => model} = state) do
-    provider = decode_provider(provider)
-
-    DSEx.Clients.HTTPLM.new(model,
-      api_key: nil,
-      provider: provider,
-      base_url: state["base_url"],
-      path: state["path"],
-      opts: decode_config(Map.get(state, "opts", []))
-    )
+  defp decode_lm(%{"provider" => provider}) do
+    raise ArgumentError,
+          "unsupported saved DSEx provider: #{inspect(provider)}; saved provider clients must use req_llm"
   end
 
   defp decode_config_key(key) when is_atom(key), do: key
@@ -138,19 +130,6 @@ defmodule DSEx.Saving do
       "receive_timeout" -> :receive_timeout
       "provider_options" -> :provider_options
       other -> other
-    end
-  end
-
-  defp decode_provider(provider) when provider in [:openai, :litellm, :local, :databricks],
-    do: provider
-
-  defp decode_provider(provider) do
-    case to_string(provider) do
-      "openai" -> :openai
-      "litellm" -> :litellm
-      "local" -> :local
-      "databricks" -> :databricks
-      other -> raise ArgumentError, "unsupported saved DSEx provider: #{inspect(other)}"
     end
   end
 end

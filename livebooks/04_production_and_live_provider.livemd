@@ -25,10 +25,10 @@ Unknown external keys remain strings:
 
 ```elixir
 key = "external_key_#{System.unique_integer([:positive])}"
-example = DSEx.Example.new(%{key => "value"})
+example = DSEx.example(%{key => "value"})
 
 {
-  DSEx.Example.get(example, key),
+  DSEx.get(example, key),
   try do
     String.to_existing_atom(key)
   rescue
@@ -40,7 +40,7 @@ example = DSEx.Example.new(%{key => "value"})
 Trace redaction:
 
 ```elixir
-echo = DSEx.Tool.new(:echo, "echo", fn input -> input end)
+echo = DSEx.tool(:echo, "echo", fn input -> input end)
 
 agent =
   DSEx.Agent.new(:redactor, fn agent, _input, runtime ->
@@ -59,7 +59,7 @@ paste secrets into the notebook.
 ```elixir
 if System.get_env("OPENAI_API_KEY") do
   model = System.get_env("OPENAI_MODEL") || "gpt-4o-mini"
-  lm = DSEx.openai(model, opts: [temperature: 0, max_completion_tokens: 40])
+  lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 40)
   program = DSEx.predict("question -> answer", lm: lm)
   DSEx.call(program, %{question: "Reply with exactly: pong"})
 else
@@ -81,7 +81,7 @@ LIVE_PROVIDER=1 mix live.check
 ## Saving Without Secrets
 
 ```elixir
-lm = DSEx.openai("gpt-test", api_key: "not-persisted")
+lm = DSEx.req_llm("openai:gpt-test", api_key: "not-persisted", temperature: 0)
 program = DSEx.predict("question -> answer", lm: lm)
 
 path = Path.join(System.tmp_dir!(), "dsex-no-secret.json")
@@ -92,6 +92,7 @@ File.rm(path)
 
 {
   String.contains?(state, "not-persisted"),
-  loaded.lm.api_key
+  Keyword.has_key?(loaded.lm.opts, :api_key),
+  loaded.lm
 }
 ```

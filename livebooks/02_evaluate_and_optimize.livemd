@@ -9,12 +9,12 @@ Mix.install([{:dsex, path: repo}])
 
 ```elixir
 trainset = [
-  DSEx.example(question: "2+2?", answer: "4") |> DSEx.Example.with_inputs(:question),
-  DSEx.example(question: "3+3?", answer: "6") |> DSEx.Example.with_inputs(:question)
+  DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question),
+  DSEx.example(question: "3+3?", answer: "6") |> DSEx.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "2 plus 2?", answer: "4") |> DSEx.Example.with_inputs(:question)
+  DSEx.example(question: "2 plus 2?", answer: "4") |> DSEx.with_inputs(:question)
 ]
 ```
 
@@ -28,7 +28,7 @@ metric = DSEx.Metrics.exact_match(:answer)
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -125,7 +125,7 @@ on another.
 
 ```elixir
 reflection_lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [handler: fn _messages, _opts -> %{mutation: "Paris\nconcise"} end]
 }
 
@@ -152,10 +152,10 @@ report.best
 ## Deterministic Advanced Benchmarks
 
 These fixtures are a compact regression check for advanced DSEx behavior. They
-belong in production gates, but they are useful here because their passing and
-failing cases are small enough to inspect while learning.
+belong in production gates rather than application code. Run them through the
+release gate when you want evidence that the optimizer and artifact examples
+still behave as expected:
 
-```elixir
-DSEx.Benchmarks.assert_pass!()
-DSEx.Benchmarks.assert_negative_controls!()
+```sh
+mix production.check
 ```

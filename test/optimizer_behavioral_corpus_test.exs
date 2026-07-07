@@ -1,6 +1,13 @@
 defmodule OptimizerBehavioralCorpusTest do
   use ExUnit.Case
 
+  defmodule ErrorLM do
+    @behaviour DSEx.LM
+
+    @impl true
+    def generate(_messages, _opts), do: {:error, :offline_candidate}
+  end
+
   defp metric, do: DSEx.Metrics.exact_match(:answer)
 
   defp evaluator(program),
@@ -9,14 +16,14 @@ defmodule OptimizerBehavioralCorpusTest do
   defp france_program do
     DSEx.predict("question -> answer",
       lm: %{
-        module: DSEx.LM.Fake,
+        module: DSEx.LM.Static,
         opts: [
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
 
             cond do
               prompt =~ "Always answer Paris" -> %{answer: "Paris"}
-              prompt =~ "answer: Paris" -> %{answer: "Paris"}
+              prompt =~ "[[ ## answer ## ]]\nParis" -> %{answer: "Paris"}
               true -> %{answer: "unknown"}
             end
           end
@@ -80,6 +87,29 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
   end
 
+  test "GEPA records program call failures as optimizer feedback instead of crashing" do
+    broken_program =
+      DSEx.predict("question -> answer",
+        lm: %{module: ErrorLM, opts: []}
+      )
+
+    compiled =
+      DSEx.Optimizer.GEPA.new(metric(),
+        generations: 1,
+        feedback_fn: fn _trainset -> "Recover from malformed candidate outputs." end
+      )
+      |> DSEx.Optimizer.GEPA.compile(broken_program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :gepa
+    assert report.best_score == 0.0
+
+    assert Enum.any?(report.candidates, fn candidate ->
+             candidate.mutation =~ "Program call failed"
+           end)
+  end
+
   test "SIMBA performs monotonic mini-batch ascent over candidate programs" do
     program = france_program()
     baseline_score = evaluator(program).score
@@ -97,7 +127,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "SIMBA can use introspective LM feedback for candidate instructions" do
     judge_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(self(), {:simba_judge, messages})
@@ -140,7 +170,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "COPRO can use LM-generated score-informed instruction proposals" do
     proposer_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(self(), {:copro_proposer, messages})

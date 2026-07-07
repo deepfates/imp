@@ -7,7 +7,7 @@ defmodule DSEx do
   improvement loops.
   """
 
-  alias DSEx.{Example, Prediction, Settings, Signature}
+  alias DSEx.{Example, Prediction, Settings, Signature, Tool}
   alias DSEx.Predict.{ChainOfThought, Predict, ReAct}
 
   @doc "Configures process/global settings such as `:lm` and `:adapter`."
@@ -25,8 +25,23 @@ defmodule DSEx do
   @doc "Builds a train/dev/test example row."
   defdelegate example(fields), to: Example, as: :new
 
+  @doc "Marks which fields of an example are inputs."
+  defdelegate with_inputs(example, keys), to: Example
+
+  @doc "Returns the input fields for an example."
+  defdelegate inputs(example), to: Example
+
+  @doc "Returns the label/output fields for an example."
+  defdelegate labels(example), to: Example
+
   @doc "Builds a structured prediction."
   defdelegate prediction(fields), to: Prediction, as: :new
+
+  @doc "Converts a prediction or example to its field map."
+  def to_map(container)
+
+  def to_map(%Prediction{} = prediction), do: Prediction.to_map(prediction)
+  def to_map(%Example{} = example), do: Example.to_map(example)
 
   @doc "Reads a field from a prediction or example."
   def get(container, key, default \\ nil)
@@ -43,11 +58,20 @@ defmodule DSEx do
   @doc "Creates a basic signature-to-prediction program."
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
 
+  @doc "Attaches demonstrations to a prediction program or example."
+  def with_demos(program_or_example, demos)
+
+  def with_demos(%Predict{} = predict, demos), do: Predict.with_demos(predict, demos)
+  def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
+
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
 
-  @doc "Creates a simple ReAct-style program with tools."
+  @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
+
+  @doc "Creates a named tool for ReAct programs and agents."
+  def tool(name, description, run, opts \\ []), do: Tool.new(name, description, run, opts)
 
   @doc "Creates a program-of-thought module backed by the BEAM-safe sandbox."
   def program_of_thought(signature, opts \\ []),
@@ -57,28 +81,12 @@ defmodule DSEx do
   def code_act(signature, tools \\ [], opts \\ []),
     do: DSEx.Predict.CodeAct.new(signature, tools, opts)
 
-  @doc "Creates an iterative provider-tool-call ReAct module with reserved submit."
-  def react_v2(signature, tools, opts \\ []),
-    do: DSEx.Predict.ReActV2.new(signature, tools, opts)
-
   @doc "Creates a recursive controller loop for large-context exploration."
   def rlm(signature, opts \\ []), do: DSEx.Predict.RLM.new(signature, opts)
 
   @doc "Calls any DSEx program struct."
   defdelegate call(program, inputs), to: DSEx.Module
 
-  @doc "Creates an OpenAI-compatible LM client."
-  def openai(model, opts \\ []), do: DSEx.Clients.OpenAI.new(model, opts)
-
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: DSEx.Clients.ReqLLM.new(model_spec, opts)
-
-  @doc "Creates a LiteLLM-compatible LM client."
-  def litellm(model, opts \\ []), do: DSEx.Clients.LiteLLM.new(model, opts)
-
-  @doc "Creates a local OpenAI-compatible LM client."
-  def local_lm(model, opts \\ []), do: DSEx.Clients.Local.new(model, opts)
-
-  @doc "Creates a Databricks OpenAI-compatible LM client."
-  def databricks(model, opts \\ []), do: DSEx.Clients.Databricks.new(model, opts)
 end

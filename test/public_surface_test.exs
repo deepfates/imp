@@ -8,7 +8,7 @@ defmodule PublicSurfaceTest do
 
   test "prediction public surface has executable equivalents" do
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "4", rationale: "math"} end]
     }
 
@@ -29,7 +29,7 @@ defmodule PublicSurfaceTest do
     assert DSEx.Prediction.get(compared, :answer) == "4"
 
     rlm_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "4"}} end]
     }
 
@@ -42,9 +42,9 @@ defmodule PublicSurfaceTest do
     assert [%{action: :submit}] = rlm_pred.metadata.rlm_trace
   end
 
-  test "react v2 and code act execute operational loops" do
+  test "react and code act execute operational loops" do
     react_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{answer: "pong"}}]}
@@ -52,12 +52,12 @@ defmodule PublicSurfaceTest do
       ]
     }
 
-    agent = DSEx.react_v2("question -> answer", [], lm: react_lm, max_iters: 2)
-    assert {:ok, pred} = DSEx.Predict.ReActV2.call(agent, %{question: "ping"})
+    agent = DSEx.react("question -> answer", [], lm: react_lm, max_iters: 2)
+    assert {:ok, pred} = DSEx.Predict.ReAct.call(agent, %{question: "ping"})
     assert DSEx.Prediction.get(pred, :answer) == "pong"
 
     pot_lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{program: "n * n"} end]
     }
 
@@ -68,14 +68,14 @@ defmodule PublicSurfaceTest do
 
   test "optimizer public surface composes programs" do
     metric = DSEx.Metrics.exact_match(:answer)
-    lm = %{module: DSEx.LM.Fake, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
     trainset = [
       DSEx.example(question: "2+2?", answer: "4")
-      |> DSEx.Example.with_inputs(:question),
+      |> DSEx.with_inputs(:question),
       DSEx.example(question: "sqrt 16?", answer: "4")
-      |> DSEx.Example.with_inputs(:question)
+      |> DSEx.with_inputs(:question)
     ]
 
     knn =
@@ -113,7 +113,7 @@ defmodule PublicSurfaceTest do
     assert DSEx.Metrics.f1("red blue", "red green") > 0
 
     lm = %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{reasoning: "judge", precision: 1, recall: 1, f1: 1, completeness: 1, groundedness: 1}
@@ -162,12 +162,7 @@ defmodule PublicSurfaceTest do
       DSEx.Adapter.XML,
       DSEx.Adapter.TwoStep,
       DSEx.Cache,
-      DSEx.Clients.Databricks,
       DSEx.Clients.DatabricksTrainer,
-      DSEx.Clients.HTTPLM,
-      DSEx.Clients.Local,
-      DSEx.Clients.LiteLLM,
-      DSEx.Clients.OpenAI,
       DSEx.Clients.OpenAITrainer,
       DSEx.Clients.ReqLLM,
       DSEx.Clients.Trainer,
@@ -175,6 +170,7 @@ defmodule PublicSurfaceTest do
       DSEx.Embeddings,
       DSEx.Evaluate,
       DSEx.Example,
+      DSEx.LM.Static,
       DSEx.MCP,
       DSEx.Metrics,
       DSEx.Optimize.Anything,
@@ -198,7 +194,6 @@ defmodule PublicSurfaceTest do
       DSEx.Predict.Predict,
       DSEx.Predict.RLM,
       DSEx.Predict.ReAct,
-      DSEx.Predict.ReActV2,
       DSEx.Predict.Refine,
       DSEx.Prediction,
       DSEx.Retrieve,
@@ -222,36 +217,34 @@ defmodule PublicSurfaceTest do
       signature: 1,
       signature: 2,
       example: 1,
+      with_inputs: 2,
+      inputs: 1,
+      labels: 1,
       prediction: 1,
+      to_map: 1,
       get: 2,
       get: 3,
       majority: 1,
       majority: 2,
       predict: 1,
       predict: 2,
+      with_demos: 2,
       chain_of_thought: 1,
       chain_of_thought: 2,
       react: 3,
+      tool: 3,
+      tool: 4,
       react: 2,
       program_of_thought: 1,
       program_of_thought: 2,
       code_act: 1,
       code_act: 2,
       code_act: 3,
-      react_v2: 3,
       rlm: 1,
       rlm: 2,
       call: 2,
-      openai: 1,
-      openai: 2,
       req_llm: 1,
-      req_llm: 2,
-      litellm: 1,
-      litellm: 2,
-      local_lm: 1,
-      local_lm: 2,
-      databricks: 1,
-      databricks: 2
+      req_llm: 2
     ]
 
     assert Enum.all?(facade_exports, fn {name, arity} ->
@@ -259,9 +252,6 @@ defmodule PublicSurfaceTest do
            end)
 
     assert %DSEx.Clients.ReqLLM{} = DSEx.req_llm("openai:gpt-test")
-
-    assert %DSEx.Clients.HTTPLM{provider: :openai} =
-             DSEx.openai("gpt-test", api_key: "sk-test")
 
     assert %DSEx.Retrievers.HTTP{} = DSEx.Retrievers.HTTP.new("https://retriever.example")
     assert %DSEx.MCP.HTTPClient{} = DSEx.MCP.HTTPClient.new("https://mcp.example")
@@ -271,5 +261,17 @@ defmodule PublicSurfaceTest do
 
     assert %DSEx.Clients.HTTPTrainer{} =
              DSEx.Clients.OpenAITrainer.new(training_file: "file-test")
+  end
+
+  test "borrowed adapter aliases do not leak into the DSEx product surface" do
+    borrowed_name = "BA" <> "ML"
+
+    refute Code.ensure_loaded?(Module.concat(DSEx.Adapter, String.to_atom(borrowed_name)))
+
+    docs =
+      ["README.md" | Path.wildcard("docs/*.md")]
+      |> Enum.map_join("\n", &File.read!/1)
+
+    refute docs =~ borrowed_name
   end
 end

@@ -44,6 +44,12 @@ defmodule DSEx.Signature.Parser do
     "map" => :object
   }
 
+  @answer_shapes %{
+    "yes_no" => :yes_no,
+    "short_span" => :short_span,
+    "numeric_span" => :numeric_span
+  }
+
   def parse(spec) when is_binary(spec) do
     case split_arrow(spec) do
       {:ok, raw_inputs, raw_outputs} ->
@@ -113,6 +119,9 @@ defmodule DSEx.Signature.Parser do
       Map.has_key?(@types, raw) ->
         {Map.fetch!(@types, raw), %{}}
 
+      Map.has_key?(@answer_shapes, raw) ->
+        {:string, %{constraints: %{answer_shape: Map.fetch!(@answer_shapes, raw)}}}
+
       raw == "array" ->
         {:array, %{}}
 
@@ -174,8 +183,7 @@ defmodule DSEx.Signature.Parser do
   end
 
   defp closest_type(raw) do
-    @types
-    |> Map.keys()
+    ((@types |> Map.keys()) ++ Map.keys(@answer_shapes))
     |> Enum.max_by(&String.jaro_distance(raw, &1))
   end
 end

@@ -18,7 +18,7 @@ Then you attach an LM and call a program:
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -31,7 +31,7 @@ DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
 
 program = DSEx.predict("question -> answer")
 {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
-DSEx.Prediction.to_map(prediction)
+DSEx.to_map(prediction)
 ```
 
 ## Inspect The Generated Messages
@@ -49,13 +49,13 @@ artifact of a typed program.
 
 ```elixir
 cot_lm = %{
-  module: DSEx.LM.Fake,
+  module: DSEx.LM.Static,
   opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
 }
 
 program = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
 {:ok, pred} = DSEx.call(program, %{question: "What is 2+2?"})
-DSEx.Prediction.to_map(pred)
+DSEx.to_map(pred)
 ```
 
 ## Schema-Constrained Output
@@ -77,7 +77,7 @@ signature =
     []
   )
 
-DSEx.Prediction.to_map(pred)
+DSEx.to_map(pred)
 ```
 
 Try a bad output:
@@ -91,9 +91,9 @@ DSEx.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [
 ```elixir
 example =
   DSEx.example(question: "2+2?", answer: "4")
-  |> DSEx.Example.with_inputs(:question)
+  |> DSEx.with_inputs(:question)
 
-{DSEx.Example.to_map(DSEx.Example.inputs(example)), DSEx.Example.to_map(DSEx.Example.labels(example))}
+{DSEx.to_map(DSEx.inputs(example)), DSEx.to_map(DSEx.labels(example))}
 ```
 
 ## Save And Load

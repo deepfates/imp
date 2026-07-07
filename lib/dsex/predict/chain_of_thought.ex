@@ -11,7 +11,7 @@ defmodule DSEx.Predict.ChainOfThought do
       |> DSEx.Signature.ensure()
       |> DSEx.Signature.prepend_output(%{
         name: :reasoning,
-        desc: "Reasoning before the final answer"
+        desc: "Work through the problem step by step before giving the final answer"
       })
 
     %__MODULE__{predict: DSEx.Predict.Predict.new(signature, opts)}

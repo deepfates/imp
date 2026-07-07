@@ -1,11 +1,5 @@
 defmodule DSEx.BenchmarkTruth.Fetcher do
-  @moduledoc """
-  Fetch canonical benchmark samples through HuggingFace's datasets-server API.
-
-  The fetcher writes normalized JSONL files plus a manifest containing source
-  URLs, split/config metadata, row counts, and SHA256 digests. It is designed
-  for reproducible benchmark samples, not for mirroring entire datasets.
-  """
+  @moduledoc false
 
   @hf_rows "https://datasets-server.huggingface.co/rows"
   @page_size 100
@@ -28,7 +22,7 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
     "hotpotqa" => %{
       task: "hotpotqa",
       dataset: "hotpotqa/hotpot_qa",
-      config: "fullwiki",
+      config: "distractor",
       split: "validation",
       input_keys: ["question", "context"],
       normalizer: &__MODULE__.normalize_hotpotqa/1

@@ -9,9 +9,20 @@ defmodule DSEx.Adapter.JSON do
 
   @impl true
   def format(signature, inputs, opts) do
-    messages = DSEx.Adapter.Chat.format(signature, inputs, opts)
+    messages =
+      DSEx.Adapter.Chat.format(signature, inputs, Keyword.put(opts, :response_instruction, false))
+
     schema = signature.outputs |> Enum.map(&to_string(&1.name)) |> Enum.join(", ")
-    [%{role: :system, content: "Return a JSON object with keys: #{schema}"} | messages]
+    field_contract = output_contract(signature.outputs)
+
+    json_message = %{
+      role: :system,
+      content:
+        "Return only a JSON object with keys: #{schema}. Each value must satisfy the task instruction and its field contract. #{field_contract} Do not include extra explanation or unrelated detail outside those fields."
+    }
+
+    [system | rest] = messages
+    [system, json_message | rest]
   end
 
   def lm_opts(signature, opts) do
@@ -73,4 +84,16 @@ defmodule DSEx.Adapter.JSON do
     |> String.trim_trailing("```")
     |> String.trim()
   end
+
+  defp output_contract(fields) do
+    fields
+    |> Enum.map(fn field ->
+      desc = field.desc || default_field_desc(field.name)
+      "#{field.name}: #{desc}"
+    end)
+    |> Enum.join("; ")
+  end
+
+  defp default_field_desc(:reasoning), do: "show the reasoning needed to derive the answer"
+  defp default_field_desc(_name), do: "answer according to the task instruction"
 end

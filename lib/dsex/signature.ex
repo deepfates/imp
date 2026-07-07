@@ -29,7 +29,15 @@ defmodule DSEx.Signature do
     }
   end
 
-  def new(%{inputs: inputs, outputs: outputs} = attrs, instructions) do
+  def new(%{} = attrs, instructions) do
+    inputs = Map.get(attrs, :inputs, Map.get(attrs, "inputs"))
+    outputs = Map.get(attrs, :outputs, Map.get(attrs, "outputs"))
+
+    if is_nil(inputs) or is_nil(outputs) do
+      raise ArgumentError,
+            "signature map requires :inputs/:outputs or \"inputs\"/\"outputs\" keys"
+    end
+
     inputs = Enum.map(inputs, &Field.new(&1, :input))
     outputs = Enum.map(outputs, &Field.new(&1, :output))
 
@@ -37,8 +45,9 @@ defmodule DSEx.Signature do
       inputs: inputs,
       outputs: outputs,
       instructions:
-        instructions || Map.get(attrs, :instructions) || default_instructions(inputs, outputs),
-      metadata: Map.get(attrs, :metadata, %{})
+        instructions || Map.get(attrs, :instructions, Map.get(attrs, "instructions")) ||
+          default_instructions(inputs, outputs),
+      metadata: Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
     }
   end
 

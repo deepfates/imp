@@ -11,6 +11,8 @@ mix production.check
 mix integration.check
 mix protocol.check
 mix benchmark.truth.check
+mix benchmark.trace.check
+mix package.check
 mix quality.check
 ```
 
@@ -70,11 +72,10 @@ crash/restart recreates the table and loses cached values by design.
 `fetch_or_store/2` is best-effort under concurrent misses and does not provide
 single-flight locking.
 
-Provider access should normally use `DSEx.req_llm/2`, which delegates provider
+Provider access uses `DSEx.req_llm/2`, which delegates provider
 catalogs, Req/Finch transport, streaming, structured-output negotiation, and
-provider-specific option translation to `ReqLLM`. Use direct `DSEx.openai/2`
-or `DSEx.Clients.HTTPLM` when you need a narrow OpenAI-compatible contract for
-local servers, transport injection, or credential-binding regression tests.
+provider-specific option translation to `ReqLLM`. DSEx does not maintain a
+parallel OpenAI-compatible provider client stack.
 
 Dependency policy:
 
@@ -95,6 +96,8 @@ Dependency policy:
 - the deterministic non-live, non-integration test suite, including the public
   surface contract, benchmark positive controls, and benchmark negative controls
 - benchmark truth fixture harness tests through `mix benchmark.truth.check`
+- provider-free DSEx-vs-DSPy golden trace parity through
+  `mix benchmark.trace.check`
 - documentation generation with ExDoc
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
@@ -102,7 +105,6 @@ tests that may start local HTTP servers, local MCP processes, or other
 controlled local infrastructure, but do not require paid provider credentials.
 The current integration gate proves:
 
-- save/load/rebind/deployed-call through a local OpenAI-compatible HTTP server
 - generic HTTP retriever request and response mapping through a local server
 - HTTP MCP initialize, discovery, and tool-call flow through a local JSON-RPC server
 - stdio MCP discovery and tool-call flow through a trusted local executable
@@ -125,6 +127,11 @@ state:
 deterministic release gates so style and maintainability regressions are caught
 before merge, not only during local release preparation.
 
+`mix package.check` verifies the Hex package boundary. It checks that the
+installable package contains product modules, docs, and Livebooks while
+excluding local benchmark evidence tasks, historical compatibility modules, and
+test-only support.
+
 The live provider tests prove a real provider can execute:
 
 - basic `Predict`
@@ -132,7 +139,7 @@ The live provider tests prove a real provider can execute:
 - basic `Predict` through the ReqLLM-backed DSEx client
 - `ChainOfThought` with required reasoning
 - provider streaming through `DSEx.Streaming`
-- `ReActV2` function-tool calls plus reserved `submit`
+- `ReAct` function-tool calls plus reserved `submit`
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
@@ -149,17 +156,18 @@ scale. It requires a local Python environment with `dspy-ai` installed and live
 provider credentials. It proves wiring, not full parity.
 
 `mix benchmark.parity.full` is the expensive evidence lane. It fetches the full
-canonical GSM8K test and HotPotQA fullwiki validation splits, uses current
+canonical GSM8K test and HotPotQA distractor validation splits, uses current
 OpenAI-compatible model discovery when `OPENAI_MODEL` is unset, and writes the
 same DSEx-vs-DSPy report schema over the full row set. Use full-lane artifacts,
 not smoke runs, before making production parity claims.
 
 For long campaigns, run `mix dsex.benchmark.parity` in chunks with `--offset`
 and `--max-examples`, then run
-`mix dsex.benchmark.parity.aggregate --model MODEL`. The campaign aggregate is
-the decisive artifact: it deduplicates overlapping chunks by absolute row index,
-reports missing ranges, computes weighted scores, and refuses `full_parity`
-unless the complete canonical row range is covered.
+`mix dsex.benchmark.parity.aggregate --provider req_llm --model MODEL`. The
+campaign aggregate is the decisive artifact: it deduplicates overlapping chunks
+by absolute row index, reports missing ranges, computes weighted scores, refuses
+to mix historical provider paths, and refuses `full_parity` unless the complete
+canonical row range is covered.
 
 Use `--max-concurrency` on parity chunks, or
 `mix dsex.benchmark.parity.campaign --chunks N --max-concurrency N`, to improve
@@ -183,11 +191,11 @@ The library avoids persisting provider secrets in saved program JSON.
 
 Security-sensitive defaults:
 
-- saved HTTP LMs load with `api_key: nil`
-- custom provider `base_url:` values require explicit `api_key:` and do not
-  silently bind ambient provider credentials
-- provider clients use real transport by default; mock/fallback behavior
-  requires explicit `DSEX_TEST_MODE` or `test_mode:` configuration
+- saved provider clients load without serialized credentials
+- custom provider endpoint configuration must be explicit and must not silently
+  bind ambient provider credentials
+- provider clients use real transport by default; tests use injectable
+  transports and ExUnit tags instead of hidden provider fallbacks
 - Databricks vector-search retrievers require explicit `token:` for explicit
   endpoint URLs and do not silently bind ambient `DATABRICKS_TOKEN`
 - default `:httpc` transport verifies TLS peer certificates

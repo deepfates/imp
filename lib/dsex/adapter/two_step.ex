@@ -24,15 +24,3 @@ defmodule DSEx.Adapter.TwoStep do
   @impl true
   def parse(signature, raw, opts), do: DSEx.Adapter.Chat.parse(signature, raw, opts)
 end
-
-defmodule DSEx.Adapter.BAML do
-  @moduledoc "BAML-style structured adapter alias over the JSON adapter."
-
-  @behaviour DSEx.Adapter
-
-  @impl true
-  def format(signature, inputs, opts), do: DSEx.Adapter.JSON.format(signature, inputs, opts)
-
-  @impl true
-  def parse(signature, raw, opts), do: DSEx.Adapter.JSON.parse(signature, raw, opts)
-end

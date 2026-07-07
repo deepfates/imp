@@ -19,20 +19,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
   def run(args) do
     Mix.Task.run("app.start")
 
-    {opts, _argv, invalid} =
-      OptionParser.parse(args,
-        strict: [
-          gsm8k: :string,
-          hotpotqa: :string,
-          offset: :integer,
-          max_examples: :integer,
-          max_concurrency: :integer,
-          out: :string,
-          model: :string,
-          models: :string,
-          python: :string
-        ]
-      )
+    {opts, _argv, invalid} = parse_args(args)
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
@@ -47,50 +34,147 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
     max_examples = Keyword.get(opts, :max_examples, 20)
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
+    generation_opts = generation_opts(opts)
+    dspy_model = Keyword.get(opts, :dspy_model)
+    campaign_id = Keyword.get(opts, :campaign_id)
+    runner_order = runner_order(opts)
     File.mkdir_p!(out_dir)
 
     Enum.each(models, fn model ->
-      run_model!(opts, tasks, model, api_key, max_examples, max_concurrency, out_dir)
+      run_model!(
+        opts,
+        tasks,
+        model,
+        api_key,
+        max_examples,
+        max_concurrency,
+        generation_opts,
+        dspy_model,
+        campaign_id,
+        runner_order,
+        out_dir
+      )
     end)
   end
 
-  defp run_model!(opts, tasks, model, api_key, max_examples, max_concurrency, out_dir) do
-    dsex =
-      DSEx.BenchmarkTruth.run(
-        tasks: tasks,
-        mode: :live,
-        lm: DSEx.openai(model, api_key: api_key),
-        model: %{provider: "openai-compatible", model: model},
-        out_dir: out_dir,
-        offset: Keyword.get(opts, :offset, 0),
-        max_examples: max_examples,
-        max_concurrency: max_concurrency,
-        optimizer_comparisons: false
-      )
+  defp run_model!(
+         opts,
+         tasks,
+         model,
+         api_key,
+         max_examples,
+         max_concurrency,
+         generation_opts,
+         dspy_model,
+         campaign_id,
+         runner_order,
+         out_dir
+       ) do
+    dspy_model = dspy_model || model
 
-    dspy_path =
-      run_dspy!(
-        python(opts),
-        tasks,
-        model,
-        Keyword.get(opts, :offset, 0),
-        max_examples,
-        max_concurrency,
-        out_dir
-      )
+    {dsex, dspy_path} =
+      case runner_order do
+        :dsex_first ->
+          dsex =
+            run_dsex!(
+              opts,
+              tasks,
+              model,
+              api_key,
+              max_examples,
+              max_concurrency,
+              generation_opts,
+              campaign_id,
+              out_dir
+            )
+
+          dspy_path =
+            run_dspy!(
+              python(opts),
+              tasks,
+              Keyword.get(opts, :offset, 0),
+              max_examples,
+              max_concurrency,
+              generation_opts,
+              dspy_model,
+              campaign_id,
+              out_dir
+            )
+
+          {dsex, dspy_path}
+
+        :dspy_first ->
+          dspy_path =
+            run_dspy!(
+              python(opts),
+              tasks,
+              Keyword.get(opts, :offset, 0),
+              max_examples,
+              max_concurrency,
+              generation_opts,
+              dspy_model,
+              campaign_id,
+              out_dir
+            )
+
+          dsex =
+            run_dsex!(
+              opts,
+              tasks,
+              model,
+              api_key,
+              max_examples,
+              max_concurrency,
+              generation_opts,
+              campaign_id,
+              out_dir
+            )
+
+          {dsex, dspy_path}
+      end
 
     dspy = dspy_path |> File.read!() |> Jason.decode!()
-    report = parity_report(dsex.report, dspy)
+    report = parity_report(dsex.report, dspy, generation_opts, campaign_id, runner_order)
 
     out_path =
-      Path.join(out_dir, "dsex-dspy-parity-#{model_slug(model)}-#{timestamp_slug()}.json")
+      Path.join(
+        out_dir,
+        "dsex-dspy-parity-#{model_slug(model)}-vs-#{model_slug(dspy_model)}-#{timestamp_slug()}.json"
+      )
 
     File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
 
     Mix.shell().info("dsex report: #{dsex.out_path}")
     Mix.shell().info("dspy report: #{dspy_path}")
     Mix.shell().info("parity report: #{out_path}")
+    Mix.shell().info("runner order: #{runner_order}")
     Mix.shell().info("aggregate score delta: #{report["aggregate"]["score_delta"]}")
+  end
+
+  defp run_dsex!(
+         opts,
+         tasks,
+         model,
+         api_key,
+         max_examples,
+         max_concurrency,
+         generation_opts,
+         campaign_id,
+         out_dir
+       ) do
+    DSEx.BenchmarkTruth.run(
+      tasks: tasks,
+      mode: :live,
+      lm: DSEx.req_llm("openai:#{model}", Keyword.merge([api_key: api_key], generation_opts)),
+      model: %{provider: "req_llm", model: model},
+      generation: generation_metadata(model, generation_opts, "dsex_req_llm"),
+      campaign_id: campaign_id,
+      out_dir: out_dir,
+      offset: Keyword.get(opts, :offset, 0),
+      max_examples: max_examples,
+      max_concurrency: max_concurrency,
+      optimizer_comparisons: false
+    )
   end
 
   defp models(opts, api_key) do
@@ -114,6 +198,56 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     |> String.split(",", trim: true)
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+  end
+
+  @doc false
+  def parse_args(args) do
+    OptionParser.parse(args,
+      strict: [
+        gsm8k: :string,
+        hotpotqa: :string,
+        offset: :integer,
+        max_examples: :integer,
+        max_concurrency: :integer,
+        out: :string,
+        model: :string,
+        models: :string,
+        dspy_model: :string,
+        campaign_id: :string,
+        temperature: :float,
+        max_tokens: :integer,
+        reasoning_effort: :string,
+        runner_order: :string,
+        python: :string
+      ]
+    )
+  end
+
+  @doc false
+  def generation_opts(opts) do
+    generation =
+      [
+        temperature: Keyword.get(opts, :temperature, 0.0),
+        max_tokens: Keyword.get(opts, :max_tokens, 700)
+      ]
+
+    maybe_keyword(generation, :reasoning_effort, Keyword.get(opts, :reasoning_effort))
+  end
+
+  defp maybe_keyword(opts, _key, nil), do: opts
+  defp maybe_keyword(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp runner_order(opts) do
+    case Keyword.get(opts, :runner_order, "dsex_first") do
+      value when value in ["dsex_first", "dsex-first"] ->
+        :dsex_first
+
+      value when value in ["dspy_first", "dspy-first"] ->
+        :dspy_first
+
+      other ->
+        Mix.raise("--runner-order must be dsex_first or dspy_first, got: #{inspect(other)}")
+    end
   end
 
   defp discover_default_model(api_key) do
@@ -160,31 +294,46 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     if String.contains?(path, "/"), do: Path.expand(path), else: path
   end
 
-  defp run_dspy!(python, tasks, model, offset, max_examples, max_concurrency, out_dir) do
+  defp run_dspy!(
+         python,
+         tasks,
+         offset,
+         max_examples,
+         max_concurrency,
+         generation_opts,
+         dspy_model,
+         campaign_id,
+         out_dir
+       ) do
     args =
       [
         "scripts/dspy_parity_runner.py",
         "--model",
-        model,
+        dspy_model,
         "--offset",
         to_string(offset),
         "--max-examples",
         to_string(max_examples),
         "--max-concurrency",
         to_string(max_concurrency),
-        "--out",
-        out_dir
+        "--temperature",
+        to_string(Keyword.fetch!(generation_opts, :temperature)),
+        "--max-tokens",
+        to_string(Keyword.fetch!(generation_opts, :max_tokens))
       ] ++
+        reasoning_effort_args(generation_opts) ++
+        [
+          "--out",
+          out_dir
+        ] ++
+        campaign_args(campaign_id) ++
         Enum.flat_map(tasks, fn {task, path} -> ["--#{task}", path] end)
 
     case System.cmd(python, args, stderr_to_stdout: true) do
       {output, 0} ->
-        output
-        |> String.split("\n", trim: true)
-        |> Enum.find(&String.ends_with?(&1, ".json"))
-        |> case do
-          nil -> Mix.raise("DSPy runner did not print a report path:\n#{output}")
-          path -> path
+        case parse_dspy_report_path(output) do
+          {:ok, path} -> path
+          :error -> Mix.raise("DSPy runner did not print DSPY_REPORT_PATH sentinel:\n#{output}")
         end
 
       {output, status} ->
@@ -192,7 +341,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     end
   end
 
-  defp parity_report(dsex, dspy) do
+  @doc false
+  def parse_dspy_report_path(output) do
+    output
+    |> String.split("\n", trim: true)
+    |> Enum.find_value(fn
+      "DSPY_REPORT_PATH=" <> path -> {:ok, path}
+      _line -> nil
+    end)
+    |> case do
+      nil -> :error
+      {:ok, path} -> {:ok, path}
+    end
+  end
+
+  defp campaign_args(nil), do: []
+  defp campaign_args(campaign_id), do: ["--campaign-id", campaign_id]
+
+  defp reasoning_effort_args(generation_opts) do
+    case Keyword.get(generation_opts, :reasoning_effort) do
+      nil -> []
+      value -> ["--reasoning-effort", to_string(value)]
+    end
+  end
+
+  defp parity_report(dsex, dspy, generation_opts, campaign_id, runner_order) do
     dsex_tasks = Map.new(dsex["tasks"], &{&1["task"], &1})
     dspy_tasks = Map.new(dspy["tasks"], &{&1["task"], &1})
     task_names = Enum.sort((Map.keys(dsex_tasks) ++ Map.keys(dspy_tasks)) |> Enum.uniq())
@@ -206,8 +379,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       "schema_version" => 1,
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
+      "campaign_id" => campaign_id,
+      "runner_order" => Atom.to_string(runner_order),
       "dsex" => Map.take(dsex, ["git_sha", "elixir", "otp", "model", "mode"]),
       "dspy" => Map.take(dspy, ["git_sha", "python", "dspy_version", "model", "mode"]),
+      "generation" => %{
+        "temperature" => Keyword.fetch!(generation_opts, :temperature),
+        "max_tokens" => Keyword.fetch!(generation_opts, :max_tokens),
+        "reasoning_effort" => Keyword.get(generation_opts, :reasoning_effort),
+        "prompt_contract" => prompt_contract(),
+        "requested" => Map.new(generation_opts),
+        "dsex" => dsex["generation"],
+        "dspy" => dspy["generation"]
+      },
       "aggregate" => %{
         "dsex_score" => dsex["aggregate_score"],
         "dspy_score" => dspy["aggregate_score"],
@@ -224,6 +408,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
   end
 
   defp compare_task(task, dsex, dspy) do
+    row_agreement = row_agreement(dsex, dspy)
+
     %{
       "task" => task,
       "offset" => max((dsex && dsex["offset"]) || 0, (dspy && dspy["offset"]) || 0),
@@ -239,34 +425,214 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         ratio(dsex && dsex["duration_ms"], dspy && dspy["duration_ms"]),
       "dsex_errors" => dsex |> errors(),
       "dspy_errors" => dspy |> errors(),
-      "row_agreement" => row_agreement(dsex, dspy)
+      "evidence_complete" => Enum.all?(row_agreement, &(&1["row_evidence_complete"] == true)),
+      "evidence_issues" => evidence_issues(dsex, dspy, row_agreement),
+      "row_agreement" => row_agreement,
+      "supporting_metrics" => supporting_metrics(task, dsex, dspy)
     }
+  end
+
+  defp generation_metadata(model, generation_opts, runtime) do
+    requested = Map.new(generation_opts)
+    {effective, warnings} = effective_generation(model, generation_opts)
+
+    Map.merge(requested, %{
+      "runtime" => runtime,
+      "prompt_contract" => prompt_contract()[runtime],
+      "requested" => requested,
+      "effective" => effective,
+      "wire_api" => wire_api(model, runtime),
+      "warnings" => warnings,
+      "note" =>
+        "requested records the benchmark intent; effective and wire_api record deterministic runtime/provider translation known before the request is sent"
+    })
+  end
+
+  defp effective_generation(model, generation_opts) do
+    model = model |> to_string() |> String.downcase()
+    max_tokens = Keyword.fetch!(generation_opts, :max_tokens)
+    temperature = Keyword.fetch!(generation_opts, :temperature)
+    reasoning_effort = Keyword.get(generation_opts, :reasoning_effort)
+
+    cond do
+      reasoning_model?(model) ->
+        {%{"max_completion_tokens" => max_tokens}
+         |> maybe_put_string("reasoning_effort", reasoning_effort),
+         [
+           "Renamed max_tokens to max_completion_tokens for reasoning model profile",
+           "Dropped temperature because this model profile does not support sampling parameters"
+         ]}
+
+      fixed_temperature_model?(model) ->
+        {%{"max_tokens" => max_tokens},
+         [
+           "Dropped temperature because this model profile only supports provider default temperature"
+         ]}
+
+      true ->
+        {%{"temperature" => temperature, "max_tokens" => max_tokens}
+         |> maybe_put_string("reasoning_effort", reasoning_effort), []}
+    end
+  end
+
+  defp maybe_put_string(map, _key, nil), do: map
+  defp maybe_put_string(map, key, value), do: Map.put(map, key, value)
+
+  defp reasoning_model?(model),
+    do: String.match?(model, ~r/(^|[-_:])(gpt-5|o[134])/) or String.contains?(model, "reasoning")
+
+  defp fixed_temperature_model?(model), do: model in ["chat-latest"]
+
+  defp wire_api(model, "dsex_req_llm") do
+    model = model |> to_string() |> String.downcase()
+
+    if reasoning_model?(model) or String.match?(model, ~r/(gpt-4o|gpt-4\.1)/),
+      do: "openai_responses",
+      else: "openai_chat_completions"
+  end
+
+  defp wire_api(model, "python_dspy") do
+    model = model |> to_string() |> String.downcase()
+
+    cond do
+      dspy_responses_model?(model) ->
+        "openai_responses"
+
+      dspy_reasoning_model?(model) ->
+        "litellm_chat_completion_with_max_completion_tokens"
+
+      true ->
+        "litellm_chat_completion"
+    end
+  end
+
+  defp dspy_reasoning_model?(model), do: String.match?(model, ~r/(^|[-_:])o[134]/)
+  defp dspy_responses_model?(model), do: String.contains?(String.trim(model, "/"), "responses/")
+
+  defp prompt_contract do
+    DSEx.BenchmarkTruth.Contract.current_prompt_contract()
   end
 
   defp row_agreement(nil, _dspy), do: []
   defp row_agreement(_dsex, nil), do: []
 
   defp row_agreement(dsex, dspy) do
-    dspy_rows = Map.new(dspy["rows"], &{&1["index"], &1})
+    dsex_rows = rows_by_absolute_index(dsex)
+    dspy_rows = rows_by_absolute_index(dspy)
 
-    Enum.map(dsex["rows"], fn row ->
-      other = dspy_rows[row["index"]]
+    (Map.keys(dsex_rows) ++ Map.keys(dspy_rows))
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.map(fn absolute_index ->
+      row = dsex_rows[absolute_index]
+      other = dspy_rows[absolute_index]
+      dsex_answer = answer(row)
+      dspy_answer = other && get_in(other, ["prediction", "answer"])
+      pass_agreement = other && row["passed"] == other["passed"]
+      answer_agreement = other && normalize_answer(dsex_answer) == normalize_answer(dspy_answer)
 
-      %{
-        "index" => row["index"],
-        "absolute_index" => (dsex["offset"] || 0) + row["index"],
-        "dsex_passed" => row["passed"],
+      agreement = %{
+        "index" => local_index(row, other, absolute_index),
+        "absolute_index" => absolute_index,
+        "dsex_row_present" => row != nil,
+        "dspy_row_present" => other != nil,
+        "row_evidence_complete" => row != nil and other != nil,
+        "dsex_passed" => row && row["passed"],
         "dspy_passed" => other && other["passed"],
-        "pass_agreement" => other && row["passed"] == other["passed"],
-        "answer_agreement" =>
-          other &&
-            normalize_answer(answer(row)) ==
-              normalize_answer(get_in(other, ["prediction", "answer"])),
-        "dsex_answer" => answer(row),
-        "dspy_answer" => other && get_in(other, ["prediction", "answer"])
+        "pass_agreement" => pass_agreement,
+        "answer_agreement" => answer_agreement,
+        "dsex_answer" => dsex_answer,
+        "dspy_answer" => dspy_answer,
+        "dsex_duration_ms" => row && row["duration_ms"],
+        "dspy_duration_ms" => other && other["duration_ms"],
+        "dsex_instrumentation" => (row && row["instrumentation"]) || %{},
+        "dspy_instrumentation" => (other && other["instrumentation"]) || %{},
+        "dsex_metric_metadata" => (row && row["metric_metadata"]) || %{},
+        "dspy_metric_metadata" => (other && other["metric_metadata"]) || %{}
       }
+
+      if pass_agreement == true and answer_agreement == true do
+        agreement
+      else
+        Map.put(agreement, "diagnostic", %{
+          "dsex" => row && row["diagnostic"],
+          "dspy_error" => other && other["error"]
+        })
+      end
     end)
   end
+
+  defp rows_by_absolute_index(nil), do: %{}
+
+  defp rows_by_absolute_index(task) do
+    offset = task["offset"] || 0
+
+    task
+    |> Map.get("rows", [])
+    |> Map.new(fn row ->
+      absolute_index = row["absolute_index"] || offset + row["index"]
+      {absolute_index, row}
+    end)
+  end
+
+  defp local_index(row, _other, _absolute_index) when is_map(row), do: row["index"]
+  defp local_index(_row, other, _absolute_index) when is_map(other), do: other["index"]
+  defp local_index(_row, _other, absolute_index), do: absolute_index
+
+  defp evidence_issues(dsex, dspy, row_agreement) do
+    []
+    |> maybe_issue(dsex == nil, "missing_dsex_task")
+    |> maybe_issue(dspy == nil, "missing_dspy_task")
+    |> maybe_issue(dsex && dspy && dsex["offset"] != dspy["offset"], "offset_mismatch")
+    |> maybe_issue(dsex && dspy && dsex["examples"] != dspy["examples"], "example_count_mismatch")
+    |> maybe_issue(dsex && dspy && dsex["sha256"] != dspy["sha256"], "dataset_sha256_mismatch")
+    |> maybe_issue(errors(dsex) not in [nil, 0], "dsex_runner_errors")
+    |> maybe_issue(errors(dspy) not in [nil, 0], "dspy_runner_errors")
+    |> maybe_issue(
+      Enum.any?(row_agreement, &(&1["row_evidence_complete"] != true)),
+      "missing_counterpart_rows"
+    )
+  end
+
+  defp maybe_issue(issues, true, issue), do: [issue | issues]
+  defp maybe_issue(issues, _condition, _issue), do: issues
+
+  defp supporting_metrics("hotpotqa", dsex, dspy) do
+    %{
+      "official_hotpotqa_f1" => %{
+        "dsex" => average_metric(dsex, "official_hotpotqa_f1"),
+        "dspy" => average_metric(dspy, "official_hotpotqa_f1"),
+        "delta" =>
+          metric_delta(
+            average_metric(dsex, "official_hotpotqa_f1"),
+            average_metric(dspy, "official_hotpotqa_f1")
+          ),
+        "note" =>
+          "Supporting evidence only: strict parity score remains exact match for this campaign lineage."
+      }
+    }
+  end
+
+  defp supporting_metrics(_task, _dsex, _dspy), do: %{}
+
+  defp average_metric(nil, _key), do: nil
+
+  defp average_metric(task, key) do
+    values =
+      task
+      |> Map.get("rows", [])
+      |> Enum.map(&get_in(&1, ["metric_metadata", key]))
+      |> Enum.filter(&is_number/1)
+
+    case values do
+      [] -> nil
+      _values -> Enum.sum(values) / length(values)
+    end
+  end
+
+  defp metric_delta(nil, _right), do: nil
+  defp metric_delta(_left, nil), do: nil
+  defp metric_delta(left, right), do: left - right
 
   defp answer(%{"prediction" => nil}), do: nil
 

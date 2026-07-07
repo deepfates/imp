@@ -15,6 +15,15 @@ defmodule SchemaConstraintsTest do
         },
         :output
       ),
+      Field.new(%{name: :verdict, type: :string, constraints: %{answer_shape: :yes_no}}, :output),
+      Field.new(
+        %{name: :amount, type: :string, constraints: %{answer_shape: :numeric_span}},
+        :output
+      ),
+      Field.new(
+        %{name: :span, type: :string, constraints: %{answer_shape: :short_span}},
+        :output
+      ),
       Field.new(
         %{name: :tags, type: :array, constraints: %{items: %{type: :string, enum: ["a", "b"]}}},
         :output
@@ -30,12 +39,43 @@ defmodule SchemaConstraintsTest do
       Field.new(%{name: :note, type: :string, metadata: %{optional: true}}, :output)
     ]
 
-    valid = %{status: "ok", score: 0.5, code: "AB", tags: ["a", "b"], meta: %{count: 2}}
+    valid = %{
+      status: "ok",
+      score: 0.5,
+      code: "AB",
+      verdict: "Yes",
+      amount: "$1,200.50",
+      span: "Henry J. Kaiser",
+      tags: ["a", "b"],
+      meta: %{count: 2}
+    }
+
     assert :ok = DSEx.Schema.validate_fields(fields, valid)
 
-    invalid = %{status: "bad", score: 2, code: "abcde", tags: ["c"], meta: %{count: 0}}
+    invalid = %{
+      status: "bad",
+      score: 2,
+      code: "abcde",
+      verdict: "Paris",
+      amount: "about 12",
+      span: "Paris is the capital; it is in France",
+      tags: ["c"],
+      meta: %{count: 0}
+    }
+
     assert {:error, errors} = DSEx.Schema.validate_fields(fields, invalid)
-    assert Enum.map(errors, & &1.rule) == [:enum, :max, :max_length, :pattern, :enum, :min]
+
+    assert Enum.map(errors, & &1.rule) == [
+             :enum,
+             :max,
+             :max_length,
+             :pattern,
+             :answer_shape,
+             :answer_shape,
+             :answer_shape,
+             :enum,
+             :min
+           ]
   end
 
   test "exports stable JSON schema from signature outputs" do
@@ -44,6 +84,7 @@ defmodule SchemaConstraintsTest do
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},
+          %{name: :span, type: :string, constraints: %{answerShape: "short_span"}},
           %{name: :confidence, type: :number, constraints: %{min: 0, max: 1}},
           %{name: :items, type: :array, constraints: %{items: %{type: :integer}}},
           %{
@@ -57,9 +98,10 @@ defmodule SchemaConstraintsTest do
 
     assert DSEx.Signature.json_schema(signature) == %{
              "type" => "object",
-             "required" => ["answer", "confidence", "items"],
+             "required" => ["answer", "span", "confidence", "items"],
              "properties" => %{
                "answer" => %{"type" => "string", "enum" => ["yes", "no"]},
+               "span" => %{"type" => "string", "x-dsex-answerShape" => "short_span"},
                "confidence" => %{"type" => "number", "minimum" => 0, "maximum" => 1},
                "items" => %{"type" => "array", "items" => %{"type" => "integer"}},
                "meta" => %{

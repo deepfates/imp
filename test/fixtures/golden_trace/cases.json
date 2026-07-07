@@ -1,0 +1,315 @@
+[
+  {
+    "id": "predict_chat_basic",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Answer the question.",
+    "inputs": {
+      "question": "What is the capital of France?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nParis"
+    ],
+    "expected_prediction": {
+      "answer": "Paris"
+    }
+  },
+  {
+    "id": "chain_of_thought_basic",
+    "module": "chain_of_thought",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Solve the math problem.",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "[[ ## reasoning ## ]]\n2 + 2 = 4\n[[ ## answer ## ]]\n4"
+    ],
+    "expected_prediction": {
+      "reasoning": "2 + 2 = 4",
+      "answer": "4"
+    }
+  },
+  {
+    "id": "typed_fields_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer: string, score: int",
+    "instructions": "Return an answer and integer score.",
+    "inputs": {
+      "question": "Say pong with score seven."
+    },
+    "responses": [
+      "[[ ## answer ## ]]\npong\n[[ ## score ## ]]\n7"
+    ],
+    "expected_prediction": {
+      "answer": "pong",
+      "score": 7
+    }
+  },
+  {
+    "id": "json_adapter_basic",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> answer: string, score: int",
+    "instructions": "Return an answer and integer score.",
+    "inputs": {
+      "question": "Say beam with score five."
+    },
+    "responses": [
+      "{\"answer\":\"beam\",\"score\":5}"
+    ],
+    "expected_prediction": {
+      "answer": "beam",
+      "score": 5
+    }
+  },
+  {
+    "id": "react_tool_lookup",
+    "module": "react",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use the lookup tool when external facts are needed.",
+    "inputs": {
+      "question": "What is the capital of France?"
+    },
+    "tools": [
+      {
+        "name": "lookup",
+        "description": "Lookup a fact by query.",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputs": {
+          "{\"query\":\"capital-france\"}": "Paris"
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nNeed the lookup result.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"capital-france\"}",
+      "[[ ## next_thought ## ]]\nThe lookup result is enough.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nThe lookup observation says Paris.\n[[ ## answer ## ]]\nParis"
+    ],
+    "dsex_responses": [
+      {
+        "tool_calls": [
+          {
+            "name": "lookup",
+            "arguments": {
+              "query": "capital-france"
+            }
+          }
+        ]
+      },
+      {
+        "tool_calls": [
+          {
+            "name": "submit",
+            "arguments": {
+              "answer": "Paris"
+            }
+          }
+        ]
+      }
+    ],
+    "expected_prediction": {
+      "answer": "Paris"
+    },
+    "expected_tool_trace": [
+      {
+        "tool": "lookup",
+        "arguments": {
+          "query": "capital-france"
+        },
+        "result": "Paris"
+      }
+    ],
+    "intentional_deviations": [
+      "DSPy 2.6 ReAct represents actions with next_tool_name/next_tool_args fields and a finish control tool followed by extraction; DSEx ReAct uses provider function-tool calls with a reserved submit tool. This fixture asserts normalized external tool trajectory and final output parity."
+    ]
+  },
+  {
+    "id": "react_multi_tool_transform",
+    "module": "react",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use tools step by step when external facts must be transformed.",
+    "inputs": {
+      "question": "Find France's capital and return it uppercase."
+    },
+    "max_iters": 5,
+    "tools": [
+      {
+        "name": "lookup",
+        "description": "Lookup a fact by query.",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputs": {
+          "{\"query\":\"capital-france\"}": "Paris"
+        }
+      },
+      {
+        "name": "uppercase",
+        "description": "Uppercase text.",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        "outputs": {
+          "{\"text\":\"Paris\"}": "PARIS"
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nNeed the capital first.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"capital-france\"}",
+      "[[ ## next_thought ## ]]\nNeed uppercase formatting.\n[[ ## next_tool_name ## ]]\nuppercase\n[[ ## next_tool_args ## ]]\n{\"text\":\"Paris\"}",
+      "[[ ## next_thought ## ]]\nNow finish.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nLookup returned Paris and uppercase returned PARIS.\n[[ ## answer ## ]]\nPARIS"
+    ],
+    "dsex_responses": [
+      {
+        "tool_calls": [
+          {
+            "name": "lookup",
+            "arguments": {
+              "query": "capital-france"
+            }
+          },
+          {
+            "name": "uppercase",
+            "arguments": {
+              "text": "Paris"
+            }
+          }
+        ]
+      },
+      {
+        "tool_calls": [
+          {
+            "name": "submit",
+            "arguments": {
+              "answer": "PARIS"
+            }
+          }
+        ]
+      }
+    ],
+    "expected_prediction": {
+      "answer": "PARIS"
+    },
+    "expected_tool_trace": [
+      {
+        "tool": "lookup",
+        "arguments": {
+          "query": "capital-france"
+        },
+        "result": "Paris"
+      },
+      {
+        "tool": "uppercase",
+        "arguments": {
+          "text": "Paris"
+        },
+        "result": "PARIS"
+      }
+    ],
+    "intentional_deviations": [
+      "DSPy ReAct emits one tool action per iteration; DSEx can execute multiple provider tool calls from one assistant turn. This fixture asserts normalized external tool order and final output parity."
+    ]
+  },
+  {
+    "id": "react_tool_argument_error",
+    "module": "react",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use lookup only with supported fact keys.",
+    "inputs": {
+      "question": "Look up an unsupported fact."
+    },
+    "max_iters": 2,
+    "tools": [
+      {
+        "name": "lookup",
+        "description": "Lookup a fact by query.",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputs": {
+          "{\"query\":\"capital-france\"}": "Paris"
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nTry the lookup.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"unknown-fact\"}"
+    ],
+    "dsex_responses": [
+      {
+        "tool_calls": [
+          {
+            "name": "lookup",
+            "arguments": {
+              "query": "unknown-fact"
+            }
+          }
+        ]
+      }
+    ],
+    "expected_status": "error",
+    "intentional_deviations": [
+      "DSPy records tool failure as trajectory pressure and exhausts the fixture queue here; DSEx raises the tool error immediately. This fixture asserts shared error status and retains both error traces for review."
+    ]
+  },
+  {
+    "id": "missing_output_error",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer, score: int",
+    "instructions": "Return answer and integer score.",
+    "inputs": {
+      "question": "This fixture should fail parsing."
+    },
+    "responses": [
+      "[[ ## answer ## ]]\npartial",
+      "[[ ## answer ## ]]\npartial"
+    ],
+    "expected_status": "error",
+    "expected_error_contains": "score",
+    "intentional_deviations": [
+      "Both DSPy and DSEx retry ChatAdapter parse failure through JSON-style output handling; this fixture deliberately gives the retry another incomplete response, so shared error status and trace retention are asserted."
+    ]
+  }
+]

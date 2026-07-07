@@ -44,8 +44,44 @@ defmodule DSEx.Clients.ReqLLM do
     do: generate(new(Keyword.fetch!(opts, :model), opts), messages, opts)
 
   def generate(%__MODULE__{} = lm, messages, opts) do
-    opts = lm.opts |> Keyword.merge(opts) |> normalize_opts()
+    opts =
+      lm.opts
+      |> Keyword.merge(opts)
+      |> normalize_opts()
+      |> normalize_provider_profile_opts(lm.model)
 
+    cache? = Keyword.get(opts, :cache, false)
+    opts = Keyword.delete(opts, :cache)
+    cache_key = cache_key(lm, messages, opts)
+
+    if cache? do
+      generate_cached(lm, messages, opts, cache_key)
+    else
+      generate_uncached(lm, messages, opts)
+    end
+  end
+
+  defp generate_cached(lm, messages, opts, cache_key) do
+    case DSEx.Cache.get(cache_key, :__missing__) do
+      :__missing__ ->
+        DSEx.Telemetry.execute([:dsex, :cache, :miss], %{count: 1}, %{key: cache_key})
+
+        case generate_uncached(lm, messages, opts) do
+          {:ok, _value} = success ->
+            DSEx.Cache.put(cache_key, success)
+            success
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      value ->
+        DSEx.Telemetry.execute([:dsex, :cache, :hit], %{count: 1}, %{key: cache_key})
+        value
+    end
+  end
+
+  defp generate_uncached(lm, messages, opts) do
     started = System.monotonic_time()
 
     DSEx.Telemetry.execute([:dsex, :lm, :start], %{system_time: System.system_time()}, %{
@@ -66,13 +102,31 @@ defmodule DSEx.Clients.ReqLLM do
     result
   end
 
+  def cache_key(%__MODULE__{} = lm, messages, opts) do
+    opts =
+      opts
+      |> Keyword.drop([:api_key, :headers, :req_module])
+      |> Enum.sort()
+
+    {:lm_response,
+     :crypto.hash(
+       :sha256,
+       :erlang.term_to_binary({lm.model, to_req_messages(messages), opts})
+     )
+     |> Base.encode16(case: :lower)}
+  end
+
   def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
     DSEx.Tasks.async(fn -> generate(lm, messages, opts) end)
   end
 
   @impl true
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
-    opts = lm.opts |> Keyword.merge(opts) |> normalize_opts()
+    opts =
+      lm.opts
+      |> Keyword.merge(opts)
+      |> normalize_opts()
+      |> normalize_provider_profile_opts(lm.model)
 
     DSEx.Telemetry.execute([:dsex, :lm, :stream, :start], %{system_time: System.system_time()}, %{
       lm: redact_lm(lm)
@@ -98,7 +152,10 @@ defmodule DSEx.Clients.ReqLLM do
     %{
       provider: :req_llm,
       model: encode_model(lm.model),
-      opts: Enum.map(lm.opts, fn {k, v} -> [Atom.to_string(k), v] end)
+      opts:
+        lm.opts
+        |> Keyword.drop([:api_key, :authorization, :headers])
+        |> Enum.map(fn {k, v} -> [Atom.to_string(k), v] end)
     }
   end
 
@@ -212,7 +269,12 @@ defmodule DSEx.Clients.ReqLLM do
 
   defp normalize_opts(opts) do
     opts
-    |> Keyword.drop([:model, :req_module, :json_retries, :test_mode, :mock_response])
+    |> Keyword.drop([
+      :model,
+      :req_module,
+      :json_retries,
+      :native_json_schema
+    ])
     |> rename_timeout()
     |> normalize_numeric_opts()
     |> normalize_response_format()
@@ -252,6 +314,42 @@ defmodule DSEx.Clients.ReqLLM do
   defp normalize_tools(opts) do
     Keyword.update(opts, :tools, [], fn tools ->
       Enum.map(tools, &normalize_tool/1)
+    end)
+  end
+
+  defp normalize_provider_profile_opts(opts, model) do
+    if openai_reasoning_model?(model) do
+      opts
+      |> rename_max_tokens_for_reasoning()
+      |> Keyword.drop([:temperature, :top_p, :frequency_penalty, :presence_penalty])
+    else
+      opts
+    end
+  end
+
+  defp rename_max_tokens_for_reasoning(opts) do
+    {max_tokens, opts} = Keyword.pop(opts, :max_tokens)
+
+    cond do
+      Keyword.has_key?(opts, :max_completion_tokens) ->
+        opts
+
+      is_nil(max_tokens) ->
+        opts
+
+      true ->
+        Keyword.put(opts, :max_completion_tokens, max_tokens)
+    end
+  end
+
+  defp openai_reasoning_model?(model) do
+    model
+    |> to_string()
+    |> String.downcase()
+    |> String.replace_prefix("openai:", "")
+    |> then(fn model ->
+      String.match?(model, ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/) or
+        String.contains?(model, "reasoning")
     end)
   end
 

@@ -93,6 +93,7 @@ defmodule ReqLLMClientTest do
 
     assert Keyword.fetch!(opts, :receive_timeout) == 1_000
     assert Keyword.fetch!(opts, :temperature) == 0.0
+    refute Keyword.has_key?(opts, :native_json_schema)
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
   end
 
@@ -103,6 +104,27 @@ defmodule ReqLLMClientTest do
     assert {:ok, prediction} = DSEx.call(program, %{question: "pong?"})
     assert DSEx.Prediction.get(prediction, :answer) == "pong"
     assert DSEx.Prediction.get(prediction, :score) == 7
+  end
+
+  test "ReqLLM client pre-normalizes OpenAI reasoning model options" do
+    lm =
+      DSEx.req_llm("openai:gpt-5.4-mini",
+        test_pid: self(),
+        req_module: TextStub,
+        temperature: 0,
+        max_tokens: 80,
+        top_p: 0.5
+      )
+
+    program = DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+
+    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert_received {:req_llm_generate, "openai:gpt-5.4-mini", _messages, opts}
+
+    assert Keyword.fetch!(opts, :max_completion_tokens) == 80
+    refute Keyword.has_key?(opts, :max_tokens)
+    refute Keyword.has_key?(opts, :temperature)
+    refute Keyword.has_key?(opts, :top_p)
   end
 
   test "ReqLLM tool calls return DSEx ReAct-compatible tool call payloads" do
@@ -117,10 +139,10 @@ defmodule ReqLLMClientTest do
         }
       )
 
-    program = DSEx.react_v2("question -> answer", [tool], lm: lm, max_iters: 1)
+    program = DSEx.react("question -> answer", [tool], lm: lm, max_iters: 1)
 
-    assert {:error, {:react_v2_max_iters, history}} =
-             DSEx.Predict.ReActV2.call(program, %{question: "lookup beam"})
+    assert {:error, {:react_max_iters, history}} =
+             DSEx.Predict.ReAct.call(program, %{question: "lookup beam"})
 
     assert [%{tool: :lookup, arguments: %{query: "beam"}, result: "ok"}] = history
 
@@ -149,10 +171,14 @@ defmodule ReqLLMClientTest do
   test "save/load preserves ReqLLM-backed programs without serializing credentials" do
     program =
       DSEx.predict("question -> answer",
-        lm: DSEx.req_llm("openai:gpt-test", opts: [temperature: 0])
+        lm: DSEx.req_llm("openai:gpt-test", api_key: "not-persisted", opts: [temperature: 0])
       )
 
-    loaded = program |> DSEx.Saving.dump() |> DSEx.Saving.load()
+    dumped = DSEx.Saving.dump(program)
+
+    refute dumped["lm"][:opts] |> List.flatten() |> Enum.member?("not-persisted")
+
+    loaded = DSEx.Saving.load(dumped)
 
     assert %DSEx.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
   end

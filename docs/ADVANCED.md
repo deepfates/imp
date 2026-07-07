@@ -73,7 +73,7 @@ candidate lineage, replacement branches, and system-aware merges.
 ## Agents And MCP
 
 ```elixir
-tool = DSEx.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+tool = DSEx.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
 agent =
   DSEx.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
@@ -118,13 +118,18 @@ Supported constraints include enum, numeric bounds, string length, regex
 patterns, arrays, nested objects, and optional fields. JSON adapter parse errors
 return retry feedback suitable for another model attempt.
 
-## Benchmarks
+## Release Evidence
 
-```elixir
-DSEx.Benchmarks.assert_pass!()
+DSEx keeps release evidence behind Mix gates rather than presenting benchmark
+helpers as application APIs:
+
+```sh
+mix production.check
+mix benchmark.truth.check
+mix benchmark.dashboard
 ```
 
-The current deterministic benchmark fixture covers:
+The deterministic production fixture covers:
 
 - Ax-style structured extraction with schema constraints.
 - Agent/tool execution with trace evidence.
@@ -146,7 +151,7 @@ DSEx behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared DSEx
 contracts and tested through injectable transports.
 
-For real dataset benchmark evidence, use `DSEx.BenchmarkTruth` and
-`BENCHMARK_TRUTH.md`. That lane fetches canonical GSM8K/HotPotQA rows, writes
-manifests and result artifacts, and keeps research evidence separate from
-deterministic production-gate fixtures.
+For real dataset benchmark evidence, use the commands in `BENCHMARK_TRUTH.md`.
+That lane fetches canonical GSM8K/HotPotQA rows, writes manifests and result
+artifacts, and keeps research evidence separate from deterministic
+production-gate fixtures.

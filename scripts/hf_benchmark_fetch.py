@@ -28,7 +28,7 @@ SPECS: Dict[str, Dict[str, Any]] = {
     },
     "hotpotqa": {
         "dataset": "hotpotqa/hotpot_qa",
-        "config": "fullwiki",
+        "config": "distractor",
         "split": "validation",
         "full_length": 7405,
         "input_keys": ["question", "context"],

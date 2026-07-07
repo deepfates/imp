@@ -21,6 +21,7 @@ defmodule DSEx.MixProject do
           "docs/API_GUIDE.md",
           "docs/ADVANCED.md",
           "docs/BENCHMARK_TRUTH.md",
+          "docs/PARITY_VALIDATION_PROGRAM.md",
           "docs/PRODUCTION_OPERATIONS.md",
           "docs/COVERAGE_MATRIX.md",
           "docs/RELEASE_CRITERIA.md",
@@ -57,9 +58,18 @@ defmodule DSEx.MixProject do
         "protocol.mcp.check": :test,
         "benchmark.truth.check": :test,
         "benchmark.live.check": :test,
+        "benchmark.dashboard": :test,
+        "benchmark.dashboard.full": :test,
+        "benchmark.live_matrix": :test,
+        "dsex.benchmark.hotpotqa_analysis": :test,
+        "benchmark.hotpotqa_analysis": :test,
+        "benchmark.optimizer_lift.check": :test,
+        "benchmark.overhead.check": :test,
+        "benchmark.rag_tool_agent.check": :test,
         "benchmark.parity.check": :test,
         "benchmark.parity.full": :test,
         "live.check": :test,
+        "package.check": :test,
         "quality.check": :test
       ]
     ]
@@ -86,11 +96,28 @@ defmodule DSEx.MixProject do
 
   defp package do
     [
+      files: package_files(),
       licenses: ["MIT"],
       links: %{
         "Source" => "https://github.com/deepfates/dsex"
       }
     ]
+  end
+
+  defp package_files do
+    excluded_lib =
+      Path.wildcard("lib/mix/tasks/dsex.benchmark*.ex") ++
+        Path.wildcard("lib/dsex/benchmark*.ex") ++
+        Path.wildcard("lib/dsex/benchmark_truth/**/*.ex")
+
+    (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
+      Path.wildcard("docs/*.md") ++
+      Path.wildcard("livebooks/*.livemd") ++
+      [
+        ".formatter.exs",
+        "README.md",
+        "mix.exs"
+      ]
   end
 
   defp aliases do
@@ -101,6 +128,10 @@ defmodule DSEx.MixProject do
         "compile --warnings-as-errors",
         "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp",
         "benchmark.truth.check",
+        "benchmark.trace.check",
+        "benchmark.overhead.check",
+        "benchmark.optimizer_lift.check",
+        "benchmark.rag_tool_agent.check",
         "docs"
       ],
       "integration.check": [
@@ -119,7 +150,32 @@ defmodule DSEx.MixProject do
         "test --only protocol_mcp test/protocol_mcp"
       ],
       "benchmark.truth.check": [
-        "test test/benchmark_truth_test.exs"
+        "test test/benchmark_truth_test.exs",
+        "dsex.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
+      ],
+      "benchmark.trace.check": [
+        "dsex.benchmark.trace --out tmp/golden-trace"
+      ],
+      "benchmark.overhead.check": [
+        "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+      ],
+      "benchmark.optimizer_lift.check": [
+        "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"
+      ],
+      "benchmark.rag_tool_agent.check": [
+        "dsex.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
+      ],
+      "benchmark.live_matrix": [
+        "dsex.benchmark.live_matrix --in benchmarks/results/dsex-dspy-parity-campaign-*.json --out tmp/live-matrix"
+      ],
+      "benchmark.hotpotqa_analysis": [
+        "dsex.benchmark.hotpotqa_analysis"
+      ],
+      "benchmark.dashboard": [
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard"
+      ],
+      "benchmark.dashboard.full": [
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
@@ -135,6 +191,10 @@ defmodule DSEx.MixProject do
       ],
       "live.check": [
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
+      ],
+      "package.check": [
+        "test test/package_contract_test.exs",
+        "cmd mix hex.build --unpack --output tmp/package-check"
       ],
       "quality.check": [
         "credo --only warning"

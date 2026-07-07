@@ -34,4 +34,14 @@ defmodule LivebookContractTest do
     assert body =~ "mix integration.check"
     assert body =~ "LIVE_PROVIDER=1 mix live.check"
   end
+
+  test "Livebooks teach the ReqLLM provider path only" do
+    body = Path.wildcard("livebooks/*.livemd") |> Enum.map_join("\n", &File.read!/1)
+
+    assert body =~ "DSEx.req_llm"
+    refute body =~ "DSEx.openai"
+    refute body =~ "DSEx.litellm"
+    refute body =~ "DSEx.local_lm"
+    refute body =~ "DSEx.databricks("
+  end
 end

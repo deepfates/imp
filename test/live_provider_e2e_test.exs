@@ -9,8 +9,9 @@ defmodule LiveProviderE2ETest do
 
     assert is_binary(api_key) and byte_size(api_key) > 0
 
-    DSEx.Clients.OpenAI.new(model,
-      opts: Keyword.merge([temperature: 0, max_completion_tokens: 120], opts)
+    DSEx.req_llm(
+      "openai:#{model}",
+      Keyword.merge([temperature: 0, max_completion_tokens: 120], opts)
     )
   end
 
@@ -57,7 +58,7 @@ defmodule LiveProviderE2ETest do
     assert String.contains?(text, "pong")
   end
 
-  test "live provider uses ReActV2 function tools and reserved submit" do
+  test "live provider uses ReAct function tools and reserved submit" do
     signature =
       DSEx.Signature.new(
         "question -> answer",
@@ -90,14 +91,14 @@ defmodule LiveProviderE2ETest do
       )
 
     agent =
-      DSEx.react_v2(signature, [lookup],
+      DSEx.react(signature, [lookup],
         lm: live_lm(max_completion_tokens: 160),
         tool_policy: [:lookup, :submit],
         max_iters: 4
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.ReActV2.call(agent, %{
+             DSEx.Predict.ReAct.call(agent, %{
                question: "What is the capital of France?"
              })
 

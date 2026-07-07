@@ -3,13 +3,13 @@ defmodule OptimizerEffectivenessTest do
 
   defp demo_sensitive_lm do
     %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
           cond do
-            prompt =~ "answer: Paris" -> %{answer: "Paris"}
+            prompt =~ "[[ ## answer ## ]]\nParis" -> %{answer: "Paris"}
             prompt =~ "Always answer Paris" -> %{answer: "Paris"}
             true -> %{answer: "unknown"}
           end

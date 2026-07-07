@@ -17,7 +17,7 @@ Elixir programs.
 
 - Signatures are data: `%DSEx.Signature{}` declares inputs, outputs,
   instructions, and constraints. Use `DSEx.signature/2` at the public edge.
-- Programs are structs: Predict, ChainOfThought, ReActV2, RLM, and related
+- Programs are structs: Predict, ChainOfThought, ReAct, RLM, and related
   modules hold configuration, demos, adapters, and LMs.
 - Boundaries are behaviours: LM, adapter, retrieval, and HTTP clients are
   explicit seams for tests and production clients.
@@ -89,7 +89,7 @@ programs, or arbitrary text artifacts.
 | --- | --- |
 | Public facade | `DSEx` |
 | Signature | `DSEx.signature/2`, `%DSEx.Signature{}` |
-| Program | `DSEx.predict/2`, `chain_of_thought/2`, `react_v2/3`, `rlm/2` |
+| Program | `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `rlm/2` |
 | Call boundary | `DSEx.call/2` |
 | Example | `DSEx.example/1`, `%DSEx.Example{}` |
 | Prediction | `DSEx.prediction/1`, `%DSEx.Prediction{}` |

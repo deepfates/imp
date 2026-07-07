@@ -5,8 +5,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
       mix dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-20.jsonl \\
         --hotpotqa benchmarks/data/hotpotqa-validation-0-20.jsonl --max-examples 20
 
-  By default this runs in fixture mode. Use `--live` to use an OpenAI-compatible
-  live provider from `OPENAI_API_KEY`/`OPENAI_MODEL`.
+  By default this runs in fixture mode. Use `--live` to use the ReqLLM-backed
+  OpenAI provider from `OPENAI_API_KEY`/`OPENAI_MODEL`.
   """
 
   use Mix.Task
@@ -73,14 +73,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
       System.get_env("OPENAI_API_KEY") || Mix.raise("OPENAI_API_KEY is required for --live")
 
     model = Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
-    DSEx.openai(model, api_key: api_key)
+    DSEx.req_llm("openai:#{model}", api_key: api_key)
   end
 
   defp model_metadata(:fixture, _opts), do: %{provider: "fixture", model: "oracle"}
 
   defp model_metadata(:live, opts) do
     %{
-      provider: "openai-compatible",
+      provider: "req_llm",
       model: Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
     }
   end

@@ -1,12 +1,5 @@
 defmodule DSEx.BenchmarkTruth.Runner do
-  @moduledoc """
-  Run DSEx programs over canonical benchmark JSONL files and write audit artifacts.
-
-  `:fixture` mode uses an oracle LM derived from the dataset rows. It proves the
-  benchmark harness, data loading, metrics, and artifact schema without spending
-  provider tokens. `:live` mode uses the caller-supplied LM and records model
-  metadata for research evidence.
-  """
+  @moduledoc false
 
   @default_out_dir "benchmarks/results"
 
@@ -19,6 +12,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     lm = Keyword.get(opts, :lm)
     model = Keyword.get(opts, :model)
+    generation = Keyword.get(opts, :generation, %{})
+    campaign_id = Keyword.get(opts, :campaign_id)
     optimizer_comparisons? = Keyword.get(opts, :optimizer_comparisons, true)
 
     File.mkdir_p!(out_dir)
@@ -44,9 +39,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "mode" => Atom.to_string(mode),
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
+      "campaign_id" => campaign_id,
       "elixir" => System.version(),
       "otp" => System.otp_release(),
       "model" => safe_json(model),
+      "generation" => safe_json(generation),
       "tasks" => task_results,
       "aggregate_score" => average(Enum.map(task_results, & &1["score"]))
     }
@@ -106,35 +103,41 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp load_examples(:hotpotqa, path), do: DSEx.Datasets.HotPotQA.load(path)
 
   defp program(:gsm8k, lm) do
-    "question -> answer"
+    "question -> answer: string \"final numeric answer\""
     |> DSEx.signature(
       "Solve the math word problem. Return only the final numeric answer in `answer`."
     )
-    |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.JSON, config: [json_retries: 1])
+    |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
   defp program(:hotpotqa, lm) do
-    "question, context -> answer"
-    |> DSEx.signature(
-      "Answer using the provided context. Return the shortest exact answer string."
-    )
-    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.JSON, config: [json_retries: 1])
+    "question, context -> answer: short_span \"short exact answer\""
+    |> DSEx.signature(DSEx.BenchmarkTruth.Contract.hotpotqa_instruction())
+    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
   defp metric(:gsm8k) do
     fn example, prediction ->
       gold = DSEx.Example.get(example, :canonical_answer, DSEx.Example.get(example, :answer))
       predicted = DSEx.Prediction.get(prediction, :answer)
-      DSEx.Metrics.normalize_text(predicted) == DSEx.Metrics.normalize_text(gold)
+
+      numeric_answer_equal?(predicted, gold) ||
+        DSEx.Metrics.normalize_text(predicted) == DSEx.Metrics.normalize_text(gold)
     end
   end
 
   defp metric(:hotpotqa) do
     fn example, prediction ->
-      DSEx.Metrics.em(
-        DSEx.Prediction.get(prediction, :answer),
-        DSEx.Example.get(example, :answer)
-      )
+      predicted = DSEx.Prediction.get(prediction, :answer)
+      gold = DSEx.Example.get(example, :answer)
+      result = DSEx.Metrics.extractive_qa(predicted, gold, metric_name: "hotpotqa_exact_match")
+
+      metadata =
+        result.metadata
+        |> Map.put("official_hotpotqa_f1", result.metadata["f1"])
+        |> Map.put("official_hotpotqa_em", result.metadata["exact_match"])
+
+      %{result | metadata: metadata}
     end
   end
 
@@ -179,16 +182,18 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp evaluate_row(program, example, metric, index) do
     inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
 
-    {duration_us, outcome} =
+    {duration_us, {outcome, instrumentation}} =
       timed(fn ->
-        with {:ok, prediction} <- DSEx.Module.call(program, inputs) do
-          result =
-            metric
-            |> apply_metric(example, prediction)
-            |> DSEx.Metrics.normalize_result()
+        collect_instrumentation(fn ->
+          with {:ok, prediction} <- DSEx.Module.call(program, inputs) do
+            result =
+              metric
+              |> apply_metric(example, prediction)
+              |> DSEx.Metrics.normalize_result()
 
-          {:ok, prediction, result}
-        end
+            {:ok, prediction, result}
+          end
+        end)
       end)
 
     row =
@@ -203,7 +208,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
             feedback: result.feedback,
             metric_metadata: result.metadata,
             error: nil,
-            duration_us: duration_us
+            duration_us: duration_us,
+            instrumentation: instrumentation
           }
 
         {:error, reason} ->
@@ -216,7 +222,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
             feedback: nil,
             metric_metadata: %{},
             error: reason,
-            duration_us: duration_us
+            duration_us: duration_us,
+            instrumentation: instrumentation
           }
       end
 
@@ -224,11 +231,97 @@ defmodule DSEx.BenchmarkTruth.Runner do
     {row, error}
   end
 
+  defp collect_instrumentation(fun) do
+    key = {__MODULE__, self(), make_ref()}
+    Process.put(key, empty_instrumentation())
+
+    events = [
+      [:dsex, :lm, :stop],
+      [:dsex, :adapter, :parse, :json_fallback],
+      [:dsex, :adapter, :parse, :retry]
+    ]
+
+    :telemetry.attach_many(key, events, &__MODULE__.record_instrumentation/4, {self(), key})
+
+    try do
+      {fun.(), Process.get(key, empty_instrumentation())}
+    after
+      :telemetry.detach(key)
+      Process.delete(key)
+    end
+  end
+
+  defp empty_instrumentation do
+    %{
+      "lm_calls" => 0,
+      "lm_duration_ms" => 0.0,
+      "json_fallbacks" => 0,
+      "parse_retries" => 0
+    }
+  end
+
+  @doc false
+  def record_instrumentation(event, measurements, _metadata, {owner, key}) do
+    if self() == owner do
+      Process.put(
+        key,
+        update_instrumentation(Process.get(key, empty_instrumentation()), event, measurements)
+      )
+    end
+  end
+
+  defp update_instrumentation(stats, [:dsex, :lm, :stop], measurements) do
+    duration_ms =
+      measurements
+      |> Map.get(:duration, 0)
+      |> System.convert_time_unit(:native, :microsecond)
+      |> us_to_ms()
+
+    stats
+    |> Map.update!("lm_calls", &(&1 + 1))
+    |> Map.update!("lm_duration_ms", &Float.round(&1 + duration_ms, 3))
+  end
+
+  defp update_instrumentation(stats, [:dsex, :adapter, :parse, :json_fallback], _measurements),
+    do: Map.update!(stats, "json_fallbacks", &(&1 + 1))
+
+  defp update_instrumentation(stats, [:dsex, :adapter, :parse, :retry], _measurements),
+    do: Map.update!(stats, "parse_retries", &(&1 + 1))
+
+  defp update_instrumentation(stats, _event, _measurements), do: stats
+
   defp apply_metric(metric, example, prediction) when is_function(metric, 2),
     do: metric.(example, prediction)
 
   defp apply_metric(metric, example, prediction) when is_function(metric, 3),
     do: metric.(example, prediction, nil)
+
+  defp numeric_answer_equal?(predicted, gold) do
+    with {:ok, predicted_number} <- parse_numeric_answer(predicted),
+         {:ok, gold_number} <- parse_numeric_answer(gold) do
+      abs(predicted_number - gold_number) <= 1.0e-9
+    else
+      _other -> false
+    end
+  end
+
+  defp parse_numeric_answer(value) do
+    text =
+      value
+      |> to_string()
+      |> String.trim()
+      |> String.replace(",", "")
+      |> String.trim_leading("$")
+
+    if String.match?(text, ~r/^-?\d+(?:\.\d+)?$/) do
+      case Float.parse(text) do
+        {number, ""} -> {:ok, number}
+        _other -> :error
+      end
+    else
+      :error
+    end
+  end
 
   defp optimizer_comparisons(_task, examples, _lm, _metric) when length(examples) < 2, do: []
 
@@ -326,7 +419,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
       end)
 
     %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           text = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
@@ -347,23 +440,142 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp fixture_fields(:hotpotqa, example), do: %{answer: DSEx.Example.get(example, :answer)}
 
   defp row_summary(row) do
-    %{
+    instrumentation =
+      row
+      |> Map.get(:instrumentation, empty_instrumentation())
+      |> Map.merge(trace_instrumentation(row))
+
+    summary = %{
       "index" => row.index,
       "score" => row.score,
       "passed" => row.passed?,
       "prediction" => prediction_summary(row.prediction),
+      "metric_metadata" => safe_json(row.metric_metadata || %{}),
       "error" => safe_json(row.error),
-      "duration_ms" => us_to_ms(Map.get(row, :duration_us, 0))
+      "duration_ms" => us_to_ms(Map.get(row, :duration_us, 0)),
+      "instrumentation" => safe_json(instrumentation)
     }
+
+    if row.passed? do
+      summary
+    else
+      Map.put(summary, "diagnostic", row_diagnostic(row))
+    end
   end
 
   defp prediction_summary(nil), do: nil
   defp prediction_summary(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
 
+  defp row_diagnostic(row) do
+    example = DSEx.Example.to_map(row.example)
+    context = Map.get(example, :context) || Map.get(example, "context")
+
+    %{
+      "gold_answer" => Map.get(example, :answer) || Map.get(example, "answer"),
+      "question" => Map.get(example, :question) || Map.get(example, "question"),
+      "context_sha256" => text_sha256(context),
+      "context_length" => context && String.length(to_string(context)),
+      "trace" => row_trace(row)
+    }
+  end
+
+  defp row_trace(row), do: prediction_trace(row.prediction) || error_trace(row.error)
+
+  defp trace_instrumentation(row) do
+    case raw_trace(row) do
+      nil ->
+        %{}
+
+      %{messages: messages, raw: raw} ->
+        %{
+          "message_count" => length(messages || []),
+          "message_chars" => message_chars(messages || []),
+          "raw_chars" => raw_chars(raw)
+        }
+
+      %{"messages" => messages, "raw" => raw} ->
+        %{
+          "message_count" => length(messages || []),
+          "message_chars" => message_chars(messages || []),
+          "raw_chars" => raw_chars(raw)
+        }
+    end
+  end
+
+  defp raw_trace(row), do: raw_prediction_trace(row.prediction) || raw_error_trace(row.error)
+
+  defp raw_prediction_trace(%DSEx.Prediction{metadata: %{trace: trace}}), do: trace
+  defp raw_prediction_trace(%DSEx.Prediction{metadata: %{"trace" => trace}}), do: trace
+  defp raw_prediction_trace(_prediction), do: nil
+
+  defp raw_error_trace(%{trace: trace}), do: trace
+  defp raw_error_trace(%{"trace" => trace}), do: trace
+  defp raw_error_trace(_error), do: nil
+
+  defp message_chars(messages) do
+    Enum.reduce(messages, 0, fn message, acc ->
+      content = Map.get(message, :content) || Map.get(message, "content") || ""
+      acc + String.length(to_string(content))
+    end)
+  end
+
+  defp raw_chars(raw) when is_binary(raw), do: String.length(raw)
+  defp raw_chars(raw), do: raw |> safe_json() |> Jason.encode!() |> String.length()
+
+  defp prediction_trace(%DSEx.Prediction{metadata: %{trace: trace}}), do: compact_trace(trace)
+  defp prediction_trace(%DSEx.Prediction{metadata: %{"trace" => trace}}), do: compact_trace(trace)
+  defp prediction_trace(_prediction), do: nil
+
+  defp error_trace(%{trace: trace}), do: compact_trace(trace)
+  defp error_trace(%{"trace" => trace}), do: compact_trace(trace)
+  defp error_trace(_error), do: nil
+
+  defp compact_trace(%{messages: messages, raw: raw}) do
+    %{
+      "messages" => Enum.map(messages, &compact_message/1),
+      "raw" => truncate_middle(raw, 2_000)
+    }
+  end
+
+  defp compact_trace(%{"messages" => messages, "raw" => raw}) do
+    %{
+      "messages" => Enum.map(messages, &compact_message/1),
+      "raw" => truncate_middle(raw, 2_000)
+    }
+  end
+
+  defp compact_trace(_trace), do: nil
+
+  defp compact_message(message) do
+    %{
+      "role" => message[:role] || message["role"],
+      "content" => truncate_middle(message[:content] || message["content"], 2_000)
+    }
+  end
+
+  defp text_sha256(nil), do: nil
+
+  defp text_sha256(text),
+    do: :crypto.hash(:sha256, to_string(text)) |> Base.encode16(case: :lower)
+
+  defp truncate_middle(nil, _limit), do: nil
+
+  defp truncate_middle(value, limit) do
+    text = if is_binary(value), do: value, else: inspect(value)
+
+    if String.length(text) <= limit do
+      text
+    else
+      keep = div(limit - 20, 2)
+      String.slice(text, 0, keep) <> "\n...[truncated]...\n" <> String.slice(text, -keep, keep)
+    end
+  end
+
   defp safe_json(nil), do: nil
   defp safe_json(value) when is_binary(value) or is_number(value) or is_boolean(value), do: value
   defp safe_json(value) when is_atom(value), do: Atom.to_string(value)
   defp safe_json(value) when is_list(value), do: Enum.map(value, &safe_json/1)
+  defp safe_json(value) when is_tuple(value), do: value |> Tuple.to_list() |> safe_json()
 
   defp safe_json(%module{} = value),
     do:

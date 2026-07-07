@@ -52,7 +52,7 @@ defmodule DSEx.Streaming do
     if function_exported?(module, :stream, 3) do
       module.stream(lm, messages, opts)
     else
-      DSEx.Clients.HTTPLM.stream(lm, messages, opts)
+      generate_once(lm, messages, opts)
     end
   end
 
@@ -63,7 +63,7 @@ defmodule DSEx.Streaming do
     if function_exported?(module, :stream, 3) do
       module.stream(module, messages, opts)
     else
-      DSEx.Clients.HTTPLM.stream(module, messages, opts)
+      generate_once(module, messages, opts)
     end
   end
 

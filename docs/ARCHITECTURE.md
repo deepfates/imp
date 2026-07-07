@@ -19,9 +19,11 @@ Example / inputs
 
 - `DSEx.configure/1`, `DSEx.context/2`
 - `DSEx.signature/2`, `DSEx.example/1`, `DSEx.prediction/1`
-- `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `react_v2/3`, `rlm/2`
+- `DSEx.with_inputs/2`, `DSEx.inputs/1`, `DSEx.labels/1`, `DSEx.to_map/1`
+- `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `rlm/2`
+- `DSEx.with_demos/2`, `DSEx.tool/4`
 - `DSEx.call/2`
-- provider helpers: `req_llm/2`, `openai/2`, `litellm/2`, `local_lm/2`, `databricks/2`
+- provider helper: `req_llm/2`
 
 Use the facade for application code. Use deeper modules when you need direct
 control in tests, docs, or advanced systems.
@@ -74,8 +76,7 @@ All major program structs implement the `DSEx.Module` behaviour.
 | --- | --- |
 | `DSEx.Predict.Predict` | Basic signature-to-output LM call. |
 | `DSEx.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
-| `DSEx.Predict.ReAct` | Compatibility facade for `ReActV2`. |
-| `DSEx.Predict.ReActV2` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
+| `DSEx.Predict.ReAct` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
 | `DSEx.Predict.ProgramOfThought` | LM emits a safe expression or tool action plan. |
 | `DSEx.Predict.CodeAct` | Iterates tool observations and BEAM-safe sandbox execution with trace metadata. |
 | `DSEx.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
@@ -99,7 +100,6 @@ Available adapters:
 - `DSEx.Adapter.JSON`
 - `DSEx.Adapter.XML`
 - `DSEx.Adapter.TwoStep`
-- `DSEx.Adapter.BAML`
 
 `JSON` and schema-constrained signatures are the best fit when the output shape
 matters more than prose flexibility.
@@ -109,7 +109,7 @@ matters more than prose flexibility.
 `DSEx.LM` is a small behaviour. Tests usually use:
 
 ```elixir
-%{module: DSEx.LM.Fake, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
+%{module: DSEx.LM.Static, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
 ```
 
 The preferred production client is:
@@ -122,21 +122,9 @@ Elixir `req_llm` ecosystem. DSEx keeps the declarative programming layer:
 signatures, adapters, modules, optimizers, evaluation, traces, persistence, and
 redacted telemetry.
 
-DSEx also keeps direct OpenAI-compatible HTTP wrappers for local servers,
-focused contract tests, and deployments that need a very small injectable wire
-surface:
-
-- `DSEx.Clients.OpenAI`
-- `DSEx.Clients.LiteLLM`
-- `DSEx.Clients.Local`
-- `DSEx.Clients.Databricks`
-
-The underlying transport is injectable via `DSEx.HTTP`, which is how provider
-contracts are tested without live credentials.
-
-Provider clients use real transport by default. Deterministic provider-contract
-tests must opt into `DSEX_TEST_MODE=mock`, `DSEX_TEST_MODE=fallback`, or a
-constructor-level `test_mode:`.
+Production provider access goes through ReqLLM. DSEx does not maintain a
+parallel OpenAI-compatible provider client stack; deterministic provider tests
+use ReqLLM test modules or the live ReqLLM-backed gates.
 
 Provider streaming is client-dependent. The ReqLLM-backed client streams through
 ReqLLM's Finch/SSE machinery and maps `ReqLLM.StreamChunk` values into the DSEx
@@ -179,16 +167,9 @@ and the Elixir-facing public API. A dependency should either remove operational
 risk, align DSEx with normal OTP practice, or provide test evidence that would
 be hard to maintain in bespoke code.
 
-Direct `DSEx.Clients.HTTPLM` remains appropriate for:
-
-- focused OpenAI-compatible contract tests;
-- local model servers with intentionally tiny wire requirements;
-- deployments that need a narrow injectable transport surface;
-- regression tests around credential binding, timeouts, and saved-state
-  security.
-
-Production application code should prefer `DSEx.req_llm/2` unless there is a
-specific reason to own the wire contract directly.
+Production application code should use `DSEx.req_llm/2`. Provider APIs,
+transport pooling, streaming, retries, model metadata, and structured output
+belong to ReqLLM, not to a parallel DSEx-owned client stack.
 
 ### OTP Runtime Boundary
 

@@ -1,5 +1,5 @@
 defmodule DSEx.Benchmarks do
-  @moduledoc "Deterministic benchmark fixtures for production gates."
+  @moduledoc false
 
   alias DSEx.Agent
   alias DSEx.Optimize.Anything
@@ -253,12 +253,12 @@ defmodule DSEx.Benchmarks do
 
   defp reward_lm do
     %{
-      module: DSEx.LM.Fake,
+      module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
-          if prompt =~ "answer: Paris",
+          if prompt =~ "[[ ## answer ## ]]\nParis",
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end

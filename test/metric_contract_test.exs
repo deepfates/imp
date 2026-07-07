@@ -71,6 +71,35 @@ defmodule MetricContractTest do
     assert length(result.rows) == 1
   end
 
+  test "token F1 counts duplicate overlap like extractive QA metrics" do
+    assert DSEx.Metrics.f1("alpha alpha beta", "alpha beta beta") == 2 / 3
+  end
+
+  test "extractive QA reports exact match F1 answer type and span relation" do
+    assert %DSEx.Metrics.Result{
+             score: 1.0,
+             passed?: true,
+             metadata: %{
+               "task_metric" => "hotpotqa_exact_match",
+               "exact_match" => true,
+               "f1" => 1.0,
+               "answer_type" => "numeric",
+               "span_relation" => "exact"
+             }
+           } = DSEx.Metrics.extractive_qa("2000", "2000", metric_name: "hotpotqa_exact_match")
+
+    overlong = DSEx.Metrics.extractive_qa("since 2000", "2000")
+
+    refute overlong.passed?
+    assert overlong.score == 0.0
+    assert overlong.metadata["f1"] == 2 / 3
+    assert overlong.metadata["answer_type"] == "numeric"
+    assert overlong.metadata["span_relation"] == "overlong_span"
+
+    assert DSEx.Metrics.answer_type("yes") == "yes_no"
+    assert DSEx.Metrics.span_relation("Paris", "Paris France") == "short_span"
+  end
+
   test "BestOfN Refine and few-shot optimizers accept structured metric results" do
     good = DSEx.prediction(answer: "good")
     bad = DSEx.prediction(answer: "bad")

@@ -1,42 +1,60 @@
-# DSEx Documentation
+# DSEx Manual
 
-This directory is the practical manual for DSEx. It is meant to be read
-alongside the code and tests, not instead of them.
+DSEx turns language-model work into declared, callable, measurable, improvable
+Elixir programs. This manual is organized by what you are trying to do.
 
-## Reading Path
+## Learn The Model
 
-1. [Philosophy](DSEX_PHILOSOPHY.md): the Elixir-native model of declarative
-   self-improving programs.
-2. [API Guide](API_GUIDE.md): task-oriented examples for signatures, modules,
-   adapters, optimizers, agents, RLM, MCP, persistence, and providers.
-3. [Prior Art](PRIOR_ART.md): project lineage, terminology, and independence.
-4. [Livebook 01](../livebooks/01_programming_not_prompting.livemd):
-   signatures, predictions, examples, and schema-constrained output.
-5. [Livebook 02](../livebooks/02_evaluate_and_optimize.livemd): evaluation,
-   optimizer reports, and artifact optimization.
-6. [Livebook 03](../livebooks/03_agents_tools_mcp_rlm.livemd): tools, agents,
-   MCP-style catalogs, ReActV2, and RLM.
-7. [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA, agents, MCP, schemas,
-   and deterministic benchmark fixtures.
-8. [Benchmark Truth](BENCHMARK_TRUTH.md): real-dataset benchmark evidence,
-   manifests, result artifacts, and live-provider research smoke runs.
-9. [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
-   security posture, and release discipline.
-10. [Architecture](ARCHITECTURE.md): the modules, behaviours, data flow, and
-   supervision/runtime boundaries.
-11. [Coverage Matrix](COVERAGE_MATRIX.md): the release truth table mapping
-    upstream concepts to DSEx surfaces, tests, docs, and V3 decisions.
-12. [Release Criteria](RELEASE_CRITERIA.md): production gate criteria and the
-    external references used to define release readiness.
+- [Philosophy](DSEX_PHILOSOPHY.md): the mental model: signatures, programs,
+  adapters, examples, metrics, and optimizers.
+- [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
+  library.
+- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
+  optimize-anything style systems.
 
-## Livebooks
+## Build With DSEx
 
-Open the notebooks in `livebooks/` when you want to learn by running code:
+- [API Guide](API_GUIDE.md): task-oriented examples for normal application
+  code.
+- [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA-style reflection,
+  agents, MCP, schemas, and deterministic fixtures.
 
-- `01_programming_not_prompting.livemd`
-- `02_evaluate_and_optimize.livemd`
-- `03_agents_tools_mcp_rlm.livemd`
-- `04_production_and_live_provider.livemd`
+## Learn By Running Code
 
-All notebooks use deterministic fake LMs by default. The live-provider notebook
-has an explicit opt-in cell for local `.env` credentials.
+The notebooks in `livebooks/` are written to run with deterministic local LMs by
+default. The live-provider notebook has an explicit opt-in cell for `.env`
+credentials.
+
+- [01 Programming, Not Prompting](../livebooks/01_programming_not_prompting.livemd)
+- [02 Evaluate And Optimize](../livebooks/02_evaluate_and_optimize.livemd)
+- [03 Agents, Tools, MCP, RLM](../livebooks/03_agents_tools_mcp_rlm.livemd)
+- [04 Production And Live Provider](../livebooks/04_production_and_live_provider.livemd)
+
+## Operate It
+
+- [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
+  redaction, security posture, and release discipline.
+- [Benchmark Truth](BENCHMARK_TRUTH.md): real-dataset benchmark artifacts,
+  manifests, integrity checks, and live-provider evidence.
+
+## Validate Claims
+
+These documents are mostly for maintainers, reviewers, and release decisions.
+They are useful when you want to audit DSEx claims, but they are not required
+for normal application use.
+
+- [Parity Validation Program](PARITY_VALIDATION_PROGRAM.md): the evidence
+  standard for DSEx-vs-DSPy semantic parity, optimizer lift, production
+  behavior, and provider-free performance claims.
+- [Coverage Matrix](COVERAGE_MATRIX.md): upstream concept coverage mapped to
+  DSEx surfaces, tests, docs, and production decisions.
+- [Release Criteria](RELEASE_CRITERIA.md): release gates and external
+  references used to define readiness.
+
+## First Things To Try
+
+1. Read the first half of [Philosophy](DSEX_PHILOSOPHY.md).
+2. Run the first example in [API Guide](API_GUIDE.md).
+3. Open [Livebook 01](../livebooks/01_programming_not_prompting.livemd).
+4. Add one metric and one tiny dev set.
+5. Run `mix production.check` before trusting a change.
