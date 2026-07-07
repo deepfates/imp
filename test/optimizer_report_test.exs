@@ -111,6 +111,54 @@ defmodule OptimizerReportTest do
     assert Enum.any?(report.candidates, &(&1.instruction == "Always answer Paris."))
   end
 
+  test "instruction search keeps the baseline when candidates regress" do
+    {_train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    program =
+      "question -> answer"
+      |> DSEx.predict(lm: lm())
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Always answer Paris.")
+
+    compiled =
+      DSEx.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
+        "Answer unknown."
+      ])
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.best_score == 1.0
+    assert report.metadata.baseline_score == 1.0
+    assert Enum.any?(report.candidates, &(&1.baseline and &1.score == 1.0))
+
+    assert DSEx.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             "Always answer Paris."
+  end
+
+  test "instruction search reports all failed evaluations without crashing" do
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      DSEx.Optimizer.InstructionSearch.compile(program, metric, [], :not_an_enumerable_devset, [
+        "Always answer Paris."
+      ])
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :instruction_search
+    assert report.best_score == nil
+    assert report.candidates == []
+    assert report.metadata.status == :all_candidates_failed
+
+    assert Enum.map(report.errors, & &1.instruction) == [
+             "Always answer Paris.",
+             "Given the fields `question`, produce the fields `answer`."
+           ]
+
+    assert Enum.all?(report.errors, &String.contains?(&1.error, "Enumerable"))
+  end
+
   test "instruction proposer accepts LM-generated scored candidates" do
     lm = %{
       module: DSEx.LM.Static,

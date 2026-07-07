@@ -1,42 +1,57 @@
 defmodule DSEx.Optimizer.InstructionSearch do
-  @moduledoc false
+  @moduledoc """
+  Search over candidate signature instructions and keep the best program.
+
+  `InstructionSearch` is the small, explicit optimizer underneath
+  instruction-only workflows such as `DSEx.Optimizer.SignatureOptimizer` and
+  coordinate prompt optimization. It evaluates each proposed instruction on the
+  dev set, evaluates the original program as a baseline, and attaches an
+  optimizer report to the selected program.
+
+  Failed candidates are recorded in the report instead of aborting the whole
+  compile. If every evaluation fails, `compile/6` returns the original program
+  with a diagnostic report.
+  """
 
   def compile(program, metric, trainset, devset, candidates, opts \\ []) do
     demos = Keyword.get(opts, :demos, [])
     evaluator = DSEx.Evaluate.new(devset, metric)
+    candidate_instructions = unique_candidates(candidates)
 
-    results =
-      candidates
-      |> Enum.uniq()
+    candidate_results =
+      candidate_instructions
       |> Enum.map(fn instruction ->
         candidate =
           program
           |> put_instruction(instruction)
           |> maybe_put_demos(demos)
 
-        {DSEx.Evaluate.run(evaluator, candidate).score, candidate, instruction}
+        evaluate_candidate(evaluator, candidate, instruction, %{baseline: false})
       end)
-      |> Kernel.++([
-        {DSEx.Evaluate.run(evaluator, program).score, program, current_instruction(program)}
-      ])
 
-    {best_score, best, _instruction} =
-      Enum.max_by(results, fn {score, _candidate, _instruction} -> score end)
+    baseline_result =
+      evaluate_candidate(evaluator, program, current_instruction(program), %{baseline: true})
+
+    {best_score, best, report_candidates, errors, report_metadata} =
+      summarize(candidate_results ++ [baseline_result], program)
 
     best
     |> attach_optimizer_metadata(%{
-      trainset_size: length(trainset),
-      candidate_count: length(candidates)
+      trainset_size: safe_count(trainset),
+      candidate_count: length(candidate_instructions)
     })
     |> DSEx.Optimizer.Report.attach(
       DSEx.Optimizer.Report.new(%{
         optimizer: :instruction_search,
         best_score: best_score,
-        candidate_count: length(results),
-        candidates:
-          Enum.map(results, fn {score, _candidate, instruction} ->
-            %{score: score, instruction: instruction}
-          end)
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
+        errors: errors,
+        metadata:
+          Map.merge(report_metadata, %{
+            requested_candidates: length(candidate_instructions),
+            trainset_size: safe_count(trainset)
+          })
       })
     )
   end
@@ -63,6 +78,58 @@ defmodule DSEx.Optimizer.InstructionSearch do
     DSEx.Optimizer.InstructionProposer.propose(program, trainset, opts)
   end
 
+  defp evaluate_candidate(evaluator, candidate, instruction, metadata) do
+    result = DSEx.Evaluate.run(evaluator, candidate)
+    {:ok, result.score, candidate, instruction, metadata}
+  rescue
+    error -> {:error, error, instruction, metadata}
+  catch
+    kind, reason -> {:error, {kind, reason}, instruction, metadata}
+  end
+
+  defp summarize(results, fallback) do
+    successes =
+      Enum.flat_map(results, fn
+        {:ok, score, candidate, instruction, metadata} ->
+          [{score, candidate, instruction, metadata}]
+
+        _ ->
+          []
+      end)
+
+    errors =
+      Enum.flat_map(results, fn
+        {:error, error, instruction, metadata} ->
+          [%{error: error_message(error), instruction: instruction, metadata: metadata}]
+
+        _ ->
+          []
+      end)
+
+    report_candidates =
+      Enum.map(successes, fn {score, _candidate, instruction, metadata} ->
+        metadata
+        |> Map.take([:baseline])
+        |> Map.merge(%{score: score, instruction: instruction})
+      end)
+
+    case successes do
+      [] ->
+        {nil, fallback, [], errors, %{status: :all_candidates_failed}}
+
+      _ ->
+        {best_score, best, _instruction, _metadata} =
+          Enum.max_by(successes, fn {score, _candidate, _instruction, _metadata} -> score end)
+
+        {best_score, best, report_candidates, errors,
+         %{
+           status: :ok,
+           baseline_score: baseline_score(report_candidates),
+           successful_candidates: length(report_candidates)
+         }}
+    end
+  end
+
   defp maybe_put_demos(program, []), do: program
 
   defp maybe_put_demos(%DSEx.Predict.Predict{} = program, demos),
@@ -85,4 +152,20 @@ defmodule DSEx.Optimizer.InstructionSearch do
   end
 
   defp attach_optimizer_metadata(program, _metadata), do: program
+
+  defp unique_candidates(candidates), do: Enum.uniq(candidates)
+
+  defp safe_count(enumerable), do: Enum.count(enumerable)
+
+  defp baseline_score(candidates) do
+    candidates
+    |> Enum.find(& &1.baseline)
+    |> case do
+      nil -> nil
+      candidate -> candidate.score
+    end
+  end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
