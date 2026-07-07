@@ -109,6 +109,12 @@ defmodule MCPImportTest do
     end
   end
 
+  defmodule MalformedCatalog do
+    defstruct [:result]
+
+    def list_tools(%__MODULE__{result: result}), do: result
+  end
+
   test "imports MCP-style catalog tools and runs them through an agent" do
     catalog =
       MCP.Catalog.new([
@@ -195,6 +201,41 @@ defmodule MCPImportTest do
 
     assert_raise ArgumentError, ~r/MCP tool schema missing run/, fn ->
       MCP.import_tools([Map.delete(duplicate, :run)])
+    end
+  end
+
+  test "MCP import rejects malformed catalog and tool schema shapes clearly" do
+    assert_raise ArgumentError, ~r/MCP catalog list_tools\/1 must return a list/, fn ->
+      MCP.import_tools(%MalformedCatalog{result: %{tools: []}})
+    end
+
+    assert_raise ArgumentError, ~r/MCP tool schema must be a map/, fn ->
+      MCP.import_tools(["not-a-tool-schema"])
+    end
+  end
+
+  test "MCP import validates schema field types before wrapping tools" do
+    base = %{
+      name: :lookup,
+      description: "lookup",
+      input_schema: %{},
+      run: fn input -> input end
+    }
+
+    assert_raise ArgumentError, ~r/MCP tool name must be an atom or string/, fn ->
+      MCP.import_tools([%{base | name: 123}])
+    end
+
+    assert_raise ArgumentError, ~r/MCP tool :lookup description must be a string/, fn ->
+      MCP.import_tools([%{base | description: nil}])
+    end
+
+    assert_raise ArgumentError, ~r/MCP tool :lookup input_schema must be a map/, fn ->
+      MCP.import_tools([%{base | input_schema: []}])
+    end
+
+    assert_raise ArgumentError, ~r/MCP tool :lookup run must be a one-argument function/, fn ->
+      MCP.import_tools([%{base | run: fn _, _ -> :ok end}])
     end
   end
 

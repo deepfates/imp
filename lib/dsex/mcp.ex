@@ -397,6 +397,8 @@ defmodule DSEx.MCP do
   def import_tools(catalog) do
     catalog
     |> list_tools()
+    |> validate_tool_list!()
+    |> validate_tool_schemas!()
     |> validate_unique_names!()
     |> Enum.map(&tool_from_schema/1)
   end
@@ -410,11 +412,27 @@ defmodule DSEx.MCP do
 
   defp list_tools(tools) when is_list(tools), do: tools
 
+  defp validate_tool_list!(tools) when is_list(tools), do: tools
+
+  defp validate_tool_list!(other) do
+    raise ArgumentError, "MCP catalog list_tools/1 must return a list, got: #{inspect(other)}"
+  end
+
+  defp validate_tool_schemas!(tools) do
+    Enum.map(tools, fn
+      schema when is_map(schema) ->
+        schema
+
+      other ->
+        raise ArgumentError, "MCP tool schema must be a map, got: #{inspect(other)}"
+    end)
+  end
+
   defp tool_from_schema(schema) when is_map(schema) do
-    name = fetch_required!(schema, :name)
-    description = fetch_required!(schema, :description)
-    input_schema = fetch_required!(schema, :input_schema)
-    run = fetch_required!(schema, :run)
+    name = validate_tool_name!(fetch_required!(schema, :name))
+    description = validate_description!(fetch_required!(schema, :description), name)
+    input_schema = validate_input_schema!(fetch_required!(schema, :input_schema), name)
+    run = validate_run!(fetch_required!(schema, :run), name)
 
     DSEx.Tool.new(
       name,
@@ -439,6 +457,33 @@ defmodule DSEx.MCP do
       duplicate_names ->
         raise ArgumentError, "duplicate MCP tool names: #{inspect(duplicate_names)}"
     end
+  end
+
+  defp validate_tool_name!(name) when is_atom(name) or is_binary(name), do: name
+
+  defp validate_tool_name!(name) do
+    raise ArgumentError, "MCP tool name must be an atom or string, got: #{inspect(name)}"
+  end
+
+  defp validate_description!(description, _name) when is_binary(description), do: description
+
+  defp validate_description!(description, name) do
+    raise ArgumentError,
+          "MCP tool #{inspect(name)} description must be a string, got: #{inspect(description)}"
+  end
+
+  defp validate_input_schema!(schema, _name) when is_map(schema), do: schema
+
+  defp validate_input_schema!(schema, name) do
+    raise ArgumentError,
+          "MCP tool #{inspect(name)} input_schema must be a map, got: #{inspect(schema)}"
+  end
+
+  defp validate_run!(run, _name) when is_function(run, 1), do: run
+
+  defp validate_run!(run, name) do
+    raise ArgumentError,
+          "MCP tool #{inspect(name)} run must be a one-argument function, got: #{inspect(run)}"
   end
 
   defp validate_tool_input(input, schema) do
