@@ -107,6 +107,8 @@ defmodule DSEx.MixProject do
   defp product_docs do
     [
       "docs/README.md",
+      "docs/LEARNING_PATH.md",
+      "docs/GLOSSARY.md",
       "docs/DSEX_PHILOSOPHY.md",
       "docs/PRIOR_ART.md",
       "docs/ARCHITECTURE.md",

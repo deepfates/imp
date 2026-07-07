@@ -5,21 +5,78 @@ defmodule DSEx do
   DSEx programs are ordinary Elixir structs with explicit signatures,
   injectable model clients, measurable behavior, and optimizer-driven
   improvement loops.
+
+  Most application code should start here. The deeper `DSEx.*` modules are
+  available when you need direct control, but the facade gives the normal flow:
+  configure an LM, declare a signature, build a program, call it, evaluate it,
+  and improve it.
+
+  ## A tiny deterministic program
+
+      lm = %{
+        module: DSEx.LM.Static,
+        opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+      }
+
+      DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+
+      program =
+        "question -> answer: short_span"
+        |> DSEx.signature("Answer with the shortest correct span.")
+        |> DSEx.predict()
+
+      {:ok, prediction} =
+        DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+
+      DSEx.get(prediction, :answer)
+
+  ## Production provider boundary
+
+  Swap the LM dependency without changing the task:
+
+      lm =
+        DSEx.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
+          api_key: System.fetch_env!("OPENAI_API_KEY"),
+          temperature: 0
+        )
+
+      DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+
+  DSEx owns the programming layer: signatures, adapters, examples, metrics,
+  optimizers, traces, persistence, and telemetry. Provider transport and model
+  details belong to ReqLLM.
   """
 
   alias DSEx.{Example, Prediction, Settings, Signature, Tool}
   alias DSEx.Predict.{ChainOfThought, Predict, ReAct}
 
-  @doc "Configures process/global settings such as `:lm` and `:adapter`."
+  @doc """
+  Configures global settings such as `:lm` and `:adapter`.
+
+  Prefer passing explicit dependencies to individual programs when a program
+  must be self-contained. Use `configure/1` for application defaults and
+  `context/2` for request-scoped overrides.
+  """
   defdelegate configure(opts), to: Settings
 
   @doc "Returns the effective settings for the current process."
   defdelegate settings(), to: Settings, as: :get
 
-  @doc "Runs `fun` with temporary process-local settings."
+  @doc """
+  Runs `fun` with temporary process-local settings.
+
+  This is the preferred way to override the LM or adapter for one request,
+  test, task, or Livebook cell without mutating global defaults.
+  """
   defdelegate context(opts, fun), to: Settings
 
-  @doc "Builds a declarative input/output contract."
+  @doc """
+  Builds a declarative input/output contract.
+
+      DSEx.signature("question -> answer: short_span")
+
+  Signatures may also be maps when you need explicit constraints.
+  """
   defdelegate signature(spec, instructions \\ nil), to: Signature, as: :new
 
   @doc "Builds a train/dev/test example row."
@@ -55,7 +112,13 @@ defmodule DSEx do
   @doc "Returns the majority value across predictions."
   defdelegate majority(predictions, opts \\ []), to: DSEx.Predict.Aggregation
 
-  @doc "Creates a basic signature-to-prediction program."
+  @doc """
+  Creates a basic signature-to-prediction program.
+
+  `Predict` is the first program shape to reach for: one call maps named inputs
+  to named outputs. Add demos, metrics, and optimizers before reaching for
+  agents or recursive controllers.
+  """
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
 
   @doc "Attaches demonstrations to a prediction program or example."

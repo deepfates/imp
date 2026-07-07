@@ -1,5 +1,25 @@
 defmodule DSEx.Optimizer.RandomSearch do
-  @moduledoc "Try random demo subsets and keep the program with the best dev score."
+  @moduledoc """
+  Try random demo subsets and keep the program with the best dev score.
+
+  `RandomSearch` is a useful first optimizer because it is easy to reason
+  about: sample candidate demo sets from the train set, evaluate each candidate
+  on the dev set, and attach a report to the best program.
+
+  ## Example
+
+      metric = DSEx.Metrics.exact_match(:answer)
+
+      compiled =
+        metric
+        |> DSEx.Optimizer.RandomSearch.new(candidates: 8, demos_per_candidate: 2)
+        |> DSEx.Optimizer.RandomSearch.compile(program, trainset, devset)
+
+      DSEx.Optimizer.Report.fetch(compiled)
+
+  Keep candidate counts small while developing. Raise them only after your
+  metric and dev set are trustworthy.
+  """
 
   defstruct [:metric, candidates: 8, demos_per_candidate: 4]
 

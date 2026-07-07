@@ -9,12 +9,20 @@ Mix.install([{:dsex, path: repo}])
 
 DSEx-style programming means declaring the task boundary first:
 
+The signature is the smallest useful unit in DSEx. It says what data enters the
+task and what data must come back. It does not say which provider to use, how
+many examples to show, or how the final prompt should look.
+
 ```elixir
 signature = DSEx.signature("question -> answer")
 DSEx.Signature.to_spec(signature)
 ```
 
 Then you attach an LM and call a program:
+
+This notebook uses a deterministic local LM so the behavior is stable. The LM
+is deliberately boring; the point is to see the DSEx program shape without
+network calls or provider variance.
 
 ```elixir
 lm = %{
@@ -38,6 +46,10 @@ DSEx.to_map(prediction)
 
 Predictions keep trace metadata:
 
+The generated messages are still available. DSEx is not asking you to trust a
+black box; it is giving the prompt an owner, a contract, and a place in normal
+Elixir data.
+
 ```elixir
 prediction.metadata.trace.messages
 ```
@@ -46,6 +58,9 @@ The point is not to hide prompts forever. The point is to make them a generated
 artifact of a typed program.
 
 ## Chain Of Thought
+
+Some tasks benefit from a separate reasoning field. In DSEx that is still a
+structured output, not an informal convention hidden in a prompt.
 
 ```elixir
 cot_lm = %{
@@ -59,6 +74,10 @@ DSEx.to_map(pred)
 ```
 
 ## Schema-Constrained Output
+
+When another part of your application consumes the result, prefer constraints
+over hoping the model follows prose. The JSON adapter validates the parsed
+fields and returns feedback when output does not fit the signature.
 
 ```elixir
 signature =
@@ -88,6 +107,9 @@ DSEx.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [
 
 ## Examples
 
+Examples are rows of data. Marking inputs tells DSEx which fields the model can
+see and which fields are labels for evaluation or optimization.
+
 ```elixir
 example =
   DSEx.example(question: "2+2?", answer: "4")
@@ -97,6 +119,10 @@ example =
 ```
 
 ## Save And Load
+
+Program state can be saved without serializing provider secrets. That makes it
+reasonable to treat compiled programs as artifacts while rebinding live
+credentials at runtime.
 
 ```elixir
 path = Path.join(System.tmp_dir!(), "dsex-livebook-program.json")

@@ -190,7 +190,9 @@ original signature.
 Start here:
 
 - [Documentation Guide](docs/README.md)
+- [Learning Path](docs/LEARNING_PATH.md)
 - [API Guide](docs/API_GUIDE.md)
+- [Glossary](docs/GLOSSARY.md)
 - [Philosophy](docs/DSEX_PHILOSOPHY.md)
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md)
 

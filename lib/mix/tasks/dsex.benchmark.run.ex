@@ -72,7 +72,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
     api_key =
       System.get_env("OPENAI_API_KEY") || Mix.raise("OPENAI_API_KEY is required for --live")
 
-    model = Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
+    model = live_model(opts)
     DSEx.req_llm("openai:#{model}", api_key: api_key)
   end
 
@@ -81,7 +81,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
   defp model_metadata(:live, opts) do
     %{
       provider: "req_llm",
-      model: Keyword.get(opts, :model, System.get_env("OPENAI_MODEL") || "gpt-4o-mini")
+      model: live_model(opts)
     }
+  end
+
+  defp live_model(opts) do
+    Keyword.get(opts, :model) ||
+      System.get_env("OPENAI_MODEL") ||
+      Mix.raise("OPENAI_MODEL or --model is required for --live")
   end
 end

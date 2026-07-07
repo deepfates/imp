@@ -3,6 +3,27 @@ defmodule DSEx.Adapter.JSON do
   JSON-oriented adapter.
 
   This adapter accepts map outputs directly and parses provider JSON with Jason.
+
+  Use this adapter when a field is required, typed, constrained, or consumed by
+  application code that should not guess its way through prose.
+
+  ## Example
+
+      signature =
+        DSEx.signature(
+          "text -> sentiment: enum[positive,negative], confidence: number",
+          "Classify the text."
+        )
+
+      program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
+
+  By default the adapter requests provider JSON object mode when the LM client
+  supports response-format options. Pass `config: [native_json_schema: true]`
+  to request native JSON Schema mode through providers that support it.
+
+  Parse failures return structured retry feedback through
+  `DSEx.AdapterParseError`, so callers and retry loops can tell the model what
+  violated the schema.
   """
 
   @behaviour DSEx.Adapter

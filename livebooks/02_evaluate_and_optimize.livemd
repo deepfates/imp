@@ -7,6 +7,10 @@ Mix.install([{:dsex, path: repo}])
 
 ## Build Train And Dev Sets
 
+Optimizers need two kinds of examples. The train set is material they can use
+to build candidates. The dev set is the held-out scorecard used to choose
+between those candidates.
+
 ```elixir
 trainset = [
   DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question),
@@ -20,11 +24,17 @@ devset = [
 
 ## Define A Metric
 
+The metric is the telos of an optimization run. DSEx can search demos,
+instructions, or artifacts, but it can only improve what the metric can see.
+
 ```elixir
 metric = DSEx.Metrics.exact_match(:answer)
 ```
 
 ## Evaluate A Baseline
+
+Start with a baseline before optimizing. A baseline tells you whether the
+metric, dev set, adapter, and LM are wired together before search adds motion.
 
 ```elixir
 lm = %{
@@ -46,6 +56,9 @@ DSEx.Evaluate.run(evaluator, program)
 
 ## Labeled Few-Shot
 
+The simplest improvement is to attach known-good examples as demos. This is not
+magic training; it is ordinary data being rendered by the adapter.
+
 ```elixir
 compiled =
   DSEx.Optimizer.LabeledFewShot.new(k: 1)
@@ -55,6 +68,10 @@ DSEx.Evaluate.run(evaluator, compiled)
 ```
 
 ## Random Search
+
+Random search tries several demo subsets and keeps the candidate that scores
+best. Its value is not sophistication; its value is that it creates an
+inspectable optimization report.
 
 ```elixir
 compiled =
@@ -72,6 +89,8 @@ compiled =
 
 Instruction search changes the program instructions and keeps the candidate
 that scores best against the dev set.
+
+Use this when the examples are fine but the task wording is the bottleneck.
 
 ```elixir
 compiled =
@@ -91,6 +110,9 @@ DSEx.Optimizer.Report.fetch(compiled)
 Use artifact optimization when the thing you want to improve is not a DSEx
 program yet: a config file, policy text, rubric, template, or other named
 artifact.
+
+This is the broader DSEx philosophy in miniature: define an artifact, define
+how to score it, then let the system propose and evaluate changes.
 
 ```elixir
 artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
@@ -122,6 +144,9 @@ report.best
 GEPA-style optimization keeps per-example diagnostics, reflects on misses, and
 uses Pareto pressure so an improvement for one case does not erase performance
 on another.
+
+The key idea is not "make a bigger prompt." The key idea is to preserve useful
+diagnostics from failures and use them as material for the next candidate.
 
 ```elixir
 reflection_lm = %{

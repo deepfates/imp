@@ -1,11 +1,40 @@
 defmodule DSEx.Evaluate.Result do
-  @moduledoc "Evaluation result with aggregate score and per-example rows."
+  @moduledoc """
+  Evaluation result with aggregate score, per-example rows, and call errors.
+
+  Rows keep the original example, prediction, normalized metric score,
+  pass/fail state, feedback, metric metadata, and any program error. Optimizers
+  use the same structure that you can inspect in tests and notebooks.
+  """
 
   defstruct [:score, rows: [], errors: []]
 end
 
 defmodule DSEx.Evaluate do
-  @moduledoc "Evaluate a program against examples and a metric."
+  @moduledoc """
+  Evaluate a program against examples and a metric.
+
+  Evaluation is the hinge between "the model answered" and "the program got
+  better." A metric turns each `(example, prediction)` pair into a score;
+  optimizers use those scores to compare candidate programs.
+
+  ## Example
+
+      devset = [
+        DSEx.example(question: "Capital of France?", answer: "Paris")
+        |> DSEx.with_inputs(:question)
+      ]
+
+      metric = DSEx.Metrics.exact_match(:answer)
+
+      evaluator = DSEx.Evaluate.new(devset, metric)
+      report = DSEx.Evaluate.run(evaluator, program)
+
+      report.score
+
+  Metrics may return booleans, numbers, maps with `:score` and `:feedback`, or
+  `%DSEx.Metrics.Result{}`. Arity-3 metrics also receive the prediction trace.
+  """
 
   defstruct [:devset, :metric, display_progress: false, failure_score: 0.0, max_errors: :infinity]
 

@@ -1,0 +1,76 @@
+# Glossary
+
+DSEx uses a small vocabulary. These words are meant to describe ordinary
+Elixir values, not magic.
+
+## Adapter
+
+An adapter turns a signature, inputs, and demos into model messages, then turns
+raw model output back into a `DSEx.Prediction`.
+
+Use `DSEx.Adapter.Chat` for readable field-labelled text. Use
+`DSEx.Adapter.JSON` when output shape matters.
+
+## Demo
+
+A demo is an example attached to a program so the model can see the desired
+input/output pattern. Demos are data, not hidden prompt strings.
+
+## Dev Set
+
+A dev set is the set of examples used to choose between candidate programs.
+Optimizers score candidates on the dev set.
+
+## Example
+
+An example is a row of named data. `DSEx.with_inputs/2` marks which fields are
+inputs; the remaining fields are labels.
+
+## LM
+
+An LM is the runtime model dependency. In tests this is often
+`DSEx.LM.Static`. In production it is usually `DSEx.req_llm/2`.
+
+## Metric
+
+A metric scores a prediction against an example. Metrics can return booleans,
+numbers, maps with feedback, or `DSEx.Metrics.Result`.
+
+## Optimizer
+
+An optimizer compiles a better program from examples, metrics, and candidate
+changes. Optimizers may choose demos, rewrite instructions, search program
+variants, or optimize text artifacts.
+
+## Prediction
+
+A prediction is the structured output of a program. It contains fields,
+optional completions, score metadata, and traces.
+
+## Program
+
+A program is a callable DSEx struct such as `Predict`, `ChainOfThought`,
+`ReAct`, or `ProgramOfThought`. Programs hold the signature, adapter, LM,
+demos, configuration, and metadata needed to run.
+
+## Signature
+
+A signature is the task contract: named inputs, named outputs, field types,
+constraints, and instructions.
+
+Example:
+
+```elixir
+DSEx.signature("question -> answer: short_span")
+```
+
+## Trace
+
+A trace records what happened around a call: generated messages, raw model
+output, retries, tool calls, and related metadata. Traces are for debugging and
+evaluation, and DSEx redacts common secret-shaped values.
+
+## Train Set
+
+A train set is the set of examples an optimizer can use to build candidates,
+for example by selecting demos.

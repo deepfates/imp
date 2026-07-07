@@ -5,8 +5,11 @@ Elixir programs. This manual is organized by what you are trying to do.
 
 ## Learn The Model
 
+- [Learning Path](LEARNING_PATH.md): what to read and run in 30 minutes,
+  two hours, an afternoon, and a production app.
 - [Philosophy](DSEX_PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
+- [Glossary](GLOSSARY.md): short definitions for DSEx vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
 - [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
@@ -37,7 +40,7 @@ credentials.
 
 ## First Things To Try
 
-1. Read the first half of [Philosophy](DSEX_PHILOSOPHY.md).
+1. Follow the [30-minute path](LEARNING_PATH.md).
 2. Run the first example in [API Guide](API_GUIDE.md).
 3. Open [Livebook 01](../livebooks/01_programming_not_prompting.livemd).
 4. Add one metric and one tiny dev set.
