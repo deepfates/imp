@@ -100,6 +100,14 @@ defmodule OTPStateSemanticsTest do
     assert Enum.map(1..50, &DSEx.Cache.get({:concurrent, &1})) == Enum.to_list(1..50)
   end
 
+  test "cache reports invalid fetch callbacks clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Cache\.fetch_or_store\/2 expects a zero-arity function/,
+                 fn ->
+                   DSEx.Cache.fetch_or_store(:bad_callback, fn value -> value end)
+                 end
+  end
+
   defp parent_lm_from_child do
     Task.async(fn -> DSEx.settings().lm end)
     |> Task.await()
