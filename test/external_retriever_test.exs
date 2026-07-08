@@ -159,13 +159,13 @@ defmodule ExternalRetrieverTest do
     Process.delete(:previous_databricks_token)
   end
 
-  test "HTTP retriever families clamp non-positive per-call k in wire payloads" do
+  test "HTTP retriever families accept zero k and reject invalid per-call k" do
     generic =
       DSEx.Retrievers.HTTP.new("https://retriever.example/search",
         transport: DatabricksTransport
       )
 
-    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(generic, "capital France", k: -1)
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(generic, "capital France", k: 0)
 
     assert_received {:databricks_request, "https://retriever.example/search", _headers,
                      generic_body}
@@ -177,7 +177,7 @@ defmodule ExternalRetrieverTest do
         transport: WeaviateTransport
       )
 
-    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(weaviate, "capital France", k: -3)
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(weaviate, "capital France", k: 0)
     assert_received {:weaviate_request, "https://weaviate.example/v1/graphql", _headers, body}
     assert body["query"] =~ "limit: 0"
 
@@ -187,13 +187,28 @@ defmodule ExternalRetrieverTest do
         transport: DatabricksTransport
       )
 
-    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(databricks, "capital France", k: :bad)
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(databricks, "capital France", k: 0)
 
     assert_received {:databricks_request,
                      "https://dbc.example/api/2.0/vector-search/indexes/i/query", _headers,
                      databricks_body}
 
     assert databricks_body["num_results"] == 0
+
+    assert {:error, {:invalid_retriever_request, generic_message}} =
+             DSEx.Retrieve.retrieve(generic, "capital France", k: -1)
+
+    assert generic_message =~ "retriever :k must be a non-negative integer"
+
+    assert {:error, {:invalid_retriever_request, weaviate_message}} =
+             DSEx.Retrieve.retrieve(weaviate, "capital France", k: -3)
+
+    assert weaviate_message =~ "retriever :k must be a non-negative integer"
+
+    assert {:error, {:invalid_retriever_request, databricks_message}} =
+             DSEx.Retrieve.retrieve(databricks, "capital France", k: :bad)
+
+    assert databricks_message =~ "retriever :k must be a non-negative integer"
   end
 
   test "generic HTTP retriever rejects unsupported methods explicitly" do

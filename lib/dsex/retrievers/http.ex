@@ -4,11 +4,15 @@ defmodule DSEx.Retrievers.Limit do
   def retrieve_limit(opts, default) do
     opts
     |> Keyword.get(:k, default)
-    |> non_negative_integer()
+    |> validate_limit!()
   end
 
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
+  defp validate_limit!(value) when is_integer(value) and value >= 0, do: value
+
+  defp validate_limit!(value) do
+    raise ArgumentError,
+          "retriever :k must be a non-negative integer; got: #{inspect(value)}"
+  end
 end
 
 defmodule DSEx.Retrievers.HTTP do
