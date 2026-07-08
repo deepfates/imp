@@ -196,6 +196,59 @@ defmodule DSEx.Metrics do
   end
 
   @doc """
+  Returns a structured single-row classification result.
+
+  The comparison uses `normalize_text/1` so label capitalization and light
+  punctuation differences do not matter. Aggregate classification metrics can
+  be computed with `classification_report/2`.
+  """
+  def classification(prediction, label, opts \\ []) do
+    metric_name = Keyword.get(opts, :metric_name, "classification_accuracy")
+    predicted = normalize_text(prediction)
+    gold = normalize_text(label)
+    correct? = predicted == gold and gold != ""
+
+    %Result{
+      score: if(correct?, do: 1.0, else: 0.0),
+      passed?: correct?,
+      metadata: %{
+        "task_metric" => metric_name,
+        "predicted_label" => predicted,
+        "gold_label" => gold,
+        "correct" => correct?
+      }
+    }
+  end
+
+  @doc """
+  Computes accuracy and macro/micro/weighted F1 for classification rows.
+
+  Rows can be `{gold, predicted}` tuples or maps with `:gold`/`:predicted`
+  (or string-keyed equivalents).
+  """
+  def classification_report(rows, opts \\ []) do
+    pairs = Enum.map(rows, &classification_pair/1)
+
+    labels =
+      pairs |> Enum.flat_map(fn {gold, pred} -> [gold, pred] end) |> Enum.uniq() |> Enum.sort()
+
+    total = length(pairs)
+    correct = Enum.count(pairs, fn {gold, pred} -> gold == pred and gold != "" end)
+    by_label = Map.new(labels, &{&1, label_stats(&1, pairs)})
+    supports = Map.new(by_label, fn {label, stats} -> {label, stats["support"]} end)
+
+    %{
+      "task_metric" => Keyword.get(opts, :metric_name, "classification_report"),
+      "examples" => total,
+      "accuracy" => if(total == 0, do: 0.0, else: correct / total),
+      "macro_f1" => mean_metric(by_label, "f1"),
+      "micro_f1" => micro_f1(by_label),
+      "weighted_f1" => weighted_metric(by_label, supports, "f1"),
+      "labels" => by_label
+    }
+  end
+
+  @doc """
   Classifies a normalized answer as `"yes_no"`, `"numeric"`, `"short_span"`, or `"long_span"`.
   """
   def answer_type(answer) do
@@ -224,6 +277,87 @@ defmodule DSEx.Metrics do
       true -> "different_or_ambiguous"
     end
   end
+
+  defp classification_pair({gold, predicted}),
+    do: {normalize_text(gold), normalize_text(predicted)}
+
+  defp classification_pair(%{} = row) do
+    gold = Map.get(row, :gold, Map.get(row, "gold", Map.get(row, :label, Map.get(row, "label"))))
+
+    predicted =
+      Map.get(
+        row,
+        :predicted,
+        Map.get(row, "predicted", Map.get(row, :prediction, Map.get(row, "prediction")))
+      )
+
+    {normalize_text(gold), normalize_text(predicted)}
+  end
+
+  defp label_stats(label, pairs) do
+    true_positive = Enum.count(pairs, fn {gold, pred} -> gold == label and pred == label end)
+    false_positive = Enum.count(pairs, fn {gold, pred} -> gold != label and pred == label end)
+    false_negative = Enum.count(pairs, fn {gold, pred} -> gold == label and pred != label end)
+    support = Enum.count(pairs, fn {gold, _pred} -> gold == label end)
+    precision = ratio(true_positive, true_positive + false_positive)
+    recall = ratio(true_positive, true_positive + false_negative)
+
+    %{
+      "precision" => precision,
+      "recall" => recall,
+      "f1" => f1_from_precision_recall(precision, recall),
+      "support" => support
+    }
+  end
+
+  defp mean_metric(by_label, _metric) when map_size(by_label) == 0, do: 0.0
+
+  defp mean_metric(by_label, metric) do
+    by_label
+    |> Map.values()
+    |> Enum.map(&Map.fetch!(&1, metric))
+    |> Enum.sum()
+    |> Kernel./(map_size(by_label))
+  end
+
+  defp weighted_metric(_by_label, supports, _metric) when map_size(supports) == 0, do: 0.0
+
+  defp weighted_metric(by_label, supports, metric) do
+    total = supports |> Map.values() |> Enum.sum()
+
+    if total == 0 do
+      0.0
+    else
+      Enum.reduce(by_label, 0.0, fn {label, stats}, acc ->
+        acc + Map.fetch!(stats, metric) * Map.fetch!(supports, label) / total
+      end)
+    end
+  end
+
+  defp micro_f1(by_label) do
+    true_positive =
+      by_label |> Map.values() |> Enum.map(&(&1["support"] * &1["recall"])) |> Enum.sum()
+
+    predicted_positive = by_label |> Map.values() |> Enum.map(&predicted_positive/1) |> Enum.sum()
+    actual_positive = by_label |> Map.values() |> Enum.map(& &1["support"]) |> Enum.sum()
+    precision = ratio(true_positive, predicted_positive)
+    recall = ratio(true_positive, actual_positive)
+    f1_from_precision_recall(precision, recall)
+  end
+
+  defp predicted_positive(%{"precision" => precision}) when precision == 0.0, do: 0.0
+
+  defp predicted_positive(%{"precision" => precision, "recall" => recall, "support" => support}),
+    do: support * recall / precision
+
+  defp ratio(_numerator, 0), do: 0.0
+  defp ratio(numerator, denominator), do: numerator / denominator
+
+  defp f1_from_precision_recall(precision, _recall) when precision == 0.0, do: 0.0
+  defp f1_from_precision_recall(_precision, recall) when recall == 0.0, do: 0.0
+
+  defp f1_from_precision_recall(precision, recall),
+    do: 2 * precision * recall / (precision + recall)
 
   @doc """
   Builds an evaluator metric that compares one prediction field to an example field.

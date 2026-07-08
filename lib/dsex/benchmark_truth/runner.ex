@@ -94,6 +94,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "score" => result.score,
       "duration_ms" => us_to_ms(duration_us),
       "optimizer_comparisons" => optimizer_comparisons,
+      "aggregate_metrics" => aggregate_metrics(task, result.rows),
       "errors" => Enum.map(result.errors, &safe_json/1),
       "rows" => Enum.map(result.rows, &row_summary/1)
     }
@@ -101,6 +102,10 @@ defmodule DSEx.BenchmarkTruth.Runner do
 
   defp load_examples(:gsm8k, path), do: DSEx.Datasets.GSM8K.load(path)
   defp load_examples(:hotpotqa, path), do: DSEx.Datasets.HotPotQA.load(path)
+  defp load_examples(:colors, path), do: DSEx.Datasets.jsonl(path, [:input])
+
+  defp load_examples(task, path) when task in [:iris, :iris_typo, :heart_disease],
+    do: DSEx.Datasets.jsonl(path, [:features])
 
   defp program(:gsm8k, lm) do
     "question -> answer: string \"final numeric answer\""
@@ -113,6 +118,18 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp program(:hotpotqa, lm) do
     "question, context -> answer: string \"short exact answer\""
     |> DSEx.signature(DSEx.BenchmarkTruth.Contract.hotpotqa_instruction())
+    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+  end
+
+  defp program(:colors, lm) do
+    "input -> label: string \"class label\""
+    |> DSEx.signature("Classify the color into the correct label.")
+    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+  end
+
+  defp program(task, lm) when task in [:iris, :iris_typo, :heart_disease] do
+    "features -> label: string \"class label\""
+    |> DSEx.signature("Classify the tabular feature row into the correct label.")
     |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
@@ -140,6 +157,28 @@ defmodule DSEx.BenchmarkTruth.Runner do
       %{result | metadata: metadata}
     end
   end
+
+  defp metric(task) when task in [:colors, :iris, :iris_typo, :heart_disease] do
+    fn example, prediction ->
+      predicted = DSEx.Prediction.get(prediction, :label)
+      gold = DSEx.Example.get(example, :label)
+      DSEx.Metrics.classification(predicted, gold, metric_name: "#{task}_label_accuracy")
+    end
+  end
+
+  defp aggregate_metrics(task, rows) when task in [:colors, :iris, :iris_typo, :heart_disease] do
+    pairs =
+      Enum.map(rows, fn row ->
+        %{
+          gold: DSEx.Example.get(row.example, :label),
+          predicted: row.prediction && DSEx.Prediction.get(row.prediction, :label)
+        }
+      end)
+
+    DSEx.Metrics.classification_report(pairs, metric_name: "#{task}_classification_report")
+  end
+
+  defp aggregate_metrics(_task, _rows), do: %{}
 
   defp evaluate(program, examples, metric, max_concurrency) when max_concurrency <= 1 do
     {rows, errors} =
@@ -415,7 +454,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp fixture_lm(task, examples) do
     lookup =
       Map.new(examples, fn example ->
-        {DSEx.Example.get(example, :question), fixture_fields(task, example)}
+        {fixture_lookup_key(task, example), fixture_fields(task, example)}
       end)
 
     %{
@@ -423,12 +462,38 @@ defmodule DSEx.BenchmarkTruth.Runner do
       opts: [
         handler: fn messages, _opts ->
           text = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
-          question = Enum.find(Map.keys(lookup), &String.contains?(text, &1))
-          Map.get(lookup, question, %{answer: ""})
+
+          key =
+            lookup
+            |> Map.keys()
+            |> Enum.map(&{&1, fixture_key_last_position(text, &1)})
+            |> Enum.reject(fn {_key, position} -> is_nil(position) end)
+            |> Enum.max_by(fn {key, position} -> {position, String.length(key)} end, fn ->
+              {nil, nil}
+            end)
+            |> elem(0)
+
+          Map.get(lookup, key, fixture_empty_fields(task))
         end
       ]
     }
   end
+
+  defp fixture_key_last_position(text, key) do
+    ~r/(^|[^[:alnum:]_])#{Regex.escape(key)}([^[:alnum:]_]|$)/iu
+    |> Regex.scan(text, return: :index)
+    |> List.last()
+    |> case do
+      [{position, _length} | _captures] -> position
+      nil -> nil
+    end
+  end
+
+  defp fixture_lookup_key(task, example)
+       when task in [:colors, :iris, :iris_typo, :heart_disease],
+       do: to_string(DSEx.Example.get(example, :input, DSEx.Example.get(example, :features)))
+
+  defp fixture_lookup_key(_task, example), do: DSEx.Example.get(example, :question)
 
   defp fixture_fields(:gsm8k, example) do
     %{
@@ -438,6 +503,14 @@ defmodule DSEx.BenchmarkTruth.Runner do
   end
 
   defp fixture_fields(:hotpotqa, example), do: %{answer: DSEx.Example.get(example, :answer)}
+
+  defp fixture_fields(task, example) when task in [:colors, :iris, :iris_typo, :heart_disease],
+    do: %{label: DSEx.Example.get(example, :label)}
+
+  defp fixture_empty_fields(task) when task in [:colors, :iris, :iris_typo, :heart_disease],
+    do: %{label: ""}
+
+  defp fixture_empty_fields(_task), do: %{answer: ""}
 
   defp row_summary(row) do
     instrumentation =

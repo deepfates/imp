@@ -29,7 +29,108 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
     }
   }
 
-  def canonical_specs, do: @canonical_specs
+  @local_specs %{
+    "colors" => %{
+      task: "colors",
+      dataset: "dsex/local-colors",
+      config: "main",
+      split: "test",
+      input_keys: ["input"],
+      label_key: "label",
+      rows: [
+        %{"input" => "red", "label" => "warm"},
+        %{"input" => "orange", "label" => "warm"},
+        %{"input" => "yellow", "label" => "warm"},
+        %{"input" => "blue", "label" => "cool"},
+        %{"input" => "green", "label" => "cool"},
+        %{"input" => "violet", "label" => "cool"}
+      ]
+    },
+    "iris" => %{
+      task: "iris",
+      dataset: "dsex/local-iris",
+      config: "balanced",
+      split: "test",
+      input_keys: ["features"],
+      label_key: "label",
+      rows: [
+        %{
+          "features" => "sepal_length=5.1 sepal_width=3.5 petal_length=1.4 petal_width=0.2",
+          "label" => "setosa"
+        },
+        %{
+          "features" => "sepal_length=4.9 sepal_width=3.0 petal_length=1.4 petal_width=0.2",
+          "label" => "setosa"
+        },
+        %{
+          "features" => "sepal_length=7.0 sepal_width=3.2 petal_length=4.7 petal_width=1.4",
+          "label" => "versicolor"
+        },
+        %{
+          "features" => "sepal_length=6.4 sepal_width=3.2 petal_length=4.5 petal_width=1.5",
+          "label" => "versicolor"
+        },
+        %{
+          "features" => "sepal_length=6.3 sepal_width=3.3 petal_length=6.0 petal_width=2.5",
+          "label" => "virginica"
+        },
+        %{
+          "features" => "sepal_length=5.8 sepal_width=2.7 petal_length=5.1 petal_width=1.9",
+          "label" => "virginica"
+        }
+      ]
+    },
+    "iris_typo" => %{
+      task: "iris_typo",
+      dataset: "dsex/local-iris-typo",
+      config: "balanced",
+      split: "test",
+      input_keys: ["features"],
+      label_key: "label",
+      rows: [
+        %{
+          "features" => "sepal lengh 5.1; sepal widht 3.5; petal lengh 1.4; petal widht 0.2",
+          "label" => "setosa"
+        },
+        %{
+          "features" => "sepal lengh 7.0; sepal widht 3.2; petal lengh 4.7; petal widht 1.4",
+          "label" => "versicolor"
+        },
+        %{
+          "features" => "sepal lengh 6.3; sepal widht 3.3; petal lengh 6.0; petal widht 2.5",
+          "label" => "virginica"
+        }
+      ]
+    },
+    "heart_disease" => %{
+      task: "heart_disease",
+      dataset: "dsex/local-heart-disease",
+      config: "risk-smoke",
+      split: "test",
+      input_keys: ["features"],
+      label_key: "label",
+      rows: [
+        %{
+          "features" => "age=29 chest_pain=typical max_hr=202 st_depression=0.0",
+          "label" => "low_risk"
+        },
+        %{
+          "features" => "age=41 chest_pain=atypical max_hr=172 st_depression=0.0",
+          "label" => "low_risk"
+        },
+        %{
+          "features" => "age=63 chest_pain=asymptomatic max_hr=108 st_depression=1.5",
+          "label" => "high_risk"
+        },
+        %{
+          "features" => "age=67 chest_pain=asymptomatic max_hr=108 st_depression=1.5",
+          "label" => "high_risk"
+        }
+      ]
+    }
+  }
+
+  def canonical_specs, do: Map.merge(@canonical_specs, @local_specs)
 
   def fetch(specs, opts \\ []) do
     out_dir = Keyword.get(opts, :out_dir, "benchmarks/data")
@@ -94,9 +195,8 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
   defp fetch_one(spec, out_dir, offset, length, transport, page_delay_ms) do
     requested_length = requested_length(spec, length)
 
-    with {:ok, rows, source_urls} <-
-           fetch_pages(spec, offset, requested_length, transport, page_delay_ms, [], []) do
-      records = Enum.map(rows, fn %{"row" => row} -> spec.normalizer.(row) end)
+    with {:ok, records, source_urls} <-
+           fetch_records(spec, offset, requested_length, transport, page_delay_ms) do
       basename = "#{spec.task}-#{spec.split}-#{offset}-#{requested_length}"
       data_path = Path.join(out_dir, basename <> ".jsonl")
       manifest_path = Path.join(out_dir, basename <> ".manifest.json")
@@ -113,10 +213,12 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
         "length" => length(records),
         "rows" => length(records),
         "source_urls" => source_urls,
+        "source" => if(Map.has_key?(spec, :rows), do: "local-fixture", else: "huggingface-rows"),
         "fetched_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         "sha256" => sha256(jsonl),
         "data_path" => data_path,
-        "input_keys" => spec.input_keys
+        "input_keys" => spec.input_keys,
+        "label_key" => Map.get(spec, :label_key, "answer")
       }
 
       File.write!(manifest_path, Jason.encode!(manifest, pretty: true) <> "\n")
@@ -124,8 +226,25 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
     end
   end
 
+  defp requested_length(%{rows: rows}, :full), do: length(rows)
   defp requested_length(spec, :full), do: Map.fetch!(@full_lengths, spec.task)
   defp requested_length(_spec, length), do: length
+
+  defp fetch_records(%{rows: rows} = spec, offset, requested_length, _transport, _page_delay_ms) do
+    records =
+      rows
+      |> Enum.slice(offset, requested_length)
+      |> Enum.map(&Map.put_new(&1, "source_task", spec.task))
+
+    {:ok, records, ["local://#{spec.dataset}/#{spec.config}/#{spec.split}"]}
+  end
+
+  defp fetch_records(spec, offset, requested_length, transport, page_delay_ms) do
+    with {:ok, rows, source_urls} <-
+           fetch_pages(spec, offset, requested_length, transport, page_delay_ms, [], []) do
+      {:ok, Enum.map(rows, fn %{"row" => row} -> spec.normalizer.(row) end), source_urls}
+    end
+  end
 
   defp fetch_pages(_spec, _offset, remaining, _transport, _page_delay_ms, rows, urls)
        when remaining <= 0 do
@@ -176,7 +295,7 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
   defp canonical_spec!(task) when is_atom(task), do: canonical_spec!(Atom.to_string(task))
 
   defp canonical_spec!(task) when is_binary(task) do
-    Map.fetch!(@canonical_specs, task)
+    Map.fetch!(canonical_specs(), task)
   end
 
   defp decode_rows(%{"rows" => rows}) when is_list(rows), do: {:ok, rows}

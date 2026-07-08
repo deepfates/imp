@@ -161,6 +161,34 @@ defmodule MetricContractTest do
     assert DSEx.Metrics.span_relation("Paris", "Paris France") == "short_span"
   end
 
+  test "classification metrics report per-row accuracy and macro micro weighted F1" do
+    assert %DSEx.Metrics.Result{
+             score: 1.0,
+             passed?: true,
+             metadata: %{
+               "task_metric" => "colors_label_accuracy",
+               "predicted_label" => "warm",
+               "gold_label" => "warm",
+               "correct" => true
+             }
+           } = DSEx.Metrics.classification("Warm!", "warm", metric_name: "colors_label_accuracy")
+
+    report =
+      DSEx.Metrics.classification_report([
+        {"warm", "warm"},
+        {"warm", "cool"},
+        {"cool", "cool"},
+        {"cool", "cool"}
+      ])
+
+    assert report["accuracy"] == 0.75
+    assert_in_delta report["macro_f1"], 0.7333, 0.0001
+    assert report["micro_f1"] == 0.75
+    assert_in_delta report["weighted_f1"], 0.7333, 0.0001
+    assert report["labels"]["warm"]["support"] == 2
+    assert report["labels"]["cool"]["support"] == 2
+  end
+
   test "BestOfN Refine and few-shot optimizers accept structured metric results" do
     good = DSEx.prediction(answer: "good")
     bad = DSEx.prediction(answer: "bad")

@@ -64,6 +64,35 @@ defmodule BenchmarkTruthTest do
     assert [%{"canonical_answer" => "4"}] = result.data_path |> File.read!() |> read_jsonl()
   end
 
+  test "fetcher writes deterministic local classification and tabular samples" do
+    out_dir = tmp_dir("fetch-local-classification")
+
+    results =
+      DSEx.BenchmarkTruth.fetch(["colors", "iris", "iris_typo", "heart_disease"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    assert Enum.map(results, & &1.task) == ["colors", "iris", "iris_typo", "heart_disease"]
+
+    colors = Enum.find(results, &(&1.task == "colors"))
+    manifest = Jason.decode!(File.read!(colors.manifest_path))
+    rows = colors.data_path |> File.read!() |> read_jsonl()
+
+    assert manifest["source"] == "local-fixture"
+    assert manifest["input_keys"] == ["input"]
+    assert manifest["label_key"] == "label"
+    assert manifest["rows"] == 6
+    assert [%{"input" => "red", "label" => "warm", "source_task" => "colors"} | _] = rows
+
+    iris = Enum.find(results, &(&1.task == "iris"))
+
+    assert [%{"features" => features, "label" => "setosa"} | _] =
+             iris.data_path |> File.read!() |> read_jsonl()
+
+    assert features =~ "sepal_length"
+  end
+
   test "fetcher paginates full-size requests and records source pages" do
     out_dir = tmp_dir("fetch-pages")
     parent = self()
@@ -149,6 +178,35 @@ defmodule BenchmarkTruthTest do
 
     assert %{"schema_version" => 1, "tasks" => [_ | _]} =
              Jason.decode!(File.read!(result.out_path))
+  end
+
+  test "fixture benchmark truth runner evaluates local classification tasks with F1 reports" do
+    out_dir = tmp_dir("classification-results")
+
+    [colors] =
+      DSEx.BenchmarkTruth.fetch(["colors"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [colors: colors.data_path],
+        out_dir: out_dir,
+        max_examples: 6,
+        optimizer_comparisons: false
+      )
+
+    [task] = result.report["tasks"]
+    assert task["task"] == "colors"
+    assert task["score"] == 1.0
+    assert task["aggregate_metrics"]["accuracy"] == 1.0
+    assert task["aggregate_metrics"]["macro_f1"] == 1.0
+    assert task["aggregate_metrics"]["micro_f1"] == 1.0
+    assert task["aggregate_metrics"]["weighted_f1"] == 1.0
+    assert Map.keys(task["aggregate_metrics"]["labels"]) == ["cool", "warm"]
+    assert Enum.all?(task["rows"], & &1["passed"])
+    assert File.exists?(result.out_path)
   end
 
   test "benchmark truth rows include compact diagnostics for failed predictions" do

@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
 
       mix dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-20.jsonl \\
         --hotpotqa benchmarks/data/hotpotqa-validation-0-20.jsonl --max-examples 20
+      mix dsex.benchmark.run --colors benchmarks/data/colors-test-0-6.jsonl
 
   By default this runs in fixture mode. Use `--live` to use the ReqLLM-backed
   OpenAI provider from `OPENAI_API_KEY`/`OPENAI_MODEL`.
@@ -22,6 +23,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
         strict: [
           gsm8k: :string,
           hotpotqa: :string,
+          colors: :string,
+          iris: :string,
+          iris_typo: :string,
+          heart_disease: :string,
           offset: :integer,
           max_examples: :integer,
           max_concurrency: :integer,
@@ -36,7 +41,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
     tasks = tasks(opts)
 
     if tasks == [] do
-      Mix.raise("provide at least one dataset path with --gsm8k or --hotpotqa")
+      Mix.raise(
+        "provide at least one dataset path with --gsm8k, --hotpotqa, --colors, --iris, --iris-typo, or --heart-disease"
+      )
     end
 
     mode = if Keyword.get(opts, :live, false), do: :live, else: :fixture
@@ -61,6 +68,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
     []
     |> maybe_put(:gsm8k, Keyword.get(opts, :gsm8k))
     |> maybe_put(:hotpotqa, Keyword.get(opts, :hotpotqa))
+    |> maybe_put(:colors, Keyword.get(opts, :colors))
+    |> maybe_put(:iris, Keyword.get(opts, :iris))
+    |> maybe_put(:iris_typo, Keyword.get(opts, :iris_typo))
+    |> maybe_put(:heart_disease, Keyword.get(opts, :heart_disease))
   end
 
   defp maybe_put(tasks, _task, nil), do: tasks

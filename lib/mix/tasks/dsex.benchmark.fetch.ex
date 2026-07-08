@@ -3,6 +3,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Fetch do
   Fetch canonical benchmark samples.
 
       mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 20 --out benchmarks/data
+      mix dsex.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease --full --out benchmarks/data
       mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data
   """
 
@@ -32,7 +33,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Fetch do
 
     tasks = parse_tasks(Keyword.get(opts, :tasks, "gsm8k,hotpotqa"))
 
-    if backend(opts) == "parquet" do
+    if backend(opts, tasks) == "parquet" do
       run_parquet_fetch!(opts, tasks)
     else
       run_rows_fetch!(opts, tasks)
@@ -49,8 +50,18 @@ defmodule Mix.Tasks.Dsex.Benchmark.Fetch do
     if Keyword.get(opts, :full, false), do: :full, else: Keyword.get(opts, :length, 20)
   end
 
-  defp backend(opts) do
-    Keyword.get(opts, :backend) || if Keyword.get(opts, :full, false), do: "parquet", else: "rows"
+  defp backend(opts, tasks) do
+    Keyword.get(opts, :backend) ||
+      cond do
+        local_tasks?(tasks) -> "rows"
+        Keyword.get(opts, :full, false) -> "parquet"
+        true -> "rows"
+      end
+  end
+
+  defp local_tasks?(tasks) do
+    specs = DSEx.BenchmarkTruth.Fetcher.canonical_specs()
+    Enum.all?(tasks, &Map.has_key?(Map.fetch!(specs, &1), :rows))
   end
 
   defp run_rows_fetch!(opts, tasks) do
