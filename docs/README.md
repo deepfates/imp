@@ -31,7 +31,7 @@ credentials.
 - [01 Programming, Not Prompting](../livebooks/01_programming_not_prompting.livemd)
 - [02 Evaluate And Optimize](../livebooks/02_evaluate_and_optimize.livemd)
 - [03 Agents, Tools, MCP, Recursive Control](../livebooks/03_agents_tools_mcp_rlm.livemd)
-- [04 Local Gates And Live Provider Smoke](../livebooks/04_production_and_live_provider.livemd)
+- [04 Local Gates And Live Provider Smoke](../livebooks/04_local_gates_and_live_provider_smoke.livemd)
 
 ## Operate It
 

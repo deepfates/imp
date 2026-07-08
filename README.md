@@ -247,7 +247,7 @@ The `livebooks/` directory contains runnable tutorials:
 - `01_programming_not_prompting.livemd`
 - `02_evaluate_and_optimize.livemd`
 - `03_agents_tools_mcp_rlm.livemd`
-- `04_production_and_live_provider.livemd`
+- `04_local_gates_and_live_provider_smoke.livemd`
 
 ## Validation
 

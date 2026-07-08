@@ -125,7 +125,7 @@ defmodule DSEx.MixProject do
       "livebooks/01_programming_not_prompting.livemd",
       "livebooks/02_evaluate_and_optimize.livemd",
       "livebooks/03_agents_tools_mcp_rlm.livemd",
-      "livebooks/04_production_and_live_provider.livemd"
+      "livebooks/04_local_gates_and_live_provider_smoke.livemd"
     ]
   end
 
