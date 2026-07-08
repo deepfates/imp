@@ -4,7 +4,10 @@ defmodule DSEx.Optimizer.BetterTogether do
   defstruct [:metric, optimizers: %{}]
 
   @option_schema [
-    strategy: [type: :any, default: "p"]
+    strategy: [
+      type: {:custom, __MODULE__, :validate_strategy, []},
+      default: "p"
+    ]
   ]
 
   def new(metric, optimizers \\ %{}) do
@@ -62,6 +65,20 @@ defmodule DSEx.Optimizer.BetterTogether do
     )
   end
 
+  def validate_strategy(strategy) do
+    case strategy_steps(strategy) do
+      [_ | _] = steps ->
+        if Enum.all?(steps, &valid_strategy_step?/1) do
+          {:ok, strategy}
+        else
+          {:error, "expected a non-empty optimizer key, \"a->b\" string, or list of keys"}
+        end
+
+      _empty ->
+        {:error, "expected a non-empty optimizer key, \"a->b\" string, or list of keys"}
+    end
+  end
+
   defp strategy_steps(strategy) when is_binary(strategy) do
     strategy
     |> String.split("->")
@@ -70,6 +87,10 @@ defmodule DSEx.Optimizer.BetterTogether do
   end
 
   defp strategy_steps(strategy), do: List.wrap(strategy)
+
+  defp valid_strategy_step?(step) when is_atom(step), do: true
+  defp valid_strategy_step?(step) when is_binary(step), do: String.trim(step) != ""
+  defp valid_strategy_step?(_step), do: false
 
   defp compile_step(
          %DSEx.Optimizer.BootstrapFinetune{} = optimizer,

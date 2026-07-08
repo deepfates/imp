@@ -413,6 +413,39 @@ defmodule OptimizerReportTest do
     assert [%{key: "missing", error: {:unknown_optimizer, "missing"}}] = report.errors
   end
 
+  test "better together rejects malformed strategy shapes at the boundary" do
+    {train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    better =
+      DSEx.Optimizer.BetterTogether.new(metric, %{p: DSEx.Optimizer.LabeledFewShot.new(k: 1)})
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.compile\/5: invalid value for :strategy option: expected a non-empty optimizer key/,
+                 fn ->
+                   DSEx.Optimizer.BetterTogether.compile(better, program, train, dev,
+                     strategy: ""
+                   )
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.compile\/5: invalid value for :strategy option: expected a non-empty optimizer key/,
+                 fn ->
+                   DSEx.Optimizer.BetterTogether.compile(better, program, train, dev,
+                     strategy: []
+                   )
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.compile\/5: invalid value for :strategy option: expected a non-empty optimizer key/,
+                 fn ->
+                   DSEx.Optimizer.BetterTogether.compile(better, program, train, dev,
+                     strategy: %{p: true}
+                   )
+                 end
+  end
+
   test "better together reports invalid optimizer values without crashing" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
