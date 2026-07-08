@@ -147,18 +147,31 @@ defmodule DSEx.Saving do
     end
   end
 
+  defp decode_adapter(adapter) do
+    raise ArgumentError,
+          "invalid saved DSEx adapter reference: #{inspect(adapter)}; expected an allowlisted module name string"
+  end
+
   defp decode_lm(nil), do: nil
 
   defp decode_lm(%{provider: :req_llm, model: model} = state) do
-    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, :opts, [])))
+    decode_req_llm!(model, Map.get(state, :opts, []))
   end
 
   defp decode_lm(%{"provider" => "req_llm", "model" => model} = state) do
-    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, "opts", [])))
+    decode_req_llm!(model, Map.get(state, "opts", []))
   end
 
   defp decode_lm(%{"provider" => :req_llm, "model" => model} = state) do
-    DSEx.Clients.ReqLLM.new(model, opts: decode_config(Map.get(state, "opts", [])))
+    decode_req_llm!(model, Map.get(state, "opts", []))
+  end
+
+  defp decode_lm(%{provider: :req_llm}) do
+    raise ArgumentError, "saved req_llm client is missing required key :model"
+  end
+
+  defp decode_lm(%{"provider" => provider}) when provider in ["req_llm", :req_llm] do
+    raise ArgumentError, "saved req_llm client is missing required key \"model\""
   end
 
   defp decode_lm(%{"provider" => provider}) do
@@ -173,6 +186,14 @@ defmodule DSEx.Saving do
 
   defp decode_lm(lm) do
     raise ArgumentError, "invalid saved DSEx LM client: #{inspect(lm)}"
+  end
+
+  defp decode_req_llm!(nil, _opts) do
+    raise ArgumentError, "saved req_llm client is missing required model"
+  end
+
+  defp decode_req_llm!(model, opts) do
+    DSEx.Clients.ReqLLM.new(model, opts: decode_config(opts))
   end
 
   defp dump_retriever(%DSEx.Retrieve.Memory{} = retriever) do

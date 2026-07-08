@@ -297,6 +297,20 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError, ~r/invalid saved DSEx LM client/, fn ->
       base |> Map.put("lm", %{"model" => "missing-provider"}) |> DSEx.Saving.load()
     end
+
+    assert_raise ArgumentError, ~r/invalid saved DSEx adapter reference/, fn ->
+      base |> Map.put("adapter", %{"module" => "Elixir.DSEx.Adapter.Chat"}) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved req_llm client is missing required key "model"/, fn ->
+      base |> Map.put("lm", %{"provider" => "req_llm"}) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved DSEx config must be a map or list/, fn ->
+      base
+      |> Map.put("lm", %{"provider" => "req_llm", "model" => "openai:gpt-test", "opts" => 1})
+      |> DSEx.Saving.load()
+    end
   end
 
   test "loading saved non-ReqLLM provider clients fails closed" do
