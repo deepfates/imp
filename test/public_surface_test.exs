@@ -151,6 +151,27 @@ defmodule PublicSurfaceTest do
 
     assert DSEx.Prediction.get(compared, :answer) == "4"
 
+    assert {:ok, compared_from_strings} =
+             DSEx.Predict.MultiChainComparison.call(mcc, %{
+               "question" => "2+2?",
+               "completions" => [
+                 %{"reasoning" => "add", "answer" => "4"},
+                 DSEx.Prediction.new(reasoning: "count", answer: "4")
+               ]
+             })
+
+    assert DSEx.Prediction.get(compared_from_strings, :answer) == "4"
+
+    assert {:error, {:invalid_completions, ~s("not-a-list")}} =
+             DSEx.Predict.MultiChainComparison.call(mcc, %{
+               question: "2+2?",
+               completions: "not-a-list"
+             })
+
+    assert_raise ArgumentError, ~r/:m to be a positive integer/, fn ->
+      DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 0)
+    end
+
     rlm_lm = %{
       module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "4"}} end]
