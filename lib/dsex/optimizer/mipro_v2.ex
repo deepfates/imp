@@ -4,9 +4,9 @@ defmodule DSEx.Optimizer.MIPROv2 do
   defstruct [:metric, trials: 12, demos_per_candidate: 4, cold_start: 4]
 
   @option_schema [
-    trials: [type: :any, default: 12],
-    demos_per_candidate: [type: :any, default: 4],
-    cold_start: [type: :any, default: 4]
+    trials: [type: :non_neg_integer, default: 12],
+    demos_per_candidate: [type: :non_neg_integer, default: 4],
+    cold_start: [type: :non_neg_integer, default: 4]
   ]
 
   def new(metric, opts \\ []) do
@@ -15,9 +15,9 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
     %__MODULE__{
       metric: metric,
-      trials: non_negative_integer(opts[:trials]),
-      demos_per_candidate: non_negative_integer(opts[:demos_per_candidate]),
-      cold_start: non_negative_integer(opts[:cold_start])
+      trials: opts[:trials],
+      demos_per_candidate: opts[:demos_per_candidate],
+      cold_start: opts[:cold_start]
     }
   end
 
@@ -256,9 +256,6 @@ defmodule DSEx.Optimizer.MIPROv2 do
       demos
     )
   end
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
 

@@ -4,9 +4,9 @@ defmodule DSEx.Optimizer.SIMBA do
   defstruct [:metric, :judge_lm, steps: 8, demos_per_step: 3]
 
   @option_schema [
-    steps: [type: :any, default: 8],
+    steps: [type: :non_neg_integer, default: 8],
     judge_lm: [type: :any, default: nil],
-    demos_per_step: [type: :any, default: 3]
+    demos_per_step: [type: :non_neg_integer, default: 3]
   ]
 
   def new(metric, opts \\ []) do
@@ -15,9 +15,9 @@ defmodule DSEx.Optimizer.SIMBA do
 
     %__MODULE__{
       metric: metric,
-      steps: non_negative_integer(opts[:steps]),
+      steps: opts[:steps],
       judge_lm: opts[:judge_lm],
-      demos_per_step: non_negative_integer(opts[:demos_per_step])
+      demos_per_step: opts[:demos_per_step]
     }
   end
 
@@ -160,9 +160,6 @@ defmodule DSEx.Optimizer.SIMBA do
 
   defp step_indices(steps) when steps > 0, do: 1..steps
   defp step_indices(_steps), do: []
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
 

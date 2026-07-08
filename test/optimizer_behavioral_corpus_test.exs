@@ -67,15 +67,15 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, &(not Enum.empty?(Map.get(&1, :demos, []))))
   end
 
-  test "MIPROv2 treats non-positive search counts as baseline-only compile" do
+  test "MIPROv2 treats zero search counts as baseline-only compile" do
     program = france_program()
     baseline_score = evaluator(program).score
 
     compiled =
       DSEx.Optimizer.MIPROv2.new(metric(),
-        trials: -3,
-        demos_per_candidate: -1,
-        cold_start: -2
+        trials: 0,
+        demos_per_candidate: 0,
+        cold_start: 0
       )
       |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), devset())
 
@@ -145,13 +145,13 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
   end
 
-  test "GEPA treats non-positive generations as a baseline-only compile" do
+  test "GEPA treats zero generations as a baseline-only compile" do
     program = france_program()
     baseline_score = evaluator(program).score
 
     compiled =
       DSEx.Optimizer.GEPA.new(metric(),
-        generations: -1,
+        generations: 0,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
       |> DSEx.Optimizer.GEPA.compile(program, trainset(), devset())
@@ -251,12 +251,12 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, & &1.accepted)
   end
 
-  test "SIMBA treats non-positive steps as a baseline-only compile" do
+  test "SIMBA treats zero steps as a baseline-only compile" do
     program = france_program()
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.SIMBA.new(metric(), steps: 0, demos_per_step: -3)
+      DSEx.Optimizer.SIMBA.new(metric(), steps: 0, demos_per_step: 0)
       |> DSEx.Optimizer.SIMBA.compile(program, trainset(), devset())
 
     report = DSEx.Optimizer.Report.fetch(compiled)
@@ -352,12 +352,12 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
   end
 
-  test "COPRO treats non-positive depth as a baseline-only compile" do
+  test "COPRO treats zero depth as a baseline-only compile" do
     program = france_program()
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.COPRO.new(metric(), breadth: -2, depth: 0)
+      DSEx.Optimizer.COPRO.new(metric(), breadth: 0, depth: 0)
       |> DSEx.Optimizer.COPRO.compile(program, trainset(), devset())
 
     report = DSEx.Optimizer.Report.fetch(compiled)
@@ -411,6 +411,54 @@ defmodule OptimizerBehavioralCorpusTest do
     assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GEPA\.new\/2: expected keyword options/, fn ->
       DSEx.Optimizer.GEPA.new(metric(), %{generations: 1})
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :depth option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.COPRO.new(metric(), depth: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :breadth option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.COPRO.new(metric(), breadth: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :trials option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.MIPROv2.new(metric(), trials: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :demos_per_candidate option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.MIPROv2.new(metric(), demos_per_candidate: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :cold_start option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.MIPROv2.new(metric(), cold_start: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :steps option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.SIMBA.new(metric(), steps: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :demos_per_step option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.SIMBA.new(metric(), demos_per_step: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.GEPA\.new\/2: invalid value for :generations option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.GEPA.new(metric(), generations: -1)
+                 end
   end
 
   test "advanced optimizer constructors reject invalid callback contracts at the boundary" do

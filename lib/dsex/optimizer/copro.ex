@@ -4,8 +4,8 @@ defmodule DSEx.Optimizer.COPRO do
   defstruct [:metric, :proposer_lm, breadth: 5, depth: 2, extra_instructions: []]
 
   @option_schema [
-    breadth: [type: :any, default: 5],
-    depth: [type: :any, default: 2],
+    breadth: [type: :non_neg_integer, default: 5],
+    depth: [type: :non_neg_integer, default: 2],
     proposer_lm: [type: :any, default: nil],
     extra_instructions: [type: {:list, :string}, default: []]
   ]
@@ -16,8 +16,8 @@ defmodule DSEx.Optimizer.COPRO do
 
     %__MODULE__{
       metric: metric,
-      breadth: non_negative_integer(opts[:breadth]),
-      depth: non_negative_integer(opts[:depth]),
+      breadth: opts[:breadth],
+      depth: opts[:depth],
       proposer_lm: opts[:proposer_lm],
       extra_instructions: opts[:extra_instructions]
     }
@@ -134,9 +134,6 @@ defmodule DSEx.Optimizer.COPRO do
     |> Enum.flat_map(& &1.candidates)
     |> Enum.map(&Map.take(&1, [:instruction, :score, :round]))
   end
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
 

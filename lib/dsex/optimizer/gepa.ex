@@ -12,7 +12,7 @@ defmodule DSEx.Optimizer.GEPA do
 
   @option_schema [
     feedback_fn: [type: :any, default: nil],
-    generations: [type: :any, default: 4]
+    generations: [type: :non_neg_integer, default: 4]
   ]
 
   def new(metric, opts \\ []) do
@@ -23,7 +23,7 @@ defmodule DSEx.Optimizer.GEPA do
     %__MODULE__{
       metric: metric,
       feedback_fn: opts[:feedback_fn],
-      generations: non_negative_integer(opts[:generations])
+      generations: opts[:generations]
     }
   end
 
@@ -147,9 +147,6 @@ defmodule DSEx.Optimizer.GEPA do
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2), do: :ok
 
