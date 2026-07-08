@@ -531,6 +531,16 @@ defmodule ProductionHardeningTest do
     assert Enum.all?(results, &match?({:ok, %DSEx.Prediction{}}, &1))
   end
 
+  test "parallel map reports invalid options clearly" do
+    program = DSEx.predict("question -> answer", lm: %{module: DSEx.LM.Static, opts: []})
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Parallel\.map\/3: expected keyword options/,
+                 fn ->
+                   DSEx.Predict.Parallel.map(program, [%{question: "a"}], :not_options)
+                 end
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

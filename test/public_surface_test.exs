@@ -267,6 +267,33 @@ defmodule PublicSurfaceTest do
     assert {:error, :wrapped_failed} = DSEx.call(failed, %{question: "capital France"})
   end
 
+  test "rag reports invalid options inputs and retrieved docs clearly" do
+    base = DSEx.predict("question, context -> answer", lm: %{module: DSEx.LM.Static, opts: []})
+    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.RAG\.new\/3: expected keyword options/, fn ->
+      DSEx.rag(base, retriever, :not_options)
+    end
+
+    rag = DSEx.rag(base, retriever)
+
+    assert {:error, {:invalid_rag_inputs, message}} = DSEx.Predict.RAG.call(rag, :not_inputs)
+    assert message =~ "expected a map or field pair list"
+
+    assert {:error, {:invalid_rag_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.Predict.RAG.call(rag, [:not_a_pair])
+
+    bad_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [:not_a_doc]} end)
+
+    assert {:error, {:invalid_rag_document, :not_a_doc}} =
+             DSEx.Predict.RAG.call(bad_doc_rag, %{question: "capital France"})
+
+    bad_pair_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [[:not_a_pair]]} end)
+
+    assert {:error, {:invalid_rag_document, [:not_a_pair]}} =
+             DSEx.Predict.RAG.call(bad_pair_doc_rag, %{question: "capital France"})
+  end
+
   test "react and code act execute operational loops" do
     react_lm = %{
       module: DSEx.LM.Static,

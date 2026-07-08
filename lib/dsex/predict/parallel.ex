@@ -7,15 +7,21 @@ defmodule DSEx.Predict.Parallel do
   input does not bring down the whole batch.
   """
 
+  @option_schema [
+    max_concurrency: [type: :any, default: System.schedulers_online()],
+    timeout: [type: :any, default: 30_000],
+    on_timeout: [type: :any, default: :kill_task]
+  ]
+
   def map(program, inputs, opts \\ []) do
-    concurrency =
-      positive_integer(Keyword.get(opts, :max_concurrency, System.schedulers_online()))
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.Parallel.map/3")
+    concurrency = positive_integer(opts[:max_concurrency])
 
     inputs
     |> DSEx.Tasks.async_stream(&call_program(program, &1),
       max_concurrency: concurrency,
-      timeout: Keyword.get(opts, :timeout, 30_000),
-      on_timeout: Keyword.get(opts, :on_timeout, :kill_task)
+      timeout: opts[:timeout],
+      on_timeout: opts[:on_timeout]
     )
     |> Enum.map(fn
       {:ok, result} -> result
