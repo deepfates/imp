@@ -42,12 +42,17 @@ the signature, adapter, optimizer, evaluation, and trace vocabulary.
 ## Basic Predict
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
 program =
   "question -> answer: short_span"
   |> DSEx.signature(
     "Answer with the shortest correct span. Do not explain."
   )
-  |> DSEx.predict()
+  |> DSEx.predict(lm: lm)
 
 {:ok, pred} = DSEx.call(program, %{question: "Capital of France?"})
 DSEx.get(pred, :answer)
@@ -158,19 +163,31 @@ signature =
 ## Examples And Demos
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
+}
+
 demo =
   DSEx.example(question: "2+2?", answer: "4")
   |> DSEx.with_inputs(:question)
 
 program =
   "question -> answer"
-  |> DSEx.predict()
+  |> DSEx.predict(lm: lm)
   |> DSEx.with_demos([demo])
 ```
 
 ## Evaluate A Program
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = DSEx.predict("question -> answer", lm: lm)
+
 devset = [
   DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
@@ -188,6 +205,11 @@ receive the prediction trace as their third argument.
 ## Retrieval-Augmented Programs
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
 docs = [
   %{text: "France has capital Paris."},
   %{text: "Germany has capital Berlin."}
@@ -197,7 +219,7 @@ retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
 
 program =
   "question, context -> answer"
-  |> DSEx.predict()
+  |> DSEx.predict(lm: lm)
   |> DSEx.rag(retriever, k: 1)
 
 {:ok, prediction} = DSEx.call(program, %{question: "capital France"})
@@ -216,10 +238,22 @@ instead of serialized.
 ## Optimize A Program
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = DSEx.predict("question -> answer", lm: lm)
+
 trainset = [
   DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
 
+devset = [
+  DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
+]
+
+metric = DSEx.Metrics.exact_match(:answer)
 optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
 compiled = DSEx.optimize(program, optimizer, trainset, devset)
 
@@ -351,14 +385,15 @@ catalog =
 [tool] = DSEx.MCP.import_tools(catalog)
 ```
 
-For HTTP-backed discovery:
+For HTTP-backed discovery, configure a real MCP endpoint. This is an external
+service sketch, not a local runnable snippet:
 
 ```elixir
 client = DSEx.MCP.HTTPClient.new("https://mcp.example/tools")
 tools = DSEx.MCP.import_tools(client)
 ```
 
-For stdio or Streamable HTTP transports:
+For stdio or Streamable HTTP transports, point DSEx at trusted services you own:
 
 ```elixir
 stdio = DSEx.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
@@ -430,8 +465,10 @@ RLM controller actions:
 ```elixir
 program = DSEx.predict("question -> answer")
 
-DSEx.Saving.save!(program, "tmp/program.json")
-loaded = DSEx.Saving.load!("tmp/program.json")
+path = Path.join(System.tmp_dir!(), "dsex-program.json")
+DSEx.Saving.save!(program, path)
+loaded = DSEx.Saving.load!(path)
+File.rm(path)
 ```
 
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
@@ -443,6 +480,13 @@ or live tool closures should be rebuilt by application code.
 ## Streaming
 
 ```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = DSEx.predict("question -> answer", lm: lm)
+
 DSEx.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
 
 DSEx.Streaming.incremental_fields(

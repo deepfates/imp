@@ -64,6 +64,16 @@ defmodule DocumentationContractTest do
     assert advanced =~ ~r/do not\s+train models in-process/
   end
 
+  test "API guide distinguishes runnable snippets from external-service sketches" do
+    api = File.read!("docs/API_GUIDE.md")
+
+    assert api =~ "Path.join(System.tmp_dir!(), \"dsex-program.json\")"
+    refute api =~ "tmp/program.json"
+
+    assert api =~ "This is an external\nservice sketch"
+    assert api =~ "point DSEx at trusted services you own"
+  end
+
   test "API guide ReAct example is executable with a deterministic tool-calling LM" do
     {:ok, actions} =
       Agent.start_link(fn ->
@@ -103,6 +113,59 @@ defmodule DocumentationContractTest do
              DSEx.call(program, %{question: "What is the capital of France?"})
 
     assert DSEx.get(prediction, :answer) == "Paris"
+  end
+
+  test "API guide basic Predict and ChainOfThought examples are executable" do
+    predict_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program =
+      "question -> answer: short_span"
+      |> DSEx.signature("Answer with the shortest correct span. Do not explain.")
+      |> DSEx.predict(lm: predict_lm)
+
+    assert {:ok, pred} = DSEx.call(program, %{question: "Capital of France?"})
+    assert DSEx.get(pred, :answer) == "Paris"
+
+    cot_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
+    }
+
+    cot = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
+
+    assert {:ok, cot_pred} = DSEx.call(cot, %{question: "2+2?"})
+    assert DSEx.get(cot_pred, :reasoning) == "add two and two"
+    assert DSEx.get(cot_pred, :answer) == "4"
+  end
+
+  test "API guide evaluate and optimize examples are executable through the facade" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    trainset = [
+      DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
+    ]
+
+    devset = [
+      DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
+    ]
+
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(program, devset, metric)
+
+    optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+    compiled = DSEx.optimize(program, optimizer, trainset, devset)
+
+    assert %DSEx.Optimizer.Report{optimizer: :random_search} =
+             DSEx.Optimizer.Report.fetch(compiled)
   end
 
   test "API guide Save And Load example uses a portable program" do
