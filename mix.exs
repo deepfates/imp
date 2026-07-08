@@ -12,7 +12,8 @@ defmodule DSEx.MixProject do
       package: package(),
       docs: [
         main: "DSEx",
-        extras: ["README.md"] ++ product_docs() ++ livebooks()
+        extras: ["README.md"] ++ product_docs() ++ livebooks(),
+        filter_modules: &public_doc_module?/2
       ],
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -127,6 +128,19 @@ defmodule DSEx.MixProject do
       "livebooks/03_agents_tools_mcp_rlm.livemd",
       "livebooks/04_local_gates_and_live_provider_smoke.livemd"
     ]
+  end
+
+  defp public_doc_module?(module, _metadata) do
+    module_name = Atom.to_string(module)
+
+    not Enum.any?(
+      [
+        "Elixir.DSEx.Benchmark",
+        "Elixir.DSEx.Benchmarks",
+        "Elixir.Mix.Tasks.Dsex.Benchmark"
+      ],
+      &String.starts_with?(module_name, &1)
+    )
   end
 
   defp aliases do

@@ -105,4 +105,18 @@ defmodule GateContractTest do
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".retriever.check"))
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".mcp.check"))
   end
+
+  test "generated docs expose the product API, not local validation machinery" do
+    filter_modules =
+      Mix.Project.config()
+      |> Keyword.fetch!(:docs)
+      |> Keyword.fetch!(:filter_modules)
+
+    assert filter_modules.(DSEx, %{})
+    assert filter_modules.(DSEx.Predict.ChainOfThought, %{})
+
+    refute filter_modules.(DSEx.Benchmarks, %{})
+    refute filter_modules.(DSEx.BenchmarkTruth, %{})
+    refute filter_modules.(Mix.Tasks.Dsex.Benchmark.Parity, %{})
+  end
 end

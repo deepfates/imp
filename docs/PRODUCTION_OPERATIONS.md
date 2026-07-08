@@ -186,18 +186,16 @@ OpenAI-compatible model discovery when `OPENAI_MODEL` is unset, and writes the
 same DSEx-vs-DSPy report schema over the full row set. Use full-lane artifacts,
 not smoke runs, before making production parity claims.
 
-For long campaigns, run `mix dsex.benchmark.parity` in chunks with `--offset`
-and `--max-examples`, then run
-`mix dsex.benchmark.parity.aggregate --provider req_llm --model MODEL`. The
-campaign aggregate is the decisive artifact: it deduplicates overlapping chunks
-by absolute row index, reports missing ranges, computes weighted scores, refuses
-to mix historical provider paths, and refuses `full_parity` unless the complete
-canonical row range is covered.
+For long campaigns, use the parity task in chunks with `--offset` and
+`--max-examples`, then aggregate the chunk artifacts with the parity aggregate
+task. The campaign aggregate is the decisive artifact: it deduplicates
+overlapping chunks by absolute row index, reports missing ranges, computes
+weighted scores, refuses to mix historical provider paths, and refuses
+`full_parity` unless the complete canonical row range is covered.
 
-Use `--max-concurrency` on parity chunks, or
-`mix dsex.benchmark.parity.campaign --chunks N --max-concurrency N`, to improve
-wall-clock time without changing the evidence standard. Concurrency must be
-chosen within provider rate limits and is recorded in chunk artifacts.
+Use `--max-concurrency` on parity chunks or campaign runs to improve wall-clock
+time without changing the evidence standard. Concurrency must be chosen within
+provider rate limits and is recorded in chunk artifacts.
 
 ## What The Gates Do Not Prove
 
