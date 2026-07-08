@@ -232,6 +232,23 @@ defmodule DocumentationContractTest do
            )
   end
 
+  test "core LM structs are deliberate public vocabulary" do
+    for module <- [
+          DSEx.Core.Message,
+          DSEx.Core.System,
+          DSEx.Core.User,
+          DSEx.Core.Assistant,
+          DSEx.Core.Developer,
+          DSEx.Core.ToolCall,
+          DSEx.Core.ToolResult,
+          DSEx.Core.LMConfig,
+          DSEx.Core.LMRequest,
+          DSEx.Core.LMResponse
+        ] do
+      assert match?({:docs_v1, _, _, _, %{"en" => _}, _, _}, Code.fetch_docs(module))
+    end
+  end
+
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
 
