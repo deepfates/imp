@@ -75,6 +75,7 @@ defmodule PackageContractTest do
 
     assert_release_files(files)
     assert_unpacked_mix_surface(output_dir)
+    assert_unpacked_package_can_be_consumed(output_dir)
   end
 
   test "shipped docs do not reference modules excluded from the Hex package" do
@@ -184,6 +185,66 @@ defmodule PackageContractTest do
       )
 
     assert status == 0, output
+  end
+
+  defp assert_unpacked_package_can_be_consumed(package_dir) do
+    consumer_dir = consumer_tmp_dir()
+    on_exit(fn -> File.rm_rf(consumer_dir) end)
+
+    mix_exs = """
+    defmodule DSExConsumer.MixProject do
+      use Mix.Project
+
+      def project do
+        [
+          app: :dsex_consumer,
+          version: "0.1.0",
+          elixir: "~> 1.19",
+          deps: [{:dsex, path: #{inspect(package_dir)}}]
+        ]
+      end
+    end
+    """
+
+    File.mkdir_p!(consumer_dir)
+    File.write!(Path.join(consumer_dir, "mix.exs"), mix_exs)
+
+    script = """
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+    {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+
+    unless DSEx.get(prediction, :answer) == "Paris" do
+      raise "unexpected DSEx prediction: \#{inspect(prediction)}"
+    end
+    """
+
+    {deps_output, deps_status} =
+      System.cmd("mix", ["deps.get"],
+        cd: consumer_dir,
+        stderr_to_stdout: true
+      )
+
+    assert deps_status == 0, deps_output
+
+    {output, status} =
+      System.cmd("mix", ["run", "-e", script],
+        cd: consumer_dir,
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+  end
+
+  defp consumer_tmp_dir do
+    Path.join([
+      System.tmp_dir!(),
+      "dsex-package-consumer-#{System.unique_integer([:positive])}"
+    ])
   end
 
   defp documented_module_references(paths) do
