@@ -77,6 +77,32 @@ defmodule OptimizeGEPATest do
     assert report.metadata.generations == 0
   end
 
+  test "optimizer boundary rejects invalid option and callback shapes" do
+    artifact = Anything.new_artifact(:prompt, "Base prompt")
+
+    evaluator = fn _artifact, examples ->
+      %{per_example_scores: Enum.map(examples, fn _example -> 1.0 end)}
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3: expected keyword options/,
+                 fn ->
+                   GEPA.optimize(artifact, evaluator, %{generations: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3 expects :mutation_fn to be an arity-3 function/,
+                 fn ->
+                   GEPA.optimize(artifact, evaluator, mutation_fn: fn _artifact -> "bad" end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3 expects an evaluator function with arity 2/,
+                 fn ->
+                   GEPA.optimize(artifact, fn _artifact -> %{per_example_scores: []} end)
+                 end
+  end
+
   test "system-aware merge combines complementary frontier candidates" do
     artifact = Anything.new_artifact(:prompt, "Base")
 

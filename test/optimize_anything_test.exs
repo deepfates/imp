@@ -71,6 +71,41 @@ defmodule OptimizeAnythingTest do
     assert report.errors == []
   end
 
+  test "artifact and optimizer boundaries reject invalid option and callback shapes" do
+    artifact = Anything.new_artifact(:prompt, "baseline")
+    evaluator = fn _artifact, _examples -> 1.0 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.new_artifact\/3: expected keyword options/,
+                 fn ->
+                   Anything.new_artifact(:prompt, "baseline", %{id: "bad"})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.new_artifact\/3 expects artifact text to be a binary/,
+                 fn ->
+                   Anything.new_artifact(:prompt, :not_text)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.optimize\/3: expected keyword options/,
+                 fn ->
+                   Anything.optimize(artifact, evaluator, %{trials: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.optimize\/3 expects :mutation_fn to be an arity-3 function/,
+                 fn ->
+                   Anything.optimize(artifact, evaluator, mutation_fn: fn _artifact -> "bad" end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.optimize\/3 expects an evaluator function with arity 2/,
+                 fn ->
+                   Anything.optimize(artifact, fn _artifact -> 1.0 end)
+                 end
+  end
+
   test "supports prompt code config and generic string artifact kinds" do
     kinds = [:prompt, :code, :config, :text]
 

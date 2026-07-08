@@ -37,11 +37,23 @@ defmodule DSEx.Optimize.GEPA do
     ]
   end
 
-  def optimize(%Artifact{} = artifact, evaluator, opts \\ []) when is_function(evaluator, 2) do
-    examples = Keyword.get(opts, :examples, [])
-    dev_examples = Keyword.get(opts, :dev_examples, [])
-    generations = Keyword.get(opts, :generations, 4)
-    mutation_fn = Keyword.get(opts, :mutation_fn, reflection_mutation_fn(opts))
+  @option_schema [
+    examples: [type: {:list, :any}, default: []],
+    dev_examples: [type: {:list, :any}, default: []],
+    generations: [type: :any, default: 4],
+    mutation_fn: [type: :any, default: nil],
+    reflection_lm: [type: :any, default: nil]
+  ]
+
+  def optimize(artifact, evaluator, opts \\ [])
+
+  def optimize(%Artifact{} = artifact, evaluator, opts) when is_function(evaluator, 2) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimize.GEPA.optimize/3")
+    examples = opts[:examples]
+    dev_examples = opts[:dev_examples]
+    generations = non_negative_integer(opts[:generations])
+    mutation_fn = opts[:mutation_fn] || reflection_mutation_fn(opts)
+    validate_mutation_fn!(mutation_fn)
 
     baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
@@ -91,8 +103,16 @@ defmodule DSEx.Optimize.GEPA do
     }
   end
 
+  def optimize(%Artifact{}, evaluator, _opts) do
+    raise ArgumentError,
+          "DSEx.Optimize.GEPA.optimize/3 expects an evaluator function with arity 2; got: #{inspect(evaluator)}"
+  end
+
   defp generation_indices(count) when is_integer(count) and count > 0, do: 1..count
   defp generation_indices(_count), do: []
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 
   def pareto_frontier(candidates) do
     candidates
@@ -212,7 +232,7 @@ defmodule DSEx.Optimize.GEPA do
   end
 
   defp reflection_mutation_fn(opts) do
-    case Keyword.get(opts, :reflection_lm) do
+    case opts[:reflection_lm] do
       nil -> &default_mutation/3
       lm -> fn artifact, asi, generation -> propose_reflection(lm, artifact, asi, generation) end
     end
@@ -267,4 +287,11 @@ defmodule DSEx.Optimize.GEPA do
 
   defp average([]), do: 0.0
   defp average(scores), do: Enum.sum(scores) / length(scores)
+
+  defp validate_mutation_fn!(mutation_fn) when is_function(mutation_fn, 3), do: :ok
+
+  defp validate_mutation_fn!(mutation_fn) do
+    raise ArgumentError,
+          "DSEx.Optimize.GEPA.optimize/3 expects :mutation_fn to be an arity-3 function; got: #{inspect(mutation_fn)}"
+  end
 end

@@ -133,26 +133,58 @@ defmodule DSEx.Optimize.Anything do
     end
   end
 
-  def new_artifact(kind, text, opts \\ []) when is_binary(text) do
+  @artifact_option_schema [
+    id: [type: :string],
+    parameters: [type: :map, default: %{}],
+    metadata: [type: :map, default: %{}]
+  ]
+
+  @optimize_option_schema [
+    seed: [type: :any, default: 0],
+    examples: [type: {:list, :any}, default: []],
+    trials: [type: :any, default: 8],
+    mutation_fn: [type: :any, default: nil]
+  ]
+
+  def new_artifact(kind, text, opts \\ [])
+
+  def new_artifact(kind, text, opts) when is_binary(text) do
+    opts =
+      DSEx.Options.validate!(
+        opts,
+        @artifact_option_schema,
+        "DSEx.Optimize.Anything.new_artifact/3"
+      )
+
     parameters =
-      opts
-      |> Keyword.get(:parameters, %{})
+      opts[:parameters]
       |> Map.put_new(:main, text)
 
     %Artifact{
-      id: Keyword.get(opts, :id, stable_id(kind, text)),
+      id: opts[:id] || stable_id(kind, text),
       kind: kind,
       text: text,
       parameters: parameters,
-      metadata: Keyword.get(opts, :metadata, %{})
+      metadata: opts[:metadata]
     }
   end
 
-  def optimize(%Artifact{} = artifact, evaluator, opts \\ []) when is_function(evaluator, 2) do
-    seed = Keyword.get(opts, :seed, 0)
-    examples = Keyword.get(opts, :examples, [])
-    trials = non_negative_integer(Keyword.get(opts, :trials, 8))
-    mutation_fn = Keyword.get(opts, :mutation_fn, &default_mutation/3)
+  def new_artifact(_kind, text, _opts) do
+    raise ArgumentError,
+          "DSEx.Optimize.Anything.new_artifact/3 expects artifact text to be a binary; got: #{inspect(text)}"
+  end
+
+  def optimize(artifact, evaluator, opts \\ [])
+
+  def optimize(%Artifact{} = artifact, evaluator, opts) when is_function(evaluator, 2) do
+    opts =
+      DSEx.Options.validate!(opts, @optimize_option_schema, "DSEx.Optimize.Anything.optimize/3")
+
+    seed = opts[:seed]
+    examples = opts[:examples]
+    trials = non_negative_integer(opts[:trials])
+    mutation_fn = opts[:mutation_fn] || (&default_mutation/3)
+    validate_mutation_fn!(mutation_fn)
 
     baseline = evaluate_candidate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
@@ -193,6 +225,11 @@ defmodule DSEx.Optimize.Anything do
         evaluator_examples: length(examples)
       }
     }
+  end
+
+  def optimize(%Artifact{}, evaluator, _opts) do
+    raise ArgumentError,
+          "DSEx.Optimize.Anything.optimize/3 expects an evaluator function with arity 2; got: #{inspect(evaluator)}"
   end
 
   def save_report!(%Report{} = report, path) do
@@ -243,6 +280,13 @@ defmodule DSEx.Optimize.Anything do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_mutation_fn!(mutation_fn) when is_function(mutation_fn, 3), do: :ok
+
+  defp validate_mutation_fn!(mutation_fn) do
+    raise ArgumentError,
+          "DSEx.Optimize.Anything.optimize/3 expects :mutation_fn to be an arity-3 function; got: #{inspect(mutation_fn)}"
+  end
 
   defp default_mutation(%Artifact{} = artifact, trial, seed) do
     marker = "candidate #{trial + seed}"
