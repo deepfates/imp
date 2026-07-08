@@ -17,11 +17,12 @@ defmodule DSEx.Cache do
 
   @table __MODULE__
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
+  def start_link(_opts), do: GenServer.start_link(__MODULE__, [])
 
   @impl true
   def init(_opts) do
     create_table()
+    Process.register(self(), __MODULE__)
     {:ok, %{}}
   end
 
@@ -108,7 +109,7 @@ defmodule DSEx.Cache do
   end
 
   defp start_unlinked do
-    case GenServer.start(__MODULE__, [], name: __MODULE__) do
+    case GenServer.start(__MODULE__, []) do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
     end

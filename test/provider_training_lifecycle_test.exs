@@ -186,6 +186,12 @@ defmodule ProviderTrainingLifecycleTest do
                    DSEx.Clients.Trainer.finetune(callback, lm, %{question: "2+2?"}, [])
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.Trainer\.finetune\/4 expects examples as DSEx\.Example structs/,
+                 fn ->
+                   DSEx.Clients.Trainer.finetune(callback, lm, [%{question: "2+2?"}], [])
+                 end
+
     refute_received :trainer_callback_ran
   end
 
@@ -242,6 +248,12 @@ defmodule ProviderTrainingLifecycleTest do
                  ~r/DSEx.Clients.HTTPTrainer\.finetune\/4 expects a list of examples/,
                  fn ->
                    DSEx.Clients.HTTPTrainer.finetune(trainer, lm, %{question: "2+2?"}, [])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.HTTPTrainer\.finetune\/4 expects examples as DSEx\.Example structs/,
+                 fn ->
+                   DSEx.Clients.HTTPTrainer.finetune(trainer, lm, [%{question: "2+2?"}], [])
                  end
   end
 

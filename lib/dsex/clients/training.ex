@@ -157,7 +157,7 @@ defmodule DSEx.Clients.Trainer do
   end
 
   defp do_finetune(module, lm, examples, opts) when is_atom(module) do
-    if function_exported?(module, :finetune, 3) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :finetune, 3) do
       call_trainer(fn -> module.finetune(lm, examples, opts) end, module)
     else
       {:error, {:not_a_trainer, module}}
@@ -165,7 +165,7 @@ defmodule DSEx.Clients.Trainer do
   end
 
   defp do_finetune(%module{} = trainer, lm, examples, opts) do
-    if function_exported?(module, :finetune, 4) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :finetune, 4) do
       call_trainer(fn -> module.finetune(trainer, lm, examples, opts) end, module)
     else
       {:error, {:not_a_trainer, module}}
@@ -192,7 +192,16 @@ defmodule DSEx.Clients.Trainer do
           "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
   end
 
-  defp validate_examples!(examples) when is_list(examples), do: examples
+  defp validate_examples!(examples) when is_list(examples) do
+    case Enum.find(examples, &(not match?(%DSEx.Example{}, &1))) do
+      nil ->
+        examples
+
+      invalid ->
+        raise ArgumentError,
+              "#{inspect(__MODULE__)}.finetune/4 expects examples as DSEx.Example structs, got entry: #{inspect(invalid)}"
+    end
+  end
 
   defp validate_examples!(examples) do
     raise ArgumentError,
@@ -293,7 +302,16 @@ defmodule DSEx.Clients.HTTPTrainer do
           "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
   end
 
-  defp validate_examples!(examples) when is_list(examples), do: examples
+  defp validate_examples!(examples) when is_list(examples) do
+    case Enum.find(examples, &(not match?(%DSEx.Example{}, &1))) do
+      nil ->
+        examples
+
+      invalid ->
+        raise ArgumentError,
+              "#{inspect(__MODULE__)}.finetune/4 expects examples as DSEx.Example structs, got entry: #{inspect(invalid)}"
+    end
+  end
 
   defp validate_examples!(examples) do
     raise ArgumentError,
