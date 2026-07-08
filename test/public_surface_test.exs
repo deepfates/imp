@@ -226,9 +226,17 @@ defmodule PublicSurfaceTest do
     assert {:error, {:invalid_multi_chain_inputs, "expected inputs as {key, value} pairs"}} =
              DSEx.Predict.MultiChainComparison.call(mcc, [:not_a_pair])
 
-    assert_raise ArgumentError, ~r/:m to be a positive integer/, fn ->
-      DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 0)
-    end
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :m option: expected a positive integer/,
+                 fn ->
+                   DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 0)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :M option: expected a positive integer/,
+                 fn ->
+                   DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, M: "2")
+                 end
 
     rlm_lm = %{
       module: DSEx.LM.Static,
@@ -461,7 +469,7 @@ defmodule PublicSurfaceTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1 expects :reduce_fn to be nil or an arity-1 function/,
+                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: invalid value for :reduce_fn option: expected nil or an arity-1 function/,
                  fn ->
                    DSEx.Optimizer.Ensemble.new(reduce_fn: fn -> %{} end)
                  end

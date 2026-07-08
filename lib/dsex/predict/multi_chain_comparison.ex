@@ -40,8 +40,8 @@ defmodule DSEx.Predict.MultiChainComparison do
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
-    m: [type: :any],
-    M: [type: :any]
+    m: [type: {:custom, __MODULE__, :validate_m, []}],
+    M: [type: {:custom, __MODULE__, :validate_m, []}]
   ]
 
   @doc """
@@ -54,7 +54,7 @@ defmodule DSEx.Predict.MultiChainComparison do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.MultiChainComparison.new/2")
     signature = DSEx.Signature.ensure(signature)
     last_key = signature |> DSEx.Signature.output_names() |> List.last()
-    m = positive_m!(Keyword.get(opts, :m, Keyword.get(opts, :M, 3)))
+    m = Keyword.get(opts, :m, Keyword.get(opts, :M, 3))
 
     comparison_signature =
       Enum.reduce(1..m, signature, fn index, acc ->
@@ -71,6 +71,12 @@ defmodule DSEx.Predict.MultiChainComparison do
       last_key: last_key,
       m: m
     }
+  end
+
+  def validate_m(m) when is_integer(m) and m > 0, do: {:ok, m}
+
+  def validate_m(m) do
+    {:error, "expected a positive integer, got: #{inspect(m)}"}
   end
 
   @impl true
@@ -130,13 +136,6 @@ defmodule DSEx.Predict.MultiChainComparison do
 
         DSEx.Predict.Predict.call(mcc.predict, inputs)
     end
-  end
-
-  defp positive_m!(m) when is_integer(m) and m > 0, do: m
-
-  defp positive_m!(m) do
-    raise ArgumentError,
-          "MultiChainComparison expects :m to be a positive integer, got: #{inspect(m)}"
   end
 
   defp completion_value(%DSEx.Prediction{} = prediction, field),

@@ -91,14 +91,16 @@ defmodule DSEx.Optimizer.Ensemble do
   defstruct reduce_fn: nil, size: nil, deterministic: false
 
   @option_schema [
-    reduce_fn: [type: :any, default: nil],
+    reduce_fn: [
+      type: {:custom, __MODULE__, :validate_reduce_fn, []},
+      default: nil
+    ],
     size: [type: {:or, [:non_neg_integer, nil]}, default: nil],
     deterministic: [type: :boolean, default: false]
   ]
 
   def new(opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.Ensemble.new/1")
-    validate_reduce_fn!(opts[:reduce_fn])
 
     %__MODULE__{
       reduce_fn: opts[:reduce_fn],
@@ -122,11 +124,10 @@ defmodule DSEx.Optimizer.Ensemble do
     end
   end
 
-  defp validate_reduce_fn!(nil), do: :ok
-  defp validate_reduce_fn!(reduce_fn) when is_function(reduce_fn, 1), do: :ok
+  def validate_reduce_fn(nil), do: {:ok, nil}
+  def validate_reduce_fn(reduce_fn) when is_function(reduce_fn, 1), do: {:ok, reduce_fn}
 
-  defp validate_reduce_fn!(reduce_fn) do
-    raise ArgumentError,
-          "DSEx.Optimizer.Ensemble.new/1 expects :reduce_fn to be nil or an arity-1 function; got: #{inspect(reduce_fn)}"
+  def validate_reduce_fn(reduce_fn) do
+    {:error, "expected nil or an arity-1 function, got: #{inspect(reduce_fn)}"}
   end
 end
