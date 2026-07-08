@@ -249,6 +249,34 @@ defmodule DSEx.Metrics do
   end
 
   @doc """
+  Computes recall of expected evidence ids in retrieved documents.
+
+  `prediction` may be a `%DSEx.Prediction{}` with RAG retrieval metadata or a
+  list of retrieved document maps. Expected ids can be strings or atoms.
+  """
+  def retrieval_recall(prediction, expected_ids, opts \\ []) do
+    metric_name = Keyword.get(opts, :metric_name, "retrieval_recall")
+    expected = expected_ids |> List.wrap() |> Enum.map(&to_string/1) |> MapSet.new()
+    retrieved = prediction |> retrieved_ids() |> MapSet.new()
+    hits = MapSet.intersection(expected, retrieved)
+
+    recall =
+      if MapSet.size(expected) == 0, do: 0.0, else: MapSet.size(hits) / MapSet.size(expected)
+
+    %Result{
+      score: recall,
+      passed?: recall >= Keyword.get(opts, :min_recall, 1.0),
+      metadata: %{
+        "task_metric" => metric_name,
+        "expected_evidence_ids" => Enum.sort(MapSet.to_list(expected)),
+        "retrieved_evidence_ids" => Enum.sort(MapSet.to_list(retrieved)),
+        "hit_evidence_ids" => Enum.sort(MapSet.to_list(hits)),
+        "recall" => recall
+      }
+    }
+  end
+
+  @doc """
   Classifies a normalized answer as `"yes_no"`, `"numeric"`, `"short_span"`, or `"long_span"`.
   """
   def answer_type(answer) do
@@ -293,6 +321,19 @@ defmodule DSEx.Metrics do
 
     {normalize_text(gold), normalize_text(predicted)}
   end
+
+  defp retrieved_ids(%DSEx.Prediction{metadata: metadata}) do
+    metadata
+    |> Map.get(:retrieval, %{})
+    |> Map.get(:docs, [])
+    |> retrieved_ids()
+  end
+
+  defp retrieved_ids(docs) when is_list(docs), do: Enum.map(docs, &doc_id/1)
+  defp retrieved_ids(_prediction), do: []
+
+  defp doc_id(%{} = doc), do: doc |> Map.get(:id, Map.get(doc, "id", "")) |> to_string()
+  defp doc_id(_doc), do: ""
 
   defp label_stats(label, pairs) do
     true_positive = Enum.count(pairs, fn {gold, pred} -> gold == label and pred == label end)

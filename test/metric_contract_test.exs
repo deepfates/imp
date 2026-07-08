@@ -189,6 +189,32 @@ defmodule MetricContractTest do
     assert report["labels"]["cool"]["support"] == 2
   end
 
+  test "retrieval recall scores expected evidence ids from prediction metadata" do
+    prediction =
+      DSEx.prediction(answer: "Paris")
+      |> Map.put(:metadata, %{
+        retrieval: %{
+          docs: [
+            %{"id" => "city-france", "text" => "Paris is the capital city of France."},
+            %{id: :city_germany, text: "Berlin is the capital city of Germany."}
+          ]
+        }
+      })
+
+    assert %DSEx.Metrics.Result{
+             score: 0.5,
+             passed?: false,
+             metadata: %{
+               "expected_evidence_ids" => ["city-france", "missing-doc"],
+               "hit_evidence_ids" => ["city-france"],
+               "recall" => 0.5
+             }
+           } = DSEx.Metrics.retrieval_recall(prediction, ["city-france", "missing-doc"])
+
+    assert %DSEx.Metrics.Result{score: 1.0, passed?: true} =
+             DSEx.Metrics.retrieval_recall(prediction, ["city-france"], min_recall: 1.0)
+  end
+
   test "BestOfN Refine and few-shot optimizers accept structured metric results" do
     good = DSEx.prediction(answer: "good")
     bad = DSEx.prediction(answer: "bad")

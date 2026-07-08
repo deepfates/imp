@@ -93,6 +93,42 @@ defmodule BenchmarkTruthTest do
     assert features =~ "sepal_length"
   end
 
+  test "fetcher writes retrieval and claim verification corpora with query manifests" do
+    out_dir = tmp_dir("fetch-local-retrieval")
+
+    results =
+      DSEx.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    assert Enum.map(results, & &1.task) == ["retrieval_qa", "claim_verification"]
+
+    retrieval = Enum.find(results, &(&1.task == "retrieval_qa"))
+    manifest = Jason.decode!(File.read!(retrieval.manifest_path))
+    rows = retrieval.data_path |> File.read!() |> read_jsonl()
+    corpus = manifest["corpus_path"] |> File.read!() |> read_jsonl()
+
+    assert manifest["source"] == "local-fixture"
+    assert manifest["input_keys"] == ["question"]
+    assert manifest["label_key"] == "answer"
+    assert manifest["corpus_rows"] == 4
+    assert byte_size(manifest["corpus_sha256"]) == 64
+
+    assert [%{"question" => question, "answer" => "Paris", "evidence_ids" => ["city-france"]} | _] =
+             rows
+
+    assert question =~ "France"
+    assert Enum.any?(corpus, &(&1["id"] == "city-france" and &1["text"] =~ "Paris"))
+
+    claims = Enum.find(results, &(&1.task == "claim_verification"))
+    claim_manifest = Jason.decode!(File.read!(claims.manifest_path))
+
+    assert claim_manifest["input_keys"] == ["claim"]
+    assert claim_manifest["label_key"] == "label"
+    assert File.exists?(claim_manifest["corpus_path"])
+  end
+
   test "fetcher paginates full-size requests and records source pages" do
     out_dir = tmp_dir("fetch-pages")
     parent = self()
@@ -207,6 +243,45 @@ defmodule BenchmarkTruthTest do
     assert Map.keys(task["aggregate_metrics"]["labels"]) == ["cool", "warm"]
     assert Enum.all?(task["rows"], & &1["passed"])
     assert File.exists?(result.out_path)
+  end
+
+  test "fixture benchmark truth runner evaluates retrieval and claim tasks with evidence recall" do
+    out_dir = tmp_dir("retrieval-results")
+
+    [retrieval, claims] =
+      DSEx.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [retrieval_qa: retrieval.data_path, claim_verification: claims.data_path],
+        out_dir: out_dir,
+        max_examples: 3,
+        optimizer_comparisons: false
+      )
+
+    assert result.report["aggregate_score"] == 1.0
+
+    by_task = Map.new(result.report["tasks"], &{&1["task"], &1})
+    retrieval_task = by_task["retrieval_qa"]
+    claim_task = by_task["claim_verification"]
+
+    assert retrieval_task["aggregate_metrics"]["mean_retrieval_recall"] == 1.0
+    assert retrieval_task["aggregate_metrics"]["full_retrieval_recall_rows"] == 3
+    assert claim_task["aggregate_metrics"]["mean_retrieval_recall"] == 1.0
+    assert claim_task["aggregate_metrics"]["full_retrieval_recall_rows"] == 3
+
+    assert Enum.all?(retrieval_task["rows"], fn row ->
+             row["metric_metadata"]["primary"]["exact_match"] == true and
+               row["metric_metadata"]["retrieval"]["recall"] == 1.0
+           end)
+
+    assert Enum.all?(claim_task["rows"], fn row ->
+             row["metric_metadata"]["primary"]["correct"] == true and
+               row["metric_metadata"]["retrieval"]["recall"] == 1.0
+           end)
   end
 
   test "benchmark truth rows include compact diagnostics for failed predictions" do

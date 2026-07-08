@@ -27,6 +27,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
           iris: :string,
           iris_typo: :string,
           heart_disease: :string,
+          retrieval_qa: :string,
+          claim_verification: :string,
           offset: :integer,
           max_examples: :integer,
           max_concurrency: :integer,
@@ -42,7 +44,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
 
     if tasks == [] do
       Mix.raise(
-        "provide at least one dataset path with --gsm8k, --hotpotqa, --colors, --iris, --iris-typo, or --heart-disease"
+        "provide at least one dataset path with --gsm8k, --hotpotqa, --colors, --iris, --iris-typo, --heart-disease, --retrieval-qa, or --claim-verification"
       )
     end
 
@@ -72,6 +74,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
     |> maybe_put(:iris, Keyword.get(opts, :iris))
     |> maybe_put(:iris_typo, Keyword.get(opts, :iris_typo))
     |> maybe_put(:heart_disease, Keyword.get(opts, :heart_disease))
+    |> maybe_put(:retrieval_qa, Keyword.get(opts, :retrieval_qa))
+    |> maybe_put(:claim_verification, Keyword.get(opts, :claim_verification))
   end
 
   defp maybe_put(tasks, _task, nil), do: tasks

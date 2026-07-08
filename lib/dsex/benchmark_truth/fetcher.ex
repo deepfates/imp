@@ -127,6 +127,102 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
           "label" => "high_risk"
         }
       ]
+    },
+    "retrieval_qa" => %{
+      task: "retrieval_qa",
+      dataset: "dsex/local-retrieval-qa",
+      config: "mini-corpus",
+      split: "test",
+      input_keys: ["question"],
+      label_key: "answer",
+      corpus: [
+        %{
+          "id" => "city-france",
+          "title" => "France",
+          "text" => "Paris is the capital city of France."
+        },
+        %{
+          "id" => "city-germany",
+          "title" => "Germany",
+          "text" => "Berlin is the capital city of Germany."
+        },
+        %{
+          "id" => "beam-elixir",
+          "title" => "Elixir",
+          "text" => "Elixir runs on the BEAM virtual machine and uses lightweight processes."
+        },
+        %{
+          "id" => "otp-supervision",
+          "title" => "OTP",
+          "text" =>
+            "OTP supervision trees restart failed child processes according to a strategy."
+        }
+      ],
+      rows: [
+        %{
+          "question" => "What is the capital city of France?",
+          "answer" => "Paris",
+          "evidence_ids" => ["city-france"]
+        },
+        %{
+          "question" => "Which virtual machine does Elixir run on?",
+          "answer" => "BEAM",
+          "evidence_ids" => ["beam-elixir"]
+        },
+        %{
+          "question" => "What do OTP supervision trees restart?",
+          "answer" => "failed child processes",
+          "evidence_ids" => ["otp-supervision"]
+        }
+      ]
+    },
+    "claim_verification" => %{
+      task: "claim_verification",
+      dataset: "dsex/local-claim-verification",
+      config: "mini-corpus",
+      split: "test",
+      input_keys: ["claim"],
+      label_key: "label",
+      corpus: [
+        %{
+          "id" => "city-france",
+          "title" => "France",
+          "text" => "Paris is the capital city of France."
+        },
+        %{
+          "id" => "city-germany",
+          "title" => "Germany",
+          "text" => "Berlin is the capital city of Germany."
+        },
+        %{
+          "id" => "beam-elixir",
+          "title" => "Elixir",
+          "text" => "Elixir runs on the BEAM virtual machine and uses lightweight processes."
+        },
+        %{
+          "id" => "otp-supervision",
+          "title" => "OTP",
+          "text" =>
+            "OTP supervision trees restart failed child processes according to a strategy."
+        }
+      ],
+      rows: [
+        %{
+          "claim" => "Paris is the capital city of France.",
+          "label" => "supported",
+          "evidence_ids" => ["city-france"]
+        },
+        %{
+          "claim" => "Elixir runs on the JVM.",
+          "label" => "refuted",
+          "evidence_ids" => ["beam-elixir"]
+        },
+        %{
+          "claim" => "OTP supervision trees restart failed child processes.",
+          "label" => "supported",
+          "evidence_ids" => ["otp-supervision"]
+        }
+      ]
     }
   }
 
@@ -202,24 +298,29 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
       manifest_path = Path.join(out_dir, basename <> ".manifest.json")
       jsonl = Enum.map_join(records, "\n", &Jason.encode!/1) <> "\n"
       File.write!(data_path, jsonl)
+      corpus_info = maybe_write_corpus(spec, out_dir)
 
-      manifest = %{
-        "task" => spec.task,
-        "dataset" => spec.dataset,
-        "config" => spec.config,
-        "split" => spec.split,
-        "offset" => offset,
-        "requested_length" => requested_length,
-        "length" => length(records),
-        "rows" => length(records),
-        "source_urls" => source_urls,
-        "source" => if(Map.has_key?(spec, :rows), do: "local-fixture", else: "huggingface-rows"),
-        "fetched_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-        "sha256" => sha256(jsonl),
-        "data_path" => data_path,
-        "input_keys" => spec.input_keys,
-        "label_key" => Map.get(spec, :label_key, "answer")
-      }
+      manifest =
+        %{
+          "task" => spec.task,
+          "dataset" => spec.dataset,
+          "config" => spec.config,
+          "split" => spec.split,
+          "offset" => offset,
+          "requested_length" => requested_length,
+          "length" => length(records),
+          "rows" => length(records),
+          "source_urls" => source_urls,
+          "source" =>
+            if(Map.has_key?(spec, :rows), do: "local-fixture", else: "huggingface-rows"),
+          "fetched_at" =>
+            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+          "sha256" => sha256(jsonl),
+          "data_path" => data_path,
+          "input_keys" => spec.input_keys,
+          "label_key" => Map.get(spec, :label_key, "answer")
+        }
+        |> Map.merge(corpus_info)
 
       File.write!(manifest_path, Jason.encode!(manifest, pretty: true) <> "\n")
       %{task: spec.task, data_path: data_path, manifest_path: manifest_path, manifest: manifest}
@@ -245,6 +346,21 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
       {:ok, Enum.map(rows, fn %{"row" => row} -> spec.normalizer.(row) end), source_urls}
     end
   end
+
+  defp maybe_write_corpus(%{corpus: corpus, task: task, config: config}, out_dir) do
+    corpus_basename = "#{task}-#{config}-corpus"
+    corpus_path = Path.join(out_dir, corpus_basename <> ".jsonl")
+    corpus_jsonl = Enum.map_join(corpus, "\n", &Jason.encode!/1) <> "\n"
+    File.write!(corpus_path, corpus_jsonl)
+
+    %{
+      "corpus_path" => corpus_path,
+      "corpus_rows" => length(corpus),
+      "corpus_sha256" => sha256(corpus_jsonl)
+    }
+  end
+
+  defp maybe_write_corpus(_spec, _out_dir), do: %{}
 
   defp fetch_pages(_spec, _offset, remaining, _transport, _page_delay_ms, rows, urls)
        when remaining <= 0 do

@@ -73,13 +73,13 @@ defmodule DSEx.BenchmarkTruth.Runner do
       |> Enum.take(max_examples)
 
     effective_lm = lm || fixture_lm(task, examples)
-    program = program(task, effective_lm)
+    program = program(task, effective_lm, path)
     metric = metric(task)
     {duration_us, result} = timed(fn -> evaluate(program, examples, metric, max_concurrency) end)
 
     optimizer_comparisons =
       if optimizer_comparisons?,
-        do: optimizer_comparisons(task, examples, effective_lm, metric),
+        do: optimizer_comparisons(task, examples, effective_lm, metric, path),
         else: []
 
     %{
@@ -103,11 +103,13 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp load_examples(:gsm8k, path), do: DSEx.Datasets.GSM8K.load(path)
   defp load_examples(:hotpotqa, path), do: DSEx.Datasets.HotPotQA.load(path)
   defp load_examples(:colors, path), do: DSEx.Datasets.jsonl(path, [:input])
+  defp load_examples(:retrieval_qa, path), do: DSEx.Datasets.jsonl(path, [:question])
+  defp load_examples(:claim_verification, path), do: DSEx.Datasets.jsonl(path, [:claim])
 
   defp load_examples(task, path) when task in [:iris, :iris_typo, :heart_disease],
     do: DSEx.Datasets.jsonl(path, [:features])
 
-  defp program(:gsm8k, lm) do
+  defp program(:gsm8k, lm, _path) do
     "question -> answer: string \"final numeric answer\""
     |> DSEx.signature(
       "Solve the math word problem. Return only the final numeric answer in `answer`."
@@ -115,22 +117,40 @@ defmodule DSEx.BenchmarkTruth.Runner do
     |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
-  defp program(:hotpotqa, lm) do
+  defp program(:hotpotqa, lm, _path) do
     "question, context -> answer: string \"short exact answer\""
     |> DSEx.signature(DSEx.BenchmarkTruth.Contract.hotpotqa_instruction())
     |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
-  defp program(:colors, lm) do
+  defp program(:colors, lm, _path) do
     "input -> label: string \"class label\""
     |> DSEx.signature("Classify the color into the correct label.")
     |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
-  defp program(task, lm) when task in [:iris, :iris_typo, :heart_disease] do
+  defp program(task, lm, _path) when task in [:iris, :iris_typo, :heart_disease] do
     "features -> label: string \"class label\""
     |> DSEx.signature("Classify the tabular feature row into the correct label.")
     |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+  end
+
+  defp program(:retrieval_qa, lm, path) do
+    base =
+      "question, context -> answer: string \"short exact answer\""
+      |> DSEx.signature("Answer using only the retrieved context.")
+      |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+
+    DSEx.rag(base, memory_retriever(path), k: 2)
+  end
+
+  defp program(:claim_verification, lm, path) do
+    base =
+      "claim, context -> label: string \"supported or refuted\""
+      |> DSEx.signature("Verify the claim using only the retrieved context.")
+      |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+
+    DSEx.rag(base, memory_retriever(path), query_field: :claim, k: 2)
   end
 
   defp metric(:gsm8k) do
@@ -166,6 +186,47 @@ defmodule DSEx.BenchmarkTruth.Runner do
     end
   end
 
+  defp metric(:retrieval_qa) do
+    fn example, prediction ->
+      answer =
+        prediction
+        |> DSEx.Prediction.get(:answer)
+
+      answer_result =
+        answer
+        |> DSEx.Metrics.extractive_qa(DSEx.Example.get(example, :answer),
+          metric_name: "retrieval_qa_answer"
+        )
+
+      recall_result =
+        prediction
+        |> DSEx.Metrics.retrieval_recall(DSEx.Example.get(example, :evidence_ids),
+          metric_name: "retrieval_qa_evidence_recall"
+        )
+
+      combine_metric_results(answer_result, recall_result)
+    end
+  end
+
+  defp metric(:claim_verification) do
+    fn example, prediction ->
+      label_result =
+        DSEx.Metrics.classification(
+          DSEx.Prediction.get(prediction, :label),
+          DSEx.Example.get(example, :label),
+          metric_name: "claim_verification_label"
+        )
+
+      recall_result =
+        prediction
+        |> DSEx.Metrics.retrieval_recall(DSEx.Example.get(example, :evidence_ids),
+          metric_name: "claim_verification_evidence_recall"
+        )
+
+      combine_metric_results(label_result, recall_result)
+    end
+  end
+
   defp aggregate_metrics(task, rows) when task in [:colors, :iris, :iris_typo, :heart_disease] do
     pairs =
       Enum.map(rows, fn row ->
@@ -178,7 +239,35 @@ defmodule DSEx.BenchmarkTruth.Runner do
     DSEx.Metrics.classification_report(pairs, metric_name: "#{task}_classification_report")
   end
 
+  defp aggregate_metrics(task, rows) when task in [:retrieval_qa, :claim_verification] do
+    recalls =
+      rows
+      |> Enum.map(&get_in(&1.metric_metadata, ["retrieval", "recall"]))
+      |> Enum.reject(&is_nil/1)
+
+    %{
+      "task_metric" => "#{task}_retrieval_report",
+      "examples" => length(rows),
+      "mean_retrieval_recall" => average(recalls),
+      "full_retrieval_recall_rows" => Enum.count(recalls, &(&1 >= 1.0))
+    }
+  end
+
   defp aggregate_metrics(_task, _rows), do: %{}
+
+  defp combine_metric_results(primary, retrieval) do
+    score = (primary.score + retrieval.score) / 2
+
+    %DSEx.Metrics.Result{
+      score: score,
+      passed?: primary.passed? and retrieval.passed?,
+      metadata: %{
+        "task_metric" => "answer_or_label_plus_retrieval",
+        "primary" => primary.metadata,
+        "retrieval" => retrieval.metadata
+      }
+    }
+  end
 
   defp evaluate(program, examples, metric, max_concurrency) when max_concurrency <= 1 do
     {rows, errors} =
@@ -362,11 +451,12 @@ defmodule DSEx.BenchmarkTruth.Runner do
     end
   end
 
-  defp optimizer_comparisons(_task, examples, _lm, _metric) when length(examples) < 2, do: []
+  defp optimizer_comparisons(_task, examples, _lm, _metric, _path) when length(examples) < 2,
+    do: []
 
-  defp optimizer_comparisons(task, examples, lm, metric) do
+  defp optimizer_comparisons(task, examples, lm, metric, path) do
     {trainset, devset} = Enum.split(examples, max(1, div(length(examples), 2)))
-    baseline = program(task, lm)
+    baseline = program(task, lm, path)
     evaluator = DSEx.Evaluate.new(devset, metric, max_errors: :infinity)
     baseline_result = DSEx.Evaluate.run(evaluator, baseline)
 
@@ -462,11 +552,12 @@ defmodule DSEx.BenchmarkTruth.Runner do
       opts: [
         handler: fn messages, _opts ->
           text = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+          lookup_text = fixture_lookup_text(task, text)
 
           key =
             lookup
             |> Map.keys()
-            |> Enum.map(&{&1, fixture_key_last_position(text, &1)})
+            |> Enum.map(&{&1, fixture_key_last_position(lookup_text, &1)})
             |> Enum.reject(fn {_key, position} -> is_nil(position) end)
             |> Enum.max_by(fn {key, position} -> {position, String.length(key)} end, fn ->
               {nil, nil}
@@ -477,6 +568,26 @@ defmodule DSEx.BenchmarkTruth.Runner do
         end
       ]
     }
+  end
+
+  defp fixture_lookup_text(task, text) do
+    prompt_field(text, fixture_prompt_field(task)) || text
+  end
+
+  defp fixture_prompt_field(:colors), do: "input"
+  defp fixture_prompt_field(task) when task in [:iris, :iris_typo, :heart_disease], do: "features"
+  defp fixture_prompt_field(:retrieval_qa), do: "question"
+  defp fixture_prompt_field(:claim_verification), do: "claim"
+  defp fixture_prompt_field(_task), do: "question"
+
+  defp prompt_field(text, field) do
+    pattern =
+      ~r/\[\[ ## #{Regex.escape(field)} ## \]\]\s*(.*?)(?=\n\[\[ ## |\nRespond with|\z)/su
+
+    case pattern |> Regex.scan(text) |> List.last() do
+      [_full, value] -> String.trim(value)
+      nil -> nil
+    end
   end
 
   defp fixture_key_last_position(text, key) do
@@ -493,6 +604,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
        when task in [:colors, :iris, :iris_typo, :heart_disease],
        do: to_string(DSEx.Example.get(example, :input, DSEx.Example.get(example, :features)))
 
+  defp fixture_lookup_key(:retrieval_qa, example), do: DSEx.Example.get(example, :question)
+  defp fixture_lookup_key(:claim_verification, example), do: DSEx.Example.get(example, :claim)
   defp fixture_lookup_key(_task, example), do: DSEx.Example.get(example, :question)
 
   defp fixture_fields(:gsm8k, example) do
@@ -507,10 +620,38 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp fixture_fields(task, example) when task in [:colors, :iris, :iris_typo, :heart_disease],
     do: %{label: DSEx.Example.get(example, :label)}
 
+  defp fixture_fields(:retrieval_qa, example), do: %{answer: DSEx.Example.get(example, :answer)}
+
+  defp fixture_fields(:claim_verification, example),
+    do: %{label: DSEx.Example.get(example, :label)}
+
   defp fixture_empty_fields(task) when task in [:colors, :iris, :iris_typo, :heart_disease],
     do: %{label: ""}
 
+  defp fixture_empty_fields(:claim_verification), do: %{label: ""}
+
   defp fixture_empty_fields(_task), do: %{answer: ""}
+
+  defp memory_retriever(path) do
+    path
+    |> corpus_path_for()
+    |> File.stream!()
+    |> Stream.map(&Jason.decode!/1)
+    |> Enum.to_list()
+    |> DSEx.Retrieve.Memory.new(k: 2)
+  end
+
+  defp corpus_path_for(data_path) do
+    manifest_path = String.replace_suffix(data_path, ".jsonl", ".manifest.json")
+    manifest = manifest_path |> File.read!() |> Jason.decode!()
+    corpus_path = Map.fetch!(manifest, "corpus_path")
+
+    if Path.type(corpus_path) == :absolute do
+      corpus_path
+    else
+      Path.expand(corpus_path)
+    end
+  end
 
   defp row_summary(row) do
     instrumentation =
