@@ -238,6 +238,22 @@ defmodule PublicSurfaceTest do
     assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
   end
 
+  test "rag clamps non-positive k at the program boundary" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "unknown"} end]
+    }
+
+    base = DSEx.predict("question, context -> answer", lm: lm)
+    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
+    rag = DSEx.rag(base, retriever, k: -3)
+
+    assert rag.k == 0
+    assert {:ok, prediction} = DSEx.call(rag, %{question: "capital France"})
+    assert prediction.metadata.retrieval.count == 0
+    assert prediction.metadata.retrieval.docs == []
+  end
+
   test "rag reports invalid and failed wrapped program results without crashing" do
     retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
 

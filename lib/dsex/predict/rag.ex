@@ -18,7 +18,7 @@ defmodule DSEx.Predict.RAG do
       retriever: retriever,
       query_field: Keyword.get(opts, :query_field, :question),
       context_field: Keyword.get(opts, :context_field, :context),
-      k: Keyword.get(opts, :k, 3)
+      k: non_negative_integer(Keyword.get(opts, :k, 3))
     }
   end
 
@@ -73,4 +73,7 @@ defmodule DSEx.Predict.RAG do
 
     %{prediction | metadata: Map.put(metadata, :retrieval, DSEx.Redaction.redact(retrieval))}
   end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end
