@@ -166,6 +166,29 @@ defmodule ProviderTrainingLifecycleTest do
              DSEx.Clients.Trainer.finetune(String, lm, examples(), [])
   end
 
+  test "trainer dispatch validates call inputs before provider callbacks run" do
+    lm = DSEx.req_llm("gpt-test")
+
+    callback = fn _lm, _examples, _opts ->
+      send(self(), :trainer_callback_ran)
+      {:ok, DSEx.Clients.TrainingJob.new(%{provider: :test})}
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.Trainer\.finetune\/4 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.Trainer.finetune(callback, lm, examples(), %{method: :sft})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.Trainer\.finetune\/4 expects a list of examples/,
+                 fn ->
+                   DSEx.Clients.Trainer.finetune(callback, lm, %{question: "2+2?"}, [])
+                 end
+
+    refute_received :trainer_callback_ran
+  end
+
   test "HTTP trainer reports payload transport decode and mapper failures" do
     lm = DSEx.req_llm("gpt-test")
 
@@ -203,6 +226,23 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:error, {:invalid_training_job, "mapper exploded"}} =
              DSEx.Clients.Trainer.finetune(mapper_trainer, lm, examples(), [])
+  end
+
+  test "HTTP trainer validates direct call inputs before transport work starts" do
+    lm = DSEx.req_llm("gpt-test")
+    trainer = DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs")
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.HTTPTrainer\.finetune\/4 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.HTTPTrainer.finetune(trainer, lm, examples(), %{method: :sft})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.HTTPTrainer\.finetune\/4 expects a list of examples/,
+                 fn ->
+                   DSEx.Clients.HTTPTrainer.finetune(trainer, lm, %{question: "2+2?"}, [])
+                 end
   end
 
   test "training job refresh reports transport decode and shape failures" do

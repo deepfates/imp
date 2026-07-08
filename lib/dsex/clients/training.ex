@@ -149,7 +149,14 @@ defmodule DSEx.Clients.Trainer do
 
   def finetune(provider, lm, examples, opts \\ [])
 
-  def finetune(module, lm, examples, opts) when is_atom(module) do
+  def finetune(provider, lm, examples, opts) do
+    opts = validate_opts!(opts)
+    examples = validate_examples!(examples)
+
+    do_finetune(provider, lm, examples, opts)
+  end
+
+  defp do_finetune(module, lm, examples, opts) when is_atom(module) do
     if function_exported?(module, :finetune, 3) do
       call_trainer(fn -> module.finetune(lm, examples, opts) end, module)
     else
@@ -157,7 +164,7 @@ defmodule DSEx.Clients.Trainer do
     end
   end
 
-  def finetune(%module{} = trainer, lm, examples, opts) do
+  defp do_finetune(%module{} = trainer, lm, examples, opts) do
     if function_exported?(module, :finetune, 4) do
       call_trainer(fn -> module.finetune(trainer, lm, examples, opts) end, module)
     else
@@ -165,11 +172,32 @@ defmodule DSEx.Clients.Trainer do
     end
   end
 
-  def finetune(fun, lm, examples, opts) when is_function(fun, 3) do
+  defp do_finetune(fun, lm, examples, opts) when is_function(fun, 3) do
     call_trainer(fn -> fun.(lm, examples, opts) end, fun)
   end
 
-  def finetune(provider, _lm, _examples, _opts), do: {:error, {:not_a_trainer, provider}}
+  defp do_finetune(provider, _lm, _examples, _opts), do: {:error, {:not_a_trainer, provider}}
+
+  defp validate_opts!(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_examples!(examples) when is_list(examples), do: examples
+
+  defp validate_examples!(examples) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.finetune/4 expects a list of examples, got: #{inspect(examples)}"
+  end
 
   defp call_trainer(fun, trainer) do
     case fun.() do
@@ -235,6 +263,9 @@ defmodule DSEx.Clients.HTTPTrainer do
   end
 
   def finetune(%__MODULE__{} = trainer, lm, examples, opts) do
+    opts = validate_call_opts!(opts)
+    examples = validate_examples!(examples)
+
     DSEx.Telemetry.span(
       [:dsex, :training, :submit],
       %{provider: trainer.provider, model: Map.get(lm, :model)},
@@ -246,6 +277,27 @@ defmodule DSEx.Clients.HTTPTrainer do
 
   def finetune(trainer, lm, examples, opts) when is_map(trainer) do
     finetune(struct(__MODULE__, trainer), lm, examples, opts)
+  end
+
+  defp validate_call_opts!(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_call_opts!(opts) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.finetune/4 expects keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_examples!(examples) when is_list(examples), do: examples
+
+  defp validate_examples!(examples) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.finetune/4 expects a list of examples, got: #{inspect(examples)}"
   end
 
   defp default_payload(lm, examples, opts) do
