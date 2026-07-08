@@ -13,7 +13,7 @@ defmodule DSEx.Streaming do
 
     cond do
       owned_opts[:provider_stream] ->
-        case provider_stream_predict(program) do
+        case DSEx.ProgramAccess.provider_stream_predict(program) do
           %DSEx.Predict.Predict{} = predict -> provider_stream(predict, inputs, opts)
           nil -> fallback_stream(program, inputs, opts)
         end
@@ -253,18 +253,7 @@ defmodule DSEx.Streaming do
   defp error_chunk?({:error, _reason}), do: true
   defp error_chunk?(_value), do: false
 
-  defp provider_stream_predict(%DSEx.Predict.Predict{} = predict), do: predict
-  defp provider_stream_predict(%DSEx.Predict.ChainOfThought{predict: predict}), do: predict
-  defp provider_stream_predict(_program), do: nil
-
-  defp output_names(%DSEx.Predict.ProgramOfThought{signature: signature}),
-    do: DSEx.Signature.output_names(signature)
-
-  defp output_names(%DSEx.Predict.CodeAct{program_of_thought: pot}), do: output_names(pot)
-  defp output_names(%DSEx.Predict.ChainOfThought{predict: predict}), do: output_names(predict)
-  defp output_names(%DSEx.Predict.RAG{program: program}), do: output_names(program)
-  defp output_names(%{signature: signature}), do: DSEx.Signature.output_names(signature)
-  defp output_names(_program), do: []
+  defp output_names(program), do: DSEx.ProgramAccess.output_names(program)
 
   defp fetch_field(map, key) do
     cond do

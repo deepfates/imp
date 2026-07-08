@@ -129,6 +129,35 @@ defmodule DSExFacadeTest do
     assert DSEx.Tool.call(tool, %{key: "x"}) == "y"
   end
 
+  test "internal program access separates task and LM-facing signatures" do
+    pot =
+      "x, context -> doubled"
+      |> DSEx.program_of_thought(output_field: :doubled)
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "double x"}]))
+
+    assert "x, context -> doubled" =
+             pot
+             |> DSEx.ProgramAccess.task_signature()
+             |> DSEx.Signature.to_spec()
+
+    assert "x, context -> program, tool, arguments" =
+             pot
+             |> DSEx.ProgramAccess.lm_signature()
+             |> DSEx.Signature.to_spec()
+
+    assert DSEx.ProgramAccess.output_names(pot) == [:doubled]
+    assert DSEx.ProgramAccess.provider_stream_predict(pot) == nil
+
+    cot = DSEx.chain_of_thought("question -> answer")
+
+    assert "question -> reasoning, answer" =
+             cot
+             |> DSEx.ProgramAccess.task_signature()
+             |> DSEx.Signature.to_spec()
+
+    assert %DSEx.Predict.Predict{} = DSEx.ProgramAccess.provider_stream_predict(cot)
+  end
+
   test "facade normalizes plain demo data and rejects malformed demos clearly" do
     program = DSEx.predict("question -> answer")
 

@@ -644,7 +644,8 @@ defmodule OptimizerReportTest do
     [%{role: :system}, %{role: :user, content: payload}] = messages
     decoded = Jason.decode!(payload)
 
-    assert decoded["signature"] == "x, context -> program, tool, arguments"
+    assert decoded["signature"] == "x, context -> doubled"
+    assert decoded["lm_signature"] == "x, context -> program, tool, arguments"
 
     assert decoded["current_instruction"] ==
              "Given the fields `x`, `context`, produce the fields `doubled`."

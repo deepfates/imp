@@ -43,14 +43,21 @@ defmodule DSEx.Optimizer.InstructionProposer do
       %{
         role: :user,
         content:
-          Jason.encode!(%{
-            current_instruction: DSEx.Optimizer.InstructionSearch.current_instruction(program),
-            signature: signature_spec(program),
-            train_examples: Enum.map(trainset, &DSEx.Example.to_map/1),
-            scored_examples: scored_examples
-          })
+          program
+          |> prompt_payload(trainset, scored_examples)
+          |> Jason.encode!()
       }
     ]
+  end
+
+  defp prompt_payload(program, trainset, scored_examples) do
+    %{
+      current_instruction: DSEx.Optimizer.InstructionSearch.current_instruction(program),
+      signature: signature_spec(DSEx.ProgramAccess.task_signature(program)),
+      lm_signature: signature_spec(DSEx.ProgramAccess.lm_signature(program)),
+      train_examples: Enum.map(trainset, &DSEx.Example.to_map/1),
+      scored_examples: scored_examples
+    }
   end
 
   defp parse(raw, count, fallback) when is_list(raw) do
@@ -127,10 +134,6 @@ defmodule DSEx.Optimizer.InstructionProposer do
     ] ++ Keyword.get(opts, :extra_instructions, [])
   end
 
-  defp signature_spec(program) do
-    case DSEx.ProgramAccess.predict(program) do
-      %DSEx.Predict.Predict{signature: signature} -> DSEx.Signature.to_spec(signature)
-      nil -> nil
-    end
-  end
+  defp signature_spec(%DSEx.Signature{} = signature), do: DSEx.Signature.to_spec(signature)
+  defp signature_spec(nil), do: nil
 end
