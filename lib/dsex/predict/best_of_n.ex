@@ -22,13 +22,18 @@ defmodule DSEx.Predict.BestOfN do
   end
 
   def call(%__MODULE__{} = best, inputs) do
-    attempts(best.n)
-    |> Enum.map(fn _ -> DSEx.Module.call(best.program, inputs) end)
-    |> Enum.filter(&match?({:ok, _}, &1))
-    |> Enum.map(fn {:ok, prediction} -> prediction end)
+    attempts = attempts(best.n)
+
+    results =
+      attempts
+      |> Enum.map(fn attempt -> {attempt, DSEx.Module.call(best.program, inputs)} end)
+
+    results
+    |> Enum.filter(fn {_attempt, result} -> match?({:ok, _}, result) end)
+    |> Enum.map(fn {_attempt, {:ok, prediction}} -> prediction end)
     |> case do
       [] ->
-        {:error, :no_successful_predictions}
+        {:error, no_successful_predictions_error(attempts, results)}
 
       predictions ->
         {:ok,
@@ -40,6 +45,18 @@ defmodule DSEx.Predict.BestOfN do
 
   defp attempts(n) when is_integer(n) and n > 0, do: 1..n
   defp attempts(_n), do: []
+
+  defp no_successful_predictions_error([], _results), do: :no_successful_predictions
+
+  defp no_successful_predictions_error(_attempts, results) do
+    errors =
+      Enum.map(results, fn
+        {attempt, {:error, reason}} -> %{attempt: attempt, error: reason}
+        {attempt, other} -> %{attempt: attempt, error: {:invalid_module_result, inspect(other)}}
+      end)
+
+    {:no_successful_predictions, errors}
+  end
 
   defp validate_metric!(metric) when is_function(metric, 2), do: :ok
 

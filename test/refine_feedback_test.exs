@@ -147,6 +147,32 @@ defmodule RefineFeedbackTest do
              |> DSEx.Predict.BestOfN.call(%{question: "q"})
   end
 
+  test "BestOfN reports wrapped program failures when every attempt fails" do
+    metric = fn _example, _prediction -> true end
+
+    assert {:error,
+            {:no_successful_predictions,
+             [
+               %{attempt: 1, error: :provider_unavailable},
+               %{attempt: 2, error: :provider_unavailable}
+             ]}} =
+             DSEx.Predict.BestOfN.new(%ErrorProgram{}, metric, n: 2)
+             |> DSEx.Predict.BestOfN.call(%{question: "q"})
+
+    assert {:error,
+            {:no_successful_predictions,
+             [
+               %{
+                 attempt: 1,
+                 error:
+                   {:invalid_module_result, RefineFeedbackTest.InvalidResultProgram,
+                    ":not_a_module_result"}
+               }
+             ]}} =
+             DSEx.Predict.BestOfN.new(%InvalidResultProgram{}, metric, n: 1)
+             |> DSEx.Predict.BestOfN.call(%{question: "q"})
+  end
+
   test "BestOfN reports invalid constructor inputs clearly" do
     metric = fn _example, _prediction -> true end
 
