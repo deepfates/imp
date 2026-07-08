@@ -210,6 +210,11 @@ defmodule ReqLLMClientTest do
     assert Enum.map(chunks, & &1.chunk) |> Enum.reject(&is_nil/1) == ["po", "ng"]
     assert Enum.any?(chunks, & &1.done)
 
+    assert DSEx.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
+
+    assert_received {:req_llm_stream, "openai:gpt-test",
+                     [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
   end

@@ -94,15 +94,35 @@ defmodule DSEx.Streaming do
   defp stream_value(value), do: value
 
   def collect(program, inputs, opts \\ []) do
+    outputs = output_names(program)
+
     program
     |> stream(inputs, opts)
-    |> Enum.reject(&match?({:error, _}, &1))
-    |> Enum.map_join(&collect_value/1)
+    |> Enum.reject(&error_chunk?/1)
+    |> Enum.map_join(&collect_value(&1, outputs))
   end
 
-  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: nil}), do: ""
-  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: chunk}), do: to_string(chunk)
-  defp collect_value(value), do: to_string(value)
+  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: nil}, _outputs), do: ""
+
+  defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: chunk}, outputs),
+    do: collect_value(chunk, outputs)
+
+  defp collect_value(%DSEx.Prediction{} = prediction, outputs),
+    do: collect_value(DSEx.Prediction.to_map(prediction), outputs)
+
+  defp collect_value(value, outputs) when is_map(value) do
+    values =
+      case outputs do
+        [] -> Map.values(value)
+        outputs -> Enum.map(outputs, &fetch_field(value, &1))
+      end
+
+    values
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map_join(&to_string/1)
+  end
+
+  defp collect_value(value, _outputs), do: to_string(value)
 
   @doc """
   Parses provider chunks into incremental typed field updates.
@@ -129,11 +149,47 @@ defmodule DSEx.Streaming do
   defp call_once(program, inputs) do
     case DSEx.Module.call(program, inputs) do
       {:ok, prediction} ->
-        {:ok, prediction |> DSEx.Prediction.to_map() |> Map.values() |> Enum.join("")}
+        text =
+          prediction
+          |> DSEx.Prediction.to_map()
+          |> collect_value(output_names(program))
+
+        {:ok, text}
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp error_chunk?(%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, _reason}}), do: true
+  defp error_chunk?({:error, _reason}), do: true
+  defp error_chunk?(_value), do: false
+
+  defp output_names(%{signature: signature}), do: DSEx.Signature.output_names(signature)
+  defp output_names(%DSEx.Predict.RAG{program: program}), do: output_names(program)
+  defp output_names(_program), do: []
+
+  defp fetch_field(map, key) do
+    cond do
+      Map.has_key?(map, key) ->
+        Map.fetch!(map, key)
+
+      is_atom(key) and Map.has_key?(map, Atom.to_string(key)) ->
+        Map.fetch!(map, Atom.to_string(key))
+
+      is_binary(key) ->
+        fetch_existing_atom_key(map, key)
+
+      true ->
+        nil
+    end
+  end
+
+  defp fetch_existing_atom_key(map, key) do
+    atom = String.to_existing_atom(key)
+    Map.get(map, atom)
+  rescue
+    ArgumentError -> nil
   end
 
   defp field_event(field, value, allowed) do

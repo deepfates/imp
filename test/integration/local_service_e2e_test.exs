@@ -75,6 +75,46 @@ defmodule LocalServiceE2ETest do
     assert Enum.all?(result.rows, &(&1.prediction.metadata.retrieval.count == 1))
   end
 
+  test "streaming collection preserves structured RAG output order through local HTTP retrieval" do
+    base_url =
+      DSEx.Test.LocalHTTP.start(fn request ->
+        assert request.method == "POST"
+        assert request.path == "/retrieve"
+        assert %{"query" => "streaming capital", "k" => 1} = Jason.decode!(request.body)
+
+        {200,
+         %{
+           documents: [
+             %{text: "The streaming capital answer is Lisbon.", score: 1.0, source: "local"}
+           ]
+         }}
+      end)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "streaming capital answer is Lisbon",
+            do: %{answer: "Lisbon", citation: "local"},
+            else: %{answer: "unknown", citation: "none"}
+        end
+      ]
+    }
+
+    retriever = DSEx.Retrievers.HTTP.new(base_url <> "/retrieve")
+
+    program =
+      DSEx.predict("question, context -> answer, citation", lm: lm)
+      |> DSEx.rag(retriever, k: 1)
+
+    assert DSEx.Streaming.collect(program, %{question: "streaming capital"}) == "Lisbonlocal"
+
+    assert Enum.take(DSEx.Streaming.stream(program, %{question: "streaming capital"}), 6) ==
+             ~w(L i s b o n)
+  end
+
   test "HTTP MCP client discovers and calls a local JSON-RPC tool server" do
     base_url =
       DSEx.Test.LocalHTTP.start(fn request ->

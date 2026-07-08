@@ -195,6 +195,22 @@ defmodule CompletionSurfaceTest do
              )
   end
 
+  test "streaming fallback collects structured outputs in signature order" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{second: "two", first: "one"}
+        end
+      ]
+    }
+
+    program = DSEx.predict("question -> first, second", lm: lm)
+
+    assert DSEx.Streaming.collect(program, %{question: "order?"}) == "onetwo"
+    assert Enum.take(DSEx.Streaming.stream(program, %{question: "order?"}), 6) == ~w(o n e t w o)
+  end
+
   test "dataset loaders produce examples with declared inputs" do
     path =
       Path.join(
