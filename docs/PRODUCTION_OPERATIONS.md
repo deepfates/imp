@@ -141,9 +141,10 @@ state:
   decoding, and trusted stdio MCP clients through imported tool discovery and
   tool-call execution.
 
-`mix quality.check` runs the static warning gate. CI must run it alongside the
-deterministic release gates so style and maintainability regressions are caught
-before merge, not only during local release preparation.
+`mix quality.check` runs the static warning and dependency advisory gate:
+Credo warning-level review plus Hex package audit. CI must run it alongside the
+deterministic release gates so maintainability and known dependency risks are
+caught before merge, not only during local release preparation.
 
 `mix package.check` verifies the Hex package boundary. It checks that the
 installable package contains product modules, docs, and Livebooks while

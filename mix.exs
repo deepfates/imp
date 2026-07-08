@@ -215,7 +215,8 @@ defmodule DSEx.MixProject do
         "test.livebooks --path livebooks --execute"
       ],
       "quality.check": [
-        "credo --only warning"
+        "credo --only warning",
+        "hex.audit"
       ]
     ]
 

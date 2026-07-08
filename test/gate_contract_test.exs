@@ -101,6 +101,11 @@ defmodule GateContractTest do
              "test.livebooks --path livebooks --execute"
            ]
 
+    assert Keyword.fetch!(aliases, :"quality.check") == [
+             "credo --only warning",
+             "hex.audit"
+           ]
+
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".training.check"))
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".retriever.check"))
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".mcp.check"))
