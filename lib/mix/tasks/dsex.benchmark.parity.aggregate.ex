@@ -31,6 +31,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
           provider: :string,
           model: :string,
           campaign_id: :string,
+          max_concurrency: :integer,
           strict_task_gap: :float,
           strict_aggregate_gap: :float,
           max_latency_ratio: :float
@@ -50,6 +51,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       |> filter_model(Keyword.get(opts, :model))
       |> filter_provider(Keyword.get(opts, :provider))
       |> filter_campaign_id(Keyword.get(opts, :campaign_id))
+      |> filter_max_concurrency(Keyword.get(opts, :max_concurrency))
       |> require_generation!()
 
     if reports == [] do
@@ -104,6 +106,17 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
 
   defp filter_campaign_id(reports, campaign_id) do
     Enum.filter(reports, &(&1["campaign_id"] == campaign_id))
+  end
+
+  defp filter_max_concurrency(reports, nil), do: reports
+
+  defp filter_max_concurrency(_reports, max_concurrency)
+       when not is_integer(max_concurrency) or max_concurrency <= 0 do
+    Mix.raise("--max-concurrency must be a positive integer, got: #{inspect(max_concurrency)}")
+  end
+
+  defp filter_max_concurrency(reports, max_concurrency) do
+    Enum.filter(reports, &(report_max_concurrency(&1) == max_concurrency))
   end
 
   defp require_generation!(reports) do

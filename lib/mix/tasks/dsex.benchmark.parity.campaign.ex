@@ -62,7 +62,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
     Mix.shell().info("campaign id: #{campaign_id}")
 
     Enum.reduce_while(1..chunks, nil, fn chunk_index, _last ->
-      aggregate = aggregate!(model, out_dir, campaign_id)
+      aggregate = aggregate!(model, out_dir, campaign_id, opts)
 
       cond do
         full?(aggregate) ->
@@ -87,7 +87,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
           )
 
           run_chunk!(chunk_opts, model, campaign_id, chunk_plan, out_dir)
-          next_aggregate = aggregate!(model, out_dir, campaign_id)
+          next_aggregate = aggregate!(model, out_dir, campaign_id, opts)
 
           if halt_after_chunk?(
                before_coverage,
@@ -150,30 +150,38 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
     max(remaining_limited, 1)
   end
 
-  defp aggregate!(model, out_dir, campaign_id) do
+  defp aggregate!(model, out_dir, campaign_id, opts) do
     if campaign_reports(model, out_dir, campaign_id) == [] do
       fresh_campaign()
     else
-      run_aggregate!(model, out_dir, campaign_id)
+      run_aggregate!(model, out_dir, campaign_id, opts)
       latest_campaign!(model, out_dir, campaign_id)
     end
   end
 
-  defp run_aggregate!(model, out_dir, campaign_id) do
+  defp run_aggregate!(model, out_dir, campaign_id, opts) do
     Mix.Task.reenable("dsex.benchmark.parity.aggregate")
 
-    Mix.Task.run("dsex.benchmark.parity.aggregate", [
-      "--provider",
-      "req_llm",
-      "--model",
-      model,
-      "--in",
-      Path.join(out_dir, "dsex-dspy-parity-#{model_slug(model)}-*.json"),
-      "--campaign-id",
-      campaign_id,
-      "--out",
-      out_dir
-    ])
+    Mix.Task.run(
+      "dsex.benchmark.parity.aggregate",
+      [
+        "--provider",
+        "req_llm",
+        "--model",
+        model,
+        "--in",
+        Path.join(out_dir, "dsex-dspy-parity-#{model_slug(model)}-*.json"),
+        "--campaign-id",
+        campaign_id,
+        "--out",
+        out_dir
+      ] ++ aggregate_execution_args(opts)
+    )
+  end
+
+  defp aggregate_execution_args(opts) do
+    []
+    |> maybe_arg("--max-concurrency", Keyword.get(opts, :max_concurrency))
   end
 
   defp fresh_campaign do

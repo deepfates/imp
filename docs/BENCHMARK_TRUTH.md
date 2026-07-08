@@ -410,6 +410,12 @@ Use this for measured transport experiments, not as a hidden release-policy
 escape hatch. Release evidence should record the campaign id, model, generation
 settings, and pool settings whenever they change.
 
+When resuming a release campaign after concurrency experiments, keep passing the
+release `--max-concurrency` value. The campaign runner forwards that value to
+aggregation, so coverage and next offsets are computed from the comparable
+execution slice instead of mixing older serial/concurrent chunks into one
+latency claim.
+
 `--chunks` limits how many new chunks this invocation may run.
 `--target-coverage` limits the total campaign coverage to reach before
 stopping. When both are present, the runner aggregates current evidence before
@@ -454,7 +460,8 @@ Aggregate chunk artifacts into a campaign report:
 mix dsex.benchmark.parity.aggregate \
   --provider req_llm \
   --model gpt-5.4-mini \
-  --in 'benchmarks/results/dsex-dspy-parity-gpt-5.4-mini-*.json'
+  --in 'benchmarks/results/dsex-dspy-parity-gpt-5.4-mini-*.json' \
+  --max-concurrency 8
 ```
 
 The aggregator counts each `(task, absolute_index)` once, so overlapping smoke
