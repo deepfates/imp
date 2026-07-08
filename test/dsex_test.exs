@@ -411,6 +411,22 @@ defmodule DSExTest do
     assert DSEx.Example.get(nearest, :answer) == "otp"
   end
 
+  test "KNN predictor reports invalid constructor and call inputs clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.KNN\.new\/3: expected keyword options/, fn ->
+      DSEx.Predict.KNN.new(1, [], %{field: :question})
+    end
+
+    knn = DSEx.Predict.KNN.new(1, [])
+
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.KNN\.call\/2 expects inputs as a map/, fn ->
+      DSEx.Predict.KNN.call(knn, :not_inputs)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.KNN\.call\/2 expects inputs as a map/, fn ->
+      DSEx.Predict.KNN.call(knn, [:not_a_pair])
+    end
+  end
+
   test "evaluate scores a program against examples" do
     lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)

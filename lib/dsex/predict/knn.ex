@@ -10,8 +10,13 @@ defmodule DSEx.Predict.KNN do
 
   defstruct [:retriever, :field]
 
+  @option_schema [
+    field: [type: :any, default: :question]
+  ]
+
   def new(k, trainset, opts \\ []) do
-    field = Keyword.get(opts, :field, :question)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.KNN.new/3")
+    field = opts[:field]
 
     %__MODULE__{
       retriever: DSEx.Retrievers.KNN.new(trainset, k: k, field: field),
@@ -20,9 +25,27 @@ defmodule DSEx.Predict.KNN do
   end
 
   def call(%__MODULE__{retriever: retriever, field: field}, inputs) do
-    query = inputs |> Map.new() |> query_text(field)
+    query =
+      inputs
+      |> normalize_inputs!()
+      |> query_text(field)
 
     retriever |> DSEx.Retrievers.KNN.call(query)
+  end
+
+  defp normalize_inputs!(inputs) when is_map(inputs), do: inputs
+
+  defp normalize_inputs!(inputs) when is_list(inputs) do
+    Map.new(inputs)
+  rescue
+    _error ->
+      raise ArgumentError,
+            "DSEx.Predict.KNN.call/2 expects inputs as a map or field pair list; got: #{inspect(inputs)}"
+  end
+
+  defp normalize_inputs!(inputs) do
+    raise ArgumentError,
+          "DSEx.Predict.KNN.call/2 expects inputs as a map or field pair list; got: #{inspect(inputs)}"
   end
 
   defp query_text(inputs, fields) when is_list(fields) do
