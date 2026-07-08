@@ -93,6 +93,10 @@ defmodule GateContractTest do
              "test.livebooks --path livebooks"
            ]
 
+    assert Keyword.fetch!(aliases, :"livebook.execute.check") == [
+             "test.livebooks --path livebooks --execute"
+           ]
+
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".training.check"))
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".retriever.check"))
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".mcp.check"))

@@ -54,6 +54,7 @@ defmodule DSEx.MixProject do
         "benchmark.parity.full": :test,
         "live.check": :test,
         "livebook.check": :test,
+        "livebook.execute.check": :test,
         "package.check": :test,
         "quality.check": :test
       ]
@@ -210,6 +211,9 @@ defmodule DSEx.MixProject do
       ],
       "livebook.check": [
         "test.livebooks --path livebooks"
+      ],
+      "livebook.execute.check": [
+        "test.livebooks --path livebooks --execute"
       ],
       "quality.check": [
         "credo --only warning"

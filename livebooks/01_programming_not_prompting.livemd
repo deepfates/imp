@@ -37,8 +37,8 @@ lm = %{
 
 DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
 
-program = DSEx.predict("question -> answer")
-{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+qa_program = DSEx.predict("question -> answer")
+{:ok, prediction} = DSEx.call(qa_program, %{question: "Capital of France?"})
 DSEx.to_map(prediction)
 ```
 
@@ -68,8 +68,8 @@ cot_lm = %{
   opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
 }
 
-program = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
-{:ok, pred} = DSEx.call(program, %{question: "What is 2+2?"})
+cot_program = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
+{:ok, pred} = DSEx.call(cot_program, %{question: "What is 2+2?"})
 DSEx.to_map(pred)
 ```
 
@@ -126,7 +126,7 @@ credentials at runtime.
 
 ```elixir
 path = Path.join(System.tmp_dir!(), "dsex-livebook-program.json")
-DSEx.Saving.save!(program, path)
+DSEx.Saving.save!(qa_program, path)
 loaded = DSEx.Saving.load!(path)
 File.rm(path)
 
