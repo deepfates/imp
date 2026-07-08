@@ -1,6 +1,121 @@
 defmodule PublicSurfaceTest do
   use ExUnit.Case
 
+  @public_modules [
+    DSEx,
+    DSEx.Adapter,
+    DSEx.Adapter.Chat,
+    DSEx.Adapter.JSON,
+    DSEx.Adapter.XML,
+    DSEx.Adapter.TwoStep,
+    DSEx.Adapters.Types,
+    DSEx.Agent,
+    DSEx.Agent.Runtime,
+    DSEx.Cache,
+    DSEx.Clients.DatabricksTrainer,
+    DSEx.Clients.HTTPTrainer,
+    DSEx.Clients.OpenAITrainer,
+    DSEx.Clients.ReqLLM,
+    DSEx.Clients.Trainer,
+    DSEx.Clients.TrainingJob,
+    DSEx.Core,
+    DSEx.Core.Assistant,
+    DSEx.Core.Developer,
+    DSEx.Core.LMConfig,
+    DSEx.Core.LMRequest,
+    DSEx.Core.LMResponse,
+    DSEx.Core.Message,
+    DSEx.Core.System,
+    DSEx.Core.ToolCall,
+    DSEx.Core.ToolResult,
+    DSEx.Core.User,
+    DSEx.Datasets,
+    DSEx.Datasets.Colors,
+    DSEx.Datasets.DataLoader,
+    DSEx.Datasets.Dataset,
+    DSEx.Datasets.GSM8K,
+    DSEx.Datasets.HotPotQA,
+    DSEx.Datasets.MATH,
+    DSEx.Embeddings,
+    DSEx.Embeddings.BagOfWords,
+    DSEx.Errors,
+    DSEx.Evaluate,
+    DSEx.Evaluate.CompleteAndGrounded,
+    DSEx.Evaluate.Result,
+    DSEx.Evaluate.SemanticF1,
+    DSEx.Example,
+    DSEx.HTTP,
+    DSEx.HTTP.Hackneyless,
+    DSEx.LM,
+    DSEx.LM.Static,
+    DSEx.MCP,
+    DSEx.MCP.Catalog,
+    DSEx.MCP.HTTPClient,
+    DSEx.MCP.StdioClient,
+    DSEx.MCP.StreamableHTTPClient,
+    DSEx.Metrics,
+    DSEx.Metrics.Result,
+    DSEx.Module,
+    DSEx.Optimize.Anything,
+    DSEx.Optimize.Anything.Artifact,
+    DSEx.Optimize.Anything.Candidate,
+    DSEx.Optimize.Anything.Evaluation,
+    DSEx.Optimize.Anything.Report,
+    DSEx.Optimize.GEPA,
+    DSEx.Optimize.GEPA.Candidate,
+    DSEx.Optimize.GEPA.Report,
+    DSEx.Optimizer.BetterTogether,
+    DSEx.Optimizer.BootstrapFewShot,
+    DSEx.Optimizer.BootstrapFinetune,
+    DSEx.Optimizer.COPRO,
+    DSEx.Optimizer.Ensemble,
+    DSEx.Optimizer.GEPA,
+    DSEx.Optimizer.GRPO,
+    DSEx.Optimizer.InstructionProposer,
+    DSEx.Optimizer.InstructionSearch,
+    DSEx.Optimizer.KNNFewShot,
+    DSEx.Optimizer.LabeledFewShot,
+    DSEx.Optimizer.MIPROv2,
+    DSEx.Optimizer.RandomSearch,
+    DSEx.Optimizer.Report,
+    DSEx.Optimizer.SIMBA,
+    DSEx.Optimizer.SignatureOptimizer,
+    DSEx.Predict.Aggregation,
+    DSEx.Predict.BestOfN,
+    DSEx.Predict.ChainOfThought,
+    DSEx.Predict.CodeAct,
+    DSEx.Predict.KNN,
+    DSEx.Predict.MultiChainComparison,
+    DSEx.Predict.Parallel,
+    DSEx.Predict.Predict,
+    DSEx.Predict.ProgramOfThought,
+    DSEx.Predict.RAG,
+    DSEx.Predict.RLM,
+    DSEx.Predict.ReAct,
+    DSEx.Predict.Refine,
+    DSEx.Prediction,
+    DSEx.Redaction,
+    DSEx.Retrieve,
+    DSEx.Retrieve.Memory,
+    DSEx.Retrievers.Databricks,
+    DSEx.Retrievers.HTTP,
+    DSEx.Retrievers.KNN,
+    DSEx.Retrievers.Weaviate,
+    DSEx.Sandbox,
+    DSEx.Saving,
+    DSEx.Schema,
+    DSEx.Settings,
+    DSEx.Signature,
+    DSEx.Signature.Field,
+    DSEx.Streaming,
+    DSEx.Streaming.Messages,
+    DSEx.Streaming.Messages.StatusMessage,
+    DSEx.Streaming.Messages.StatusMessageProvider,
+    DSEx.Tasks,
+    DSEx.Telemetry,
+    DSEx.Tool
+  ]
+
   defmodule ExplodingProgram do
     @behaviour DSEx.Module
     defstruct []
@@ -249,91 +364,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "documented public modules and facade constructors remain available" do
-    public_modules = [
-      DSEx,
-      DSEx.Adapter.Chat,
-      DSEx.Adapter.JSON,
-      DSEx.Adapter.XML,
-      DSEx.Adapter.TwoStep,
-      DSEx.Cache,
-      DSEx.Clients.DatabricksTrainer,
-      DSEx.Clients.HTTPTrainer,
-      DSEx.Clients.OpenAITrainer,
-      DSEx.Clients.ReqLLM,
-      DSEx.Clients.Trainer,
-      DSEx.Clients.TrainingJob,
-      DSEx.Core,
-      DSEx.Core.Assistant,
-      DSEx.Core.Developer,
-      DSEx.Core.LMConfig,
-      DSEx.Core.LMRequest,
-      DSEx.Core.LMResponse,
-      DSEx.Core.Message,
-      DSEx.Core.System,
-      DSEx.Core.ToolCall,
-      DSEx.Core.ToolResult,
-      DSEx.Core.User,
-      DSEx.Datasets,
-      DSEx.Datasets.Colors,
-      DSEx.Datasets.DataLoader,
-      DSEx.Datasets.Dataset,
-      DSEx.Datasets.GSM8K,
-      DSEx.Datasets.HotPotQA,
-      DSEx.Datasets.MATH,
-      DSEx.Embeddings,
-      DSEx.Embeddings.BagOfWords,
-      DSEx.Evaluate,
-      DSEx.Evaluate.CompleteAndGrounded,
-      DSEx.Evaluate.Result,
-      DSEx.Evaluate.SemanticF1,
-      DSEx.Example,
-      DSEx.LM.Static,
-      DSEx.MCP,
-      DSEx.Metrics.Result,
-      DSEx.Metrics,
-      DSEx.Optimize.Anything,
-      DSEx.Optimize.GEPA,
-      DSEx.Optimizer.BetterTogether,
-      DSEx.Optimizer.BootstrapFewShot,
-      DSEx.Optimizer.BootstrapFinetune,
-      DSEx.Optimizer.COPRO,
-      DSEx.Optimizer.Ensemble,
-      DSEx.Optimizer.GEPA,
-      DSEx.Optimizer.InstructionSearch,
-      DSEx.Optimizer.KNNFewShot,
-      DSEx.Optimizer.LabeledFewShot,
-      DSEx.Optimizer.MIPROv2,
-      DSEx.Optimizer.RandomSearch,
-      DSEx.Optimizer.SIMBA,
-      DSEx.Predict.BestOfN,
-      DSEx.Predict.ChainOfThought,
-      DSEx.Predict.CodeAct,
-      DSEx.Predict.Parallel,
-      DSEx.Predict.Predict,
-      DSEx.Predict.RAG,
-      DSEx.Predict.RLM,
-      DSEx.Predict.ReAct,
-      DSEx.Predict.Refine,
-      DSEx.Prediction,
-      DSEx.Retrieve,
-      DSEx.Retrieve.Memory,
-      DSEx.Retrievers.Databricks,
-      DSEx.Retrievers.HTTP,
-      DSEx.Retrievers.KNN,
-      DSEx.Retrievers.Weaviate,
-      DSEx.Saving,
-      DSEx.Schema,
-      DSEx.Signature,
-      DSEx.Signature.Field,
-      DSEx.Streaming,
-      DSEx.Streaming.Messages,
-      DSEx.Streaming.Messages.StatusMessage,
-      DSEx.Streaming.Messages.StatusMessageProvider,
-      DSEx.Telemetry,
-      DSEx.Tool
-    ]
-
-    assert Enum.all?(public_modules, &Code.ensure_loaded?/1)
+    assert Enum.all?(@public_modules, &Code.ensure_loaded?/1)
 
     facade_exports = [
       configure: 1,
@@ -394,6 +425,20 @@ defmodule PublicSurfaceTest do
              DSEx.Clients.OpenAITrainer.new(training_file: "file-test")
   end
 
+  test "documented product modules are deliberately included in the public surface" do
+    public = MapSet.new(@public_modules)
+
+    missing =
+      :dsex
+      |> Application.spec(:modules)
+      |> Enum.filter(&dsex_module?/1)
+      |> Enum.filter(&documented_module?/1)
+      |> Enum.reject(&MapSet.member?(public, &1))
+      |> Enum.sort()
+
+    assert missing == []
+  end
+
   test "borrowed adapter aliases do not leak into the DSEx product surface" do
     borrowed_name = "BA" <> "ML"
 
@@ -404,5 +449,15 @@ defmodule PublicSurfaceTest do
       |> Enum.map_join("\n", &File.read!/1)
 
     refute docs =~ borrowed_name
+  end
+
+  defp dsex_module?(module) do
+    module
+    |> Atom.to_string()
+    |> String.starts_with?("Elixir.DSEx")
+  end
+
+  defp documented_module?(module) do
+    match?({:docs_v1, _, _, _, %{"en" => _}, _, _}, Code.fetch_docs(module))
   end
 end
