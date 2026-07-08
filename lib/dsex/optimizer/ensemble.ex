@@ -41,6 +41,9 @@ defmodule DSEx.Optimizer.Ensemble.Program do
       {:ok, other} ->
         {:error, {:invalid_ensemble_prediction, inspect(other)}}
 
+      {:error, {:module_call_failed, _module, reason}} ->
+        {:error, {:ensemble_program_failed, reason}}
+
       {:error, reason} ->
         {:error, reason}
 

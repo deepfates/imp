@@ -1,6 +1,18 @@
 defmodule DSExFacadeTest do
   use ExUnit.Case
 
+  defmodule RaisingProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: raise("program exploded")
+  end
+
+  defmodule ThrowingProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: throw(:program_thrown)
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -98,6 +110,14 @@ defmodule DSExFacadeTest do
 
   test "call reports non-callable values instead of raising" do
     assert DSEx.call(%{}, %{question: "q"}) == {:error, {:not_callable, %{}}}
+  end
+
+  test "call reports program exceptions and throws as structured errors" do
+    assert DSEx.call(%RaisingProgram{}, %{question: "q"}) ==
+             {:error, {:module_call_failed, RaisingProgram, "program exploded"}}
+
+    assert DSEx.call(%ThrowingProgram{}, %{question: "q"}) ==
+             {:error, {:module_call_failed, ThrowingProgram, "{:throw, :program_thrown}"}}
   end
 
   test "canonical facade builds and calls directly" do

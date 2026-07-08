@@ -25,9 +25,17 @@ defmodule DSEx.Predict.Parallel do
 
   defp call_program(program, input) do
     case DSEx.Module.call(program, input) do
-      {:ok, _value} = ok -> ok
-      {:error, _reason} = error -> error
-      other -> {:error, {:invalid_parallel_result, inspect(other)}}
+      {:ok, _value} = ok ->
+        ok
+
+      {:error, {:module_call_failed, _module, reason}} ->
+        {:error, {:parallel_program_failed, reason}}
+
+      {:error, _reason} = error ->
+        error
+
+      other ->
+        {:error, {:invalid_parallel_result, inspect(other)}}
     end
   rescue
     error -> {:error, {:parallel_program_failed, error_message(error)}}
