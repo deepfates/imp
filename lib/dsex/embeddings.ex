@@ -1,5 +1,11 @@
 defmodule DSEx.Embeddings do
-  @moduledoc "Embedding behaviour plus deterministic local bag-of-words embeddings."
+  @moduledoc """
+  Embedding behaviour plus deterministic local bag-of-words embeddings.
+
+  Providers must return one numeric vector for each input text, in the same
+  order. DSEx validates that shape at this boundary so retrieval code does not
+  silently pair a query or document with the wrong vector.
+  """
 
   @callback embed([String.t()], keyword()) :: {:ok, [[number()]]} | {:error, term()}
 
@@ -13,21 +19,21 @@ defmodule DSEx.Embeddings do
 
   defp dispatch(module, texts, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :embed, 2) do
-      call_embedder(fn -> module.embed(texts, opts) end, module)
+      call_embedder(fn -> module.embed(texts, opts) end, module, length(texts))
     else
       {:error, {:not_embedding_provider, module}}
     end
   end
 
   defp dispatch(fun, texts, opts) when is_function(fun, 2),
-    do: call_embedder(fn -> fun.(texts, opts) end, :anonymous_embedder)
+    do: call_embedder(fn -> fun.(texts, opts) end, :anonymous_embedder, length(texts))
 
   defp dispatch(embedder, _texts, _opts), do: {:error, {:not_embedding_provider, embedder}}
 
-  defp call_embedder(fun, provider) do
+  defp call_embedder(fun, provider, expected_count) do
     case fun.() do
       {:ok, vectors} when is_list(vectors) ->
-        if valid_vectors?(vectors) do
+        if valid_vectors?(vectors, expected_count) do
           {:ok, vectors}
         else
           {:error, {:invalid_embedding_result, vectors}}
@@ -47,15 +53,22 @@ defmodule DSEx.Embeddings do
       {:error, {:embedding_provider_failed, provider, {kind, reason}}}
   end
 
-  defp valid_vectors?(vectors) do
-    Enum.all?(vectors, fn
-      vector when is_list(vector) -> Enum.all?(vector, &is_number/1)
-      _other -> false
-    end)
+  defp valid_vectors?(vectors, expected_count) do
+    length(vectors) == expected_count and
+      Enum.all?(vectors, fn
+        vector when is_list(vector) -> Enum.all?(vector, &is_number/1)
+        _other -> false
+      end)
   end
 
   defmodule BagOfWords do
-    @moduledoc "Deterministic hashing bag-of-words embedder."
+    @moduledoc """
+    Deterministic hashing bag-of-words embedder.
+
+    This is a local baseline for examples, tests, and small retrieval
+    experiments. It is not a semantic embedding model; production semantic
+    retrieval should inject a real embedding provider through `DSEx.Embeddings`.
+    """
     @behaviour DSEx.Embeddings
 
     @option_schema [

@@ -195,6 +195,17 @@ defmodule DocumentationContractTest do
     assert parity =~ "GEPA-style optimizer rows"
   end
 
+  test "embedding documentation names the deterministic baseline and provider shape contract" do
+    api = File.read!("docs/API_GUIDE.md")
+    coverage = File.read!("docs/COVERAGE_MATRIX.md")
+
+    assert api =~ "BagOfWords` is deterministic and local"
+    assert api =~ "Production semantic embeddings"
+    assert api =~ "one numeric vector for each input text"
+    assert coverage =~ "deterministic local baseline"
+    assert coverage =~ "one numeric vector per input text"
+  end
+
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
 

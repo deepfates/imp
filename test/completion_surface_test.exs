@@ -610,6 +610,20 @@ defmodule CompletionSurfaceTest do
     assert {:error, {:invalid_embedding_result, [[1.0, "bad"]]}} =
              DSEx.Embeddings.embed(fn _texts, _opts -> {:ok, [[1.0, "bad"]]} end, ["beam"], [])
 
+    assert {:error, {:invalid_embedding_result, [[1.0]]}} =
+             DSEx.Embeddings.embed(
+               fn _texts, _opts -> {:ok, [[1.0]]} end,
+               ["beam", "elixir"],
+               []
+             )
+
+    assert {:error, {:invalid_embedding_result, [[1.0], [2.0]]}} =
+             DSEx.Embeddings.embed(
+               fn _texts, _opts -> {:ok, [[1.0], [2.0]]} end,
+               ["beam"],
+               []
+             )
+
     assert {:error, {:embedding_provider_failed, :anonymous_embedder, "embed exploded"}} =
              DSEx.Embeddings.embed(fn _texts, _opts -> raise "embed exploded" end, ["beam"], [])
 

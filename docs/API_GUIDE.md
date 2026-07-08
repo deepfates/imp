@@ -251,7 +251,8 @@ length(hd(vectors))
 `DSEx.Embeddings.BagOfWords` is deterministic and local. It is useful for
 examples, tests, and small retrieval experiments. Production semantic embeddings
 should be injected behind the `DSEx.Embeddings` behaviour so credentials,
-network calls, and model choice stay explicit.
+network calls, and model choice stay explicit. Any provider must return exactly
+one numeric vector for each input text, in the same order.
 
 ## Optimize A Program
 
