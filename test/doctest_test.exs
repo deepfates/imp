@@ -6,6 +6,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Example
   doctest DSEx.Metrics
   doctest DSEx.Optimizer.RandomSearch
+  doctest DSEx.Prediction
   doctest DSEx.Signature
   doctest DSEx.Tool
 end

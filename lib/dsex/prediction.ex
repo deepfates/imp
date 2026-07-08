@@ -1,5 +1,30 @@
 defmodule DSEx.Prediction do
-  @moduledoc "A model output, represented as fields plus completions metadata."
+  @moduledoc """
+  Structured output from a DSEx program.
+
+  Predictions carry the named output fields produced by a program plus optional
+  completions, score, and metadata. Program modules use fields for task answers,
+  metrics use `score` or score-like fields when normalizing results, and traces
+  live under metadata so debugging information stays separate from task output.
+
+  Like `DSEx.Example`, prediction keys are normalized without creating atoms
+  from unknown external strings. This matters for provider JSON, user-provided
+  schemas, and other dynamic boundaries.
+
+  ## Example
+
+      iex> prediction =
+      ...>   DSEx.Prediction.new(%{"answer" => "Paris", "external_field" => 42},
+      ...>     score: 1.0,
+      ...>     metadata: %{trace: %{provider: :local}}
+      ...>   )
+      iex> DSEx.Prediction.get(prediction, :answer)
+      "Paris"
+      iex> DSEx.Prediction.get(prediction, "external_field")
+      42
+      iex> {prediction.score, prediction.metadata.trace.provider}
+      {1.0, :local}
+  """
 
   @type t :: %__MODULE__{
           fields: map(),
@@ -9,6 +34,12 @@ defmodule DSEx.Prediction do
         }
   defstruct fields: %{}, completions: [], score: nil, metadata: %{}
 
+  @doc """
+  Builds a prediction from fields and optional completions, score, and metadata.
+
+  `fields` may be a map or keyword list. Existing atom names in string keys are
+  resolved to those atoms, while unknown string keys remain strings.
+  """
   def new(fields \\ %{}, opts \\ []) do
     %__MODULE__{
       fields: fields |> Map.new(fn {k, v} -> {normalize_key(k), v} end),
@@ -18,9 +49,11 @@ defmodule DSEx.Prediction do
     }
   end
 
+  @doc "Reads a prediction field, returning `default` when it is missing."
   def get(%__MODULE__{fields: fields}, key, default \\ nil),
     do: get_key(fields, normalize_key(key), default)
 
+  @doc "Reads a prediction field or raises `KeyError` when it is missing."
   def fetch!(%__MODULE__{fields: fields}, key) do
     case fetch_key(fields, normalize_key(key)) do
       {:ok, value} -> value
@@ -28,11 +61,14 @@ defmodule DSEx.Prediction do
     end
   end
 
+  @doc "Returns a copy of the prediction with one field set."
   def put(%__MODULE__{fields: fields} = prediction, key, value),
     do: %{prediction | fields: Map.put(fields, normalize_key(key), value)}
 
+  @doc "Returns the prediction field map."
   def to_map(%__MODULE__{fields: fields}), do: fields
 
+  @doc "Converts an example into a prediction, preserving fields and applying prediction options."
   def from_example(%DSEx.Example{} = example, opts \\ []),
     do: new(DSEx.Example.to_map(example), opts)
 
