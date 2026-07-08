@@ -72,6 +72,34 @@ defmodule OptimizerReportTest do
     assert length(compiled.demos) == 1
   end
 
+  test "optimizer reports serialize with embedded examples and restore as reports" do
+    {train, _dev} = sets()
+
+    report =
+      DSEx.Optimizer.Report.new(%{
+        optimizer: :labeled_few_shot,
+        candidate_count: 1,
+        candidates: [%{index: 0, selected?: true, example: hd(train)}],
+        metadata: %{status: :ok, note: "keep strings as strings"}
+      })
+
+    restored =
+      report
+      |> DSEx.Optimizer.Report.json_safe()
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> DSEx.Optimizer.Report.restore_json_safe()
+
+    assert %DSEx.Optimizer.Report{} = restored
+    assert restored.optimizer == :labeled_few_shot
+    assert restored.metadata.status == :ok
+    assert restored.metadata.note == "keep strings as strings"
+    assert [%{example: example, selected?: true}] = restored.candidates
+    assert %DSEx.Example{} = example
+    assert DSEx.Example.get(example, :question) == "France capital?"
+    assert DSEx.Example.inputs(example).fields == %{question: "France capital?"}
+  end
+
   test "labeled few-shot reports trainset enumeration failures" do
     program = DSEx.predict("question -> answer", lm: lm())
 

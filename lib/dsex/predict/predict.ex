@@ -62,7 +62,7 @@ defmodule DSEx.Predict.Predict do
       "signature" => DSEx.Signature.dump(predict.signature),
       "demos" => Enum.map(predict.demos, &DSEx.Example.to_map/1),
       "config" => encode_keyword(predict.config),
-      "metadata" => predict.metadata,
+      "metadata" => DSEx.Optimizer.Report.json_safe(predict.metadata),
       "adapter" => predict |> resolve_adapter() |> Atom.to_string(),
       "lm" => dump_lm(predict.lm),
       "dynamic_lm" => predict.dynamic_lm?,

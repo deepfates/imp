@@ -380,4 +380,37 @@ defmodule ProductionAdapterPersistenceTest do
 
     assert DSEx.Prediction.get(prediction, :answer) == "settings-ok"
   end
+
+  test "save/load preserves optimizer reports on compiled programs" do
+    trainset = [
+      DSEx.example(question: "Capital?", answer: "Paris")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    compiled =
+      "question -> answer"
+      |> DSEx.predict()
+      |> then(fn program ->
+        DSEx.Optimizer.LabeledFewShot.new(k: 1)
+        |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
+      end)
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "DSEx-compiled-save-#{System.unique_integer([:positive])}.json"
+      )
+
+    assert :ok = DSEx.Saving.save!(compiled, path)
+    loaded = DSEx.Saving.load!(path)
+    File.rm(path)
+
+    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
+             report = DSEx.Optimizer.Report.fetch(loaded)
+
+    assert report.metadata.selected_count == 1
+    assert [%{example: %DSEx.Example{} = example, selected?: true}] = report.candidates
+    assert DSEx.Example.get(example, :answer) == "Paris"
+    assert length(loaded.demos) == 1
+  end
 end

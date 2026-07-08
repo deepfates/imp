@@ -37,7 +37,11 @@ defmodule DSEx.Saving do
     signature = Map.fetch!(state, "signature")
     demos = require_list!(state, "demos")
     config = Map.fetch!(state, "config")
-    metadata = require_map!(state, "metadata")
+
+    metadata =
+      state
+      |> require_map!("metadata")
+      |> DSEx.Optimizer.Report.restore_json_safe()
 
     opts =
       [

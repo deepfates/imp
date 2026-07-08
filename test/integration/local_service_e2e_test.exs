@@ -148,6 +148,59 @@ defmodule LocalServiceE2ETest do
     assert_code_act_json_tool_arguments(tool)
   end
 
+  test "optimized programs save load rebind and evaluate end to end" do
+    trainset = [
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    devset = [
+      DSEx.example(question: "France capital?", answer: "Paris")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    program = DSEx.predict("question -> answer")
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
+
+    path =
+      Path.join(System.tmp_dir!(), "dsex-compiled-#{System.unique_integer([:positive])}.json")
+
+    assert :ok = DSEx.Saving.save!(compiled, path)
+
+    loaded = DSEx.Saving.load!(path)
+    File.rm(path)
+
+    report = DSEx.Optimizer.Report.fetch(loaded)
+    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} = report
+    assert [%{example: %DSEx.Example{} = example, selected?: true}] = report.candidates
+    assert DSEx.Example.get(example, :answer) == "Paris"
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "Capital of France?",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      ]
+    }
+
+    result =
+      DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+        devset
+        |> DSEx.Evaluate.new(DSEx.Metrics.exact_match(:answer))
+        |> DSEx.Evaluate.run(loaded)
+      end)
+
+    assert result.score == 1.0
+  end
+
   defp assert_react_json_tool_arguments(tool) do
     {:ok, actions} =
       Agent.start_link(fn ->
