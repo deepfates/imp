@@ -5,9 +5,25 @@ defmodule DSEx.Datasets do
     defexception [:message, :path, :line, :record]
   end
 
+  @records_option_schema [
+    source: [type: :any, default: "records"],
+    record: [type: :any, default: nil]
+  ]
+
+  @file_records_option_schema [
+    source: [type: :any],
+    record: [type: :any]
+  ]
+
+  @split_option_schema [
+    train: [type: :any, default: 0.8],
+    shuffle: [type: :boolean, default: true]
+  ]
+
   def from_records(records, input_keys, opts \\ []) do
-    source = Keyword.get(opts, :source, "records")
-    record_module = Keyword.get(opts, :record)
+    opts = DSEx.Options.validate!(opts, @records_option_schema, "DSEx.Datasets.from_records/3")
+    source = opts[:source]
+    record_module = opts[:record]
 
     records
     |> Enum.with_index(1)
@@ -21,6 +37,8 @@ defmodule DSEx.Datasets do
   end
 
   def jsonl(path, input_keys, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @file_records_option_schema, "DSEx.Datasets.jsonl/3")
+
     path
     |> File.stream!()
     |> Stream.with_index(1)
@@ -31,6 +49,8 @@ defmodule DSEx.Datasets do
   end
 
   def csv(path, input_keys, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @file_records_option_schema, "DSEx.Datasets.csv/3")
+
     rows =
       path
       |> File.read!()
@@ -54,8 +74,9 @@ defmodule DSEx.Datasets do
     do: jsonl(path, [:question, :context], record: DSEx.Datasets.HotPotQA.Record)
 
   def split(examples, opts \\ []) do
-    train = train_fraction!(Keyword.get(opts, :train, 0.8))
-    shuffled = if Keyword.get(opts, :shuffle, true), do: Enum.shuffle(examples), else: examples
+    opts = DSEx.Options.validate!(opts, @split_option_schema, "DSEx.Datasets.split/2")
+    train = train_fraction!(opts[:train])
+    shuffled = if opts[:shuffle], do: Enum.shuffle(examples), else: examples
     count = floor(length(shuffled) * train)
     Enum.split(shuffled, count)
   end
@@ -170,6 +191,11 @@ defmodule DSEx.Datasets do
   defp normalize_key(key) when is_atom(key), do: key
   defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
 
+  defp normalize_key(key) do
+    raise ArgumentError,
+          "DSEx.Datasets input keys and record keys must be atoms or strings; got: #{inspect(key)}"
+  end
+
   defp existing_atom_or_string(key) do
     String.to_existing_atom(key)
   rescue
@@ -197,22 +223,36 @@ defmodule DSEx.Datasets.Dataset do
   @moduledoc "Dataset container with train/dev/test splits."
   defstruct train: [], dev: [], test: [], metadata: %{}
 
+  @option_schema [
+    train: [type: :any, default: 0.8],
+    shuffle: [type: :boolean, default: false],
+    metadata: [type: {:map, :any, :any}, default: %{}]
+  ]
+
   def new(examples, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Datasets.Dataset.new/2")
+
     {train, rest} =
       DSEx.Datasets.split(examples,
-        train: Keyword.get(opts, :train, 0.8),
-        shuffle: Keyword.get(opts, :shuffle, false)
+        train: opts[:train],
+        shuffle: opts[:shuffle]
       )
 
     {dev, test} = Enum.split(rest, div(length(rest), 2))
-    %__MODULE__{train: train, dev: dev, test: test, metadata: Keyword.get(opts, :metadata, %{})}
+    %__MODULE__{train: train, dev: dev, test: test, metadata: opts[:metadata]}
   end
 end
 
 defmodule DSEx.Datasets.DataLoader do
   @moduledoc "Loader facade for JSONL/CSV records."
 
+  @option_schema [
+    format: [type: :any]
+  ]
+
   def load(path, input_keys, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Datasets.DataLoader.load/3")
+
     case Keyword.get(opts, :format, Path.extname(path)) do
       ".csv" -> DSEx.Datasets.csv(path, input_keys)
       _ -> DSEx.Datasets.jsonl(path, input_keys)

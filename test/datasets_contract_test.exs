@@ -61,6 +61,67 @@ defmodule DatasetsContractTest do
     end
   end
 
+  test "dataset APIs report invalid option containers clearly" do
+    examples = [
+      DSEx.example(question: "a", answer: "b") |> DSEx.with_inputs(:question)
+    ]
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.from_records\/3: expected keyword options/,
+                 fn ->
+                   Datasets.from_records([%{question: "a"}], [:question], :not_options)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Datasets\.split\/2: expected keyword options/, fn ->
+      Datasets.split(examples, :not_options)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.Dataset\.new\/2: expected keyword options/,
+                 fn ->
+                   Datasets.Dataset.new(examples, :not_options)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.Dataset\.new\/2.*:metadata.*expected.*map/s,
+                 fn ->
+                   Datasets.Dataset.new(examples, metadata: :not_metadata)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.DataLoader\.load\/3: expected keyword options/,
+                 fn ->
+                   Datasets.DataLoader.load("missing.jsonl", [:question], :not_options)
+                 end
+  end
+
+  test "dataset APIs report invalid input and record keys clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets input keys and record keys must be atoms or strings/,
+                 fn ->
+                   Datasets.from_records([%{question: "a"}], [123])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets input keys and record keys must be atoms or strings/,
+                 fn ->
+                   Datasets.from_records([%{123 => "a"}], [:question],
+                     record: Datasets.GSM8K.Record
+                   )
+                 end
+  end
+
+  test "JSONL option validation preserves path-backed source context" do
+    path = tmp_path("missing-with-options.jsonl")
+    File.write!(path, ~s({"answer":"4"}\n))
+
+    assert_raise Datasets.Error, ~r/invalid dataset record at #{Regex.escape(path)}:1/, fn ->
+      Datasets.jsonl(path, [:question], record: Datasets.GSM8K.Record)
+    end
+  after
+    cleanup_tmp("missing-with-options.jsonl")
+  end
+
   test "typed dataset records load as examples for GSM8K HotPotQA MATH and Colors" do
     gsm8k_path = tmp_path("typed-gsm8k.jsonl")
     hotpot_path = tmp_path("typed-hotpot.jsonl")
