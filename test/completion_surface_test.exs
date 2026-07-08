@@ -7,6 +7,29 @@ defmodule CompletionSurfaceTest do
     def embed(_texts, _opts), do: raise("embed exploded")
   end
 
+  defmodule StreamingRaisingAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: raise("streaming format exploded")
+    def parse(_signature, _raw, _opts), do: {:ok, DSEx.prediction(answer: "unused")}
+  end
+
+  defmodule StreamingInvalidLMOptsAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
+    def parse(_signature, _raw, _opts), do: {:ok, DSEx.prediction(answer: "unused")}
+    def lm_opts(_signature, _opts), do: %{response_format: %{type: "json_object"}}
+  end
+
+  defmodule StreamingLMOptsAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
+    def parse(_signature, _raw, _opts), do: {:ok, DSEx.prediction(answer: "unused")}
+    def lm_opts(_signature, _opts), do: [marker: :from_adapter]
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -349,6 +372,69 @@ defmodule CompletionSurfaceTest do
            ] =
              DSEx.Streaming.stream(missing_lm, %{question: "q"}, provider_stream: true)
              |> Enum.to_list()
+  end
+
+  test "provider streaming reports adapter setup failures as error chunks" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+
+    raising_format = DSEx.predict("question -> answer", lm: lm, adapter: StreamingRaisingAdapter)
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk:
+                 {:error,
+                  {:adapter_format_failed, StreamingRaisingAdapter, "streaming format exploded"}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(raising_format, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+
+    invalid_lm_opts =
+      DSEx.predict("question -> answer", lm: lm, adapter: StreamingInvalidLMOptsAdapter)
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk:
+                 {:error,
+                  {:invalid_adapter_lm_opts, StreamingInvalidLMOptsAdapter, %{response_format: _}}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(invalid_lm_opts, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+
+    unloaded = DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingStreamAdapter")
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:adapter_not_loaded, :"Elixir.MissingStreamAdapter", :nofile}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(unloaded, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+  end
+
+  test "provider streaming applies adapter supplied LM options" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, opts ->
+          send(self(), {:streaming_lm_opts, opts})
+          %{answer: "ok"}
+        end
+      ]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm, adapter: StreamingLMOptsAdapter)
+
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: %{answer: "ok"}}] =
+             DSEx.Streaming.stream(program, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+
+    assert_received {:streaming_lm_opts, opts}
+    assert Keyword.fetch!(opts, :marker) == :from_adapter
   end
 
   test "streaming fallback collects structured outputs in signature order" do

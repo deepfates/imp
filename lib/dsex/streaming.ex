@@ -53,13 +53,15 @@ defmodule DSEx.Streaming do
           else: program.adapter || settings.adapter
 
       lm = if program.dynamic_lm?, do: settings.lm, else: program.lm
-      messages = adapter.format(program.signature, inputs, demos: program.demos)
+      config = Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream, :chunker]))
 
-      stream_lm(
-        lm,
-        messages,
-        Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream, :chunker]))
-      )
+      with {:ok, messages} <-
+             format_with_adapter(adapter, program.signature, inputs, demos: program.demos),
+           {:ok, lm_opts} <- adapter_lm_opts(adapter, program.signature, config) do
+        stream_lm(lm, messages, lm_opts)
+      else
+        {:error, reason} -> error_response(reason)
+      end
     else
       {:error, reason} ->
         [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
@@ -122,6 +124,54 @@ defmodule DSEx.Streaming do
 
   defp error_response(reason),
     do: [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
+
+  defp format_with_adapter(adapter, signature, inputs, opts) do
+    with :ok <- ensure_adapter_loaded(adapter),
+         true <- function_exported?(adapter, :format, 3) do
+      {:ok, adapter.format(signature, inputs, opts)}
+    else
+      {:error, _reason} = error -> error
+      false -> {:error, {:invalid_adapter, adapter, :format}}
+    end
+  rescue
+    error -> {:error, {:adapter_format_failed, adapter, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:adapter_format_failed, adapter, {kind, reason}}}
+  end
+
+  defp adapter_lm_opts(adapter, signature, config) do
+    with :ok <- ensure_adapter_loaded(adapter),
+         true <- function_exported?(adapter, :lm_opts, 2),
+         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config) do
+      {:ok, Keyword.merge(config, opts)}
+    else
+      false -> {:ok, config}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp call_adapter_lm_opts(adapter, signature, config) do
+    opts = adapter.lm_opts(signature, config)
+
+    if Keyword.keyword?(opts) do
+      {:ok, opts}
+    else
+      {:error, {:invalid_adapter_lm_opts, adapter, opts}}
+    end
+  rescue
+    error -> {:error, {:adapter_lm_opts_failed, adapter, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:adapter_lm_opts_failed, adapter, {kind, reason}}}
+  end
+
+  defp ensure_adapter_loaded(adapter) when is_atom(adapter) do
+    case Code.ensure_loaded(adapter) do
+      {:module, _module} -> :ok
+      {:error, reason} -> {:error, {:adapter_not_loaded, adapter, reason}}
+    end
+  end
+
+  defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
 
   defp stream_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
   defp stream_value(value), do: value
