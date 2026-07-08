@@ -24,6 +24,7 @@ defmodule DSEx.Predict.ProgramOfThought do
           DSEx.Signature.Field.new(
             %{
               name: :program,
+              type: :any,
               desc: "Safe Elixir expression to evaluate",
               metadata: %{optional: true}
             },
@@ -65,7 +66,7 @@ defmodule DSEx.Predict.ProgramOfThought do
     else
       nil -> {:error, :missing_program}
       {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_program, other}}
+      other -> {:error, {:invalid_generated_program, other}}
     end
   end
 

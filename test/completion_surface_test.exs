@@ -52,6 +52,18 @@ defmodule CompletionSurfaceTest do
                  end
   end
 
+  test "ProgramOfThought reports malformed generated code explicitly" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: %{not: "source"}} end]
+    }
+
+    program = DSEx.Predict.ProgramOfThought.new("x -> answer", lm: lm)
+
+    assert {:error, {:invalid_generated_program, %{not: "source"}}} =
+             DSEx.Predict.ProgramOfThought.call(program, %{x: 3})
+  end
+
   test "CodeAct loops through tool observations before evaluating a program" do
     actions = [
       %{tool: "lookup", arguments: %{"key" => "n"}},

@@ -148,7 +148,7 @@ caught before merge, not only during local release preparation.
 
 `mix package.check` verifies the Hex package boundary. It checks that the
 installable package contains product modules, docs, and Livebooks while
-excluding local benchmark evidence tasks, historical compatibility modules, and
+excluding local benchmark evidence tasks, Mix-only proof harnesses, and
 test-only support.
 
 In a source checkout, `mix evidence.check` runs deterministic maintainer

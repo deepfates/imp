@@ -141,6 +141,16 @@ defmodule ProductionAdapterPersistenceTest do
     assert DSEx.Prediction.get(json, :score) == 1.0
   end
 
+  test "chat adapter reports structured field type errors without crashing" do
+    signature = DSEx.signature("question -> answer: string")
+
+    assert {:error, %DSEx.AdapterParseError{} = error} =
+             DSEx.Adapter.Chat.parse(signature, %{"answer" => %{"nested" => true}}, [])
+
+    assert error.message =~ "answer: expected string"
+    assert error.reason == %{answer: %{"nested" => true}}
+  end
+
   test "XML adapter validates parsed fields through the shared adapter contract" do
     signature = DSEx.signature("question -> answer: string, score: int")
 

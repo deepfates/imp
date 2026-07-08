@@ -100,7 +100,10 @@ defmodule DSEx.Adapter.Chat do
     end)
   end
 
-  defp coerce_value(value, :string) when not is_binary(value), do: to_string(value)
+  defp coerce_value(value, :string) when is_atom(value) or is_number(value) or is_boolean(value),
+    do: to_string(value)
+
+  defp coerce_value(value, :string), do: value
 
   defp coerce_value(value, :integer) when is_binary(value) do
     case Integer.parse(String.trim(value)) do
