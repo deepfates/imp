@@ -166,7 +166,7 @@ return retry feedback suitable for another model attempt.
 ## Release Evidence
 
 DSEx keeps release evidence behind Mix gates rather than presenting benchmark
-helpers as application APIs:
+helpers as application APIs. In a source checkout:
 
 ```sh
 mix production.check

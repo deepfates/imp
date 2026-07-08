@@ -148,7 +148,8 @@ installable package contains product modules, docs, and Livebooks while
 excluding local benchmark evidence tasks, historical compatibility modules, and
 test-only support.
 
-`mix evidence.check` runs deterministic maintainer evidence:
+In a source checkout, `mix evidence.check` runs deterministic maintainer
+evidence. These commands are not shipped as package APIs:
 
 - benchmark truth fixture harness tests through `mix benchmark.truth.check`
 - provider-free DSEx-vs-DSPy golden trace parity through
@@ -168,23 +169,25 @@ The live provider tests prove a real provider can execute:
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
-`mix benchmark.live.check` is a separate research smoke gate. It fetches fresh
-GSM8K and HotPotQA rows and runs DSEx programs over a live provider, writing
-result artifacts under `benchmarks/results/`. It is intentionally not part of
-the fast production gate because it spends provider tokens and depends on
-external dataset and provider availability.
+In a source checkout, `mix benchmark.live.check` is a separate research smoke
+gate. It fetches fresh GSM8K and HotPotQA rows and runs DSEx programs over a
+live provider, writing result artifacts under `benchmarks/results/`. It is
+intentionally not part of the fast production gate because it spends provider
+tokens and depends on external dataset and provider availability.
 
-`mix benchmark.parity.check` is a live smoke comparison: it runs DSEx and the
-real Python DSPy package against the same rows and model endpoint, then writes a
-parity artifact with score, latency, error, row-level agreement, and evidence
-scale. It requires a local Python environment with `dspy-ai` installed and live
-provider credentials. It proves wiring, not full parity.
+In a source checkout, `mix benchmark.parity.check` is a live smoke comparison:
+it runs DSEx and the real Python DSPy package against the same rows and model
+endpoint, then writes a parity artifact with score, latency, error, row-level
+agreement, and evidence scale. It requires a local Python environment with
+`dspy-ai` installed and live provider credentials. It proves wiring, not full
+parity.
 
-`mix benchmark.parity.full` is the expensive evidence lane. It fetches the full
-canonical GSM8K test and HotPotQA distractor validation splits, uses current
-OpenAI-compatible model discovery when `OPENAI_MODEL` is unset, and writes the
-same DSEx-vs-DSPy report schema over the full row set. Use full-lane artifacts,
-not smoke runs, before making production parity claims.
+In a source checkout, `mix benchmark.parity.full` is the expensive evidence
+lane. It fetches the full canonical GSM8K test and HotPotQA distractor
+validation splits, uses current OpenAI-compatible model discovery when
+`OPENAI_MODEL` is unset, and writes the same DSEx-vs-DSPy report schema over
+the full row set. Use full-lane artifacts, not smoke runs, before making
+production parity claims.
 
 For long campaigns, use the parity task in chunks with `--offset` and
 `--max-examples`, then aggregate the chunk artifacts with the parity aggregate
@@ -299,6 +302,7 @@ mix public_surface.check
 Maintainer evidence failure:
 
 ```sh
+# source checkout only
 mix evidence.check
 ```
 

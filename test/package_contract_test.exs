@@ -75,6 +75,7 @@ defmodule PackageContractTest do
       |> Enum.sort()
 
     assert_release_files(files)
+    assert_unpacked_mix_surface(output_dir)
   end
 
   test "shipped docs do not reference modules excluded from the Hex package" do
@@ -138,6 +139,42 @@ defmodule PackageContractTest do
       System.tmp_dir!(),
       "dsex-package-contract-#{System.unique_integer([:positive])}"
     ])
+  end
+
+  defp assert_unpacked_mix_surface(output_dir) do
+    script = """
+    Mix.start()
+    Code.require_file("mix.exs")
+
+    aliases =
+      Mix.Project.config()
+      |> Keyword.fetch!(:aliases)
+      |> Keyword.keys()
+      |> Enum.map(&to_string/1)
+
+    preferred_envs =
+      DSEx.MixProject.cli()
+      |> Keyword.fetch!(:preferred_envs)
+      |> Keyword.keys()
+      |> Enum.map(&to_string/1)
+
+    unavailable =
+      Enum.filter(aliases ++ preferred_envs, fn command ->
+        command == "evidence.check" or String.contains?(command, "benchmark")
+      end)
+
+    if unavailable != [] do
+      raise "unpacked package exposes unavailable maintainer commands: \#{inspect(unavailable)}"
+    end
+    """
+
+    {output, status} =
+      System.cmd("elixir", ["-e", script],
+        cd: output_dir,
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
   end
 
   defp documented_module_references(paths) do

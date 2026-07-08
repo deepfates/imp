@@ -32,34 +32,46 @@ defmodule DSEx.MixProject do
 
   def cli do
     [
-      preferred_envs: [
-        "production.check": :test,
-        "evidence.check": :test,
-        "public_surface.check": :test,
-        "integration.check": :test,
-        "protocol.check": :test,
-        "protocol.training.check": :test,
-        "protocol.retriever.check": :test,
-        "protocol.mcp.check": :test,
-        "benchmark.truth.check": :test,
-        "benchmark.live.check": :test,
-        "benchmark.dashboard": :test,
-        "benchmark.dashboard.full": :test,
-        "benchmark.live_matrix": :test,
-        "dsex.benchmark.hotpotqa_analysis": :test,
-        "benchmark.hotpotqa_analysis": :test,
-        "benchmark.optimizer_lift.check": :test,
-        "benchmark.overhead.check": :test,
-        "benchmark.rag_tool_agent.check": :test,
-        "benchmark.parity.check": :test,
-        "benchmark.parity.full": :test,
-        "live.check": :test,
-        "livebook.check": :test,
-        "livebook.execute.check": :test,
-        "package.check": :test,
-        "quality.check": :test
-      ]
+      preferred_envs: preferred_envs()
     ]
+  end
+
+  defp preferred_envs do
+    base_preferred_envs = [
+      "production.check": :test,
+      "public_surface.check": :test,
+      "integration.check": :test,
+      "protocol.check": :test,
+      "protocol.training.check": :test,
+      "protocol.retriever.check": :test,
+      "protocol.mcp.check": :test,
+      "live.check": :test,
+      "livebook.check": :test,
+      "livebook.execute.check": :test,
+      "package.check": :test,
+      "quality.check": :test
+    ]
+
+    if benchmark_tasks_available?() do
+      base_preferred_envs ++
+        [
+          "evidence.check": :test,
+          "benchmark.truth.check": :test,
+          "benchmark.live.check": :test,
+          "benchmark.dashboard": :test,
+          "benchmark.dashboard.full": :test,
+          "benchmark.live_matrix": :test,
+          "dsex.benchmark.hotpotqa_analysis": :test,
+          "benchmark.hotpotqa_analysis": :test,
+          "benchmark.optimizer_lift.check": :test,
+          "benchmark.overhead.check": :test,
+          "benchmark.rag_tool_agent.check": :test,
+          "benchmark.parity.check": :test,
+          "benchmark.parity.full": :test
+        ]
+    else
+      base_preferred_envs
+    end
   end
 
   # Run "mix help deps" to learn about dependencies.
@@ -144,7 +156,7 @@ defmodule DSEx.MixProject do
   end
 
   defp aliases do
-    [
+    base_aliases = [
       "public_surface.check": ["test test/public_surface_test.exs"],
       "production.check": [
         "format --check-formatted",
@@ -157,13 +169,6 @@ defmodule DSEx.MixProject do
       ],
       "docs.clean": [
         &clean_docs/1
-      ],
-      "evidence.check": [
-        "benchmark.truth.check",
-        "benchmark.trace.check",
-        "benchmark.overhead.check",
-        "benchmark.optimizer_lift.check",
-        "benchmark.rag_tool_agent.check"
       ],
       "integration.check": [
         "test --only integration test/integration"
@@ -179,6 +184,40 @@ defmodule DSEx.MixProject do
       ],
       "protocol.mcp.check": [
         "test --only protocol_mcp test/protocol_mcp"
+      ],
+      "live.check": [
+        "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
+      ],
+      "package.check": [
+        "test test/package_contract_test.exs",
+        "cmd mix hex.build --unpack --output tmp/package-check"
+      ],
+      "livebook.check": [
+        "test.livebooks --path livebooks"
+      ],
+      "livebook.execute.check": [
+        "test.livebooks --path livebooks --execute"
+      ],
+      "quality.check": [
+        "credo --only warning"
+      ]
+    ]
+
+    if benchmark_tasks_available?() do
+      base_aliases ++ benchmark_aliases()
+    else
+      base_aliases
+    end
+  end
+
+  defp benchmark_aliases do
+    [
+      "evidence.check": [
+        "benchmark.truth.check",
+        "benchmark.trace.check",
+        "benchmark.overhead.check",
+        "benchmark.optimizer_lift.check",
+        "benchmark.rag_tool_agent.check"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
@@ -219,24 +258,12 @@ defmodule DSEx.MixProject do
       "benchmark.parity.full": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data",
         "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
-      ],
-      "live.check": [
-        "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
-      ],
-      "package.check": [
-        "test test/package_contract_test.exs",
-        "cmd mix hex.build --unpack --output tmp/package-check"
-      ],
-      "livebook.check": [
-        "test.livebooks --path livebooks"
-      ],
-      "livebook.execute.check": [
-        "test.livebooks --path livebooks --execute"
-      ],
-      "quality.check": [
-        "credo --only warning"
       ]
     ]
+  end
+
+  defp benchmark_tasks_available? do
+    File.exists?("lib/mix/tasks/dsex.benchmark.run.ex")
   end
 
   defp clean_docs(_args), do: File.rm_rf!("doc")
