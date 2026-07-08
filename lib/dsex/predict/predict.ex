@@ -1,5 +1,30 @@
 defmodule DSEx.Predict.Predict do
-  @moduledoc "Basic DSEx module that maps signature inputs to outputs with an LM."
+  @moduledoc """
+  Basic DSEx program that maps signature inputs to typed outputs with an LM.
+
+  `Predict` is the smallest executable DSEx module. It formats a signature and
+  input map with an adapter, calls the configured LM, parses the result into a
+  `DSEx.Prediction`, and attaches trace metadata. Most higher-level modules
+  such as ChainOfThought, RAG, ReAct, BestOfN, and optimizers eventually compose
+  around this shape.
+
+  Required inputs are validated before an LM call is made. This keeps missing
+  data as a local program error instead of spending provider calls on malformed
+  prompts.
+
+  ## Example
+
+      iex> lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+      iex> program = DSEx.Predict.Predict.new("question -> answer", lm: lm)
+      iex> {:ok, prediction} = DSEx.Predict.Predict.call(program, %{question: "2+2?"})
+      iex> DSEx.Prediction.get(prediction, :answer)
+      "4"
+
+      iex> silent_lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "unused"} end]}
+      iex> missing = DSEx.Predict.Predict.new("question, context -> answer", lm: silent_lm)
+      iex> DSEx.Predict.Predict.call(missing, %{question: "2+2?"})
+      {:error, {:missing_input_fields, [:context]}}
+  """
 
   @behaviour DSEx.Module
 
@@ -15,6 +40,14 @@ defmodule DSEx.Predict.Predict do
     dynamic_adapter?: true
   ]
 
+  @doc """
+  Builds a prediction program.
+
+  Pass `:lm` and `:adapter` for a self-contained program, or omit them to resolve
+  from process/global DSEx settings at call time. `:demos`, `:config`, and
+  `:metadata` are retained on the program and participate in dump/load where
+  supported.
+  """
   def new(signature, opts \\ []) do
     %__MODULE__{
       signature: DSEx.Signature.ensure(signature),
@@ -28,6 +61,13 @@ defmodule DSEx.Predict.Predict do
     }
   end
 
+  @doc """
+  Calls the program with a map or keyword list of inputs.
+
+  Returns `{:ok, prediction}` on success or `{:error, reason}` for local input
+  errors, LM errors, or adapter parse errors. Successful predictions include
+  redacted trace metadata with the rendered messages and raw LM output.
+  """
   @impl true
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
     with {:ok, lm} <- require_lm(resolve_lm(predict)),
@@ -52,12 +92,17 @@ defmodule DSEx.Predict.Predict do
     end
   end
 
+  @doc "Returns a copy of the program with demonstrations attached."
   def with_demos(%__MODULE__{} = predict, demos), do: %{predict | demos: List.wrap(demos)}
+
+  @doc "Returns a copy of the program pinned to a concrete LM."
   def with_lm(%__MODULE__{} = predict, lm), do: %{predict | lm: lm, dynamic_lm?: false}
 
+  @doc "Returns a copy of the program with a new signature."
   def with_signature(%__MODULE__{} = predict, signature),
     do: %{predict | signature: DSEx.Signature.ensure(signature)}
 
+  @doc "Serializes portable program state for `DSEx.Saving`."
   def dump(%__MODULE__{} = predict) do
     %{
       "signature" => DSEx.Signature.dump(predict.signature),
