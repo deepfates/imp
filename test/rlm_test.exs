@@ -89,7 +89,7 @@ defmodule RLMPublicSurfaceTest do
              DSEx.Predict.RLM.call(rlm, %{question: "q"})
   end
 
-  test "RLM normalizes non-positive budgets and preview limits conservatively" do
+  test "RLM treats zero budgets and preview limits conservatively" do
     parent = self()
 
     lm = %{
@@ -105,9 +105,9 @@ defmodule RLMPublicSurfaceTest do
     exhausted =
       DSEx.Predict.RLM.new("question -> answer",
         lm: lm,
-        max_iterations: -2,
-        max_llm_calls: -3,
-        max_time_ms: -4
+        max_iterations: 0,
+        max_llm_calls: 0,
+        max_time_ms: 0
       )
 
     assert {:error, {:rlm_max_iterations, 0, []}} =
@@ -118,8 +118,8 @@ defmodule RLMPublicSurfaceTest do
     preview =
       DSEx.Predict.RLM.new("context, values -> answer",
         lm: lm,
-        max_preview_chars: -1,
-        max_observation_chars: -1
+        max_preview_chars: 0,
+        max_observation_chars: 0
       )
 
     assert {:ok, prediction} =
@@ -149,6 +149,18 @@ defmodule RLMPublicSurfaceTest do
                  ~r/DSEx\.Predict\.RLM\.new\/2 expects :tools to contain DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.RLM.new("question -> answer", tools: [:not_a_tool])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :max_iterations option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.RLM.new("question -> answer", max_iterations: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :max_preview_chars option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.RLM.new("question -> answer", max_preview_chars: -1)
                  end
 
     rlm = DSEx.Predict.RLM.new("question -> answer", lm: nil)

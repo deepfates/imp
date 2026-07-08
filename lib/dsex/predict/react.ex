@@ -38,7 +38,7 @@ defmodule DSEx.Predict.ReAct do
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
-    max_iters: [type: :any, default: 20],
+    max_iters: [type: :non_neg_integer, default: 20],
     tool_policy: [type: :any, default: :allow]
   ]
 
@@ -334,6 +334,5 @@ defmodule DSEx.Predict.ReAct do
     ArgumentError -> to_string(key)
   end
 
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
+  defp non_negative_integer(value) when is_integer(value) and value >= 0, do: value
 end

@@ -60,12 +60,12 @@ defmodule DSEx.Predict.RLM do
     sub_lm: [type: :any],
     tools: [type: :any, default: []],
     tool_policy: [type: :any, default: :allow],
-    max_iterations: [type: :any, default: 10],
-    max_llm_calls: [type: :any, default: 20],
-    max_time_ms: [type: :any],
-    max_preview_chars: [type: :any, default: 2_000],
-    max_observation_chars: [type: :any, default: 10_000],
-    max_output_chars: [type: :any]
+    max_iterations: [type: :non_neg_integer, default: 10],
+    max_llm_calls: [type: :non_neg_integer, default: 20],
+    max_time_ms: [type: :non_neg_integer],
+    max_preview_chars: [type: :non_neg_integer, default: 2_000],
+    max_observation_chars: [type: :non_neg_integer, default: 10_000],
+    max_output_chars: [type: :non_neg_integer]
   ]
 
   def new(signature, opts \\ []) do
@@ -497,9 +497,8 @@ defmodule DSEx.Predict.RLM do
     ArgumentError -> inspect(value)
   end
 
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
+  defp non_negative_integer(value) when is_integer(value) and value >= 0, do: value
 
   defp non_negative_integer_or_nil(nil), do: nil
-  defp non_negative_integer_or_nil(value), do: non_negative_integer(value)
+  defp non_negative_integer_or_nil(value) when is_integer(value) and value >= 0, do: value
 end

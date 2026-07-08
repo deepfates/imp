@@ -50,7 +50,7 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
-  test "non-positive max_iters fails before calling the model" do
+  test "zero max_iters fails before calling the model" do
     parent = self()
 
     lm = %{
@@ -63,7 +63,7 @@ defmodule ReActContractTest do
       ]
     }
 
-    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: -3)
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 0)
 
     assert {:error, {:react_max_iters, []}} =
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
@@ -86,6 +86,12 @@ defmodule ReActContractTest do
                  ~r/DSEx\.Predict\.ReAct\.new\/3 expects tools to contain DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.ReAct.new("question -> answer", [:not_a_tool])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ReAct\.new\/3: invalid value for :max_iters option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.ReAct.new("question -> answer", [], max_iters: -1)
                  end
 
     agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: nil)
