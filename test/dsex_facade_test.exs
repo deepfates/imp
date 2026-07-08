@@ -37,13 +37,47 @@ defmodule DSExFacadeTest do
 
   test "facade attaches demos and builds tools" do
     program = DSEx.predict("question -> answer")
+    cot = DSEx.chain_of_thought("question -> answer")
+    rag = DSEx.rag(program, DSEx.Retrieve.Memory.new([%{text: "2+2 is 4"}]))
     demo = DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
 
     assert %{demos: [^demo]} = DSEx.with_demos(program, [demo])
+    assert %{predict: %{demos: [^demo]}} = DSEx.with_demos(cot, [demo])
+    assert %{program: %{demos: [^demo]}} = DSEx.with_demos(rag, [demo])
     assert %{demos: [^demo]} = DSEx.with_demos(DSEx.example(question: "q"), demo)
 
     tool = DSEx.tool(:lookup, "lookup", fn %{key: "x"} -> "y" end)
     assert DSEx.Tool.call(tool, %{key: "x"}) == "y"
+  end
+
+  test "facade evaluates and optimizes through the golden path" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    trainset = [
+      DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
+    ]
+
+    devset = [
+      DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
+    ]
+
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(program, devset, metric)
+
+    assert %{demos: [_]} =
+             DSEx.optimize(program, DSEx.Optimizer.LabeledFewShot.new(k: 1), trainset)
+
+    random_search = DSEx.Optimizer.RandomSearch.new(metric, candidates: 1, demos_per_candidate: 1)
+    compiled = DSEx.optimize(program, random_search, trainset, devset)
+
+    assert %DSEx.Optimizer.Report{optimizer: :random_search} =
+             DSEx.Optimizer.Report.fetch(compiled)
   end
 
   test "call reports non-callable values instead of raising" do

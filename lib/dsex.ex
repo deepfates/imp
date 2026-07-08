@@ -121,10 +121,17 @@ defmodule DSEx do
   """
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
 
-  @doc "Attaches demonstrations to a prediction program or example."
+  @doc "Attaches demonstrations to a prediction program, ChainOfThought program, RAG wrapper, or example."
   def with_demos(program_or_example, demos)
 
   def with_demos(%Predict{} = predict, demos), do: Predict.with_demos(predict, demos)
+
+  def with_demos(%ChainOfThought{predict: predict} = cot, demos),
+    do: %{cot | predict: Predict.with_demos(predict, demos)}
+
+  def with_demos(%RAG{program: program} = rag, demos),
+    do: %{rag | program: with_demos(program, demos)}
+
   def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
 
   @doc "Creates a program that asks for reasoning before final outputs."
@@ -152,6 +159,55 @@ defmodule DSEx do
 
   @doc "Calls any DSEx program struct."
   defdelegate call(program, inputs), to: DSEx.Module
+
+  @doc """
+  Evaluates a program against examples with a metric.
+
+  This is the facade form of:
+
+      devset
+      |> DSEx.Evaluate.new(metric, opts)
+      |> DSEx.Evaluate.run(program)
+  """
+  def evaluate(program, devset, metric, opts \\ []) do
+    devset
+    |> DSEx.Evaluate.new(metric, opts)
+    |> DSEx.Evaluate.run(program)
+  end
+
+  @doc """
+  Compiles a program with an optimizer.
+
+  Use `DSEx.optimize/4` for optimizers that need a dev set, such as
+  `RandomSearch`, `COPRO`, `MIPROv2`, `SIMBA`, and `GEPA`. Use
+  `DSEx.optimize/3` for trainset-only optimizers such as `LabeledFewShot`.
+  """
+  def optimize(program, optimizer, trainset)
+
+  def optimize(program, %module{} = optimizer, trainset) do
+    if function_exported?(module, :compile, 3) do
+      module.compile(optimizer, program, trainset)
+    else
+      raise ArgumentError,
+            "#{inspect(module)} cannot compile through DSEx.optimize/3; pass a devset with DSEx.optimize/4"
+    end
+  end
+
+  def optimize(program, optimizer, trainset, devset)
+
+  def optimize(program, %module{} = optimizer, trainset, devset) do
+    cond do
+      function_exported?(module, :compile, 4) ->
+        module.compile(optimizer, program, trainset, devset)
+
+      function_exported?(module, :compile, 3) ->
+        module.compile(optimizer, program, trainset)
+
+      true ->
+        raise ArgumentError,
+              "#{inspect(module)} is not a DSEx optimizer with compile/3 or compile/4"
+    end
+  end
 
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: DSEx.Clients.ReqLLM.new(model_spec, opts)

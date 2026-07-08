@@ -45,6 +45,7 @@ credentials.
 3. Open [Livebook 01](../livebooks/01_programming_not_prompting.livemd).
 4. Add one metric and one tiny dev set.
 5. Run `mix production.check` before trusting a change.
+6. Run `mix livebook.execute.check` after changing public examples or notebooks.
 
 ## Maintainer Evidence
 

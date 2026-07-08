@@ -78,12 +78,12 @@ program = DSEx.predict(signature)
 | Calling models | `DSEx.predict/2` | One LM call with validated structured output |
 | Testing | `DSEx.LM.Static` | Deterministic examples without provider credentials |
 | Providers | `DSEx.req_llm/2` | ReqLLM-backed access to production model APIs |
-| Evaluation | `DSEx.Evaluate`, `DSEx.Metrics` | Scores, feedback, traces, metric metadata |
-| Optimization | `DSEx.Optimizer.*` | Better demos, instructions, and program variants |
+| Evaluation | `DSEx.evaluate/4`, `DSEx.Metrics` | Scores, feedback, traces, metric metadata |
+| Optimization | `DSEx.optimize/4`, `DSEx.Optimizer.*` | Better demos, instructions, and program variants |
 | Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
 | Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
 | Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |
-| Operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, and docs |
+| Operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, Livebook validation, and docs |
 
 ## Installation
 
@@ -105,6 +105,55 @@ def deps do
     {:dsex, github: "deepfates/dsex"}
   ]
 end
+```
+
+## Your First DSEx App
+
+In a new Elixir app, keep the first DSEx program deterministic and testable:
+
+```sh
+mix new qa_bot --sup
+cd qa_bot
+```
+
+Add DSEx to `mix.exs`, then write a normal ExUnit test:
+
+```elixir
+defmodule QaBotTest do
+  use ExUnit.Case
+
+  test "answers through a declared DSEx program" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program =
+      "question -> answer: short_span"
+      |> DSEx.signature("Answer with the shortest correct span.")
+      |> DSEx.predict(lm: lm)
+
+    assert {:ok, prediction} =
+             DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+
+    assert DSEx.get(prediction, :answer) == "Paris"
+  end
+end
+```
+
+When the test is useful, move the LM dependency to runtime configuration or a
+request-scoped `DSEx.context/2` call:
+
+```elixir
+lm =
+  DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+    api_key: System.fetch_env!("OPENAI_API_KEY"),
+    temperature: 0
+  )
+
+DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+  DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+end)
 ```
 
 ## Common Workflows
@@ -134,10 +183,7 @@ devset = [
 
 metric = DSEx.Metrics.exact_match(:answer)
 
-report =
-  devset
-  |> DSEx.Evaluate.new(metric)
-  |> DSEx.Evaluate.run(program)
+report = DSEx.evaluate(program, devset, metric)
 
 report.score
 ```
@@ -156,9 +202,9 @@ optimizer =
   )
 
 compiled =
-  DSEx.Optimizer.RandomSearch.compile(
-    optimizer,
+  DSEx.optimize(
     program,
+    optimizer,
     trainset,
     devset
   )
@@ -205,15 +251,22 @@ The `livebooks/` directory contains runnable tutorials:
 
 ## Validation
 
-The everyday local gate proves the package is shippable without spending
-provider tokens or depending on external datasets:
+The everyday local quality gate checks the package without spending provider
+tokens or depending on external datasets:
 
 ```sh
 mix production.check
 ```
 
 It runs formatting, compilation with warnings as errors, deterministic tests,
-package-boundary checks, and ExDoc generation.
+package-boundary checks, Livebook validation, and ExDoc generation.
+
+When you change public examples or teaching material, also execute the shipped
+notebooks end to end:
+
+```sh
+mix livebook.execute.check
+```
 
 Provider-backed checks are opt-in because they use live credentials:
 

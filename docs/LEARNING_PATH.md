@@ -13,6 +13,8 @@ Goal: understand the shape of a DSEx program.
 4. Inspect `prediction.metadata.trace.messages`.
 5. Change the signature from `question -> answer` to a typed output such as
    `question -> answer: short_span`.
+6. If you are starting a real app, follow "Your First DSEx App" in `README.md`
+   and put the deterministic program under ExUnit before adding live providers.
 
 You should leave this step knowing that the prompt is generated from a
 signature, demos, inputs, and an adapter. The prompt matters, but it is not the
@@ -57,6 +59,8 @@ rewriting the task.
 4. Keep provider calls out of normal unit tests.
 5. Add opt-in live tests with `LIVE_PROVIDER=1 mix live.check`.
 6. Watch telemetry, traces, retries, and validation failures.
+7. Decide rollout, cost limits, provider-failure behavior, and data-retention
+   policy in the host application.
 
 The production move should change the LM dependency, not the shape of the
 program. That is the main design promise.

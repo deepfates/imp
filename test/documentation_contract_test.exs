@@ -23,6 +23,22 @@ defmodule DocumentationContractTest do
     assert body =~ ~r/Historical planning tickets are not release\s+criteria/
     assert body =~ "mix production.check"
     assert body =~ "mix benchmark.dashboard.full"
+    assert body =~ "mix livebook.execute.check"
+  end
+
+  test "user-facing docs name the executable Livebook proof" do
+    assert File.read!("README.md") =~ "mix livebook.execute.check"
+    assert File.read!("docs/README.md") =~ "mix livebook.execute.check"
+    assert File.read!("docs/PRODUCTION_OPERATIONS.md") =~ "mix livebook.execute.check"
+  end
+
+  test "README teaches the new-app onboarding path" do
+    body = File.read!("README.md")
+
+    assert body =~ "mix new qa_bot --sup"
+    assert body =~ "DSEx.LM.Static"
+    assert body =~ "DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat]"
+    assert body =~ "OPENAI_MODEL"
   end
 
   test "API guide ReAct example is executable with a deterministic tool-calling LM" do

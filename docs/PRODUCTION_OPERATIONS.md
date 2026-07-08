@@ -14,6 +14,13 @@ mix package.check
 mix quality.check
 ```
 
+When changing public examples, notebooks, or learning-material control flow,
+also run the slower executable Livebook proof:
+
+```sh
+mix livebook.execute.check
+```
+
 With live provider credentials, run the opt-in provider smoke gate:
 
 ```sh
@@ -98,10 +105,15 @@ Dependency policy:
 - compile with warnings as errors
 - the deterministic non-live, non-integration, non-protocol test suite
 - package-boundary checks through `mix package.check`
+- Livebook syntax validation through `mix livebook.check`
 - documentation generation with ExDoc
 
 It intentionally does not run paid provider calls, dataset fetches, long
 campaigns, or parity dashboards.
+
+`mix livebook.execute.check` runs every shipped notebook. Keep it out of the
+ordinary fast gate, but run it when changing public examples, notebook code, or
+the learning path.
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other

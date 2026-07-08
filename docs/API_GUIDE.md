@@ -3,8 +3,9 @@
 This guide is organized around the things you build.
 
 Most examples use the public `DSEx` facade. Reach for deeper `DSEx.*` modules
-when you need direct control over adapters, optimizers, tools, agents, or
-persistence.
+when you need direct control over adapters, optimizer reports, tools, agents, or
+persistence. The golden path is `Predict -> Evaluate -> Add demos -> Optimize
+-> Tools`.
 
 ## Configure An LM
 
@@ -52,6 +53,48 @@ program =
 DSEx.get(pred, :answer)
 ```
 
+## The Golden Path
+
+Start with one typed program, evaluate it, attach examples, then optimize only
+after the metric is meaningful:
+
+```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = DSEx.predict("question -> answer", lm: lm)
+
+trainset = [
+  DSEx.example(question: "Capital of France?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
+
+devset = [
+  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
+
+metric = DSEx.Metrics.exact_match(:answer)
+
+baseline = DSEx.evaluate(program, devset, metric)
+
+compiled =
+  program
+  |> DSEx.optimize(
+    DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1),
+    trainset,
+    devset
+  )
+
+{baseline.score, DSEx.Optimizer.Report.fetch(compiled)}
+```
+
+Use deeper modules such as `DSEx.Evaluate` or `DSEx.Optimizer.RandomSearch`
+directly when you need to hold evaluator structs, inspect optimizer internals,
+or build custom orchestration.
+
 ## Which Program Shape?
 
 | Use this | When |
@@ -64,7 +107,6 @@ DSEx.get(pred, :answer)
 | `DSEx.rlm/2` | You need a bounded recursive controller for large-context exploration. |
 | `DSEx.Agent` | You want an explicit Elixir agent runtime with tools and events. |
 
-The golden path is `Predict -> Evaluate -> Add demos -> Optimize -> Tools`.
 The later sections are there when your program needs more control, not because
 every DSEx project should start with agents or recursive controllers.
 
@@ -134,8 +176,7 @@ devset = [
 ]
 
 metric = DSEx.Metrics.exact_match(:answer)
-evaluator = DSEx.Evaluate.new(devset, metric)
-report = DSEx.Evaluate.run(evaluator, program)
+report = DSEx.evaluate(program, devset, metric)
 report.score
 ```
 
@@ -180,7 +221,7 @@ trainset = [
 ]
 
 optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-compiled = DSEx.Optimizer.RandomSearch.compile(optimizer, program, trainset, devset)
+compiled = DSEx.optimize(program, optimizer, trainset, devset)
 
 DSEx.Optimizer.Report.fetch(compiled)
 ```
