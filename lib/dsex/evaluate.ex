@@ -20,17 +20,20 @@ defmodule DSEx.Evaluate do
 
   ## Example
 
-      devset = [
-        DSEx.example(question: "Capital of France?", answer: "Paris")
-        |> DSEx.with_inputs(:question)
-      ]
-
-      metric = DSEx.Metrics.exact_match(:answer)
-
-      evaluator = DSEx.Evaluate.new(devset, metric)
-      report = DSEx.Evaluate.run(evaluator, program)
-
-      report.score
+      iex> lm = %{
+      ...>   module: DSEx.LM.Static,
+      ...>   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+      ...> }
+      iex> program = DSEx.predict("question -> answer", lm: lm)
+      iex> devset = [
+      ...>   DSEx.example(question: "Capital of France?", answer: "Paris")
+      ...>   |> DSEx.with_inputs(:question)
+      ...> ]
+      iex> metric = DSEx.Metrics.exact_match(:answer)
+      iex> evaluator = DSEx.Evaluate.new(devset, metric)
+      iex> report = DSEx.Evaluate.run(evaluator, program)
+      iex> report.score
+      1.0
 
   Metrics may return booleans, numbers, maps with `:score` and `:feedback`, or
   `%DSEx.Metrics.Result{}`. Arity-3 metrics also receive the prediction trace.
