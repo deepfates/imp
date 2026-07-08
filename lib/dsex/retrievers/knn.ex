@@ -3,11 +3,18 @@ defmodule DSEx.Retrievers.KNN do
 
   defstruct examples: [], k: 3, field: :question
 
+  @option_schema [
+    k: [type: :any, default: 3],
+    field: [type: :any, default: :question]
+  ]
+
   def new(examples, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Retrievers.KNN.new/2")
+
     %__MODULE__{
       examples: examples,
-      k: non_negative_integer(Keyword.get(opts, :k, 3)),
-      field: Keyword.get(opts, :field, :question)
+      k: non_negative_integer(opts[:k]),
+      field: opts[:field]
     }
   end
 

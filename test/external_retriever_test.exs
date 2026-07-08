@@ -197,6 +197,34 @@ defmodule ExternalRetrieverTest do
     assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris", k: -1)
   end
 
+  test "memory retriever reports invalid construction and document inputs clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Retrieve\.Memory\.new\/2 expects a list/, fn ->
+      DSEx.Retrieve.Memory.new(:not_docs)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrieve\.Memory\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Retrieve.Memory.new([%{text: "Paris"}], :not_options)
+                 end
+
+    retriever = DSEx.Retrieve.Memory.new([:not_a_document])
+
+    assert {:error, {:invalid_memory_document, :not_a_document}} =
+             DSEx.Retrieve.retrieve(retriever, "Paris")
+
+    retriever = DSEx.Retrieve.Memory.new([[:not_a_pair]])
+
+    assert {:error, {:invalid_memory_document, [:not_a_pair]}} =
+             DSEx.Retrieve.retrieve(retriever, "Paris")
+  end
+
+  test "KNN retriever reports invalid options clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Retrievers\.KNN\.new\/2: expected keyword options/, fn ->
+      DSEx.Retrievers.KNN.new([], :not_options)
+    end
+  end
+
   test "generic HTTP retriever reports request transport decode and mapper failures" do
     bad_request =
       DSEx.Retrievers.HTTP.new("https://retriever.example/search",
