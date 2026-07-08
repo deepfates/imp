@@ -13,7 +13,7 @@ defmodule DSEx.Predict.BestOfN do
 
   def new(program, metric, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.BestOfN.new/3")
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Predict.BestOfN.new/3", "metric")
 
     %__MODULE__{
       program: program,
@@ -65,13 +65,6 @@ defmodule DSEx.Predict.BestOfN do
       end)
 
     {:no_successful_predictions, errors}
-  end
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Predict.BestOfN.new/3 expects a metric function with arity 2; got: #{inspect(metric)}"
   end
 
   defp score(metric, prediction) do

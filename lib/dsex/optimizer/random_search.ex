@@ -46,7 +46,13 @@ defmodule DSEx.Optimizer.RandomSearch do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(
+      metric,
+      [2, 3],
+      "DSEx.Optimizer.RandomSearch.new/2",
+      "metric"
+    )
+
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.RandomSearch.new/2")
 
     %__MODULE__{
@@ -171,13 +177,6 @@ defmodule DSEx.Optimizer.RandomSearch do
 
   defp candidate_indices(count) when count > 0, do: 1..count
   defp candidate_indices(_count), do: []
-
-  defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.RandomSearch.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
-  end
 
   defp sampled_success_count(candidates),
     do: Enum.count(candidates, &(&1.index != :baseline))

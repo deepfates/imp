@@ -10,7 +10,7 @@ defmodule DSEx.Optimizer.SIMBA do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, [2, 3], "DSEx.Optimizer.SIMBA.new/2", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.SIMBA.new/2")
 
     %__MODULE__{
@@ -160,13 +160,6 @@ defmodule DSEx.Optimizer.SIMBA do
 
   defp step_indices(steps) when steps > 0, do: 1..steps
   defp step_indices(_steps), do: []
-
-  defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.SIMBA.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
-  end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

@@ -52,9 +52,8 @@ defmodule DSEx.Evaluate do
     ]
   ]
 
-  def new(devset, metric, opts \\ [])
-
-  def new(devset, metric, opts) when is_function(metric, 2) or is_function(metric, 3) do
+  def new(devset, metric, opts \\ []) do
+    DSEx.FunctionContract.validate!(metric, [2, 3], "DSEx.Evaluate.new/3", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Evaluate.new/3")
     devset = validate_devset!(devset)
 
@@ -65,11 +64,6 @@ defmodule DSEx.Evaluate do
       failure_score: opts[:failure_score],
       max_errors: opts[:max_errors]
     }
-  end
-
-  def new(_devset, metric, _opts) do
-    raise ArgumentError,
-          "DSEx.Evaluate.new/3 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
 
   def validate_max_errors(:infinity), do: {:ok, :infinity}

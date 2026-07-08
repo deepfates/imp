@@ -16,7 +16,7 @@ defmodule DSEx.Optimizer.GEPA do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Optimizer.GEPA.new/2", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.GEPA.new/2")
     validate_feedback_fn!(opts[:feedback_fn])
 
@@ -147,13 +147,6 @@ defmodule DSEx.Optimizer.GEPA do
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.GEPA.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
-  end
 
   defp validate_feedback_fn!(nil), do: :ok
   defp validate_feedback_fn!(feedback_fn) when is_function(feedback_fn, 1), do: :ok

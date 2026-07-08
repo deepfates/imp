@@ -11,7 +11,7 @@ defmodule DSEx.Optimizer.COPRO do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, [2, 3], "DSEx.Optimizer.COPRO.new/2", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.COPRO.new/2")
 
     %__MODULE__{
@@ -133,13 +133,6 @@ defmodule DSEx.Optimizer.COPRO do
     reports
     |> Enum.flat_map(& &1.candidates)
     |> Enum.map(&Map.take(&1, [:instruction, :score, :round]))
-  end
-
-  defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.COPRO.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)

@@ -9,7 +9,13 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(
+      metric,
+      2,
+      "DSEx.Optimizer.BootstrapFinetune.new/2",
+      "metric"
+    )
+
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BootstrapFinetune.new/2")
 
     %__MODULE__{
@@ -48,11 +54,4 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   defp get_lm(%DSEx.Predict.Predict{lm: lm}), do: lm
   defp get_lm(%DSEx.Predict.ChainOfThought{predict: predict}), do: get_lm(predict)
   defp get_lm(_program), do: nil
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.BootstrapFinetune.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
-  end
 end

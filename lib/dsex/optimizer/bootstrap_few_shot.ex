@@ -18,7 +18,7 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   ]
 
   def new(metric, opts \\ []) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Optimizer.BootstrapFewShot.new/2", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BootstrapFewShot.new/2")
 
     %__MODULE__{
@@ -171,13 +171,6 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
     |> Enum.map(& &1.score)
     |> Enum.sum()
     |> Kernel./(length(candidates))
-  end
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.BootstrapFewShot.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
   end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)

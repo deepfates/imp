@@ -13,7 +13,7 @@ defmodule DSEx.Predict.Refine do
 
   def new(program, metric, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.Refine.new/3")
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Predict.Refine.new/3", "metric")
 
     %__MODULE__{
       program: program,
@@ -65,13 +65,6 @@ defmodule DSEx.Predict.Refine do
     do: 1..max_attempts
 
   defp attempts(_max_attempts), do: []
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Predict.Refine.new/3 expects a metric function with arity 2; got: #{inspect(metric)}"
-  end
 
   defp maybe_add_hint(inputs, nil, _history), do: inputs
   defp maybe_add_hint(inputs, _feedback_fn, []), do: inputs

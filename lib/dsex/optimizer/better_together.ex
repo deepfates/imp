@@ -11,7 +11,7 @@ defmodule DSEx.Optimizer.BetterTogether do
   ]
 
   def new(metric, optimizers \\ %{}) do
-    validate_metric!(metric)
+    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Optimizer.BetterTogether.new/2", "metric")
     optimizers = normalize_optimizers!(optimizers)
 
     optimizers =
@@ -182,13 +182,6 @@ defmodule DSEx.Optimizer.BetterTogether do
   end
 
   defp existing_atom_or_string(key), do: key
-
-  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
-
-  defp validate_metric!(metric) do
-    raise ArgumentError,
-          "DSEx.Optimizer.BetterTogether.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
-  end
 
   defp normalize_optimizers!(optimizers) do
     Map.new(optimizers)
