@@ -1,6 +1,12 @@
 defmodule OptimizerReportTest do
   use ExUnit.Case
 
+  defmodule ErrorOptimizer do
+    defstruct []
+
+    def compile(%__MODULE__{}, _program, _trainset, _devset), do: {:error, :optimizer_declined}
+  end
+
   defp lm do
     %{
       module: DSEx.LM.Static,
@@ -351,6 +357,50 @@ defmodule OptimizerReportTest do
              report.candidates
 
     assert [%{key: :bad, error: {:invalid_optimizer, :not_an_optimizer}}] = report.errors
+  end
+
+  test "better together reports optimizer error tuples instead of treating them as compiled programs" do
+    {train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BetterTogether.new(%{bad: %ErrorOptimizer{}})
+      |> DSEx.Optimizer.BetterTogether.compile(program, train, dev, strategy: :bad)
+
+    assert {:ok, prediction} = DSEx.Predict.Predict.call(compiled, %{question: "Capital?"})
+    assert DSEx.Prediction.get(prediction, :answer) == "unknown"
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert [%{key: :bad, status: :error, error: :optimizer_declined}] = report.candidates
+    assert [%{key: :bad, error: :optimizer_declined}] = report.errors
+  end
+
+  test "better together reports unloaded optimizer modules explicitly" do
+    {train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+    unloaded = %{__struct__: :"Elixir.MissingOptimizer"}
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.BetterTogether.new(%{missing: unloaded})
+      |> DSEx.Optimizer.BetterTogether.compile(program, train, dev, strategy: :missing)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert [
+             %{
+               key: :missing,
+               status: :error,
+               error: {:optimizer_not_loaded, :"Elixir.MissingOptimizer"}
+             }
+           ] = report.candidates
+
+    assert [%{key: :missing, error: {:optimizer_not_loaded, :"Elixir.MissingOptimizer"}}] =
+             report.errors
   end
 
   test "instruction proposer accepts LM-generated scored candidates" do

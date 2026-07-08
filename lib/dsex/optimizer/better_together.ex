@@ -101,6 +101,9 @@ defmodule DSEx.Optimizer.BetterTogether do
       not is_map(optimizer) or not Map.has_key?(optimizer, :__struct__) ->
         {:error, {:invalid_optimizer, optimizer}}
 
+      not optimizer_module_loaded?(optimizer.__struct__) ->
+        {:error, {:optimizer_not_loaded, optimizer.__struct__}}
+
       function_exported?(optimizer.__struct__, :compile, 4) ->
         optimizer
         |> safe_compile(fn ->
@@ -118,10 +121,14 @@ defmodule DSEx.Optimizer.BetterTogether do
 
   defp safe_compile(optimizer, fun) do
     case safe_call(fun) do
+      {:ok, {:error, reason}} -> {:error, reason}
       {:ok, compiled} -> {:ok, compiled, %{optimizer: optimizer.__struct__}}
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp optimizer_module_loaded?(module) when is_atom(module), do: Code.ensure_loaded?(module)
+  defp optimizer_module_loaded?(_module), do: false
 
   defp safe_call(fun) do
     {:ok, fun.()}
