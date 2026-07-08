@@ -84,8 +84,9 @@ defmodule DSEx.Predict.Predict do
          adapter <- resolve_adapter(predict),
          {:ok, inputs} <- normalize_inputs(inputs),
          :ok <- validate_inputs(predict.signature, inputs),
-         messages <- adapter.format(predict.signature, inputs, demos: predict.demos),
-         lm_opts <- adapter_lm_opts(adapter, predict.signature, predict.config),
+         {:ok, messages} <-
+           format_with_adapter(adapter, predict.signature, inputs, demos: predict.demos),
+         {:ok, lm_opts} <- adapter_lm_opts(adapter, predict.signature, predict.config),
          {:ok, raw} <- DSEx.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
          {:ok, prediction, trace_messages, trace_raw} <-
            parse_with_retry(
@@ -215,13 +216,63 @@ defmodule DSEx.Predict.Predict do
     ArgumentError -> value
   end
 
-  defp adapter_lm_opts(adapter, signature, config) do
-    if function_exported?(adapter, :lm_opts, 2) do
-      Keyword.merge(config, adapter.lm_opts(signature, config))
+  defp format_with_adapter(adapter, signature, inputs, opts) do
+    with :ok <- ensure_adapter_loaded(adapter),
+         true <- function_exported?(adapter, :format, 3) do
+      {:ok, adapter.format(signature, inputs, opts)}
     else
-      config
+      {:error, _reason} = error ->
+        error
+
+      false ->
+        {:error, {:invalid_adapter, adapter, :format}}
+    end
+  rescue
+    error ->
+      {:error, {:adapter_format_failed, adapter, Exception.message(error)}}
+  catch
+    kind, reason ->
+      {:error, {:adapter_format_failed, adapter, {kind, reason}}}
+  end
+
+  defp adapter_lm_opts(adapter, signature, config) do
+    with :ok <- ensure_adapter_loaded(adapter),
+         true <- function_exported?(adapter, :lm_opts, 2),
+         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config) do
+      {:ok, Keyword.merge(config, opts)}
+    else
+      false ->
+        {:ok, config}
+
+      {:error, _reason} = error ->
+        error
     end
   end
+
+  defp call_adapter_lm_opts(adapter, signature, config) do
+    opts = adapter.lm_opts(signature, config)
+
+    if Keyword.keyword?(opts) do
+      {:ok, opts}
+    else
+      {:error, {:invalid_adapter_lm_opts, adapter, opts}}
+    end
+  rescue
+    error ->
+      {:error, {:adapter_lm_opts_failed, adapter, Exception.message(error)}}
+  catch
+    kind, reason ->
+      {:error, {:adapter_lm_opts_failed, adapter, {kind, reason}}}
+  end
+
+  defp ensure_adapter_loaded(adapter) when is_atom(adapter) do
+    case Code.ensure_loaded(adapter) do
+      {:module, _module} -> :ok
+      {:error, reason} -> {:error, {:adapter_not_loaded, adapter, reason}}
+    end
+  end
+
+  defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
 
   defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos) do
     case adapter.parse(signature, raw, []) do

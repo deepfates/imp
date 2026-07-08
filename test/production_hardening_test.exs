@@ -66,6 +66,35 @@ defmodule ProductionHardeningTest do
     end
   end
 
+  defmodule RaisingFormatAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: raise("format exploded")
+    def parse(_signature, _raw, _opts), do: {:ok, DSEx.prediction(answer: "unused")}
+  end
+
+  defmodule RaisingLMOptsAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
+
+    def parse(_signature, raw, _opts),
+      do: DSEx.Adapter.Chat.parse(DSEx.signature("q -> answer"), raw, [])
+
+    def lm_opts(_signature, _opts), do: raise("lm opts exploded")
+  end
+
+  defmodule InvalidLMOptsAdapter do
+    @behaviour DSEx.Adapter
+
+    def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
+
+    def parse(_signature, raw, _opts),
+      do: DSEx.Adapter.Chat.parse(DSEx.signature("q -> answer"), raw, [])
+
+    def lm_opts(_signature, _opts), do: %{response_format: %{type: "json_object"}}
+  end
+
   test "ReqLLM-backed LM reports provider failures without caching them" do
     Process.delete(:flaky_count)
 
@@ -300,6 +329,32 @@ defmodule ProductionHardeningTest do
 
     assert {:ok, "prefix:value"} =
              DSEx.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
+  end
+
+  test "Predict reports adapter callback boundary failures explicitly" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+
+    format_program = DSEx.predict("question -> answer", lm: lm, adapter: RaisingFormatAdapter)
+
+    assert {:error, {:adapter_format_failed, RaisingFormatAdapter, "format exploded"}} =
+             DSEx.Predict.Predict.call(format_program, %{question: "q"})
+
+    lm_opts_program = DSEx.predict("question -> answer", lm: lm, adapter: RaisingLMOptsAdapter)
+
+    assert {:error, {:adapter_lm_opts_failed, RaisingLMOptsAdapter, "lm opts exploded"}} =
+             DSEx.Predict.Predict.call(lm_opts_program, %{question: "q"})
+
+    invalid_opts_program =
+      DSEx.predict("question -> answer", lm: lm, adapter: InvalidLMOptsAdapter)
+
+    assert {:error, {:invalid_adapter_lm_opts, InvalidLMOptsAdapter, %{response_format: _}}} =
+             DSEx.Predict.Predict.call(invalid_opts_program, %{question: "q"})
+
+    unloaded_program =
+      DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
+
+    assert {:error, {:adapter_not_loaded, :"Elixir.MissingAdapter", :nofile}} =
+             DSEx.Predict.Predict.call(unloaded_program, %{question: "q"})
   end
 
   test "Static LM validates direct-call options and handler shape" do
