@@ -83,7 +83,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          out_dir
        ) do
     dsex_model = dsex_model_spec(opts, model)
-    dspy_model = dspy_model || default_dspy_model(dsex_model, model)
+    dspy_model = validate_dspy_model!(dspy_model || default_dspy_model(dsex_model, model))
 
     {dsex, dspy_path} =
       case runner_order do
@@ -316,6 +316,21 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       [provider, model_id] -> "#{provider}/#{model_id}"
       _other -> model
     end
+  end
+
+  @doc false
+  def validate_dspy_model!(model) do
+    model = to_string(model)
+    downcased = String.downcase(model)
+
+    if String.starts_with?(downcased, ["anthropic:", "gemini:", "google:"]) do
+      Mix.raise(
+        "--dspy-model expects a Python DSPy/LiteLLM model id such as #{String.replace(model, ":", "/", parts: 2)}; " <>
+          "ReqLLM provider specs such as #{inspect(model)} belong in --model. Omit --dspy-model to let DSEx derive the matching LiteLLM id."
+      )
+    end
+
+    model
   end
 
   defp maybe_keyword(opts, _key, nil), do: opts

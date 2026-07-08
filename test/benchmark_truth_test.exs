@@ -932,6 +932,17 @@ defmodule BenchmarkTruthTest do
              "openai:gpt-5.4-mini",
              "gpt-5.4-mini"
            ) == "gpt-5.4-mini"
+
+    assert Mix.Tasks.Dsex.Benchmark.Parity.validate_dspy_model!("anthropic/claude-haiku-4-5") ==
+             "anthropic/claude-haiku-4-5"
+
+    assert_raise Mix.Error,
+                 ~r/--dspy-model expects a Python DSPy\/LiteLLM model id such as anthropic\/claude-haiku-4-5/,
+                 fn ->
+                   Mix.Tasks.Dsex.Benchmark.Parity.validate_dspy_model!(
+                     "anthropic:claude-haiku-4-5"
+                   )
+                 end
   end
 
   test "parity aggregate deduplicates overlapping chunks and reports coverage gaps" do

@@ -395,6 +395,10 @@ mix dsex.benchmark.parity.campaign \
 For non-OpenAI campaign lanes, use the provider-qualified ReqLLM model as
 `--model`, the matching DSPy/LiteLLM model as `--dspy-model`, and the relevant
 `--api-key-env`. The campaign driver forwards those settings to every chunk.
+For example, Anthropic uses `--model anthropic:claude-haiku-4-5` on the DSEx
+side and `--dspy-model anthropic/claude-haiku-4-5` on the Python DSPy side.
+Do not pass the ReqLLM colon form as `--dspy-model`; omit the flag when the
+default DSEx mapper can derive the matching LiteLLM id.
 
 For measured transport A/B checks, configure ReqLLM's Finch pool before startup
 through the same runner:
