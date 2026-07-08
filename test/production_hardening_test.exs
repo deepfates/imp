@@ -553,6 +553,12 @@ defmodule ProductionHardeningTest do
                  fn ->
                    DSEx.Predict.Parallel.map(program, [%{question: "a"}], :not_options)
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Parallel\.map\/3 expects inputs to be an enumerable batch/,
+                 fn ->
+                   DSEx.Predict.Parallel.map(program, :not_a_batch)
+                 end
   end
 
   defp restore_env(key, nil), do: System.delete_env(key)

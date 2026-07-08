@@ -15,6 +15,7 @@ defmodule DSEx.Predict.Parallel do
 
   def map(program, inputs, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.Parallel.map/3")
+    inputs = validate_inputs!(inputs)
     concurrency = positive_integer(opts[:max_concurrency])
 
     inputs
@@ -51,6 +52,15 @@ defmodule DSEx.Predict.Parallel do
 
   defp positive_integer(value) when is_integer(value) and value > 0, do: value
   defp positive_integer(_value), do: 1
+
+  defp validate_inputs!(inputs) do
+    if Enumerable.impl_for(inputs) do
+      inputs
+    else
+      raise ArgumentError,
+            "DSEx.Predict.Parallel.map/3 expects inputs to be an enumerable batch; got: #{inspect(inputs)}"
+    end
+  end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)
