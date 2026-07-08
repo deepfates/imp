@@ -37,8 +37,6 @@ credentials.
 
 - [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
   redaction, security posture, package shape, and release discipline.
-- [Benchmark Catalog](BENCHMARK_CATALOG.md): outside-view map of DSPy-derived
-  benchmark families, current DSEx coverage, and the next sampled lanes.
 
 ## First Things To Try
 
@@ -53,4 +51,5 @@ credentials.
 
 The repository also keeps release-evidence notes for maintainers and reviewers.
 They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
-separate from the packaged user manual.
+separate from the packaged user manual. In the source checkout, the benchmark
+catalog is the maintainer starting point for outside-view validation work.

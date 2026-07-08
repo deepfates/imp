@@ -137,7 +137,6 @@ defmodule DSEx.MixProject do
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",
       "docs/ADVANCED.md",
-      "docs/BENCHMARK_CATALOG.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end

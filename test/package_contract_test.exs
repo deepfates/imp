@@ -22,6 +22,7 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
+    "docs/BENCHMARK_CATALOG.md",
     "docs/BENCHMARK_TRUTH.md",
     "docs/COVERAGE_MATRIX.md",
     "docs/PARITY_VALIDATION_PROGRAM.md",
