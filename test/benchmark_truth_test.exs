@@ -841,6 +841,30 @@ defmodule BenchmarkTruthTest do
     assert Keyword.fetch!(generation_opts, :reasoning_effort) == "low"
   end
 
+  test "parity task only auto-selects unambiguous models returned by provider discovery" do
+    assert {:ok, "gpt-future-mini"} =
+             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+               "text-embedding-3-large",
+               "gpt-future-mini",
+               "gpt-future-audio-preview"
+             ])
+
+    assert {:error, {:ambiguous_text_generation_models, ["gpt-alpha", "gpt-beta"]}} =
+             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+               "gpt-beta",
+               "gpt-alpha"
+             ])
+
+    assert {:error, :no_models} =
+             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([])
+
+    assert {:error, {:no_text_generation_model, ["text-embedding-3-large", "tts-1"]}} =
+             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+               "text-embedding-3-large",
+               "tts-1"
+             ])
+  end
+
   test "parity task can configure ReqLLM pool before app startup" do
     previous_protocols = Application.get_env(:req_llm, :stream_pool_protocols)
     previous_size = Application.get_env(:req_llm, :stream_pool_size)

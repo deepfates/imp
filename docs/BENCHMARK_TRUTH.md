@@ -230,10 +230,14 @@ OPENAI_API_KEY=... mix benchmark.parity.check
 ```
 
 This runs DSEx and the real Python `dspy` package over the same fetched GSM8K
-and HotPotQA rows, using the same OpenAI-compatible model. If `OPENAI_MODEL` is
-not set, DSEx queries the OpenAI-compatible `/models` endpoint and selects the
-first available current model from `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`,
-`gpt-5`, and `gpt-4.1`.
+and HotPotQA rows, using the same OpenAI-compatible model. For reproducible
+evidence, set `OPENAI_MODEL` or pass `--model` with a provider model id you have
+verified in the current account. If neither is set, DSEx queries the
+OpenAI-compatible `/models` endpoint and auto-selects only when exactly one
+text-generation-looking candidate is visible. If discovery fails, returns no
+candidate, or returns multiple candidates, the task stops and asks for an
+explicit `--model`; it does not invent a fallback model or choose among paid
+models on the operator's behalf.
 
 The parity report records:
 
@@ -261,7 +265,7 @@ mix dsex.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-200.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-200.jsonl \
   --max-examples 200 \
-  --models gpt-5.5,gpt-5.4-mini
+  --models "$CURRENT_LOW_COST_MODEL,$FRONTIER_SANITY_MODEL"
 ```
 
 OpenAI is the default parity provider. For another provider, make both sides
@@ -269,13 +273,13 @@ explicit so the artifact proves a matched operational path instead of an
 accidental OpenAI-shaped comparison:
 
 ```sh
-ANTHROPIC_API_KEY=... mix dsex.benchmark.parity \
+PROVIDER_API_KEY=... mix dsex.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-200.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-200.jsonl \
   --max-examples 200 \
-  --model anthropic:claude-haiku-4-5 \
-  --dspy-model anthropic/claude-haiku-4-5 \
-  --api-key-env ANTHROPIC_API_KEY
+  --model "$DSEX_PROVIDER_MODEL" \
+  --dspy-model "$DSEX_DSPY_MODEL" \
+  --api-key-env PROVIDER_API_KEY
 ```
 
 The DSEx side takes a ReqLLM model spec such as `anthropic:...` or
@@ -344,7 +348,7 @@ When a dataset contract changes or a fresh full campaign supersedes older
 smoke evidence, filter the matrix to the intended lineage:
 
 ```sh
-DSEX_BENCH_CAMPAIGN_ID=req-llm-gpt-5.4-mini-distractor-full-YYYYMMDD \
+DSEX_BENCH_CAMPAIGN_ID=req-llm-current-low-cost-full-YYYYMMDD \
   mix benchmark.live_matrix
 ```
 
@@ -359,11 +363,11 @@ and `--max-examples`, then preserve every emitted artifact:
 mix dsex.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
-  --campaign-id req-llm-gpt-5.4-mini-full-YYYYMMDD \
+  --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
   --offset 0 \
   --max-examples 100 \
   --max-concurrency 8 \
-  --model gpt-5.4-mini
+  --model "$CURRENT_LOW_COST_MODEL"
 ```
 
 Chunked runs avoid losing an entire benchmark to one network interruption. A
@@ -376,9 +380,9 @@ To advance a campaign without babysitting each offset:
 
 ```sh
 mix dsex.benchmark.parity.campaign \
-  --model gpt-5.4-mini \
-  --dspy-model responses/gpt-5.4-mini \
-  --campaign-id req-llm-gpt-5.4-mini-full-YYYYMMDD \
+  --model "$CURRENT_LOW_COST_MODEL" \
+  --dspy-model "$CURRENT_LOW_COST_DSPY_MODEL" \
+  --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --chunk-size 100 \
@@ -397,9 +401,9 @@ through the same runner:
 
 ```sh
 mix dsex.benchmark.parity.campaign \
-  --model anthropic:claude-haiku-4-5 \
-  --dspy-model anthropic/claude-haiku-4-5 \
-  --api-key-env ANTHROPIC_API_KEY \
+  --model "$DSEX_PROVIDER_MODEL" \
+  --dspy-model "$DSEX_DSPY_MODEL" \
+  --api-key-env PROVIDER_API_KEY \
   --req-llm-pool-protocols http1 \
   --req-llm-pool-count 16 \
   --chunk-size 100 \
@@ -432,10 +436,10 @@ incomplete evidence, not negative benchmark rows. Fix provider
 quota/credentials or switch to a matched provider/model lane, then rerun the
 same campaign id to continue from the earliest missing accepted row.
 
-Use `--dspy-model responses/<model>` for GPT-5-family endpoint-equivalent
-campaigns. DSEx reaches the provider through ReqLLM's OpenAI Responses route;
-the explicit DSPy model route makes LiteLLM use the same endpoint family instead
-of comparing Responses semantics against Chat Completions semantics.
+Use `--dspy-model responses/<model>` when the matching Python DSPy/LiteLLM path
+must force OpenAI Responses endpoint semantics for the selected model. DSEx
+reaches the provider through ReqLLM; the explicit DSPy model route prevents
+comparing Responses semantics against Chat Completions semantics by accident.
 
 For reasoning models, add `--reasoning-effort low` when the parity question is
 throughput and answer-quality parity under a bounded reasoning budget. The
@@ -459,8 +463,8 @@ Aggregate chunk artifacts into a campaign report:
 ```sh
 mix dsex.benchmark.parity.aggregate \
   --provider req_llm \
-  --model gpt-5.4-mini \
-  --in 'benchmarks/results/dsex-dspy-parity-gpt-5.4-mini-*.json' \
+  --model "$CURRENT_LOW_COST_MODEL" \
+  --in "benchmarks/results/dsex-dspy-parity-${CURRENT_LOW_COST_MODEL}-*.json" \
   --max-concurrency 8
 ```
 
@@ -496,10 +500,11 @@ DSEx/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
 (`1.5` by default). Latency is part of the decision because parity is about
 operational behavior, not only answer quality.
 
-The current v4 canonical-answer campaign for `gpt-5.4-mini` is a research
-sample, not release proof: `300/8724` canonical rows are covered, aggregate gap
-is within threshold, and latency parity passes, but full coverage and current
-frontier/historical prompt-contract lanes are still missing.
+Historical checked-in campaign artifacts may be useful diagnostics, but they are
+not release proof unless the live matrix selects them under the current prompt
+contract, model-lane policy, effective generation settings, and concurrency
+requirements. Treat stale named-model campaigns as prior evidence, not as a
+template for new operator commands.
 
 Use the `dsex_instrumentation`, `dspy_instrumentation`, and `runtime_shape`
 summaries before optimizing runtime code. When DSEx `lm_duration_share` is close

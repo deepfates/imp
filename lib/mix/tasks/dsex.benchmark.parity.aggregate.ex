@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
   @moduledoc """
   Aggregate DSEx-vs-DSPy parity chunk artifacts into one campaign report.
 
-      mix dsex.benchmark.parity.aggregate --provider req_llm --model gpt-5.4-mini
+      mix dsex.benchmark.parity.aggregate --provider req_llm --model "$DSEX_PARITY_MODEL"
 
   The aggregator is row-based: each `(task, absolute_index)` is counted once,
   and the newest artifact wins when chunks overlap. This prevents smoke runs

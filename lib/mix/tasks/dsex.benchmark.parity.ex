@@ -7,17 +7,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
 
   The task expects Python DSPy to be installed. By default it uses
   `tmp/dspy-parity-venv/bin/python` when present. OpenAI remains the default
-  provider; pass an explicit ReqLLM model spec and matching DSPy/LiteLLM model
-  when validating another provider.
+  provider; pass `--model` or set `OPENAI_MODEL` for reproducible evidence.
+  When neither is supplied, the task queries the OpenAI-compatible `/models`
+  endpoint and only auto-selects if exactly one text-generation candidate is
+  visible. Otherwise it stops and prints candidate ids so the operator chooses
+  deliberately. Pass an explicit ReqLLM model spec and matching DSPy/LiteLLM
+  model when validating another provider.
 
-      mix dsex.benchmark.parity --model anthropic:claude-haiku-4-5 \\
-        --dspy-model anthropic/claude-haiku-4-5 --api-key-env ANTHROPIC_API_KEY
+      mix dsex.benchmark.parity --model "$DSEX_PROVIDER_MODEL" \\
+        --dspy-model "$DSEX_DSPY_MODEL" --api-key-env PROVIDER_API_KEY
   """
 
   use Mix.Task
 
   @shortdoc "Run DSEx-vs-DSPy live parity comparison"
-  @default_models ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5", "gpt-4.1"]
   @full_lengths %{"gsm8k" => 1319, "hotpotqa" => 7405}
 
   @impl true
@@ -332,8 +335,60 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
   end
 
   defp discover_default_model(api_key) do
-    available = openai_models(api_key)
-    Enum.find(@default_models, "gpt-5.5", &(&1 in available))
+    case select_default_openai_model(openai_models(api_key)) do
+      {:ok, model} ->
+        model
+
+      {:error, :no_models} ->
+        Mix.raise(
+          "could not discover OpenAI models from /models; pass --model or set OPENAI_MODEL to an explicitly verified provider model id"
+        )
+
+      {:error, {:no_text_generation_model, available}} ->
+        sample = available |> Enum.sort() |> Enum.take(10) |> Enum.join(", ")
+
+        Mix.raise(
+          "OpenAI /models returned #{length(available)} model id(s), but none looked like a text-generation model for parity; pass --model explicitly. Sample: #{sample}"
+        )
+
+      {:error, {:ambiguous_text_generation_models, candidates}} ->
+        sample = Enum.join(candidates, ", ")
+
+        Mix.raise(
+          "OpenAI /models returned multiple text-generation candidates; pass --model or set OPENAI_MODEL explicitly. Candidates: #{sample}"
+        )
+    end
+  end
+
+  @doc false
+  def select_default_openai_model([]), do: {:error, :no_models}
+
+  def select_default_openai_model(available) when is_list(available) do
+    candidates =
+      available
+      |> Enum.map(&to_string/1)
+      |> Enum.filter(&text_generation_model?/1)
+      |> Enum.sort()
+
+    case candidates do
+      [model] -> {:ok, model}
+      [] -> {:error, {:no_text_generation_model, Enum.map(available, &to_string/1)}}
+      candidates -> {:error, {:ambiguous_text_generation_models, candidates}}
+    end
+  end
+
+  defp text_generation_model?(model) do
+    model = String.downcase(model)
+
+    (String.starts_with?(model, "gpt-") or String.match?(model, ~r/^o\d/)) and
+      not String.contains?(model, "embedding") and
+      not String.contains?(model, "audio") and
+      not String.contains?(model, "realtime") and
+      not String.contains?(model, "transcrib") and
+      not String.contains?(model, "tts") and
+      not String.contains?(model, "image") and
+      not String.contains?(model, "moderation") and
+      not String.contains?(model, "search")
   end
 
   defp openai_models(api_key) do

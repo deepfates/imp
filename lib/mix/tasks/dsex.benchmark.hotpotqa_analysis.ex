@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis do
   Analyze HotPotQA disagreements in DSEx-vs-DSPy parity artifacts.
 
       mix dsex.benchmark.hotpotqa_analysis \\
-        --campaign-id req-llm-gpt-5.4-mini-distractor-chat-template-v3-dspy-objective-20260707 \\
+        --campaign-id req-llm-current-low-cost-full-YYYYMMDD \\
         --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl
 
   The analysis is row-based: each absolute HotPotQA index is counted once and

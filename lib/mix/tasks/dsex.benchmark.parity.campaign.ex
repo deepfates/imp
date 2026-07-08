@@ -3,14 +3,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   Run a chunked DSEx-vs-DSPy parity campaign until coverage advances.
 
       mix dsex.benchmark.parity.campaign \\
-        --model gpt-5.4-mini \\
-        --dspy-model responses/gpt-5.4-mini \\
+        --model "$DSEX_PARITY_MODEL" \\
+        --dspy-model "$DSEX_PARITY_DSPY_MODEL" \\
         --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \\
         --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \\
         --chunk-size 100 \\
         --chunks 3 \\
         --target-coverage 1000 \\
         --max-concurrency 8
+
+  Set `DSEX_PARITY_MODEL` to a provider model id you have verified in the
+  current provider account, and set `DSEX_PARITY_DSPY_MODEL` to the matching
+  DSPy/LiteLLM route when the Python side needs an explicit endpoint family
+  such as `responses/<model>`.
 
   The task always aggregates before choosing the next offset and after each
   completed chunk. It does not change the benchmark evidence standard; it only
