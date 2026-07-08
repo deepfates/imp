@@ -223,6 +223,19 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
           "evidence_ids" => ["otp-supervision"]
         }
       ]
+    },
+    "composition_orchestration" => %{
+      task: "composition_orchestration",
+      dataset: "dsex/local-composition-orchestration",
+      config: "qa-mini",
+      split: "test",
+      input_keys: ["question"],
+      label_key: "answer",
+      rows: [
+        %{"question" => "What is the capital city of France?", "answer" => "Paris"},
+        %{"question" => "What is the capital city of Germany?", "answer" => "Berlin"},
+        %{"question" => "What answer should an unknown branch return?", "answer" => "unknown"}
+      ]
     }
   }
 

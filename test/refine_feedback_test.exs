@@ -40,6 +40,7 @@ defmodule RefineFeedbackTest do
              |> DSEx.Predict.Refine.call(%{question: "q"})
 
     assert DSEx.Prediction.get(prediction, :answer) == "fixed"
+    assert [%{attempt: 1}, %{attempt: 2}] = DSEx.Prediction.get(prediction, :refine_history)
   end
 
   test "Refine with non-positive attempts does not call the wrapped program" do

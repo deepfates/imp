@@ -72,6 +72,36 @@ defmodule DSEx.BenchmarkTruth.Runner do
       |> Enum.drop(offset)
       |> Enum.take(max_examples)
 
+    if task == :composition_orchestration do
+      run_composition_task(path, mode, offset, max_concurrency, model, examples)
+    else
+      run_program_task(
+        task,
+        path,
+        mode,
+        offset,
+        max_examples,
+        max_concurrency,
+        lm,
+        model,
+        optimizer_comparisons?,
+        examples
+      )
+    end
+  end
+
+  defp run_program_task(
+         task,
+         path,
+         mode,
+         offset,
+         _max_examples,
+         max_concurrency,
+         lm,
+         model,
+         optimizer_comparisons?,
+         examples
+       ) do
     effective_lm = lm || fixture_lm(task, examples)
     program = program(task, effective_lm, path)
     metric = metric(task)
@@ -100,11 +130,37 @@ defmodule DSEx.BenchmarkTruth.Runner do
     }
   end
 
+  defp run_composition_task(path, mode, offset, max_concurrency, model, examples) do
+    {duration_us, result} =
+      timed(fn ->
+        DSEx.BenchmarkTruth.Composition.run(examples, max_concurrency: max_concurrency)
+      end)
+
+    %{
+      "task" => "composition_orchestration",
+      "path" => path,
+      "sha256" => file_sha256(path),
+      "mode" => Atom.to_string(mode),
+      "model" => safe_json(model),
+      "offset" => offset,
+      "examples" => length(examples),
+      "max_concurrency" => max_concurrency,
+      "score" => result["score"],
+      "duration_ms" => us_to_ms(duration_us),
+      "optimizer_comparisons" => [],
+      "aggregate_metrics" => result["aggregate_metrics"],
+      "errors" => [],
+      "rows" => [],
+      "scenarios" => result["scenarios"]
+    }
+  end
+
   defp load_examples(:gsm8k, path), do: DSEx.Datasets.GSM8K.load(path)
   defp load_examples(:hotpotqa, path), do: DSEx.Datasets.HotPotQA.load(path)
   defp load_examples(:colors, path), do: DSEx.Datasets.jsonl(path, [:input])
   defp load_examples(:retrieval_qa, path), do: DSEx.Datasets.jsonl(path, [:question])
   defp load_examples(:claim_verification, path), do: DSEx.Datasets.jsonl(path, [:claim])
+  defp load_examples(:composition_orchestration, path), do: DSEx.Datasets.jsonl(path, [:question])
 
   defp load_examples(task, path) when task in [:iris, :iris_typo, :heart_disease],
     do: DSEx.Datasets.jsonl(path, [:features])

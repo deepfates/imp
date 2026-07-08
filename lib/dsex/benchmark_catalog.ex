@@ -110,14 +110,16 @@ defmodule DSEx.BenchmarkCatalog do
       metric:
         "non-regression, selected-answer quality, failure isolation, concurrency safety, and trace shape",
       tiers: ["smoke", "research"],
-      status: "deterministic_implemented",
+      status: "provider_free_implemented",
       commands: [
+        "mix dsex.benchmark.fetch --tasks composition_orchestration --full --out benchmarks/data",
+        "mix dsex.benchmark.run --composition-orchestration benchmarks/data/composition_orchestration-test-0-3.jsonl",
         "mix test test/public_surface_test.exs test/refine_feedback_test.exs",
         "mix benchmark.optimizer_lift.check",
         "LIVE_PROVIDER=1 mix live.check"
       ],
       next_step:
-        "Add sampled orchestration tasks for BestOfN, Refine, MultiChainComparison, Ensemble, KNN, and Parallel under shared metrics."
+        "Extend sampled orchestration to matched DSEx/DSPy live-provider comparison once cost and model policy are selected."
     },
     %{
       id: "adapter_streaming_structured_io",

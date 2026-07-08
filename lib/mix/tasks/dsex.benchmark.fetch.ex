@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Fetch do
       mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 20 --out benchmarks/data
       mix dsex.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease --full --out benchmarks/data
       mix dsex.benchmark.fetch --tasks retrieval_qa,claim_verification --full --out benchmarks/data
+      mix dsex.benchmark.fetch --tasks composition_orchestration --full --out benchmarks/data
       mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data
   """
 

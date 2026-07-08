@@ -19,11 +19,11 @@ defmodule DSEx.Predict.Refine do
       inputs = maybe_add_hint(inputs, refine.feedback_fn, history)
 
       case DSEx.Module.call(refine.program, inputs) do
-        {:ok, prediction} = ok ->
+        {:ok, prediction} ->
           history = history ++ [%{attempt: attempt, prediction: prediction}]
 
           if safe_metric(refine.metric, prediction) |> DSEx.Metrics.pass?(),
-            do: {:halt, ok},
+            do: {:halt, {:ok, DSEx.Prediction.put(prediction, :refine_history, history)}},
             else: {:cont, {:ok, prediction, history}}
 
         {:error, reason} ->

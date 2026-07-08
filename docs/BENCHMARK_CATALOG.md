@@ -44,7 +44,7 @@ The sampling harness must preserve:
 | RAG/retrieval | DSP and DSPy papers emphasize retrieval + generation for knowledge-intensive QA. | Provider-free deterministic RAG and retriever protocol gates exist. | `mix benchmark.rag_tool_agent.check`, `mix protocol.retriever.check` | Add real small corpus retrieval benchmark with recall/F1, then matched DSEx/DSPy generation. |
 | Tool and ReAct agents | DSPy docs present tools and agents as first-class programming workflows. | Provider-free parity and local integration exist. | `mix benchmark.trace.check`, `mix benchmark.rag_tool_agent.check`, `mix integration.check` | Add sampled task set with measurable tool-use success, not just fixture replay. |
 | RLM recursive control | DSEx-native recursive controller inspired by DSP-style modular inference, distinct from RAG. | Deterministic public-surface, budget, recursion, tool, sandbox, redaction, and integration coverage exists. | `mix test test/rlm_test.exs`, `mix benchmark.rag_tool_agent.check`, `mix integration.check` | Add sampled controller tasks that measure action success, budget use, and answer quality across larger contexts. |
-| Program composition and orchestration | DSPy modules compose predictors, ensembles, comparison, refinement, parallel fan-out, and retrieval-aware variants. | Deterministic and selected live orchestration coverage exists. | `mix test test/public_surface_test.exs test/refine_feedback_test.exs`, `mix benchmark.optimizer_lift.check`, `LIVE_PROVIDER=1 mix live.check` | Add sampled orchestration tasks for BestOfN, Refine, MultiChainComparison, Ensemble, KNN, and Parallel under shared metrics. |
+| Program composition and orchestration | DSPy modules compose predictors, ensembles, comparison, refinement, parallel fan-out, and retrieval-aware variants. | Provider-free sampled orchestration benchmark exists for BestOfN, Refine, MultiChainComparison, Ensemble, KNN, and Parallel; selected live orchestration coverage also exists. | `mix dsex.benchmark.fetch --tasks composition_orchestration --full --out benchmarks/data`, `mix dsex.benchmark.run --composition-orchestration benchmarks/data/composition_orchestration-test-0-3.jsonl`, `mix test test/public_surface_test.exs test/refine_feedback_test.exs` | Extend sampled orchestration to matched DSEx/DSPy live-provider comparison once cost and model policy are selected. |
 | Adapters, streaming, and structured I/O | DSPy adapters and Ax-style signatures make parsing, schema negotiation, retries, and streaming part of the programming contract. | Provider-free trace, deterministic schema, ReqLLM, and live streaming coverage exists. | `mix benchmark.trace.check`, `mix test test/schema_constraints_test.exs test/req_llm_client_test.exs`, `LIVE_PROVIDER=1 mix live.check` | Add adversarial structured-output samples with malformed JSON/XML/chat, partial streams, and provider-native schema fallbacks. |
 | Persistence, cache, telemetry, and OTP operations | Production DSP-style systems need save/load, cache behavior, redaction, observability, and supervised concurrency outside notebooks. | Deterministic production, integration, and overhead coverage exists. | `mix production.check`, `mix integration.check`, `mix benchmark.overhead.check` | Add lifecycle stress scenarios that combine save/load, cache, telemetry, streaming, and parallel execution in one sampled workflow. |
 | Multimodal primitives | Modern provider surfaces include image, audio, file, document, and code content blocks. | Deterministic encoding/decoding primitive coverage exists. | `mix test test/multimodal_adapter_test.exs` | Keep as primitive proof until DSEx claims live multimodal reasoning. |
@@ -75,16 +75,13 @@ The sampling harness must preserve:
 4. **Tool/ReAct/RLM task sampler.** Add measurable tool-use and recursive
    controller tasks so ReAct and RLM are tested by outcomes, traces, budget
    adherence, and policy behavior rather than only fixture replay.
-5. **Composition/orchestration sampler.** Add tasks where BestOfN, Refine,
-   MultiChainComparison, Ensemble, KNN, and Parallel can be evaluated under
-   shared metrics and failure-isolation expectations.
-6. **Structured I/O and operations stress.** Add adversarial adapter/streaming
+5. **Structured I/O and operations stress.** Add adversarial adapter/streaming
    samples plus lifecycle workflows that combine save/load, cache, telemetry,
    redaction, and supervised concurrency.
-7. **Natural-data optimizer lift.** Run baseline and compiled programs on
+6. **Natural-data optimizer lift.** Run baseline and compiled programs on
    classification, QA, and instruction-following samples, comparing lift rather
    than exact prompt text.
-8. **Hard math sampler.** Add MATH/AIME-style rows for CoT smoke and optimizer
+7. **Hard math sampler.** Add MATH/AIME-style rows for CoT smoke and optimizer
    sanity.
 
 ## Sources

@@ -129,6 +129,36 @@ defmodule BenchmarkTruthTest do
     assert File.exists?(claim_manifest["corpus_path"])
   end
 
+  test "fetcher writes deterministic composition orchestration samples" do
+    out_dir = tmp_dir("fetch-local-composition")
+
+    [result] =
+      DSEx.BenchmarkTruth.fetch(["composition_orchestration"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    manifest = Jason.decode!(File.read!(result.manifest_path))
+    rows = result.data_path |> File.read!() |> read_jsonl()
+
+    assert result.task == "composition_orchestration"
+    assert manifest["source"] == "local-fixture"
+    assert manifest["input_keys"] == ["question"]
+    assert manifest["label_key"] == "answer"
+    assert manifest["rows"] == 3
+
+    assert [
+             %{
+               "question" => question,
+               "answer" => "Paris",
+               "source_task" => "composition_orchestration"
+             }
+             | _
+           ] = rows
+
+    assert question =~ "France"
+  end
+
   test "fetcher paginates full-size requests and records source pages" do
     out_dir = tmp_dir("fetch-pages")
     parent = self()
@@ -282,6 +312,55 @@ defmodule BenchmarkTruthTest do
              row["metric_metadata"]["primary"]["correct"] == true and
                row["metric_metadata"]["retrieval"]["recall"] == 1.0
            end)
+  end
+
+  test "fixture benchmark truth runner evaluates composition and orchestration scenarios" do
+    Application.ensure_all_started(:dsex)
+    out_dir = tmp_dir("composition-results")
+
+    [composition] =
+      DSEx.BenchmarkTruth.fetch(["composition_orchestration"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [composition_orchestration: composition.data_path],
+        out_dir: out_dir,
+        max_examples: 3,
+        max_concurrency: 2
+      )
+
+    [task] = result.report["tasks"]
+    assert result.report["aggregate_score"] == 1.0
+    assert task["task"] == "composition_orchestration"
+    assert task["score"] == 1.0
+    assert task["aggregate_metrics"]["scenarios"] == 6
+    assert task["aggregate_metrics"]["passed"] == 6
+    assert task["aggregate_metrics"]["failed_child_isolation"] == true
+    assert task["aggregate_metrics"]["max_concurrency"] == 2
+
+    scenarios = Map.new(task["scenarios"], &{&1["name"], &1})
+
+    assert Map.keys(scenarios) |> Enum.sort() ==
+             [
+               "best_of_n",
+               "ensemble",
+               "knn",
+               "multi_chain_comparison",
+               "parallel",
+               "refine"
+             ]
+
+    assert scenarios["best_of_n"]["base_score"] == 0.0
+    assert scenarios["best_of_n"]["composed_score"] == 1.0
+    assert scenarios["refine"]["history_length"] == 2
+    assert scenarios["ensemble"]["failed_child_isolation"] == true
+    assert scenarios["parallel"]["failed_child_isolation"] == true
+    assert scenarios["parallel"]["max_concurrency"] == 2
+    assert scenarios["knn"]["demo_count"] == 2
+    assert File.exists?(result.out_path)
   end
 
   test "benchmark truth rows include compact diagnostics for failed predictions" do
