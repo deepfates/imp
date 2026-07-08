@@ -163,6 +163,12 @@ defmodule RLMPublicSurfaceTest do
                    DSEx.Predict.RLM.new("question -> answer", max_preview_chars: -1)
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 fn ->
+                   DSEx.Predict.RLM.new("question -> answer", tool_policy: %{only: :lookup})
+                 end
+
     rlm = DSEx.Predict.RLM.new("question -> answer", lm: nil)
 
     assert {:error, {:invalid_rlm_inputs, message}} = DSEx.Predict.RLM.call(rlm, :not_inputs)

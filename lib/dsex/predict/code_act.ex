@@ -29,7 +29,10 @@ defmodule DSEx.Predict.CodeAct do
     metadata: [type: {:map, :any, :any}, default: %{}],
     output_field: [type: :any, default: :answer],
     max_iters: [type: :non_neg_integer, default: 5],
-    tool_policy: [type: :any, default: :allow]
+    tool_policy: [
+      type: {:custom, DSEx.ToolPolicy, :validate, []},
+      default: :allow
+    ]
   ]
 
   def new(signature, tools \\ [], opts \\ []) do
@@ -146,30 +149,8 @@ defmodule DSEx.Predict.CodeAct do
       {:error, {:tool_error, tool.name, {kind, reason}}}
   end
 
-  defp authorize_tool(:allow, _name, _arguments), do: :ok
-
-  defp authorize_tool(allowed, name, _arguments) when is_list(allowed) do
-    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
-  end
-
-  defp authorize_tool(policy, name, arguments) when is_function(policy, 2) do
-    try do
-      case policy.(name, arguments) do
-        true -> :ok
-        :ok -> :ok
-        {:error, reason} -> {:error, reason}
-        _other -> {:error, {:tool_denied, name}}
-      end
-    rescue
-      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
-    catch
-      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
-    end
-  end
-
-  defp authorize_tool(policy, name, _arguments) do
-    if name in List.wrap(policy), do: :ok, else: {:error, {:tool_denied, name}}
-  end
+  defp authorize_tool(policy, name, arguments),
+    do: DSEx.ToolPolicy.authorize(policy, name, arguments)
 
   defp trace_event(trace, iteration, action, input, output) do
     [

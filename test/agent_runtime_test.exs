@@ -93,6 +93,12 @@ defmodule AgentRuntimeTest do
                  fn ->
                    Agent.new(:bad, handler, children: [:not_an_agent])
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.new\/3: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 fn ->
+                   Agent.new(:bad, handler, tool_policy: %{allow: [:lookup]})
+                 end
   end
 
   test "runtime stores large context by reference and exposes memory" do
@@ -164,6 +170,20 @@ defmodule AgentRuntimeTest do
 
     assert [%{type: :tool_denied, tool: :boom}, %{type: :agent_error, agent: :locked}] =
              runtime.traces
+  end
+
+  test "tool policy accepts string tool names consistently" do
+    tool = DSEx.Tool.new(:lookup, "lookup", fn _input -> "ok" end)
+
+    agent =
+      Agent.new(
+        :reader,
+        fn agent, _input, runtime -> Agent.call_tool(agent, :lookup, %{}, runtime) end,
+        tools: [tool],
+        tool_policy: ["lookup"]
+      )
+
+    assert {:ok, "ok", _runtime} = Agent.run(agent, %{})
   end
 
   test "tool policy exceptions become structured agent errors" do

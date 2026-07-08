@@ -265,6 +265,14 @@ defmodule CompletionSurfaceTest do
                    DSEx.Predict.CodeAct.new("question -> answer", [], max_iters: -1)
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", [],
+                     tool_policy: %{only: :lookup}
+                   )
+                 end
+
     code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: nil)
 
     assert {:error, {:invalid_code_act_inputs, message}} =

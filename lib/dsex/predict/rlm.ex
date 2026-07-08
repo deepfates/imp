@@ -59,7 +59,10 @@ defmodule DSEx.Predict.RLM do
     adapter: [type: :any],
     sub_lm: [type: :any],
     tools: [type: :any, default: []],
-    tool_policy: [type: :any, default: :allow],
+    tool_policy: [
+      type: {:custom, DSEx.ToolPolicy, :validate, []},
+      default: :allow
+    ],
     max_iterations: [type: :non_neg_integer, default: 10],
     max_llm_calls: [type: :non_neg_integer, default: 20],
     max_time_ms: [type: :non_neg_integer],
@@ -430,30 +433,7 @@ defmodule DSEx.Predict.RLM do
       {:error, {:tool_error, tool.name, {kind, reason}}}
   end
 
-  defp authorize_tool(:allow, _name, _args), do: :ok
-
-  defp authorize_tool(allowed, name, _args) when is_list(allowed) do
-    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
-  end
-
-  defp authorize_tool(policy, name, args) when is_function(policy, 2) do
-    try do
-      case policy.(name, args) do
-        true -> :ok
-        :ok -> :ok
-        {:error, reason} -> {:error, reason}
-        _other -> {:error, {:tool_denied, name}}
-      end
-    rescue
-      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
-    catch
-      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
-    end
-  end
-
-  defp authorize_tool(policy, name, _args) do
-    if name in List.wrap(policy), do: :ok, else: {:error, {:tool_denied, name}}
-  end
+  defp authorize_tool(policy, name, args), do: DSEx.ToolPolicy.authorize(policy, name, args)
 
   defp check_time_budget(%__MODULE__{max_time_ms: nil}, _state), do: :ok
 

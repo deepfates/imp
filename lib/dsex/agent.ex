@@ -41,7 +41,10 @@ defmodule DSEx.Agent do
     children: [type: {:list, :any}, default: []],
     input_schema: [type: {:map, :any, :any}, default: %{}],
     output_schema: [type: {:map, :any, :any}, default: %{}],
-    tool_policy: [type: :any, default: :allow]
+    tool_policy: [
+      type: {:custom, DSEx.ToolPolicy, :validate, []},
+      default: :allow
+    ]
   ]
 
   @doc """
@@ -168,36 +171,8 @@ defmodule DSEx.Agent do
     end
   end
 
-  defp authorize_tool(%__MODULE__{tool_policy: :allow}, _name, _input), do: :ok
-
-  defp authorize_tool(%__MODULE__{tool_policy: allowed}, name, _input) when is_list(allowed) do
-    if name in allowed, do: :ok, else: {:error, {:tool_denied, name}}
-  end
-
-  defp authorize_tool(%__MODULE__{tool_policy: policy}, name, input)
-       when is_function(policy, 2) do
-    try do
-      case policy.(name, input) do
-        true -> :ok
-        :ok -> :ok
-        false -> {:error, {:tool_denied, name}}
-        {:error, reason} -> {:error, reason}
-        _other -> {:error, {:tool_denied, name}}
-      end
-    rescue
-      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
-    catch
-      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
-    end
-  end
-
-  defp authorize_tool(%__MODULE__{tool_policy: policy}, name, _input) do
-    if MapSet.member?(MapSet.new(List.wrap(policy)), name) do
-      :ok
-    else
-      {:error, {:tool_denied, name}}
-    end
-  end
+  defp authorize_tool(%__MODULE__{tool_policy: policy}, name, input),
+    do: DSEx.ToolPolicy.authorize(policy, name, input)
 
   @doc "Runs a named child agent with the current runtime."
   def call_child(%__MODULE__{} = agent, name, input, %Runtime{} = runtime) do

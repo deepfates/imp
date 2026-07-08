@@ -94,6 +94,12 @@ defmodule ReActContractTest do
                    DSEx.Predict.ReAct.new("question -> answer", [], max_iters: -1)
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ReAct\.new\/3: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 fn ->
+                   DSEx.Predict.ReAct.new("question -> answer", [], tool_policy: %{only: :lookup})
+                 end
+
     agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: nil)
 
     assert {:error, {:invalid_react_inputs, message}} =
@@ -170,6 +176,29 @@ defmodule ReActContractTest do
     assert {:error,
             {:react_max_iters,
              [%{tool: :lookup, arguments: %{query: "capital"}, result: %{answer: "Paris"}}]}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "string tool policies authorize normalized ReAct tool names" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: "lookup", arguments: %{query: "capital"}}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        max_iters: 1,
+        tool_policy: ["lookup"]
+      )
+
+    assert {:error, {:react_max_iters, [%{tool: :lookup, result: "Paris"}]}} =
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
