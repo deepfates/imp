@@ -57,6 +57,45 @@ defmodule ProductionAdapterPersistenceTest do
     assert content =~ "answer: final numeric answer"
   end
 
+  test "adapters validate owned options while ignoring provider options they do not own" do
+    signature = DSEx.signature("question -> answer")
+
+    assert [%{role: :system}, %{role: :user}] =
+             DSEx.Adapter.Chat.format(signature, %{question: "q"},
+               temperature: 0,
+               response_instruction: false
+             )
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Adapter.Chat.format\/3.*:response_instruction.*expected.*boolean/s,
+                 fn ->
+                   DSEx.Adapter.Chat.format(signature, %{question: "q"},
+                     response_instruction: :sometimes
+                   )
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.format\/3.*:demos.*expected.*list/s, fn ->
+      DSEx.Adapter.Chat.format(signature, %{question: "q"}, demos: :not_demos)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.parse\/3 expects keyword options/, fn ->
+      DSEx.Adapter.Chat.parse(signature, %{"answer" => "ok"}, %{unused: true})
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.Adapter.JSON.format\/3 expects keyword options/, fn ->
+      DSEx.Adapter.JSON.format(signature, %{question: "q"}, %{native_json_schema: true})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Adapter.JSON.lm_opts\/2.*:native_json_schema.*expected.*boolean/s,
+                 fn ->
+                   DSEx.Adapter.JSON.lm_opts(signature, native_json_schema: :yes)
+                 end
+
+    assert [response_format: %{type: "json_object"}] =
+             DSEx.Adapter.JSON.lm_opts(signature, temperature: 0)
+  end
+
   test "json adapter parses fenced provider json and rejects missing fields" do
     signature = DSEx.signature("question -> answer, confidence: float")
 

@@ -33,8 +33,15 @@ defmodule DSEx.Adapter.JSON do
 
   @behaviour DSEx.Adapter
 
+  @lm_option_schema [
+    native_json_schema: [type: :boolean, default: false],
+    response_format: [type: :any]
+  ]
+
   @impl true
   def format(signature, inputs, opts) do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.format/3")
+
     messages =
       DSEx.Adapter.Chat.format(signature, inputs, Keyword.put(opts, :response_instruction, false))
 
@@ -52,8 +59,10 @@ defmodule DSEx.Adapter.JSON do
   end
 
   def lm_opts(signature, opts) do
+    opts = validate_lm_opts!(opts, "#{inspect(__MODULE__)}.lm_opts/2")
+
     cond do
-      Keyword.get(opts, :native_json_schema) ->
+      opts[:native_json_schema] ->
         [
           response_format: %{
             type: "json_schema",
@@ -74,6 +83,8 @@ defmodule DSEx.Adapter.JSON do
     do: DSEx.Adapter.Chat.parse(signature, raw, opts)
 
   def parse(signature, raw, opts) when is_binary(raw) do
+    validate_opts!(opts, "#{inspect(__MODULE__)}.parse/3")
+
     with {:ok, decoded} <- Jason.decode(extract_json(raw)),
          true <- is_map(decoded),
          {:ok, prediction} <- DSEx.Adapter.Chat.parse(signature, decoded, opts),
@@ -122,4 +133,30 @@ defmodule DSEx.Adapter.JSON do
 
   defp default_field_desc(:reasoning), do: "show the reasoning needed to derive the answer"
   defp default_field_desc(_name), do: "answer according to the task instruction"
+
+  defp validate_lm_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+      |> Keyword.take(Keyword.keys(@lm_option_schema))
+      |> DSEx.Options.validate!(@lm_option_schema, context)
+    else
+      raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_lm_opts!(opts, context) do
+    raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+  end
 end

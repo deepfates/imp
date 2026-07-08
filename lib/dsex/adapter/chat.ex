@@ -3,10 +3,16 @@ defmodule DSEx.Adapter.Chat do
 
   @behaviour DSEx.Adapter
 
+  @format_option_schema [
+    demos: [type: {:list, :any}, default: []],
+    response_instruction: [type: :boolean, default: true]
+  ]
+
   @impl true
   def format(signature, inputs, opts) do
-    demos = Keyword.get(opts, :demos, [])
-    response_instruction? = Keyword.get(opts, :response_instruction, true)
+    opts = validate_format_opts!(opts, "#{inspect(__MODULE__)}.format/3")
+    demos = opts[:demos]
+    response_instruction? = opts[:response_instruction]
 
     [%{role: :system, content: render_system(signature)}] ++
       render_demos(signature, demos) ++
@@ -21,10 +27,15 @@ defmodule DSEx.Adapter.Chat do
   end
 
   @impl true
-  def parse(_signature, %DSEx.Prediction{} = prediction, _opts), do: {:ok, prediction}
-  def parse(signature, map, _opts) when is_map(map), do: build_prediction(signature, map)
+  def parse(signature, raw, opts) do
+    validate_opts!(opts, "#{inspect(__MODULE__)}.parse/3")
+    do_parse(signature, raw)
+  end
 
-  def parse(signature, text, _opts) when is_binary(text) do
+  defp do_parse(_signature, %DSEx.Prediction{} = prediction), do: {:ok, prediction}
+  defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
+
+  defp do_parse(signature, text) when is_binary(text) do
     outputs = DSEx.Signature.output_names(signature)
     parsed = parse_labelled_text(signature, text)
 
@@ -44,7 +55,7 @@ defmodule DSEx.Adapter.Chat do
     end
   end
 
-  def parse(_signature, raw, _opts), do: {:error, {:unsupported_lm_output, raw}}
+  defp do_parse(_signature, raw), do: {:error, {:unsupported_lm_output, raw}}
 
   defp build_prediction(signature, fields) do
     required =
@@ -449,5 +460,32 @@ defmodule DSEx.Adapter.Chat do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> nil
+  end
+
+  defp validate_format_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+      |> Keyword.take(Keyword.keys(@format_option_schema))
+      |> DSEx.Options.validate!(@format_option_schema, context)
+    else
+      raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_format_opts!(opts, context) do
+    raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_opts!(opts, _context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      :ok
+    else
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.parse/3 expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
 end
