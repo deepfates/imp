@@ -140,6 +140,31 @@ defmodule OptimizeAnythingTest do
     assert Enum.find(report.candidates, &(&1.id == "candidate-1")).score == 0.0
   end
 
+  test "captures mutation errors as failed candidates without aborting search" do
+    artifact = Anything.new_artifact(:prompt, "base")
+
+    evaluator = fn artifact, _examples ->
+      if artifact.text =~ "good", do: 1.0, else: 0.25
+    end
+
+    mutation_fn = fn _artifact, trial, _seed ->
+      case trial do
+        1 -> raise "mutation engine failed"
+        2 -> "good"
+      end
+    end
+
+    report = Anything.optimize(artifact, evaluator, trials: 2, mutation_fn: mutation_fn)
+
+    assert report.best.id == "candidate-2"
+    assert report.best.score == 1.0
+
+    assert [%{candidate_id: "candidate-1", diagnostics: ["mutation engine failed"]}] =
+             report.errors
+
+    assert Enum.find(report.candidates, &(&1.id == "candidate-1")).mutation == :mutation_failed
+  end
+
   test "artifacts carry named text parameters through mutation and report roundtrip" do
     artifact =
       Anything.new_artifact(:code, "def answer, do: :old",

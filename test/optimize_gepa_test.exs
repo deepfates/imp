@@ -209,6 +209,99 @@ defmodule OptimizeGEPATest do
     assert report.metadata.dev_examples == 1
   end
 
+  test "captures mutation errors as failed candidates without aborting search" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    evaluator = fn artifact, examples ->
+      %{
+        per_example_scores:
+          Enum.map(examples, fn required ->
+            if artifact.text =~ required, do: 1.0, else: 0.0
+          end),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end
+
+    mutation_fn = fn _artifact, _asi, generation ->
+      case generation do
+        1 -> raise "reflection failed"
+        2 -> "target"
+      end
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["target"],
+        generations: 2,
+        mutation_fn: mutation_fn
+      )
+
+    assert report.best.aggregate_score == 1.0
+    assert [%{candidate_id: "gepa-1", diagnostics: ["reflection failed"]}] = report.errors
+    assert Enum.find(report.candidates, &(&1.id == "gepa-1")).mutation == :mutation_failed
+  end
+
+  test "captures invalid evaluator results as failed candidates" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    evaluator = fn artifact, examples ->
+      if artifact.id == "baseline" or artifact.text == "Base" do
+        %{per_example_scores: Enum.map(examples, fn _example -> 0.25 end), asi: ["target"]}
+      else
+        :invalid
+      end
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["target"],
+        generations: 1,
+        mutation_fn: fn _artifact, _asi, _generation -> "target" end
+      )
+
+    assert report.best.id == "baseline"
+
+    assert [
+             %{
+               candidate_id: "gepa-1",
+               diagnostics: [
+                 "GEPA evaluator must return a map with :per_example_scores; got: :invalid"
+               ]
+             }
+           ] = report.errors
+  end
+
+  test "captures dev evaluator failures while preserving train-side optimization" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    evaluator = fn artifact, examples ->
+      if examples == [:dev] do
+        raise "dev service unavailable"
+      end
+
+      %{
+        per_example_scores:
+          Enum.map(examples, fn required ->
+            if artifact.text =~ required, do: 1.0, else: 0.0
+          end),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["target"],
+        dev_examples: [:dev],
+        generations: 1,
+        mutation_fn: fn _artifact, _asi, _generation -> "target" end
+      )
+
+    assert report.best.aggregate_score == 1.0
+    assert report.best.metadata.dev_score == 0.0
+    assert report.best.metadata.dev_error == RuntimeError
+    assert Enum.any?(report.errors, &(&1.candidate_id == report.best.id))
+  end
+
   test "covers single-task multi-task and held-out generalization behavior" do
     evaluator = fn artifact, examples ->
       %{

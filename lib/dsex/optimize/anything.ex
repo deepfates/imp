@@ -193,18 +193,22 @@ defmodule DSEx.Optimize.Anything do
       |> trial_indices()
       |> Enum.reduce({[baseline], error_list(baseline)}, fn trial, {candidates, errors} ->
         parent = select_parent(candidates)
-        mutation = mutation_fn.(parent.artifact, trial, seed)
-        artifact = apply_mutation(parent.artifact, mutation, trial)
 
         candidate =
-          evaluate_candidate(
-            artifact,
-            evaluator,
-            examples,
-            candidate_id(trial),
-            parent.id,
-            mutation
-          )
+          case mutate_candidate(parent, mutation_fn, trial, seed) do
+            {:ok, artifact, mutation} ->
+              evaluate_candidate(
+                artifact,
+                evaluator,
+                examples,
+                candidate_id(trial),
+                parent.id,
+                mutation
+              )
+
+            {:error, candidate} ->
+              candidate
+          end
 
         {[candidate | candidates], errors ++ error_list(candidate)}
       end)
@@ -271,6 +275,46 @@ defmodule DSEx.Optimize.Anything do
         diagnostics: [Exception.message(exception)],
         metadata: %{error: inspect(exception.__struct__)}
       }
+  end
+
+  defp mutate_candidate(%Candidate{} = parent, mutation_fn, trial, seed) do
+    mutation = mutation_fn.(parent.artifact, trial, seed)
+    artifact = apply_mutation(parent.artifact, mutation, trial)
+    {:ok, artifact, mutation}
+  rescue
+    exception ->
+      {:error,
+       failed_candidate(
+         parent.artifact,
+         candidate_id(trial),
+         parent.id,
+         :mutation_failed,
+         Exception.message(exception),
+         exception.__struct__
+       )}
+  catch
+    kind, reason ->
+      {:error,
+       failed_candidate(
+         parent.artifact,
+         candidate_id(trial),
+         parent.id,
+         :mutation_failed,
+         "#{kind}: #{inspect(reason)}",
+         kind
+       )}
+  end
+
+  defp failed_candidate(%Artifact{} = artifact, id, parent_id, mutation, message, error) do
+    %Candidate{
+      id: id,
+      artifact: artifact,
+      parent_id: parent_id,
+      mutation: mutation,
+      score: 0.0,
+      diagnostics: [message],
+      metadata: %{error: error}
+    }
   end
 
   defp select_parent(candidates), do: Enum.max_by(candidates, & &1.score)

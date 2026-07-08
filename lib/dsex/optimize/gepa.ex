@@ -31,6 +31,7 @@ defmodule DSEx.Optimize.GEPA do
       :best,
       baseline: nil,
       candidates: [],
+      errors: [],
       frontier: [],
       merges: [],
       metadata: %{}
@@ -63,13 +64,17 @@ defmodule DSEx.Optimize.GEPA do
       |> Enum.reduce([baseline], fn generation, candidates ->
         frontier = pareto_frontier(candidates)
         parent = Enum.at(frontier, rem(generation - 1, length(frontier)))
-        mutation = mutation_fn.(parent.artifact, parent.asi, generation)
-        artifact = mutate(parent.artifact, mutation, generation)
 
-        [
-          evaluate(artifact, evaluator, examples, "gepa-#{generation}", parent.id, mutation)
-          | candidates
-        ]
+        candidate =
+          case mutate_candidate(parent, mutation_fn, generation) do
+            {:ok, artifact, mutation} ->
+              evaluate(artifact, evaluator, examples, "gepa-#{generation}", parent.id, mutation)
+
+            {:error, candidate} ->
+              candidate
+          end
+
+        [candidate | candidates]
       end)
       |> Enum.reverse()
 
@@ -88,6 +93,7 @@ defmodule DSEx.Optimize.GEPA do
       baseline: baseline,
       best: best,
       candidates: candidates,
+      errors: Enum.flat_map(candidates, &candidate_errors/1),
       frontier: final_frontier,
       merges: merges,
       metadata: %{
@@ -135,24 +141,41 @@ defmodule DSEx.Optimize.GEPA do
   defp dominates?(_left, _right), do: false
 
   defp evaluate(%Artifact{} = artifact, evaluator, examples, id, parent_id, mutation) do
-    result = evaluator.(artifact, examples)
-
-    per_example_scores = Map.fetch!(result, :per_example_scores)
-    aggregate_score = average(per_example_scores)
-    asi = List.wrap(Map.get(result, :asi, []))
-    diagnostics = List.wrap(Map.get(result, :diagnostics, []))
+    result = normalize_evaluation(evaluator.(artifact, examples), examples)
 
     %Candidate{
       id: id,
       artifact: artifact,
       parent_id: parent_id,
       mutation: mutation,
-      aggregate_score: aggregate_score,
-      per_example_scores: per_example_scores,
-      asi: asi,
-      diagnostics: diagnostics,
-      metadata: Map.get(result, :metadata, %{})
+      aggregate_score: result.aggregate_score,
+      per_example_scores: result.per_example_scores,
+      asi: result.asi,
+      diagnostics: result.diagnostics,
+      metadata: result.metadata
     }
+  rescue
+    exception ->
+      failed_candidate(
+        artifact,
+        id,
+        parent_id,
+        mutation,
+        examples,
+        Exception.message(exception),
+        exception.__struct__
+      )
+  catch
+    kind, reason ->
+      failed_candidate(
+        artifact,
+        id,
+        parent_id,
+        mutation,
+        examples,
+        "#{kind}: #{inspect(reason)}",
+        kind
+      )
   end
 
   defp mutate(%Artifact{} = artifact, {:replace, text}, generation) do
@@ -175,6 +198,36 @@ defmodule DSEx.Optimize.GEPA do
         text: text,
         parameters: Map.put(artifact.parameters, :main, text)
     }
+  end
+
+  defp mutate_candidate(%Candidate{} = parent, mutation_fn, generation) do
+    mutation = mutation_fn.(parent.artifact, parent.asi, generation)
+    artifact = mutate(parent.artifact, mutation, generation)
+    {:ok, artifact, mutation}
+  rescue
+    exception ->
+      {:error,
+       failed_candidate(
+         parent.artifact,
+         "gepa-#{generation}",
+         parent.id,
+         :mutation_failed,
+         parent.per_example_scores,
+         Exception.message(exception),
+         exception.__struct__
+       )}
+  catch
+    kind, reason ->
+      {:error,
+       failed_candidate(
+         parent.artifact,
+         "gepa-#{generation}",
+         parent.id,
+         :mutation_failed,
+         parent.per_example_scores,
+         "#{kind}: #{inspect(reason)}",
+         kind
+       )}
   end
 
   defp merge_frontier([_single], _evaluator, _examples), do: {[], []}
@@ -205,19 +258,98 @@ defmodule DSEx.Optimize.GEPA do
 
   defp annotate_dev_scores(candidates, evaluator, dev_examples) do
     Enum.map(candidates, fn candidate ->
-      dev = evaluator.(candidate.artifact, dev_examples)
-      dev_scores = Map.fetch!(dev, :per_example_scores)
-      dev_score = average(dev_scores)
+      dev =
+        evaluate(
+          candidate.artifact,
+          evaluator,
+          dev_examples,
+          "#{candidate.id}-dev",
+          candidate.id,
+          :dev
+        )
+
+      dev_scores = dev.per_example_scores
+      dev_score = dev.aggregate_score
+
+      dev_metadata =
+        case dev.metadata do
+          %{error: error} -> %{dev_error: error, dev_diagnostics: dev.diagnostics}
+          _metadata -> %{}
+        end
 
       %{
         candidate
         | metadata:
             candidate.metadata
+            |> Map.merge(dev_metadata)
             |> Map.put(:dev_per_example_scores, dev_scores)
             |> Map.put(:dev_score, dev_score)
       }
     end)
   end
+
+  defp normalize_evaluation(%{per_example_scores: per_example_scores} = result, _examples)
+       when is_list(per_example_scores) do
+    %{
+      aggregate_score: average(per_example_scores),
+      per_example_scores: per_example_scores,
+      asi: List.wrap(Map.get(result, :asi, [])),
+      diagnostics: List.wrap(Map.get(result, :diagnostics, [])),
+      metadata: Map.get(result, :metadata, %{})
+    }
+  end
+
+  defp normalize_evaluation(result, _examples) do
+    raise ArgumentError,
+          "GEPA evaluator must return a map with :per_example_scores; got: #{inspect(result)}"
+  end
+
+  defp failed_candidate(
+         %Artifact{} = artifact,
+         id,
+         parent_id,
+         mutation,
+         examples_or_scores,
+         message,
+         error
+       ) do
+    per_example_scores = zero_scores(examples_or_scores)
+
+    %Candidate{
+      id: id,
+      artifact: artifact,
+      parent_id: parent_id,
+      mutation: mutation,
+      aggregate_score: 0.0,
+      per_example_scores: per_example_scores,
+      asi: [],
+      diagnostics: [message],
+      metadata: %{error: error}
+    }
+  end
+
+  defp zero_scores(scores) when is_list(scores) do
+    Enum.map(scores, fn _ -> 0.0 end)
+  end
+
+  defp candidate_errors(%Candidate{metadata: %{error: error}} = candidate) do
+    [%{candidate_id: candidate.id, error: inspect(error), diagnostics: candidate.diagnostics}]
+  end
+
+  defp candidate_errors(%Candidate{metadata: %{dev_error: error}} = candidate) do
+    [
+      %{
+        candidate_id: candidate.id,
+        error: inspect(error),
+        diagnostics: Map.get(candidate.metadata, :dev_diagnostics, [])
+      }
+    ]
+  end
+
+  defp candidate_errors(_candidate), do: []
+
+  defp selection_score(%Candidate{metadata: %{dev_error: _error}, aggregate_score: score}),
+    do: score
 
   defp selection_score(%Candidate{metadata: %{dev_score: score}}), do: score
   defp selection_score(%Candidate{aggregate_score: score}), do: score
