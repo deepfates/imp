@@ -7,6 +7,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Evaluate
   doctest DSEx.Example
   doctest DSEx.Metrics
+  doctest DSEx.Module
   doctest DSEx.Optimizer.RandomSearch
   doctest DSEx.Prediction
   doctest DSEx.Predict.Aggregation
