@@ -19,10 +19,15 @@ defmodule DSEx.Settings do
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
   def configure(opts) when is_list(opts) or is_map(opts) do
-    updates = Map.new(opts)
+    updates = normalize_settings(opts, "DSEx.configure/1")
     ensure_started()
     Agent.update(@name, &Map.merge(&1, updates))
     :ok
+  end
+
+  def configure(opts) do
+    raise ArgumentError,
+          "DSEx.configure/1 expects a map or settings pair list; got: #{inspect(opts)}"
   end
 
   def get do
@@ -44,14 +49,25 @@ defmodule DSEx.Settings do
   end
 
   def context(opts, fun) when is_function(fun, 0) do
+    settings = normalize_settings(opts, "DSEx.context/2")
     previous = Process.get(@context_key, [])
-    Process.put(@context_key, [Map.new(opts) | previous])
+    Process.put(@context_key, [settings | previous])
 
     try do
       fun.()
     after
       Process.put(@context_key, previous)
     end
+  end
+
+  def context(_opts, fun) when not is_function(fun, 0) do
+    raise ArgumentError,
+          "DSEx.context/2 expects a zero-arity function; got: #{inspect(fun)}"
+  end
+
+  def context(opts, _fun) do
+    raise ArgumentError,
+          "DSEx.context/2 expects settings as a map or settings pair list; got: #{inspect(opts)}"
   end
 
   @doc false
@@ -95,5 +111,21 @@ defmodule DSEx.Settings do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
     end
+  end
+
+  defp normalize_settings(settings, context) when is_list(settings) or is_map(settings) do
+    Enum.reduce(settings, %{}, fn
+      {key, value}, normalized ->
+        Map.put(normalized, key, value)
+
+      invalid_entry, _normalized ->
+        raise ArgumentError,
+              "#{context} expects settings as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
+    end)
+  end
+
+  defp normalize_settings(settings, context) do
+    raise ArgumentError,
+          "#{context} expects settings as a map or settings pair list; got: #{inspect(settings)}"
   end
 end

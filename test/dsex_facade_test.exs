@@ -61,6 +61,40 @@ defmodule DSExFacadeTest do
                  end
   end
 
+  test "facade settings report invalid inputs clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.configure\/1 expects a map or settings pair list/, fn ->
+      DSEx.configure(:not_settings)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.configure\/1 expects settings as \{key, value\} pairs/,
+                 fn ->
+                   DSEx.configure([:not_a_pair])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.context\/2 expects settings as a map or settings pair list/,
+                 fn ->
+                   DSEx.context(:not_settings, fn -> :ok end)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.context\/2 expects a zero-arity function/, fn ->
+      DSEx.context([lm: :local], :not_a_function)
+    end
+  end
+
+  test "invalid context settings do not leak process-local overrides" do
+    DSEx.configure(lm: :global)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.context\/2 expects settings as \{key, value\} pairs/,
+                 fn ->
+                   DSEx.context([:not_a_pair], fn -> :ok end)
+                 end
+
+    assert DSEx.settings().lm == :global
+  end
+
   test "facade attaches demos and builds tools" do
     program = DSEx.predict("question -> answer")
     cot = DSEx.chain_of_thought("question -> answer")
