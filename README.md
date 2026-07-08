@@ -83,7 +83,7 @@ program = DSEx.predict(signature)
 | Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
 | Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
 | Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |
-| Operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, Livebook validation, and docs |
+| Source-checkout operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, Livebook validation, and docs |
 
 ## Installation
 
@@ -251,8 +251,8 @@ The `livebooks/` directory contains runnable tutorials:
 
 ## Validation
 
-The everyday local quality gate checks the package without spending provider
-tokens or depending on external datasets:
+From the source checkout, the everyday local quality gate checks the package
+without spending provider tokens or depending on external datasets:
 
 ```sh
 mix production.check
@@ -261,14 +261,15 @@ mix production.check
 It runs formatting, compilation with warnings as errors, deterministic tests,
 package-boundary checks, Livebook validation, and ExDoc generation.
 
-When you change public examples or teaching material, also execute the shipped
-notebooks end to end:
+When you change public examples or teaching material in the source checkout,
+also execute the shipped notebooks end to end:
 
 ```sh
 mix livebook.execute.check
 ```
 
-Provider-backed checks are opt-in because they use live credentials:
+Provider-backed source-checkout checks are opt-in because they use live
+credentials:
 
 ```sh
 LIVE_PROVIDER=1 mix live.check

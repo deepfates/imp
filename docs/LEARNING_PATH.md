@@ -43,7 +43,7 @@ Goal: build a useful local workflow.
 2. Add one retrieval or tool boundary.
 3. Run the program against deterministic local examples.
 4. Save and load the program.
-5. Run `mix production.check`.
+5. From the source checkout, run `mix production.check`.
 
 At this point DSEx should feel like ordinary Elixir: structs, functions,
 tests, docs, and explicit dependencies.
@@ -57,7 +57,7 @@ rewriting the task.
 2. Keep model names and API keys in runtime configuration.
 3. Use `DSEx.context/2` for request-scoped settings.
 4. Keep provider calls out of normal unit tests.
-5. Add opt-in live tests with `LIVE_PROVIDER=1 mix live.check`.
+5. From the source checkout, add opt-in live tests with `LIVE_PROVIDER=1 mix live.check`.
 6. Watch telemetry, traces, retries, and validation failures.
 7. Decide rollout, cost limits, provider-failure behavior, and data-retention
    policy in the host application.

@@ -7,7 +7,7 @@ Mix.install([{:dsex, path: repo}])
 
 ## Local Quality Gates
 
-Run these in a terminal from the repo root:
+Run these in a terminal from the source checkout repo root:
 
 ```sh
 mix production.check
@@ -18,7 +18,7 @@ mix protocol.check
 These gates are the local project contract. They check formatting, compilation,
 deterministic tests, package shape, docs, local service integration, and
 provider-compatible protocol behavior. Run the executable notebook gate when you
-change teaching material:
+change teaching material in the source checkout:
 
 ```sh
 mix livebook.execute.check

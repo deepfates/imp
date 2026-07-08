@@ -105,7 +105,7 @@ There is no parallel namespace. Prefer “program”, “signature”,
 
 ## Production Principle
 
-The codebase should be judged by gates, not vibes:
+The source checkout should be judged by gates, not vibes:
 
 ```sh
 mix production.check

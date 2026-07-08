@@ -6,8 +6,8 @@ catalogs, schema constraints, and deterministic benchmark fixtures.
 
 ## Gates
 
-Advanced DSEx behavior is part of the production gate. These commands must pass
-before release:
+Advanced DSEx behavior is part of the source-checkout production gate. These
+commands must pass before release:
 
 ```sh
 mix production.check

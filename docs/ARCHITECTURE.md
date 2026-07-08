@@ -296,7 +296,7 @@ ambient environment credentials.
 
 ## Gates
 
-The production gates are not docs-only promises:
+The source-checkout production gates are not docs-only promises:
 
 - `mix production.check`
 - `mix integration.check`

@@ -1,10 +1,11 @@
 # Production Operations
 
-This document is the authoritative release gate contract for DSEx.
+This document is the authoritative source-checkout release gate contract for
+DSEx.
 
 ## Required Gates
 
-Run from a clean tree before shipping ordinary product changes:
+Run from a clean source checkout tree before shipping ordinary product changes:
 
 ```sh
 mix production.check
@@ -14,14 +15,15 @@ mix package.check
 mix quality.check
 ```
 
-When changing public examples, notebooks, or learning-material control flow,
-also run the slower executable Livebook proof:
+When changing public examples, notebooks, or learning-material control flow in
+the source checkout, also run the slower executable Livebook proof:
 
 ```sh
 mix livebook.execute.check
 ```
 
-With live provider credentials, run the opt-in provider smoke gate:
+With live provider credentials in the source checkout, run the opt-in provider
+smoke gate:
 
 ```sh
 set -a

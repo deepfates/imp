@@ -37,6 +37,14 @@ defmodule DSEx.MixProject do
   end
 
   defp preferred_envs do
+    if source_checkout_gates_available?() do
+      source_checkout_preferred_envs()
+    else
+      []
+    end
+  end
+
+  defp source_checkout_preferred_envs do
     base_preferred_envs = [
       "production.check": :test,
       "public_surface.check": :test,
@@ -156,6 +164,14 @@ defmodule DSEx.MixProject do
   end
 
   defp aliases do
+    if source_checkout_gates_available?() do
+      source_checkout_aliases()
+    else
+      []
+    end
+  end
+
+  defp source_checkout_aliases do
     base_aliases = [
       "public_surface.check": ["test test/public_surface_test.exs"],
       "production.check": [
@@ -264,6 +280,10 @@ defmodule DSEx.MixProject do
 
   defp benchmark_tasks_available? do
     File.exists?("lib/mix/tasks/dsex.benchmark.run.ex")
+  end
+
+  defp source_checkout_gates_available? do
+    File.exists?("test/package_contract_test.exs")
   end
 
   defp clean_docs(_args), do: File.rm_rf!("doc")
