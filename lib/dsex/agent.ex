@@ -36,6 +36,14 @@ defmodule DSEx.Agent do
     tool_policy: :allow
   ]
 
+  @option_schema [
+    tools: [type: {:list, :any}, default: []],
+    children: [type: {:list, :any}, default: []],
+    input_schema: [type: {:map, :any, :any}, default: %{}],
+    output_schema: [type: {:map, :any, :any}, default: %{}],
+    tool_policy: [type: :any, default: :allow]
+  ]
+
   @doc """
   Creates an agent.
 
@@ -46,16 +54,25 @@ defmodule DSEx.Agent do
   - `:input_schema` / `:output_schema` - maps with `:required` keys.
   - `:tool_policy` - `:allow`, a list of allowed names, or a predicate function.
   """
-  def new(name, handler, opts \\ []) when is_function(handler, 2) or is_function(handler, 3) do
+  def new(name, handler, opts \\ [])
+
+  def new(name, handler, opts) when is_function(handler, 2) or is_function(handler, 3) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Agent.new/3")
+
     %__MODULE__{
       name: normalize_name(name),
       handler: handler,
-      tools: index_by_name(Keyword.get(opts, :tools, [])),
-      children: index_by_name(Keyword.get(opts, :children, [])),
-      input_schema: Keyword.get(opts, :input_schema, %{}),
-      output_schema: Keyword.get(opts, :output_schema, %{}),
-      tool_policy: Keyword.get(opts, :tool_policy, :allow)
+      tools: index_tools(opts[:tools]),
+      children: index_children(opts[:children]),
+      input_schema: opts[:input_schema],
+      output_schema: opts[:output_schema],
+      tool_policy: opts[:tool_policy]
     }
+  end
+
+  def new(_name, handler, _opts) do
+    raise ArgumentError,
+          "DSEx.Agent.new/3 expects an arity-2 or arity-3 handler; got: #{inspect(handler)}"
   end
 
   @doc """
@@ -279,9 +296,35 @@ defmodule DSEx.Agent do
     end
   end
 
-  defp index_by_name(values), do: Map.new(values, fn item -> {item.name, item} end)
+  defp index_tools(values) do
+    Map.new(values, fn
+      %DSEx.Tool{name: name} = tool ->
+        {name, tool}
+
+      invalid ->
+        raise ArgumentError,
+              "DSEx.Agent.new/3 expects :tools to contain DSEx.Tool structs; got: #{inspect(invalid)}"
+    end)
+  end
+
+  defp index_children(values) do
+    Map.new(values, fn
+      %__MODULE__{name: name} = child ->
+        {name, child}
+
+      invalid ->
+        raise ArgumentError,
+              "DSEx.Agent.new/3 expects :children to contain DSEx.Agent structs; got: #{inspect(invalid)}"
+    end)
+  end
+
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
+
+  defp normalize_name(name) do
+    raise ArgumentError,
+          "DSEx.Agent names must be atoms or strings; got: #{inspect(name)}"
+  end
 
   defp existing_atom_or_string(name) do
     String.to_existing_atom(name)

@@ -43,6 +43,58 @@ defmodule AgentRuntimeTest do
     Process.delete(:agent_ref)
   end
 
+  test "tool constructor reports invalid definitions clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Tool names must be atoms or strings/, fn ->
+      DSEx.Tool.new(123, "bad", fn input -> input end)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4 expects a unary function/, fn ->
+      DSEx.Tool.new(:bad, "bad", :not_a_function)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4.*expected keyword options/, fn ->
+      DSEx.Tool.new(:bad, "bad", fn input -> input end, :not_options)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4.*:schema.*expected.*map/s, fn ->
+      DSEx.Tool.new(:bad, "bad", fn input -> input end, schema: :not_a_schema)
+    end
+  end
+
+  test "agent constructor reports invalid definitions clearly" do
+    handler = fn input, runtime -> {:ok, input, runtime} end
+
+    assert_raise ArgumentError, ~r/DSEx\.Agent names must be atoms or strings/, fn ->
+      Agent.new(123, handler)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.new\/3 expects an arity-2 or arity-3 handler/,
+                 fn ->
+                   Agent.new(:bad, fn input -> input end)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Agent\.new\/3.*expected keyword options/, fn ->
+      Agent.new(:bad, handler, :not_options)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Agent\.new\/3.*:input_schema.*expected.*map/s, fn ->
+      Agent.new(:bad, handler, input_schema: :not_schema)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.new\/3 expects :tools to contain DSEx\.Tool structs/,
+                 fn ->
+                   Agent.new(:bad, handler, tools: [:not_a_tool])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.new\/3 expects :children to contain DSEx\.Agent structs/,
+                 fn ->
+                   Agent.new(:bad, handler, children: [:not_an_agent])
+                 end
+  end
+
   test "runtime stores large context by reference and exposes memory" do
     runtime =
       Runtime.new()

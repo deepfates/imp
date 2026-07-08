@@ -24,6 +24,10 @@ defmodule DSEx.Tool do
 
   defstruct [:name, :description, :run, schema: %{}]
 
+  @option_schema [
+    schema: [type: {:map, :any, :any}, default: %{}]
+  ]
+
   @doc """
   Builds a tool from a name, description, unary function, and optional schema.
 
@@ -35,13 +39,22 @@ defmodule DSEx.Tool do
   The schema is a JSON-schema-shaped map used by ReAct/provider adapters and by
   humans reading the program boundary.
   """
-  def new(name, description, run, opts \\ []) when is_function(run, 1) do
+  def new(name, description, run, opts \\ [])
+
+  def new(name, description, run, opts) when is_function(run, 1) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Tool.new/4")
+
     %__MODULE__{
       name: normalize_name(name),
       description: description,
       run: run,
-      schema: Keyword.get(opts, :schema, %{})
+      schema: opts[:schema]
     }
+  end
+
+  def new(_name, _description, run, _opts) do
+    raise ArgumentError,
+          "DSEx.Tool.new/4 expects a unary function as the tool runner; got: #{inspect(run)}"
   end
 
   @doc """
@@ -57,6 +70,11 @@ defmodule DSEx.Tool do
 
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
+
+  defp normalize_name(name) do
+    raise ArgumentError,
+          "DSEx.Tool names must be atoms or strings; got: #{inspect(name)}"
+  end
 
   defp existing_atom_or_string(name) do
     String.to_existing_atom(name)
