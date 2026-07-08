@@ -34,26 +34,34 @@ defmodule DSEx.Prediction do
         }
   defstruct fields: %{}, completions: [], score: nil, metadata: %{}
 
+  @option_schema [
+    completions: [type: {:list, :any}, default: []],
+    score: [type: :any, default: nil],
+    metadata: [type: :map, default: %{}]
+  ]
+
   @doc """
   Builds a prediction from fields and optional completions, score, and metadata.
 
-  `fields` may be a map or keyword list. Existing atom names in string keys are
-  resolved to those atoms, while unknown string keys remain strings.
+  `fields` may be a map or field pair list. Existing atom names in string keys
+  are resolved to those atoms, while unknown string keys remain strings.
   """
   def new(fields \\ %{}, opts \\ [])
 
   def new(fields, opts) when is_list(fields) or is_map(fields) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Prediction.new/2")
+
     %__MODULE__{
-      fields: fields |> Map.new(fn {k, v} -> {normalize_key(k), v} end),
-      completions: Keyword.get(opts, :completions, []),
-      score: Keyword.get(opts, :score),
-      metadata: Keyword.get(opts, :metadata, %{})
+      fields: normalize_fields(fields),
+      completions: opts[:completions],
+      score: opts[:score],
+      metadata: opts[:metadata]
     }
   end
 
   def new(fields, _opts) do
     raise ArgumentError,
-          "DSEx.Prediction.new/2 expects a map or keyword list; got: #{inspect(fields)}"
+          "DSEx.Prediction.new/2 expects a map or field pair list; got: #{inspect(fields)}"
   end
 
   @doc "Reads a prediction field, returning `default` when it is missing."
@@ -78,6 +86,17 @@ defmodule DSEx.Prediction do
   @doc "Converts an example into a prediction, preserving fields and applying prediction options."
   def from_example(%DSEx.Example{} = example, opts \\ []),
     do: new(DSEx.Example.to_map(example), opts)
+
+  defp normalize_fields(fields) do
+    Enum.reduce(fields, %{}, fn
+      {key, value}, normalized ->
+        Map.put(normalized, normalize_key(key), value)
+
+      invalid_entry, _normalized ->
+        raise ArgumentError,
+              "DSEx.Prediction.new/2 expects fields as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
+    end)
+  end
 
   defp normalize_key(key) when is_atom(key), do: key
   defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)

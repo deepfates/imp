@@ -90,13 +90,39 @@ defmodule DSExTest do
 
   test "examples and predictions report invalid field containers clearly" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Example\.new\/1 expects a map, keyword list, or DSEx\.Example/,
+                 ~r/DSEx\.Example\.new\/1 expects a map, field pair list, or DSEx\.Example/,
                  fn ->
                    DSEx.Example.new(:not_fields)
                  end
 
-    assert_raise ArgumentError, ~r/DSEx\.Prediction\.new\/2 expects a map or keyword list/, fn ->
-      DSEx.Prediction.new(:not_fields)
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Prediction\.new\/2 expects a map or field pair list/,
+                 fn ->
+                   DSEx.Prediction.new(:not_fields)
+                 end
+  end
+
+  test "examples and predictions report malformed field pair lists clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Example\.new\/1 expects fields as \{key, value\} pairs/,
+                 fn ->
+                   DSEx.Example.new([:not_a_pair])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Prediction\.new\/2 expects fields as \{key, value\} pairs/,
+                 fn ->
+                   DSEx.Prediction.new([:not_a_pair])
+                 end
+  end
+
+  test "prediction reports invalid options clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Prediction\.new\/2: expected keyword options/, fn ->
+      DSEx.Prediction.new(%{answer: "4"}, :not_options)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Prediction\.new\/2.*:metadata.*expected.*map/s, fn ->
+      DSEx.Prediction.new(%{answer: "4"}, metadata: :not_metadata)
     end
   end
 

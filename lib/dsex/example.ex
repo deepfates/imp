@@ -31,7 +31,7 @@ defmodule DSEx.Example do
 
   defstruct fields: %{}, input_keys: nil, demos: []
 
-  @doc "Builds an example from a map, keyword list, or existing example."
+  @doc "Builds an example from a map, field pair list, or existing example."
   def new(fields \\ %{})
   def new(%__MODULE__{} = example), do: example
 
@@ -40,7 +40,7 @@ defmodule DSEx.Example do
 
   def new(fields) do
     raise ArgumentError,
-          "DSEx.Example.new/1 expects a map, keyword list, or DSEx.Example; got: #{inspect(fields)}"
+          "DSEx.Example.new/1 expects a map, field pair list, or DSEx.Example; got: #{inspect(fields)}"
   end
 
   @doc "Reads a field, returning `default` when it is missing."
@@ -95,7 +95,17 @@ defmodule DSEx.Example do
   @doc "Attaches demonstrations to an example."
   def with_demos(%__MODULE__{} = example, demos), do: %{example | demos: List.wrap(demos)}
 
-  defp normalize_keys(fields), do: Map.new(fields, fn {k, v} -> {normalize_key(k), v} end)
+  defp normalize_keys(fields) do
+    Enum.reduce(fields, %{}, fn
+      {key, value}, normalized ->
+        Map.put(normalized, normalize_key(key), value)
+
+      invalid_entry, _normalized ->
+        raise ArgumentError,
+              "DSEx.Example.new/1 expects fields as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
+    end)
+  end
+
   defp normalize_key(key) when is_atom(key), do: key
   defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
 
