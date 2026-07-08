@@ -101,9 +101,17 @@ defmodule MetricContractTest do
       DSEx.Evaluate.new(devset, metric, failure_score: :zero)
     end
 
-    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
-      DSEx.Evaluate.new(devset, metric, max_errors: -1)
-    end
+    assert_raise ArgumentError,
+                 ~r/:max_errors.*expected :infinity or a non-negative integer/s,
+                 fn ->
+                   DSEx.Evaluate.new(devset, metric, max_errors: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/:max_errors.*expected :infinity or a non-negative integer/s,
+                 fn ->
+                   DSEx.Evaluate.new(devset, metric, max_errors: "forever")
+                 end
   end
 
   test "Evaluate normalizes plain map and field-pair devset rows" do
