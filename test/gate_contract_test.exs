@@ -10,8 +10,12 @@ defmodule GateContractTest do
              "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
              "package.check",
              "livebook.check",
+             "docs.clean",
              "docs"
            ]
+
+    assert [docs_clean] = Keyword.fetch!(aliases, :"docs.clean")
+    assert is_function(docs_clean, 1)
 
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "benchmark.truth.check",

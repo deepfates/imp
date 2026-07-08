@@ -138,7 +138,11 @@ defmodule DSEx.MixProject do
         "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "package.check",
         "livebook.check",
+        "docs.clean",
         "docs"
+      ],
+      "docs.clean": [
+        &clean_docs/1
       ],
       "evidence.check": [
         "benchmark.truth.check",
@@ -220,4 +224,6 @@ defmodule DSEx.MixProject do
       ]
     ]
   end
+
+  defp clean_docs(_args), do: File.rm_rf!("doc")
 end

@@ -106,7 +106,8 @@ Dependency policy:
 - the deterministic non-live, non-integration, non-protocol test suite
 - package-boundary checks through `mix package.check`
 - Livebook syntax validation through `mix livebook.check`
-- documentation generation with ExDoc
+- clean documentation generation with ExDoc, so renamed modules or Livebooks
+  cannot leave stale pages in the ignored `doc/` output directory
 
 It intentionally does not run paid provider calls, dataset fetches, long
 campaigns, or parity dashboards.
