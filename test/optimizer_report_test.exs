@@ -619,6 +619,37 @@ defmodule OptimizerReportTest do
     assert Enum.map_join(messages, "\n", & &1.content) =~ "scored_examples"
   end
 
+  test "instruction proposer includes signatures from composed program wrappers" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(self(), {:wrapped_proposer_messages, messages})
+          ~s(["Double the number using context."])
+        end
+      ]
+    }
+
+    {train, _dev} = sets()
+
+    program =
+      "x, context -> doubled"
+      |> DSEx.program_of_thought(lm: lm, output_field: :doubled)
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "double x"}]), query_field: :x, k: 1)
+
+    assert ["Double the number using context."] =
+             DSEx.Optimizer.InstructionProposer.propose(program, train, lm: lm, count: 1)
+
+    assert_received {:wrapped_proposer_messages, messages}
+    [%{role: :system}, %{role: :user, content: payload}] = messages
+    decoded = Jason.decode!(payload)
+
+    assert decoded["signature"] == "x, context -> program, tool, arguments"
+
+    assert decoded["current_instruction"] ==
+             "Given the fields `x`, `context`, produce the fields `doubled`."
+  end
+
   test "instruction proposer falls back for malformed training rows" do
     program = DSEx.predict("question -> answer", lm: lm())
 

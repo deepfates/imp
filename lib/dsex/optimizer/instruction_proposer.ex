@@ -127,9 +127,10 @@ defmodule DSEx.Optimizer.InstructionProposer do
     ] ++ Keyword.get(opts, :extra_instructions, [])
   end
 
-  defp signature_spec(%DSEx.Predict.Predict{signature: signature}),
-    do: DSEx.Signature.to_spec(signature)
-
-  defp signature_spec(%DSEx.Predict.ChainOfThought{predict: predict}), do: signature_spec(predict)
-  defp signature_spec(_program), do: nil
+  defp signature_spec(program) do
+    case DSEx.ProgramAccess.predict(program) do
+      %DSEx.Predict.Predict{signature: signature} -> DSEx.Signature.to_spec(signature)
+      nil -> nil
+    end
+  end
 end
