@@ -34,6 +34,16 @@ defmodule DSEx.Predict.MultiChainComparison do
 
   defstruct [:predict, :last_key, m: 3]
 
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    demos: [type: {:list, :any}, default: []],
+    config: [type: :keyword_list, default: []],
+    metadata: [type: {:map, :any, :any}, default: %{}],
+    m: [type: :any],
+    M: [type: :any]
+  ]
+
   @doc """
   Builds a multi-chain comparison program.
 
@@ -41,6 +51,7 @@ defmodule DSEx.Predict.MultiChainComparison do
   time and must be a positive integer.
   """
   def new(signature, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.MultiChainComparison.new/2")
     signature = DSEx.Signature.ensure(signature)
     last_key = signature |> DSEx.Signature.output_names() |> List.last()
     m = positive_m!(Keyword.get(opts, :m, Keyword.get(opts, :M, 3)))
@@ -71,8 +82,25 @@ defmodule DSEx.Predict.MultiChainComparison do
   `{:error, {:invalid_completions, value}}` when the completions field is not a
   list.
   """
-  def call(%__MODULE__{} = mcc, inputs) do
-    inputs = Map.new(inputs)
+  def call(%__MODULE__{} = mcc, inputs) when is_list(inputs) or is_map(inputs) do
+    with {:ok, inputs} <- normalize_inputs(inputs) do
+      compare(mcc, inputs)
+    end
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_multi_chain_inputs,
+        "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error -> {:error, {:invalid_multi_chain_inputs, "expected inputs as {key, value} pairs"}}
+  end
+
+  defp compare(%__MODULE__{} = mcc, inputs) do
     completions = Map.get(inputs, :completions, Map.get(inputs, "completions", []))
 
     cond do

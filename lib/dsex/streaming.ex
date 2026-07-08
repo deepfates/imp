@@ -1,9 +1,17 @@
 defmodule DSEx.Streaming do
   @moduledoc "Enumerable-friendly streaming helpers."
 
+  @option_schema [
+    provider_stream: [type: :boolean, default: false],
+    chunker: [type: :any]
+  ]
+
   def stream(program, inputs, opts \\ []) do
+    owned_opts = validate_opts!(opts, "DSEx.Streaming.stream/3")
+    validate_chunker!(owned_opts[:chunker], "DSEx.Streaming.stream/3")
+
     cond do
-      Keyword.get(opts, :provider_stream, false) and match?(%DSEx.Predict.Predict{}, program) ->
+      owned_opts[:provider_stream] and match?(%DSEx.Predict.Predict{}, program) ->
         provider_stream(program, inputs, opts)
 
       true ->
@@ -36,16 +44,26 @@ defmodule DSEx.Streaming do
   end
 
   defp provider_stream(%DSEx.Predict.Predict{} = program, inputs, opts) do
-    inputs = Map.new(inputs)
-    settings = DSEx.Settings.get()
+    with {:ok, inputs} <- normalize_inputs(inputs) do
+      settings = DSEx.Settings.get()
 
-    adapter =
-      if program.dynamic_adapter?, do: settings.adapter, else: program.adapter || settings.adapter
+      adapter =
+        if program.dynamic_adapter?,
+          do: settings.adapter,
+          else: program.adapter || settings.adapter
 
-    lm = if program.dynamic_lm?, do: settings.lm, else: program.lm
-    messages = adapter.format(program.signature, inputs, demos: program.demos)
+      lm = if program.dynamic_lm?, do: settings.lm, else: program.lm
+      messages = adapter.format(program.signature, inputs, demos: program.demos)
 
-    stream_lm(lm, messages, Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream])))
+      stream_lm(
+        lm,
+        messages,
+        Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream, :chunker]))
+      )
+    else
+      {:error, reason} ->
+        [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
+    end
   end
 
   defp stream_lm(%module{} = lm, messages, opts) do
@@ -94,6 +112,7 @@ defmodule DSEx.Streaming do
   defp stream_value(value), do: value
 
   def collect(program, inputs, opts \\ []) do
+    validate_opts!(opts, "DSEx.Streaming.collect/3")
     outputs = output_names(program)
 
     program
@@ -201,5 +220,33 @@ defmodule DSEx.Streaming do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> name
+  end
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+      |> Keyword.take(Keyword.keys(@option_schema))
+      |> DSEx.Options.validate!(@option_schema, context)
+    else
+      raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_chunker!(nil, _context), do: :ok
+  defp validate_chunker!(chunker, _context) when is_function(chunker, 1), do: :ok
+
+  defp validate_chunker!(chunker, context) do
+    raise ArgumentError,
+          "#{context} expects :chunker to be nil or an arity-1 function; got: #{inspect(chunker)}"
+  end
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error -> {:error, {:invalid_stream_inputs, "expected inputs as {key, value} pairs"}}
   end
 end

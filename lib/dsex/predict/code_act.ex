@@ -34,10 +34,12 @@ defmodule DSEx.Predict.CodeAct do
 
   def new(signature, tools \\ [], opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.CodeAct.new/3")
+    tools = normalize_tools!(tools)
+    pot_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata, :output_field])
 
     %__MODULE__{
-      program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, opts),
-      tools: normalize_tools!(tools),
+      program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, pot_opts),
+      tools: tools,
       max_iters: non_negative_integer(opts[:max_iters]),
       tool_policy: opts[:tool_policy]
     }

@@ -38,6 +38,14 @@ defmodule CompletionSurfaceTest do
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_identifier) end
   end
 
+  test "ProgramOfThought constructor rejects invalid option containers clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ProgramOfThought\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Predict.ProgramOfThought.new("x -> answer", %{lm: nil})
+                 end
+  end
+
   test "CodeAct loops through tool observations before evaluating a program" do
     actions = [
       %{tool: "lookup", arguments: %{"key" => "n"}},
@@ -244,6 +252,37 @@ defmodule CompletionSurfaceTest do
                ["[[ ## ans", "wer ## ]]beam", "[[ ## rationale ## ]]fast"],
                "question -> answer, rationale"
              )
+  end
+
+  test "streaming helpers validate owned options and provider-stream inputs" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "beam"} end]}
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    assert_raise ArgumentError, ~r/DSEx\.Streaming\.stream\/3: expected keyword options/, fn ->
+      DSEx.Streaming.stream(program, %{question: "q"}, %{provider_stream: true}) |> Enum.to_list()
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Streaming\.stream\/3 expects :chunker to be nil or an arity-1 function/,
+                 fn ->
+                   DSEx.Streaming.stream(program, %{question: "q"}, chunker: :not_a_function)
+                   |> Enum.to_list()
+                 end
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:invalid_stream_inputs, "expected inputs as {key, value} pairs"}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(program, [:not_a_pair], provider_stream: true)
+             |> Enum.to_list()
+
+    assert DSEx.Streaming.collect(program, %{question: "q"},
+             provider_stream: true,
+             temperature: 0
+           ) ==
+             "beam"
   end
 
   test "streaming fallback collects structured outputs in signature order" do

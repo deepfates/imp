@@ -112,6 +112,24 @@ defmodule AgentRuntimeTest do
     assert length > 1000
   end
 
+  test "runtime constructor reports invalid options clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Agent\.Runtime\.new\/1: expected keyword options/, fn ->
+      Runtime.new(%{context: %{}})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :context/,
+                 fn ->
+                   Runtime.new(context: [])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.Runtime\.new\/1 expects :event_sink to be nil or an arity-1 function/,
+                 fn ->
+                   Runtime.new(event_sink: fn _event, _runtime -> :ok end)
+                 end
+  end
+
   test "arity-3 handlers receive the agent without process dictionary self-reference" do
     normalize =
       DSEx.Tool.new(:normalize, "normalize text", fn %{text: text} ->

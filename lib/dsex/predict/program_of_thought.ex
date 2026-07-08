@@ -5,7 +5,17 @@ defmodule DSEx.Predict.ProgramOfThought do
 
   defstruct [:predict, output_field: :answer]
 
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    demos: [type: {:list, :any}, default: []],
+    config: [type: :keyword_list, default: []],
+    metadata: [type: {:map, :any, :any}, default: %{}],
+    output_field: [type: :any, default: :answer]
+  ]
+
   def new(signature, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.ProgramOfThought.new/2")
     original = DSEx.Signature.ensure(signature)
 
     program_signature = %{
@@ -42,7 +52,7 @@ defmodule DSEx.Predict.ProgramOfThought do
 
     %__MODULE__{
       predict: DSEx.Predict.Predict.new(program_signature, opts),
-      output_field: Keyword.get(opts, :output_field, :answer)
+      output_field: opts[:output_field]
     }
   end
 
