@@ -8,8 +8,16 @@ defmodule DSEx.Optimizer.Report do
             errors: [],
             metadata: %{}
 
+  @doc """
+  Builds an optimizer report from atom-key, string-key, or keyword attributes.
+
+  String-key support is intentional: report data is often restored from JSON
+  artifacts or provider/debug payloads before it is attached back to a program.
+  Malformed attribute containers raise DSEx-context errors instead of generic
+  `Map.new/1` failures.
+  """
   def new(attrs \\ %{}) do
-    attrs = Map.new(attrs)
+    attrs = normalize_attrs!(attrs)
 
     %__MODULE__{
       optimizer: fetch(attrs, :optimizer),
@@ -19,6 +27,22 @@ defmodule DSEx.Optimizer.Report do
       errors: fetch(attrs, :errors, []),
       metadata: fetch(attrs, :metadata, %{})
     }
+  end
+
+  defp normalize_attrs!(attrs) when is_map(attrs) or is_list(attrs) do
+    Map.new(attrs, fn
+      {key, value} when is_atom(key) or is_binary(key) ->
+        {key, value}
+
+      invalid ->
+        raise ArgumentError,
+              "DSEx.Optimizer.Report.new/1 expects attrs as atom or string keyed pairs; got entry: #{inspect(invalid)}"
+    end)
+  end
+
+  defp normalize_attrs!(attrs) do
+    raise ArgumentError,
+          "DSEx.Optimizer.Report.new/1 expects a map or keyword list; got: #{inspect(attrs)}"
   end
 
   def dump(%__MODULE__{} = report) do

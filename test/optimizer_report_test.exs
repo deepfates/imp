@@ -238,6 +238,39 @@ defmodule OptimizerReportTest do
     assert DSEx.Example.inputs(example).fields == %{question: "France capital?"}
   end
 
+  test "optimizer reports accept decoded attrs and reject malformed attrs clearly" do
+    report =
+      DSEx.Optimizer.Report.new(%{
+        "optimizer" => "provider_search",
+        "best_score" => 0.75,
+        "candidate_count" => 2,
+        "candidates" => [%{"score" => 0.75}],
+        "errors" => [%{"error" => "candidate failed"}],
+        "metadata" => %{"source" => "decoded-json"}
+      })
+
+    assert report.optimizer == "provider_search"
+    assert report.best_score == 0.75
+    assert report.candidate_count == 2
+    assert report.candidates == [%{"score" => 0.75}]
+    assert report.errors == [%{"error" => "candidate failed"}]
+    assert report.metadata == %{"source" => "decoded-json"}
+
+    assert DSEx.Optimizer.Report.new(optimizer: :keyword_report).optimizer == :keyword_report
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Optimizer.Report\.new\/1 expects a map or keyword list/,
+                 fn ->
+                   DSEx.Optimizer.Report.new(:not_attrs)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Optimizer.Report\.new\/1 expects attrs as atom or string keyed pairs/,
+                 fn ->
+                   DSEx.Optimizer.Report.new([{123, "bad"}])
+                 end
+  end
+
   test "labeled few-shot reports trainset enumeration failures" do
     program = DSEx.predict("question -> answer", lm: lm())
 
