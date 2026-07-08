@@ -46,7 +46,8 @@ defmodule DSEx.Optimize.GEPA do
     baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
     evolved =
-      1..generations
+      generations
+      |> generation_indices()
       |> Enum.reduce([baseline], fn generation, candidates ->
         frontier = pareto_frontier(candidates)
         parent = Enum.at(frontier, rem(generation - 1, length(frontier)))
@@ -89,6 +90,9 @@ defmodule DSEx.Optimize.GEPA do
       }
     }
   end
+
+  defp generation_indices(count) when is_integer(count) and count > 0, do: 1..count
+  defp generation_indices(_count), do: []
 
   def pareto_frontier(candidates) do
     candidates

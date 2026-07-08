@@ -52,6 +52,31 @@ defmodule OptimizeGEPATest do
     assert report.metadata.merge_strategy == :pareto_frontier_union
   end
 
+  test "non-positive generations evaluate only the baseline artifact" do
+    artifact = Anything.new_artifact(:prompt, "Base prompt")
+
+    evaluator = fn artifact, examples ->
+      %{
+        per_example_scores:
+          Enum.map(examples, fn required ->
+            if artifact.text =~ required, do: 1.0, else: 0.0
+          end),
+        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
+      }
+    end
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["Base"],
+        generations: 0,
+        mutation_fn: fn _artifact, _asi, _generation -> flunk("unexpected mutation") end
+      )
+
+    assert report.best.id == "baseline"
+    assert Enum.map(report.candidates, & &1.id) == ["baseline"]
+    assert report.metadata.generations == 0
+  end
+
   test "system-aware merge combines complementary frontier candidates" do
     artifact = Anything.new_artifact(:prompt, "Base")
 

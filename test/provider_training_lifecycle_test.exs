@@ -310,4 +310,23 @@ defmodule ProviderTrainingLifecycleTest do
            } =
              result
   end
+
+  test "BootstrapFinetune clamps non-positive max_demos before training" do
+    lm = DSEx.req_llm("gpt-test")
+    program = DSEx.predict("question -> answer", lm: lm)
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    trainer = fn _lm, demos, _opts ->
+      send(self(), {:finetune_demos, demos})
+      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_0", provider: :test, status: :queued})}
+    end
+
+    result =
+      metric
+      |> DSEx.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: -5)
+      |> DSEx.Optimizer.BootstrapFinetune.compile(program, examples())
+
+    assert %{program: %DSEx.Predict.Predict{}, job: %DSEx.Clients.TrainingJob{}} = result
+    assert_received {:finetune_demos, []}
+  end
 end

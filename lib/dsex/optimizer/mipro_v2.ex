@@ -6,9 +6,9 @@ defmodule DSEx.Optimizer.MIPROv2 do
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
-      trials: Keyword.get(opts, :trials, 12),
-      demos_per_candidate: Keyword.get(opts, :demos_per_candidate, 4),
-      cold_start: Keyword.get(opts, :cold_start, 4)
+      trials: non_negative_integer(Keyword.get(opts, :trials, 12)),
+      demos_per_candidate: non_negative_integer(Keyword.get(opts, :demos_per_candidate, 4)),
+      cold_start: non_negative_integer(Keyword.get(opts, :cold_start, 4))
     }
   end
 
@@ -156,4 +156,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
       demos
     )
   end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

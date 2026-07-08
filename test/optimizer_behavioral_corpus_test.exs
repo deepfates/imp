@@ -67,6 +67,28 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, &(not Enum.empty?(Map.get(&1, :demos, []))))
   end
 
+  test "MIPROv2 treats non-positive search counts as baseline-only compile" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.MIPROv2.new(metric(),
+        trials: -3,
+        demos_per_candidate: -1,
+        cold_start: -2
+      )
+      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :mipro_v2
+    assert report.best_score == baseline_score
+    assert report.candidate_count == 1
+    assert [%{baseline: true, trial: 0, score: ^baseline_score}] = report.candidates
+    assert report.metadata.cold_start == 0
+    assert report.metadata.demo_candidate_count == 1
+  end
+
   test "GEPA turns textual feedback into reflective candidates and keeps the best" do
     program = france_program()
 
@@ -85,6 +107,26 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.feedback =~ "Always answer Paris"
     assert report.metadata.implementation == DSEx.Optimize.GEPA
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
+  end
+
+  test "GEPA treats non-positive generations as a baseline-only compile" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.GEPA.new(metric(),
+        generations: -1,
+        feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
+      )
+      |> DSEx.Optimizer.GEPA.compile(program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :gepa
+    assert report.best_score == baseline_score
+    assert report.candidate_count == 1
+    assert [%{id: "baseline", mutation: "baseline", score: ^baseline_score}] = report.candidates
+    assert report.metadata.generations == 0
   end
 
   test "GEPA records program call failures as optimizer feedback instead of crashing" do

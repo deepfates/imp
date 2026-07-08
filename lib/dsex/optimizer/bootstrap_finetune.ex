@@ -7,7 +7,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
     %__MODULE__{
       metric: metric,
       trainer: Keyword.get(opts, :trainer),
-      max_demos: Keyword.get(opts, :max_demos, 32)
+      max_demos: non_negative_integer(Keyword.get(opts, :max_demos, 32))
     }
   end
 
@@ -40,4 +40,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   defp get_lm(%DSEx.Predict.Predict{lm: lm}), do: lm
   defp get_lm(%DSEx.Predict.ChainOfThought{predict: predict}), do: get_lm(predict)
   defp get_lm(_program), do: nil
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

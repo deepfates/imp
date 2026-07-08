@@ -14,7 +14,7 @@ defmodule DSEx.Optimizer.GEPA do
     %__MODULE__{
       metric: metric,
       feedback_fn: Keyword.get(opts, :feedback_fn),
-      generations: Keyword.get(opts, :generations, 4)
+      generations: non_negative_integer(Keyword.get(opts, :generations, 4))
     }
   end
 
@@ -110,4 +110,7 @@ defmodule DSEx.Optimizer.GEPA do
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end
