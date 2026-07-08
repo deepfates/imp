@@ -9,13 +9,18 @@ defmodule DSEx.Adapter.JSON do
 
   ## Example
 
-      signature =
-        DSEx.signature(
-          "text -> sentiment: enum[positive,negative], confidence: number",
-          "Classify the text."
-        )
-
-      program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
+      iex> signature =
+      ...>   DSEx.signature(
+      ...>     "text -> sentiment: enum[positive,negative], confidence: number",
+      ...>     "Classify the text."
+      ...>   )
+      iex> program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
+      iex> program.adapter
+      DSEx.Adapter.JSON
+      iex> {:ok, prediction} =
+      ...>   DSEx.Adapter.JSON.parse(signature, ~s({"sentiment":"positive","confidence":0.9}), [])
+      iex> {DSEx.get(prediction, :sentiment), DSEx.get(prediction, :confidence)}
+      {"positive", 0.9}
 
   By default the adapter requests provider JSON object mode when the LM client
   supports response-format options. Pass `config: [native_json_schema: true]`

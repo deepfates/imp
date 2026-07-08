@@ -10,14 +10,26 @@ defmodule DSEx.Optimizer.RandomSearch do
 
   ## Example
 
-      metric = DSEx.Metrics.exact_match(:answer)
-
-      compiled =
-        metric
-        |> DSEx.Optimizer.RandomSearch.new(candidates: 8, demos_per_candidate: 2)
-        |> DSEx.Optimizer.RandomSearch.compile(program, trainset, devset)
-
-      DSEx.Optimizer.Report.fetch(compiled)
+      iex> lm = %{
+      ...>   module: DSEx.LM.Static,
+      ...>   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+      ...> }
+      iex> program = DSEx.predict("question -> answer", lm: lm)
+      iex> trainset = [
+      ...>   DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
+      ...>   |> DSEx.with_inputs(:question)
+      ...> ]
+      iex> devset = [
+      ...>   DSEx.example(question: "Capital of France?", answer: "Paris")
+      ...>   |> DSEx.with_inputs(:question)
+      ...> ]
+      iex> metric = DSEx.Metrics.exact_match(:answer)
+      iex> compiled =
+      ...>   metric
+      ...>   |> DSEx.Optimizer.RandomSearch.new(candidates: 1, demos_per_candidate: 1)
+      ...>   |> DSEx.Optimizer.RandomSearch.compile(program, trainset, devset)
+      iex> DSEx.Optimizer.Report.fetch(compiled).optimizer
+      :random_search
 
   Keep candidate counts small while developing. Raise them only after your
   metric and dev set are trustworthy. If every candidate fails because the
