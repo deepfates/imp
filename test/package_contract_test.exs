@@ -256,6 +256,13 @@ defmodule PackageContractTest do
       raise "optimized program did not remain executable"
     end
 
+    metric = DSEx.exact_match(:answer)
+    report = DSEx.evaluate(compiled, [demo], metric)
+
+    unless report.score == 1.0 do
+      raise "facade metric/evaluation path failed from package consumer: \#{inspect(report)}"
+    end
+
     loaded =
       compiled
       |> DSEx.dump()

@@ -202,6 +202,18 @@ defmodule DSEx do
     |> DSEx.Evaluate.run(program)
   end
 
+  @doc "Builds a metric that compares one prediction field to the same example field."
+  defdelegate exact_match(field \\ :answer), to: DSEx.Metrics
+
+  @doc "Returns a structured extractive-QA metric result for one prediction/answer pair."
+  defdelegate extractive_qa(prediction, answer, opts \\ []), to: DSEx.Metrics
+
+  @doc "Returns a structured classification metric result for one prediction/label pair."
+  defdelegate classification(prediction, label, opts \\ []), to: DSEx.Metrics
+
+  @doc "Summarizes classification rows into precision, recall, F1, and accuracy."
+  defdelegate classification_report(rows, opts \\ []), to: DSEx.Metrics
+
   @doc """
   Compiles a program with an optimizer.
 

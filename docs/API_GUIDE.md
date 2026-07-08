@@ -87,7 +87,7 @@ devset = [
   |> DSEx.with_inputs(:question)
 ]
 
-metric = DSEx.Metrics.exact_match(:answer)
+metric = DSEx.exact_match(:answer)
 
 baseline = DSEx.evaluate(program, devset, metric)
 
@@ -198,7 +198,7 @@ devset = [
   DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
 
-metric = DSEx.Metrics.exact_match(:answer)
+metric = DSEx.exact_match(:answer)
 report = DSEx.evaluate(program, devset, metric)
 report.score
 ```
@@ -278,7 +278,7 @@ devset = [
   DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
 ]
 
-metric = DSEx.Metrics.exact_match(:answer)
+metric = DSEx.exact_match(:answer)
 optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
 compiled = DSEx.optimize(program, optimizer, trainset, devset)
 

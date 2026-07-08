@@ -28,7 +28,7 @@ The metric is the telos of an optimization run. DSEx can search demos,
 instructions, or artifacts, but it can only improve what the metric can see.
 
 ```elixir
-metric = DSEx.Metrics.exact_match(:answer)
+metric = DSEx.exact_match(:answer)
 ```
 
 ## Evaluate A Baseline

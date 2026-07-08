@@ -257,7 +257,7 @@ defmodule DSExFacadeTest do
       DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
     ]
 
-    metric = DSEx.Metrics.exact_match(:answer)
+    metric = DSEx.exact_match(:answer)
 
     assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(program, devset, metric)
 
@@ -269,6 +269,27 @@ defmodule DSExFacadeTest do
 
     assert %DSEx.Optimizer.Report{optimizer: :random_search} =
              DSEx.Optimizer.Report.fetch(compiled)
+  end
+
+  test "facade exposes common metric helpers" do
+    example = DSEx.example(answer: "Paris")
+    prediction = DSEx.prediction(answer: "paris")
+
+    assert DSEx.exact_match(:answer).(example, prediction)
+
+    assert %{score: 1.0, metadata: %{"exact_match" => true}} =
+             DSEx.extractive_qa("Paris", "paris")
+
+    assert %{score: 1.0, metadata: %{"correct" => true}} =
+             DSEx.classification("Positive", "positive")
+
+    report =
+      DSEx.classification_report([
+        %{prediction: "yes", label: "yes"},
+        %{prediction: "no", label: "yes"}
+      ])
+
+    assert report["accuracy"] == 0.5
   end
 
   test "facade reports unsupported demos and optimizers clearly" do

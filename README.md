@@ -203,7 +203,7 @@ devset = [
   |> DSEx.with_inputs(:question)
 ]
 
-metric = DSEx.Metrics.exact_match(:answer)
+metric = DSEx.exact_match(:answer)
 
 report = DSEx.evaluate(qa_program, devset, metric)
 
@@ -211,7 +211,7 @@ report.score
 ```
 
 Metrics can return booleans, numeric scores, or structured maps with feedback
-and metadata. Extractive QA tasks can use `DSEx.Metrics.extractive_qa/3` to
+and metadata. Extractive QA tasks can use `DSEx.extractive_qa/3` to
 record exact match, F1, answer type, and span relation.
 
 ### Optimization
