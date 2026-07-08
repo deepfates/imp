@@ -1,6 +1,33 @@
 defmodule DSEx.Signature do
   @moduledoc """
-  Input/output contract for a DSEx module.
+  Input/output contract for a DSEx program.
+
+  A signature names the fields a program receives and the fields it must
+  produce. It is the center of the DSEx programming model: adapters render it
+  for models, schemas validate structured outputs, optimizers mutate programs
+  around it, and persistence stores it as plain data.
+
+  The compact string form is ideal for most code:
+
+      iex> signature = DSEx.Signature.new("question: string -> answer: short_span")
+      iex> DSEx.Signature.input_names(signature)
+      [:question]
+      iex> DSEx.Signature.output_names(signature)
+      [:answer]
+      iex> DSEx.Signature.json_schema(signature)["properties"]["answer"]["x-dsex-answerShape"]
+      :short_span
+
+  Use the map form when constraints or metadata should be explicit data:
+
+      iex> signature =
+      ...>   DSEx.Signature.new(%{
+      ...>     inputs: [:text],
+      ...>     outputs: [
+      ...>       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}}
+      ...>     ]
+      ...>   })
+      iex> DSEx.Signature.json_schema(signature)["properties"]["sentiment"]["enum"]
+      ["positive", "negative"]
   """
 
   alias DSEx.Signature.Field
@@ -15,6 +42,14 @@ defmodule DSEx.Signature do
           metadata: map()
         }
 
+  @doc """
+  Builds a signature from a compact spec string, map, or existing signature.
+
+  Strings use the `inputs -> outputs` grammar and may include field types,
+  descriptions, enums, and answer-shape aliases. Maps accept atom or string keys
+  and are useful when signatures are loaded from JSON or built from structured
+  configuration.
+  """
   def new(spec, instructions \\ nil)
 
   def new(%__MODULE__{} = signature, _instructions), do: signature
@@ -51,13 +86,24 @@ defmodule DSEx.Signature do
     }
   end
 
+  @doc "Returns a signature, constructing one when given a supported spec value."
   def ensure(value), do: new(value)
+
+  @doc "Returns input field names in declaration order."
   def input_names(%__MODULE__{inputs: fields}), do: Enum.map(fields, & &1.name)
+
+  @doc "Returns output field names in declaration order."
   def output_names(%__MODULE__{outputs: fields}), do: Enum.map(fields, & &1.name)
 
+  @doc "Returns all field names, inputs first and outputs second."
   def field_names(%__MODULE__{} = signature),
     do: input_names(signature) ++ output_names(signature)
 
+  @doc """
+  Appends one or more fields to the input or output side of a signature.
+
+  `fields` accepts the same field shapes as `DSEx.Signature.Field.new/2`.
+  """
   def extend(%__MODULE__{} = signature, fields, kind) when kind in [:input, :output] do
     parsed = Enum.map(List.wrap(fields), &Field.new(&1, kind))
 
@@ -67,12 +113,25 @@ defmodule DSEx.Signature do
     end
   end
 
+  @doc """
+  Prepends an output field.
+
+  Chain-of-thought style modules use this to add a `:reasoning` field before
+  the task outputs while preserving the original contract.
+  """
   def prepend_output(%__MODULE__{} = signature, field),
     do: %{signature | outputs: [Field.new(field, :output) | signature.outputs]}
 
+  @doc """
+  Returns a compact `inputs -> outputs` display string.
+
+  This is intentionally a readable summary, not a lossless serialization. Use
+  `dump/1` when types, constraints, instructions, and metadata must round-trip.
+  """
   def to_spec(%__MODULE__{} = signature),
     do: "#{join_names(signature.inputs)} -> #{join_names(signature.outputs)}"
 
+  @doc "Serializes a signature to JSON-friendly data."
   def dump(%__MODULE__{} = signature) do
     %{
       "instructions" => signature.instructions,
@@ -82,9 +141,11 @@ defmodule DSEx.Signature do
     }
   end
 
+  @doc "Exports output fields as a JSON-schema-shaped object."
   def json_schema(%__MODULE__{} = signature),
     do: DSEx.Schema.json_schema(signature.outputs)
 
+  @doc "Loads a signature produced by `dump/1`."
   def load(%{"inputs" => inputs, "outputs" => outputs} = state) do
     %__MODULE__{
       inputs: Enum.map(inputs, &Field.load/1),

@@ -5,5 +5,6 @@ defmodule DSExDoctestTest do
   doctest DSEx.Evaluate
   doctest DSEx.Metrics
   doctest DSEx.Optimizer.RandomSearch
+  doctest DSEx.Signature
   doctest DSEx.Tool
 end
