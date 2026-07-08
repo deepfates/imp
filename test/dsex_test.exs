@@ -116,6 +116,43 @@ defmodule DSExTest do
     assert DSEx.get(prediction, :answer) == "second"
   end
 
+  test "predict reports missing required inputs before calling the LM" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          flunk("LM should not be called when required inputs are missing")
+        end
+      ]
+    }
+
+    program = DSEx.predict("question, context -> answer", lm: lm)
+
+    assert {:error, {:missing_input_fields, [:context]}} =
+             DSEx.Predict.Predict.call(program, %{question: "q"})
+  end
+
+  test "predict accepts string-key inputs and allows optional inputs to be absent" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
+    }
+
+    signature =
+      DSEx.Signature.new(%{
+        inputs: [
+          %{name: :question, type: :string},
+          %{name: :context, type: :string, metadata: %{optional: true}}
+        ],
+        outputs: [:answer]
+      })
+
+    program = DSEx.predict(signature, lm: lm)
+
+    assert {:ok, prediction} = DSEx.Predict.Predict.call(program, %{"question" => "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "ok"
+  end
+
   test "context settings are process-local and restored" do
     global = %{
       module: DSEx.LM.Static,

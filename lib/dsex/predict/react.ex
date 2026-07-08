@@ -119,7 +119,7 @@ defmodule DSEx.Predict.ReAct do
               validate_final(agent.signature, prediction, history, :submit)
 
             true ->
-              run_loop(agent, %{}, history, remaining - 1)
+              run_loop(agent, inputs, history, remaining - 1)
           end
       end
     end

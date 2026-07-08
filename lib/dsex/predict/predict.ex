@@ -33,6 +33,7 @@ defmodule DSEx.Predict.Predict do
     with {:ok, lm} <- require_lm(resolve_lm(predict)),
          adapter <- resolve_adapter(predict),
          inputs <- Map.new(inputs),
+         :ok <- validate_inputs(predict.signature, inputs),
          messages <- adapter.format(predict.signature, inputs, demos: predict.demos),
          lm_opts <- adapter_lm_opts(adapter, predict.signature, predict.config),
          {:ok, raw} <- DSEx.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
@@ -80,6 +81,47 @@ defmodule DSEx.Predict.Predict do
 
   defp require_lm(nil), do: {:error, :lm_not_configured}
   defp require_lm(lm), do: {:ok, lm}
+
+  defp validate_inputs(signature, inputs) do
+    required =
+      signature.inputs
+      |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
+      |> Enum.map(& &1.name)
+
+    missing = Enum.reject(required, &input_present?(inputs, &1))
+
+    case missing do
+      [] -> :ok
+      missing -> {:error, {:missing_input_fields, missing}}
+    end
+  end
+
+  defp input_present?(inputs, name) do
+    string_name = to_string(name)
+
+    cond do
+      Map.has_key?(inputs, name) ->
+        true
+
+      Map.has_key?(inputs, string_name) ->
+        true
+
+      is_binary(name) ->
+        case existing_atom(name) do
+          atom when is_atom(atom) -> Map.has_key?(inputs, atom)
+          _string -> false
+        end
+
+      true ->
+        false
+    end
+  end
+
+  defp existing_atom(value) when is_binary(value) do
+    String.to_existing_atom(value)
+  rescue
+    ArgumentError -> value
+  end
 
   defp adapter_lm_opts(adapter, signature, config) do
     if function_exported?(adapter, :lm_opts, 2) do
