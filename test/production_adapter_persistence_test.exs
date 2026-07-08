@@ -92,8 +92,17 @@ defmodule ProductionAdapterPersistenceTest do
                    DSEx.Adapter.JSON.lm_opts(signature, native_json_schema: :yes)
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx.Adapter.JSON.lm_opts\/2.*:response_format.*expected a provider response_format map/s,
+                 fn ->
+                   DSEx.Adapter.JSON.lm_opts(signature, response_format: "json_object")
+                 end
+
     assert [response_format: %{type: "json_object"}] =
              DSEx.Adapter.JSON.lm_opts(signature, temperature: 0)
+
+    assert [] =
+             DSEx.Adapter.JSON.lm_opts(signature, response_format: %{type: "json_object"})
   end
 
   test "json adapter parses fenced provider json and rejects missing fields" do

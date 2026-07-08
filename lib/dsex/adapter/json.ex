@@ -35,7 +35,7 @@ defmodule DSEx.Adapter.JSON do
 
   @lm_option_schema [
     native_json_schema: [type: :boolean, default: false],
-    response_format: [type: :any]
+    response_format: [type: {:custom, __MODULE__, :validate_response_format, []}]
   ]
 
   @impl true
@@ -111,6 +111,13 @@ defmodule DSEx.Adapter.JSON do
   end
 
   def parse(signature, raw, opts), do: DSEx.Adapter.Chat.parse(signature, raw, opts)
+
+  @doc false
+  def validate_response_format(format) when is_map(format), do: {:ok, format}
+
+  def validate_response_format(format) do
+    {:error, "expected a provider response_format map, got: #{inspect(format)}"}
+  end
 
   defp extract_json(raw) do
     trimmed = String.trim(raw)
