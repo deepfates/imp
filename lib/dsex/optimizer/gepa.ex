@@ -28,7 +28,7 @@ defmodule DSEx.Optimizer.GEPA do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    feedback = feedback(optimizer, trainset)
+    {feedback, feedback_errors} = feedback(optimizer, trainset)
     examples = Enum.map(devset, &DSEx.Example.to_map/1)
 
     artifact =
@@ -55,7 +55,8 @@ defmodule DSEx.Optimizer.GEPA do
           instruction: candidate.artifact.text,
           id: candidate.id,
           parent_id: candidate.parent_id,
-          mutation: candidate.mutation
+          mutation: candidate.mutation,
+          diagnostics: candidate.diagnostics
         }
       end)
 
@@ -69,11 +70,13 @@ defmodule DSEx.Optimizer.GEPA do
         best_score: report.best.aggregate_score,
         candidate_count: length(candidates),
         candidates: candidates,
+        errors: feedback_errors ++ report.errors,
         metadata: %{
           feedback: feedback,
           generations: optimizer.generations,
           implementation: DSEx.Optimize.GEPA,
-          frontier_size: length(report.frontier)
+          frontier_size: length(report.frontier),
+          status: if(feedback_errors == [] and report.errors == [], do: :ok, else: :with_errors)
         }
       })
     )
@@ -112,10 +115,35 @@ defmodule DSEx.Optimizer.GEPA do
     |> Enum.map(fn {example, _score} -> "Improve result for #{inspect(example)}" end)
   end
 
-  defp feedback(%__MODULE__{feedback_fn: fun}, trainset) when is_function(fun, 1),
-    do: fun.(trainset)
+  defp feedback(%__MODULE__{feedback_fn: fun}, trainset) when is_function(fun, 1) do
+    {to_string(fun.(trainset)), []}
+  rescue
+    exception ->
+      default = default_feedback(trainset)
 
-  defp feedback(_optimizer, trainset), do: default_feedback(trainset)
+      {default,
+       [
+         %{
+           stage: :feedback,
+           error: Exception.message(exception),
+           fallback: default
+         }
+       ]}
+  catch
+    kind, reason ->
+      default = default_feedback(trainset)
+
+      {default,
+       [
+         %{
+           stage: :feedback,
+           error: "#{kind}: #{inspect(reason)}",
+           fallback: default
+         }
+       ]}
+  end
+
+  defp feedback(_optimizer, trainset), do: {default_feedback(trainset), []}
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."

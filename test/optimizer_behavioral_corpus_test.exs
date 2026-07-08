@@ -152,6 +152,54 @@ defmodule OptimizerBehavioralCorpusTest do
            end)
   end
 
+  test "GEPA reports feedback callback failures and falls back to default feedback" do
+    compiled =
+      DSEx.Optimizer.GEPA.new(metric(),
+        generations: 1,
+        feedback_fn: fn _trainset -> raise "feedback service offline" end
+      )
+      |> DSEx.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :gepa
+    assert report.metadata.status == :with_errors
+    assert report.metadata.feedback =~ "Use observed examples carefully"
+
+    assert [
+             %{
+               stage: :feedback,
+               error: "feedback service offline",
+               fallback: fallback
+             }
+           ] = report.errors
+
+    assert fallback == report.metadata.feedback
+  end
+
+  test "GEPA preserves artifact-level evaluator diagnostics in optimizer report" do
+    exploding_metric = fn _example, _prediction -> raise "metric unavailable" end
+
+    compiled =
+      DSEx.Optimizer.GEPA.new(exploding_metric,
+        generations: 1,
+        feedback_fn: fn _trainset -> "Try to improve." end
+      )
+      |> DSEx.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :gepa
+    assert report.best_score == 0.0
+    assert report.metadata.status == :with_errors
+    assert Enum.any?(report.candidates, &(&1.diagnostics == ["metric unavailable"]))
+
+    assert Enum.any?(report.errors, fn error ->
+             error.candidate_id in ["baseline", "gepa-1"] and
+               error.diagnostics == ["metric unavailable"]
+           end)
+  end
+
   test "SIMBA performs monotonic mini-batch ascent over candidate programs" do
     program = france_program()
     baseline_score = evaluator(program).score
