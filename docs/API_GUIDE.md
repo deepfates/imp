@@ -144,6 +144,31 @@ Metrics may return booleans, numbers, maps with `:score` / `:feedback`, or a
 into row scores, pass/fail state, feedback, and metric metadata. Arity-3 metrics
 receive the prediction trace as their third argument.
 
+## Retrieval-Augmented Programs
+
+```elixir
+docs = [
+  %{text: "France has capital Paris."},
+  %{text: "Germany has capital Berlin."}
+]
+
+retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
+
+program =
+  "question, context -> answer"
+  |> DSEx.predict()
+  |> DSEx.rag(retriever, k: 1)
+
+{:ok, prediction} = DSEx.call(program, %{question: "capital France"})
+DSEx.get(prediction, :answer)
+prediction.metadata.retrieval
+```
+
+`DSEx.rag/3` is intentionally small: it retrieves documents, renders them into
+the configured context field, calls the wrapped program, and records retrieval
+metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
+program, or any other callable DSEx module that expects a context input.
+
 ## Optimize A Program
 
 ```elixir

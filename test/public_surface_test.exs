@@ -50,6 +50,30 @@ defmodule PublicSurfaceTest do
     assert [%{action: :submit}] = rlm_pred.metadata.rlm_trace
   end
 
+  test "rag wraps a program with retrieved context and metadata" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "France has capital Paris",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      ]
+    }
+
+    base = DSEx.predict("question, context -> answer", lm: lm)
+    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+    rag = DSEx.rag(base, retriever, k: 1)
+
+    assert {:ok, prediction} = DSEx.call(rag, %{question: "capital France"})
+    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert prediction.metadata.retrieval.count == 1
+    assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
+  end
+
   test "react and code act execute operational loops" do
     react_lm = %{
       module: DSEx.LM.Static,
@@ -262,6 +286,7 @@ defmodule PublicSurfaceTest do
       DSEx.Predict.CodeAct,
       DSEx.Predict.Parallel,
       DSEx.Predict.Predict,
+      DSEx.Predict.RAG,
       DSEx.Predict.RLM,
       DSEx.Predict.ReAct,
       DSEx.Predict.Refine,
@@ -301,6 +326,8 @@ defmodule PublicSurfaceTest do
       with_demos: 2,
       chain_of_thought: 1,
       chain_of_thought: 2,
+      rag: 2,
+      rag: 3,
       react: 3,
       tool: 3,
       tool: 4,

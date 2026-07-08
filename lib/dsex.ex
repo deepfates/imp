@@ -48,7 +48,7 @@ defmodule DSEx do
   """
 
   alias DSEx.{Example, Prediction, Settings, Signature, Tool}
-  alias DSEx.Predict.{ChainOfThought, Predict, ReAct}
+  alias DSEx.Predict.{ChainOfThought, Predict, RAG, ReAct}
 
   @doc """
   Configures global settings such as `:lm` and `:adapter`.
@@ -129,6 +129,9 @@ defmodule DSEx do
 
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
+
+  @doc "Wraps a program with retrieval-augmented context injection."
+  def rag(program, retriever, opts \\ []), do: RAG.new(program, retriever, opts)
 
   @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)

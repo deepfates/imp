@@ -201,6 +201,69 @@ defmodule LocalServiceE2ETest do
     assert result.score == 1.0
   end
 
+  test "file dataset drives local RAG evaluation and few-shot improvement end to end" do
+    path = Path.join(System.tmp_dir!(), "dsex-rag-#{System.unique_integer([:positive])}.jsonl")
+
+    File.write!(path, """
+    {"question":"capital France","answer":"Paris","context":"France has capital Paris."}
+    {"question":"capital Germany","answer":"Berlin","context":"Germany has capital Berlin."}
+    {"question":"capital Italy","answer":"Rome","context":"Italy has capital Rome."}
+    {"question":"capital Spain","answer":"Madrid","context":"Spain has capital Madrid."}
+    """)
+
+    on_exit(fn -> File.rm(path) end)
+
+    examples = DSEx.Datasets.hotpotqa(path)
+    dataset = DSEx.Datasets.Dataset.new(examples, train: 0.5)
+
+    docs =
+      Enum.map(examples, fn example ->
+        %{text: DSEx.Example.get(example, :context), source: DSEx.Example.get(example, :question)}
+      end)
+
+    retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+          current = prompt |> String.split("[[ ## context ## ]]") |> List.last()
+
+          cond do
+            current =~ "Germany has capital Berlin" -> %{answer: "Berlin"}
+            current =~ "France has capital Paris" -> %{answer: "Paris"}
+            current =~ "Italy has capital Rome" -> %{answer: "Rome"}
+            current =~ "Spain has capital Madrid" -> %{answer: "Madrid"}
+            true -> %{answer: "unknown"}
+          end
+        end
+      ]
+    }
+
+    base = DSEx.predict("question, context -> answer", lm: lm)
+    rag = DSEx.rag(base, retriever, k: 1)
+
+    evaluator = DSEx.Evaluate.new(dataset.dev, DSEx.Metrics.exact_match(:answer))
+    baseline = DSEx.Evaluate.run(evaluator, rag)
+
+    assert baseline.score == 1.0
+    assert [%{prediction: prediction}] = baseline.rows
+    assert prediction.metadata.retrieval.count == 1
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(base, dataset.train)
+      |> DSEx.rag(retriever, k: 1)
+
+    optimized = DSEx.Evaluate.run(evaluator, compiled)
+
+    assert optimized.score == 1.0
+
+    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
+             DSEx.Optimizer.Report.fetch(compiled.program)
+  end
+
   defp assert_react_json_tool_arguments(tool) do
     {:ok, actions} =
       Agent.start_link(fn ->
