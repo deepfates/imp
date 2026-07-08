@@ -44,6 +44,12 @@ defmodule DSEx.Saving do
     }
   end
 
+  def dump(program) do
+    raise ArgumentError,
+          "unsupported DSEx program for saving: #{inspect(program_name(program))}; " <>
+            "portable saving currently supports Predict, ChainOfThought, and RAG over memory retrievers"
+  end
+
   def load(%{"type" => "predict"} = state) do
     require_keys!(state, @predict_required_keys)
     signature = Map.fetch!(state, "signature")
@@ -95,6 +101,9 @@ defmodule DSEx.Saving do
   def load(state) do
     raise ArgumentError, "saved DSEx program must be a map, got: #{inspect(state)}"
   end
+
+  defp program_name(%module{}), do: module
+  defp program_name(program), do: program
 
   defp maybe_put_adapter(opts, %{"dynamic_adapter" => true}), do: opts
 

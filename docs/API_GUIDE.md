@@ -239,6 +239,26 @@ report.best
 ## Tools And ReAct
 
 ```elixir
+{:ok, actions} =
+  Agent.start_link(fn ->
+    [
+      %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
+      %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+    ]
+  end)
+
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      Agent.get_and_update(actions, fn
+        [action | rest] -> {action, rest}
+        [] -> {%{tool_calls: []}, []}
+      end)
+    end
+  ]
+}
+
 lookup =
   DSEx.tool(
     :lookup,
@@ -251,9 +271,9 @@ lookup =
     }
   )
 
-agent = DSEx.react("question -> answer", [lookup], tool_policy: [:lookup, :submit])
-{:ok, pred} = DSEx.call(agent, %{question: "What is the capital of France?"})
-DSEx.get(pred, :answer)
+program = DSEx.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+{:ok, prediction} = DSEx.call(program, %{question: "What is the capital of France?"})
+DSEx.get(prediction, :answer)
 ```
 
 `ReAct` sends provider-style function definitions when the LM client supports
@@ -376,12 +396,17 @@ RLM controller actions:
 ## Save And Load
 
 ```elixir
+program = DSEx.predict("question -> answer")
+
 DSEx.Saving.save!(program, "tmp/program.json")
 loaded = DSEx.Saving.load!("tmp/program.json")
 ```
 
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
-credentials; reconfigure credentials explicitly before live use.
+credentials; reconfigure credentials explicitly before live use. Portable
+saving supports `Predict`, `ChainOfThought`, and RAG programs backed by
+`DSEx.Retrieve.Memory`. Programs that hold functions, external service clients,
+or live tool closures should be rebuilt by application code.
 
 ## Streaming
 

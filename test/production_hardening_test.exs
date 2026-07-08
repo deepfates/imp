@@ -251,6 +251,12 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError, ~r/unsupported saved DSEx program type/, fn ->
       DSEx.Saving.load(%{"type" => "unknown"})
     end
+
+    react = DSEx.react("question -> answer", [])
+
+    assert_raise ArgumentError,
+                 ~r/unsupported DSEx program for saving: DSEx.Predict.ReAct/,
+                 fn -> DSEx.Saving.dump(react) end
   end
 
   test "saving rejects malformed program artifacts with explicit errors" do
