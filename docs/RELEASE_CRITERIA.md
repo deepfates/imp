@@ -33,19 +33,19 @@ The release standard is grounded in:
 
 ## Release Scope
 
-The production release scope is tracked under ticket `de-vwsu`.
+The production release scope is the current DSEx product surface plus the
+evidence required to trust it. Historical planning tickets are not release
+criteria; current commands, docs, tests, and artifacts are.
 
-| Ticket | Work | Release Meaning |
-| --- | --- | --- |
-| `de-5dt5` | Canonical upstream coverage matrix | A public truth table maps each DSPy/Ax/optimize_anything concept to DSEx status, tests, docs, and intentional deviations. |
-| `de-qvwf` | Dependency and runtime hardening | Runtime choices are idiomatic Elixir and justified: HTTP, option validation, telemetry, and test infrastructure are no longer ad hoc. |
-| `de-i8cc` | Split release gates by proof level | Deterministic, local integration, live inference, and costly/stateful live workflows have separate gates. |
-| `de-ld5r` | Remove unsupported production fallbacks | Production-facing APIs require real backends instead of treating unsupported behavior as success. |
-| `de-wrnz` | External integration E2E coverage | MCP, retrievers, save/load/rebind/deploy, and optional provider workflows are exercised end to end. |
-| `de-2iou` | Metric/evaluation contract parity | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal. |
-| `de-x02m` | Production observability and trace model | Telemetry events make DSEx inspectable without leaking secrets. |
-| `de-t7s8` | Release-grade docs, Livebooks, and examples | Documentation becomes a cohesive product manual, not historical project notes. |
-| `de-k5tf` | Full parity validation program | Release claims are backed by a dashboard covering trace parity, live matched models, optimizer lift, production semantics, and provider-free performance. |
+| Surface | Release Meaning |
+| --- | --- |
+| Coverage matrix | `docs/COVERAGE_MATRIX.md` maps each DSPy/Ax/optimize_anything concept to DSEx status, tests, docs, and intentional deviations. |
+| Runtime boundary | Provider access goes through ReqLLM, injectable behaviours, explicit transports, option validation, telemetry, and redaction rather than hidden fallbacks. |
+| Proof-level gates | Deterministic production, local integration, provider-compatible protocol, paid live inference, and parity evidence gates are separate commands with separate claims. |
+| External workflows | MCP, retrievers, save/load/rebind, streaming, tools, and provider-compatible training are exercised through local integration or protocol gates before they appear as production surface. |
+| Evaluation and optimization | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal; optimizers emit executable compiled programs and reports. |
+| Documentation | README, ExDoc, docs, and Livebooks teach DSEx as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
+| Parity evidence | Release claims are backed by the dashboard lanes for golden trace parity, live matched models, optimizer lift, production semantics, and provider-free performance. |
 
 ## Gate Model
 
