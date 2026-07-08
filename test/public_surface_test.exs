@@ -189,21 +189,21 @@ defmodule PublicSurfaceTest do
                    DSEx.majority(["A"], field: [])
                  end
 
-    assert {:ok, pred} = DSEx.Predict.Predict.call(program, %{question: "2+2?"})
-    assert DSEx.Prediction.get(pred, :answer) == "4"
+    assert {:ok, pred} = DSEx.call(program, %{question: "2+2?"})
+    assert DSEx.get(pred, :answer) == "4"
 
-    mcc = DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 2)
+    mcc = DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 2)
 
     assert {:ok, compared} =
-             DSEx.Predict.MultiChainComparison.call(mcc, %{
+             DSEx.call(mcc, %{
                question: "2+2?",
                completions: [%{reasoning: "add", answer: "4"}, %{reasoning: "count", answer: "4"}]
              })
 
-    assert DSEx.Prediction.get(compared, :answer) == "4"
+    assert DSEx.get(compared, :answer) == "4"
 
     assert {:ok, compared_from_strings} =
-             DSEx.Predict.MultiChainComparison.call(mcc, %{
+             DSEx.call(mcc, %{
                "question" => "2+2?",
                "completions" => [
                  %{"reasoning" => "add", "answer" => "4"},
@@ -211,10 +211,10 @@ defmodule PublicSurfaceTest do
                ]
              })
 
-    assert DSEx.Prediction.get(compared_from_strings, :answer) == "4"
+    assert DSEx.get(compared_from_strings, :answer) == "4"
 
     assert {:error, {:invalid_completions, ~s("not-a-list")}} =
-             DSEx.Predict.MultiChainComparison.call(mcc, %{
+             DSEx.call(mcc, %{
                question: "2+2?",
                completions: "not-a-list"
              })
@@ -222,28 +222,65 @@ defmodule PublicSurfaceTest do
     assert_raise ArgumentError,
                  ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Predict.MultiChainComparison.new("question -> answer", %{m: 2})
+                   DSEx.multi_chain_comparison("question -> answer", %{m: 2})
                  end
 
     assert {:error, {:invalid_multi_chain_inputs, message}} =
-             DSEx.Predict.MultiChainComparison.call(mcc, :not_inputs)
+             DSEx.call(mcc, :not_inputs)
 
     assert message =~ "expected a map or keyword/list of input pairs"
 
     assert {:error, {:invalid_multi_chain_inputs, "expected inputs as {key, value} pairs"}} =
-             DSEx.Predict.MultiChainComparison.call(mcc, [:not_a_pair])
+             DSEx.call(mcc, [:not_a_pair])
 
     assert_raise ArgumentError,
                  ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :m option: expected a positive integer/,
                  fn ->
-                   DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 0)
+                   DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 0)
                  end
 
     assert_raise ArgumentError,
                  ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :M option: expected a positive integer/,
                  fn ->
-                   DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, M: "2")
+                   DSEx.multi_chain_comparison("question -> answer", lm: lm, M: "2")
                  end
+
+    metric = DSEx.exact_match(:answer)
+
+    assert {:ok, best} =
+             program
+             |> DSEx.best_of_n(metric, n: 2)
+             |> DSEx.call(%{question: "2+2?"})
+
+    assert DSEx.get(best, :answer) == "4"
+
+    assert {:ok, refined} =
+             program
+             |> DSEx.refine(metric, max_attempts: 1)
+             |> DSEx.call(%{question: "2+2?"})
+
+    assert DSEx.get(refined, :answer) == "4"
+    assert [%{attempt: 1}] = DSEx.get(refined, :refine_history)
+
+    assert [{:ok, first}, {:ok, second}] =
+             DSEx.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
+               max_concurrency: 2
+             )
+
+    assert Enum.map([first, second], &DSEx.get(&1, :answer)) == ["4", "4"]
+
+    trainset = [
+      DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question),
+      DSEx.example(question: "capital Germany", answer: "Berlin") |> DSEx.with_inputs(:question)
+    ]
+
+    knn = DSEx.knn(1, trainset, field: "question")
+    assert [nearest] = DSEx.nearest(knn, %{question: "France"})
+    assert DSEx.get(nearest, :answer) == "Paris"
+
+    assert_raise ArgumentError, ~r/DSEx.nearest\/2 expects a DSEx KNN predictor/, fn ->
+      DSEx.nearest(program, %{question: "France"})
+    end
 
     rlm_lm = %{
       module: DSEx.LM.Static,

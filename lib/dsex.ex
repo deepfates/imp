@@ -48,7 +48,20 @@ defmodule DSEx do
   """
 
   alias DSEx.{Example, Prediction, Settings, Signature, Tool}
-  alias DSEx.Predict.{ChainOfThought, CodeAct, Predict, ProgramOfThought, RAG, ReAct}
+
+  alias DSEx.Predict.{
+    BestOfN,
+    ChainOfThought,
+    CodeAct,
+    KNN,
+    MultiChainComparison,
+    Parallel,
+    Predict,
+    ProgramOfThought,
+    RAG,
+    ReAct,
+    Refine
+  }
 
   @doc """
   Configures global settings such as `:lm` and `:adapter`.
@@ -157,6 +170,29 @@ defmodule DSEx do
 
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
+
+  @doc "Creates a self-consistency comparison program over candidate completions."
+  def multi_chain_comparison(signature, opts \\ []), do: MultiChainComparison.new(signature, opts)
+
+  @doc "Creates a wrapper that runs a program repeatedly and keeps the best scored prediction."
+  def best_of_n(program, metric, opts \\ []), do: BestOfN.new(program, metric, opts)
+
+  @doc "Creates a wrapper that retries a program with feedback until a metric passes."
+  def refine(program, metric, opts \\ []), do: Refine.new(program, metric, opts)
+
+  @doc "Runs a program over a batch of inputs through DSEx's supervised task boundary."
+  def parallel(program, inputs, opts \\ []), do: Parallel.map(program, inputs, opts)
+
+  @doc "Builds a callable KNN predictor over an example trainset."
+  def knn(k, trainset, opts \\ []), do: KNN.new(k, trainset, opts)
+
+  @doc "Retrieves nearest examples from a DSEx KNN predictor for one input map."
+  def nearest(%KNN{} = knn, inputs), do: KNN.call(knn, inputs)
+
+  def nearest(knn, _inputs) do
+    raise ArgumentError,
+          "DSEx.nearest/2 expects a DSEx KNN predictor from DSEx.knn/3; got: #{inspect(knn)}"
+  end
 
   @doc "Wraps a program with retrieval-augmented context injection."
   def rag(program, retriever, opts \\ []), do: RAG.new(program, retriever, opts)

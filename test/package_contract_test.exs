@@ -317,6 +317,55 @@ defmodule PackageContractTest do
       raise "ReAct tool workflow failed from package consumer"
     end
 
+    metric = DSEx.exact_match(:answer)
+
+    {:ok, best} =
+      program
+      |> DSEx.best_of_n(metric, n: 2)
+      |> DSEx.call(%{question: "What city is the Eiffel Tower in?"})
+
+    unless DSEx.get(best, :answer) == "Paris" do
+      raise "BestOfN facade workflow failed from package consumer"
+    end
+
+    [{:ok, batch_prediction}] =
+      DSEx.parallel(program, [%{question: "What city is the Eiffel Tower in?"}],
+        max_concurrency: 1
+      )
+
+    unless DSEx.get(batch_prediction, :answer) == "Paris" do
+      raise "Parallel facade workflow failed from package consumer"
+    end
+
+    chooser =
+      DSEx.multi_chain_comparison("question -> answer",
+        lm: %{
+          module: DSEx.LM.Static,
+          opts: [handler: fn _messages, _opts -> %{rationale: "agreement", answer: "Paris"} end]
+        },
+        m: 2
+      )
+
+    {:ok, chosen} =
+      DSEx.call(chooser, %{
+        question: "What city is the Eiffel Tower in?",
+        completions: [
+          %{reasoning: "landmark", answer: "Paris"},
+          %{reasoning: "capital", answer: "Paris"}
+        ]
+      })
+
+    unless DSEx.get(chosen, :answer) == "Paris" do
+      raise "Multi-chain facade workflow failed from package consumer"
+    end
+
+    knn = DSEx.knn(1, [demo], field: "question")
+    [nearest] = DSEx.nearest(knn, %{"question" => "Eiffel Tower city"})
+
+    unless DSEx.get(nearest, :answer) == "Paris" do
+      raise "KNN facade workflow failed from package consumer"
+    end
+
     provider = DSEx.req_llm("openai:gpt-test", api_key: "sk-redacted-test", temperature: 0)
     dump = DSEx.dump(DSEx.predict("question -> answer", lm: provider))
 

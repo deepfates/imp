@@ -112,6 +112,11 @@ or build custom orchestration.
 | --- | --- |
 | `DSEx.predict/2` | One model call maps named inputs to named outputs. |
 | `DSEx.chain_of_thought/2` | You want a reasoning field before the final answer. |
+| `DSEx.multi_chain_comparison/2` | You already have candidate completions and want a self-consistency chooser. |
+| `DSEx.best_of_n/3` | You want to run one program several times and keep the highest-scored result. |
+| `DSEx.refine/3` | You want bounded retry with feedback until a metric passes. |
+| `DSEx.parallel/3` | You want supervised concurrent batch calls with one result per input. |
+| `DSEx.knn/3`, `DSEx.nearest/2` | You want nearest-neighbor examples from a local trainset. |
 | `DSEx.react/3` | The model should choose tools and then submit a validated answer. |
 | `DSEx.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
 | `DSEx.code_act/3` | You want interleaved tool/code execution under a policy. |
@@ -120,6 +125,58 @@ or build custom orchestration.
 
 The later sections are there when your program needs more control, not because
 every DSEx project should start with agents or recursive controllers.
+
+## Composition Helpers
+
+```elixir
+lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+program = DSEx.predict("question -> answer", lm: lm)
+metric = DSEx.exact_match(:answer)
+
+{:ok, best} =
+  program
+  |> DSEx.best_of_n(metric, n: 2)
+  |> DSEx.call(%{question: "2+2?"})
+
+{:ok, refined} =
+  program
+  |> DSEx.refine(metric, max_attempts: 1)
+  |> DSEx.call(%{question: "sqrt 16?"})
+
+batch =
+  DSEx.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
+    max_concurrency: 2
+  )
+
+{DSEx.get(best, :answer), DSEx.get(refined, :answer), length(batch)}
+```
+
+`DSEx.multi_chain_comparison/2` is useful when candidate completions are
+already available:
+
+```elixir
+chooser = DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 2)
+
+DSEx.call(chooser, %{
+  question: "2+2?",
+  completions: [
+    %{reasoning: "addition", answer: "4"},
+    %{reasoning: "counting", answer: "4"}
+  ]
+})
+```
+
+`DSEx.knn/3` builds a local nearest-neighbor predictor over examples. It returns
+retrieved examples rather than a model prediction:
+
+```elixir
+trainset = [
+  DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question)
+]
+
+knn = DSEx.knn(1, trainset, field: "question")
+DSEx.nearest(knn, %{question: "France"})
+```
 
 ## Chain Of Thought
 

@@ -54,12 +54,35 @@ defmodule DSEx.Predict.KNN do
 
   defp query_text(inputs, fields) when is_list(fields) do
     fields
-    |> Enum.map(&Map.get(inputs, &1, Map.get(inputs, to_string(&1), "")))
+    |> Enum.map(&field_value(inputs, &1, ""))
     |> Enum.map_join(" ", &safe_text/1)
   end
 
   defp query_text(inputs, field),
-    do: inputs |> Map.get(field, Map.get(inputs, to_string(field), "")) |> safe_text()
+    do: inputs |> field_value(field, "") |> safe_text()
+
+  defp field_value(inputs, field, default) do
+    cond do
+      Map.has_key?(inputs, field) ->
+        Map.fetch!(inputs, field)
+
+      Map.has_key?(inputs, to_string(field)) ->
+        Map.fetch!(inputs, to_string(field))
+
+      is_binary(field) ->
+        existing_atom_value(inputs, field, default)
+
+      true ->
+        default
+    end
+  end
+
+  defp existing_atom_value(inputs, field, default) do
+    atom = String.to_existing_atom(field)
+    Map.get(inputs, atom, default)
+  rescue
+    ArgumentError -> default
+  end
 
   defp safe_text(value) do
     case String.Chars.impl_for(value) do

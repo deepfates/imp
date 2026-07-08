@@ -116,6 +116,18 @@ defmodule DocumentationContractTest do
     refute body =~ "agent =\n  DSEx.react"
   end
 
+  test "API guide teaches facade-first composition helpers" do
+    body = File.read!("docs/API_GUIDE.md")
+
+    assert body =~ "DSEx.multi_chain_comparison/2"
+    assert body =~ "DSEx.best_of_n/3"
+    assert body =~ "DSEx.refine/3"
+    assert body =~ "DSEx.parallel/3"
+    assert body =~ "DSEx.knn/3"
+    assert body =~ "DSEx.nearest/2"
+    assert body =~ "## Composition Helpers"
+  end
+
   test "README common workflow snippets compose as one coherent path" do
     typed_lm = %{
       module: DSEx.LM.Static,
