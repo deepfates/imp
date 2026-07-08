@@ -26,12 +26,7 @@ defmodule PackageContractTest do
     "docs/COVERAGE_MATRIX.md",
     "docs/PARITY_VALIDATION_PROGRAM.md",
     "docs/RELEASE_CRITERIA.md",
-    "lib/dsex/benchmarks.ex",
-    "lib/dsex/test_mode.ex",
-    "lib/dsex/lm/fake.ex",
-    "lib/dsex/predict/react_v2.ex",
-    "lib/dsex/clients/http_lm.ex",
-    "lib/dsex/clients/providers.ex"
+    "lib/dsex/benchmarks.ex"
   ]
 
   @documented_module_allowlist MapSet.new([
@@ -49,6 +44,10 @@ defmodule PackageContractTest do
       |> Enum.sort()
 
     assert_release_files(files)
+  end
+
+  test "package exclusion list names current repository files" do
+    assert Enum.all?(@excluded_files, &File.regular?/1)
   end
 
   test "unpacked Hex artifact preserves the release boundary" do
