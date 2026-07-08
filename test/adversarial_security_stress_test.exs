@@ -39,7 +39,7 @@ defmodule AdversarialSecurityStressTest do
                ":not_a_module_result"}}
            ] =
              DSEx.Predict.Parallel.map(%ExplodingProgram{}, [:ok, :raise, :throw, :invalid],
-               max_concurrency: 0
+               max_concurrency: 2
              )
 
     assert DSEx.Prediction.get(ok_prediction, :value) == :ok
