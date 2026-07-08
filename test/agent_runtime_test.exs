@@ -139,6 +139,21 @@ defmodule AgentRuntimeTest do
              runtime.traces
   end
 
+  test "invalid handler return shapes become structured agent errors" do
+    agent = Agent.new(:bad_return, fn _input, _runtime -> :ok end)
+
+    assert {:error, {:invalid_handler_result, :bad_return, :ok}, runtime} =
+             Agent.run(agent, %{})
+
+    assert [
+             %{
+               type: :agent_error,
+               agent: :bad_return,
+               error: {:invalid_handler_result, :bad_return, :ok}
+             }
+           ] = runtime.traces
+  end
+
   test "output schema failures preserve traces accumulated by the handler" do
     tool = DSEx.Tool.new(:normalize, "normalize", fn %{text: text} -> String.downcase(text) end)
 
@@ -159,6 +174,24 @@ defmodule AgentRuntimeTest do
     assert [
              %{type: :tool, tool: :normalize, output: "hello"},
              %{type: :agent_error, agent: :schema_checked, error: {:missing_required, [:label]}}
+           ] = runtime.traces
+  end
+
+  test "schema validation reports non-map outputs instead of crashing" do
+    agent =
+      Agent.new(:bad_output, fn _input, runtime -> {:ok, :not_a_map, runtime} end,
+        output_schema: %{required: [:label]}
+      )
+
+    assert {:error, {:invalid_schema_value, ":not_a_map"}, runtime} =
+             Agent.run(agent, %{})
+
+    assert [
+             %{
+               type: :agent_error,
+               agent: :bad_output,
+               error: {:invalid_schema_value, ":not_a_map"}
+             }
            ] = runtime.traces
   end
 

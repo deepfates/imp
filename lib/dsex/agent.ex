@@ -88,6 +88,12 @@ defmodule DSEx.Agent do
         {:error, reason} ->
           {:error, reason,
            Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
+
+        other ->
+          reason = {:invalid_handler_result, agent.name, other}
+
+          {:error, reason,
+           Runtime.trace(runtime, %{type: :agent_error, agent: agent.name, error: reason})}
       end
     else
       {:error, reason} ->
@@ -257,6 +263,9 @@ defmodule DSEx.Agent do
   end
 
   defp validate(_value, schema) when schema in [%{}, nil], do: :ok
+
+  defp validate(value, _schema) when not is_map(value),
+    do: {:error, {:invalid_schema_value, inspect(value)}}
 
   defp validate(value, schema) do
     missing =
