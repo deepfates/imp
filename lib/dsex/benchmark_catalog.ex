@@ -185,7 +185,8 @@ defmodule DSEx.BenchmarkCatalog do
       tiers: ["smoke", "research"],
       status: "provider_free_implemented",
       commands: ["mix benchmark.optimizer_lift.check"],
-      next_step: "Add natural-data classification and QA optimizer lift lanes."
+      next_step:
+        "Scale natural classification, QA, retrieval, and instruction-following lift lanes to larger sampled datasets when release policy requires model-quality evidence."
     },
     %{
       id: "factuality_classification",

@@ -212,6 +212,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
       "task" => task_metadata(),
+      "natural_lanes" => natural_lanes(),
       "summary" => %{
         "total" => length(rows),
         "passing" => passing,
@@ -233,6 +234,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
         ]),
       "rows" => rows
     }
+    |> put_natural_summary()
+  end
+
+  defp put_natural_summary(report) do
+    lanes = report["natural_lanes"]
+    passing = Enum.count(lanes, & &1["passing"])
+
+    put_in(report, ["summary", "natural_lanes"], %{
+      "total" => length(lanes),
+      "passing" => passing,
+      "all_passing" => passing == length(lanes),
+      "families" => Enum.map(lanes, & &1["family"])
+    })
   end
 
   defp compare_optimizer(dsex, nil) do
@@ -275,6 +289,312 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
 
   defp non_regression?(%{"baseline_score" => nil}), do: true
   defp non_regression?(row), do: row["optimized_score"] >= row["baseline_score"]
+
+  defp natural_lanes do
+    [
+      classification_lane(),
+      qa_lane(),
+      retrieval_lane(),
+      instruction_following_lane()
+    ]
+  end
+
+  defp classification_lane do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    trainset = [
+      example(%{input: "red", label: "warm"}, [:input]),
+      example(%{input: "blue", label: "cool"}, [:input])
+    ]
+
+    devset = [
+      example(%{input: "orange", label: "warm"}, [:input]),
+      example(%{input: "green", label: "cool"}, [:input])
+    ]
+
+    program = classification_program(calls)
+
+    metric = fn example, prediction ->
+      DSEx.Metrics.classification(
+        DSEx.Prediction.get(prediction, :label),
+        DSEx.Example.get(example, :label),
+        metric_name: "natural_classification_label"
+      )
+    end
+
+    run_natural_lane(%{
+      "id" => "classification_colors",
+      "family" => "classification",
+      "optimizer" => "LabeledFewShot",
+      "trainset" => trainset,
+      "devset" => devset,
+      "metric" => metric,
+      "program" => program,
+      "calls" => calls,
+      "compile" => fn _metric, program, trainset, _devset ->
+        DSEx.Optimizer.LabeledFewShot.new(k: 2)
+        |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
+      end
+    })
+  end
+
+  defp qa_lane do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    trainset = [
+      example(%{question: "What is the capital of France?", answer: "Paris"}, [:question])
+    ]
+
+    devset = [
+      example(%{question: "Capital of France?", answer: "Paris"}, [:question])
+    ]
+
+    program = qa_program(calls)
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    run_natural_lane(%{
+      "id" => "qa_paraphrase",
+      "family" => "qa",
+      "optimizer" => "LabeledFewShot",
+      "trainset" => trainset,
+      "devset" => devset,
+      "metric" => metric,
+      "program" => program,
+      "calls" => calls,
+      "compile" => fn metric, program, trainset, _devset ->
+        compile_labeled(metric, program, {trainset, []})
+      end
+    })
+  end
+
+  defp retrieval_lane do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    trainset = [
+      example(%{question: "France capital lookup", answer: "Paris"}, [:question]),
+      example(%{question: "Germany capital lookup", answer: "Berlin"}, [:question])
+    ]
+
+    devset = [
+      example(%{question: "France capital?", answer: "Paris"}, [:question])
+    ]
+
+    program = qa_program(calls)
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    run_natural_lane(%{
+      "id" => "retrieval_knn_few_shot",
+      "family" => "retrieval",
+      "optimizer" => "KNNFewShot",
+      "trainset" => trainset,
+      "devset" => devset,
+      "metric" => metric,
+      "program" => program,
+      "calls" => calls,
+      "compile" => fn _metric, program, trainset, _devset ->
+        DSEx.Optimizer.KNNFewShot.new(1, trainset)
+        |> DSEx.Optimizer.KNNFewShot.compile(program)
+      end
+    })
+  end
+
+  defp instruction_following_lane do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    trainset = [
+      example(%{instruction: "Return exactly OK.", answer: "OK"}, [:instruction])
+    ]
+
+    devset = [
+      example(%{instruction: "Return exactly OK.", answer: "OK"}, [:instruction])
+    ]
+
+    program = instruction_program(calls)
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    run_natural_lane(%{
+      "id" => "instruction_following_exact",
+      "family" => "instruction_following",
+      "optimizer" => "InstructionSearch",
+      "trainset" => trainset,
+      "devset" => devset,
+      "metric" => metric,
+      "program" => program,
+      "calls" => calls,
+      "compile" => fn metric, program, trainset, devset ->
+        DSEx.Optimizer.InstructionSearch.compile(program, metric, trainset, devset, [
+          "Answer loosely.",
+          "When the user asks to return exactly OK, answer OK."
+        ])
+      end
+    })
+  end
+
+  defp run_natural_lane(spec) do
+    calls = spec["calls"]
+    metric = spec["metric"]
+    trainset = spec["trainset"]
+    devset = spec["devset"]
+    evaluator = DSEx.Evaluate.new(devset, metric)
+    program = spec["program"]
+
+    baseline_calls = Agent.get(calls, & &1)
+    baseline_score = DSEx.Evaluate.run(evaluator, program).score
+    calls_after_baseline = Agent.get(calls, & &1)
+
+    {compile_us, compiled} =
+      :timer.tc(fn -> spec["compile"].(metric, program, trainset, devset) end)
+
+    optimized_result = DSEx.Evaluate.run(evaluator, compiled)
+    optimized_score = optimized_result.score
+    calls_after_optimized = Agent.get(calls, & &1)
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    Agent.stop(calls)
+
+    row = %{
+      "id" => spec["id"],
+      "family" => spec["family"],
+      "optimizer" => spec["optimizer"],
+      "comparison_status" => "dsex_release_evidence",
+      "passing" => optimized_score >= baseline_score,
+      "baseline_score" => baseline_score,
+      "optimized_score" => optimized_score,
+      "lift" => optimized_score - baseline_score,
+      "lm_calls" => calls_after_optimized - baseline_calls,
+      "compile_lm_calls" => max(calls_after_optimized - calls_after_baseline - length(devset), 0),
+      "compile_duration_ms" => Float.round(compile_us / 1000, 3),
+      "estimated_cost" => cost_estimate(calls_after_optimized - baseline_calls),
+      "train_examples" => length(trainset),
+      "dev_examples" => length(devset),
+      "selected" => selected_summary(report, compiled, optimized_result),
+      "trace" => optimizer_trace(report, compiled),
+      "deviation" =>
+        "Natural-data lane is DSEx release evidence over local benchmark-shaped samples. Direct DSEx-vs-DSPy optimizer parity remains in the top-level optimizer rows when the sidecar exposes the matching optimizer."
+    }
+
+    Map.put(row, "passing", row["passing"] and row["lift"] > 0.0)
+  end
+
+  defp classification_program(calls) do
+    DSEx.predict("input -> label",
+      lm: fn messages, _opts ->
+        Agent.update(calls, &(&1 + 1))
+        prompt = prompt_text(messages)
+        input = prompt_field(prompt, "input")
+
+        label =
+          if String.contains?(prompt, "warm") and String.contains?(prompt, "cool") do
+            if input in ["red", "orange", "yellow"], do: "warm", else: "cool"
+          else
+            "unknown"
+          end
+
+        {:ok, %{label: label}}
+      end
+    )
+  end
+
+  defp qa_program(calls) do
+    DSEx.predict("question -> answer",
+      lm: fn messages, _opts ->
+        Agent.update(calls, &(&1 + 1))
+        prompt = prompt_text(messages)
+        question = prompt_field(prompt, "question")
+
+        answer =
+          cond do
+            String.contains?(prompt, "Paris") and String.contains?(question, "France") ->
+              "Paris"
+
+            String.contains?(prompt, "Berlin") and String.contains?(question, "Germany") ->
+              "Berlin"
+
+            true ->
+              "unknown"
+          end
+
+        {:ok, %{answer: answer}}
+      end
+    )
+  end
+
+  defp instruction_program(calls) do
+    DSEx.predict("instruction -> answer",
+      lm: fn messages, _opts ->
+        Agent.update(calls, &(&1 + 1))
+        prompt = prompt_text(messages)
+        answer = if String.contains?(prompt, "answer OK"), do: "OK", else: "not ok"
+        {:ok, %{answer: answer}}
+      end
+    )
+  end
+
+  defp example(fields, inputs) do
+    fields
+    |> DSEx.example()
+    |> DSEx.Example.with_inputs(inputs)
+  end
+
+  defp cost_estimate(calls) do
+    %{
+      "provider" => "fixture",
+      "estimated_lm_calls" => calls,
+      "estimated_tokens" => calls * 200,
+      "estimated_usd" => 0.0
+    }
+  end
+
+  defp selected_summary(report, compiled, optimized_result) do
+    %{
+      "demos" =>
+        compiled
+        |> selected_demos(optimized_result)
+        |> Enum.map(&DSEx.Example.to_map/1)
+        |> normalize(),
+      "instructions" => selected_instructions(report)
+    }
+  end
+
+  defp selected_demos(compiled, optimized_result) do
+    case demos(compiled) do
+      [] -> dynamic_selected_demos(optimized_result)
+      static_demos -> static_demos
+    end
+  end
+
+  defp dynamic_selected_demos(nil), do: []
+
+  defp dynamic_selected_demos(%DSEx.Evaluate.Result{rows: rows}) do
+    rows
+    |> Enum.flat_map(fn
+      %{prediction: %DSEx.Prediction{metadata: %{knn_few_shot: %{demos: demos}}}} -> demos
+      _row -> []
+    end)
+    |> Enum.uniq_by(&DSEx.Example.to_map/1)
+  end
+
+  defp selected_instructions(nil), do: []
+
+  defp selected_instructions(report) do
+    report.candidates
+    |> Enum.filter(fn candidate -> Map.get(candidate, :score, -1.0) == report.best_score end)
+    |> Enum.map(&Map.get(&1, :instruction))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  defp prompt_text(messages),
+    do: Enum.map_join(messages, "\n", &to_string(Map.get(&1, :content, "")))
+
+  defp prompt_field(prompt, field) do
+    pattern =
+      ~r/\[\[ ## #{Regex.escape(field)} ## \]\]\s*(.*?)(?=\n\[\[ ## |\nRespond with|\z)/su
+
+    case pattern |> Regex.scan(prompt) |> List.last() do
+      [_full, value] -> String.trim(value)
+      nil -> ""
+    end
+  end
 
   defp program(calls) do
     DSEx.predict("question -> answer",

@@ -107,8 +107,11 @@ defmodule DSEx.Evaluate do
   defp call_program(%module{} = program, inputs) do
     result =
       cond do
-        function_exported?(module, :call, 2) -> module.call(program, inputs)
-        true -> {:error, {:not_a_program, module}}
+        Code.ensure_loaded?(module) and function_exported?(module, :call, 2) ->
+          module.call(program, inputs)
+
+        true ->
+          {:error, {:not_a_program, module}}
       end
 
     case result do

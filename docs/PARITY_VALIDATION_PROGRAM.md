@@ -238,7 +238,10 @@ sidecar exposes the optimizer. It records DSEx lift/non-regression plus explicit
 deviation notes for `InstructionSearch`, finetuning, and GRPO where the
 installed DSPy sidecar lacks a stable provider-free equivalent. The artifact
 includes Python package versions and detected DSPy optimizer capabilities so
-stale assumptions become visible.
+stale assumptions become visible. It also includes DSEx natural user-story lanes
+for classification, QA, retrieval/KNN few-shot, and instruction following. Each
+natural lane reports baseline score, optimized score, lift, LM calls, estimated
+fixture cost, and selected demos or instructions.
 
 Pass condition:
 

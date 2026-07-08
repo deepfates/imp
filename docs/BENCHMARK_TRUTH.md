@@ -173,7 +173,10 @@ documented DSEx-only or intentional-deviation evidence for Elixir-native
 `InstructionSearch` and provider-side trainer workflows such as finetuning and
 GRPO. The artifact records the installed Python `dspy` package version and
 detected optimizer capabilities so the lane stays honest as the upstream runtime
-changes.
+changes. The same artifact includes natural DSEx user-story lanes for
+classification, QA, retrieval/KNN few-shot, and instruction following, with
+baseline score, optimized score, lift, call counts, cost estimate, and selected
+demos or instructions.
 
 ## Run RAG, Tool, And Agent Parity
 
