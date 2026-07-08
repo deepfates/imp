@@ -2438,6 +2438,73 @@ defmodule BenchmarkTruthTest do
     assert model["proof"]["prompt_contract"] == current_prompt_contract()
   end
 
+  test "live matrix summarizes latency parity and DSEx transport settings" do
+    out_dir = tmp_dir("live-matrix-latency-transport")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    generation =
+      matched_effective_generation()
+      |> put_in(
+        ["value", "dsex_transport"],
+        %{"req_llm_pool" => %{"count" => 16, "protocols" => [:http1]}}
+      )
+
+    write_campaign_artifact(in_dir, "haiku-latency.json", %{
+      "campaign_id" => "latency-transport",
+      "provider" => "req_llm",
+      "model" => "claude-haiku-4-5",
+      "generated_at" => "2026-07-07T00:01:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "generation" => generation,
+      "parity" => Map.put(sample_parity(), "latency_parity", false),
+      "aggregate" => %{
+        "dsex_score" => 0.8,
+        "dspy_score" => 0.8,
+        "score_delta" => 0.0,
+        "dsex_duration_ms" => 162.0,
+        "dspy_duration_ms" => 100.0,
+        "latency_ratio_dsex_over_dspy" => 1.62
+      },
+      "tasks" => instrumented_task_pair(100)
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir,
+        "--campaign-id",
+        "latency-transport"
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    [model] = matrix["models"]
+
+    refute matrix["summary"]["latency"]["complete"]
+    assert matrix["summary"]["latency"]["failing_models"] == ["claude-haiku-4-5"]
+
+    assert get_in(matrix, [
+             "summary",
+             "latency",
+             "by_model",
+             "claude-haiku-4-5",
+             "ratio_dsex_over_dspy"
+           ]) == 1.62
+
+    assert get_in(matrix, ["summary", "transport", "by_model", "claude-haiku-4-5"]) == %{
+             "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
+           }
+
+    assert model["transport"] == %{
+             "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
+           }
+  end
+
   test "live matrix lane summaries prefer current proof over stale larger low-cost coverage" do
     out_dir = tmp_dir("live-matrix-lane-current-proof-rank")
     in_dir = Path.join(out_dir, "campaigns")

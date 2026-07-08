@@ -166,6 +166,26 @@ defmodule DashboardTest do
           "total_models" => 1,
           "complete" => false
         },
+        "latency" => %{
+          "complete" => false,
+          "failing_models" => ["gpt-test-mini"],
+          "by_model" => %{
+            "gpt-test-mini" => %{
+              "latency_parity" => false,
+              "ratio_dsex_over_dspy" => 1.62,
+              "transport" => %{"req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}}
+            }
+          }
+        },
+        "transport" => %{
+          "recorded_models" => 1,
+          "total_models" => 1,
+          "by_model" => %{
+            "gpt-test-mini" => %{
+              "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
+            }
+          }
+        },
         "required_lanes" => %{
           "current_low_cost" => %{
             "present" => true,
@@ -198,7 +218,17 @@ defmodule DashboardTest do
             "best_status" => "missing"
           }
         }
-      }
+      },
+      "models" => [
+        %{
+          "model" => "gpt-test-mini",
+          "lane_tags" => ["current_low_cost"],
+          "parity" => %{"latency_parity" => false},
+          "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
+          "transport" => %{"req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}},
+          "artifact" => %{"path" => "benchmarks/results/gpt-test-mini.json"}
+        }
+      ]
     })
 
     capture_io(fn ->
@@ -240,6 +270,7 @@ defmodule DashboardTest do
              "live_lane_full_evidence",
              "live_lane_missing",
              "live_lane_missing",
+             "live_latency_parity_false",
              "prompt_contract_incomplete",
              "runtime_shape_incomplete"
            ]
@@ -248,6 +279,7 @@ defmodule DashboardTest do
              "current_low_cost",
              "frontier_sanity",
              "historical_research",
+             nil,
              nil,
              nil
            ]
@@ -263,6 +295,19 @@ defmodule DashboardTest do
              },
              %{"kind" => "live_lane_missing", "lane" => "frontier_sanity"},
              %{"kind" => "live_lane_missing", "lane" => "historical_research"},
+             %{
+               "kind" => "live_latency_parity_false",
+               "models" => ["gpt-test-mini"],
+               "failures" => [
+                 %{
+                   "model" => "gpt-test-mini",
+                   "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
+                   "transport" => %{
+                     "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
+                   }
+                 }
+               ]
+             },
              %{"kind" => "prompt_contract_incomplete"},
              %{
                "kind" => "runtime_shape_incomplete",

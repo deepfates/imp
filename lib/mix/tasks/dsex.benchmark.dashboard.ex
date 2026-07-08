@@ -187,6 +187,24 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   defp format_blocking_requirement(_parent_lane, %{"kind" => "campaign_full_parity_false"} = req),
     do: "live campaign parity thresholds not satisfied#{parity_suffix(req["parity"])}"
 
+  defp format_blocking_requirement(_parent_lane, %{"kind" => "live_latency_parity_false"} = req) do
+    models =
+      cond do
+        is_binary(req["model"]) -> req["model"]
+        is_list(req["models"]) and req["models"] != [] -> Enum.join(req["models"], ", ")
+        true -> "unknown model"
+      end
+
+    ratio =
+      req["failures"]
+      |> List.wrap()
+      |> Enum.find_value(&get_in(&1, ["latency", "latency_ratio_dsex_over_dspy"]))
+
+    suffix = if is_number(ratio), do: " (latency ratio #{ratio})", else: ""
+
+    "live latency parity failed for #{models}#{suffix}"
+  end
+
   defp format_blocking_requirement(parent_lane, %{"message" => message}) when is_binary(message),
     do: "#{parent_lane}: #{message}"
 
@@ -388,7 +406,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
            "prompt_contract" => get_in(artifact, ["summary", "prompt_contract"]),
            "dsex_instrumentation" => get_in(artifact, ["summary", "dsex_instrumentation"]),
            "runtime_shape" => get_in(artifact, ["summary", "runtime_shape"]),
-           "disagreements" => get_in(artifact, ["summary", "disagreements"])
+           "disagreements" => get_in(artifact, ["summary", "disagreements"]),
+           "latency" => get_in(artifact, ["summary", "latency"]),
+           "transport" => get_in(artifact, ["summary", "transport"])
          },
          blocking_requirements: live_matrix_blocking_requirements(artifact),
          limitation:
@@ -524,6 +544,26 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     instrumentation_requirements =
       []
       |> maybe_add_requirement(
+        latency_failures(artifact) != [],
+        %{
+          "kind" => "live_latency_parity_false",
+          "models" => Enum.map(latency_failures(artifact), & &1["model"]),
+          "failures" =>
+            Enum.map(latency_failures(artifact), fn model ->
+              %{
+                "model" => model["model"],
+                "lane_tags" => model["lane_tags"],
+                "latency" => model["latency"],
+                "parity" => model["parity"],
+                "transport" => model["transport"],
+                "artifact" => model["artifact"]
+              }
+            end),
+          "message" =>
+            "One or more selected live model artifacts fail latency parity; inspect latency and DSEx transport metadata before claiming performance parity."
+        }
+      )
+      |> maybe_add_requirement(
         get_in(summary, ["prompt_contract", "complete"]) != true,
         %{
           "kind" => "prompt_contract_incomplete",
@@ -551,6 +591,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       )
 
     lane_requirements ++ instrumentation_requirements
+  end
+
+  defp latency_failures(artifact) do
+    artifact
+    |> Map.get("models", [])
+    |> Enum.filter(&(get_in(&1, ["parity", "latency_parity"]) == false))
   end
 
   defp live_campaign_blocking_requirements(artifact) do

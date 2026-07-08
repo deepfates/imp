@@ -193,6 +193,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "dsex_instrumentation" => matrix_instrumentation_summary(models),
         "runtime_shape" => matrix_runtime_shape_summary(models),
         "disagreements" => matrix_disagreement_summary(models),
+        "latency" => matrix_latency_summary(models),
+        "transport" => matrix_transport_summary(models),
         "note" =>
           "Live matrix is complete only when required lanes satisfy their lane-specific release policies: full current low-cost coverage plus matched research-sample frontier and historical/research evidence."
       },
@@ -250,6 +252,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
           "dspy_duration_ms",
           "latency_ratio_dsex_over_dspy"
         ]),
+      "transport" => model_transport(artifact["generation"]),
       "dsex_instrumentation" => model_instrumentation_summary(artifact["tasks"] || []),
       "runtime_shape" => model_runtime_shape_summary(artifact["tasks"] || []),
       "disagreements" => model_disagreement_summary(artifact["tasks"] || []),
@@ -637,6 +640,55 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   defp dominant_latency_source(nil), do: "unknown"
   defp dominant_latency_source(value) when value >= 0.9, do: "provider_model"
   defp dominant_latency_source(_value), do: "local_or_mixed"
+
+  defp matrix_latency_summary(models) do
+    by_model =
+      Map.new(models, fn model ->
+        {
+          model["model"],
+          %{
+            "latency_parity" => get_in(model, ["parity", "latency_parity"]) == true,
+            "ratio_dsex_over_dspy" => get_in(model, ["latency", "latency_ratio_dsex_over_dspy"]),
+            "dsex_duration_ms" => get_in(model, ["latency", "dsex_duration_ms"]),
+            "dspy_duration_ms" => get_in(model, ["latency", "dspy_duration_ms"]),
+            "transport" => model["transport"]
+          }
+        }
+      end)
+
+    failing =
+      models
+      |> Enum.filter(&(get_in(&1, ["parity", "latency_parity"]) == false))
+      |> Enum.map(& &1["model"])
+
+    %{
+      "complete" => models != [] and failing == [],
+      "failing_models" => failing,
+      "by_model" => by_model,
+      "note" =>
+        "Latency parity is evaluated from the selected campaign aggregate for each model; transport records DSEx ReqLLM pool settings when the run configured them explicitly."
+    }
+  end
+
+  defp matrix_transport_summary(models) do
+    by_model = Map.new(models, &{&1["model"], &1["transport"]})
+
+    %{
+      "recorded_models" => Enum.count(models, &is_map(&1["transport"])),
+      "total_models" => length(models),
+      "by_model" => by_model,
+      "note" =>
+        "Nil transport means the artifact used the default ReqLLM transport profile or predates explicit transport metadata."
+    }
+  end
+
+  defp model_transport(%{"value" => %{"dsex_transport" => transport}}) when is_map(transport),
+    do: transport
+
+  defp model_transport(%{"dsex" => %{"transport" => transport}}) when is_map(transport),
+    do: transport
+
+  defp model_transport(_generation), do: nil
 
   defp average([]), do: nil
   defp average(values), do: Enum.sum(values) / length(values)
