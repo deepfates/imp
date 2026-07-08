@@ -176,9 +176,11 @@ defmodule PublicSurfaceTest do
                    DSEx.majority(["A"], :not_options)
                  end
 
-    assert_raise ArgumentError, ~r/majority\/2 expects :normalize to be a unary function/, fn ->
-      DSEx.majority(["A"], normalize: :not_a_function)
-    end
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Aggregation\.majority\/2: invalid value for :normalize option: expected a unary function/,
+                 fn ->
+                   DSEx.majority(["A"], normalize: :not_a_function)
+                 end
 
     assert {:ok, pred} = DSEx.Predict.Predict.call(program, %{question: "2+2?"})
     assert DSEx.Prediction.get(pred, :answer) == "4"

@@ -179,7 +179,7 @@ defmodule RefineFeedbackTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/BestOfN\.new\/3 expects :feedback_fn to be nil or a unary function/,
+                 ~r/DSEx\.Predict\.BestOfN\.new\/3: invalid value for :feedback_fn option: expected nil or a unary function/,
                  fn ->
                    DSEx.Predict.BestOfN.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
                  end
@@ -203,7 +203,7 @@ defmodule RefineFeedbackTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/Refine\.new\/3 expects :feedback_fn to be nil or a unary function/,
+                 ~r/DSEx\.Predict\.Refine\.new\/3: invalid value for :feedback_fn option: expected nil or a unary function/,
                  fn ->
                    DSEx.Predict.Refine.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
                  end

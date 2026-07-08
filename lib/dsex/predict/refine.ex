@@ -4,14 +4,16 @@ defmodule DSEx.Predict.Refine do
   defstruct [:program, :metric, :feedback_fn, max_attempts: 3]
 
   @option_schema [
-    feedback_fn: [type: :any, default: nil],
+    feedback_fn: [
+      type: {:custom, __MODULE__, :validate_feedback_fn, []},
+      default: nil
+    ],
     max_attempts: [type: :non_neg_integer, default: 3]
   ]
 
   def new(program, metric, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.Refine.new/3")
     validate_metric!(metric)
-    validate_feedback_fn!(opts[:feedback_fn])
 
     %__MODULE__{
       program: program,
@@ -19,6 +21,13 @@ defmodule DSEx.Predict.Refine do
       feedback_fn: opts[:feedback_fn],
       max_attempts: opts[:max_attempts]
     }
+  end
+
+  def validate_feedback_fn(nil), do: {:ok, nil}
+  def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
+
+  def validate_feedback_fn(feedback_fn) do
+    {:error, "expected nil or a unary function, got: #{inspect(feedback_fn)}"}
   end
 
   def call(%__MODULE__{} = refine, inputs) do
@@ -62,14 +71,6 @@ defmodule DSEx.Predict.Refine do
   defp validate_metric!(metric) do
     raise ArgumentError,
           "DSEx.Predict.Refine.new/3 expects a metric function with arity 2; got: #{inspect(metric)}"
-  end
-
-  defp validate_feedback_fn!(nil), do: :ok
-  defp validate_feedback_fn!(feedback_fn) when is_function(feedback_fn, 1), do: :ok
-
-  defp validate_feedback_fn!(feedback_fn) do
-    raise ArgumentError,
-          "DSEx.Predict.Refine.new/3 expects :feedback_fn to be nil or a unary function; got: #{inspect(feedback_fn)}"
   end
 
   defp maybe_add_hint(inputs, nil, _history), do: inputs
