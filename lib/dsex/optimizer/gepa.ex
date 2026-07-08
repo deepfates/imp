@@ -10,11 +10,20 @@ defmodule DSEx.Optimizer.GEPA do
 
   defstruct [:metric, feedback_fn: nil, generations: 4]
 
+  @option_schema [
+    feedback_fn: [type: :any, default: nil],
+    generations: [type: :any, default: 4]
+  ]
+
   def new(metric, opts \\ []) do
+    validate_metric!(metric)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.GEPA.new/2")
+    validate_feedback_fn!(opts[:feedback_fn])
+
     %__MODULE__{
       metric: metric,
-      feedback_fn: Keyword.get(opts, :feedback_fn),
-      generations: non_negative_integer(Keyword.get(opts, :generations, 4))
+      feedback_fn: opts[:feedback_fn],
+      generations: non_negative_integer(opts[:generations])
     }
   end
 
@@ -113,4 +122,19 @@ defmodule DSEx.Optimizer.GEPA do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Optimizer.GEPA.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
+  end
+
+  defp validate_feedback_fn!(nil), do: :ok
+  defp validate_feedback_fn!(feedback_fn) when is_function(feedback_fn, 1), do: :ok
+
+  defp validate_feedback_fn!(feedback_fn) do
+    raise ArgumentError,
+          "DSEx.Optimizer.GEPA.new/2 expects :feedback_fn to be nil or an arity-1 function; got: #{inspect(feedback_fn)}"
+  end
 end

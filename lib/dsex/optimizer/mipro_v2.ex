@@ -3,12 +3,21 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
   defstruct [:metric, trials: 12, demos_per_candidate: 4, cold_start: 4]
 
+  @option_schema [
+    trials: [type: :any, default: 12],
+    demos_per_candidate: [type: :any, default: 4],
+    cold_start: [type: :any, default: 4]
+  ]
+
   def new(metric, opts \\ []) do
+    validate_metric!(metric)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.MIPROv2.new/2")
+
     %__MODULE__{
       metric: metric,
-      trials: non_negative_integer(Keyword.get(opts, :trials, 12)),
-      demos_per_candidate: non_negative_integer(Keyword.get(opts, :demos_per_candidate, 4)),
-      cold_start: non_negative_integer(Keyword.get(opts, :cold_start, 4))
+      trials: non_negative_integer(opts[:trials]),
+      demos_per_candidate: non_negative_integer(opts[:demos_per_candidate]),
+      cold_start: non_negative_integer(opts[:cold_start])
     }
   end
 
@@ -159,4 +168,11 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Optimizer.MIPROv2.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
+  end
 end

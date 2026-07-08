@@ -247,6 +247,52 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.status == :baseline_only
   end
 
+  test "advanced optimizer constructors reject invalid option containers at the boundary" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.COPRO.new(metric(), %{depth: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.MIPROv2.new(metric(), %{trials: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.SIMBA.new(metric(), %{steps: 1})
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GEPA\.new\/2: expected keyword options/, fn ->
+      DSEx.Optimizer.GEPA.new(metric(), %{generations: 1})
+    end
+  end
+
+  test "advanced optimizer constructors reject invalid callback contracts at the boundary" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.COPRO\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> DSEx.Optimizer.COPRO.new(fn _example -> true end) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> DSEx.Optimizer.MIPROv2.new(fn _example -> true end) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> DSEx.Optimizer.SIMBA.new(fn _example -> true end) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.GEPA\.new\/2 expects a metric function with arity 2/,
+                 fn -> DSEx.Optimizer.GEPA.new(fn _example, _prediction, _trace -> true end) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.GEPA\.new\/2 expects :feedback_fn to be nil or an arity-1 function/,
+                 fn -> DSEx.Optimizer.GEPA.new(metric(), feedback_fn: fn -> "feedback" end) end
+  end
+
   test "COPRO can use LM-generated score-informed instruction proposals" do
     proposer_lm = %{
       module: DSEx.LM.Static,
