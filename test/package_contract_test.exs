@@ -34,6 +34,13 @@ defmodule PackageContractTest do
     "lib/dsex/clients/providers.ex"
   ]
 
+  @documented_module_allowlist MapSet.new([
+                                 "DSEx.Optimize",
+                                 "DSEx.Optimizer",
+                                 "DSEx.TaskSupervisor",
+                                 "DSEx.UnlinkedTaskSupervisor"
+                               ])
+
   test "Hex package ships product code and docs, not local evidence machinery" do
     files =
       Mix.Project.config()
@@ -70,6 +77,30 @@ defmodule PackageContractTest do
     assert_release_files(files)
   end
 
+  test "shipped docs do not reference modules excluded from the Hex package" do
+    files =
+      Mix.Project.config()
+      |> Keyword.fetch!(:package)
+      |> Keyword.fetch!(:files)
+      |> Enum.sort()
+
+    package_file_set = MapSet.new(files)
+
+    missing =
+      files
+      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+      |> documented_module_references()
+      |> Enum.reject(&MapSet.member?(@documented_module_allowlist, &1))
+      |> Enum.reject(fn module_name ->
+        module_name
+        |> module_from_string()
+        |> module_source_file()
+        |> then(&MapSet.member?(package_file_set, &1))
+      end)
+
+    assert missing == []
+  end
+
   defp assert_release_files(files) do
     for file <- @product_files do
       assert file in files
@@ -89,5 +120,32 @@ defmodule PackageContractTest do
       System.tmp_dir!(),
       "dsex-package-contract-#{System.unique_integer([:positive])}"
     ])
+  end
+
+  defp documented_module_references(paths) do
+    paths
+    |> Enum.flat_map(fn path ->
+      path
+      |> File.read!()
+      |> then(&Regex.scan(~r/DSEx(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
+      |> List.flatten()
+    end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp module_from_string(name) do
+    name
+    |> String.split(".")
+    |> Module.concat()
+  end
+
+  defp module_source_file(module) do
+    Code.ensure_loaded?(module)
+
+    module.module_info(:compile)
+    |> Keyword.fetch!(:source)
+    |> List.to_string()
+    |> Path.relative_to(File.cwd!())
   end
 end
