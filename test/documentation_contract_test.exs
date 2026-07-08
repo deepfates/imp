@@ -1,6 +1,13 @@
 defmodule DocumentationContractTest do
   use ExUnit.Case, async: true
 
+  @documented_module_allowlist MapSet.new([
+                                 "DSEx.Optimize",
+                                 "DSEx.Optimizer",
+                                 "DSEx.TaskSupervisor",
+                                 "DSEx.UnlinkedTaskSupervisor"
+                               ])
+
   test "coverage matrix describes current evidence instead of closed planning tickets" do
     body = File.read!("docs/COVERAGE_MATRIX.md")
 
@@ -27,6 +34,19 @@ defmodule DocumentationContractTest do
     assert Code.ensure_loaded?(DSEx.MCP.HTTPClient)
     assert Code.ensure_loaded?(DSEx.MCP.StdioClient)
     assert Code.ensure_loaded?(DSEx.MCP.StreamableHTTPClient)
+  end
+
+  test "documented DSEx module references resolve to loadable modules" do
+    missing =
+      documented_module_references()
+      |> Enum.reject(&MapSet.member?(@documented_module_allowlist, &1))
+      |> Enum.reject(fn name ->
+        name
+        |> module_from_string()
+        |> Code.ensure_loaded?()
+      end)
+
+    assert missing == []
   end
 
   test "release criteria are expressed as current product evidence, not historical tickets" do
@@ -326,5 +346,23 @@ defmodule DocumentationContractTest do
     refute body =~ "de-i8cc"
     refute body =~ "de-qvwf"
     refute body =~ "de-i4o5"
+  end
+
+  defp documented_module_references do
+    (["README.md"] ++ Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd"))
+    |> Enum.flat_map(fn path ->
+      path
+      |> File.read!()
+      |> then(&Regex.scan(~r/DSEx(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
+      |> List.flatten()
+    end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp module_from_string(name) do
+    name
+    |> String.split(".")
+    |> Module.concat()
   end
 end
