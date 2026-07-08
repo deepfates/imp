@@ -217,6 +217,27 @@ defmodule ExternalRetrieverTest do
     assert {:error, {:not_a_retriever, String}} = DSEx.Retrieve.retrieve(String, "q")
   end
 
+  test "retriever facade validates option containers before dispatch" do
+    callback = fn _query, _opts ->
+      send(self(), :retriever_callback_ran)
+      {:ok, [%{text: "should not run"}]}
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Retrieve.retrieve\/3 expects keyword options/,
+                 fn ->
+                   DSEx.Retrieve.retrieve(callback, "q", %{k: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Retrieve.retrieve\/3 expects keyword options/,
+                 fn ->
+                   DSEx.Retrieve.retrieve(callback, "q", [:not_a_pair])
+                 end
+
+    refute_received :retriever_callback_ran
+  end
+
   test "memory retriever clamps negative k to no documents" do
     retriever = DSEx.Retrieve.Memory.new([%{text: "Paris"}], k: -2)
     assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris")

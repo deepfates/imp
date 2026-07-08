@@ -5,7 +5,12 @@ defmodule DSEx.Retrieve do
 
   def retrieve(retriever, query, opts \\ [])
 
-  def retrieve(module, query, opts) when is_atom(module) do
+  def retrieve(retriever, query, opts) do
+    opts = validate_opts!(opts)
+    do_retrieve(retriever, query, opts)
+  end
+
+  defp do_retrieve(module, query, opts) when is_atom(module) do
     if function_exported?(module, :retrieve, 2) do
       call_retriever(fn -> module.retrieve(query, opts) end, module)
     else
@@ -13,11 +18,11 @@ defmodule DSEx.Retrieve do
     end
   end
 
-  def retrieve(fun, query, opts) when is_function(fun, 2) do
+  defp do_retrieve(fun, query, opts) when is_function(fun, 2) do
     call_retriever(fn -> fun.(query, opts) end, fun)
   end
 
-  def retrieve(%module{} = retriever, query, opts) do
+  defp do_retrieve(%module{} = retriever, query, opts) do
     if function_exported?(module, :retrieve, 3) do
       call_retriever(fn -> module.retrieve(retriever, query, opts) end, module)
     else
@@ -25,7 +30,20 @@ defmodule DSEx.Retrieve do
     end
   end
 
-  def retrieve(retriever, _query, _opts), do: {:error, {:not_a_retriever, retriever}}
+  defp do_retrieve(retriever, _query, _opts), do: {:error, {:not_a_retriever, retriever}}
+
+  defp validate_opts!(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError,
+            "DSEx.Retrieve.retrieve/3 expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts) do
+    raise ArgumentError, "DSEx.Retrieve.retrieve/3 expects keyword options, got: #{inspect(opts)}"
+  end
 
   defp call_retriever(fun, retriever) do
     case fun.() do
