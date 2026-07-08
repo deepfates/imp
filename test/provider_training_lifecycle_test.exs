@@ -129,6 +129,22 @@ defmodule ProviderTrainingLifecycleTest do
     assert_received {^ref, [:dsex, :training, :refresh, :start], _, %{job_id: "ftjob_123"}}
   end
 
+  test "training jobs normalize provider lifecycle status at construction and refresh" do
+    assert %DSEx.Clients.TrainingJob{status: :succeeded} =
+             DSEx.Clients.TrainingJob.new(%{status: "completed"})
+
+    assert %DSEx.Clients.TrainingJob{status: :pending} =
+             DSEx.Clients.TrainingJob.new(%{status: "queued"})
+
+    assert %DSEx.Clients.TrainingJob{status: :running} =
+             DSEx.Clients.TrainingJob.new(%{status: "in_progress"})
+
+    assert %DSEx.Clients.TrainingJob{status: {:unknown, "provider-paused"}} =
+             DSEx.Clients.TrainingJob.new(%{status: "provider-paused"})
+
+    assert DSEx.Clients.TrainingJob.normalize_status("canceled") == :cancelled
+  end
+
   test "OpenAI trainer requires an uploaded training file id" do
     lm = DSEx.req_llm("gpt-test")
 

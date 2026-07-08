@@ -27,6 +27,13 @@ defmodule DSEx.Clients.TrainingJob do
     metadata: %{}
   ]
 
+  @doc """
+  Builds a provider-neutral training job.
+
+  Status values are normalized at the boundary: common provider strings such as
+  `"succeeded"`, `"completed"`, `"queued"`, and `"running"` become DSEx atoms,
+  while unknown external statuses remain visible as `{:unknown, value}`.
+  """
   def new(attrs) do
     %__MODULE__{
       id:
@@ -34,7 +41,7 @@ defmodule DSEx.Clients.TrainingJob do
           "train-" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower),
       provider: Map.get(attrs, :provider, :local),
       model: Map.get(attrs, :model),
-      status: Map.get(attrs, :status, :created),
+      status: normalize_status(Map.get(attrs, :status, :created)),
       training_data: Map.get(attrs, :training_data, []),
       result_model: Map.get(attrs, :result_model),
       transport: Map.get(attrs, :transport),
@@ -61,6 +68,29 @@ defmodule DSEx.Clients.TrainingJob do
 
   def fail(%__MODULE__{} = job, reason),
     do: %{job | status: :failed, metadata: Map.put(job.metadata, :error, reason)}
+
+  @doc """
+  Normalizes external provider status names into DSEx job lifecycle atoms.
+
+      iex> DSEx.Clients.TrainingJob.normalize_status("completed")
+      :succeeded
+      iex> DSEx.Clients.TrainingJob.normalize_status("queued")
+      :pending
+      iex> DSEx.Clients.TrainingJob.normalize_status("provider-paused")
+      {:unknown, "provider-paused"}
+  """
+  def normalize_status(status) when is_atom(status), do: status
+  def normalize_status("succeeded"), do: :succeeded
+  def normalize_status("completed"), do: :succeeded
+  def normalize_status("success"), do: :succeeded
+  def normalize_status("failed"), do: :failed
+  def normalize_status("cancelled"), do: :cancelled
+  def normalize_status("canceled"), do: :cancelled
+  def normalize_status("running"), do: :running
+  def normalize_status("in_progress"), do: :running
+  def normalize_status("pending"), do: :pending
+  def normalize_status("queued"), do: :pending
+  def normalize_status(other), do: {:unknown, to_string(other)}
 
   defp refresh_status(%__MODULE__{} = job) do
     body = Jason.encode!(%{job_id: job.id})
@@ -110,23 +140,13 @@ defmodule DSEx.Clients.TrainingJob do
   defp merge_status(job, decoded) do
     %{
       job
-      | status: normalize_status(decoded["status"] || decoded["state"] || job.status),
+      | status: __MODULE__.normalize_status(decoded["status"] || decoded["state"] || job.status),
         result_model:
           decoded["fine_tuned_model"] || decoded["result_model"] || decoded["model_output"] ||
             job.result_model,
         metadata: Map.merge(job.metadata, %{"last_status_response" => decoded})
     }
   end
-
-  defp normalize_status(status) when is_atom(status), do: status
-  defp normalize_status("succeeded"), do: :succeeded
-  defp normalize_status("completed"), do: :succeeded
-  defp normalize_status("success"), do: :succeeded
-  defp normalize_status("failed"), do: :failed
-  defp normalize_status("cancelled"), do: :cancelled
-  defp normalize_status("running"), do: :running
-  defp normalize_status("pending"), do: :pending
-  defp normalize_status(other), do: {:unknown, to_string(other)}
 
   defp auth_headers(nil), do: []
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
@@ -417,7 +437,10 @@ defmodule DSEx.Clients.HTTPTrainer do
       id: decoded["id"] || decoded["job_id"],
       provider: trainer.provider,
       model: Map.get(lm, :model),
-      status: normalize_status(decoded["status"] || decoded["state"] || :submitted),
+      status:
+        DSEx.Clients.TrainingJob.normalize_status(
+          decoded["status"] || decoded["state"] || :submitted
+        ),
       training_data: Enum.map(examples, &DSEx.Example.to_map/1),
       result_model: decoded["fine_tuned_model"] || decoded["result_model"],
       transport: trainer.transport,
@@ -432,16 +455,6 @@ defmodule DSEx.Clients.HTTPTrainer do
   defp status_url(%__MODULE__{status_url: template}, decoded) do
     String.replace(template, "{id}", to_string(decoded["id"] || decoded["job_id"]))
   end
-
-  defp normalize_status(status) when is_atom(status), do: status
-  defp normalize_status("succeeded"), do: :succeeded
-  defp normalize_status("completed"), do: :succeeded
-  defp normalize_status("success"), do: :succeeded
-  defp normalize_status("failed"), do: :failed
-  defp normalize_status("cancelled"), do: :cancelled
-  defp normalize_status("running"), do: :running
-  defp normalize_status("pending"), do: :pending
-  defp normalize_status(other), do: {:unknown, to_string(other)}
 
   defp auth_headers(nil), do: []
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
