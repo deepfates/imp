@@ -147,29 +147,11 @@ defmodule DSEx.Evaluate do
      }, [error | errors]}
   end
 
-  defp call_program(%module{} = program, inputs) do
-    result =
-      cond do
-        Code.ensure_loaded?(module) and function_exported?(module, :call, 2) ->
-          module.call(program, inputs)
-
-        true ->
-          {:error, {:not_a_program, module}}
-      end
-
-    case result do
-      {:ok, %DSEx.Prediction{} = prediction} -> {:ok, prediction}
-      {:ok, other} -> {:error, {:invalid_program_prediction, inspect(other)}}
-      {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_program_result, inspect(other)}}
-    end
-  rescue
-    error -> {:error, {:program_error, error_message(error)}}
-  catch
-    kind, reason -> {:error, {:program_error, error_message({kind, reason})}}
+  defp call_program(%_module{} = program, inputs) do
+    DSEx.Module.call(program, inputs)
   end
 
-  defp call_program(other, _inputs), do: {:error, {:not_a_program, other}}
+  defp call_program(other, _inputs), do: {:error, {:not_callable, other}}
 
   defp metric_result(metric, example, prediction) when is_function(metric, 2),
     do: metric |> apply_metric([example, prediction]) |> DSEx.Metrics.normalize_result()

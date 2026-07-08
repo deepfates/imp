@@ -164,8 +164,11 @@ defmodule MetricContractTest do
       |> DSEx.Evaluate.run(raising)
 
     assert raised.score == -1.0
-    assert [%{reason: {:program_error, "program exploded"}}] = raised.errors
-    assert [%{error: {:program_error, "program exploded"}, prediction: nil}] = raised.rows
+
+    assert [%{reason: {:module_call_failed, Program, "program exploded"}}] = raised.errors
+
+    assert [%{error: {:module_call_failed, Program, "program exploded"}, prediction: nil}] =
+             raised.rows
 
     invalid = %Program{handler: fn _inputs -> :not_a_module_result end}
 
@@ -174,7 +177,8 @@ defmodule MetricContractTest do
       |> DSEx.Evaluate.new(metric)
       |> DSEx.Evaluate.run(invalid)
 
-    assert [%{reason: {:invalid_program_result, ":not_a_module_result"}}] = result.errors
+    assert [%{reason: {:invalid_module_result, Program, ":not_a_module_result"}}] =
+             result.errors
   end
 
   test "Evaluate records metric throws as metric feedback and budgeted errors" do
