@@ -71,6 +71,34 @@ defmodule ReActContractTest do
     refute_received :react_lm_called
   end
 
+  test "constructor and call boundaries report invalid inputs clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.ReAct\.new\/3: expected keyword options/, fn ->
+      DSEx.Predict.ReAct.new("question -> answer", [], %{lm: nil})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ReAct\.new\/3 expects tools to be a list of DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.ReAct.new("question -> answer", :not_tools)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ReAct\.new\/3 expects tools to contain DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.ReAct.new("question -> answer", [:not_a_tool])
+                 end
+
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: nil)
+
+    assert {:error, {:invalid_react_inputs, message}} =
+             DSEx.Predict.ReAct.call(agent, :not_inputs)
+
+    assert message =~ "expected a map or keyword/list of input pairs"
+
+    assert {:error, {:invalid_react_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.Predict.ReAct.call(agent, [:not_a_pair])
+  end
+
   test "tool policy denial stops ReAct before executing LM-selected tool" do
     lm = %{
       module: DSEx.LM.Static,

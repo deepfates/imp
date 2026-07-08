@@ -32,9 +32,20 @@ defmodule DSEx.Predict.ReAct do
 
   defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
 
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    demos: [type: {:list, :any}, default: []],
+    config: [type: :keyword_list, default: []],
+    metadata: [type: {:map, :any, :any}, default: %{}],
+    max_iters: [type: :any, default: 20],
+    tool_policy: [type: :any, default: :allow]
+  ]
+
   def new(signature, tools, opts \\ []) do
     signature = DSEx.Signature.ensure(signature)
-    tool_map = tools |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1})
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.ReAct.new/3")
+    tool_map = normalize_tools!(tools)
     submit = DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
     tools = Map.put(tool_map, :submit, submit)
 
@@ -64,8 +75,8 @@ defmodule DSEx.Predict.ReAct do
       signature: signature,
       react: DSEx.Predict.Predict.new(react_signature, react_opts),
       tools: tools,
-      max_iters: non_negative_integer(Keyword.get(opts, :max_iters, 20)),
-      tool_policy: Keyword.get(opts, :tool_policy, :allow)
+      max_iters: non_negative_integer(opts[:max_iters]),
+      tool_policy: opts[:tool_policy]
     }
   end
 
@@ -83,8 +94,22 @@ defmodule DSEx.Predict.ReAct do
   end
 
   @impl true
-  def call(%__MODULE__{} = agent, inputs) do
-    run_loop(agent, Map.new(inputs), [], agent.max_iters)
+  def call(%__MODULE__{} = agent, inputs) when is_list(inputs) or is_map(inputs) do
+    with {:ok, inputs} <- normalize_inputs(inputs) do
+      run_loop(agent, inputs, [], agent.max_iters)
+    end
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_react_inputs,
+        "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error -> {:error, {:invalid_react_inputs, "expected inputs as {key, value} pairs"}}
   end
 
   defp run_loop(_agent, _inputs, history, 0) do
@@ -268,7 +293,20 @@ defmodule DSEx.Predict.ReAct do
 
   defp tool_parameters(_tool, _signature), do: %{"type" => "object", "properties" => %{}}
 
-  defp coerce_tool(%DSEx.Tool{} = tool), do: tool
+  defp normalize_tools!(tools) when is_list(tools),
+    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
+
+  defp normalize_tools!(tools) do
+    raise ArgumentError,
+          "DSEx.Predict.ReAct.new/3 expects tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
+  end
+
+  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
+
+  defp coerce_tool!(tool) do
+    raise ArgumentError,
+          "DSEx.Predict.ReAct.new/3 expects tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
+  end
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->

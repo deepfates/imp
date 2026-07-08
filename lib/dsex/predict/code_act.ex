@@ -21,18 +21,45 @@ defmodule DSEx.Predict.CodeAct do
 
   defstruct [:program_of_thought, tools: %{}, max_iters: 5, tool_policy: :allow]
 
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    demos: [type: {:list, :any}, default: []],
+    config: [type: :keyword_list, default: []],
+    metadata: [type: {:map, :any, :any}, default: %{}],
+    output_field: [type: :any, default: :answer],
+    max_iters: [type: :any, default: 5],
+    tool_policy: [type: :any, default: :allow]
+  ]
+
   def new(signature, tools \\ [], opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.CodeAct.new/3")
+
     %__MODULE__{
       program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, opts),
-      tools: tools |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
-      max_iters: non_negative_integer(Keyword.get(opts, :max_iters, 5)),
-      tool_policy: Keyword.get(opts, :tool_policy, :allow)
+      tools: normalize_tools!(tools),
+      max_iters: non_negative_integer(opts[:max_iters]),
+      tool_policy: opts[:tool_policy]
     }
   end
 
   @impl true
-  def call(%__MODULE__{} = code_act, inputs) do
-    run_loop(code_act, Map.new(inputs), [], 1)
+  def call(%__MODULE__{} = code_act, inputs) when is_list(inputs) or is_map(inputs) do
+    with {:ok, inputs} <- normalize_inputs(inputs) do
+      run_loop(code_act, inputs, [], 1)
+    end
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_code_act_inputs,
+        "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error -> {:error, {:invalid_code_act_inputs, "expected inputs as {key, value} pairs"}}
   end
 
   defp run_loop(%__MODULE__{} = code_act, _inputs, trace, iteration)
@@ -155,7 +182,20 @@ defmodule DSEx.Predict.CodeAct do
 
   defp present?(value), do: value not in [nil, ""]
 
-  defp coerce_tool(%DSEx.Tool{} = tool), do: tool
+  defp normalize_tools!(tools) when is_list(tools),
+    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
+
+  defp normalize_tools!(tools) do
+    raise ArgumentError,
+          "DSEx.Predict.CodeAct.new/3 expects tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
+  end
+
+  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
+
+  defp coerce_tool!(tool) do
+    raise ArgumentError,
+          "DSEx.Predict.CodeAct.new/3 expects tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
+  end
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->

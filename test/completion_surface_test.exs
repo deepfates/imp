@@ -191,6 +191,36 @@ defmodule CompletionSurfaceTest do
     refute_received :code_act_lm_called
   end
 
+  test "CodeAct constructor and call boundaries report invalid inputs clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3: expected keyword options/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", [], %{lm: nil})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3 expects tools to be a list of DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", :not_tools)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3 expects tools to contain DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", [:not_a_tool])
+                 end
+
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: nil)
+
+    assert {:error, {:invalid_code_act_inputs, message}} =
+             DSEx.Predict.CodeAct.call(code_act, :not_inputs)
+
+    assert message =~ "expected a map or keyword/list of input pairs"
+
+    assert {:error, {:invalid_code_act_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.Predict.CodeAct.call(code_act, [:not_a_pair])
+  end
+
   test "streaming exposes predictions as an enumerable" do
     lm = %{
       module: DSEx.LM.Static,
