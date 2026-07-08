@@ -1871,8 +1871,8 @@ defmodule BenchmarkTruthTest do
     assert "--req-llm-pool-count" in args
   end
 
-  test "campaign halt decision stops runner-error chunks with no accepted coverage gain" do
-    refute Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 150, true)
+  test "campaign halt decision stops after any runner-error chunk" do
+    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 150, true)
     refute Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, false)
     assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, true)
     assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 90, true)

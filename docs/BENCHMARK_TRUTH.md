@@ -425,12 +425,12 @@ reached the requested paired-row coverage. This is the preferred way to run
 staged live campaigns because the stopping condition is evidence coverage, not a
 hand-counted number of offsets.
 
-If a live chunk produces runner/API errors and accepted coverage does not
-advance, the campaign runner halts instead of continuing to spend provider
-calls. This is intentional: quota/rate-limit failures are incomplete evidence,
-not negative benchmark rows. Fix provider quota/credentials or switch to a
-matched provider/model lane, then rerun the same campaign id to continue from
-the earliest missing accepted row.
+If a live chunk produces runner/API errors, the campaign runner halts after that
+chunk instead of continuing to spend provider calls. Any rows with complete
+DSEx/DSPy evidence are preserved, but quota/rate-limit failures remain
+incomplete evidence, not negative benchmark rows. Fix provider
+quota/credentials or switch to a matched provider/model lane, then rerun the
+same campaign id to continue from the earliest missing accepted row.
 
 Use `--dspy-model responses/<model>` for GPT-5-family endpoint-equivalent
 campaigns. DSEx reaches the provider through ReqLLM's OpenAI Responses route;

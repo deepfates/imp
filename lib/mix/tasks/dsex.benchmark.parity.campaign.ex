@@ -95,7 +95,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
                latest_chunk_has_runner_errors?(model, out_dir, campaign_id)
              ) do
             Mix.shell().info(
-              "campaign halted after runner/API errors produced no accepted coverage advance; fix provider quota/credentials or rerun later"
+              "campaign halted after runner/API errors produced an incomplete chunk; fix provider quota/credentials or rerun later"
             )
 
             {:halt, next_aggregate}
@@ -117,9 +117,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   defp coverage(aggregate), do: get_in(aggregate, ["coverage", "covered"]) || 0
 
   @doc false
-  def halt_after_chunk?(before_coverage, after_coverage, runner_errors?) do
-    runner_errors? and after_coverage <= before_coverage
-  end
+  def halt_after_chunk?(_before_coverage, _after_coverage, runner_errors?), do: runner_errors?
 
   @doc false
   def planned_chunk_size(aggregate, chunk_plan, opts) do
