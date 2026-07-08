@@ -37,6 +37,8 @@ credentials.
 
 - [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
   redaction, security posture, package shape, and release discipline.
+- [Benchmark Catalog](BENCHMARK_CATALOG.md): outside-view map of DSPy-derived
+  benchmark families, current DSEx coverage, and the next sampled lanes.
 
 ## First Things To Try
 

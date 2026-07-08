@@ -30,6 +30,9 @@ The release standard is grounded in:
 - DSEx's parity validation program: golden trace parity, live matched-model
   parity, optimizer lift, production semantics, and provider-free performance
   evidence: `docs/PARITY_VALIDATION_PROGRAM.md`
+- DSEx's benchmark catalog: a source-grounded outside-view map of DSPy-derived
+  benchmark families and which ones are runnable, sampled, deferred, or
+  release-blocking: `docs/BENCHMARK_CATALOG.md`
 
 ## Release Scope
 

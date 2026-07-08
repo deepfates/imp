@@ -1,6 +1,7 @@
 # Benchmark Truth
 
-DSEx has two benchmark lanes plus one release-level validation program.
+DSEx has two benchmark lanes, one outside-view benchmark catalog, and one
+release-level validation program.
 
 DSEx keeps benchmark evidence behind Mix tasks instead of treating benchmark
 helpers as part of the application API. Deterministic production fixtures prove
@@ -11,11 +12,12 @@ The benchmark truth tasks are the research-evidence lane. They run DSEx
 programs over canonical DSPy-style dataset rows, write auditable result JSON,
 and separate fixture-mode harness proof from live-provider evidence.
 
-`PARITY_VALIDATION_PROGRAM.md` defines the full release evidence standard. A
-full-row live benchmark is one important lane, but it is not sufficient by
-itself. Full parity claims also require provider-free golden trace parity,
-optimizer lift parity, RAG/tool/agent semantics, and provider-free performance
-benchmarks.
+`BENCHMARK_CATALOG.md` maps the broader DSPy paper/docs/example benchmark
+universe to DSEx's current samplers and gaps. `PARITY_VALIDATION_PROGRAM.md`
+defines the full release evidence standard. A full-row live benchmark is one
+important lane, but it is not sufficient by itself. Full parity claims also
+require provider-free golden trace parity, optimizer lift parity,
+RAG/tool/agent semantics, and provider-free performance benchmarks.
 
 ## Canonical Minimum
 
@@ -31,6 +33,10 @@ DSPy's public docs list HotPotQA, GSM8K, and Color as built-in datasets. The
 DSPy paper lineage evaluates math word problems and multi-hop QA, especially
 GSM8K and HotPotQA. DSEx should not claim benchmark parity until it has run
 real provider/model comparisons over fixed train/dev/test manifests.
+
+The broader benchmark backlog is intentionally larger than this minimum. See
+`docs/BENCHMARK_CATALOG.md` for classification/factuality, retrieval-indexed
+QA, hard math, optimizer-lift, tool-use, and deferred long-form writing lanes.
 
 ## Fetch Data
 

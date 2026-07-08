@@ -137,6 +137,7 @@ defmodule DSEx.MixProject do
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",
       "docs/ADVANCED.md",
+      "docs/BENCHMARK_CATALOG.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end
@@ -239,6 +240,9 @@ defmodule DSEx.MixProject do
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
         "dsex.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
+      ],
+      "benchmark.catalog": [
+        "dsex.benchmark.catalog --format json --out tmp/benchmark-catalog.json"
       ],
       "benchmark.trace.check": [
         "dsex.benchmark.trace --out tmp/golden-trace"

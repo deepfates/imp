@@ -59,6 +59,7 @@ defmodule DocumentationContractTest do
     assert body =~ "mix production.check"
     assert body =~ "mix benchmark.dashboard.full"
     assert body =~ "mix livebook.execute.check"
+    assert body =~ "docs/BENCHMARK_CATALOG.md"
   end
 
   test "user-facing docs name the executable Livebook proof" do

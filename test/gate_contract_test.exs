@@ -41,6 +41,10 @@ defmodule GateContractTest do
              "dsex.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
            ]
 
+    assert Keyword.fetch!(aliases, :"benchmark.catalog") == [
+             "dsex.benchmark.catalog --format json --out tmp/benchmark-catalog.json"
+           ]
+
     assert Keyword.fetch!(aliases, :"benchmark.trace.check") == [
              "dsex.benchmark.trace --out tmp/golden-trace"
            ]
