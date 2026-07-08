@@ -101,6 +101,24 @@ defmodule PackageContractTest do
     assert missing == []
   end
 
+  test "shipped docs do not point readers at files excluded from the Hex package" do
+    files =
+      Mix.Project.config()
+      |> Keyword.fetch!(:package)
+      |> Keyword.fetch!(:files)
+      |> Enum.sort()
+
+    package_file_set = MapSet.new(files)
+
+    missing =
+      files
+      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+      |> documented_file_references()
+      |> Enum.reject(&MapSet.member?(package_file_set, &1))
+
+    assert missing == []
+  end
+
   defp assert_release_files(files) do
     for file <- @product_files do
       assert file in files
@@ -133,6 +151,57 @@ defmodule PackageContractTest do
     |> Enum.uniq()
     |> Enum.sort()
   end
+
+  defp documented_file_references(paths) do
+    paths
+    |> Enum.flat_map(fn path ->
+      body = File.read!(path)
+
+      markdown_targets =
+        ~r/\]\(([^)]+)\)/
+        |> Regex.scan(body)
+        |> Enum.map(fn [_match, target] -> target end)
+
+      bare_targets =
+        ~r/(?:^|[\s`(])((?:\.\.\/)?(?:docs|livebooks)\/[A-Za-z0-9_\/.-]+\.(?:md|livemd)|[A-Z][A-Z0-9_]+\.md)/m
+        |> Regex.scan(body)
+        |> Enum.map(fn [_match, target] -> target end)
+
+      Enum.flat_map(markdown_targets ++ bare_targets, &resolve_document_reference(path, &1))
+    end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp resolve_document_reference(source, target) do
+    target =
+      target
+      |> String.trim()
+      |> String.split(~r/\s+/, parts: 2)
+      |> hd()
+      |> String.split("#", parts: 2)
+      |> hd()
+
+    cond do
+      String.match?(target, ~r/^(?:https?:|mailto:|#)/) ->
+        []
+
+      String.ends_with?(target, [".md", ".livemd"]) ->
+        [
+          reference_base(source, target)
+          |> Path.join(target)
+          |> Path.expand(File.cwd!())
+          |> Path.relative_to(File.cwd!())
+        ]
+
+      true ->
+        []
+    end
+  end
+
+  defp reference_base(_source, "docs/" <> _rest), do: File.cwd!()
+  defp reference_base(_source, "livebooks/" <> _rest), do: File.cwd!()
+  defp reference_base(source, _target), do: Path.dirname(source)
 
   defp module_from_string(name) do
     name

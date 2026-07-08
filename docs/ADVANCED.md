@@ -195,6 +195,7 @@ DSEx behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared DSEx
 contracts and tested through injectable transports.
 
-For real dataset benchmark evidence, use the commands in `BENCHMARK_TRUTH.md`.
-That lane fetches canonical GSM8K/HotPotQA rows, writes manifests and result
-artifacts, and keeps research evidence separate from the normal product gate.
+For real dataset benchmark evidence, use the maintainer evidence notes in the
+source repository. That lane fetches canonical GSM8K/HotPotQA rows, writes
+manifests and result artifacts, and keeps research evidence separate from the
+normal product gate.
