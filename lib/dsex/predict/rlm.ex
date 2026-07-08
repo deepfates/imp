@@ -240,7 +240,7 @@ defmodule DSEx.Predict.RLM do
   defp step(%__MODULE__{} = rlm, %{"action" => "tool"} = action, state, iteration) do
     requested_name = Map.get(action, "name")
     name = normalize_tool_name(rlm.tools, requested_name)
-    args = Map.get(action, "arguments", Map.get(action, "args", %{}))
+    args = action |> Map.get("arguments", Map.get(action, "args", %{})) |> normalize_tool_args()
     result = execute_tool_call(rlm, name, requested_name, args)
 
     state =
@@ -354,6 +354,15 @@ defmodule DSEx.Predict.RLM do
       if to_string(known) == to_string(name), do: known
     end)
   end
+
+  defp normalize_tool_args(args) when is_binary(args) do
+    case Jason.decode(args) do
+      {:ok, decoded} -> decoded
+      {:error, _reason} -> args
+    end
+  end
+
+  defp normalize_tool_args(args), do: args
 
   defp execute_tool_call(_rlm, nil, requested_name, _args),
     do: {:error, {:unknown_tool, requested_name}}

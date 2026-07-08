@@ -30,8 +30,9 @@ defmodule DSEx.Predict.ProgramOfThought do
           DSEx.Signature.Field.new(
             %{
               name: :arguments,
-              type: :object,
-              desc: "Optional map of tool arguments",
+              type: :any,
+              desc:
+                "Optional raw tool arguments; maps and provider JSON strings are both accepted",
               metadata: %{optional: true}
             },
             :output

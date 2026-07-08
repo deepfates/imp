@@ -123,6 +123,37 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_tool_prompt)
   end
 
+  test "RLM decodes JSON string tool arguments before execution" do
+    actions = [
+      %{action: "tool", name: "lookup", arguments: ~s({"key":"capital"})},
+      %{action: "submit", result: %{answer: "Paris"}}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:rlm_actions)
+          Process.put(:rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
+    Process.put(:rlm_actions, actions)
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 3)
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+
+    assert %{action: :tool, input: %{"arguments" => ~s({"key":"capital"})}, output: "Paris"} =
+             hd(prediction.metadata.rlm_trace)
+  after
+    Process.delete(:rlm_actions)
+  end
+
   test "RLM supports genuine recursive child calls with reduced budget" do
     actions = [
       %{action: "recurse", signature: "question -> answer", inputs: %{question: "child"}},

@@ -87,6 +87,7 @@ defmodule DSEx.Predict.CodeAct do
 
   defp call_tool(%__MODULE__{} = code_act, tool_name, arguments, trace, iteration) do
     normalized = normalize_tool_name(code_act.tools, tool_name)
+    arguments = normalize_tool_args(arguments)
     result = execute_tool_call(code_act, normalized, tool_name, arguments)
 
     {result,
@@ -161,4 +162,13 @@ defmodule DSEx.Predict.CodeAct do
       if to_string(known) == to_string(name), do: known
     end)
   end
+
+  defp normalize_tool_args(arguments) when is_binary(arguments) do
+    case Jason.decode(arguments) do
+      {:ok, decoded} -> decoded
+      {:error, _reason} -> arguments
+    end
+  end
+
+  defp normalize_tool_args(arguments), do: arguments
 end

@@ -67,6 +67,39 @@ defmodule CompletionSurfaceTest do
     Process.delete(:code_act_actions)
   end
 
+  test "CodeAct decodes JSON string tool arguments before execution" do
+    actions = [
+      %{tool: "lookup", arguments: ~s({"key":"n"})},
+      %{program: "observation + 1"}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:code_act_actions)
+          Process.put(:code_act_actions, rest)
+          action
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup a number", fn %{"key" => "n"} -> 41 end)
+    Process.put(:code_act_actions, actions)
+
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
+
+    assert {:ok, prediction} = DSEx.Predict.CodeAct.call(code_act, %{question: "life?"})
+    assert DSEx.Prediction.get(prediction, :answer) == 42
+
+    assert [
+             %{action: :tool, input: %{arguments: %{"key" => "n"}}},
+             %{action: :program}
+           ] = prediction.metadata.code_act_trace
+  after
+    Process.delete(:code_act_actions)
+  end
+
   test "CodeAct fails immediately on unknown denied or crashing tools with traces" do
     lm = %{
       module: DSEx.LM.Static,
