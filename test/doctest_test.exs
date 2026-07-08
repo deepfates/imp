@@ -3,6 +3,7 @@ defmodule DSExDoctestTest do
 
   doctest DSEx.Adapters.Types
   doctest DSEx.Adapter.JSON
+  doctest DSEx.Errors
   doctest DSEx.Evaluate
   doctest DSEx.Example
   doctest DSEx.Metrics
