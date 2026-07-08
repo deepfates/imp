@@ -34,6 +34,7 @@ defmodule DSEx.Retrievers.HTTP do
   ]
 
   def new(url, opts \\ []) do
+    validate_url!(url, "#{inspect(__MODULE__)}.new/2")
     opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
     %__MODULE__{
@@ -132,6 +133,12 @@ defmodule DSEx.Retrievers.HTTP do
 
   def normalize_doc(text) when is_binary(text), do: %{text: text, score: nil, metadata: %{}}
   def normalize_doc(doc), do: %{text: inspect(doc), score: nil, metadata: %{raw: doc}}
+
+  defp validate_url!(url, _context) when is_binary(url), do: :ok
+
+  defp validate_url!(url, context) do
+    raise ArgumentError, "#{context} expects url to be a binary; got: #{inspect(url)}"
+  end
 end
 
 defmodule DSEx.Retrievers.Weaviate do
@@ -145,6 +152,8 @@ defmodule DSEx.Retrievers.Weaviate do
   ]
 
   def new(base_url, class_name, opts \\ []) do
+    validate_binary!(base_url, "base_url")
+    validate_binary!(class_name, "class_name")
     opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/3")
     endpoint = String.trim_trailing(base_url, "/") <> "/v1/graphql"
 
@@ -184,6 +193,13 @@ defmodule DSEx.Retrievers.Weaviate do
       end
     )
   end
+
+  defp validate_binary!(value, _name) when is_binary(value), do: :ok
+
+  defp validate_binary!(value, name) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.new/3 expects #{name} to be a binary; got: #{inspect(value)}"
+  end
 end
 
 defmodule DSEx.Retrievers.Databricks do
@@ -198,6 +214,7 @@ defmodule DSEx.Retrievers.Databricks do
   ]
 
   def new(endpoint_url, opts \\ []) do
+    validate_endpoint_url!(endpoint_url)
     opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
     DSEx.Retrievers.HTTP.new(endpoint_url,
@@ -231,5 +248,12 @@ defmodule DSEx.Retrievers.Databricks do
   defp auth_headers(opts) do
     token = Keyword.get(opts, :token)
     if token, do: [{"authorization", "Bearer #{token}"}], else: []
+  end
+
+  defp validate_endpoint_url!(endpoint_url) when is_binary(endpoint_url), do: :ok
+
+  defp validate_endpoint_url!(endpoint_url) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.new/2 expects endpoint_url to be a binary; got: #{inspect(endpoint_url)}"
   end
 end

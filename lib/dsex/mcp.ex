@@ -11,7 +11,13 @@ defmodule DSEx.MCP do
     @moduledoc "In-process MCP-like catalog used for tests and adapters."
     defstruct tools: []
 
-    def new(tools), do: %__MODULE__{tools: tools}
+    def new(tools) when is_list(tools), do: %__MODULE__{tools: tools}
+
+    def new(tools) do
+      raise ArgumentError,
+            "DSEx.MCP.Catalog.new/1 expects a list of tool schemas; got: #{inspect(tools)}"
+    end
+
     def list_tools(%__MODULE__{tools: tools}), do: tools
   end
 
@@ -39,6 +45,7 @@ defmodule DSEx.MCP do
     ]
 
     def new(url, opts \\ []) do
+      validate_url!(url)
       opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
       %__MODULE__{
@@ -124,6 +131,13 @@ defmodule DSEx.MCP do
       ]
 
     defp next_id, do: System.unique_integer([:positive])
+
+    defp validate_url!(url) when is_binary(url), do: :ok
+
+    defp validate_url!(url) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.new/2 expects url to be a binary; got: #{inspect(url)}"
+    end
   end
 
   defmodule StdioClient do
@@ -143,6 +157,7 @@ defmodule DSEx.MCP do
     ]
 
     def new(command, opts \\ []) do
+      validate_command!(command)
       opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
       %__MODULE__{
@@ -279,6 +294,13 @@ defmodule DSEx.MCP do
     defp decode_tools(other), do: {:error, {:missing_tools, other}}
 
     defp next_id, do: System.unique_integer([:positive])
+
+    defp validate_command!(command) when is_binary(command), do: :ok
+
+    defp validate_command!(command) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.new/2 expects command to be a binary executable path; got: #{inspect(command)}"
+    end
   end
 
   defmodule StreamableHTTPClient do
@@ -300,6 +322,7 @@ defmodule DSEx.MCP do
     ]
 
     def new(url, opts \\ []) do
+      validate_url!(url)
       opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
       %__MODULE__{
@@ -391,6 +414,13 @@ defmodule DSEx.MCP do
     defp decode_tools(other), do: {:error, {:missing_tools, other}}
 
     defp next_id, do: System.unique_integer([:positive])
+
+    defp validate_url!(url) when is_binary(url), do: :ok
+
+    defp validate_url!(url) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.new/2 expects url to be a binary; got: #{inspect(url)}"
+    end
   end
 
   @doc "Imports a catalog or list of tool schemas into `DSEx.Tool` structs."

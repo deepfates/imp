@@ -147,6 +147,32 @@ defmodule MCPImportTest do
     Process.delete(:agent_ref)
   end
 
+  test "MCP client constructors reject invalid positional boundaries" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.MCP\.Catalog\.new\/1 expects a list of tool schemas/,
+                 fn ->
+                   MCP.Catalog.new(%{tools: []})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.MCP\.HTTPClient\.new\/2 expects url to be a binary/,
+                 fn ->
+                   MCP.HTTPClient.new(:not_a_url)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.MCP\.StreamableHTTPClient\.new\/2 expects url to be a binary/,
+                 fn ->
+                   MCP.StreamableHTTPClient.new(:not_a_url)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.MCP\.StdioClient\.new\/2 expects command to be a binary executable path/,
+                 fn ->
+                   MCP.StdioClient.new(:not_a_command)
+                 end
+  end
+
   test "imported MCP tools normalize validation errors" do
     [tool] =
       MCP.import_tools([

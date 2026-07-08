@@ -75,6 +75,32 @@ defmodule ExternalRetrieverTest do
     assert body["query"] =~ "capital France"
   end
 
+  test "HTTP retriever constructors reject invalid positional boundaries" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.HTTP\.new\/2 expects url to be a binary/,
+                 fn ->
+                   DSEx.Retrievers.HTTP.new(:not_a_url)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.Weaviate\.new\/3 expects base_url to be a binary/,
+                 fn ->
+                   DSEx.Retrievers.Weaviate.new(:not_a_url, "Passage")
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.Weaviate\.new\/3 expects class_name to be a binary/,
+                 fn ->
+                   DSEx.Retrievers.Weaviate.new("https://weaviate.example", :not_a_class)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.Databricks\.new\/2 expects endpoint_url to be a binary/,
+                 fn ->
+                   DSEx.Retrievers.Databricks.new(:not_a_url)
+                 end
+  end
+
   test "Databricks retriever builds vector-search request and maps rows" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
