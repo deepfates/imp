@@ -22,6 +22,7 @@ defmodule DSEx.Datasets do
 
   def from_records(records, input_keys, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @records_option_schema, "DSEx.Datasets.from_records/3")
+    records = validate_enumerable!(records, "DSEx.Datasets.from_records/3", "records")
     source = opts[:source]
     record_module = opts[:record]
 
@@ -38,6 +39,7 @@ defmodule DSEx.Datasets do
 
   def jsonl(path, input_keys, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @file_records_option_schema, "DSEx.Datasets.jsonl/3")
+    path = validate_path!(path, "DSEx.Datasets.jsonl/3")
 
     path
     |> File.stream!()
@@ -50,6 +52,7 @@ defmodule DSEx.Datasets do
 
   def csv(path, input_keys, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @file_records_option_schema, "DSEx.Datasets.csv/3")
+    path = validate_path!(path, "DSEx.Datasets.csv/3")
 
     rows =
       path
@@ -75,10 +78,27 @@ defmodule DSEx.Datasets do
 
   def split(examples, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @split_option_schema, "DSEx.Datasets.split/2")
+    examples = validate_enumerable!(examples, "DSEx.Datasets.split/2", "examples")
     train = train_fraction!(opts[:train])
     shuffled = if opts[:shuffle], do: Enum.shuffle(examples), else: examples
     count = floor(length(shuffled) * train)
     Enum.split(shuffled, count)
+  end
+
+  @doc false
+  def validate_path!(path, _context) when is_binary(path), do: path
+
+  def validate_path!(path, context) do
+    raise ArgumentError, "#{context} expects path to be a binary; got: #{inspect(path)}"
+  end
+
+  defp validate_enumerable!(value, context, name) do
+    if Enumerable.impl_for(value) do
+      value
+    else
+      raise ArgumentError,
+            "#{context} expects #{name} to be an enumerable; got: #{inspect(value)}"
+    end
   end
 
   defp require_csv_header!([], path) do
@@ -252,6 +272,7 @@ defmodule DSEx.Datasets.DataLoader do
 
   def load(path, input_keys, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Datasets.DataLoader.load/3")
+    path = DSEx.Datasets.validate_path!(path, "DSEx.Datasets.DataLoader.load/3")
 
     case Keyword.get(opts, :format, Path.extname(path)) do
       ".csv" -> DSEx.Datasets.csv(path, input_keys)

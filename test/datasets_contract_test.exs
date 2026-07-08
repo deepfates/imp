@@ -95,6 +95,34 @@ defmodule DatasetsContractTest do
                  end
   end
 
+  test "dataset APIs report invalid collection and path boundaries clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.from_records\/3 expects records to be an enumerable/,
+                 fn ->
+                   Datasets.from_records(:not_records, [:question])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.split\/2 expects examples to be an enumerable/,
+                 fn ->
+                   Datasets.split(:not_examples)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Datasets\.jsonl\/3 expects path to be a binary/, fn ->
+      Datasets.jsonl(:not_a_path, [:question])
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Datasets\.csv\/3 expects path to be a binary/, fn ->
+      Datasets.csv(:not_a_path, [:question])
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.DataLoader\.load\/3 expects path to be a binary/,
+                 fn ->
+                   Datasets.DataLoader.load(:not_a_path, [:question])
+                 end
+  end
+
   test "dataset APIs report invalid input and record keys clearly" do
     assert_raise ArgumentError,
                  ~r/DSEx\.Datasets input keys and record keys must be atoms or strings/,
