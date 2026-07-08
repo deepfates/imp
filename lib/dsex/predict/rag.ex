@@ -20,7 +20,7 @@ defmodule DSEx.Predict.RAG do
   @option_schema [
     query_field: [type: :any, default: :question],
     context_field: [type: :any, default: :context],
-    k: [type: :any, default: 3]
+    k: [type: :non_neg_integer, default: 3]
   ]
 
   def new(program, retriever, opts \\ []) do
@@ -31,7 +31,7 @@ defmodule DSEx.Predict.RAG do
       retriever: retriever,
       query_field: opts[:query_field],
       context_field: opts[:context_field],
-      k: non_negative_integer(opts[:k])
+      k: opts[:k]
     }
   end
 
@@ -151,7 +151,4 @@ defmodule DSEx.Predict.RAG do
   end
 
   defp normalize_doc(doc), do: {:error, {:invalid_rag_document, doc}}
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 end

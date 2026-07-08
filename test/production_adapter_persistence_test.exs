@@ -503,12 +503,12 @@ defmodule ProductionAdapterPersistenceTest do
     assert prediction.metadata.retrieval.count == 1
   end
 
-  test "save/load preserves normalized RAG retrieval limits" do
+  test "save/load preserves explicit zero RAG retrieval limits" do
     rag =
       "question, context -> answer"
       |> DSEx.predict()
       |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1),
-        k: -4
+        k: 0
       )
 
     assert rag.k == 0

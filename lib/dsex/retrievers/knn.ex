@@ -4,7 +4,7 @@ defmodule DSEx.Retrievers.KNN do
   defstruct examples: [], k: 3, field: :question
 
   @option_schema [
-    k: [type: :any, default: 3],
+    k: [type: :non_neg_integer, default: 3],
     field: [type: :any, default: :question]
   ]
 
@@ -13,7 +13,7 @@ defmodule DSEx.Retrievers.KNN do
 
     %__MODULE__{
       examples: validate_examples!(examples),
-      k: non_negative_integer(opts[:k]),
+      k: opts[:k],
       field: opts[:field]
     }
   end
@@ -46,9 +46,6 @@ defmodule DSEx.Retrievers.KNN do
       Regex.scan(~r/[a-z0-9]+/i, to_string(text))
       |> List.flatten()
       |> Enum.map(&String.downcase/1)
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_examples!(examples) do
     if Enumerable.impl_for(examples) do

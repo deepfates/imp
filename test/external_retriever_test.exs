@@ -250,10 +250,33 @@ defmodule ExternalRetrieverTest do
     refute_received :retriever_callback_ran
   end
 
-  test "memory retriever clamps negative k to no documents" do
-    retriever = DSEx.Retrieve.Memory.new([%{text: "Paris"}], k: -2)
+  test "memory retriever treats zero k as explicit no documents and rejects negative k" do
+    retriever = DSEx.Retrieve.Memory.new([%{text: "Paris"}], k: 0)
     assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris")
-    assert {:ok, []} = DSEx.Retrieve.retrieve(retriever, "Paris", k: -1)
+
+    assert {:ok, []} =
+             DSEx.Retrieve.retrieve(DSEx.Retrieve.Memory.new([%{text: "Paris"}]), "Paris", k: 0)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrieve\.Memory\.new\/2: invalid value for :k option: expected non negative integer/,
+                 fn ->
+                   DSEx.Retrieve.Memory.new([%{text: "Paris"}], k: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrieve\.Memory\.retrieve\/3: invalid value for :k option: expected non negative integer/,
+                 fn ->
+                   DSEx.Retrieve.Memory.retrieve(
+                     DSEx.Retrieve.Memory.new([%{text: "Paris"}]),
+                     "Paris",
+                     k: -1
+                   )
+                 end
+
+    assert {:error, {:retriever_failed, DSEx.Retrieve.Memory, message}} =
+             DSEx.Retrieve.retrieve(DSEx.Retrieve.Memory.new([%{text: "Paris"}]), "Paris", k: -1)
+
+    assert message =~ "expected non negative integer"
   end
 
   test "memory retriever reports invalid construction and document inputs clearly" do
@@ -287,6 +310,12 @@ defmodule ExternalRetrieverTest do
                  ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
                  fn ->
                    DSEx.Retrievers.KNN.new(:not_examples)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.KNN\.new\/2: invalid value for :k option: expected non negative integer/,
+                 fn ->
+                   DSEx.Retrievers.KNN.new([], k: -1)
                  end
   end
 

@@ -266,7 +266,7 @@ defmodule PublicSurfaceTest do
     assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
   end
 
-  test "rag clamps non-positive k at the program boundary" do
+  test "rag treats zero k as explicit no documents and rejects negative k" do
     lm = %{
       module: DSEx.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "unknown"} end]
@@ -274,12 +274,18 @@ defmodule PublicSurfaceTest do
 
     base = DSEx.predict("question, context -> answer", lm: lm)
     retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
-    rag = DSEx.rag(base, retriever, k: -3)
+    rag = DSEx.rag(base, retriever, k: 0)
 
     assert rag.k == 0
     assert {:ok, prediction} = DSEx.call(rag, %{question: "capital France"})
     assert prediction.metadata.retrieval.count == 0
     assert prediction.metadata.retrieval.docs == []
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :k option: expected non negative integer/,
+                 fn ->
+                   DSEx.rag(base, retriever, k: -3)
+                 end
   end
 
   test "rag reports invalid and failed wrapped program results without crashing" do

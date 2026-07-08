@@ -122,11 +122,11 @@ defmodule DSEx.Retrieve do
     defstruct docs: [], k: 3
 
     @option_schema [
-      k: [type: :any, default: 3]
+      k: [type: :non_neg_integer, default: 3]
     ]
 
     @retrieve_option_schema [
-      k: [type: :any]
+      k: [type: :non_neg_integer]
     ]
 
     def new(docs, opts \\ [])
@@ -142,7 +142,7 @@ defmodule DSEx.Retrieve do
     """
     def new(docs, opts) when is_list(docs) do
       opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Retrieve.Memory.new/2")
-      %__MODULE__{docs: docs, k: non_negative_integer(opts[:k])}
+      %__MODULE__{docs: docs, k: opts[:k]}
     end
 
     def new(docs, _opts) do
@@ -155,7 +155,7 @@ defmodule DSEx.Retrieve do
       opts =
         DSEx.Options.validate!(opts, @retrieve_option_schema, "DSEx.Retrieve.Memory.retrieve/3")
 
-      k = non_negative_integer(opts[:k] || retriever.k)
+      k = opts[:k] || retriever.k
       query_terms = terms(query)
 
       with {:ok, docs} <- normalize_docs(retriever.docs) do
@@ -169,9 +169,6 @@ defmodule DSEx.Retrieve do
         {:ok, docs}
       end
     end
-
-    defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-    defp non_negative_integer(_value), do: 0
 
     defp normalize_docs(docs) do
       Enum.reduce_while(docs, {:ok, []}, fn
