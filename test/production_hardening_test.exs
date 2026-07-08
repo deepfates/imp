@@ -234,6 +234,16 @@ defmodule ProductionHardeningTest do
     assert {:error, {:not_http_transport, :not_a_transport}} =
              DSEx.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
 
+    assert [{:error, _reason}] =
+             DSEx.HTTP.stream(
+               DSEx.HTTP.Hackneyless,
+               "http://127.0.0.1:1/",
+               [],
+               "{}",
+               timeout: 1
+             )
+             |> Enum.to_list()
+
     assert [{:error, {:not_http_transport, :not_a_transport}}] =
              DSEx.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
              |> Enum.to_list()

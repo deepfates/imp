@@ -11,7 +11,7 @@ defmodule DSEx.Retrieve do
   end
 
   defp do_retrieve(module, query, opts) when is_atom(module) do
-    if function_exported?(module, :retrieve, 2) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :retrieve, 2) do
       call_retriever(fn -> module.retrieve(query, opts) end, module)
     else
       {:error, {:not_a_retriever, module}}
@@ -23,7 +23,7 @@ defmodule DSEx.Retrieve do
   end
 
   defp do_retrieve(%module{} = retriever, query, opts) do
-    if function_exported?(module, :retrieve, 3) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :retrieve, 3) do
       call_retriever(fn -> module.retrieve(retriever, query, opts) end, module)
     else
       {:error, {:not_a_retriever, module}}
@@ -47,7 +47,7 @@ defmodule DSEx.Retrieve do
 
   defp call_retriever(fun, retriever) do
     case fun.() do
-      {:ok, docs} when is_list(docs) -> {:ok, docs}
+      {:ok, docs} when is_list(docs) -> normalize_docs(docs)
       {:error, _reason} = error -> error
       {:ok, other} -> {:error, {:invalid_retriever_result, other}}
       other -> {:error, {:invalid_retriever_result, other}}
@@ -57,6 +57,27 @@ defmodule DSEx.Retrieve do
   catch
     kind, reason ->
       {:error, {:retriever_failed, retriever_name(retriever), error_message({kind, reason})}}
+  end
+
+  defp normalize_docs(docs) do
+    Enum.reduce_while(docs, {:ok, []}, fn
+      doc, {:ok, normalized_docs} when is_map(doc) ->
+        {:cont, {:ok, [doc | normalized_docs]}}
+
+      doc, {:ok, normalized_docs} when is_list(doc) ->
+        if Keyword.keyword?(doc) do
+          {:cont, {:ok, [Map.new(doc) | normalized_docs]}}
+        else
+          {:halt, {:error, {:invalid_retriever_document, doc}}}
+        end
+
+      doc, _acc ->
+        {:halt, {:error, {:invalid_retriever_document, doc}}}
+    end)
+    |> case do
+      {:ok, docs} -> {:ok, Enum.reverse(docs)}
+      error -> error
+    end
   end
 
   defp retriever_name(retriever) when is_atom(retriever), do: retriever

@@ -18,7 +18,7 @@ defmodule DSEx.HTTP do
   end
 
   defp do_post(module, url, headers, body, opts) when is_atom(module) do
-    if function_exported?(module, :post, 4) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :post, 4) do
       module.post(url, headers, body, opts)
     else
       {:error, {:not_http_transport, module}}
@@ -40,10 +40,10 @@ defmodule DSEx.HTTP do
 
   defp do_stream(module, url, headers, body, opts) when is_atom(module) do
     cond do
-      function_exported?(module, :stream, 4) ->
+      Code.ensure_loaded?(module) and function_exported?(module, :stream, 4) ->
         module.stream(url, headers, body, opts)
 
-      function_exported?(module, :post, 4) ->
+      Code.ensure_loaded?(module) and function_exported?(module, :post, 4) ->
         post_stream(module, url, headers, body, opts)
 
       true ->

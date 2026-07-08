@@ -211,8 +211,20 @@ defmodule ExternalRetrieverTest do
     assert {:error, {:retriever_failed, :anonymous_retriever, "retriever exploded"}} =
              DSEx.Retrieve.retrieve(fn _query, _opts -> raise "retriever exploded" end, "q")
 
+    assert {:ok, [%{text: "Paris", id: "p1"}]} =
+             DSEx.Retrieve.retrieve(
+               fn _query, _opts -> {:ok, [[text: "Paris", id: "p1"]]} end,
+               "q"
+             )
+
     assert {:error, {:invalid_retriever_result, :not_docs}} =
              DSEx.Retrieve.retrieve(fn _query, _opts -> {:ok, :not_docs} end, "q")
+
+    assert {:error, {:invalid_retriever_document, :not_a_doc}} =
+             DSEx.Retrieve.retrieve(fn _query, _opts -> {:ok, [:not_a_doc]} end, "q")
+
+    assert {:error, {:invalid_retriever_document, [:not_a_pair]}} =
+             DSEx.Retrieve.retrieve(fn _query, _opts -> {:ok, [[:not_a_pair]]} end, "q")
 
     assert {:error, {:not_a_retriever, String}} = DSEx.Retrieve.retrieve(String, "q")
   end

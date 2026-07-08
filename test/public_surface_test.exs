@@ -311,12 +311,12 @@ defmodule PublicSurfaceTest do
 
     bad_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [:not_a_doc]} end)
 
-    assert {:error, {:invalid_rag_document, :not_a_doc}} =
+    assert {:error, {:invalid_retriever_document, :not_a_doc}} =
              DSEx.Predict.RAG.call(bad_doc_rag, %{question: "capital France"})
 
     bad_pair_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [[:not_a_pair]]} end)
 
-    assert {:error, {:invalid_rag_document, [:not_a_pair]}} =
+    assert {:error, {:invalid_retriever_document, [:not_a_pair]}} =
              DSEx.Predict.RAG.call(bad_pair_doc_rag, %{question: "capital France"})
   end
 

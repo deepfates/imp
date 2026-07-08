@@ -21,16 +21,14 @@ defmodule DSEx.Cache do
 
   @impl true
   def init(_opts) do
-    if :ets.whereis(@table) == :undefined do
-      :ets.new(@table, [
-        :named_table,
-        :public,
-        read_concurrency: true,
-        write_concurrency: true
-      ])
-    end
-
+    create_table()
     {:ok, %{}}
+  end
+
+  @impl true
+  def handle_call(:ensure_table, _from, state) do
+    create_table()
+    {:reply, :ok, state}
   end
 
   def configure(_opts \\ []) do
@@ -74,14 +72,39 @@ defmodule DSEx.Cache do
   defp ensure_table do
     case :ets.whereis(@table) do
       :undefined ->
-        case Application.ensure_all_started(:dsex) do
-          {:ok, _apps} -> :ok
-          {:error, reason} -> handle_start_error(reason)
-        end
+        ensure_owner_started()
+        ensure_owner_table()
 
       _tid ->
         :ok
     end
+  end
+
+  defp ensure_owner_started do
+    case Application.ensure_all_started(:dsex) do
+      {:ok, _apps} -> :ok
+      {:error, reason} -> handle_start_error(reason)
+    end
+  end
+
+  defp ensure_owner_table do
+    case Process.whereis(__MODULE__) do
+      pid when is_pid(pid) -> GenServer.call(__MODULE__, :ensure_table)
+      nil -> :ok
+    end
+  end
+
+  defp create_table do
+    if :ets.whereis(@table) == :undefined do
+      :ets.new(@table, [
+        :named_table,
+        :public,
+        read_concurrency: true,
+        write_concurrency: true
+      ])
+    end
+
+    :ok
   end
 
   defp start_unlinked do
