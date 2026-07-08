@@ -83,6 +83,24 @@ defmodule DSEx.BenchmarkCatalog do
       next_step: "Add sampled measurable tool-use tasks beyond fixture replay."
     },
     %{
+      id: "rlm_recursive_control",
+      family: "RLM recursive control",
+      source_lineage:
+        "DSEx-native recursive controller inspired by DSP-style modular inference, distinct from RAG.",
+      task_shape:
+        "large/awkward context + controller actions -> sandbox/tool/sub-LM/recurse/submit trace",
+      metric: "trace validity, budget adherence, final answer, and redaction invariants",
+      tiers: ["smoke", "research"],
+      status: "deterministic_implemented",
+      commands: [
+        "mix test test/rlm_test.exs",
+        "mix benchmark.rag_tool_agent.check",
+        "mix integration.check"
+      ],
+      next_step:
+        "Add sampled controller tasks that measure action success, budget use, and answer quality across larger contexts."
+    },
+    %{
       id: "optimizer_lift",
       family: "Optimizer lift",
       source_lineage:

@@ -43,6 +43,7 @@ The sampling harness must preserve:
 | Color/classification | DSPy public dataset lineage includes simple Colors-style classification. | Loader exists; not a benchmark gate. | Dataset contract tests only | Add cheap matched smoke and optimizer-lift classification lane. |
 | RAG/retrieval | DSP and DSPy papers emphasize retrieval + generation for knowledge-intensive QA. | Provider-free deterministic RAG and retriever protocol gates exist. | `mix benchmark.rag_tool_agent.check`, `mix protocol.retriever.check` | Add real small corpus retrieval benchmark with recall/F1, then matched DSEx/DSPy generation. |
 | Tool and ReAct agents | DSPy docs present tools and agents as first-class programming workflows. | Provider-free parity and local integration exist. | `mix benchmark.trace.check`, `mix benchmark.rag_tool_agent.check`, `mix integration.check` | Add sampled task set with measurable tool-use success, not just fixture replay. |
+| RLM recursive control | DSEx-native recursive controller inspired by DSP-style modular inference, distinct from RAG. | Deterministic public-surface, budget, recursion, tool, sandbox, redaction, and integration coverage exists. | `mix test test/rlm_test.exs`, `mix benchmark.rag_tool_agent.check`, `mix integration.check` | Add sampled controller tasks that measure action success, budget use, and answer quality across larger contexts. |
 | Optimizer lift | DSPy optimizer docs cover few-shot bootstrapping, instruction/demo search, MIPROv2, GEPA, and finetuning workflows. | Provider-free deterministic lift implemented. | `mix benchmark.optimizer_lift.check` | Add real sampled classification/QA optimizer lift lanes so improvement is tested on natural data. |
 | Hallucination/factuality classification | DSPy optimizer comparison papers use CovidQA, PubMedQA, DROP, FinanceBench, and similar labeled QA/factuality tasks. | Not implemented as fetchable benchmark lanes. | None | Add a generic classification/QA sampler and metric adapters for exact/F1/macro-F1. |
 | MIPRO tabular classification | MIPRO optimizer benchmarks include Iris, Iris-Typo, and Heart Disease. | Not implemented as benchmark lanes. | None | Add tiny full-split samplers and optimizer-lift runs. |
@@ -67,10 +68,13 @@ The sampling harness must preserve:
    + answer/label format for HotPotQA/Baleen-style QA and HoVer-style
    verification
    that can run DSEx retrieval and DSPy retrieval over the same rows.
-4. **Natural-data optimizer lift.** Run baseline and compiled programs on
+4. **Tool/ReAct/RLM task sampler.** Add measurable tool-use and recursive
+   controller tasks so ReAct and RLM are tested by outcomes, traces, budget
+   adherence, and policy behavior rather than only fixture replay.
+5. **Natural-data optimizer lift.** Run baseline and compiled programs on
    classification, QA, and instruction-following samples, comparing lift rather
    than exact prompt text.
-5. **Hard math sampler.** Add MATH/AIME-style rows for CoT smoke and optimizer
+6. **Hard math sampler.** Add MATH/AIME-style rows for CoT smoke and optimizer
    sanity.
 
 ## Sources

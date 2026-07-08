@@ -15,6 +15,7 @@ defmodule BenchmarkCatalogTest do
     assert by_id["classification_colors"].status == "loader_only"
     assert by_id["rag_retrieval"].status == "provider_free_implemented"
     assert by_id["tools_react"].status == "provider_free_implemented"
+    assert by_id["rlm_recursive_control"].status == "deterministic_implemented"
     assert by_id["optimizer_lift"].status == "provider_free_implemented"
     assert by_id["factuality_classification"].status == "missing"
     assert by_id["mipro_tabular"].status == "missing"
@@ -28,6 +29,7 @@ defmodule BenchmarkCatalogTest do
     assert "mix benchmark.parity.full" in by_id["math_gsm8k"].commands
     assert by_id["factuality_classification"].next_step =~ "generic classification/QA sampler"
     assert by_id["rag_retrieval"].next_step =~ "real small corpus retrieval benchmark"
+    assert by_id["rlm_recursive_control"].metric =~ "budget"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"
   end
