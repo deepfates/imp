@@ -14,6 +14,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Predict.Aggregation
   doctest DSEx.Predict.MultiChainComparison
   doctest DSEx.Predict.Predict
+  doctest DSEx.Predict.RAG
   doctest DSEx.Redaction
   doctest DSEx.Retrieve
   doctest DSEx.Settings

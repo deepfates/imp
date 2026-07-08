@@ -6,6 +6,11 @@ defmodule DSEx.Predict.RAG do
   retrieves documents for the input query, writes a rendered context field into
   the program inputs, calls the wrapped program, and attaches retrieval metadata
   to the returned prediction.
+
+  Use RAG when retrieval is part of the program, not when a caller has already
+  prepared all context. The wrapped program remains an ordinary DSEx executable
+  module, so it can still be evaluated, optimized, streamed, and saved when the
+  retriever is portable.
   """
 
   @behaviour DSEx.Module
@@ -30,6 +35,24 @@ defmodule DSEx.Predict.RAG do
     }
   end
 
+  @doc """
+  Runs retrieval, injects context, calls the wrapped program, and records metadata.
+
+      iex> lm = %{
+      ...>   module: DSEx.LM.Static,
+      ...>   opts: [handler: fn messages, _opts ->
+      ...>     prompt = Enum.map_join(messages, " ", & &1.content)
+      ...>     if prompt =~ "France has capital Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+      ...>   end]
+      ...> }
+      iex> base = DSEx.Predict.Predict.new("question, context -> answer", lm: lm)
+      iex> retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
+      iex> rag = DSEx.Predict.RAG.new(base, retriever, k: 1)
+      iex> {:ok, prediction} = DSEx.Predict.RAG.call(rag, %{question: "capital France"})
+      iex> {DSEx.Prediction.get(prediction, :answer), prediction.metadata.retrieval.count}
+      {"Paris", 1}
+
+  """
   @impl true
   def call(%__MODULE__{} = rag, inputs) when is_list(inputs) or is_map(inputs) do
     with {:ok, inputs} <- normalize_inputs(inputs),
