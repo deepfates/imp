@@ -41,9 +41,10 @@ defmodule DSEx.Predict.KNN do
   defp normalize_inputs!(inputs) when is_list(inputs) do
     Map.new(inputs)
   rescue
-    _error ->
-      raise ArgumentError,
-            "DSEx.Predict.KNN.call/2 expects inputs as a map or field pair list; got: #{inspect(inputs)}"
+    error ->
+      reraise ArgumentError,
+              "DSEx.Predict.KNN.call/2 expects inputs as a map or field pair list; got: #{inspect(inputs)} (#{Exception.message(error)})",
+              __STACKTRACE__
   end
 
   defp normalize_inputs!(inputs) do

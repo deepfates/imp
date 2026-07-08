@@ -283,6 +283,39 @@ defmodule PublicSurfaceTest do
     assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
   end
 
+  test "rag query selectors resolve equivalent atom and string input keys" do
+    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    base = DSEx.predict("question, context -> answer", lm: lm)
+
+    parent = self()
+
+    retriever = fn query, _opts ->
+      send(parent, {:retrieved_query, query})
+      {:ok, [%{text: "doc for #{query}"}]}
+    end
+
+    assert {:ok, _prediction} =
+             base
+             |> DSEx.rag(retriever, query_field: "question", k: 1)
+             |> DSEx.call(%{question: "capital"})
+
+    assert_receive {:retrieved_query, "capital"}
+
+    assert {:ok, _prediction} =
+             base
+             |> DSEx.rag(retriever, query_field: :question, k: 1)
+             |> DSEx.call(%{"question" => "capital"})
+
+    assert_receive {:retrieved_query, "capital"}
+
+    assert {:ok, _prediction} =
+             base
+             |> DSEx.rag(retriever, query_field: ["question", :topic], k: 1)
+             |> DSEx.call(%{"topic" => "France", question: "capital"})
+
+    assert_receive {:retrieved_query, "capital France"}
+  end
+
   test "rag treats zero k as explicit no documents and rejects negative k" do
     lm = %{
       module: DSEx.LM.Static,
@@ -381,6 +414,27 @@ defmodule PublicSurfaceTest do
     code_act = DSEx.code_act("n -> answer", [], lm: pot_lm)
     assert {:ok, code_pred} = DSEx.Predict.CodeAct.call(code_act, %{n: 5})
     assert DSEx.Prediction.get(code_pred, :answer) == 25
+  end
+
+  test "program of thought and code act default computed values to the task output field" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: "n * 2"} end]
+    }
+
+    pot = DSEx.program_of_thought("n -> doubled", lm: lm)
+    assert {:ok, pot_pred} = DSEx.call(pot, %{n: 3})
+    assert DSEx.Prediction.get(pot_pred, :doubled) == 6
+    refute Map.has_key?(DSEx.Prediction.to_map(pot_pred), :answer)
+
+    code_act = DSEx.code_act("n -> doubled", [], lm: lm)
+    assert {:ok, code_pred} = DSEx.call(code_act, %{n: 3})
+    assert DSEx.Prediction.get(code_pred, :doubled) == 6
+    refute Map.has_key?(DSEx.Prediction.to_map(code_pred), :answer)
+
+    assert_raise ArgumentError, ~r/:output_field must be one of the signature outputs/, fn ->
+      DSEx.program_of_thought("n -> doubled", lm: lm, output_field: :answer)
+    end
   end
 
   test "optimizer public surface composes programs" do

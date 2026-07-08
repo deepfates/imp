@@ -82,6 +82,22 @@ defmodule ProviderTrainingLifecycleTest do
     def post(_url, _headers, _body, _opts), do: :not_an_http_response
   end
 
+  defmodule SecretRefreshTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, headers, _body, _opts) do
+      assert {"authorization", "Bearer sk-test-secret-1234567890"} in headers
+
+      {:ok,
+       %{
+         status: 200,
+         headers: [],
+         body: Jason.encode!(%{id: "job_secret", status: "succeeded"})
+       }}
+    end
+  end
+
   defp examples do
     [
       DSEx.example(question: "2+2?", answer: "4") |> DSEx.Example.with_inputs(:question)
@@ -185,6 +201,26 @@ defmodule ProviderTrainingLifecycleTest do
                  fn ->
                    DSEx.Clients.TrainingJob.new([{123, "bad"}])
                  end
+  end
+
+  test "training job inspect redacts refresh credentials without breaking refresh" do
+    job =
+      DSEx.Clients.TrainingJob.new(%{
+        id: "job_secret",
+        provider: :test,
+        status_url: "https://trainer.example/jobs/job_secret",
+        api_key: "sk-test-secret-1234567890",
+        transport: SecretRefreshTransport
+      })
+
+    rendered = inspect(job)
+
+    assert rendered =~ "#DSEx.Clients.TrainingJob<"
+    assert rendered =~ "[REDACTED]"
+    refute rendered =~ "sk-test-secret-1234567890"
+
+    assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
+    assert refreshed.status == :succeeded
   end
 
   test "OpenAI trainer requires an uploaded training file id" do

@@ -163,7 +163,7 @@ it does not upload examples itself.
 
 ```elixir
 signature =
-  DSEx.Signature.new(%{
+  DSEx.signature(%{
     inputs: [:question],
     outputs: [
       %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},

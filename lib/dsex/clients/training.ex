@@ -485,6 +485,17 @@ defmodule DSEx.Clients.HTTPTrainer do
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
 end
 
+defimpl Inspect, for: DSEx.Clients.TrainingJob do
+  import Inspect.Algebra
+
+  def inspect(job, opts) do
+    job
+    |> Map.from_struct()
+    |> DSEx.Redaction.redact()
+    |> then(&concat(["#DSEx.Clients.TrainingJob<", to_doc(&1, opts), ">"]))
+  end
+end
+
 defmodule DSEx.Clients.OpenAITrainer do
   @moduledoc """
   OpenAI fine-tuning job client.

@@ -12,10 +12,13 @@ defmodule DSEx.Predict.ProgramOfThought do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     output_field: [
-      type: {:custom, DSEx.FieldSelector, :validate_name, []},
-      default: :answer
+      type: {:custom, __MODULE__, :validate_output_field, []},
+      default: nil
     ]
   ]
+
+  def validate_output_field(nil), do: {:ok, nil}
+  def validate_output_field(field), do: DSEx.FieldSelector.validate_name(field)
 
   def new(signature, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.ProgramOfThought.new/2")
@@ -57,7 +60,7 @@ defmodule DSEx.Predict.ProgramOfThought do
     %__MODULE__{
       signature: original,
       predict: DSEx.Predict.Predict.new(program_signature, opts),
-      output_field: opts[:output_field]
+      output_field: resolve_output_field!(original, opts[:output_field])
     }
   end
 
@@ -78,4 +81,23 @@ defmodule DSEx.Predict.ProgramOfThought do
   def predict_step(%__MODULE__{} = pot, inputs) do
     DSEx.Predict.Predict.call(pot.predict, inputs)
   end
+
+  defp resolve_output_field!(signature, nil) do
+    signature
+    |> output_names()
+    |> List.first()
+  end
+
+  defp resolve_output_field!(signature, field) do
+    outputs = output_names(signature)
+
+    if field in outputs do
+      field
+    else
+      raise ArgumentError,
+            "DSEx.Predict.ProgramOfThought.new/2 :output_field must be one of the signature outputs; got #{inspect(field)} for outputs #{inspect(outputs)}"
+    end
+  end
+
+  defp output_names(signature), do: Enum.map(signature.outputs, & &1.name)
 end

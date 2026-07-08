@@ -187,7 +187,8 @@ defmodule DSEx.Optimizer.BetterTogether do
     Map.new(optimizers)
   rescue
     error in [ArgumentError, Protocol.UndefinedError] ->
-      raise ArgumentError,
-            "DSEx.Optimizer.BetterTogether.new/2 expects optimizers to be an enumerable of key/value pairs; got: #{inspect(optimizers)} (#{Exception.message(error)})"
+      reraise ArgumentError,
+              "DSEx.Optimizer.BetterTogether.new/2 expects optimizers to be an enumerable of key/value pairs; got: #{inspect(optimizers)} (#{Exception.message(error)})",
+              __STACKTRACE__
   end
 end

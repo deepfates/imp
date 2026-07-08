@@ -41,6 +41,7 @@ defmodule LivebookContractTest do
     body = Path.wildcard("livebooks/*.livemd") |> Enum.map_join("\n", &File.read!/1)
 
     assert body =~ "DSEx.req_llm"
+    assert body =~ "api_key: System.fetch_env!(\"OPENAI_API_KEY\")"
     refute body =~ "DSEx.openai"
     refute body =~ "DSEx.litellm"
     refute body =~ "DSEx.local_lm"

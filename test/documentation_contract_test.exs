@@ -106,6 +106,16 @@ defmodule DocumentationContractTest do
     assert body =~ "OPENAI_MODEL"
   end
 
+  test "README distinguishes ReAct programs from agent runtimes in the quick path" do
+    body = File.read!("README.md")
+
+    assert body =~ "### Tools And ReAct"
+    assert body =~ "react =\n  DSEx.react"
+    assert body =~ "DSEx.Agent"
+    refute body =~ "### Tools And Agents"
+    refute body =~ "agent =\n  DSEx.react"
+  end
+
   test "README common workflow snippets compose as one coherent path" do
     typed_lm = %{
       module: DSEx.LM.Static,

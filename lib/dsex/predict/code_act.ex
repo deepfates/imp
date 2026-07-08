@@ -28,8 +28,8 @@ defmodule DSEx.Predict.CodeAct do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     output_field: [
-      type: {:custom, DSEx.FieldSelector, :validate_name, []},
-      default: :answer
+      type: {:custom, DSEx.Predict.ProgramOfThought, :validate_output_field, []},
+      default: nil
     ],
     max_iters: [type: :non_neg_integer, default: 5],
     tool_policy: [

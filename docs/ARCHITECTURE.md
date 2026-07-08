@@ -19,11 +19,13 @@ Example / inputs
 
 - `DSEx.configure/1`, `DSEx.context/2`
 - `DSEx.signature/2`, `DSEx.example/1`, `DSEx.prediction/1`
-- `DSEx.with_inputs/2`, `DSEx.inputs/1`, `DSEx.labels/1`, `DSEx.to_map/1`
-- `DSEx.predict/2`, `chain_of_thought/2`, `react/3`, `rlm/2`
-- `DSEx.with_demos/2`, `DSEx.tool/4`
-- `DSEx.call/2`
-- provider helper: `req_llm/2`
+- `DSEx.with_inputs/2`, `DSEx.inputs/1`, `DSEx.labels/1`, `DSEx.get/3`, `DSEx.to_map/1`
+- `DSEx.predict/2`, `chain_of_thought/2`, `program_of_thought/2`, `code_act/3`, `react/3`, `rlm/2`
+- `DSEx.memory/2`, `DSEx.retrieve/3`, `DSEx.rag/3`
+- `DSEx.tool/4`, `DSEx.with_demos/2`, `DSEx.call/2`, `DSEx.evaluate/4`, `DSEx.optimize/4`
+- `DSEx.exact_match/1`, `DSEx.extractive_qa/3`, `DSEx.classification/3`, `DSEx.classification_report/2`
+- `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, `DSEx.load!/1`
+- provider helper: `DSEx.req_llm/2`
 
 Use the facade for application code. Use deeper modules when you need direct
 control in tests, docs, or advanced systems.

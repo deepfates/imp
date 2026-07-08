@@ -142,7 +142,7 @@ DSEx.get(pred, :answer)
 
 ```elixir
 signature =
-  DSEx.Signature.new(%{
+  DSEx.signature(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},

@@ -78,7 +78,14 @@ environment. Do not paste secrets into the notebook.
 ```elixir
 if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   model = System.fetch_env!("OPENAI_MODEL")
-  lm = DSEx.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 40)
+
+  lm =
+    DSEx.req_llm("openai:#{model}",
+      api_key: System.fetch_env!("OPENAI_API_KEY"),
+      temperature: 0,
+      max_completion_tokens: 40
+    )
+
   program = DSEx.predict("question -> answer", lm: lm)
   DSEx.call(program, %{question: "Reply with exactly: pong"})
 else

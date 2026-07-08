@@ -81,7 +81,7 @@ fields and returns feedback when output does not fit the signature.
 
 ```elixir
 signature =
-  DSEx.Signature.new(%{
+  DSEx.signature(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},

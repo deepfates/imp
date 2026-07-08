@@ -98,7 +98,7 @@ program = DSEx.predict(signature)
 | Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
 | Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
 | Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |
-| Source-checkout operations | `mix production.check` | Local gates for formatting, compile, tests, package shape, Livebook validation, and docs |
+| Maintainer source-checkout gates | `mix production.check` | Repository release checks for formatting, compile, tests, package shape, Livebook validation, and docs |
 
 ## Installation
 
@@ -240,7 +240,7 @@ compiled =
 DSEx optimizers compile programs into better programs. Reports are persisted as
 data, so you can inspect what changed and why.
 
-### Tools And Agents
+### Tools And ReAct
 
 ```elixir
 tool_lm = %{
@@ -257,7 +257,7 @@ lookup =
     "Paris"
   end)
 
-agent =
+react =
   DSEx.react("question -> answer: short_span", [lookup],
     lm: tool_lm,
     tool_policy: [:lookup, :submit]
@@ -266,7 +266,8 @@ agent =
 
 Tool policies make side effects explicit. ReAct uses provider tool calls when
 the configured LM supports them and validates final submissions against the
-original signature.
+original signature. For long-running agent runtimes with event streams, see
+the Agents section in `docs/API_GUIDE.md` or Livebook 03.
 
 ## Documentation
 

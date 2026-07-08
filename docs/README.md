@@ -47,6 +47,9 @@ credentials.
 5. From the source checkout, run `mix production.check` before trusting a change.
 6. From the source checkout, run `mix livebook.execute.check` after changing public examples or notebooks.
 
+Package consumers do not need the source-checkout Mix aliases; those gates are
+for DSEx maintainers validating this repository before release.
+
 ## Maintainer Evidence
 
 The repository also keeps release-evidence notes for maintainers and reviewers.
