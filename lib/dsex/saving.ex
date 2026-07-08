@@ -9,6 +9,7 @@ defmodule DSEx.Saving do
 
   @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
   @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k"]
+  @program_of_thought_required_keys ["type", "signature", "predict", "output_field"]
 
   def save!(program, path) do
     path
@@ -44,10 +45,19 @@ defmodule DSEx.Saving do
     }
   end
 
+  def dump(%DSEx.Predict.ProgramOfThought{} = pot) do
+    %{
+      "type" => "program_of_thought",
+      "signature" => DSEx.Signature.dump(pot.signature),
+      "predict" => dump(pot.predict),
+      "output_field" => DSEx.Optimizer.Report.json_safe(pot.output_field)
+    }
+  end
+
   def dump(program) do
     raise ArgumentError,
           "unsupported DSEx program for saving: #{inspect(program_name(program))}; " <>
-            "portable saving currently supports Predict, ChainOfThought, and RAG over memory retrievers"
+            "portable saving currently supports Predict, ChainOfThought, ProgramOfThought, and RAG over memory retrievers"
   end
 
   def load(%{"type" => "predict"} = state) do
@@ -88,6 +98,16 @@ defmodule DSEx.Saving do
       context_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "context_field")),
       k: Map.fetch!(state, "k")
     )
+  end
+
+  def load(%{"type" => "program_of_thought"} = state) do
+    require_keys!(state, @program_of_thought_required_keys)
+
+    %DSEx.Predict.ProgramOfThought{
+      signature: DSEx.Signature.load(Map.fetch!(state, "signature")),
+      predict: load(Map.fetch!(state, "predict")),
+      output_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "output_field"))
+    }
   end
 
   def load(%{"type" => type}) do

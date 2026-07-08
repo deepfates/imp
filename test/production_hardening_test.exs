@@ -521,9 +521,13 @@ defmodule ProductionHardeningTest do
 
     react = DSEx.react("question -> answer", [])
 
-    assert_raise ArgumentError,
-                 ~r/unsupported DSEx program for saving: DSEx.Predict.ReAct/,
-                 fn -> DSEx.Saving.dump(react) end
+    error =
+      assert_raise ArgumentError, fn ->
+        DSEx.Saving.dump(react)
+      end
+
+    assert error.message =~ "unsupported DSEx program for saving: DSEx.Predict.ReAct"
+    assert error.message =~ "Predict, ChainOfThought, ProgramOfThought, and RAG"
   end
 
   test "saving rejects malformed program artifacts with explicit errors" do
@@ -571,6 +575,14 @@ defmodule ProductionHardeningTest do
 
     assert_raise ArgumentError, ~r/saved req_llm client is missing required key "model"/, fn ->
       base |> Map.put("lm", %{"provider" => "req_llm"}) |> DSEx.Saving.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved DSEx program_of_thought is missing required keys/, fn ->
+      DSEx.Saving.load(%{
+        "type" => "program_of_thought",
+        "signature" => DSEx.Signature.dump(DSEx.Signature.new("x -> answer")),
+        "output_field" => %{"__dsex_type__" => "atom", "value" => "answer"}
+      })
     end
 
     assert_raise ArgumentError, ~r/saved DSEx config must be a map or list/, fn ->

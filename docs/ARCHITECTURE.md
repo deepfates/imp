@@ -290,9 +290,12 @@ The implementation uses a BEAM-safe sandbox for production control.
 
 ## Persistence
 
-`DSEx.Saving` saves portable program state. It does not persist secrets. Loading
-an HTTP LM requires explicit credential rebinding rather than silently capturing
-ambient environment credentials.
+`DSEx.Saving` saves portable program state for `Predict`, `ChainOfThought`,
+`ProgramOfThought`, and memory-backed `RAG`. It does not persist secrets.
+Loading an HTTP LM requires explicit credential rebinding rather than silently
+capturing ambient environment credentials. Programs that embed function tools,
+such as ReAct and CodeAct, should be rebuilt with their tool catalogs instead
+of deserialized from disk.
 
 ## Gates
 

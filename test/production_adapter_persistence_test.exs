@@ -539,6 +539,43 @@ defmodule ProductionAdapterPersistenceTest do
     assert %DSEx.Predict.RAG{k: 0} = DSEx.Saving.load(state)
   end
 
+  test "save/load preserves ProgramOfThought programs" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
+    }
+
+    program =
+      DSEx.Predict.ProgramOfThought.new("x -> doubled",
+        output_field: :doubled,
+        metadata: %{purpose: :portable_pot}
+      )
+
+    path =
+      Path.join(System.tmp_dir!(), "DSEx-pot-save-#{System.unique_integer([:positive])}.json")
+
+    assert :ok = DSEx.Saving.save!(program, path)
+    loaded = DSEx.Saving.load!(path)
+    File.rm(path)
+
+    assert %DSEx.Predict.ProgramOfThought{
+             signature: %DSEx.Signature{},
+             predict: %DSEx.Predict.Predict{},
+             output_field: :doubled
+           } = loaded
+
+    assert DSEx.Signature.input_names(loaded.signature) == [:x]
+    assert DSEx.Signature.output_names(loaded.signature) == [:doubled]
+    assert loaded.predict.metadata.purpose == :portable_pot
+
+    assert {:ok, prediction} =
+             DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+               DSEx.Predict.ProgramOfThought.call(loaded, %{x: 21})
+             end)
+
+    assert DSEx.Prediction.get(prediction, :doubled) == 42
+  end
+
   test "save rejects non-portable RAG retrievers explicitly" do
     rag =
       "question, context -> answer"

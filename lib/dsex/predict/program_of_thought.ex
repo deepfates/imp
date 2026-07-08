@@ -3,7 +3,7 @@ defmodule DSEx.Predict.ProgramOfThought do
 
   @behaviour DSEx.Module
 
-  defstruct [:predict, output_field: :answer]
+  defstruct [:signature, :predict, output_field: :answer]
 
   @option_schema [
     lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
@@ -55,6 +55,7 @@ defmodule DSEx.Predict.ProgramOfThought do
     }
 
     %__MODULE__{
+      signature: original,
       predict: DSEx.Predict.Predict.new(program_signature, opts),
       output_field: opts[:output_field]
     }
