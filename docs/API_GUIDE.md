@@ -287,6 +287,7 @@ Use:
 | `RandomSearch` | You want a small deterministic baseline search. |
 | `InstructionSearch` / `COPRO` | Instructions are the likely bottleneck. |
 | `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
+| `GEPA` | You want DSEx-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
 | `BetterTogether` | You want to sequence prompt optimization and provider training. |
 
 ## Optimize Arbitrary Artifacts
@@ -308,6 +309,12 @@ report.best.score
 ```
 
 ## GEPA-Style Reflection
+
+DSEx's GEPA surface is an Elixir-native reflective optimizer over explicit
+artifacts and evaluator functions. It borrows the GEPA ideas of per-example
+scores, Actionable Side Information, Pareto selection, and candidate lineage;
+it is not a wrapper around Python GEPA and should be cited with benchmark
+evidence when making paper- or DSPy-comparison claims.
 
 ```elixir
 artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")

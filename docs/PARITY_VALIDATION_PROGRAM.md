@@ -207,7 +207,7 @@ Required optimizers:
 - `COPRO`
 - `MIPROv2`
 - `SIMBA`
-- `GEPA`
+- `GEPA`-style reflection
 - `BootstrapFinetune` / `GRPO` trainer workflow where the provider surface is
   claimed
 
@@ -241,15 +241,16 @@ mix benchmark.optimizer_lift.check
 
 The current artifact runs a deterministic provider-free optimizer lift task. It
 directly compares DSEx and DSPy `LabeledFewShot`, `BootstrapFewShot`,
-`RandomSearch`, `COPRO`, `MIPROv2`, `SIMBA`, and `GEPA` when the installed DSPy
-sidecar exposes the optimizer. It records DSEx lift/non-regression plus explicit
-deviation notes for `InstructionSearch`, finetuning, and GRPO where the
-installed DSPy sidecar lacks a stable provider-free equivalent. The artifact
-includes Python package versions and detected DSPy optimizer capabilities so
-stale assumptions become visible. It also includes DSEx natural user-story lanes
-for classification, QA, retrieval/KNN few-shot, and instruction following. Each
-natural lane reports baseline score, optimized score, lift, LM calls, estimated
-fixture cost, and selected demos or instructions.
+`RandomSearch`, `COPRO`, `MIPROv2`, `SIMBA`, and GEPA-style optimizer rows when
+the installed DSPy sidecar exposes a compatible GEPA path. It records DSEx
+lift/non-regression plus explicit deviation notes for `InstructionSearch`,
+finetuning, and GRPO where the installed DSPy sidecar lacks a stable
+provider-free equivalent. The artifact includes Python package versions and
+detected DSPy optimizer capabilities so stale assumptions become visible. It
+also includes DSEx natural user-story lanes for classification, QA,
+retrieval/KNN few-shot, and instruction following. Each natural lane reports
+baseline score, optimized score, lift, LM calls, estimated fixture cost, and
+selected demos or instructions.
 
 Pass condition:
 

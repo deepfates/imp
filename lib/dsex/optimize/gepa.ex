@@ -1,10 +1,16 @@
 defmodule DSEx.Optimize.GEPA do
   @moduledoc """
-  Pareto-aware reflective optimizer for arbitrary text artifacts.
+  Pareto-aware, GEPA-style reflective optimizer for arbitrary text artifacts.
 
-  This module builds on `DSEx.Optimize.Anything` and adds GEPA-style mechanics:
-  per-example scores, Actionable Side Information diagnostics, mutation lineage,
-  Pareto frontier selection, and system-aware merges of complementary candidates.
+  This module builds on `DSEx.Optimize.Anything` and implements the parts of the
+  GEPA philosophy that fit DSEx's local artifact model: per-example scores,
+  Actionable Side Information diagnostics, mutation lineage, Pareto frontier
+  selection, and system-aware merges of complementary candidates.
+
+  It is intentionally an Elixir-native optimizer over explicit artifacts and
+  evaluator functions. It is not a wrapper around the Python implementation, and
+  it does not by itself claim paper-scale GEPA results; use the benchmark and
+  parity gates when making comparative optimizer claims.
   """
 
   alias DSEx.Optimize.Anything

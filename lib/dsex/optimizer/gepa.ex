@@ -1,11 +1,12 @@
 defmodule DSEx.Optimizer.GEPA do
   @moduledoc """
-  Program-level GEPA optimizer for DSEx signatures.
+  Program-level GEPA-style optimizer for DSEx signatures.
 
   `DSEx.Optimizer.GEPA` treats a program's instruction as the artifact under
   search, then uses `DSEx.Optimize.GEPA` to generate reflective instruction
   candidates. It is the DSEx-native bridge between signature programs and
-  artifact optimization, not a Python compatibility layer.
+  artifact optimization, not a Python compatibility layer or a claim to
+  reproduce every paper-scale GEPA training regime.
   """
 
   defstruct [:metric, feedback_fn: nil, generations: 4]

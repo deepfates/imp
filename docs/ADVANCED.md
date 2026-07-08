@@ -43,7 +43,13 @@ Reports preserve baseline candidates, lineage, diagnostics, evaluator errors,
 named artifact parameters, and JSON-safe save/load via
 `save_report!/2` and `load_report!/1`.
 
-## Pareto/ASI GEPA
+## Pareto/ASI GEPA-Style Reflection
+
+`DSEx.Optimize.GEPA` is a DSEx-native artifact optimizer. It uses the GEPA
+philosophy of per-example scores, Actionable Side Information, Pareto frontier
+selection, and reflective mutation, but it is not a Python GEPA wrapper and does
+not imply paper-scale benchmark results without the separate parity evidence
+gates.
 
 ```elixir
 artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
@@ -67,8 +73,8 @@ report.best.aggregate_score
 #=> 1.0
 ```
 
-GEPA tracks per-example scores, Pareto frontier membership, ASI diagnostics,
-candidate lineage, replacement branches, and system-aware merges.
+The report tracks per-example scores, Pareto frontier membership, ASI
+diagnostics, candidate lineage, replacement branches, and system-aware merges.
 
 ## Agents And MCP
 

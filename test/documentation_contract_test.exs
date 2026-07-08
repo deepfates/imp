@@ -181,6 +181,20 @@ defmodule DocumentationContractTest do
     assert advanced =~ ~r/do not\s+train models in-process/
   end
 
+  test "GEPA documentation is precise about DSEx-native scope" do
+    api = File.read!("docs/API_GUIDE.md")
+    advanced = File.read!("docs/ADVANCED.md")
+    coverage = File.read!("docs/COVERAGE_MATRIX.md")
+    parity = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+
+    assert api =~ "Elixir-native reflective optimizer"
+    assert api =~ "not a wrapper around Python GEPA"
+    assert advanced =~ "not a Python GEPA wrapper"
+    assert advanced =~ "does\nnot imply paper-scale benchmark results"
+    assert coverage =~ "GEPA-style reflection"
+    assert parity =~ "GEPA-style optimizer rows"
+  end
+
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
 
