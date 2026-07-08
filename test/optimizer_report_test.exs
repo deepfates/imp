@@ -78,6 +78,29 @@ defmodule OptimizerReportTest do
     assert length(compiled.demos) == 1
   end
 
+  test "optimizer reports attach and fetch through wrapper programs" do
+    report = DSEx.Optimizer.Report.new(%{optimizer: :wrapper_probe, metadata: %{status: :ok}})
+
+    pot = DSEx.program_of_thought("question -> answer")
+    pot = DSEx.Optimizer.Report.attach(pot, report)
+    assert DSEx.Optimizer.Report.fetch(pot).optimizer == :wrapper_probe
+    assert pot.predict.metadata.optimizer_report.metadata.status == :ok
+
+    code_act = DSEx.code_act("question -> answer")
+    code_act = DSEx.Optimizer.Report.attach(code_act, report)
+    assert DSEx.Optimizer.Report.fetch(code_act).optimizer == :wrapper_probe
+    assert code_act.program_of_thought.predict.metadata.optimizer_report.metadata.status == :ok
+
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France: Paris."}]))
+      |> DSEx.Optimizer.Report.attach(report)
+
+    assert DSEx.Optimizer.Report.fetch(rag).optimizer == :wrapper_probe
+    assert rag.program.metadata.optimizer_report.metadata.status == :ok
+  end
+
   test "optimizer reports serialize with embedded examples and restore as reports" do
     {train, _dev} = sets()
 

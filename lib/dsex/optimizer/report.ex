@@ -59,6 +59,18 @@ defmodule DSEx.Optimizer.Report do
     %{program | predict: put_metadata(predict, key, value)}
   end
 
+  defp put_metadata(%DSEx.Predict.ProgramOfThought{predict: predict} = program, key, value) do
+    %{program | predict: put_metadata(predict, key, value)}
+  end
+
+  defp put_metadata(%DSEx.Predict.CodeAct{program_of_thought: pot} = program, key, value) do
+    %{program | program_of_thought: put_metadata(pot, key, value)}
+  end
+
+  defp put_metadata(%DSEx.Predict.RAG{program: inner} = program, key, value) do
+    %{program | program: put_metadata(inner, key, value)}
+  end
+
   defp put_metadata(program, _key, _value), do: program
 
   defp get_metadata(%DSEx.Predict.Predict{metadata: metadata}, key),
@@ -66,6 +78,15 @@ defmodule DSEx.Optimizer.Report do
 
   defp get_metadata(%DSEx.Predict.ChainOfThought{predict: predict}, key),
     do: get_metadata(predict, key)
+
+  defp get_metadata(%DSEx.Predict.ProgramOfThought{predict: predict}, key),
+    do: get_metadata(predict, key)
+
+  defp get_metadata(%DSEx.Predict.CodeAct{program_of_thought: pot}, key),
+    do: get_metadata(pot, key)
+
+  defp get_metadata(%DSEx.Predict.RAG{program: inner}, key),
+    do: get_metadata(inner, key)
 
   defp get_metadata(_program, _key), do: nil
 
