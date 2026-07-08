@@ -318,7 +318,7 @@ defmodule CompletionSurfaceTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Streaming\.stream\/3 expects :chunker to be nil or an arity-1 function/,
+                 ~r/DSEx\.Streaming\.stream\/3: invalid value for :chunker option: expected nil or an arity-1 function/,
                  fn ->
                    DSEx.Streaming.stream(program, %{question: "q"}, chunker: :not_a_function)
                    |> Enum.to_list()

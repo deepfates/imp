@@ -3,12 +3,13 @@ defmodule DSEx.Streaming do
 
   @option_schema [
     provider_stream: [type: :boolean, default: false],
-    chunker: [type: :any]
+    chunker: [
+      type: {:custom, __MODULE__, :validate_chunker, []}
+    ]
   ]
 
   def stream(program, inputs, opts \\ []) do
     owned_opts = validate_opts!(opts, "DSEx.Streaming.stream/3")
-    validate_chunker!(owned_opts[:chunker], "DSEx.Streaming.stream/3")
 
     cond do
       owned_opts[:provider_stream] and match?(%DSEx.Predict.Predict{}, program) ->
@@ -301,12 +302,11 @@ defmodule DSEx.Streaming do
     raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
   end
 
-  defp validate_chunker!(nil, _context), do: :ok
-  defp validate_chunker!(chunker, _context) when is_function(chunker, 1), do: :ok
+  def validate_chunker(nil), do: {:ok, nil}
+  def validate_chunker(chunker) when is_function(chunker, 1), do: {:ok, chunker}
 
-  defp validate_chunker!(chunker, context) do
-    raise ArgumentError,
-          "#{context} expects :chunker to be nil or an arity-1 function; got: #{inspect(chunker)}"
+  def validate_chunker(chunker) do
+    {:error, "expected nil or an arity-1 function, got: #{inspect(chunker)}"}
   end
 
   defp validate_lm_opts(opts) when is_list(opts) do
