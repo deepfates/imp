@@ -93,32 +93,45 @@ defmodule DSEx.Adapters.Types do
   def content_to_openai(values) when is_list(values), do: Enum.map(values, &to_openai/1)
   def content_to_openai(value), do: [to_openai(value)]
 
-  def from_openai(%{"type" => "image_url", "image_url" => %{"url" => url}}),
+  def from_openai(%{"type" => "image_url", "image_url" => %{"url" => url}}) when is_binary(url),
     do: image_from_url(url)
 
-  def from_openai(%{type: "image_url", image_url: %{url: url}}),
+  def from_openai(%{type: "image_url", image_url: %{url: url}}) when is_binary(url),
     do: image_from_url(url)
 
-  def from_openai(%{"type" => "input_audio", "input_audio" => audio}),
-    do: %Audio{data: audio["data"], mime_type: mime_type("audio", audio["format"])}
+  def from_openai(%{"type" => "input_audio", "input_audio" => %{"data" => data} = audio})
+      when is_binary(data),
+      do: %Audio{data: audio["data"], mime_type: mime_type("audio", audio["format"])}
 
-  def from_openai(%{type: "input_audio", input_audio: audio}),
-    do: %Audio{data: audio[:data], mime_type: mime_type("audio", audio[:format])}
+  def from_openai(%{type: "input_audio", input_audio: %{data: data} = audio})
+      when is_binary(data),
+      do: %Audio{data: audio[:data], mime_type: mime_type("audio", audio[:format])}
 
-  def from_openai(%{"type" => "file", "file" => %{"file_url" => url}}),
+  def from_openai(%{"type" => "file", "file" => %{"file_url" => url}}) when is_binary(url),
     do: %File{url: url}
 
-  def from_openai(%{type: "file", file: %{file_url: url}}),
+  def from_openai(%{type: "file", file: %{file_url: url}}) when is_binary(url),
     do: %File{url: url}
 
-  def from_openai(%{"type" => "file", "file" => %{"file_data" => data}}),
+  def from_openai(%{"type" => "file", "file" => %{"file_data" => data}}) when is_binary(data),
     do: file_from_data(data)
 
-  def from_openai(%{type: "file", file: %{file_data: data}}),
+  def from_openai(%{type: "file", file: %{file_data: data}}) when is_binary(data),
     do: file_from_data(data)
 
-  def from_openai(%{"type" => "text", "text" => text}), do: %Document{text: text}
-  def from_openai(%{type: "text", text: text}), do: %Document{text: text}
+  def from_openai(%{"type" => "text", "text" => text}) when is_binary(text),
+    do: %Document{text: text}
+
+  def from_openai(%{type: "text", text: text}) when is_binary(text), do: %Document{text: text}
+
+  def from_openai(%{"type" => type} = value)
+      when type in ["image_url", "input_audio", "file", "text"],
+      do: invalid_openai_block!(type, value)
+
+  def from_openai(%{type: type} = value)
+      when type in ["image_url", "input_audio", "file", "text"],
+      do: invalid_openai_block!(type, value)
+
   def from_openai(value), do: value
 
   def content_from_openai(values) when is_list(values), do: Enum.map(values, &from_openai/1)
@@ -136,6 +149,11 @@ defmodule DSEx.Adapters.Types do
   defp invalid_type!(module, expectation, value) do
     raise ArgumentError,
           "#{inspect(Module.concat(__MODULE__, module))} expects #{expectation}; got: #{inspect(value)}"
+  end
+
+  defp invalid_openai_block!(type, value) do
+    raise ArgumentError,
+          "OpenAI-compatible content block #{inspect(type)} has malformed payload: #{inspect(value)}"
   end
 
   defp metadata_prefix(metadata) when map_size(metadata) == 0, do: ""

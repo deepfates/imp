@@ -82,8 +82,37 @@ defmodule MultimodalAdapterTest do
                  fn -> Types.to_openai(%Types.History{messages: [:bad_message]}) end
   end
 
+  test "reports malformed known OpenAI-compatible content blocks" do
+    assert_raise ArgumentError,
+                 ~r/OpenAI-compatible content block "image_url" has malformed payload/,
+                 fn ->
+                   Types.from_openai(%{"type" => "image_url", "image_url" => %{}})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/OpenAI-compatible content block "input_audio" has malformed payload/,
+                 fn ->
+                   Types.from_openai(%{type: "input_audio", input_audio: %{format: "wav"}})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/OpenAI-compatible content block "file" has malformed payload/,
+                 fn ->
+                   Types.from_openai(%{"type" => "file", "file" => %{}})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/OpenAI-compatible content block "text" has malformed payload/,
+                 fn ->
+                   Types.from_openai(%{type: "text", text: 123})
+                 end
+  end
+
   test "keeps plain fallback values textual without hiding malformed DSEx structs" do
     assert Types.to_openai(%{arbitrary: :value}) == %{type: "text", text: "%{arbitrary: :value}"}
     assert Types.content_to_openai("hello") == [%{type: "text", text: "hello"}]
+
+    future_block = %{"type" => "provider_future_block", "payload" => %{}}
+    assert Types.from_openai(future_block) == future_block
   end
 end
