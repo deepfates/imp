@@ -585,6 +585,45 @@ defmodule ProductionHardeningTest do
       })
     end
 
+    pot_state =
+      "x -> answer"
+      |> DSEx.program_of_thought()
+      |> DSEx.Saving.dump()
+
+    rag_state =
+      "x, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "x"}]))
+      |> DSEx.Saving.dump()
+
+    assert_raise ArgumentError, ~r/nested predict must be a saved Predict program/, fn ->
+      pot_state |> Map.put("predict", rag_state) |> DSEx.Saving.load()
+    end
+
+    mismatched_instruction =
+      update_in(pot_state, ["predict", "signature", "instructions"], fn _instruction ->
+        "Different planner instruction."
+      end)
+
+    assert_raise ArgumentError, ~r/planner instructions must match task instructions/, fn ->
+      DSEx.Saving.load(mismatched_instruction)
+    end
+
+    bad_planner_outputs =
+      update_in(pot_state, ["predict", "signature"], fn _signature ->
+        DSEx.Signature.dump(DSEx.Signature.new("x -> answer"))
+      end)
+
+    assert_raise ArgumentError, ~r/planner outputs must be \[:program, :tool, :arguments\]/, fn ->
+      DSEx.Saving.load(bad_planner_outputs)
+    end
+
+    assert_raise ArgumentError, ~r/output_field must name one of the task outputs/, fn ->
+      pot_state
+      |> Map.put("output_field", %{"__dsex_type__" => "atom", "value" => "missing"})
+      |> DSEx.Saving.load()
+    end
+
     assert_raise ArgumentError, ~r/saved DSEx config must be a map or list/, fn ->
       base
       |> Map.put("lm", %{"provider" => "req_llm", "model" => "openai:gpt-test", "opts" => 1})

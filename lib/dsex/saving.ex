@@ -102,11 +102,14 @@ defmodule DSEx.Saving do
 
   def load(%{"type" => "program_of_thought"} = state) do
     require_keys!(state, @program_of_thought_required_keys)
+    signature = DSEx.Signature.load(Map.fetch!(state, "signature"))
+    predict = load(Map.fetch!(state, "predict"))
+    output_field = DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "output_field"))
 
     %DSEx.Predict.ProgramOfThought{
-      signature: DSEx.Signature.load(Map.fetch!(state, "signature")),
-      predict: load(Map.fetch!(state, "predict")),
-      output_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "output_field"))
+      signature: signature,
+      predict: validate_program_of_thought_predict!(signature, predict),
+      output_field: validate_program_of_thought_output_field!(signature, output_field)
     }
   end
 
@@ -242,6 +245,45 @@ defmodule DSEx.Saving do
 
   defp load_retriever!(retriever) do
     raise ArgumentError, "invalid saved DSEx retriever: #{inspect(retriever)}"
+  end
+
+  defp validate_program_of_thought_predict!(
+         %DSEx.Signature{} = task_signature,
+         %DSEx.Predict.Predict{signature: planner_signature} = predict
+       ) do
+    cond do
+      DSEx.Signature.input_names(planner_signature) != DSEx.Signature.input_names(task_signature) ->
+        raise ArgumentError,
+              "saved ProgramOfThought planner inputs must match task inputs"
+
+      planner_signature.instructions != task_signature.instructions ->
+        raise ArgumentError,
+              "saved ProgramOfThought planner instructions must match task instructions"
+
+      DSEx.Signature.output_names(planner_signature) != [:program, :tool, :arguments] ->
+        raise ArgumentError,
+              "saved ProgramOfThought planner outputs must be [:program, :tool, :arguments]"
+
+      true ->
+        predict
+    end
+  end
+
+  defp validate_program_of_thought_predict!(_task_signature, predict) do
+    raise ArgumentError,
+          "saved ProgramOfThought nested predict must be a saved Predict program, got: #{inspect(program_name(predict))}"
+  end
+
+  defp validate_program_of_thought_output_field!(%DSEx.Signature{} = task_signature, output_field) do
+    if Enum.any?(
+         DSEx.Signature.output_names(task_signature),
+         &(to_string(&1) == to_string(output_field))
+       ) do
+      output_field
+    else
+      raise ArgumentError,
+            "saved ProgramOfThought output_field must name one of the task outputs"
+    end
   end
 
   defp decode_config_key(key) when is_atom(key), do: key

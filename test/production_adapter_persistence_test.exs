@@ -598,6 +598,26 @@ defmodule ProductionAdapterPersistenceTest do
     assert DSEx.Prediction.get(prediction, :doubled) == 42
   end
 
+  test "save/load preserves optimized ProgramOfThought task and planner instructions" do
+    program =
+      "x -> doubled"
+      |> DSEx.program_of_thought(output_field: :doubled)
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Double exactly.")
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    assert program.signature.instructions == "Double exactly."
+    assert program.predict.signature.instructions == "Double exactly."
+
+    assert program
+           |> DSEx.ProgramAccess.task_signature()
+           |> DSEx.Signature.to_spec() == "x -> doubled"
+
+    assert program
+           |> DSEx.ProgramAccess.lm_signature()
+           |> DSEx.Signature.to_spec() == "x -> program, tool, arguments"
+  end
+
   test "save rejects non-portable RAG retrievers explicitly" do
     rag =
       "question, context -> answer"
