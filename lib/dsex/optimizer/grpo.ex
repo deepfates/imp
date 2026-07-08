@@ -4,7 +4,7 @@ defmodule DSEx.Optimizer.GRPO do
   defstruct [:reward_fn, :trainer]
 
   @option_schema [
-    trainer: [type: :any, default: nil]
+    trainer: [type: {:custom, DSEx.Clients.Trainer, :validate_provider, []}, default: nil]
   ]
 
   def new(reward_fn, opts \\ []) do

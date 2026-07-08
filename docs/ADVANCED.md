@@ -139,6 +139,9 @@ databricks =
 Provider training is also explicit. `BootstrapFinetune` and `GRPO` build
 provider training jobs only when a real trainer backend is supplied; they do not
 train models in-process and do not pretend to have a local training backend.
+Trainer options accept `nil`, a trainer module, a configured trainer struct, or
+an arity-3 callback so tests and applications can inject the training boundary
+without ambient provider state.
 
 ```elixir
 trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")

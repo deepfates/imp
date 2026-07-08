@@ -159,6 +159,15 @@ defmodule DSEx.Clients.Trainer do
     do_finetune(provider, lm, examples, opts)
   end
 
+  def validate_provider(nil), do: {:ok, nil}
+  def validate_provider(provider) when is_atom(provider), do: {:ok, provider}
+  def validate_provider(provider) when is_function(provider, 3), do: {:ok, provider}
+  def validate_provider(%_{} = provider), do: {:ok, provider}
+
+  def validate_provider(_provider) do
+    {:error, "expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback"}
+  end
+
   defp do_finetune(module, lm, examples, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :finetune, 3) do
       call_trainer(fn -> module.finetune(lm, examples, opts) end, module)

@@ -4,7 +4,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   defstruct [:metric, :trainer, max_demos: 32]
 
   @option_schema [
-    trainer: [type: :any, default: nil],
+    trainer: [type: {:custom, DSEx.Clients.Trainer, :validate_provider, []}, default: nil],
     max_demos: [type: :non_neg_integer, default: 32]
   ]
 

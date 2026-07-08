@@ -365,6 +365,19 @@ defmodule ProviderTrainingLifecycleTest do
 
   test "training optimizer constructors reject invalid boundary contracts" do
     metric = DSEx.Metrics.exact_match(:answer)
+    callback = fn _lm, _examples, _opts -> {:ok, DSEx.Clients.TrainingJob.new(%{})} end
+
+    assert {:ok, nil} = DSEx.Clients.Trainer.validate_provider(nil)
+    assert {:ok, String} = DSEx.Clients.Trainer.validate_provider(String)
+    assert {:ok, ^callback} = DSEx.Clients.Trainer.validate_provider(callback)
+
+    assert {:ok, %DSEx.Clients.HTTPTrainer{}} =
+             DSEx.Clients.Trainer.validate_provider(%DSEx.Clients.HTTPTrainer{})
+
+    assert {:error, message} = DSEx.Clients.Trainer.validate_provider(%{not: :a_trainer})
+
+    assert message =~
+             "expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback"
 
     assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2: expected keyword options/,
@@ -383,6 +396,20 @@ defmodule ProviderTrainingLifecycleTest do
     assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GRPO\.new\/2: expected keyword options/, fn ->
       DSEx.Optimizer.GRPO.new(fn _example -> 1.0 end, %{trainer: nil})
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2: invalid value for :trainer option: expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFinetune.new(metric, trainer: %{not: :a_trainer})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.GRPO\.new\/2: invalid value for :trainer option: expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback/,
+                 fn ->
+                   DSEx.Optimizer.GRPO.new(fn _example -> 1.0 end,
+                     trainer: fn _lm, _examples -> {:ok, :bad} end
+                   )
+                 end
 
     assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.GRPO\.new\/2 expects a reward function with arity 1/,

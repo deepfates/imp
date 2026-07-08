@@ -188,6 +188,9 @@ defmodule DocumentationContractTest do
     assert advanced =~ "DSEx.Retrievers.HTTP.new"
     assert advanced =~ "DSEx.Clients.OpenAITrainer.new"
     assert advanced =~ ~r/do not\s+train models in-process/
+
+    assert advanced =~
+             "Trainer options accept `nil`, a trainer module, a configured trainer struct, or\nan arity-3 callback"
   end
 
   test "GEPA documentation is precise about DSEx-native scope" do
