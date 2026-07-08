@@ -285,6 +285,54 @@ defmodule CompletionSurfaceTest do
              "beam"
   end
 
+  test "provider streaming reports LM misconfiguration as error chunks" do
+    bad_opts =
+      DSEx.predict("question -> answer",
+        lm: %{
+          module: DSEx.LM.Static,
+          opts: %{handler: fn _messages, _opts -> %{answer: "ok"} end}
+        }
+      )
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:invalid_lm_options, message}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(bad_opts, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+
+    assert message =~ "expected keyword options"
+
+    bad_handler =
+      DSEx.predict("question -> answer",
+        lm: %{module: DSEx.LM.Static, opts: [handler: :not_a_function]}
+      )
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:lm_generate_failed, message}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(bad_handler, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+
+    assert message =~ "expects :handler"
+
+    missing_lm = DSEx.predict("question -> answer", lm: %{provider: :missing})
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:not_an_lm, %{provider: :missing}}},
+               done: true
+             }
+           ] =
+             DSEx.Streaming.stream(missing_lm, %{question: "q"}, provider_stream: true)
+             |> Enum.to_list()
+  end
+
   test "streaming fallback collects structured outputs in signature order" do
     lm = %{
       module: DSEx.LM.Static,

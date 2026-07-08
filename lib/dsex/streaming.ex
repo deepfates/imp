@@ -67,7 +67,7 @@ defmodule DSEx.Streaming do
   end
 
   defp stream_lm(%module{} = lm, messages, opts) do
-    if function_exported?(module, :stream, 3) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
       module.stream(lm, messages, opts)
     else
       generate_once(lm, messages, opts)
@@ -78,7 +78,7 @@ defmodule DSEx.Streaming do
     do: [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, :lm_not_configured}, done: true}]
 
   defp stream_lm(module, messages, opts) when is_atom(module) do
-    if function_exported?(module, :stream, 3) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
       module.stream(module, messages, opts)
     else
       generate_once(module, messages, opts)
@@ -86,17 +86,23 @@ defmodule DSEx.Streaming do
   end
 
   defp stream_lm(%{module: module, opts: lm_opts} = lm, messages, opts) do
-    opts = Keyword.merge(lm_opts, opts)
+    with {:ok, lm_opts} <- validate_lm_opts(lm_opts) do
+      opts = Keyword.merge(lm_opts, opts)
 
-    if function_exported?(module, :stream, 3) do
-      module.stream(lm, messages, opts)
+      if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
+        module.stream(lm, messages, opts)
+      else
+        generate_once(lm, messages, opts)
+      end
     else
-      generate_once(lm, messages, opts)
+      {:error, reason} -> error_response(reason)
     end
   end
 
   defp stream_lm(fun, messages, opts) when is_function(fun, 2),
     do: generate_once(fun, messages, opts)
+
+  defp stream_lm(lm, _messages, _opts), do: error_response({:not_an_lm, lm})
 
   defp generate_once(lm, messages, opts) do
     case DSEx.LM.generate(lm, messages, opts) do
@@ -106,7 +112,16 @@ defmodule DSEx.Streaming do
       {:error, reason} ->
         [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
     end
+  rescue
+    error ->
+      error_response({:lm_generate_failed, Exception.message(error)})
+  catch
+    kind, reason ->
+      error_response({:lm_generate_failed, inspect({kind, reason})})
   end
+
+  defp error_response(reason),
+    do: [%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
 
   defp stream_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
   defp stream_value(value), do: value
@@ -243,6 +258,17 @@ defmodule DSEx.Streaming do
     raise ArgumentError,
           "#{context} expects :chunker to be nil or an arity-1 function; got: #{inspect(chunker)}"
   end
+
+  defp validate_lm_opts(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      {:ok, opts}
+    else
+      {:error, {:invalid_lm_options, "expected keyword options, got: #{inspect(opts)}"}}
+    end
+  end
+
+  defp validate_lm_opts(opts),
+    do: {:error, {:invalid_lm_options, "expected keyword options, got: #{inspect(opts)}"}}
 
   defp normalize_inputs(inputs) do
     {:ok, Map.new(inputs)}
