@@ -151,13 +151,14 @@ defmodule DSEx.Optimize.Anything do
   def optimize(%Artifact{} = artifact, evaluator, opts \\ []) when is_function(evaluator, 2) do
     seed = Keyword.get(opts, :seed, 0)
     examples = Keyword.get(opts, :examples, [])
-    trials = Keyword.get(opts, :trials, 8)
+    trials = non_negative_integer(Keyword.get(opts, :trials, 8))
     mutation_fn = Keyword.get(opts, :mutation_fn, &default_mutation/3)
 
     baseline = evaluate_candidate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
     {candidates, errors} =
-      1..trials
+      trials
+      |> trial_indices()
       |> Enum.reduce({[baseline], error_list(baseline)}, fn trial, {candidates, errors} ->
         parent = select_parent(candidates)
         mutation = mutation_fn.(parent.artifact, trial, seed)
@@ -236,6 +237,12 @@ defmodule DSEx.Optimize.Anything do
   end
 
   defp select_parent(candidates), do: Enum.max_by(candidates, & &1.score)
+
+  defp trial_indices(count) when is_integer(count) and count > 0, do: 1..count
+  defp trial_indices(_count), do: []
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 
   defp default_mutation(%Artifact{} = artifact, trial, seed) do
     marker = "candidate #{trial + seed}"

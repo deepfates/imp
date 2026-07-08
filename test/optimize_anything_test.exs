@@ -51,6 +51,26 @@ defmodule OptimizeAnythingTest do
     File.rm(path)
   end
 
+  test "non-positive trials evaluate only the baseline artifact" do
+    artifact = Anything.new_artifact(:prompt, "baseline")
+
+    report =
+      Anything.optimize(
+        artifact,
+        fn artifact, _examples ->
+          if artifact.text == "baseline", do: 0.75, else: flunk("unexpected candidate")
+        end,
+        trials: -2,
+        mutation_fn: fn _artifact, _trial, _seed -> flunk("unexpected mutation") end
+      )
+
+    assert report.best.id == "baseline"
+    assert report.best.score == 0.75
+    assert Enum.map(report.candidates, & &1.id) == ["baseline"]
+    assert report.metadata.trials == 0
+    assert report.errors == []
+  end
+
   test "supports prompt code config and generic string artifact kinds" do
     kinds = [:prompt, :code, :config, :text]
 
