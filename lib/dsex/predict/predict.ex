@@ -63,7 +63,7 @@ defmodule DSEx.Predict.Predict do
       signature: DSEx.Signature.ensure(signature),
       lm: predict_opts[:lm],
       adapter: predict_opts[:adapter],
-      demos: predict_opts[:demos],
+      demos: DSEx.Example.normalize_demos!(predict_opts[:demos], "DSEx.Predict.Predict.new/2"),
       config: predict_opts[:config],
       metadata: predict_opts[:metadata],
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
@@ -108,7 +108,11 @@ defmodule DSEx.Predict.Predict do
        {:invalid_predict_inputs, "expected a map or field pair list, got: #{inspect(inputs)}"}}
 
   @doc "Returns a copy of the program with demonstrations attached."
-  def with_demos(%__MODULE__{} = predict, demos), do: %{predict | demos: List.wrap(demos)}
+  def with_demos(%__MODULE__{} = predict, demos),
+    do: %{
+      predict
+      | demos: DSEx.Example.normalize_demos!(demos, "DSEx.Predict.Predict.with_demos/2")
+    }
 
   @doc "Returns a copy of the program pinned to a concrete LM."
   def with_lm(%__MODULE__{} = predict, lm), do: %{predict | lm: lm, dynamic_lm?: false}

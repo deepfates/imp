@@ -93,7 +93,31 @@ defmodule DSEx.Example do
     do: %{example | fields: Map.drop(example.fields, example.input_keys)}
 
   @doc "Attaches demonstrations to an example."
-  def with_demos(%__MODULE__{} = example, demos), do: %{example | demos: List.wrap(demos)}
+  def with_demos(%__MODULE__{} = example, demos),
+    do: %{example | demos: normalize_demos!(demos, "DSEx.Example.with_demos/2")}
+
+  @doc false
+  def normalize_demos!(demos, context) do
+    cond do
+      match?(%__MODULE__{}, demos) or is_map(demos) or field_pair_list?(demos) ->
+        [normalize_demo!(demos, context)]
+
+      is_list(demos) ->
+        Enum.map(demos, &normalize_demo!(&1, context))
+
+      true ->
+        raise ArgumentError,
+              "#{context} expects a demo, field pair list, or list of demos; got: #{inspect(demos)}"
+    end
+  end
+
+  defp normalize_demo!(%__MODULE__{} = example, _context), do: example
+  defp normalize_demo!(demo, _context) when is_map(demo) or is_list(demo), do: new(demo)
+
+  defp normalize_demo!(demo, context) do
+    raise ArgumentError,
+          "#{context} expects demos as DSEx.Example structs, maps, or field pair lists; got: #{inspect(demo)}"
+  end
 
   defp normalize_keys(fields) do
     Enum.reduce(fields, %{}, fn
@@ -156,4 +180,14 @@ defmodule DSEx.Example do
     do: key |> Atom.to_string() |> String.starts_with?("dsex_")
 
   defp internal?(key) when is_binary(key), do: String.starts_with?(key, "dsex_")
+
+  defp field_pair_list?(value) when is_list(value) do
+    value != [] and
+      Enum.all?(value, fn
+        {key, _value} when is_atom(key) or is_binary(key) -> true
+        _other -> false
+      end)
+  end
+
+  defp field_pair_list?(_value), do: false
 end

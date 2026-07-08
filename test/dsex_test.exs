@@ -221,6 +221,26 @@ defmodule DSExTest do
              DSEx.Predict.Predict.call(program, [:not_a_pair])
   end
 
+  test "predict normalizes constructor demos into examples" do
+    program =
+      DSEx.predict("question -> answer",
+        lm: %{module: DSEx.LM.Static, opts: []},
+        demos: [question: "2+2?", answer: "4"]
+      )
+
+    assert [%DSEx.Example{} = demo] = program.demos
+    assert DSEx.Example.to_map(demo) == %{question: "2+2?", answer: "4"}
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Predict.Predict.new\/2 expects demos as DSEx.Example structs/,
+                 fn ->
+                   DSEx.predict("question -> answer",
+                     lm: %{module: DSEx.LM.Static, opts: []},
+                     demos: [:not_a_demo]
+                   )
+                 end
+  end
+
   test "predict accepts string-key inputs and allows optional inputs to be absent" do
     lm = %{
       module: DSEx.LM.Static,

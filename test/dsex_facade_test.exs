@@ -110,6 +110,27 @@ defmodule DSExFacadeTest do
     assert DSEx.Tool.call(tool, %{key: "x"}) == "y"
   end
 
+  test "facade normalizes plain demo data and rejects malformed demos clearly" do
+    program = DSEx.predict("question -> answer")
+
+    assert %{demos: [%DSEx.Example{} = demo]} =
+             DSEx.with_demos(program, question: "2+2?", answer: "4")
+
+    assert DSEx.Example.to_map(demo) == %{question: "2+2?", answer: "4"}
+
+    assert %{demos: [%DSEx.Example{}, %DSEx.Example{}]} =
+             DSEx.with_demos(program, [
+               %{question: "2+2?", answer: "4"},
+               [question: "3+3?", answer: "6"]
+             ])
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Predict.Predict.with_demos\/2 expects demos as DSEx.Example structs/,
+                 fn ->
+                   DSEx.with_demos(program, [:not_a_demo])
+                 end
+  end
+
   test "facade evaluates and optimizes through the golden path" do
     lm = %{
       module: DSEx.LM.Static,
