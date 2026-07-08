@@ -85,8 +85,15 @@ defmodule DSEx.Optimizer.InstructionSearch do
     %{program | predict: put_instruction(predict, instruction)}
   end
 
-  def put_instruction(%DSEx.Predict.ProgramOfThought{predict: predict} = program, instruction) do
-    %{program | predict: put_instruction(predict, instruction)}
+  def put_instruction(
+        %DSEx.Predict.ProgramOfThought{signature: signature, predict: predict} = program,
+        instruction
+      ) do
+    %{
+      program
+      | signature: %{signature | instructions: instruction},
+        predict: put_instruction(predict, instruction)
+    }
   end
 
   def put_instruction(%DSEx.Predict.CodeAct{program_of_thought: pot} = program, instruction) do

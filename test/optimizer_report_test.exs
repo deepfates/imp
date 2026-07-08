@@ -120,6 +120,7 @@ defmodule OptimizerReportTest do
       |> DSEx.Optimizer.InstructionSearch.put_instruction("Answer briefly.")
 
     assert DSEx.Optimizer.InstructionSearch.current_instruction(pot) == "Answer briefly."
+    assert pot.signature.instructions == "Answer briefly."
     assert pot.predict.signature.instructions == "Answer briefly."
 
     code_act =
@@ -128,6 +129,7 @@ defmodule OptimizerReportTest do
       |> DSEx.Optimizer.InstructionSearch.put_instruction("Use code sparingly.")
 
     assert DSEx.Optimizer.InstructionSearch.current_instruction(code_act) == "Use code sparingly."
+    assert code_act.program_of_thought.signature.instructions == "Use code sparingly."
     assert code_act.program_of_thought.predict.signature.instructions == "Use code sparingly."
 
     rag =
@@ -138,6 +140,32 @@ defmodule OptimizerReportTest do
 
     assert DSEx.Optimizer.InstructionSearch.current_instruction(rag) == "Use retrieved context."
     assert rag.program.signature.instructions == "Use retrieved context."
+  end
+
+  test "instruction search updates wrapper task signatures as well as LM signatures" do
+    pot =
+      "x, context -> doubled"
+      |> DSEx.program_of_thought(output_field: :doubled)
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "double x"}]))
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Double with retrieved context.")
+
+    assert pot
+           |> DSEx.ProgramAccess.task_signature()
+           |> Map.fetch!(:instructions) == "Double with retrieved context."
+
+    assert pot
+           |> DSEx.ProgramAccess.lm_signature()
+           |> Map.fetch!(:instructions) == "Double with retrieved context."
+
+    assert "x, context -> doubled" =
+             pot
+             |> DSEx.ProgramAccess.task_signature()
+             |> DSEx.Signature.to_spec()
+
+    assert "x, context -> program, tool, arguments" =
+             pot
+             |> DSEx.ProgramAccess.lm_signature()
+             |> DSEx.Signature.to_spec()
   end
 
   test "optimizer reports attach and fetch through wrapper programs" do
