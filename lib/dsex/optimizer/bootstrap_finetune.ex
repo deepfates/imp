@@ -3,11 +3,19 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
 
   defstruct [:metric, :trainer, max_demos: 32]
 
+  @option_schema [
+    trainer: [type: :any, default: nil],
+    max_demos: [type: :any, default: 32]
+  ]
+
   def new(metric, opts \\ []) do
+    validate_metric!(metric)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BootstrapFinetune.new/2")
+
     %__MODULE__{
       metric: metric,
-      trainer: Keyword.get(opts, :trainer),
-      max_demos: non_negative_integer(Keyword.get(opts, :max_demos, 32))
+      trainer: opts[:trainer],
+      max_demos: non_negative_integer(opts[:max_demos])
     }
   end
 
@@ -43,4 +51,11 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Optimizer.BootstrapFinetune.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
+  end
 end

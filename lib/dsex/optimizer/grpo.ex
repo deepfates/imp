@@ -3,11 +3,19 @@ defmodule DSEx.Optimizer.GRPO do
 
   defstruct [:reward_fn, :trainer]
 
-  def new(reward_fn, opts \\ []),
-    do: %__MODULE__{
+  @option_schema [
+    trainer: [type: :any, default: nil]
+  ]
+
+  def new(reward_fn, opts \\ []) do
+    validate_reward_fn!(reward_fn)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.GRPO.new/2")
+
+    %__MODULE__{
       reward_fn: reward_fn,
-      trainer: Keyword.get(opts, :trainer)
+      trainer: opts[:trainer]
     }
+  end
 
   def compile(%__MODULE__{trainer: nil}, _program, _trainset), do: {:error, :trainer_required}
 
@@ -26,5 +34,12 @@ defmodule DSEx.Optimizer.GRPO do
       end
 
     DSEx.Clients.Trainer.finetune(optimizer.trainer, lm, enriched, method: :grpo)
+  end
+
+  defp validate_reward_fn!(reward_fn) when is_function(reward_fn, 1), do: :ok
+
+  defp validate_reward_fn!(reward_fn) do
+    raise ArgumentError,
+          "DSEx.Optimizer.GRPO.new/2 expects a reward function with arity 1; got: #{inspect(reward_fn)}"
   end
 end

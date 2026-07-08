@@ -3,22 +3,30 @@ defmodule DSEx.Optimizer.BetterTogether do
 
   defstruct [:metric, optimizers: %{}]
 
+  @option_schema [
+    strategy: [type: :any, default: "p"]
+  ]
+
   def new(metric, optimizers \\ %{}) do
+    validate_metric!(metric)
+    optimizers = normalize_optimizers!(optimizers)
+
     optimizers =
-      if map_size(Map.new(optimizers)) == 0 do
+      if map_size(optimizers) == 0 do
         %{
           p: DSEx.Optimizer.RandomSearch.new(metric),
           w: DSEx.Optimizer.BootstrapFinetune.new(metric)
         }
       else
-        Map.new(optimizers)
+        optimizers
       end
 
     %__MODULE__{metric: metric, optimizers: optimizers}
   end
 
   def compile(%__MODULE__{} = bt, student, trainset, valset, opts \\ []) do
-    strategy = Keyword.get(opts, :strategy, "p")
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BetterTogether.compile/5")
+    strategy = opts[:strategy]
     steps = strategy_steps(strategy)
 
     {compiled, step_reports, errors} =
@@ -146,4 +154,19 @@ defmodule DSEx.Optimizer.BetterTogether do
   end
 
   defp existing_atom_or_string(key), do: key
+
+  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Optimizer.BetterTogether.new/2 expects a metric function with arity 2; got: #{inspect(metric)}"
+  end
+
+  defp normalize_optimizers!(optimizers) do
+    Map.new(optimizers)
+  rescue
+    error in [ArgumentError, Protocol.UndefinedError] ->
+      raise ArgumentError,
+            "DSEx.Optimizer.BetterTogether.new/2 expects optimizers to be an enumerable of key/value pairs; got: #{inspect(optimizers)} (#{Exception.message(error)})"
+  end
 end

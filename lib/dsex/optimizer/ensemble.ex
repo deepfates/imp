@@ -90,11 +90,20 @@ defmodule DSEx.Optimizer.Ensemble do
 
   defstruct reduce_fn: nil, size: nil, deterministic: false
 
+  @option_schema [
+    reduce_fn: [type: :any, default: nil],
+    size: [type: :any, default: nil],
+    deterministic: [type: :boolean, default: false]
+  ]
+
   def new(opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.Ensemble.new/1")
+    validate_reduce_fn!(opts[:reduce_fn])
+
     %__MODULE__{
-      reduce_fn: Keyword.get(opts, :reduce_fn),
-      size: non_negative_integer_or_nil(Keyword.get(opts, :size)),
-      deterministic: Keyword.get(opts, :deterministic, false)
+      reduce_fn: opts[:reduce_fn],
+      size: non_negative_integer_or_nil(opts[:size]),
+      deterministic: opts[:deterministic]
     }
   end
 
@@ -104,4 +113,12 @@ defmodule DSEx.Optimizer.Ensemble do
   defp non_negative_integer_or_nil(nil), do: nil
   defp non_negative_integer_or_nil(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer_or_nil(_value), do: 0
+
+  defp validate_reduce_fn!(nil), do: :ok
+  defp validate_reduce_fn!(reduce_fn) when is_function(reduce_fn, 1), do: :ok
+
+  defp validate_reduce_fn!(reduce_fn) do
+    raise ArgumentError,
+          "DSEx.Optimizer.Ensemble.new/1 expects :reduce_fn to be nil or an arity-1 function; got: #{inspect(reduce_fn)}"
+  end
 end

@@ -418,6 +418,63 @@ defmodule PublicSurfaceTest do
              DSEx.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
   end
 
+  test "composition optimizer constructors reject invalid boundary contracts" do
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.Ensemble.new(%{size: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1 expects :reduce_fn to be nil or an arity-1 function/,
+                 fn ->
+                   DSEx.Optimizer.Ensemble.new(reduce_fn: fn -> %{} end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SignatureOptimizer\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.SignatureOptimizer.new(metric, %{candidates: []})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SignatureOptimizer\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn ->
+                   DSEx.Optimizer.SignatureOptimizer.new(fn _example -> true end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.new\/2 expects optimizers to be an enumerable of key\/value pairs/,
+                 fn ->
+                   DSEx.Optimizer.BetterTogether.new(metric, :not_optimizers)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.new\/2 expects a metric function with arity 2/,
+                 fn ->
+                   DSEx.Optimizer.BetterTogether.new(fn _example, _prediction, _trace -> true end)
+                 end
+
+    better = DSEx.Optimizer.BetterTogether.new(metric, %{p: DSEx.Optimizer.LabeledFewShot.new()})
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BetterTogether\.compile\/5: expected keyword options/,
+                 fn ->
+                   lm = %{
+                     module: DSEx.LM.Static,
+                     opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
+                   }
+
+                   program = DSEx.predict("question -> answer", lm: lm)
+
+                   DSEx.Optimizer.BetterTogether.compile(better, program, [], [], %{
+                     strategy: "p"
+                   })
+                 end
+  end
+
   test "ensemble reducer can return plain prediction fields" do
     lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)

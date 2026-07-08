@@ -311,6 +311,34 @@ defmodule ProviderTrainingLifecycleTest do
              result
   end
 
+  test "training optimizer constructors reject invalid boundary contracts" do
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFinetune.new(metric, %{max_demos: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2 expects a metric function with arity 2/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFinetune.new(fn _example, _prediction, _trace ->
+                     true
+                   end)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GRPO\.new\/2: expected keyword options/, fn ->
+      DSEx.Optimizer.GRPO.new(fn _example -> 1.0 end, %{trainer: nil})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.GRPO\.new\/2 expects a reward function with arity 1/,
+                 fn ->
+                   DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end)
+                 end
+  end
+
   test "BootstrapFinetune clamps non-positive max_demos before training" do
     lm = DSEx.req_llm("gpt-test")
     program = DSEx.predict("question -> answer", lm: lm)
