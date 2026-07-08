@@ -52,7 +52,7 @@ defmodule OptimizeGEPATest do
     assert report.metadata.merge_strategy == :pareto_frontier_union
   end
 
-  test "non-positive generations evaluate only the baseline artifact" do
+  test "zero generations evaluate only the baseline artifact" do
     artifact = Anything.new_artifact(:prompt, "Base prompt")
 
     evaluator = fn artifact, examples ->

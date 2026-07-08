@@ -93,6 +93,12 @@ defmodule DatasetsContractTest do
                  fn ->
                    Datasets.DataLoader.load("missing.jsonl", [:question], :not_options)
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.DataLoader\.load\/3: invalid value for :format option: expected string/,
+                 fn ->
+                   Datasets.DataLoader.load("missing.jsonl", [:question], format: :csv)
+                 end
   end
 
   test "dataset APIs report invalid collection and path boundaries clearly" do
@@ -121,6 +127,33 @@ defmodule DatasetsContractTest do
                  fn ->
                    Datasets.DataLoader.load(:not_a_path, [:question])
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.DataLoader\.load\/3 supports format/,
+                 fn ->
+                   Datasets.DataLoader.load("records.tsv", [:question])
+                 end
+  end
+
+  test "DataLoader supports explicit JSONL and CSV format names" do
+    jsonl_path = tmp_path("loader-records.data")
+    csv_path = tmp_path("loader-records.records")
+
+    File.write!(jsonl_path, ~s({"question":"2+2?","answer":"4"}\n))
+    File.write!(csv_path, "question,answer\n2+2?,4\n")
+
+    assert [%DSEx.Example{} = jsonl] =
+             Datasets.DataLoader.load(jsonl_path, [:question], format: "jsonl")
+
+    assert DSEx.Example.get(jsonl, :answer) == "4"
+
+    assert [%DSEx.Example{} = csv] =
+             Datasets.DataLoader.load(csv_path, [:question], format: "csv")
+
+    assert DSEx.Example.get(csv, :answer) == "4"
+  after
+    cleanup_tmp("loader-records.data")
+    cleanup_tmp("loader-records.records")
   end
 
   test "dataset APIs report invalid input and record keys clearly" do

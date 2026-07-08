@@ -267,17 +267,25 @@ defmodule DSEx.Datasets.DataLoader do
   @moduledoc "Loader facade for JSONL/CSV records."
 
   @option_schema [
-    format: [type: :any]
+    format: [type: :string]
   ]
 
   def load(path, input_keys, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Datasets.DataLoader.load/3")
     path = DSEx.Datasets.validate_path!(path, "DSEx.Datasets.DataLoader.load/3")
 
-    case Keyword.get(opts, :format, Path.extname(path)) do
-      ".csv" -> DSEx.Datasets.csv(path, input_keys)
-      _ -> DSEx.Datasets.jsonl(path, input_keys)
+    case normalize_format!(Keyword.get(opts, :format, Path.extname(path))) do
+      :csv -> DSEx.Datasets.csv(path, input_keys)
+      :jsonl -> DSEx.Datasets.jsonl(path, input_keys)
     end
+  end
+
+  defp normalize_format!(format) when format in [".csv", "csv"], do: :csv
+  defp normalize_format!(format) when format in [".jsonl", "jsonl", ".json", "json"], do: :jsonl
+
+  defp normalize_format!(format) do
+    raise ArgumentError,
+          "DSEx.Datasets.DataLoader.load/3 supports format .jsonl, jsonl, .json, json, .csv, or csv; got: #{inspect(format)}"
   end
 end
 
