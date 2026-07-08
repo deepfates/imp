@@ -108,7 +108,19 @@ defmodule DSEx.Optimizer.Ensemble do
   end
 
   def compile(%__MODULE__{} = ensemble, programs),
-    do: %DSEx.Optimizer.Ensemble.Program{programs: programs, ensemble: ensemble}
+    do: %DSEx.Optimizer.Ensemble.Program{
+      programs: validate_programs!(programs),
+      ensemble: ensemble
+    }
+
+  defp validate_programs!(programs) do
+    if Enumerable.impl_for(programs) do
+      Enum.to_list(programs)
+    else
+      raise ArgumentError,
+            "DSEx.Optimizer.Ensemble.compile/2 expects an enumerable of programs; got: #{inspect(programs)}"
+    end
+  end
 
   defp non_negative_integer_or_nil(nil), do: nil
   defp non_negative_integer_or_nil(value) when is_integer(value) and value > 0, do: value

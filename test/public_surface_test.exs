@@ -448,6 +448,12 @@ defmodule PublicSurfaceTest do
                  end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.Ensemble\.compile\/2 expects an enumerable of programs/,
+                 fn ->
+                   DSEx.Optimizer.Ensemble.new() |> DSEx.Optimizer.Ensemble.compile(:not_programs)
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.SignatureOptimizer\.new\/2: expected keyword options/,
                  fn ->
                    DSEx.Optimizer.SignatureOptimizer.new(metric, %{candidates: []})
