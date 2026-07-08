@@ -1,3 +1,16 @@
+defmodule DSEx.Retrievers.Limit do
+  @moduledoc false
+
+  def retrieve_limit(opts, default) do
+    opts
+    |> Keyword.get(:k, default)
+    |> non_negative_integer()
+  end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
+end
+
 defmodule DSEx.Retrievers.HTTP do
   @moduledoc "Generic HTTP retriever with injectable transport and response mapping."
 
@@ -103,7 +116,8 @@ defmodule DSEx.Retrievers.HTTP do
     kind, reason -> {:error, {:invalid_retriever_result, inspect({kind, reason})}}
   end
 
-  defp default_body(query, opts), do: %{query: query, k: Keyword.get(opts, :k, 3)}
+  defp default_body(query, opts),
+    do: %{query: query, k: DSEx.Retrievers.Limit.retrieve_limit(opts, 3)}
 
   defp default_mapper(%{"documents" => docs}), do: Enum.map(docs, &normalize_doc/1)
   defp default_mapper(%{"results" => docs}), do: Enum.map(docs, &normalize_doc/1)
@@ -138,7 +152,7 @@ defmodule DSEx.Retrievers.Weaviate do
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
       headers: Keyword.get(opts, :headers, []),
       body_builder: fn query, call_opts ->
-        limit = Keyword.get(call_opts, :k, Keyword.get(opts, :k, 3))
+        limit = DSEx.Retrievers.Limit.retrieve_limit(call_opts, Keyword.get(opts, :k, 3))
         field = Keyword.get(opts, :field, "text")
 
         %{
@@ -192,7 +206,7 @@ defmodule DSEx.Retrievers.Databricks do
       body_builder: fn query, call_opts ->
         %{
           query_text: query,
-          num_results: Keyword.get(call_opts, :k, Keyword.get(opts, :k, 3)),
+          num_results: DSEx.Retrievers.Limit.retrieve_limit(call_opts, Keyword.get(opts, :k, 3)),
           columns: Keyword.get(opts, :columns, ["text"])
         }
       end,

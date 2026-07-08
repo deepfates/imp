@@ -133,6 +133,43 @@ defmodule ExternalRetrieverTest do
     Process.delete(:previous_databricks_token)
   end
 
+  test "HTTP retriever families clamp non-positive per-call k in wire payloads" do
+    generic =
+      DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+        transport: DatabricksTransport
+      )
+
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(generic, "capital France", k: -1)
+
+    assert_received {:databricks_request, "https://retriever.example/search", _headers,
+                     generic_body}
+
+    assert generic_body["k"] == 0
+
+    weaviate =
+      DSEx.Retrievers.Weaviate.new("https://weaviate.example", "Passage",
+        transport: WeaviateTransport
+      )
+
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(weaviate, "capital France", k: -3)
+    assert_received {:weaviate_request, "https://weaviate.example/v1/graphql", _headers, body}
+    assert body["query"] =~ "limit: 0"
+
+    databricks =
+      DSEx.Retrievers.Databricks.new(
+        "https://dbc.example/api/2.0/vector-search/indexes/i/query",
+        transport: DatabricksTransport
+      )
+
+    assert {:ok, [_doc]} = DSEx.Retrieve.retrieve(databricks, "capital France", k: :bad)
+
+    assert_received {:databricks_request,
+                     "https://dbc.example/api/2.0/vector-search/indexes/i/query", _headers,
+                     databricks_body}
+
+    assert databricks_body["num_results"] == 0
+  end
+
   test "generic HTTP retriever rejects unsupported methods explicitly" do
     retriever =
       DSEx.Retrievers.HTTP.new("https://retriever.example/search",
