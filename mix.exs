@@ -233,6 +233,7 @@ defmodule DSEx.MixProject do
       "evidence.check": [
         "benchmark.truth.check",
         "benchmark.trace.check",
+        "benchmark.operations_stress.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
         "benchmark.rag_tool_agent.check"
@@ -246,6 +247,9 @@ defmodule DSEx.MixProject do
       ],
       "benchmark.trace.check": [
         "dsex.benchmark.trace --out tmp/golden-trace"
+      ],
+      "benchmark.operations_stress.check": [
+        "dsex.benchmark.operations_stress --out tmp/operations-stress"
       ],
       "benchmark.overhead.check": [
         "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"

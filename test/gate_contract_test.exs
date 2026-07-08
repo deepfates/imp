@@ -20,6 +20,7 @@ defmodule GateContractTest do
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "benchmark.truth.check",
              "benchmark.trace.check",
+             "benchmark.operations_stress.check",
              "benchmark.overhead.check",
              "benchmark.optimizer_lift.check",
              "benchmark.rag_tool_agent.check"
@@ -47,6 +48,10 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"benchmark.trace.check") == [
              "dsex.benchmark.trace --out tmp/golden-trace"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.operations_stress.check") == [
+             "dsex.benchmark.operations_stress --out tmp/operations-stress"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.overhead.check") == [

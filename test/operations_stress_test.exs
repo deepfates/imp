@@ -1,0 +1,53 @@
+defmodule OperationsStressTest do
+  use ExUnit.Case, async: false
+
+  import ExUnit.CaptureIO
+
+  test "operations stress artifact covers structured I/O and runtime operations" do
+    artifact = DSEx.BenchmarkTruth.OperationsStress.run(max_concurrency: 4)
+
+    assert artifact["summary"]["complete"]
+    assert artifact["summary"]["passing"] == 9
+
+    by_id = Map.new(artifact["checks"], &{&1["id"], &1})
+
+    for id <- [
+          "malformed_json_rejected",
+          "malformed_xml_rejected",
+          "malformed_chat_missing_fields_rejected",
+          "partial_stream_incremental_fields",
+          "provider_native_schema_shape",
+          "save_load_round_trip_redacts_credentials",
+          "cache_hit_miss_telemetry_redacted",
+          "telemetry_metadata_redaction",
+          "parallel_failure_isolation"
+        ] do
+      assert by_id[id]["passing"], "#{id} should pass"
+    end
+
+    assert by_id["cache_hit_miss_telemetry_redacted"]["evidence"]["calls"] == 1
+    assert by_id["parallel_failure_isolation"]["evidence"]["max_concurrency"] == 4
+    refute inspect(artifact) =~ "sk-test"
+  end
+
+  test "operations stress mix task writes a passing report" do
+    out_dir = tmp_dir("operations-stress")
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.OperationsStress.run(["--out", out_dir, "--max-concurrency", "2"])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "operations-stress-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    assert artifact["summary"]["complete"]
+    assert artifact["summary"]["passing"] == artifact["summary"]["total"]
+  end
+
+  defp tmp_dir(name) do
+    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    File.rm_rf!(path)
+    File.mkdir_p!(path)
+    path
+  end
+end

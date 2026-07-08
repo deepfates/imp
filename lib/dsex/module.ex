@@ -5,7 +5,7 @@ defmodule DSEx.Module do
               {:ok, DSEx.Prediction.t()} | {:error, term()}
 
   def call(%module{} = program, inputs) do
-    if function_exported?(module, :call, 2) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :call, 2) do
       safe_call(module, program, inputs)
     else
       {:error, {:not_callable, module}}

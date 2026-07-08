@@ -17,8 +17,8 @@ defmodule BenchmarkCatalogTest do
     assert by_id["tools_react"].status == "provider_free_implemented"
     assert by_id["rlm_recursive_control"].status == "deterministic_implemented"
     assert by_id["program_composition_orchestration"].status == "provider_free_implemented"
-    assert by_id["adapter_streaming_structured_io"].status == "deterministic_and_live_implemented"
-    assert by_id["operations_persistence_observability"].status == "deterministic_implemented"
+    assert by_id["adapter_streaming_structured_io"].status == "provider_free_and_live_implemented"
+    assert by_id["operations_persistence_observability"].status == "provider_free_implemented"
     assert by_id["multimodal_primitives"].status == "deterministic_implemented"
     assert by_id["optimizer_lift"].status == "provider_free_implemented"
     assert by_id["factuality_classification"].status == "missing"
@@ -35,6 +35,13 @@ defmodule BenchmarkCatalogTest do
     assert by_id["rag_retrieval"].next_step =~ "real small corpus retrieval benchmark"
     assert by_id["rlm_recursive_control"].metric =~ "budget"
     assert by_id["program_composition_orchestration"].next_step =~ "matched DSEx/DSPy"
+
+    assert "mix benchmark.operations_stress.check" in by_id["adapter_streaming_structured_io"].commands
+
+    assert "mix benchmark.operations_stress.check" in by_id[
+             "operations_persistence_observability"
+           ].commands
+
     assert by_id["adapter_streaming_structured_io"].metric =~ "incremental field"
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"

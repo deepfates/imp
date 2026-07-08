@@ -131,14 +131,15 @@ defmodule DSEx.BenchmarkCatalog do
       metric:
         "schema validity, parse recovery, incremental field correctness, stream ordering, and provider option shape",
       tiers: ["smoke", "research"],
-      status: "deterministic_and_live_implemented",
+      status: "provider_free_and_live_implemented",
       commands: [
+        "mix benchmark.operations_stress.check",
         "mix benchmark.trace.check",
         "mix test test/schema_constraints_test.exs test/req_llm_client_test.exs",
         "LIVE_PROVIDER=1 mix live.check"
       ],
       next_step:
-        "Add adversarial structured-output samples with malformed JSON/XML/chat, partial streams, and provider-native schema fallbacks."
+        "Extend adversarial structured-output stress to matched live-provider drift checks when release policy requires it."
     },
     %{
       id: "operations_persistence_observability",
@@ -150,14 +151,15 @@ defmodule DSEx.BenchmarkCatalog do
       metric:
         "round-trip fidelity, secret absence, event completeness, cache correctness, and failure isolation",
       tiers: ["smoke", "research"],
-      status: "deterministic_implemented",
+      status: "provider_free_implemented",
       commands: [
+        "mix benchmark.operations_stress.check",
         "mix production.check",
         "mix integration.check",
         "mix benchmark.overhead.check"
       ],
       next_step:
-        "Add lifecycle stress scenarios that combine save/load, cache, telemetry, streaming, and parallel execution in one sampled workflow."
+        "Extend lifecycle stress to long-running supervised service soak tests when DSEx ships service templates."
     },
     %{
       id: "multimodal_primitives",
