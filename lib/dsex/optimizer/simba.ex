@@ -22,55 +22,108 @@ defmodule DSEx.Optimizer.SIMBA do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    evaluator = DSEx.Evaluate.new(devset, optimizer.metric)
-    initial = {DSEx.Evaluate.run(evaluator, program).score, program}
+    with {:ok, evaluator} <- new_evaluator(devset, optimizer.metric),
+         {:ok, baseline_score} <- evaluate_score(evaluator, program, %{step: :baseline}) do
+      {trainset, setup_errors} = materialize_trainset(trainset)
 
-    {best_score, best_program, candidates} =
-      step_indices(optimizer.steps)
-      |> Enum.reduce({elem(initial, 0), elem(initial, 1), []}, fn step,
-                                                                  {best_score, best_program,
-                                                                   candidates} ->
-        demos = demo_window(trainset, step, optimizer.demos_per_step)
+      {best_score, best_program, candidates, errors} =
+        step_indices(optimizer.steps)
+        |> Enum.reduce({baseline_score, program, [], setup_errors}, fn step,
+                                                                       {best_score, best_program,
+                                                                        candidates, errors} ->
+          demos = demo_window(trainset, step, optimizer.demos_per_step)
 
-        instruction = introspective_instruction(best_program, optimizer.judge_lm, candidates)
+          instruction = introspective_instruction(best_program, optimizer.judge_lm, candidates)
 
-        candidate =
-          %DSEx.Optimizer.LabeledFewShot{k: optimizer.demos_per_step}
-          |> DSEx.Optimizer.LabeledFewShot.compile(
-            DSEx.Optimizer.InstructionSearch.put_instruction(best_program, instruction),
-            demos
-          )
+          candidate =
+            %DSEx.Optimizer.LabeledFewShot{k: optimizer.demos_per_step}
+            |> DSEx.Optimizer.LabeledFewShot.compile(
+              DSEx.Optimizer.InstructionSearch.put_instruction(best_program, instruction),
+              demos
+            )
 
-        score = DSEx.Evaluate.run(evaluator, candidate).score
+          case evaluate_score(evaluator, candidate, %{step: step, demos: demos}) do
+            {:ok, score} ->
+              candidate_record = %{
+                step: step,
+                score: score,
+                demos: demos,
+                accepted: score >= best_score
+              }
 
-        candidate_record = %{
-          step: step,
-          score: score,
-          demos: demos,
-          accepted: score >= best_score
-        }
+              if score >= best_score do
+                {score, candidate, candidates ++ [candidate_record], errors}
+              else
+                {best_score, best_program, candidates ++ [candidate_record], errors}
+              end
 
-        if score >= best_score do
-          {score, candidate, candidates ++ [candidate_record]}
-        else
-          {best_score, best_program, candidates ++ [candidate_record]}
-        end
-      end)
+            {:error, error} ->
+              candidate_record = %{
+                step: step,
+                score: nil,
+                demos: demos,
+                accepted: false,
+                error: error
+              }
 
+              {best_score, best_program, candidates ++ [candidate_record],
+               errors ++ [%{stage: :candidate_evaluation, reason: error, metadata: %{step: step}}]}
+          end
+        end)
+
+      attach_report(best_program, optimizer, best_score, candidates, errors, %{
+        baseline_score: baseline_score,
+        status: if(errors == [], do: :ok, else: :with_errors)
+      })
+    else
+      {:error, error} ->
+        attach_report(program, optimizer, nil, [], [%{stage: :setup, reason: error}], %{
+          baseline_score: nil,
+          status: :all_candidates_failed
+        })
+    end
+  end
+
+  defp attach_report(program, optimizer, best_score, candidates, errors, metadata) do
     DSEx.Optimizer.Report.attach(
-      best_program,
+      program,
       DSEx.Optimizer.Report.new(%{
         optimizer: :simba,
         best_score: best_score,
         candidate_count: length(candidates),
         candidates: candidates,
-        metadata: %{
-          baseline_score: elem(initial, 0),
-          policy: :monotonic_minibatch_ascent,
-          introspection: not is_nil(optimizer.judge_lm)
-        }
+        errors: errors,
+        metadata:
+          Map.merge(metadata, %{
+            policy: :monotonic_minibatch_ascent,
+            introspection: not is_nil(optimizer.judge_lm)
+          })
       })
     )
+  end
+
+  defp new_evaluator(devset, metric) do
+    {:ok, DSEx.Evaluate.new(devset, metric)}
+  rescue
+    error -> {:error, error_message(error)}
+  catch
+    kind, reason -> {:error, error_message({kind, reason})}
+  end
+
+  defp evaluate_score(evaluator, program, _metadata) do
+    {:ok, DSEx.Evaluate.run(evaluator, program).score}
+  rescue
+    error -> {:error, error_message(error)}
+  catch
+    kind, reason -> {:error, error_message({kind, reason})}
+  end
+
+  defp materialize_trainset(trainset) do
+    {Enum.to_list(trainset), []}
+  rescue
+    error -> {[], [%{stage: :trainset, reason: error_message(error)}]}
+  catch
+    kind, reason -> {[], [%{stage: :trainset, reason: error_message({kind, reason})}]}
   end
 
   defp introspective_instruction(program, nil, _candidates),
@@ -117,4 +170,7 @@ defmodule DSEx.Optimizer.SIMBA do
     raise ArgumentError,
           "DSEx.Optimizer.SIMBA.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end

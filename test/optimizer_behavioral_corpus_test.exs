@@ -230,6 +230,8 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.candidate_count == 0
     assert report.candidates == []
     assert report.metadata.baseline_score == baseline_score
+    assert report.metadata.status == :ok
+    assert report.errors == []
   end
 
   test "SIMBA can use introspective LM feedback for candidate instructions" do
@@ -251,6 +253,45 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.introspection
     assert report.best_score == 1.0
     assert_received {:simba_judge, _messages}
+  end
+
+  test "SIMBA reports invalid devset setup without crashing" do
+    program = france_program()
+
+    compiled =
+      DSEx.Optimizer.SIMBA.new(metric(), steps: 2, demos_per_step: 1)
+      |> DSEx.Optimizer.SIMBA.compile(program, trainset(), :not_an_enumerable_devset)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :simba
+    assert report.best_score == nil
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.status == :all_candidates_failed
+    assert report.metadata.baseline_score == nil
+    assert [%{stage: :setup, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+  end
+
+  test "SIMBA records trainset materialization errors while preserving baseline search" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.SIMBA.new(metric(), steps: 1, demos_per_step: 1)
+      |> DSEx.Optimizer.SIMBA.compile(program, :not_an_enumerable_trainset, devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :simba
+    assert report.best_score == baseline_score
+    assert report.candidate_count == 1
+    assert report.metadata.status == :with_errors
+    assert report.metadata.baseline_score == baseline_score
+    assert [%{stage: :trainset, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+    assert [%{demos: [], accepted: true}] = report.candidates
   end
 
   test "COPRO reports coordinate prompt optimization across breadth and depth" do
