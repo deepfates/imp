@@ -2227,6 +2227,107 @@ defmodule BenchmarkTruthTest do
     assert model["proof"]["max_concurrency_values"] == [2, 8]
   end
 
+  test "live matrix can infer stale aggregate concurrency proof from source reports" do
+    out_dir = tmp_dir("live-matrix-source-report-concurrency")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_legacy_campaign_artifact(in_dir, "frontier-source-report-concurrency.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "source_reports" => [
+        %{"path" => "chunk-a.json", "max_concurrency" => 4},
+        %{"path" => "chunk-b.json", "max_concurrency" => 4}
+      ],
+      "tasks" => instrumented_task_pair(100)
+    })
+
+    write_legacy_campaign_artifact(in_dir, "haiku-mixed-source-report-concurrency.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-haiku-4-5",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "source_reports" => [
+        %{"path" => "chunk-c.json", "max_concurrency" => 6},
+        %{"path" => "chunk-d.json", "max_concurrency" => 8}
+      ],
+      "tasks" => instrumented_task_pair(100)
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    frontier = Enum.find(matrix["models"], &(&1["model"] == "anthropic:claude-sonnet-4-6"))
+    haiku = Enum.find(matrix["models"], &(&1["model"] == "anthropic:claude-haiku-4-5"))
+
+    assert matrix["summary"]["required_lanes"]["frontier_sanity"]["satisfied"]
+    assert frontier["proof"]["max_concurrency_consistent"]
+    assert frontier["proof"]["max_concurrency"] == 4
+    assert frontier["proof"]["max_concurrency_values"] == [4]
+
+    refute haiku["proof"]["max_concurrency_consistent"]
+    assert haiku["proof"]["max_concurrency_values"] == [6, 8]
+  end
+
+  test "live matrix keeps zero-coverage attempts out of selected model evidence" do
+    out_dir = tmp_dir("live-matrix-zero-coverage")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "historical-zero.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-3.5-turbo",
+      "campaign_id" => "historical-unavailable-smoke",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 0, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "source_reports" => [%{"path" => "failed-chunk.json"}],
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+
+    assert matrix["models"] == []
+    assert matrix["summary"]["models"] == 0
+    assert matrix["summary"]["skipped_zero_coverage_artifacts"] == 1
+    assert matrix["summary"]["failed_attempts"]["count"] == 1
+    refute matrix["summary"]["required_lanes"]["historical_research"]["present"]
+
+    [attempt] = matrix["summary"]["failed_attempts"]["by_lane"]["historical_research"]
+    assert attempt["model"] == "gpt-3.5-turbo"
+    assert attempt["coverage"]["covered_rows"] == 0
+  end
+
   test "live matrix tags modern non-OpenAI model lanes" do
     out_dir = tmp_dir("live-matrix-non-openai-lanes")
     in_dir = Path.join(out_dir, "campaigns")
@@ -3473,6 +3574,11 @@ defmodule BenchmarkTruthTest do
         "max_concurrency_consistent" => true
       })
 
+    File.write!(Path.join(out_dir, name), Jason.encode!(artifact, pretty: true) <> "\n")
+  end
+
+  defp write_legacy_campaign_artifact(out_dir, name, artifact) do
+    artifact = Map.put_new(artifact, "evidence_policy", current_evidence_policy())
     File.write!(Path.join(out_dir, name), Jason.encode!(artifact, pretty: true) <> "\n")
   end
 

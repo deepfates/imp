@@ -48,12 +48,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
     skipped = Enum.count(loaded, &(not valid_identity?(&1)))
 
+    failed_attempts =
+      loaded
+      |> Enum.filter(&valid_identity?/1)
+      |> Enum.reject(&evidence_artifact?/1)
+      |> failed_attempt_summary()
+
     artifacts =
       loaded
       |> Enum.filter(&valid_identity?/1)
+      |> Enum.filter(&evidence_artifact?/1)
       |> best_by_identity(max_age_hours)
 
-    report = matrix_report(artifacts, max_age_hours, skipped, campaign_ids)
+    report = matrix_report(artifacts, max_age_hours, skipped, failed_attempts, campaign_ids)
     out_path = Path.join(out_dir, "live-matched-model-matrix-#{timestamp_slug()}.json")
     File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
 
@@ -129,7 +136,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     wire_api_matched = if generation["wire_api_matched"], do: 1, else: 0
     prompt_contract_current = if generation["prompt_contract_current"], do: 1, else: 0
     evidence_policy_current = if current_evidence_policy?(artifact), do: 1, else: 0
-    execution = execution_proof(artifact["execution"])
+    execution = execution_proof(artifact)
     execution_consistent = if execution["max_concurrency_consistent"], do: 1, else: 0
     instrumentation_complete = if artifact_instrumentation_complete?(artifact), do: 1, else: 0
     runtime_shape_complete = if artifact_runtime_shape_complete?(artifact), do: 1, else: 0
@@ -174,7 +181,43 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
   defp valid_identity?(_artifact), do: false
 
-  defp matrix_report(artifacts, max_age_hours, skipped_malformed, campaign_ids) do
+  defp evidence_artifact?(artifact), do: (get_in(artifact, ["coverage", "covered"]) || 0) > 0
+
+  defp failed_attempt_summary(artifacts) do
+    by_lane =
+      artifacts
+      |> Enum.flat_map(fn artifact ->
+        Enum.map(lane_tags(artifact["model"]), &{&1, artifact})
+      end)
+      |> Enum.group_by(fn {lane, _artifact} -> lane end, fn {_lane, artifact} -> artifact end)
+      |> Map.new(fn {lane, lane_artifacts} ->
+        {lane, Enum.map(lane_artifacts, &failed_attempt_row/1)}
+      end)
+
+    %{
+      "count" => length(artifacts),
+      "by_lane" => by_lane,
+      "note" =>
+        "Zero-accepted live attempts are retained as endpoint diagnostics but are not selected as DSEx-vs-DSPy parity evidence."
+    }
+  end
+
+  defp failed_attempt_row(artifact) do
+    %{
+      "provider" => artifact["provider"],
+      "model" => artifact["model"],
+      "campaign_id" => artifact["campaign_id"],
+      "generated_at" => artifact["generated_at"],
+      "artifact" => %{
+        "path" => artifact["__path__"],
+        "sha256" => file_sha256(artifact["__path__"])
+      },
+      "source_report_count" => length(artifact["source_reports"] || []),
+      "coverage" => coverage_progress(artifact["coverage"])
+    }
+  end
+
+  defp matrix_report(artifacts, max_age_hours, skipped_malformed, failed_attempts, campaign_ids) do
     models = Enum.map(artifacts, &model_row(&1, max_age_hours))
     required = required_lanes(models)
     complete = Enum.all?(required, fn {_lane, row} -> row["satisfied"] == true end)
@@ -189,6 +232,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "summary" => %{
         "models" => length(models),
         "skipped_malformed_artifacts" => skipped_malformed,
+        "skipped_zero_coverage_artifacts" => failed_attempts["count"],
+        "failed_attempts" => failed_attempts,
         "full_parity_models" => Enum.count(models, & &1["full_parity"]),
         "matrix_complete" => complete,
         "required_lanes" => required,
@@ -217,7 +262,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     full_parity = get_in(artifact, ["parity", "full_parity"]) == true
     fresh = fresh?(artifact, max_age_hours)
     generation_proof = generation_proof(artifact["generation"])
-    execution_proof = execution_proof(artifact["execution"])
+    execution_proof = execution_proof(artifact)
 
     full_evidence =
       fresh and full_parity and generation_proof["requested_consistent"] and
@@ -343,6 +388,29 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "prompt_contract_current" => false
     }
 
+  defp execution_proof(%{"execution" => %{} = execution}) do
+    execution_proof(execution)
+  end
+
+  defp execution_proof(%{"source_reports" => source_reports}) when is_list(source_reports) do
+    values =
+      source_reports
+      |> Enum.map(& &1["max_concurrency"])
+      |> Enum.filter(&(is_integer(&1) and &1 > 0))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    complete? =
+      values != [] and length(values) <= 1 and
+        source_report_count(source_reports) == length(source_reports)
+
+    %{
+      "max_concurrency_consistent" => complete?,
+      "max_concurrency" => if(complete?, do: List.first(values), else: nil),
+      "max_concurrency_values" => values
+    }
+  end
+
   defp execution_proof(%{"max_concurrency_consistent" => consistent} = execution) do
     %{
       "max_concurrency_consistent" => consistent == true,
@@ -366,6 +434,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "max_concurrency" => nil,
       "max_concurrency_values" => []
     }
+  end
+
+  defp source_report_count(source_reports) do
+    Enum.count(source_reports, fn report ->
+      is_integer(report["max_concurrency"]) and report["max_concurrency"] > 0
+    end)
   end
 
   defp generation_prompt_contract(%{"value" => %{"prompt_contract" => prompt_contract}})
