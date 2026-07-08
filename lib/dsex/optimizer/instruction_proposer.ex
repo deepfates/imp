@@ -10,13 +10,21 @@ defmodule DSEx.Optimizer.InstructionProposer do
         fallback
 
       lm ->
-        lm
-        |> DSEx.LM.generate(messages(program, trainset, opts), [])
-        |> case do
-          {:ok, raw} -> parse(raw, count, fallback)
-          {:error, _reason} -> fallback
-        end
+        propose_with_lm(lm, program, trainset, opts, count, fallback)
     end
+  end
+
+  defp propose_with_lm(lm, program, trainset, opts, count, fallback) do
+    lm
+    |> DSEx.LM.generate(messages(program, trainset, opts), [])
+    |> case do
+      {:ok, raw} -> parse(raw, count, fallback)
+      {:error, _reason} -> fallback
+    end
+  rescue
+    _error -> fallback
+  catch
+    _kind, _reason -> fallback
   end
 
   defp messages(program, trainset, opts) do
@@ -92,6 +100,10 @@ defmodule DSEx.Optimizer.InstructionProposer do
       base <> "\nReturn only fields requested by the signature.",
       "Solve the task by matching inputs to outputs. Expected labels include: #{labels}."
     ] ++ Keyword.get(opts, :extra_instructions, [])
+  rescue
+    _error -> fallback_without_labels(program, opts)
+  catch
+    _kind, _reason -> fallback_without_labels(program, opts)
   end
 
   defp infer_labels(trainset) do
@@ -102,6 +114,17 @@ defmodule DSEx.Optimizer.InstructionProposer do
     |> Enum.uniq()
     |> Enum.map(&to_string/1)
     |> Enum.join(", ")
+  end
+
+  defp fallback_without_labels(program, opts) do
+    base = DSEx.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
+
+    [
+      base,
+      base <> "\nBe concise and exact.",
+      base <> "\nUse the demonstrations as ground truth patterns.",
+      base <> "\nReturn only fields requested by the signature."
+    ] ++ Keyword.get(opts, :extra_instructions, [])
   end
 
   defp signature_spec(%DSEx.Predict.Predict{signature: signature}),

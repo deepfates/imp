@@ -476,4 +476,35 @@ defmodule OptimizerReportTest do
     assert_received {:proposer_messages, messages}
     assert Enum.map_join(messages, "\n", & &1.content) =~ "scored_examples"
   end
+
+  test "instruction proposer falls back for malformed training rows" do
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    candidates =
+      DSEx.Optimizer.InstructionProposer.propose(program, [:not_an_example],
+        extra_instructions: ["Use the safe fallback."]
+      )
+
+    assert Enum.any?(candidates, &String.contains?(&1, "Given the fields"))
+    assert "Use the safe fallback." in candidates
+  end
+
+  test "instruction proposer falls back when proposer LM crashes" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> raise "proposal provider offline" end]
+    }
+
+    {train, _dev} = sets()
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    candidates =
+      DSEx.Optimizer.InstructionProposer.propose(program, train,
+        lm: lm,
+        scores: :not_enumerable_scores
+      )
+
+    assert Enum.any?(candidates, &String.contains?(&1, "Given the fields"))
+    assert Enum.any?(candidates, &String.contains?(&1, "Return only fields requested"))
+  end
 end
