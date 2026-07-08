@@ -49,6 +49,21 @@ defmodule DocumentationContractTest do
     assert body =~ "OPENAI_MODEL"
   end
 
+  test "API guide keeps protocol clients out of the normal provider path" do
+    api = File.read!("docs/API_GUIDE.md")
+    advanced = File.read!("docs/ADVANCED.md")
+
+    assert api =~ "The normal provider path for inference is `DSEx.req_llm/2`"
+    assert api =~ "Advanced Protocol Clients"
+    refute api =~ "OpenAITrainer.new"
+    refute api =~ "DatabricksTrainer"
+
+    assert advanced =~ "## Protocol Clients"
+    assert advanced =~ "DSEx.Retrievers.HTTP.new"
+    assert advanced =~ "DSEx.Clients.OpenAITrainer.new"
+    assert advanced =~ ~r/do not\s+train models in-process/
+  end
+
   test "API guide ReAct example is executable with a deterministic tool-calling LM" do
     {:ok, actions} =
       Agent.start_link(fn ->

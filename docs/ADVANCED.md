@@ -99,6 +99,51 @@ Runtime sessions support memory, large context references, tool failures, child
 agents, tool policies, final-output streams, incremental trace-event streams,
 and trace capture.
 
+## Protocol Clients
+
+The normal provider path for LM inference is still `DSEx.req_llm/2`. Use the
+protocol clients below only when your application owns the external service
+boundary directly.
+
+HTTP retrievers wrap search services behind the shared `DSEx.Retrieve`
+behaviour:
+
+```elixir
+retriever =
+  DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+    body_builder: fn query, opts -> %{query: query, k: Keyword.get(opts, :k, 3)} end,
+    response_mapper: fn _retriever, decoded -> decoded["documents"] end
+  )
+```
+
+Provider-shaped retriever constructors build payload-compatible clients for
+specific APIs while keeping credentials explicit:
+
+```elixir
+weaviate = DSEx.Retrievers.Weaviate.new("https://weaviate.example", "Passage")
+
+databricks =
+  DSEx.Retrievers.Databricks.new(
+    "https://workspace.example",
+    "catalog.schema.index",
+    token: System.fetch_env!("DATABRICKS_TOKEN")
+  )
+```
+
+Provider training is also explicit. `BootstrapFinetune` and `GRPO` build
+provider training jobs only when a real trainer backend is supplied; they do not
+train models in-process and do not pretend to have a local training backend.
+
+```elixir
+trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
+```
+
+`OpenAITrainer` and `DatabricksTrainer` return configured
+`%DSEx.Clients.HTTPTrainer{}` values. Pattern match on `provider: :openai` or
+`provider: :databricks` when you need to inspect the returned trainer. The
+OpenAI trainer submits a fine-tuning job for an already uploaded provider file;
+it does not upload examples itself.
+
 ## Schema Constraints
 
 ```elixir

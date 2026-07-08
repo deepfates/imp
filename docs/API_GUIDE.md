@@ -370,23 +370,14 @@ opens a process for discovery and opens a fresh process for each imported tool
 call. DSEx treats MCP tools like ordinary `DSEx.Tool` values, so use tool
 policies for anything with side effects.
 
-## Provider Training
+## Advanced Protocol Clients
 
-`BootstrapFinetune` and `GRPO` build provider training jobs when a real trainer
-backend is supplied. They do not train models in-process, and they do not
-pretend to have a local training backend. Calling them without a trainer returns
-`:trainer_required`.
-
-```elixir
-trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
-```
-
-`OpenAITrainer` and `DatabricksTrainer` are provider-specific constructor
-modules that return configured `%DSEx.Clients.HTTPTrainer{}` values. Pattern
-match on `provider: :openai` or `provider: :databricks` when you need to inspect
-the returned trainer. `OpenAITrainer` submits a fine-tuning job for an already
-uploaded provider file.
-It does not upload examples itself.
+The normal provider path for inference is `DSEx.req_llm/2`. DSEx also ships
+explicit protocol clients for application boundaries that are not ordinary LM
+inference: HTTP retrievers, MCP transports, and provider training jobs. Those
+clients are documented in [Advanced DSEx](ADVANCED.md) and
+[Production Operations](PRODUCTION_OPERATIONS.md) because they require explicit
+service ownership, credentials, payload contracts, and protocol-specific tests.
 
 ## RLM
 
