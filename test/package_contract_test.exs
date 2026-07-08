@@ -119,6 +119,21 @@ defmodule PackageContractTest do
     assert missing == []
   end
 
+  test "shipped docs label maintainer-only commands as source-checkout commands" do
+    files =
+      Mix.Project.config()
+      |> Keyword.fetch!(:package)
+      |> Keyword.fetch!(:files)
+      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+
+    unqualified =
+      files
+      |> Enum.flat_map(&unqualified_maintainer_command_mentions/1)
+      |> Enum.sort()
+
+    assert unqualified == []
+  end
+
   defp assert_release_files(files) do
     for file <- @product_files do
       assert file in files
@@ -238,6 +253,32 @@ defmodule PackageContractTest do
   defp reference_base(_source, "docs/" <> _rest), do: File.cwd!()
   defp reference_base(_source, "livebooks/" <> _rest), do: File.cwd!()
   defp reference_base(source, _target), do: Path.dirname(source)
+
+  defp unqualified_maintainer_command_mentions(path) do
+    lines = path |> File.read!() |> String.split("\n")
+
+    lines
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {line, index} ->
+      if String.match?(line, ~r/mix (?:evidence|benchmark[.\w]*)/) and
+           not source_checkout_context?(lines, index) do
+        ["#{path}:#{index + 1}:#{line}"]
+      else
+        []
+      end
+    end)
+  end
+
+  defp source_checkout_context?(lines, index) do
+    lines
+    |> Enum.slice(max(index - 8, 0), 9)
+    |> Enum.any?(fn line ->
+      normalized = String.downcase(line)
+
+      String.contains?(normalized, "source checkout") or
+        String.contains?(normalized, "source-checkout")
+    end)
+  end
 
   defp module_from_string(name) do
     name

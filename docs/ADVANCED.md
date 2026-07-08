@@ -170,6 +170,7 @@ helpers as application APIs. In a source checkout:
 
 ```sh
 mix production.check
+# source checkout only
 mix evidence.check
 ```
 

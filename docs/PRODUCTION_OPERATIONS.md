@@ -31,7 +31,7 @@ LIVE_PROVIDER=1 mix live.check
 ```
 
 Maintainer evidence for benchmarks and parity is separate from the production
-gate:
+gate. In a source checkout:
 
 ```sh
 mix evidence.check
@@ -150,6 +150,8 @@ test-only support.
 
 In a source checkout, `mix evidence.check` runs deterministic maintainer
 evidence. These commands are not shipped as package APIs:
+
+Source-checkout maintainer aliases:
 
 - benchmark truth fixture harness tests through `mix benchmark.truth.check`
 - provider-free DSEx-vs-DSPy golden trace parity through
