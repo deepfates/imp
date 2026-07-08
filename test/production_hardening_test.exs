@@ -58,6 +58,14 @@ defmodule ProductionHardeningTest do
     def post(_url, _headers, _body, _opts), do: {:ok, %{status: 200, body: "ok", headers: []}}
   end
 
+  defmodule StructLM do
+    defstruct [:prefix]
+
+    def generate(%__MODULE__{prefix: prefix}, _messages, opts) do
+      {:ok, "#{prefix}:#{Keyword.fetch!(opts, :suffix)}"}
+    end
+  end
+
   test "ReqLLM-backed LM reports provider failures without caching them" do
     Process.delete(:flaky_count)
 
@@ -241,6 +249,44 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError,
                  ~r/DSEx.HTTP.Hackneyless.http_opts\/1 :http_opts expects a keyword list/,
                  fn -> DSEx.HTTP.Hackneyless.http_opts(http_opts: %{timeout: 1}) end
+  end
+
+  test "LM facade rejects malformed options and unknown providers explicitly" do
+    assert_raise ArgumentError, ~r/DSEx.LM.generate\/3 expects keyword options/, fn ->
+      DSEx.LM.generate(DSEx.LM.Static, [%{role: :user, content: "hello"}], %{handler: nil})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.LM.generate\/3 client :opts expects keyword options/,
+                 fn ->
+                   DSEx.LM.generate(
+                     %{module: DSEx.LM.Static, opts: %{handler: fn _messages, _opts -> "ok" end}},
+                     [%{role: :user, content: "hello"}],
+                     []
+                   )
+                 end
+
+    assert {:error, {:not_an_lm, :not_an_lm}} =
+             DSEx.LM.generate(:not_an_lm, [%{role: :user, content: "hello"}], [])
+
+    assert {:error, {:not_an_lm, %{provider: :missing}}} =
+             DSEx.LM.generate(%{provider: :missing}, [%{role: :user, content: "hello"}], [])
+
+    assert {:ok, "static"} =
+             DSEx.LM.generate(fn _messages, _opts -> {:ok, "static"} end, [], [])
+
+    assert {:ok, "prefix:value"} =
+             DSEx.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
+  end
+
+  test "Static LM validates direct-call options and handler shape" do
+    assert_raise ArgumentError, ~r/DSEx.LM.Static.generate\/2 expects keyword options/, fn ->
+      DSEx.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.LM.Static.generate\/2 expects :handler/, fn ->
+      DSEx.LM.generate(DSEx.LM.Static, [], handler: :not_a_function)
+    end
   end
 
   test "invalid test harness provider mode fails closed" do

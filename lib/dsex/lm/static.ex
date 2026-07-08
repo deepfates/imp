@@ -11,7 +11,14 @@ defmodule DSEx.LM.Static do
 
   @impl true
   def generate(messages, opts) do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.generate/2")
     handler = Keyword.get(opts, :handler, &default_handler/2)
+
+    unless is_function(handler, 2) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.generate/2 expects :handler to be a two-argument function, got: #{inspect(handler)}"
+    end
+
     {:ok, handler.(messages, opts)}
   end
 
@@ -28,5 +35,17 @@ defmodule DSEx.LM.Static do
       true ->
         %{output: "ok"}
     end
+  end
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
 end
