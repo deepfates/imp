@@ -63,6 +63,11 @@ defmodule AgentRuntimeTest do
 
   test "agent constructor reports invalid definitions clearly" do
     handler = fn input, runtime -> {:ok, input, runtime} end
+    child = Agent.new(:child, handler)
+
+    assert {:ok, [^child]} = Agent.validate_children([child])
+    assert {:error, message} = Agent.validate_children([:not_an_agent])
+    assert message =~ "expected a list of DSEx.Agent structs"
 
     assert_raise ArgumentError, ~r/DSEx\.Agent names must be atoms or strings/, fn ->
       Agent.new(123, handler)
@@ -89,7 +94,7 @@ defmodule AgentRuntimeTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3 expects :children to contain DSEx\.Agent structs/,
+                 ~r/DSEx\.Agent\.new\/3: invalid value for :children option: expected a list of DSEx\.Agent structs/,
                  fn ->
                    Agent.new(:bad, handler, children: [:not_an_agent])
                  end

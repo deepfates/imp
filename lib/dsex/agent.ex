@@ -38,7 +38,7 @@ defmodule DSEx.Agent do
 
   @option_schema [
     tools: [type: {:custom, DSEx.Tool, :validate_tools, []}, default: []],
-    children: [type: {:list, :any}, default: []],
+    children: [type: {:custom, __MODULE__, :validate_children, []}, default: []],
     input_schema: [type: {:map, :any, :any}, default: %{}],
     output_schema: [type: {:map, :any, :any}, default: %{}],
     tool_policy: [
@@ -66,7 +66,7 @@ defmodule DSEx.Agent do
       name: normalize_name(name),
       handler: handler,
       tools: DSEx.Tool.index_tools!(opts[:tools], "DSEx.Agent.new/3"),
-      children: index_children(opts[:children]),
+      children: index_children!(opts[:children]),
       input_schema: opts[:input_schema],
       output_schema: opts[:output_schema],
       tool_policy: opts[:tool_policy]
@@ -76,6 +76,20 @@ defmodule DSEx.Agent do
   def new(_name, handler, _opts) do
     raise ArgumentError,
           "DSEx.Agent.new/3 expects an arity-2 or arity-3 handler; got: #{inspect(handler)}"
+  end
+
+  def validate_children(children) when is_list(children) do
+    case Enum.find(children, &(not match?(%__MODULE__{}, &1))) do
+      nil ->
+        {:ok, children}
+
+      invalid ->
+        {:error, "expected a list of DSEx.Agent structs, got invalid entry: #{inspect(invalid)}"}
+    end
+  end
+
+  def validate_children(children) do
+    {:error, "expected a list of DSEx.Agent structs, got: #{inspect(children)}"}
   end
 
   @doc """
@@ -271,16 +285,7 @@ defmodule DSEx.Agent do
     end
   end
 
-  defp index_children(values) do
-    Map.new(values, fn
-      %__MODULE__{name: name} = child ->
-        {name, child}
-
-      invalid ->
-        raise ArgumentError,
-              "DSEx.Agent.new/3 expects :children to contain DSEx.Agent structs; got: #{inspect(invalid)}"
-    end)
-  end
+  defp index_children!(children), do: Map.new(children, &{&1.name, &1})
 
   defp normalize_name(name) when is_atom(name), do: name
   defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
