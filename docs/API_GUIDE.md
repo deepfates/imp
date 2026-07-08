@@ -25,6 +25,12 @@ are called, so a later `DSEx.configure/1` or scoped `DSEx.context/2` affects
 existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
 runtime dependency.
 
+Explicit `lm:` values are checked when the program is built. DSEx accepts
+`nil`, an LM module, an LM struct, a configured `%{module: module, opts:
+keyword}` map, or an arity-2 callback. Explicit `adapter:` values accept `nil`
+or a module exporting `format/3` and `parse/3`. Omit the option when you want
+dynamic settings; pass the option when you want a self-contained program.
+
 For production provider access, use the ReqLLM-backed client:
 
 ```elixir

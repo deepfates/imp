@@ -22,8 +22,8 @@ defmodule DSEx.Predict.CodeAct do
   defstruct [:program_of_thought, tools: %{}, max_iters: 5, tool_policy: :allow]
 
   @option_schema [
-    lm: [type: :any],
-    adapter: [type: :any],
+    lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
+    adapter: [type: {:custom, DSEx.Adapter, :validate_adapter, []}],
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],

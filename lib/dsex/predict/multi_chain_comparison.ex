@@ -35,8 +35,8 @@ defmodule DSEx.Predict.MultiChainComparison do
   defstruct [:predict, :last_key, m: 3]
 
   @option_schema [
-    lm: [type: :any],
-    adapter: [type: :any],
+    lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
+    adapter: [type: {:custom, DSEx.Adapter, :validate_adapter, []}],
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],

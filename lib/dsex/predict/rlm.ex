@@ -55,9 +55,9 @@ defmodule DSEx.Predict.RLM do
   - `:max_observation_chars` - truncation limit for string observations.
   """
   @option_schema [
-    lm: [type: :any],
-    adapter: [type: :any],
-    sub_lm: [type: :any],
+    lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
+    adapter: [type: {:custom, DSEx.Adapter, :validate_adapter, []}],
+    sub_lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
     tools: [type: :any, default: []],
     tool_policy: [
       type: {:custom, DSEx.ToolPolicy, :validate, []},

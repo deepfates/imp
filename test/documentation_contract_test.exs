@@ -181,6 +181,9 @@ defmodule DocumentationContractTest do
 
     assert api =~ "The normal provider path for inference is `DSEx.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
+    assert api =~ "Explicit `lm:` values are checked when the program is built"
+    assert api =~ "configured `%{module: module, opts:\nkeyword}` map"
+    assert api =~ "module exporting `format/3` and `parse/3`"
     refute api =~ "OpenAITrainer.new"
     refute api =~ "DatabricksTrainer"
 

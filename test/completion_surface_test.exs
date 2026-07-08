@@ -353,24 +353,16 @@ defmodule CompletionSurfaceTest do
   end
 
   test "provider streaming reports LM misconfiguration as error chunks" do
-    bad_opts =
-      DSEx.predict("question -> answer",
-        lm: %{
-          module: DSEx.LM.Static,
-          opts: %{handler: fn _messages, _opts -> %{answer: "ok"} end}
-        }
-      )
-
-    assert [
-             %DSEx.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:invalid_lm_options, message}},
-               done: true
-             }
-           ] =
-             DSEx.Streaming.stream(bad_opts, %{question: "q"}, provider_stream: true)
-             |> Enum.to_list()
-
-    assert message =~ "expected keyword options"
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :lm option: expected configured LM :opts to be a keyword list/,
+                 fn ->
+                   DSEx.predict("question -> answer",
+                     lm: %{
+                       module: DSEx.LM.Static,
+                       opts: %{handler: fn _messages, _opts -> %{answer: "ok"} end}
+                     }
+                   )
+                 end
 
     bad_handler =
       DSEx.predict("question -> answer",
@@ -388,16 +380,9 @@ defmodule CompletionSurfaceTest do
 
     assert message =~ "expects :handler"
 
-    missing_lm = DSEx.predict("question -> answer", lm: %{provider: :missing})
-
-    assert [
-             %DSEx.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:not_an_lm, %{provider: :missing}}},
-               done: true
-             }
-           ] =
-             DSEx.Streaming.stream(missing_lm, %{question: "q"}, provider_stream: true)
-             |> Enum.to_list()
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
+                 fn -> DSEx.predict("question -> answer", lm: %{provider: :missing}) end
   end
 
   test "provider streaming reports adapter setup failures as error chunks" do
@@ -430,16 +415,14 @@ defmodule CompletionSurfaceTest do
              DSEx.Streaming.stream(invalid_lm_opts, %{question: "q"}, provider_stream: true)
              |> Enum.to_list()
 
-    unloaded = DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingStreamAdapter")
-
-    assert [
-             %DSEx.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:adapter_not_loaded, :"Elixir.MissingStreamAdapter", :nofile}},
-               done: true
-             }
-           ] =
-             DSEx.Streaming.stream(unloaded, %{question: "q"}, provider_stream: true)
-             |> Enum.to_list()
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 fn ->
+                   DSEx.predict("question -> answer",
+                     lm: lm,
+                     adapter: :"Elixir.MissingStreamAdapter"
+                   )
+                 end
   end
 
   test "provider streaming applies adapter supplied LM options" do

@@ -15,6 +15,45 @@ defmodule DSEx.LM do
     dispatch_generate(lm, messages, opts)
   end
 
+  def validate_lm(nil), do: {:ok, nil}
+
+  def validate_lm(module) when is_atom(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) do
+      {:ok, module}
+    else
+      {:error, "expected an LM module exporting generate/2"}
+    end
+  end
+
+  def validate_lm(fun) when is_function(fun, 2), do: {:ok, fun}
+
+  def validate_lm(%module{} = lm) do
+    if Code.ensure_loaded?(module) and
+         (function_exported?(module, :generate, 3) or function_exported?(module, :generate, 2)) do
+      {:ok, lm}
+    else
+      {:error, "expected an LM struct whose module exports generate/3 or generate/2"}
+    end
+  end
+
+  def validate_lm(%{module: module, opts: opts} = lm) when is_atom(module) do
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, "expected configured LM :opts to be a keyword list"}
+
+      Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) ->
+        {:ok, lm}
+
+      true ->
+        {:error, "expected configured LM :module to export generate/2"}
+    end
+  end
+
+  def validate_lm(_lm) do
+    {:error,
+     "expected nil, an LM module, an LM struct, a configured %{module: module, opts: keyword} map, or an arity-2 callback"}
+  end
+
   defp dispatch_generate(module, messages, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) do
       call_lm(fn -> module.generate(messages, opts) end, module)

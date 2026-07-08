@@ -405,11 +405,11 @@ defmodule ProductionHardeningTest do
     assert {:error, {:invalid_adapter_lm_opts, InvalidLMOptsAdapter, %{response_format: _}}} =
              DSEx.Predict.Predict.call(invalid_opts_program, %{question: "q"})
 
-    unloaded_program =
-      DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
-
-    assert {:error, {:adapter_not_loaded, :"Elixir.MissingAdapter", :nofile}} =
-             DSEx.Predict.Predict.call(unloaded_program, %{question: "q"})
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 fn ->
+                   DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
+                 end
   end
 
   test "Static LM validates direct-call options and handler shape" do
@@ -443,10 +443,29 @@ defmodule ProductionHardeningTest do
     assert {:ok, String} = DSEx.HTTP.validate_transport(String)
     assert {:error, message} = DSEx.HTTP.validate_transport(fn _url -> :ok end)
     assert message =~ "expected an HTTP transport module or arity-4 callback"
+    assert {:ok, nil} = DSEx.LM.validate_lm(nil)
+    assert {:ok, DSEx.LM.Static} = DSEx.LM.validate_lm(DSEx.LM.Static)
+    assert {:ok, DSEx.Adapter.Chat} = DSEx.Adapter.validate_adapter(DSEx.Adapter.Chat)
+    assert {:error, message} = DSEx.LM.validate_lm(%{provider: :missing})
+    assert message =~ "expected nil, an LM module"
+    assert {:error, message} = DSEx.Adapter.validate_adapter(String)
+    assert message =~ "expected an adapter module exporting format/3 and parse/3"
 
     assert_raise ArgumentError, ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/, fn ->
       DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
+                 fn ->
+                   DSEx.predict("question -> answer", lm: %{provider: :missing})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 fn ->
+                   DSEx.predict("question -> answer", adapter: String)
+                 end
 
     assert_raise ArgumentError,
                  ~r/DSEx.Retrievers.HTTP\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
