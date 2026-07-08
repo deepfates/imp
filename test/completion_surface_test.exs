@@ -219,7 +219,7 @@ defmodule CompletionSurfaceTest do
              trace
   end
 
-  test "CodeAct non-positive max_iters fails before calling the planner" do
+  test "CodeAct zero max_iters fails before calling the planner" do
     parent = self()
 
     lm = %{
@@ -232,7 +232,7 @@ defmodule CompletionSurfaceTest do
       ]
     }
 
-    code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: -2)
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: 0)
 
     assert {:error, {:code_act_max_iters, 0, []}} =
              DSEx.Predict.CodeAct.call(code_act, %{question: "q"})
@@ -257,6 +257,12 @@ defmodule CompletionSurfaceTest do
                  ~r/DSEx\.Predict\.CodeAct\.new\/3 expects tools to contain DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.CodeAct.new("question -> answer", [:not_a_tool])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3: invalid value for :max_iters option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", [], max_iters: -1)
                  end
 
     code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: nil)

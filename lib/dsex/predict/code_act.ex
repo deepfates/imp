@@ -28,7 +28,7 @@ defmodule DSEx.Predict.CodeAct do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     output_field: [type: :any, default: :answer],
-    max_iters: [type: :any, default: 5],
+    max_iters: [type: :non_neg_integer, default: 5],
     tool_policy: [type: :any, default: :allow]
   ]
 
@@ -40,7 +40,7 @@ defmodule DSEx.Predict.CodeAct do
     %__MODULE__{
       program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, pot_opts),
       tools: tools,
-      max_iters: non_negative_integer(opts[:max_iters]),
+      max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy]
     }
   end
@@ -213,7 +213,4 @@ defmodule DSEx.Predict.CodeAct do
   end
 
   defp normalize_tool_args(arguments), do: arguments
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 end

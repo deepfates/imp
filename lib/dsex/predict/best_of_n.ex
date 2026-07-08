@@ -4,7 +4,7 @@ defmodule DSEx.Predict.BestOfN do
   defstruct [:program, :metric, :feedback_fn, n: 3]
 
   @option_schema [
-    n: [type: :any, default: 3],
+    n: [type: :non_neg_integer, default: 3],
     feedback_fn: [type: :any, default: nil]
   ]
 

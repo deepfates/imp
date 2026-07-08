@@ -5,7 +5,7 @@ defmodule DSEx.Predict.Refine do
 
   @option_schema [
     feedback_fn: [type: :any, default: nil],
-    max_attempts: [type: :any, default: 3]
+    max_attempts: [type: :non_neg_integer, default: 3]
   ]
 
   def new(program, metric, opts \\ []) do

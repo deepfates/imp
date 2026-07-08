@@ -43,15 +43,11 @@ defmodule RefineFeedbackTest do
     assert [%{attempt: 1}, %{attempt: 2}] = DSEx.Prediction.get(prediction, :refine_history)
   end
 
-  test "Refine with non-positive attempts does not call the wrapped program" do
+  test "Refine with zero attempts does not call the wrapped program" do
     metric = fn _example, _prediction -> true end
 
     assert {:error, :no_attempts, []} =
              DSEx.Predict.Refine.new(%ExplodingProgram{}, metric, max_attempts: 0)
-             |> DSEx.Predict.Refine.call(%{question: "q"})
-
-    assert {:error, :no_attempts, []} =
-             DSEx.Predict.Refine.new(%ExplodingProgram{}, metric, max_attempts: -2)
              |> DSEx.Predict.Refine.call(%{question: "q"})
   end
 
@@ -135,15 +131,11 @@ defmodule RefineFeedbackTest do
              {:feedback_error, "feedback exploded"}
   end
 
-  test "BestOfN with non-positive attempts does not call the wrapped program" do
+  test "BestOfN with zero attempts does not call the wrapped program" do
     metric = fn _example, _prediction -> true end
 
     assert {:error, :no_successful_predictions} =
              DSEx.Predict.BestOfN.new(%ExplodingProgram{}, metric, n: 0)
-             |> DSEx.Predict.BestOfN.call(%{question: "q"})
-
-    assert {:error, :no_successful_predictions} =
-             DSEx.Predict.BestOfN.new(%ExplodingProgram{}, metric, n: -3)
              |> DSEx.Predict.BestOfN.call(%{question: "q"})
   end
 
@@ -191,6 +183,12 @@ defmodule RefineFeedbackTest do
                  fn ->
                    DSEx.Predict.BestOfN.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.BestOfN\.new\/3: invalid value for :n option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.BestOfN.new(%HintProgram{}, metric, n: -1)
+                 end
   end
 
   test "Refine reports invalid constructor inputs clearly" do
@@ -208,6 +206,12 @@ defmodule RefineFeedbackTest do
                  ~r/Refine\.new\/3 expects :feedback_fn to be nil or a unary function/,
                  fn ->
                    DSEx.Predict.Refine.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Refine\.new\/3: invalid value for :max_attempts option: expected non negative integer/,
+                 fn ->
+                   DSEx.Predict.Refine.new(%HintProgram{}, metric, max_attempts: -1)
                  end
   end
 end
