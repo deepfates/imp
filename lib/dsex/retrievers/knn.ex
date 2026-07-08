@@ -12,7 +12,7 @@ defmodule DSEx.Retrievers.KNN do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Retrievers.KNN.new/2")
 
     %__MODULE__{
-      examples: examples,
+      examples: validate_examples!(examples),
       k: non_negative_integer(opts[:k]),
       field: opts[:field]
     }
@@ -49,6 +49,15 @@ defmodule DSEx.Retrievers.KNN do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_examples!(examples) do
+    if Enumerable.impl_for(examples) do
+      Enum.to_list(examples)
+    else
+      raise ArgumentError,
+            "DSEx.Retrievers.KNN.new/2 expects examples to be an enumerable; got: #{inspect(examples)}"
+    end
+  end
 
   defp safe_text(value) do
     case String.Chars.impl_for(value) do

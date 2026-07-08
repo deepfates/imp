@@ -393,14 +393,11 @@ defmodule PublicSurfaceTest do
     lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
-    broken =
-      DSEx.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
-      |> DSEx.Optimizer.KNNFewShot.compile(program)
-
-    assert {:error, {:knn_few_shot_retrieval_failed, reason}} =
-             DSEx.Optimizer.KNNFewShot.Program.call(broken, %{question: "2+2?"})
-
-    assert String.contains?(reason, "Enumerable")
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 fn ->
+                   DSEx.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
+                 end
 
     empty =
       DSEx.Optimizer.KNNFewShot.new(-2, [

@@ -451,6 +451,12 @@ defmodule DSExTest do
       DSEx.Predict.KNN.new(1, [], %{field: :question})
     end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 fn ->
+                   DSEx.Predict.KNN.new(1, :not_trainset)
+                 end
+
     knn = DSEx.Predict.KNN.new(1, [])
 
     assert_raise ArgumentError, ~r/DSEx\.Predict\.KNN\.call\/2 expects inputs as a map/, fn ->

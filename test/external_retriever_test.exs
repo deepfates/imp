@@ -282,6 +282,12 @@ defmodule ExternalRetrieverTest do
     assert_raise ArgumentError, ~r/DSEx\.Retrievers\.KNN\.new\/2: expected keyword options/, fn ->
       DSEx.Retrievers.KNN.new([], :not_options)
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 fn ->
+                   DSEx.Retrievers.KNN.new(:not_examples)
+                 end
   end
 
   test "generic HTTP retriever reports request transport decode and mapper failures" do
