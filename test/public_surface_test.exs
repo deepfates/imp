@@ -399,7 +399,7 @@ defmodule PublicSurfaceTest do
     assert {:ok, _} = DSEx.Predict.Predict.call(compiled, %{question: "2+2?"})
   end
 
-  test "knn few-shot reports retrieval failures and clamps negative k" do
+  test "knn few-shot reports retrieval failures and rejects negative k" do
     lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)
 
@@ -410,13 +410,21 @@ defmodule PublicSurfaceTest do
                  end
 
     empty =
-      DSEx.Optimizer.KNNFewShot.new(-2, [
+      DSEx.Optimizer.KNNFewShot.new(0, [
         DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
       ])
       |> DSEx.Optimizer.KNNFewShot.compile(program)
 
     assert {:ok, prediction} = DSEx.Optimizer.KNNFewShot.Program.call(empty, %{question: "2+2?"})
     assert prediction.metadata.knn_few_shot.demo_count == 0
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3 expects k to be a non-negative integer/,
+                 fn ->
+                   DSEx.Optimizer.KNNFewShot.new(-2, [
+                     DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+                   ])
+                 end
   end
 
   test "ensemble captures child failures and reducer failures as structured results" do
@@ -454,6 +462,12 @@ defmodule PublicSurfaceTest do
                  ~r/DSEx\.Optimizer\.Ensemble\.new\/1 expects :reduce_fn to be nil or an arity-1 function/,
                  fn ->
                    DSEx.Optimizer.Ensemble.new(reduce_fn: fn -> %{} end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: .*:size.*non negative integer/s,
+                 fn ->
+                   DSEx.Optimizer.Ensemble.new(size: -1)
                  end
 
     assert_raise ArgumentError,

@@ -80,7 +80,7 @@ defmodule DSEx.Optimizer.KNNFewShot do
   ]
 
   def new(k, trainset, opts \\ []) do
-    k = non_negative_integer(k)
+    k = validate_k!(k)
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.KNNFewShot.new/3")
 
     %__MODULE__{
@@ -92,6 +92,10 @@ defmodule DSEx.Optimizer.KNNFewShot do
   def compile(%__MODULE__{} = optimizer, student),
     do: %DSEx.Optimizer.KNNFewShot.Program{student: student, optimizer: optimizer}
 
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
+  defp validate_k!(value) when is_integer(value) and value >= 0, do: value
+
+  defp validate_k!(value) do
+    raise ArgumentError,
+          "DSEx.Optimizer.KNNFewShot.new/3 expects k to be a non-negative integer; got: #{inspect(value)}"
+  end
 end

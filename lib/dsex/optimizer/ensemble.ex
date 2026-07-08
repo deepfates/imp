@@ -92,7 +92,7 @@ defmodule DSEx.Optimizer.Ensemble do
 
   @option_schema [
     reduce_fn: [type: :any, default: nil],
-    size: [type: :any, default: nil],
+    size: [type: {:or, [:non_neg_integer, nil]}, default: nil],
     deterministic: [type: :boolean, default: false]
   ]
 
@@ -102,7 +102,7 @@ defmodule DSEx.Optimizer.Ensemble do
 
     %__MODULE__{
       reduce_fn: opts[:reduce_fn],
-      size: non_negative_integer_or_nil(opts[:size]),
+      size: opts[:size],
       deterministic: opts[:deterministic]
     }
   end
@@ -121,10 +121,6 @@ defmodule DSEx.Optimizer.Ensemble do
             "DSEx.Optimizer.Ensemble.compile/2 expects an enumerable of programs; got: #{inspect(programs)}"
     end
   end
-
-  defp non_negative_integer_or_nil(nil), do: nil
-  defp non_negative_integer_or_nil(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer_or_nil(_value), do: 0
 
   defp validate_reduce_fn!(nil), do: :ok
   defp validate_reduce_fn!(reduce_fn) when is_function(reduce_fn, 1), do: :ok
