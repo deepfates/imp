@@ -49,6 +49,7 @@ criteria; current commands, docs, tests, and artifacts are.
 | Evaluation and optimization | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal; optimizers emit executable compiled programs and reports. |
 | Documentation | README, ExDoc, docs, and Livebooks teach DSEx as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
 | Parity evidence | Release claims are backed by the dashboard lanes for golden trace parity, live matched models, optimizer lift, production semantics, and provider-free performance. |
+| Clean-room product proof | A fresh Mix project can consume the unpacked package and exercise the golden user journey through the public API: predict, optimize, save/load, ReAct tools, provider construction, and credential redaction. |
 
 ## Gate Model
 
@@ -90,7 +91,10 @@ DSEx is production complete when:
 4. `mix integration.check` passes.
 5. `mix protocol.check` passes.
 6. `mix benchmark.trace.check` passes.
-7. `mix package.check` passes.
+7. `mix package.check` passes, including the clean-room package-consumer
+   workflow that installs the unpacked Hex artifact into a fresh Mix project and
+   exercises prediction, optimization, save/load, ReAct tools, provider-client
+   construction, and credential redaction through public APIs.
 8. `mix livebook.check` validates the shipped notebooks under `livebooks/`.
 9. `mix livebook.execute.check` executes the shipped notebooks when changing
    public examples, saving/loading examples, or learning material control flow.

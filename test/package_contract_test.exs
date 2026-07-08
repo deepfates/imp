@@ -237,6 +237,78 @@ defmodule PackageContractTest do
     unless DSEx.get(prediction, :answer) == "Paris" do
       raise "unexpected DSEx prediction: \#{inspect(prediction)}"
     end
+
+    demo =
+      DSEx.example(question: "What city is the Eiffel Tower in?", answer: "Paris")
+      |> DSEx.with_inputs([:question])
+
+    compiled =
+      DSEx.optimize(
+        program,
+        DSEx.Optimizer.LabeledFewShot.new(k: 1),
+        [demo]
+      )
+
+    {:ok, compiled_prediction} =
+      DSEx.call(compiled, %{question: "What city is the Eiffel Tower in?"})
+
+    unless DSEx.get(compiled_prediction, :answer) == "Paris" do
+      raise "optimized program did not remain executable"
+    end
+
+    loaded =
+      compiled
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    {:ok, loaded_prediction} =
+      DSEx.call(loaded, %{question: "What city is the Eiffel Tower in?"})
+
+    unless DSEx.get(loaded_prediction, :answer) == "Paris" do
+      raise "saved and loaded program did not remain executable"
+    end
+
+    {:ok, queue} =
+      Agent.start_link(fn ->
+        [
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
+          %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+        ]
+      end)
+
+    react_lm =
+      %{
+        module: DSEx.LM.Static,
+        opts: [
+          handler: fn _messages, _opts ->
+            Agent.get_and_update(queue, fn
+              [response | rest] -> {response, rest}
+              [] -> {%{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}, []}
+            end)
+          end
+        ]
+      }
+
+    lookup =
+      DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} -> "Paris" end)
+
+    react = DSEx.react("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
+
+    {:ok, react_prediction} =
+      DSEx.call(react, %{question: "What city is the Eiffel Tower in?"})
+
+    Agent.stop(queue)
+
+    unless DSEx.get(react_prediction, :answer) == "Paris" do
+      raise "ReAct tool workflow failed from package consumer"
+    end
+
+    provider = DSEx.req_llm("openai:gpt-test", api_key: "sk-redacted-test", temperature: 0)
+    dump = DSEx.Saving.dump(DSEx.predict("question -> answer", lm: provider))
+
+    if inspect(dump) =~ "sk-redacted-test" do
+      raise "provider credential leaked through save/load boundary"
+    end
     """
 
     {deps_output, deps_status} =
