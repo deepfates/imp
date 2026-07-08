@@ -64,6 +64,7 @@ defmodule DSEx.Evaluate do
           case call_program(program, inputs) do
             {:ok, prediction} ->
               result = metric_result(evaluator.metric, example, prediction)
+              error = metric_error(index, result)
 
               {%{
                  index: index,
@@ -73,8 +74,8 @@ defmodule DSEx.Evaluate do
                  passed?: result.passed?,
                  feedback: result.feedback,
                  metric_metadata: result.metadata,
-                 error: nil
-               }, errors}
+                 error: error
+               }, add_error(errors, error)}
 
             {:error, reason} ->
               error = %{index: index, reason: reason}
@@ -90,8 +91,6 @@ defmodule DSEx.Evaluate do
                  error: reason
                }, [error | errors]}
           end
-
-        errors = if row.error, do: errors, else: errors
 
         if too_many_errors?(errors, evaluator.max_errors) do
           {:halt, {[row | rows], errors}}
@@ -142,19 +141,27 @@ defmodule DSEx.Evaluate do
       %{
         score: 0.0,
         feedback: {:metric_error, error_message(error)},
-        metadata: %{error: error}
+        metadata: %{dsex_metric_error: error_message(error)}
       }
   catch
     kind, reason ->
       %{
         score: 0.0,
         feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{error: {kind, reason}}
+        metadata: %{dsex_metric_error: error_message({kind, reason})}
       }
   end
 
   defp trace(%DSEx.Prediction{metadata: metadata}), do: Map.get(metadata, :trace)
   defp trace(_prediction), do: nil
+
+  defp metric_error(index, %DSEx.Metrics.Result{metadata: %{dsex_metric_error: reason}}),
+    do: %{index: index, stage: :metric, reason: reason}
+
+  defp metric_error(_index, _result), do: nil
+
+  defp add_error(errors, nil), do: errors
+  defp add_error(errors, error), do: [error | errors]
 
   defp average([]), do: 0.0
   defp average(rows), do: Enum.sum(Enum.map(rows, & &1.score)) / length(rows)
