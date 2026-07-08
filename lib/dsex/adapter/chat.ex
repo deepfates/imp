@@ -4,7 +4,10 @@ defmodule DSEx.Adapter.Chat do
   @behaviour DSEx.Adapter
 
   @format_option_schema [
-    demos: [type: {:list, :any}, default: []],
+    demos: [
+      type: {:custom, __MODULE__, :validate_demos, []},
+      default: []
+    ],
     response_instruction: [type: :boolean, default: true]
   ]
 
@@ -56,6 +59,13 @@ defmodule DSEx.Adapter.Chat do
   end
 
   defp do_parse(_signature, raw), do: {:error, {:unsupported_lm_output, raw}}
+
+  @doc false
+  def validate_demos(demos) do
+    {:ok, DSEx.Example.normalize_demos!(demos, "#{inspect(__MODULE__)}.format/3")}
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
 
   defp build_prediction(signature, fields) do
     required =

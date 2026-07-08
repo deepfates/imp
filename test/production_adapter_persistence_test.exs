@@ -74,8 +74,12 @@ defmodule ProductionAdapterPersistenceTest do
                    )
                  end
 
-    assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.format\/3.*:demos.*expected.*list/s, fn ->
+    assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.format\/3.*:demos.*expects a demo/s, fn ->
       DSEx.Adapter.Chat.format(signature, %{question: "q"}, demos: :not_demos)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.format\/3.*:demos.*expects demos/s, fn ->
+      DSEx.Adapter.Chat.format(signature, %{question: "q"}, demos: [:not_a_demo])
     end
 
     assert_raise ArgumentError, ~r/DSEx.Adapter.Chat.parse\/3 expects keyword options/, fn ->
@@ -229,19 +233,14 @@ defmodule ProductionAdapterPersistenceTest do
         "Answer using the provided context."
       )
 
-    complete_demo =
-      DSEx.example(%{
-        question: "Capital?",
-        context: "France: Paris.",
-        answer: "Paris",
-        confidence: 1.0
-      })
+    complete_demo = %{
+      question: "Capital?",
+      context: "France: Paris.",
+      answer: "Paris",
+      confidence: 1.0
+    }
 
-    incomplete_demo =
-      DSEx.example(%{
-        question: "Largest city?",
-        answer: "Tokyo"
-      })
+    incomplete_demo = [question: "Largest city?", answer: "Tokyo"]
 
     messages =
       DSEx.Adapter.Chat.format(signature, %{question: "Current?", context: "Now."},
@@ -274,6 +273,20 @@ defmodule ProductionAdapterPersistenceTest do
 
     assert current_user =~ "[[ ## question ## ]]\nCurrent?"
     assert current_user =~ "Respond with the corresponding output fields"
+  end
+
+  test "json adapter normalizes direct demo options before delegating to chat format" do
+    signature = DSEx.signature("question -> answer")
+
+    messages =
+      DSEx.Adapter.JSON.format(signature, %{question: "Current?"},
+        demos: [%{question: "Capital?", answer: "Paris"}]
+      )
+
+    assert Enum.any?(
+             messages,
+             &(&1.role == :assistant and &1.content =~ "[[ ## answer ## ]]\nParis")
+           )
   end
 
   test "predict retries malformed chat output through JSON adapter fallback" do
