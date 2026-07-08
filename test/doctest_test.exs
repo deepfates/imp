@@ -17,6 +17,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Redaction
   doctest DSEx.Settings
   doctest DSEx.Signature
+  doctest DSEx.Tasks
   doctest DSEx.Telemetry
   doctest DSEx.Tool
 end
