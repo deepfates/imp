@@ -47,48 +47,9 @@ defmodule DSEx.Optimizer.Report do
   def restore_json_safe(value), do: load_value(value)
 
   def attach(program, %__MODULE__{} = report),
-    do: put_metadata(program, :optimizer_report, report)
+    do: DSEx.ProgramAccess.put_metadata(program, :optimizer_report, report)
 
-  def fetch(program), do: get_metadata(program, :optimizer_report)
-
-  defp put_metadata(%DSEx.Predict.Predict{metadata: metadata} = program, key, value) do
-    %{program | metadata: Map.put(metadata, key, value)}
-  end
-
-  defp put_metadata(%DSEx.Predict.ChainOfThought{predict: predict} = program, key, value) do
-    %{program | predict: put_metadata(predict, key, value)}
-  end
-
-  defp put_metadata(%DSEx.Predict.ProgramOfThought{predict: predict} = program, key, value) do
-    %{program | predict: put_metadata(predict, key, value)}
-  end
-
-  defp put_metadata(%DSEx.Predict.CodeAct{program_of_thought: pot} = program, key, value) do
-    %{program | program_of_thought: put_metadata(pot, key, value)}
-  end
-
-  defp put_metadata(%DSEx.Predict.RAG{program: inner} = program, key, value) do
-    %{program | program: put_metadata(inner, key, value)}
-  end
-
-  defp put_metadata(program, _key, _value), do: program
-
-  defp get_metadata(%DSEx.Predict.Predict{metadata: metadata}, key),
-    do: Map.get(metadata, key)
-
-  defp get_metadata(%DSEx.Predict.ChainOfThought{predict: predict}, key),
-    do: get_metadata(predict, key)
-
-  defp get_metadata(%DSEx.Predict.ProgramOfThought{predict: predict}, key),
-    do: get_metadata(predict, key)
-
-  defp get_metadata(%DSEx.Predict.CodeAct{program_of_thought: pot}, key),
-    do: get_metadata(pot, key)
-
-  defp get_metadata(%DSEx.Predict.RAG{program: inner}, key),
-    do: get_metadata(inner, key)
-
-  defp get_metadata(_program, _key), do: nil
+  def fetch(program), do: DSEx.ProgramAccess.get_metadata(program, :optimizer_report)
 
   defp dump_value(%DSEx.Example{} = example) do
     %{

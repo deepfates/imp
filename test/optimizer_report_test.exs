@@ -168,6 +168,25 @@ defmodule OptimizerReportTest do
              |> DSEx.Signature.to_spec()
   end
 
+  test "instruction search optimizer metadata attaches through wrapper programs" do
+    {_train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    program =
+      "question, context -> answer"
+      |> DSEx.predict(lm: lm())
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France: Paris."}]))
+
+    compiled =
+      DSEx.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
+        "Always answer Paris."
+      ])
+
+    assert compiled.program.metadata.trainset_size == 0
+    assert compiled.program.metadata.candidate_count == 1
+    assert DSEx.Optimizer.Report.fetch(compiled).optimizer == :instruction_search
+  end
+
   test "optimizer reports attach and fetch through wrapper programs" do
     report = DSEx.Optimizer.Report.new(%{optimizer: :wrapper_probe, metadata: %{status: :ok}})
 

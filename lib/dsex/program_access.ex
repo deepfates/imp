@@ -48,4 +48,55 @@ defmodule DSEx.ProgramAccess do
       nil -> nil
     end
   end
+
+  def get_metadata(program, key) do
+    case predict(program) do
+      %Predict{metadata: metadata} -> Map.get(metadata, key)
+      nil -> nil
+    end
+  end
+
+  def put_metadata(%Predict{metadata: metadata} = program, key, value) do
+    %{program | metadata: Map.put(metadata, key, value)}
+  end
+
+  def put_metadata(%ChainOfThought{predict: predict} = program, key, value) do
+    %{program | predict: put_metadata(predict, key, value)}
+  end
+
+  def put_metadata(%ProgramOfThought{predict: predict} = program, key, value) do
+    %{program | predict: put_metadata(predict, key, value)}
+  end
+
+  def put_metadata(%CodeAct{program_of_thought: pot} = program, key, value) do
+    %{program | program_of_thought: put_metadata(pot, key, value)}
+  end
+
+  def put_metadata(%RAG{program: inner} = program, key, value) do
+    %{program | program: put_metadata(inner, key, value)}
+  end
+
+  def put_metadata(program, _key, _value), do: program
+
+  def merge_metadata(%Predict{metadata: existing} = program, metadata) when is_map(metadata) do
+    %{program | metadata: Map.merge(existing, metadata)}
+  end
+
+  def merge_metadata(%ChainOfThought{predict: predict} = program, metadata) do
+    %{program | predict: merge_metadata(predict, metadata)}
+  end
+
+  def merge_metadata(%ProgramOfThought{predict: predict} = program, metadata) do
+    %{program | predict: merge_metadata(predict, metadata)}
+  end
+
+  def merge_metadata(%CodeAct{program_of_thought: pot} = program, metadata) do
+    %{program | program_of_thought: merge_metadata(pot, metadata)}
+  end
+
+  def merge_metadata(%RAG{program: inner} = program, metadata) do
+    %{program | program: merge_metadata(inner, metadata)}
+  end
+
+  def merge_metadata(program, _metadata), do: program
 end

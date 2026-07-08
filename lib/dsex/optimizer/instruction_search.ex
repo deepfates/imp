@@ -188,35 +188,9 @@ defmodule DSEx.Optimizer.InstructionSearch do
     end
   end
 
-  defp attach_optimizer_metadata(%DSEx.Predict.Predict{} = program, metadata),
-    do: %{program | metadata: Map.merge(program.metadata, metadata)}
-
-  defp attach_optimizer_metadata(
-         %DSEx.Predict.ChainOfThought{predict: predict} = program,
-         metadata
-       ) do
-    %{program | predict: attach_optimizer_metadata(predict, metadata)}
+  defp attach_optimizer_metadata(program, metadata) do
+    DSEx.ProgramAccess.merge_metadata(program, metadata)
   end
-
-  defp attach_optimizer_metadata(
-         %DSEx.Predict.ProgramOfThought{predict: predict} = program,
-         metadata
-       ) do
-    %{program | predict: attach_optimizer_metadata(predict, metadata)}
-  end
-
-  defp attach_optimizer_metadata(
-         %DSEx.Predict.CodeAct{program_of_thought: pot} = program,
-         metadata
-       ) do
-    %{program | program_of_thought: attach_optimizer_metadata(pot, metadata)}
-  end
-
-  defp attach_optimizer_metadata(%DSEx.Predict.RAG{program: inner} = program, metadata) do
-    %{program | program: attach_optimizer_metadata(inner, metadata)}
-  end
-
-  defp attach_optimizer_metadata(program, _metadata), do: program
 
   defp unique_candidates(candidates), do: Enum.uniq(candidates)
 
