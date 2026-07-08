@@ -545,7 +545,109 @@ defmodule DashboardTest do
            ] == 26.3641
   end
 
+  test "dashboard ignores stale prompt contracts on non-winning live candidates" do
+    root = tmp_dir("dashboard-live-prompt-winners")
+    live_matrix_dir = Path.join(root, "live-matrix")
+    out_dir = Path.join(root, "out")
+    Enum.each([live_matrix_dir, out_dir], &File.mkdir_p!/1)
+
+    write_json!(Path.join(live_matrix_dir, "live-matched-model-matrix-20260707T000000Z.json"), %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "summary" => %{
+        "models" => 4,
+        "full_parity_models" => 0,
+        "matrix_complete" => false,
+        "dsex_instrumentation" => %{"complete" => true},
+        "runtime_shape" => %{"complete" => true},
+        "disagreements" => %{"count" => 0},
+        "latency" => %{"complete" => true},
+        "execution" => %{"complete" => true},
+        "prompt_contract" => %{
+          "complete" => false,
+          "models_with_current_prompt_contract" => 2,
+          "total_models" => 4
+        },
+        "required_lanes" => %{
+          "current_low_cost" => %{
+            "present" => true,
+            "satisfied" => false,
+            "satisfaction" => "unsatisfied",
+            "full_evidence" => false,
+            "models" => ["anthropic:claude-haiku-4-5", "gpt-5.4-mini"],
+            "best_model" => "anthropic:claude-haiku-4-5",
+            "best_status" => "research_sample",
+            "coverage" => %{"covered_rows" => 3219, "expected_rows" => 8724}
+          },
+          "frontier_sanity" => %{
+            "present" => true,
+            "satisfied" => true,
+            "satisfaction" => "evidence",
+            "full_evidence" => false,
+            "models" => ["anthropic:claude-sonnet-4-6", "gpt-5.5"],
+            "best_model" => "anthropic:claude-sonnet-4-6",
+            "best_status" => "research_sample"
+          },
+          "historical_research" => %{
+            "present" => true,
+            "satisfied" => true,
+            "satisfaction" => "explicit_unavailable",
+            "availability" => %{
+              "status" => "explicit_unavailable",
+              "note" => "legacy endpoints unavailable"
+            },
+            "full_evidence" => false,
+            "models" => ["gpt-3.5-turbo"],
+            "best_model" => "gpt-3.5-turbo",
+            "best_status" => "smoke"
+          }
+        }
+      },
+      "models" => [
+        live_model("anthropic:claude-haiku-4-5", ["current_low_cost"], true),
+        live_model("gpt-5.4-mini", ["current_low_cost"], false),
+        live_model("anthropic:claude-sonnet-4-6", ["frontier_sanity"], true),
+        live_model("gpt-5.5", ["frontier_sanity"], false)
+      ]
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--live-matrix-dir",
+        live_matrix_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+
+    live_blockers =
+      dashboard["lanes"]["live_matched_model"]["summary"]["blocking_requirements"]
+
+    refute Enum.any?(live_blockers, &(&1["kind"] == "prompt_contract_incomplete"))
+    assert Enum.map(live_blockers, & &1["kind"]) == ["live_lane_full_evidence"]
+  end
+
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp live_model(model, lane_tags, prompt_current?) do
+    %{
+      "model" => model,
+      "lane_tags" => lane_tags,
+      "parity" => %{"latency_parity" => true},
+      "proof" => %{
+        "prompt_contract_current" => prompt_current?,
+        "prompt_contract" => %{"dsex_req_llm" => if(prompt_current?, do: "v7", else: "v6")},
+        "expected_prompt_contract" => %{"dsex_req_llm" => "v7"},
+        "max_concurrency_consistent" => true
+      }
+    }
+  end
 
   defp live_matrix_artifact(covered_rows, coverage_percent, run_id) do
     %{

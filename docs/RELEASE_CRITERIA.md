@@ -83,7 +83,8 @@ complete feature.
 
 DSEx is production complete when:
 
-1. `tk ready -T dsex` returns no production release blockers.
+1. `tk ready | rg '^de-'` shows no ready DSEx production-release blockers
+   that lack an owner or an explicit non-blocking release decision.
 2. `tk dep cycle` reports no cycles.
 3. `mix production.check` passes.
 4. `mix integration.check` passes.

@@ -2328,6 +2328,52 @@ defmodule BenchmarkTruthTest do
     assert attempt["coverage"]["covered_rows"] == 0
   end
 
+  test "live matrix accepts explicit historical lane unavailability without inventing evidence" do
+    out_dir = tmp_dir("live-matrix-historical-unavailable")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "historical-zero.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-3.5-turbo",
+      "campaign_id" => "historical-unavailable-smoke",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 0, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "source_reports" => [%{"path" => "failed-chunk.json"}],
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir,
+        "--historical-unavailable-note",
+        "OpenAI historical quota exhausted; Gemini key invalid; Claude 3 historical endpoints unavailable on this account."
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    historical = matrix["summary"]["required_lanes"]["historical_research"]
+
+    assert matrix["models"] == []
+    assert historical["satisfied"]
+    assert historical["satisfaction"] == "explicit_unavailable"
+    refute historical["full_evidence"]
+    refute historical["present"]
+    assert historical["availability"]["status"] == "explicit_unavailable"
+    assert historical["best_model"] == nil
+
+    assert matrix["summary"]["unavailable_lanes"]["historical_research"] =~
+             "Claude 3 historical endpoints unavailable"
+  end
+
   test "live matrix tags modern non-OpenAI model lanes" do
     out_dir = tmp_dir("live-matrix-non-openai-lanes")
     in_dir = Path.join(out_dir, "campaigns")

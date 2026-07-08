@@ -608,12 +608,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         }
       )
       |> maybe_add_requirement(
-        get_in(summary, ["prompt_contract", "complete"]) != true,
+        prompt_contract_failures(artifact) != [],
         %{
           "kind" => "prompt_contract_incomplete",
+          "failures" => prompt_contract_failures(artifact),
           "prompt_contract" => summary["prompt_contract"],
           "message" =>
-            "Live matched-model evidence is not current for every selected prompt/signature contract."
+            "Live matched-model release candidates do not all use the current prompt/signature contract."
         }
       )
       |> maybe_add_requirement(
@@ -647,6 +648,43 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     artifact
     |> Map.get("models", [])
     |> Enum.filter(&(get_in(&1, ["proof", "max_concurrency_consistent"]) != true))
+  end
+
+  defp prompt_contract_failures(artifact) do
+    required = get_in(artifact, ["summary", "required_lanes"]) || %{}
+    by_model = Map.new(artifact["models"] || [], &{&1["model"], &1})
+
+    required
+    |> Enum.flat_map(fn {_lane, status} ->
+      cond do
+        get_in(status, ["availability", "status"]) == "explicit_unavailable" ->
+          []
+
+        is_binary(status["best_model"]) ->
+          [status["best_model"]]
+
+        true ->
+          status["models"] || []
+      end
+    end)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn model_name ->
+      model = by_model[model_name] || %{"model" => model_name}
+
+      if get_in(model, ["proof", "prompt_contract_current"]) == true do
+        []
+      else
+        [
+          %{
+            "model" => model_name,
+            "lane_tags" => model["lane_tags"] || [],
+            "prompt_contract" => get_in(model, ["proof", "prompt_contract"]),
+            "expected_prompt_contract" => get_in(model, ["proof", "expected_prompt_contract"]),
+            "artifact" => model["artifact"]
+          }
+        ]
+      end
+    end)
   end
 
   defp live_campaign_blocking_requirements(artifact) do

@@ -152,6 +152,18 @@ When several models are present in one lane, the lane summary reports the
 strongest candidate as the headline `coverage`/`cost` path and keeps
 cross-candidate totals under `cumulative`; release blockers should point at the
 candidate most likely to close the lane.
+If legacy/research endpoints are no longer available, an operator may record
+that decision explicitly:
+
+```sh
+mix benchmark.live_matrix \
+  --historical-unavailable-note "GPT-3.5 quota exhausted; Gemini 1.x credential invalid; Claude 3 endpoints unavailable on this account."
+```
+
+That note satisfies only the historical/research availability requirement. It
+does not create `full_evidence`, does not count zero-row failed endpoint probes
+as parity evidence, and does not satisfy the current low-cost or frontier
+evidence lanes.
 
 Pass condition:
 

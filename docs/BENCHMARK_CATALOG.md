@@ -7,6 +7,10 @@ different question than the release dashboard:
 - this catalog asks whether DSEx is sampling the right task families from the
   DSPy literature, docs, and examples.
 
+The commands in this document are source-checkout evidence commands for DSEx
+maintainers. They are not part of the Hex package API or a normal application
+install path.
+
 The goal is broad, cheap, repeatable sanity first. Full campaigns are reserved
 for lanes where the smoke and research tiers show that DSEx is in the same
 effectiveness ballpark as Python DSPy.

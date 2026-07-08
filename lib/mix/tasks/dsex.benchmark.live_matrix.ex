@@ -29,7 +29,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
           out: :string,
           max_age_hours: :integer,
           campaign_id: :string,
-          campaign_ids: :string
+          campaign_ids: :string,
+          historical_unavailable_note: :string
         ]
       )
 
@@ -39,6 +40,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     out_dir = Keyword.get(opts, :out, @default_out)
     max_age_hours = Keyword.get(opts, :max_age_hours, 168)
     campaign_ids = campaign_ids(opts)
+    unavailable_notes = unavailable_notes(opts)
     File.mkdir_p!(out_dir)
 
     loaded =
@@ -60,7 +62,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       |> Enum.filter(&evidence_artifact?/1)
       |> best_by_identity(max_age_hours)
 
-    report = matrix_report(artifacts, max_age_hours, skipped, failed_attempts, campaign_ids)
+    report =
+      matrix_report(
+        artifacts,
+        max_age_hours,
+        skipped,
+        failed_attempts,
+        campaign_ids,
+        unavailable_notes
+      )
+
     out_path = Path.join(out_dir, "live-matched-model-matrix-#{timestamp_slug()}.json")
     File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
 
@@ -114,6 +125,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
 
   defp filter_campaigns(artifacts, campaign_ids),
     do: Enum.filter(artifacts, &(&1["campaign_id"] in campaign_ids))
+
+  defp unavailable_notes(opts) do
+    note =
+      Keyword.get(opts, :historical_unavailable_note) ||
+        System.get_env("DSEX_HISTORICAL_UNAVAILABLE_NOTE")
+
+    case blank?(note) do
+      true -> %{}
+      false -> %{"historical_research" => String.trim(note)}
+    end
+  end
+
+  defp blank?(nil), do: true
+  defp blank?(value) when is_binary(value), do: String.trim(value) == ""
 
   defp best_by_identity(artifacts, max_age_hours) do
     artifacts
@@ -217,9 +242,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     }
   end
 
-  defp matrix_report(artifacts, max_age_hours, skipped_malformed, failed_attempts, campaign_ids) do
+  defp matrix_report(
+         artifacts,
+         max_age_hours,
+         skipped_malformed,
+         failed_attempts,
+         campaign_ids,
+         unavailable_notes
+       ) do
     models = Enum.map(artifacts, &model_row(&1, max_age_hours))
-    required = required_lanes(models)
+    required = required_lanes(models, unavailable_notes)
     complete = Enum.all?(required, fn {_lane, row} -> row["satisfied"] == true end)
 
     %{
@@ -234,6 +266,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "skipped_malformed_artifacts" => skipped_malformed,
         "skipped_zero_coverage_artifacts" => failed_attempts["count"],
         "failed_attempts" => failed_attempts,
+        "unavailable_lanes" => unavailable_notes,
         "full_parity_models" => Enum.count(models, & &1["full_parity"]),
         "matrix_complete" => complete,
         "required_lanes" => required,
@@ -323,11 +356,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     }
   end
 
-  defp required_lanes(models) do
+  defp required_lanes(models, unavailable_notes) do
     %{
-      "current_low_cost" => required_lane(models, "current_low_cost"),
-      "frontier_sanity" => required_lane(models, "frontier_sanity"),
-      "historical_research" => required_lane(models, "historical_research")
+      "current_low_cost" => required_lane(models, "current_low_cost", unavailable_notes),
+      "frontier_sanity" => required_lane(models, "frontier_sanity", unavailable_notes),
+      "historical_research" => required_lane(models, "historical_research", unavailable_notes)
     }
   end
 
@@ -827,15 +860,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   defp average([]), do: nil
   defp average(values), do: Enum.sum(values) / length(values)
 
-  defp required_lane(models, tag) do
+  defp required_lane(models, tag, unavailable_notes) do
     candidates = Enum.filter(models, &(tag in &1["lane_tags"]))
     best = best_lane_candidate(candidates)
     policy = lane_policy(tag)
-    satisfied = Enum.any?(candidates, &lane_candidate_satisfies?(&1, policy))
+    unavailable_note = unavailable_notes[tag]
+    evidence_satisfied = Enum.any?(candidates, &lane_candidate_satisfies?(&1, policy))
+    unavailable_satisfied = unavailable_note_allowed?(tag, unavailable_note)
+    satisfied = evidence_satisfied or unavailable_satisfied
 
     %{
       "present" => candidates != [],
       "satisfied" => satisfied,
+      "satisfaction" => satisfaction_status(evidence_satisfied, unavailable_satisfied),
+      "availability" => availability_status(unavailable_note),
       "policy" => policy,
       "full_evidence" => Enum.any?(candidates, & &1["full_evidence"]),
       "models" => Enum.map(candidates, & &1["model"]),
@@ -845,6 +883,21 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "cost" => lane_cost_progress(candidates, best)
     }
   end
+
+  defp unavailable_note_allowed?("historical_research", note) when is_binary(note), do: true
+  defp unavailable_note_allowed?(_tag, _note), do: false
+
+  defp satisfaction_status(true, _unavailable), do: "evidence"
+  defp satisfaction_status(false, true), do: "explicit_unavailable"
+  defp satisfaction_status(false, false), do: "unsatisfied"
+
+  defp availability_status(note) when is_binary(note),
+    do: %{
+      "status" => "explicit_unavailable",
+      "note" => note
+    }
+
+  defp availability_status(_note), do: %{"status" => "unresolved"}
 
   defp lane_policy("current_low_cost") do
     %{

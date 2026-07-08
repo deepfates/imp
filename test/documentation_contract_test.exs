@@ -54,8 +54,10 @@ defmodule DocumentationContractTest do
 
     refute_closed_ticket_refs(body)
     refute body =~ "The production release scope is tracked under ticket"
+    refute body =~ "tk ready -T dsex"
 
     assert body =~ ~r/Historical planning tickets are not release\s+criteria/
+    assert body =~ "tk ready | rg '^de-'"
     assert body =~ "mix production.check"
     assert body =~ "mix benchmark.dashboard.full"
     assert body =~ "mix livebook.execute.check"
