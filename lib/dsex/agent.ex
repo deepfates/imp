@@ -37,7 +37,7 @@ defmodule DSEx.Agent do
   ]
 
   @option_schema [
-    tools: [type: {:list, :any}, default: []],
+    tools: [type: {:custom, DSEx.Tool, :validate_tools, []}, default: []],
     children: [type: {:list, :any}, default: []],
     input_schema: [type: {:map, :any, :any}, default: %{}],
     output_schema: [type: {:map, :any, :any}, default: %{}],

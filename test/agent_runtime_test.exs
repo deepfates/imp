@@ -83,7 +83,7 @@ defmodule AgentRuntimeTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3 expects :tools to contain DSEx\.Tool structs/,
+                 ~r/DSEx\.Agent\.new\/3: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
                  fn ->
                    Agent.new(:bad, handler, tools: [:not_a_tool])
                  end

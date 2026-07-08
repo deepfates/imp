@@ -58,7 +58,7 @@ defmodule DSEx.Predict.RLM do
     lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
     adapter: [type: {:custom, DSEx.Adapter, :validate_adapter, []}],
     sub_lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
-    tools: [type: :any, default: []],
+    tools: [type: {:custom, DSEx.Tool, :validate_tools, []}, default: []],
     tool_policy: [
       type: {:custom, DSEx.ToolPolicy, :validate, []},
       default: :allow

@@ -140,13 +140,13 @@ defmodule RLMPublicSurfaceTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2 expects :tools to be a list of DSEx\.Tool structs/,
+                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.RLM.new("question -> answer", tools: :not_tools)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2 expects :tools to contain DSEx\.Tool structs/,
+                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.RLM.new("question -> answer", tools: [:not_a_tool])
                  end

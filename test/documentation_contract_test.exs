@@ -473,6 +473,9 @@ defmodule DocumentationContractTest do
     [tool] = DSEx.MCP.import_tools(catalog)
 
     assert tool.name == :lookup
+    assert {:ok, [^tool]} = DSEx.Tool.validate_tools([tool])
+    assert {:error, message} = DSEx.Tool.validate_tools([:not_a_tool])
+    assert message =~ "expected a list of DSEx.Tool structs"
     assert DSEx.Tool.call(tool, %{key: "value"}) == %{key: "value"}
   end
 

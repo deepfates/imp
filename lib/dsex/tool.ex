@@ -57,6 +57,20 @@ defmodule DSEx.Tool do
           "DSEx.Tool.new/4 expects a unary function as the tool runner; got: #{inspect(run)}"
   end
 
+  def validate_tools(tools) when is_list(tools) do
+    case Enum.find(tools, &(not match?(%__MODULE__{}, &1))) do
+      nil ->
+        {:ok, tools}
+
+      invalid ->
+        {:error, "expected a list of DSEx.Tool structs, got invalid entry: #{inspect(invalid)}"}
+    end
+  end
+
+  def validate_tools(tools) do
+    {:error, "expected a list of DSEx.Tool structs, got: #{inspect(tools)}"}
+  end
+
   @doc """
   Calls a tool with one argument.
 
