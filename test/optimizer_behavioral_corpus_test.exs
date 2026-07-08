@@ -89,6 +89,42 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.demo_candidate_count == 1
   end
 
+  test "MIPROv2 reports invalid devset setup without crashing" do
+    program = france_program()
+
+    compiled =
+      DSEx.Optimizer.MIPROv2.new(metric(), trials: 2, demos_per_candidate: 1)
+      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :mipro_v2
+    assert report.best_score == nil
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.status == :all_candidates_failed
+    assert [%{stage: :setup, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+  end
+
+  test "MIPROv2 records trainset errors while preserving baseline evaluation" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.MIPROv2.new(metric(), trials: 1, demos_per_candidate: 1)
+      |> DSEx.Optimizer.MIPROv2.compile(program, :not_an_enumerable_trainset, devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :mipro_v2
+    assert report.best_score == baseline_score
+    assert report.metadata.status == :with_errors
+    assert Enum.any?(report.candidates, &Map.get(&1, :baseline))
+    assert [%{stage: :trainset, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+  end
+
   test "GEPA turns textual feedback into reflective candidates and keeps the best" do
     program = france_program()
 

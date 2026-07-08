@@ -22,51 +22,136 @@ defmodule DSEx.Optimizer.MIPROv2 do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    instructions = DSEx.Optimizer.InstructionSearch.candidate_instructions(program, trainset)
-    demo_sets = demo_candidates(trainset, optimizer.demos_per_candidate)
-    evaluator = DSEx.Evaluate.new(devset, optimizer.metric)
+    {trainset, setup_errors} = materialize_trainset(trainset)
 
-    baseline =
-      {DSEx.Evaluate.run(evaluator, program).score, program, %{trial: 0, baseline: true}}
+    with {:ok, evaluator} <- new_evaluator(devset, optimizer.metric),
+         {:ok, baseline_score} <- evaluate_score(evaluator, program) do
+      {instructions, instruction_errors} = candidate_instructions(program, trainset)
+      demo_sets = demo_candidates(trainset, optimizer.demos_per_candidate)
+      search_space = candidate_pairs(instructions, demo_sets)
 
-    search_space = candidate_pairs(instructions, demo_sets)
+      {trial_results, trial_errors} =
+        search_space
+        |> tpe_trial_order(optimizer.trials, optimizer.cold_start, fn {instruction, demos} ->
+          candidate = build_candidate(program, instruction, demos, optimizer.demos_per_candidate)
+          evaluate_score(evaluator, candidate)
+        end)
+        |> Enum.map(fn
+          {{instruction, demos}, trial, {:ok, score}, source} ->
+            candidate =
+              build_candidate(program, instruction, demos, optimizer.demos_per_candidate)
 
-    results =
-      search_space
-      |> tpe_trial_order(optimizer.trials, optimizer.cold_start, fn {instruction, demos} ->
-        candidate = build_candidate(program, instruction, demos, optimizer.demos_per_candidate)
-        DSEx.Evaluate.run(evaluator, candidate).score
+            {{:ok, score, candidate,
+              %{trial: trial, instruction: instruction, demos: demos, source: source}}, []}
+
+          {{instruction, demos}, trial, {:error, reason}, source} ->
+            metadata = %{trial: trial, instruction: instruction, demos: demos, source: source}
+
+            {{:error, reason, metadata},
+             [%{stage: :candidate_evaluation, reason: reason, metadata: metadata}]}
+        end)
+        |> Enum.unzip()
+
+      results =
+        trial_results ++
+          [{:ok, baseline_score, program, %{trial: 0, baseline: true}}]
+
+      errors = setup_errors ++ instruction_errors ++ List.flatten(trial_errors)
+
+      summarize_and_attach(program, optimizer, results, errors, %{
+        search: :categorical_tpe,
+        acquisition: :laplace_density_ratio,
+        cold_start: min(optimizer.cold_start, length(search_space)),
+        instruction_count: length(instructions),
+        demo_candidate_count: length(demo_sets),
+        status: if(errors == [], do: :ok, else: :with_errors)
+      })
+    else
+      {:error, reason} ->
+        summarize_and_attach(
+          program,
+          optimizer,
+          [],
+          setup_errors ++ [%{stage: :setup, reason: reason}],
+          %{
+            search: :categorical_tpe,
+            acquisition: :laplace_density_ratio,
+            cold_start: 0,
+            instruction_count: 0,
+            demo_candidate_count: 0,
+            status: :all_candidates_failed
+          }
+        )
+    end
+  end
+
+  defp summarize_and_attach(program, _optimizer, results, errors, metadata) do
+    successes =
+      Enum.flat_map(results, fn
+        {:ok, score, candidate, candidate_metadata} -> [{score, candidate, candidate_metadata}]
+        _other -> []
       end)
-      |> Enum.map(fn {{instruction, demos}, trial, score, source} ->
-        candidate = build_candidate(program, instruction, demos, optimizer.demos_per_candidate)
 
-        {score, candidate,
-         %{trial: trial, instruction: instruction, demos: demos, source: source}}
+    report_candidates =
+      Enum.map(successes, fn {score, _candidate, candidate_metadata} ->
+        Map.put(candidate_metadata, :score, score)
       end)
-      |> Kernel.++([baseline])
 
-    {best_score, best, _metadata} =
-      Enum.max_by(results, fn {score, _candidate, _metadata} -> score end)
+    {best_score, best} =
+      case successes do
+        [] ->
+          {nil, program}
+
+        _ ->
+          {score, candidate, _metadata} =
+            Enum.max_by(successes, fn {score, _candidate, _} -> score end)
+
+          {score, candidate}
+      end
 
     DSEx.Optimizer.Report.attach(
       best,
       DSEx.Optimizer.Report.new(%{
         optimizer: :mipro_v2,
         best_score: best_score,
-        candidate_count: length(results),
-        candidates:
-          Enum.map(results, fn {score, _candidate, metadata} ->
-            Map.put(metadata, :score, score)
-          end),
-        metadata: %{
-          search: :categorical_tpe,
-          acquisition: :laplace_density_ratio,
-          cold_start: min(optimizer.cold_start, length(search_space)),
-          instruction_count: length(instructions),
-          demo_candidate_count: length(demo_sets)
-        }
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
+        errors: errors,
+        metadata: metadata
       })
     )
+  end
+
+  defp materialize_trainset(trainset) do
+    {Enum.to_list(trainset), []}
+  rescue
+    error -> {[], [%{stage: :trainset, reason: error_message(error)}]}
+  catch
+    kind, reason -> {[], [%{stage: :trainset, reason: error_message({kind, reason})}]}
+  end
+
+  defp new_evaluator(devset, metric) do
+    {:ok, DSEx.Evaluate.new(devset, metric)}
+  rescue
+    error -> {:error, error_message(error)}
+  catch
+    kind, reason -> {:error, error_message({kind, reason})}
+  end
+
+  defp candidate_instructions(program, trainset) do
+    {DSEx.Optimizer.InstructionSearch.candidate_instructions(program, trainset), []}
+  rescue
+    error -> {[], [%{stage: :instruction_proposal, reason: error_message(error)}]}
+  catch
+    kind, reason -> {[], [%{stage: :instruction_proposal, reason: error_message({kind, reason})}]}
+  end
+
+  defp evaluate_score(evaluator, program) do
+    {:ok, DSEx.Evaluate.run(evaluator, program).score}
+  rescue
+    error -> {:error, error_message(error)}
+  catch
+    kind, reason -> {:error, error_message({kind, reason})}
   end
 
   defp candidate_pairs(instructions, demo_sets) do
@@ -91,9 +176,15 @@ defmodule DSEx.Optimizer.MIPROv2 do
           best_tpe_candidate(search_space, observations)
         end
 
-      score = score_fn.(candidate)
-      observation = %{candidate: candidate, score: score}
-      {[{candidate, trial, score, source} | selected], [observation | observations]}
+      result = score_fn.(candidate)
+
+      observations =
+        case result do
+          {:ok, score} -> [%{candidate: candidate, score: score} | observations]
+          {:error, _reason} -> observations
+        end
+
+      {[{candidate, trial, result, source} | selected], observations}
     end)
     |> elem(0)
     |> Enum.reverse()
@@ -175,4 +266,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
     raise ArgumentError,
           "DSEx.Optimizer.MIPROv2.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
