@@ -704,6 +704,15 @@ defmodule PublicSurfaceTest do
     assert missing == []
   end
 
+  test "public product modules are deliberately documented" do
+    undocumented =
+      @public_modules
+      |> Enum.reject(&documented_module?/1)
+      |> Enum.sort()
+
+    assert undocumented == []
+  end
+
   test "borrowed adapter aliases do not leak into the DSEx product surface" do
     borrowed_name = "BA" <> "ML"
 
