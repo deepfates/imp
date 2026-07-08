@@ -15,22 +15,35 @@ defmodule DSEx.Optimizer.InstructionSearch do
 
   def compile(program, metric, trainset, devset, candidates, opts \\ []) do
     demos = Keyword.get(opts, :demos, [])
-    evaluator = DSEx.Evaluate.new(devset, metric)
     candidate_instructions = unique_candidates(candidates)
 
-    candidate_results =
-      candidate_instructions
-      |> Enum.map(fn instruction ->
-        candidate =
-          program
-          |> put_instruction(instruction)
-          |> maybe_put_demos(demos)
+    {candidate_results, baseline_result} =
+      case new_evaluator(devset, metric) do
+        {:ok, evaluator} ->
+          candidate_results =
+            candidate_instructions
+            |> Enum.map(fn instruction ->
+              candidate =
+                program
+                |> put_instruction(instruction)
+                |> maybe_put_demos(demos)
 
-        evaluate_candidate(evaluator, candidate, instruction, %{baseline: false})
-      end)
+              evaluate_candidate(evaluator, candidate, instruction, %{baseline: false})
+            end)
 
-    baseline_result =
-      evaluate_candidate(evaluator, program, current_instruction(program), %{baseline: true})
+          baseline_result =
+            evaluate_candidate(evaluator, program, current_instruction(program), %{baseline: true})
+
+          {candidate_results, baseline_result}
+
+        {:error, error} ->
+          candidate_results =
+            Enum.map(candidate_instructions, fn instruction ->
+              {:error, error, instruction, %{baseline: false}}
+            end)
+
+          {candidate_results, {:error, error, current_instruction(program), %{baseline: true}}}
+      end
 
     {best_score, best, report_candidates, errors, report_metadata} =
       summarize(candidate_results ++ [baseline_result], program)
@@ -54,6 +67,14 @@ defmodule DSEx.Optimizer.InstructionSearch do
           })
       })
     )
+  end
+
+  defp new_evaluator(devset, metric) do
+    {:ok, DSEx.Evaluate.new(devset, metric)}
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
   end
 
   def put_instruction(%DSEx.Predict.Predict{signature: signature} = program, instruction) do

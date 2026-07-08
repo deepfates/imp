@@ -76,6 +76,12 @@ defmodule MetricContractTest do
     metric = fn _example, _prediction -> true end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Evaluate\.new\/3 expects devset to be an enumerable/,
+                 fn ->
+                   DSEx.Evaluate.new(:not_an_enumerable_devset, metric)
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Evaluate\.new\/3 expects a metric function with arity 2 or 3/,
                  fn ->
                    DSEx.Evaluate.new(devset, :not_a_metric)
@@ -98,6 +104,53 @@ defmodule MetricContractTest do
     assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
       DSEx.Evaluate.new(devset, metric, max_errors: -1)
     end
+  end
+
+  test "Evaluate normalizes plain map and field-pair devset rows" do
+    program = %Program{
+      handler: fn inputs ->
+        assert Map.has_key?(inputs, :question)
+        {:ok, DSEx.prediction(answer: "Paris")}
+      end
+    }
+
+    metric = fn example, prediction ->
+      assert %DSEx.Example{} = example
+      DSEx.Metrics.exact_match(:answer).(example, prediction)
+    end
+
+    result =
+      [
+        %{question: "Capital?", answer: "Paris"},
+        [question: "French capital?", answer: "Paris"]
+      ]
+      |> DSEx.Evaluate.new(metric)
+      |> DSEx.Evaluate.run(program)
+
+    assert result.score == 1.0
+    assert Enum.all?(result.rows, &match?(%DSEx.Example{}, &1.example))
+  end
+
+  test "Evaluate records malformed devset rows as failed diagnostics" do
+    program = %Program{handler: fn _inputs -> {:ok, DSEx.prediction(answer: "unused")} end}
+    metric = fn _example, _prediction -> true end
+
+    result =
+      [:not_an_example, %{question: "Capital?", answer: "Paris"}]
+      |> DSEx.Evaluate.new(metric, max_errors: :infinity)
+      |> DSEx.Evaluate.run(program)
+
+    assert [
+             %{
+               index: 0,
+               reason: {:invalid_evaluation_example, ":not_an_example"}
+             }
+           ] = result.errors
+
+    assert [
+             %{index: 0, passed?: false, prediction: nil},
+             %{index: 1, passed?: true, prediction: %DSEx.Prediction{}}
+           ] = result.rows
   end
 
   test "Evaluate records program crashes and invalid returns as failed rows" do

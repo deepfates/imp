@@ -57,14 +57,27 @@ defmodule DSEx.Optimizer.RandomSearch do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    evaluator = DSEx.Evaluate.new(devset, optimizer.metric)
+    {sampled_results, baseline_result} =
+      case new_evaluator(devset, optimizer.metric) do
+        {:ok, evaluator} ->
+          sampled_results =
+            optimizer.candidates
+            |> candidate_indices()
+            |> Enum.map(
+              &build_and_evaluate_candidate(&1, evaluator, program, trainset, optimizer)
+            )
 
-    sampled_results =
-      optimizer.candidates
-      |> candidate_indices()
-      |> Enum.map(&build_and_evaluate_candidate(&1, evaluator, program, trainset, optimizer))
+          {sampled_results,
+           evaluate_candidate(evaluator, program, %{index: :baseline, demos: []})}
 
-    baseline_result = evaluate_candidate(evaluator, program, %{index: :baseline, demos: []})
+        {:error, error} ->
+          sampled_results =
+            optimizer.candidates
+            |> candidate_indices()
+            |> Enum.map(fn index -> {:error, error, %{index: index, demos: []}} end)
+
+          {sampled_results, {:error, error, %{index: :baseline, demos: []}}}
+      end
 
     {best_score, best, report_candidates, errors, metadata} =
       summarize(sampled_results ++ [baseline_result], program)
@@ -80,6 +93,14 @@ defmodule DSEx.Optimizer.RandomSearch do
         metadata: metadata
       })
     )
+  end
+
+  defp new_evaluator(devset, metric) do
+    {:ok, DSEx.Evaluate.new(devset, metric)}
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
   end
 
   defp build_and_evaluate_candidate(index, evaluator, program, trainset, optimizer) do

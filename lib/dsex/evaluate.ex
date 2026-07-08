@@ -53,6 +53,7 @@ defmodule DSEx.Evaluate do
 
   def new(devset, metric, opts) when is_function(metric, 2) or is_function(metric, 3) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Evaluate.new/3")
+    devset = validate_devset!(devset)
 
     %__MODULE__{
       devset: devset,
@@ -73,38 +74,31 @@ defmodule DSEx.Evaluate do
       evaluator.devset
       |> Enum.with_index()
       |> Enum.reduce_while({[], []}, fn {example, index}, {rows, errors} ->
-        inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
-
         {row, errors} =
-          case call_program(program, inputs) do
-            {:ok, prediction} ->
-              result = metric_result(evaluator.metric, example, prediction)
-              error = metric_error(index, result)
+          with {:ok, example} <- normalize_example(example),
+               inputs <- example |> DSEx.Example.inputs() |> DSEx.Example.to_map() do
+            case call_program(program, inputs) do
+              {:ok, prediction} ->
+                result = metric_result(evaluator.metric, example, prediction)
+                error = metric_error(index, result)
 
-              {%{
-                 index: index,
-                 example: example,
-                 prediction: prediction,
-                 score: result.score,
-                 passed?: result.passed?,
-                 feedback: result.feedback,
-                 metric_metadata: result.metadata,
-                 error: error
-               }, add_error(errors, error)}
+                {%{
+                   index: index,
+                   example: example,
+                   prediction: prediction,
+                   score: result.score,
+                   passed?: result.passed?,
+                   feedback: result.feedback,
+                   metric_metadata: result.metadata,
+                   error: error
+                 }, add_error(errors, error)}
 
+              {:error, reason} ->
+                failed_row(index, example, evaluator.failure_score, reason, errors)
+            end
+          else
             {:error, reason} ->
-              error = %{index: index, reason: reason}
-
-              {%{
-                 index: index,
-                 example: example,
-                 prediction: nil,
-                 score: evaluator.failure_score,
-                 passed?: false,
-                 feedback: nil,
-                 metric_metadata: %{},
-                 error: reason
-               }, [error | errors]}
+              failed_row(index, example, evaluator.failure_score, reason, errors)
           end
 
         if too_many_errors?(errors, evaluator.max_errors) do
@@ -117,6 +111,40 @@ defmodule DSEx.Evaluate do
     rows = Enum.reverse(rows)
     errors = Enum.reverse(errors)
     %DSEx.Evaluate.Result{score: average(rows), rows: rows, errors: errors}
+  end
+
+  defp validate_devset!(devset) do
+    if Enumerable.impl_for(devset) do
+      devset
+    else
+      raise ArgumentError,
+            "DSEx.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of examples, maps, or field pair lists; got: #{inspect(devset)}"
+    end
+  end
+
+  defp normalize_example(%DSEx.Example{} = example), do: {:ok, example}
+
+  defp normalize_example(example) when is_map(example) or is_list(example) do
+    {:ok, DSEx.Example.new(example)}
+  rescue
+    error -> {:error, {:invalid_evaluation_example, error_message(error)}}
+  end
+
+  defp normalize_example(example), do: {:error, {:invalid_evaluation_example, inspect(example)}}
+
+  defp failed_row(index, example, failure_score, reason, errors) do
+    error = %{index: index, reason: reason}
+
+    {%{
+       index: index,
+       example: example,
+       prediction: nil,
+       score: failure_score,
+       passed?: false,
+       feedback: nil,
+       metric_metadata: %{},
+       error: reason
+     }, [error | errors]}
   end
 
   defp call_program(%module{} = program, inputs) do
