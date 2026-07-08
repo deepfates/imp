@@ -54,24 +54,38 @@ defmodule DSEx.Predict.RLM do
   - `:max_preview_chars` - how much large input context the controller sees.
   - `:max_observation_chars` - truncation limit for string observations.
   """
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    sub_lm: [type: :any],
+    tools: [type: :any, default: []],
+    tool_policy: [type: :any, default: :allow],
+    max_iterations: [type: :any, default: 10],
+    max_llm_calls: [type: :any, default: 20],
+    max_time_ms: [type: :any],
+    max_preview_chars: [type: :any, default: 2_000],
+    max_observation_chars: [type: :any, default: 10_000],
+    max_output_chars: [type: :any]
+  ]
+
   def new(signature, opts \\ []) do
     signature = DSEx.Signature.ensure(signature)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.RLM.new/2")
+    tools = normalize_tools!(opts[:tools])
 
     %__MODULE__{
       signature: signature,
-      lm: Keyword.get(opts, :lm),
-      adapter: Keyword.get(opts, :adapter),
-      sub_lm: Keyword.get(opts, :sub_lm, Keyword.get(opts, :lm)),
-      tools: Keyword.get(opts, :tools, []) |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
-      tool_policy: Keyword.get(opts, :tool_policy, :allow),
-      max_iterations: non_negative_integer(Keyword.get(opts, :max_iterations, 10)),
-      max_llm_calls: non_negative_integer(Keyword.get(opts, :max_llm_calls, 20)),
-      max_time_ms: non_negative_integer_or_nil(Keyword.get(opts, :max_time_ms)),
-      max_preview_chars: non_negative_integer(Keyword.get(opts, :max_preview_chars, 2_000)),
+      lm: opts[:lm],
+      adapter: opts[:adapter],
+      sub_lm: Keyword.get(opts, :sub_lm, opts[:lm]),
+      tools: tools,
+      tool_policy: opts[:tool_policy],
+      max_iterations: non_negative_integer(opts[:max_iterations]),
+      max_llm_calls: non_negative_integer(opts[:max_llm_calls]),
+      max_time_ms: non_negative_integer_or_nil(opts[:max_time_ms]),
+      max_preview_chars: non_negative_integer(opts[:max_preview_chars]),
       max_observation_chars:
-        non_negative_integer(
-          Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000))
-        ),
+        non_negative_integer(Keyword.get(opts, :max_output_chars, opts[:max_observation_chars])),
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
       dynamic_sub_lm?: not Keyword.has_key?(opts, :sub_lm) and not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
@@ -86,16 +100,30 @@ defmodule DSEx.Predict.RLM do
   `llm_query`, and `submit`. A successful submit returns a `DSEx.Prediction`
   with `:rlm_trace` metadata.
   """
-  def call(%__MODULE__{} = rlm, inputs) do
-    state = %{
-      vars: Map.new(inputs),
-      observations: [],
-      trace: [],
-      llm_calls: 0,
-      started_at: System.monotonic_time(:millisecond)
-    }
+  def call(%__MODULE__{} = rlm, inputs) when is_list(inputs) or is_map(inputs) do
+    with {:ok, vars} <- normalize_inputs(inputs) do
+      state = %{
+        vars: vars,
+        observations: [],
+        trace: [],
+        llm_calls: 0,
+        started_at: System.monotonic_time(:millisecond)
+      }
 
-    run_loop(rlm, state, 1)
+      run_loop(rlm, state, 1)
+    end
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_rlm_inputs,
+        "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error -> {:error, {:invalid_rlm_inputs, "expected inputs as {key, value} pairs"}}
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration)
@@ -349,7 +377,20 @@ defmodule DSEx.Predict.RLM do
     |> Enum.map(&%{name: &1.name, description: &1.description, schema: &1.schema})
   end
 
-  defp coerce_tool(%DSEx.Tool{} = tool), do: tool
+  defp normalize_tools!(tools) when is_list(tools),
+    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
+
+  defp normalize_tools!(tools) do
+    raise ArgumentError,
+          "DSEx.Predict.RLM.new/2 expects :tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
+  end
+
+  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
+
+  defp coerce_tool!(tool) do
+    raise ArgumentError,
+          "DSEx.Predict.RLM.new/2 expects :tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
+  end
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->

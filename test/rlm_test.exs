@@ -134,6 +134,32 @@ defmodule RLMPublicSurfaceTest do
     refute prompt =~ "1,2,3"
   end
 
+  test "RLM constructor and call boundaries report invalid inputs clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.RLM\.new\/2: expected keyword options/, fn ->
+      DSEx.Predict.RLM.new("question -> answer", %{lm: nil})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RLM\.new\/2 expects :tools to be a list of DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.RLM.new("question -> answer", tools: :not_tools)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RLM\.new\/2 expects :tools to contain DSEx\.Tool structs/,
+                 fn ->
+                   DSEx.Predict.RLM.new("question -> answer", tools: [:not_a_tool])
+                 end
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: nil)
+
+    assert {:error, {:invalid_rlm_inputs, message}} = DSEx.Predict.RLM.call(rlm, :not_inputs)
+    assert message =~ "expected a map or keyword/list of input pairs"
+
+    assert {:error, {:invalid_rlm_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.Predict.RLM.call(rlm, [:not_a_pair])
+  end
+
   test "RLM supports persistent assignment and tool actions" do
     actions = [
       %{action: "assign", name: "scratch", value: "Paris"},
