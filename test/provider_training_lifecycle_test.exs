@@ -145,6 +145,48 @@ defmodule ProviderTrainingLifecycleTest do
     assert DSEx.Clients.TrainingJob.normalize_status("canceled") == :cancelled
   end
 
+  test "training jobs accept decoded provider-style attrs and reject malformed attrs clearly" do
+    examples = [%{"question" => "2+2?", "answer" => "4"}]
+
+    assert %DSEx.Clients.TrainingJob{
+             id: "job_string_attrs",
+             provider: "custom-provider",
+             model: "model-a",
+             status: :pending,
+             training_data: ^examples,
+             result_model: "model-b",
+             status_url: "https://trainer.example/jobs/job_string_attrs",
+             api_key: "sk-test",
+             metadata: %{"source" => "decoded-json"}
+           } =
+             DSEx.Clients.TrainingJob.new(%{
+               "id" => "job_string_attrs",
+               "provider" => "custom-provider",
+               "model" => "model-a",
+               "status" => "queued",
+               "training_data" => examples,
+               "result_model" => "model-b",
+               "status_url" => "https://trainer.example/jobs/job_string_attrs",
+               "api_key" => "sk-test",
+               "metadata" => %{"source" => "decoded-json"}
+             })
+
+    assert %DSEx.Clients.TrainingJob{status: :running} =
+             DSEx.Clients.TrainingJob.new(status: "running")
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.TrainingJob\.new\/1 expects a map or keyword list/,
+                 fn ->
+                   DSEx.Clients.TrainingJob.new(:not_attrs)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.TrainingJob\.new\/1 expects attrs as atom or string keyed pairs/,
+                 fn ->
+                   DSEx.Clients.TrainingJob.new([{123, "bad"}])
+                 end
+  end
+
   test "OpenAI trainer requires an uploaded training file id" do
     lm = DSEx.req_llm("gpt-test")
 

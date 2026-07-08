@@ -33,22 +33,33 @@ defmodule DSEx.Clients.TrainingJob do
   Status values are normalized at the boundary: common provider strings such as
   `"succeeded"`, `"completed"`, `"queued"`, and `"running"` become DSEx atoms,
   while unknown external statuses remain visible as `{:unknown, value}`.
+
+  Attributes may be an atom-key map, string-key map, or keyword list. String-key
+  support is intentional because provider callbacks often start from decoded
+  JSON payloads.
   """
-  def new(attrs) do
+  def new(attrs) when is_map(attrs) or is_list(attrs) do
+    attrs = normalize_attrs!(attrs)
+
     %__MODULE__{
       id:
-        Map.get(attrs, :id) ||
+        fetch_attr(attrs, :id) ||
           "train-" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower),
-      provider: Map.get(attrs, :provider, :local),
-      model: Map.get(attrs, :model),
-      status: normalize_status(Map.get(attrs, :status, :created)),
-      training_data: Map.get(attrs, :training_data, []),
-      result_model: Map.get(attrs, :result_model),
-      transport: Map.get(attrs, :transport),
-      status_url: Map.get(attrs, :status_url),
-      api_key: Map.get(attrs, :api_key),
-      metadata: Map.get(attrs, :metadata, %{})
+      provider: fetch_attr(attrs, :provider, :local),
+      model: fetch_attr(attrs, :model),
+      status: normalize_status(fetch_attr(attrs, :status, :created)),
+      training_data: fetch_attr(attrs, :training_data, []),
+      result_model: fetch_attr(attrs, :result_model),
+      transport: fetch_attr(attrs, :transport),
+      status_url: fetch_attr(attrs, :status_url),
+      api_key: fetch_attr(attrs, :api_key),
+      metadata: fetch_attr(attrs, :metadata, %{})
     }
+  end
+
+  def new(attrs) do
+    raise ArgumentError,
+          "DSEx.Clients.TrainingJob.new/1 expects a map or keyword list; got: #{inspect(attrs)}"
   end
 
   def refresh(%__MODULE__{status_url: nil} = job), do: {:ok, job}
@@ -91,6 +102,20 @@ defmodule DSEx.Clients.TrainingJob do
   def normalize_status("pending"), do: :pending
   def normalize_status("queued"), do: :pending
   def normalize_status(other), do: {:unknown, to_string(other)}
+
+  defp normalize_attrs!(attrs) do
+    Map.new(attrs, fn
+      {key, value} when is_atom(key) or is_binary(key) ->
+        {key, value}
+
+      invalid ->
+        raise ArgumentError,
+              "DSEx.Clients.TrainingJob.new/1 expects attrs as atom or string keyed pairs; got entry: #{inspect(invalid)}"
+    end)
+  end
+
+  defp fetch_attr(attrs, key, default \\ nil) when is_atom(key),
+    do: Map.get(attrs, key, Map.get(attrs, Atom.to_string(key), default))
 
   defp refresh_status(%__MODULE__{} = job) do
     body = Jason.encode!(%{job_id: job.id})
