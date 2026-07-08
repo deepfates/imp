@@ -551,6 +551,44 @@ defmodule BenchmarkTruthTest do
     assert Keyword.fetch!(generation_opts, :reasoning_effort) == "low"
   end
 
+  test "parity task can configure ReqLLM pool before app startup" do
+    previous_protocols = Application.get_env(:req_llm, :stream_pool_protocols)
+    previous_size = Application.get_env(:req_llm, :stream_pool_size)
+    previous_count = Application.get_env(:req_llm, :stream_pool_count)
+
+    try do
+      assert {[req_llm_pool_protocols: "http2", req_llm_pool_count: 16], [], []} =
+               Mix.Tasks.Dsex.Benchmark.Parity.parse_args([
+                 "--req-llm-pool-protocols",
+                 "http2",
+                 "--req-llm-pool-count",
+                 "16"
+               ])
+
+      pool_opts =
+        Mix.Tasks.Dsex.Benchmark.Parity.configure_req_llm_pool!(
+          req_llm_pool_protocols: "http2",
+          req_llm_pool_count: 16
+        )
+
+      assert Keyword.fetch!(pool_opts, :stream_pool_protocols) == [:http2]
+      assert Keyword.fetch!(pool_opts, :stream_pool_count) == 16
+
+      assert Application.get_env(:req_llm, :stream_pool_protocols) == [:http2]
+      assert Application.get_env(:req_llm, :stream_pool_count) == 16
+      assert Mix.Tasks.Dsex.Benchmark.Parity.req_llm_pool_config(pool_opts) == nil
+
+      assert Mix.Tasks.Dsex.Benchmark.Parity.req_llm_pool_config(
+               req_llm_pool_protocols: "http1",
+               req_llm_pool_count: 16
+             ) == %{"count" => 16, "protocols" => [:http1]}
+    after
+      restore_app_env(:req_llm, :stream_pool_protocols, previous_protocols)
+      restore_app_env(:req_llm, :stream_pool_size, previous_size)
+      restore_app_env(:req_llm, :stream_pool_count, previous_count)
+    end
+  end
+
   test "parity task supports explicit matched non-OpenAI provider specs" do
     assert {[model: "anthropic:claude-haiku-4-5", api_key_env: "ANTHROPIC_API_KEY"], [], []} =
              Mix.Tasks.Dsex.Benchmark.Parity.parse_args([
@@ -1447,7 +1485,9 @@ defmodule BenchmarkTruthTest do
           max_concurrency: 8,
           temperature: 0.0,
           max_tokens: 700,
-          reasoning_effort: "low"
+          reasoning_effort: "low",
+          req_llm_pool_protocols: "http2",
+          req_llm_pool_count: 16
         ],
         "gpt-5.4-mini",
         "responses-route-full",
@@ -1472,6 +1512,8 @@ defmodule BenchmarkTruthTest do
     assert "--runner-order" in args
     assert "--gsm8k" in args
     assert "--api-key-env" in args
+    assert "--req-llm-pool-protocols" in args
+    assert "--req-llm-pool-count" in args
   end
 
   test "campaign halt decision stops runner-error chunks with no accepted coverage gain" do
@@ -2752,6 +2794,9 @@ defmodule BenchmarkTruthTest do
     on_exit(fn -> File.rm_rf!(path) end)
     path
   end
+
+  defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
+  defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)
 
   defp gsm8k_hf_row(index) do
     %{

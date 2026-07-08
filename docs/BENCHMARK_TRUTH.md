@@ -380,6 +380,24 @@ For non-OpenAI campaign lanes, use the provider-qualified ReqLLM model as
 `--model`, the matching DSPy/LiteLLM model as `--dspy-model`, and the relevant
 `--api-key-env`. The campaign driver forwards those settings to every chunk.
 
+For measured transport A/B checks, configure ReqLLM's Finch pool before startup
+through the same runner:
+
+```sh
+mix dsex.benchmark.parity.campaign \
+  --model anthropic:claude-haiku-4-5 \
+  --dspy-model anthropic/claude-haiku-4-5 \
+  --api-key-env ANTHROPIC_API_KEY \
+  --req-llm-pool-protocols http1 \
+  --req-llm-pool-count 16 \
+  --chunk-size 100 \
+  --chunks 1
+```
+
+Use this for measured transport experiments, not as a hidden release-policy
+escape hatch. Release evidence should record the campaign id, model, generation
+settings, and pool settings whenever they change.
+
 `--chunks` limits how many new chunks this invocation may run.
 `--target-coverage` limits the total campaign coverage to reach before
 stopping. When both are present, the runner aggregates current evidence before

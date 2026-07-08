@@ -45,6 +45,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
           max_tokens: :integer,
           reasoning_effort: :string,
           runner_order: :string,
+          req_llm_pool_protocols: :string,
+          req_llm_pool_size: :integer,
+          req_llm_pool_count: :integer,
           python: :string
         ]
       )
@@ -264,6 +267,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       generation_args(opts) ++
       dspy_model_args(opts) ++
       api_key_env_args(opts) ++
+      req_llm_pool_args(opts) ++
       dataset_args(chunk_plan) ++
       python_args(opts)
   end
@@ -300,6 +304,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   defp api_key_env_args(opts) do
     []
     |> maybe_arg("--api-key-env", Keyword.get(opts, :api_key_env))
+  end
+
+  defp req_llm_pool_args(opts) do
+    []
+    |> maybe_arg("--req-llm-pool-protocols", Keyword.get(opts, :req_llm_pool_protocols))
+    |> maybe_arg("--req-llm-pool-size", Keyword.get(opts, :req_llm_pool_size))
+    |> maybe_arg("--req-llm-pool-count", Keyword.get(opts, :req_llm_pool_count))
   end
 
   defp maybe_arg(args, _name, nil), do: args

@@ -855,8 +855,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
 
     generation
     |> Map.take(["temperature", "max_tokens", "reasoning_effort", "prompt_contract"])
+    |> maybe_put("dsex_transport", get_in(generation, ["dsex", "transport"]))
     |> Map.put_new("prompt_contract", "legacy-unrecorded")
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp effective_generation_summary(values) do
     dsex_values = Enum.map(values, &get_in(&1, ["dsex", "effective"]))

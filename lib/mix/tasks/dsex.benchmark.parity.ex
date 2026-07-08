@@ -22,11 +22,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
 
   @impl true
   def run(args) do
-    Mix.Task.run("app.start")
-
     {opts, _argv, invalid} = parse_args(args)
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
+
+    configure_req_llm_pool!(opts)
+    Mix.Task.run("app.start")
 
     tasks = tasks(opts)
 
@@ -181,7 +182,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       mode: :live,
       lm: DSEx.req_llm(dsex_model, Keyword.merge([api_key: api_key], generation_opts)),
       model: %{provider: "req_llm", model: model, model_spec: dsex_model},
-      generation: generation_metadata(dsex_model, generation_opts, "dsex_req_llm"),
+      generation: generation_metadata(dsex_model, generation_opts, "dsex_req_llm", opts),
       campaign_id: campaign_id,
       out_dir: out_dir,
       offset: Keyword.get(opts, :offset, 0),
@@ -234,9 +235,46 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         max_tokens: :integer,
         reasoning_effort: :string,
         runner_order: :string,
+        req_llm_pool_protocols: :string,
+        req_llm_pool_size: :integer,
+        req_llm_pool_count: :integer,
         python: :string
       ]
     )
+  end
+
+  @doc false
+  def configure_req_llm_pool!(opts) do
+    pool_opts =
+      []
+      |> maybe_keyword(:stream_pool_protocols, req_llm_pool_protocols(opts))
+      |> maybe_keyword(:stream_pool_size, Keyword.get(opts, :req_llm_pool_size))
+      |> maybe_keyword(:stream_pool_count, Keyword.get(opts, :req_llm_pool_count))
+
+    Enum.each(pool_opts, fn {key, value} -> Application.put_env(:req_llm, key, value) end)
+
+    pool_opts
+  end
+
+  defp req_llm_pool_protocols(opts) do
+    case Keyword.get(opts, :req_llm_pool_protocols) do
+      nil ->
+        nil
+
+      value ->
+        value
+        |> split_csv()
+        |> Enum.map(fn
+          "http1" ->
+            :http1
+
+          "http2" ->
+            :http2
+
+          other ->
+            Mix.raise("--req-llm-pool-protocols accepts http1,http2, got: #{inspect(other)}")
+        end)
+    end
   end
 
   @doc false
@@ -478,11 +516,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     }
   end
 
-  defp generation_metadata(model, generation_opts, runtime) do
+  defp generation_metadata(model, generation_opts, runtime, opts) do
     requested = Map.new(generation_opts)
     {effective, warnings} = effective_generation(model, generation_opts)
 
-    Map.merge(requested, %{
+    requested
+    |> Map.merge(%{
       "runtime" => runtime,
       "prompt_contract" => prompt_contract()[runtime],
       "requested" => requested,
@@ -492,7 +531,29 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       "note" =>
         "requested records the benchmark intent; effective and wire_api record deterministic runtime/provider translation known before the request is sent"
     })
+    |> maybe_put_transport(opts)
   end
+
+  defp maybe_put_transport(metadata, opts) do
+    case req_llm_pool_config(opts) do
+      nil -> metadata
+      pool -> Map.put(metadata, "transport", %{"req_llm_pool" => pool})
+    end
+  end
+
+  @doc false
+  def req_llm_pool_config(opts) do
+    pool =
+      %{}
+      |> maybe_put_pool("protocols", req_llm_pool_protocols(opts))
+      |> maybe_put_pool("size", Keyword.get(opts, :req_llm_pool_size))
+      |> maybe_put_pool("count", Keyword.get(opts, :req_llm_pool_count))
+
+    if map_size(pool) == 0, do: nil, else: pool
+  end
+
+  defp maybe_put_pool(pool, _key, nil), do: pool
+  defp maybe_put_pool(pool, key, value), do: Map.put(pool, key, value)
 
   defp effective_generation(model, generation_opts) do
     model = model |> to_string() |> String.downcase()
