@@ -130,7 +130,7 @@ defmodule AgentRuntimeTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.Runtime\.new\/1 expects :event_sink to be nil or an arity-1 function/,
+                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :event_sink option: expected nil or an arity-1 function/,
                  fn ->
                    Runtime.new(event_sink: fn _event, _runtime -> :ok end)
                  end
