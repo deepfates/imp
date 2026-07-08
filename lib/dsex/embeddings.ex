@@ -4,16 +4,38 @@ defmodule DSEx.Embeddings do
   @callback embed([String.t()], keyword()) :: {:ok, [[number()]]} | {:error, term()}
 
   def embed(embedder, texts, opts \\ [])
-  def embed(module, texts, opts) when is_atom(module), do: module.embed(texts, opts)
-  def embed(fun, texts, opts) when is_function(fun, 2), do: fun.(texts, opts)
+
+  def embed(embedder, texts, opts) do
+    opts = validate_opts!(opts, "DSEx.Embeddings.embed/3")
+    texts = validate_texts!(texts, "DSEx.Embeddings.embed/3")
+    dispatch(embedder, texts, opts)
+  end
+
+  defp dispatch(module, texts, opts) when is_atom(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :embed, 2) do
+      module.embed(texts, opts)
+    else
+      {:error, {:not_embedding_provider, module}}
+    end
+  end
+
+  defp dispatch(fun, texts, opts) when is_function(fun, 2), do: fun.(texts, opts)
+  defp dispatch(embedder, _texts, _opts), do: {:error, {:not_embedding_provider, embedder}}
 
   defmodule BagOfWords do
     @moduledoc "Deterministic hashing bag-of-words embedder."
     @behaviour DSEx.Embeddings
 
+    @option_schema [
+      dims: [type: :pos_integer, default: 64]
+    ]
+
     @impl true
     def embed(texts, opts) do
-      dims = Keyword.get(opts, :dims, 64)
+      texts = DSEx.Embeddings.validate_texts!(texts, "#{inspect(__MODULE__)}.embed/2")
+      opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.embed/2")
+      dims = opts[:dims]
+
       {:ok, Enum.map(texts, &vectorize(&1, dims))}
     end
 
@@ -39,5 +61,31 @@ defmodule DSEx.Embeddings do
         Regex.scan(~r/[a-z0-9]+/i, to_string(text))
         |> List.flatten()
         |> Enum.map(&String.downcase/1)
+  end
+
+  def validate_texts!(texts, context) when is_list(texts) do
+    if Enum.all?(texts, &is_binary/1) do
+      texts
+    else
+      raise ArgumentError,
+            "#{context} expects texts to be a list of strings, got: #{inspect(texts)}"
+    end
+  end
+
+  def validate_texts!(texts, context) do
+    raise ArgumentError,
+          "#{context} expects texts to be a list of strings, got: #{inspect(texts)}"
+  end
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
 end

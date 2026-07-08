@@ -406,4 +406,25 @@ defmodule CompletionSurfaceTest do
     messages = DSEx.Adapter.TwoStep.format(DSEx.signature("q -> a"), %{q: "x"}, [])
     assert Enum.any?(messages, &String.contains?(&1.content, "plan"))
   end
+
+  test "embedding providers report invalid boundaries clearly" do
+    assert_raise ArgumentError, ~r/DSEx.Embeddings.embed\/3 expects keyword options/, fn ->
+      DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, ["beam"], %{dims: 8})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Embeddings.embed\/3 expects texts to be a list of strings/,
+                 fn ->
+                   DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, [:beam], dims: 8)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Embeddings.BagOfWords.embed\/2: invalid value for :dims/,
+                 fn ->
+                   DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, ["beam"], dims: 0)
+                 end
+
+    assert {:error, {:not_embedding_provider, :not_an_embedder}} =
+             DSEx.Embeddings.embed(:not_an_embedder, ["beam"], [])
+  end
 end
