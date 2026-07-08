@@ -485,6 +485,28 @@ defmodule ProductionAdapterPersistenceTest do
     assert length(loaded.demos) == 1
   end
 
+  test "save/load preserves demo input boundaries on programs" do
+    demo =
+      DSEx.example(question: "Capital?", answer: "Paris", note: "kept")
+      |> DSEx.with_inputs(:question)
+
+    loaded =
+      "question -> answer"
+      |> DSEx.predict(demos: [demo])
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    assert [%DSEx.Example{} = loaded_demo] = loaded.demos
+    assert DSEx.Example.to_map(loaded_demo) == DSEx.Example.to_map(demo)
+    assert loaded_demo.input_keys == [:question]
+    assert DSEx.Example.to_map(DSEx.Example.inputs(loaded_demo)) == %{question: "Capital?"}
+
+    assert DSEx.Example.to_map(DSEx.Example.labels(loaded_demo)) == %{
+             answer: "Paris",
+             note: "kept"
+           }
+  end
+
   test "save/load preserves local memory RAG programs" do
     lm = %{
       module: DSEx.LM.Static,

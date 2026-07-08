@@ -294,6 +294,16 @@ defmodule DSEx.Saving do
     end
   end
 
+  defp load_demo!(%{"__dsex_type__" => "example"} = demo) do
+    case DSEx.Optimizer.Report.restore_json_safe(demo) do
+      %DSEx.Example{} = example ->
+        example
+
+      other ->
+        raise ArgumentError, "saved DSEx demo restored to invalid value: #{inspect(other)}"
+    end
+  end
+
   defp load_demo!(demo) when is_map(demo) or is_list(demo), do: DSEx.Example.new(demo)
 
   defp load_demo!(demo) do

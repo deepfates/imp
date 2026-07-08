@@ -50,8 +50,8 @@ optional completions, score metadata, and traces.
 ## Program
 
 A program is a callable DSEx struct such as `Predict`, `ChainOfThought`,
-`ReAct`, or `ProgramOfThought`. Programs hold the signature, adapter, LM,
-demos, configuration, and metadata needed to run.
+`ReAct`, `ProgramOfThought`, or `CodeAct`. Programs hold or wrap the signature,
+adapter, LM, demos, configuration, and metadata needed to run.
 
 ## Signature
 

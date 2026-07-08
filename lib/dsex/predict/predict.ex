@@ -126,7 +126,7 @@ defmodule DSEx.Predict.Predict do
   def dump(%__MODULE__{} = predict) do
     %{
       "signature" => DSEx.Signature.dump(predict.signature),
-      "demos" => Enum.map(predict.demos, &DSEx.Example.to_map/1),
+      "demos" => Enum.map(predict.demos, &DSEx.Optimizer.Report.json_safe/1),
       "config" => encode_keyword(predict.config),
       "metadata" => DSEx.Optimizer.Report.json_safe(predict.metadata),
       "adapter" => predict |> resolve_adapter() |> Atom.to_string(),

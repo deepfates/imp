@@ -48,7 +48,7 @@ defmodule DSEx do
   """
 
   alias DSEx.{Example, Prediction, Settings, Signature, Tool}
-  alias DSEx.Predict.{ChainOfThought, Predict, RAG, ReAct}
+  alias DSEx.Predict.{ChainOfThought, CodeAct, Predict, ProgramOfThought, RAG, ReAct}
 
   @doc """
   Configures global settings such as `:lm` and `:adapter`.
@@ -131,13 +131,19 @@ defmodule DSEx do
   """
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
 
-  @doc "Attaches demonstrations to a prediction program, ChainOfThought program, RAG wrapper, or example."
+  @doc "Attaches demonstrations to a demo-bearing DSEx program or example."
   def with_demos(program_or_example, demos)
 
   def with_demos(%Predict{} = predict, demos), do: Predict.with_demos(predict, demos)
 
   def with_demos(%ChainOfThought{predict: predict} = cot, demos),
     do: %{cot | predict: Predict.with_demos(predict, demos)}
+
+  def with_demos(%ProgramOfThought{predict: predict} = pot, demos),
+    do: %{pot | predict: Predict.with_demos(predict, demos)}
+
+  def with_demos(%CodeAct{program_of_thought: pot} = code_act, demos),
+    do: %{code_act | program_of_thought: with_demos(pot, demos)}
 
   def with_demos(%RAG{program: program} = rag, demos),
     do: %{rag | program: with_demos(program, demos)}
@@ -146,7 +152,7 @@ defmodule DSEx do
 
   def with_demos(program_or_example, _demos) do
     raise ArgumentError,
-          "DSEx.with_demos/2 supports Predict, ChainOfThought, RAG wrappers, and examples; got: #{inspect(program_or_example)}"
+          "DSEx.with_demos/2 supports Predict, ChainOfThought, ProgramOfThought, CodeAct, RAG wrappers, and examples; got: #{inspect(program_or_example)}"
   end
 
   @doc "Creates a program that asks for reasoning before final outputs."

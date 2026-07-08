@@ -110,11 +110,18 @@ defmodule DSExFacadeTest do
   test "facade attaches demos and builds tools" do
     program = DSEx.predict("question -> answer")
     cot = DSEx.chain_of_thought("question -> answer")
+    pot = DSEx.program_of_thought("question -> answer")
+    code_act = DSEx.code_act("question -> answer")
     rag = DSEx.rag(program, DSEx.Retrieve.Memory.new([%{text: "2+2 is 4"}]))
     demo = DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
 
     assert %{demos: [^demo]} = DSEx.with_demos(program, [demo])
     assert %{predict: %{demos: [^demo]}} = DSEx.with_demos(cot, [demo])
+    assert %{predict: %{demos: [^demo]}} = DSEx.with_demos(pot, [demo])
+
+    assert %{program_of_thought: %{predict: %{demos: [^demo]}}} =
+             DSEx.with_demos(code_act, [demo])
+
     assert %{program: %{demos: [^demo]}} = DSEx.with_demos(rag, [demo])
     assert %{demos: [^demo]} = DSEx.with_demos(DSEx.example(question: "q"), demo)
 
@@ -141,6 +148,21 @@ defmodule DSExFacadeTest do
                  fn ->
                    DSEx.with_demos(program, [:not_a_demo])
                  end
+  end
+
+  test "facade-attached ProgramOfThought demos are portable" do
+    demo = DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+
+    loaded =
+      "question -> answer"
+      |> DSEx.program_of_thought()
+      |> DSEx.with_demos([demo])
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    assert %DSEx.Predict.ProgramOfThought{predict: %{demos: [loaded_demo]}} = loaded
+    assert DSEx.Example.to_map(loaded_demo) == DSEx.Example.to_map(demo)
+    assert loaded_demo.input_keys == demo.input_keys
   end
 
   test "facade evaluates and optimizes through the golden path" do
