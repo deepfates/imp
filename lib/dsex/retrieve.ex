@@ -1,10 +1,31 @@
 defmodule DSEx.Retrieve do
-  @moduledoc "Retriever behaviour and simple in-memory implementation."
+  @moduledoc """
+  Retriever behaviour and dispatch boundary for RAG-style DSEx programs.
+
+  A retriever can be a module, a struct implementing `retrieve/3`, or a
+  two-argument callback function. All retrievers return `{:ok, docs}` or
+  `{:error, reason}`. Documents are normalized to maps, so keyword-list
+  documents are accepted while malformed rows fail before they reach a RAG
+  program.
+  """
 
   @callback retrieve(query :: String.t(), opts :: keyword()) :: {:ok, [map()]} | {:error, term()}
 
   def retrieve(retriever, query, opts \\ [])
 
+  @doc """
+  Calls a retriever and normalizes returned documents.
+
+      iex> retriever = fn query, opts ->
+      ...>   {:ok, [[text: "query=" <> query, k: opts[:k]]]}
+      ...> end
+      iex> DSEx.Retrieve.retrieve(retriever, "beam", k: 1)
+      {:ok, [%{text: "query=beam", k: 1}]}
+
+      iex> DSEx.Retrieve.retrieve(fn _query, _opts -> {:ok, [:bad_doc]} end, "beam")
+      {:error, {:invalid_retriever_document, :bad_doc}}
+
+  """
   def retrieve(retriever, query, opts) do
     opts = validate_opts!(opts)
     do_retrieve(retriever, query, opts)
@@ -89,7 +110,13 @@ defmodule DSEx.Retrieve do
   defp error_message(error), do: inspect(error)
 
   defmodule Memory do
-    @moduledoc "Token-overlap in-memory retriever for deterministic local workflows."
+    @moduledoc """
+    Token-overlap in-memory retriever for deterministic local workflows.
+
+    `Memory` is useful for examples, tests, Livebooks, and portable save/load
+    workflows. It scores documents by token overlap with the query and returns
+    the top `k` documents with an added `:score` field.
+    """
     @behaviour DSEx.Retrieve
 
     defstruct docs: [], k: 3
@@ -104,6 +131,15 @@ defmodule DSEx.Retrieve do
 
     def new(docs, opts \\ [])
 
+    @doc """
+    Builds an in-memory retriever from document maps or keyword-list documents.
+
+        iex> retriever = DSEx.Retrieve.Memory.new([[text: "Elixir runs on the BEAM"]], k: 1)
+        iex> {:ok, docs} = DSEx.Retrieve.retrieve(retriever, "BEAM")
+        iex> docs
+        [%{text: "Elixir runs on the BEAM", score: 1}]
+
+    """
     def new(docs, opts) when is_list(docs) do
       opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Retrieve.Memory.new/2")
       %__MODULE__{docs: docs, k: non_negative_integer(opts[:k])}
