@@ -176,6 +176,27 @@ defmodule ProductionHardeningTest do
     Process.delete(:transient_error_count)
   end
 
+  test "telemetry span emits redacted exception event for throws" do
+    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :span, :throw, :exception]])
+
+    assert catch_throw(
+             DSEx.Telemetry.span(
+               [:dsex, :span, :throw],
+               %{api_key: "sk-test-span-secret-1234567890", operation: :throw_probe},
+               fn -> throw(:span_thrown) end
+             )
+           ) == :span_thrown
+
+    assert_received {
+      ^ref,
+      [:dsex, :span, :throw, :exception],
+      %{duration: duration},
+      %{api_key: "[REDACTED]", operation: :throw_probe, error: "{:throw, :span_thrown}"}
+    }
+
+    assert is_integer(duration)
+  end
+
   @tag capture_log: true
   test "default httpc transport verifies TLS peer certificates" do
     assert Keyword.fetch!(DSEx.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer

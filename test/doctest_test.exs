@@ -15,5 +15,6 @@ defmodule DSExDoctestTest do
   doctest DSEx.Predict.Predict
   doctest DSEx.Redaction
   doctest DSEx.Signature
+  doctest DSEx.Telemetry
   doctest DSEx.Tool
 end
