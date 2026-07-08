@@ -1,11 +1,11 @@
-# DSEx 04: Production And Live Provider
+# DSEx 04: Local Gates And Live Provider Smoke
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
 Mix.install([{:dsex, path: repo}])
 ```
 
-## Deterministic Gates
+## Local Quality Gates
 
 Run these in a terminal from the repo root:
 
@@ -17,7 +17,26 @@ mix protocol.check
 
 These gates are the local project contract. They check formatting, compilation,
 deterministic tests, package shape, docs, local service integration, and
-provider-compatible protocol behavior.
+provider-compatible protocol behavior. Run the executable notebook gate when you
+change teaching material:
+
+```sh
+mix livebook.execute.check
+```
+
+## Application Checklist
+
+Before swapping a useful deterministic program to a live provider, decide the
+host application's operational boundaries:
+
+```elixir
+[
+  runtime_config: [:model_name, :api_key, :timeout, :temperature],
+  tests: [:static_lm_unit_tests, :opt_in_live_smoke],
+  safety: [:redaction, :tool_policy, :provider_failure_behavior],
+  operations: [:telemetry, :cost_limits, :rate_limits, :rollout_plan]
+]
+```
 
 ## Security Posture
 

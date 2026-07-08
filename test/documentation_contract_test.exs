@@ -32,6 +32,14 @@ defmodule DocumentationContractTest do
     assert File.read!("docs/PRODUCTION_OPERATIONS.md") =~ "mix livebook.execute.check"
   end
 
+  test "learner-facing docs do not foreground maintainer evidence commands" do
+    learner_text =
+      ["README.md", "docs/README.md" | Path.wildcard("livebooks/*.livemd")]
+      |> Enum.map_join("\n", &File.read!/1)
+
+    refute learner_text =~ "mix evidence.check"
+  end
+
   test "README teaches the new-app onboarding path" do
     body = File.read!("README.md")
 

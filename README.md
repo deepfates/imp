@@ -6,7 +6,7 @@ DSEx lets you describe an LM task as a small typed signature, run it through
 ordinary Elixir data structures, evaluate it on examples, and improve it with
 optimizers. It is inspired by the DSPy family of ideas, but designed as an
 Elixir library: explicit structs, behaviours, OTP-friendly clients, supervised
-runtime boundaries, process-local configuration, and production gates you can
+runtime boundaries, process-local configuration, and local quality gates you can
 run in CI.
 
 Use DSEx when prompts have grown into application logic and you want them to
@@ -274,9 +274,9 @@ Provider-backed checks are opt-in because they use live credentials:
 LIVE_PROVIDER=1 mix live.check
 ```
 
-Maintainer evidence commands for benchmark truth, golden traces, optimizer
-lift, and parity research live behind `mix evidence.check` and the benchmark
-Mix tasks. They are release evidence, not the normal product workflow.
+Maintainer release-evidence commands live outside the normal product workflow.
+They are documented for reviewers who need to audit DSEx-vs-DSPy parity and
+performance claims.
 
 ## Why Elixir?
 

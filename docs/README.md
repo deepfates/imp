@@ -31,7 +31,7 @@ credentials.
 - [01 Programming, Not Prompting](../livebooks/01_programming_not_prompting.livemd)
 - [02 Evaluate And Optimize](../livebooks/02_evaluate_and_optimize.livemd)
 - [03 Agents, Tools, MCP, Recursive Control](../livebooks/03_agents_tools_mcp_rlm.livemd)
-- [04 Production And Live Provider](../livebooks/04_production_and_live_provider.livemd)
+- [04 Local Gates And Live Provider Smoke](../livebooks/04_production_and_live_provider.livemd)
 
 ## Operate It
 
@@ -49,8 +49,6 @@ credentials.
 
 ## Maintainer Evidence
 
-The repository also keeps internal benchmark and release-evidence notes under
-`docs/BENCHMARK_TRUTH.md`, `docs/PARITY_VALIDATION_PROGRAM.md`,
-`docs/COVERAGE_MATRIX.md`, and `docs/RELEASE_CRITERIA.md`. They are useful for
-maintainers and reviewers, but they are intentionally not part of the packaged
-user manual.
+The repository also keeps release-evidence notes for maintainers and reviewers.
+They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
+separate from the packaged user manual.

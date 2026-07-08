@@ -50,8 +50,7 @@ lm = %{
 }
 
 program = DSEx.predict("question -> answer", lm: lm)
-evaluator = DSEx.Evaluate.new(devset, metric)
-DSEx.Evaluate.run(evaluator, program)
+DSEx.evaluate(program, devset, metric)
 ```
 
 ## Labeled Few-Shot
@@ -62,9 +61,9 @@ magic training; it is ordinary data being rendered by the adapter.
 ```elixir
 compiled =
   DSEx.Optimizer.LabeledFewShot.new(k: 1)
-  |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
+  |> then(&DSEx.optimize(program, &1, trainset))
 
-DSEx.Evaluate.run(evaluator, compiled)
+DSEx.evaluate(compiled, devset, metric)
 ```
 
 ## Random Search
@@ -77,10 +76,10 @@ inspectable optimization report.
 compiled =
   metric
   |> DSEx.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-  |> DSEx.Optimizer.RandomSearch.compile(program, trainset, devset)
+  |> then(&DSEx.optimize(program, &1, trainset, devset))
 
 {
-  DSEx.Evaluate.run(evaluator, compiled),
+  DSEx.evaluate(compiled, devset, metric),
   DSEx.Optimizer.Report.fetch(compiled)
 }
 ```
@@ -172,14 +171,4 @@ report =
   )
 
 report.best
-```
-
-## Deterministic Advanced Benchmarks
-
-These fixtures are a compact regression check for advanced DSEx behavior. They
-are maintainer evidence rather than application code. Run them when you want
-evidence that the optimizer and artifact examples still behave as expected:
-
-```sh
-mix evidence.check
 ```

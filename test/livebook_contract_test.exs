@@ -26,10 +26,12 @@ defmodule LivebookContractTest do
     end
   end
 
-  test "production Livebook names the full local gate set" do
+  test "operations Livebook names the full local gate set" do
     body = File.read!("livebooks/04_production_and_live_provider.livemd")
 
+    assert body =~ "Local Gates And Live Provider Smoke"
     assert body =~ "mix production.check"
+    assert body =~ "mix livebook.execute.check"
     refute body =~ "mix " <> "v2" <> ".check"
     assert body =~ "mix integration.check"
     assert body =~ "LIVE_PROVIDER=1 mix live.check"
