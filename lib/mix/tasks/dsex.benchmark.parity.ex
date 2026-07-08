@@ -756,6 +756,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       else
         Map.put(agreement, "diagnostic", %{
           "dsex" => row && row["diagnostic"],
+          "dsex_error" => row && row["error"],
           "dspy_error" => other && other["error"]
         })
       end
