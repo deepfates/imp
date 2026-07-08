@@ -312,7 +312,7 @@ defmodule CompletionSurfaceTest do
 
     assert [
              %DSEx.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:lm_generate_failed, message}},
+               chunk: {:error, {:lm_failed, DSEx.LM.Static, message}},
                done: true
              }
            ] =

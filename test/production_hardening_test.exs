@@ -285,6 +285,19 @@ defmodule ProductionHardeningTest do
     assert {:ok, "static"} =
              DSEx.LM.generate(fn _messages, _opts -> {:ok, "static"} end, [], [])
 
+    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
+             DSEx.LM.generate(fn _messages, _opts -> :not_a_valid_lm_result end, [], [])
+
+    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
+             DSEx.LM.generate(
+               fn _messages, _opts -> {:ok, :not_a_valid_lm_result} end,
+               [],
+               []
+             )
+
+    assert {:error, {:lm_failed, :anonymous_lm, "lm exploded"}} =
+             DSEx.LM.generate(fn _messages, _opts -> raise "lm exploded" end, [], [])
+
     assert {:ok, "prefix:value"} =
              DSEx.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
   end
@@ -294,9 +307,10 @@ defmodule ProductionHardeningTest do
       DSEx.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
     end
 
-    assert_raise ArgumentError, ~r/DSEx.LM.Static.generate\/2 expects :handler/, fn ->
-      DSEx.LM.generate(DSEx.LM.Static, [], handler: :not_a_function)
-    end
+    assert {:error, {:lm_failed, DSEx.LM.Static, message}} =
+             DSEx.LM.generate(DSEx.LM.Static, [], handler: :not_a_function)
+
+    assert message =~ "DSEx.LM.Static.generate/2 expects :handler"
   end
 
   test "invalid test harness provider mode fails closed" do
