@@ -88,6 +88,39 @@ defmodule DSExTest do
     end
   end
 
+  test "examples and predictions report invalid field containers clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Example\.new\/1 expects a map, keyword list, or DSEx\.Example/,
+                 fn ->
+                   DSEx.Example.new(:not_fields)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Prediction\.new\/2 expects a map or keyword list/, fn ->
+      DSEx.Prediction.new(:not_fields)
+    end
+  end
+
+  test "examples and predictions reject non atom or string keys clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.Example keys must be atoms or strings/, fn ->
+      DSEx.Example.new(%{1 => "bad"})
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Prediction keys must be atoms or strings/, fn ->
+      DSEx.Prediction.new(%{1 => "bad"})
+    end
+
+    example = DSEx.example(question: "2+2?", answer: "4")
+    prediction = DSEx.prediction(answer: "4")
+
+    assert_raise ArgumentError, ~r/DSEx\.Example keys must be atoms or strings/, fn ->
+      DSEx.Example.get(example, 1)
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.Prediction keys must be atoms or strings/, fn ->
+      DSEx.Prediction.get(prediction, 1)
+    end
+  end
+
   test "signature parse errors include position and suggestions" do
     assert_raise DSEx.Signature.ParseError, ~r/position.*did you mean \"string\"/s, fn ->
       DSEx.signature("question: strng -> answer")

@@ -40,13 +40,20 @@ defmodule DSEx.Prediction do
   `fields` may be a map or keyword list. Existing atom names in string keys are
   resolved to those atoms, while unknown string keys remain strings.
   """
-  def new(fields \\ %{}, opts \\ []) do
+  def new(fields \\ %{}, opts \\ [])
+
+  def new(fields, opts) when is_list(fields) or is_map(fields) do
     %__MODULE__{
       fields: fields |> Map.new(fn {k, v} -> {normalize_key(k), v} end),
       completions: Keyword.get(opts, :completions, []),
       score: Keyword.get(opts, :score),
       metadata: Keyword.get(opts, :metadata, %{})
     }
+  end
+
+  def new(fields, _opts) do
+    raise ArgumentError,
+          "DSEx.Prediction.new/2 expects a map or keyword list; got: #{inspect(fields)}"
   end
 
   @doc "Reads a prediction field, returning `default` when it is missing."
@@ -74,6 +81,11 @@ defmodule DSEx.Prediction do
 
   defp normalize_key(key) when is_atom(key), do: key
   defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
+
+  defp normalize_key(key) do
+    raise ArgumentError,
+          "DSEx.Prediction keys must be atoms or strings; got: #{inspect(key)}"
+  end
 
   defp existing_atom_or_string(key) do
     String.to_existing_atom(key)

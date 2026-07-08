@@ -38,6 +38,11 @@ defmodule DSEx.Example do
   def new(fields) when is_list(fields) or is_map(fields),
     do: %__MODULE__{fields: normalize_keys(fields)}
 
+  def new(fields) do
+    raise ArgumentError,
+          "DSEx.Example.new/1 expects a map, keyword list, or DSEx.Example; got: #{inspect(fields)}"
+  end
+
   @doc "Reads a field, returning `default` when it is missing."
   def get(%__MODULE__{fields: fields}, key, default \\ nil),
     do: get_key(fields, normalize_key(key), default)
@@ -93,6 +98,11 @@ defmodule DSEx.Example do
   defp normalize_keys(fields), do: Map.new(fields, fn {k, v} -> {normalize_key(k), v} end)
   defp normalize_key(key) when is_atom(key), do: key
   defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
+
+  defp normalize_key(key) do
+    raise ArgumentError,
+          "DSEx.Example keys must be atoms or strings; got: #{inspect(key)}"
+  end
 
   defp existing_atom_or_string(key) do
     String.to_existing_atom(key)
