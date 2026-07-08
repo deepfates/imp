@@ -297,6 +297,11 @@ Use:
 | `GEPA` | You want DSEx-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
 | `BetterTogether` | You want to sequence prompt optimization and provider training. |
 
+Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
+and GEPA-style artifact optimization, use the same explicit LM shapes as
+programs. `proposer_lm:`, `judge_lm:`, and `reflection_lm:` reject malformed
+values when the optimizer is built or run, before a search loop starts.
+
 ## Optimize Arbitrary Artifacts
 
 ```elixir

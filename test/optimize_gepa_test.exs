@@ -182,6 +182,17 @@ defmodule OptimizeGEPATest do
     Process.delete(:gepa_reflection_prompt)
   end
 
+  test "reflection LM option is validated at the boundary" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+    evaluator = fn _artifact, _examples -> %{per_example_scores: [1.0], asi: []} end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3: invalid value for :reflection_lm option: expected nil, an LM module/,
+                 fn ->
+                   GEPA.optimize(artifact, evaluator, reflection_lm: %{provider: :missing})
+                 end
+  end
+
   test "dev examples can select a held-out candidate over train-only score" do
     artifact = Anything.new_artifact(:prompt, "Base")
 

@@ -206,6 +206,8 @@ defmodule DocumentationContractTest do
 
     assert api =~ "Elixir-native reflective optimizer"
     assert api =~ "not a wrapper around Python GEPA"
+    assert api =~ "proposer_lm:"
+    assert api =~ "reject malformed\nvalues when the optimizer is built or run"
     assert advanced =~ "not a Python GEPA wrapper"
     assert advanced =~ "does\nnot imply paper-scale benchmark results"
     assert coverage =~ "GEPA-style reflection"

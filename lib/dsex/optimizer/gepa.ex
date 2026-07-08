@@ -12,14 +12,13 @@ defmodule DSEx.Optimizer.GEPA do
   defstruct [:metric, feedback_fn: nil, generations: 4]
 
   @option_schema [
-    feedback_fn: [type: :any, default: nil],
+    feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4]
   ]
 
   def new(metric, opts \\ []) do
     DSEx.FunctionContract.validate!(metric, 2, "DSEx.Optimizer.GEPA.new/2", "metric")
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.GEPA.new/2")
-    validate_feedback_fn!(opts[:feedback_fn])
 
     %__MODULE__{
       metric: metric,
@@ -149,11 +148,10 @@ defmodule DSEx.Optimizer.GEPA do
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
 
-  defp validate_feedback_fn!(nil), do: :ok
-  defp validate_feedback_fn!(feedback_fn) when is_function(feedback_fn, 1), do: :ok
+  def validate_feedback_fn(nil), do: {:ok, nil}
+  def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
 
-  defp validate_feedback_fn!(feedback_fn) do
-    raise ArgumentError,
-          "DSEx.Optimizer.GEPA.new/2 expects :feedback_fn to be nil or an arity-1 function; got: #{inspect(feedback_fn)}"
+  def validate_feedback_fn(feedback_fn) do
+    {:error, "expected nil or an arity-1 function, got: #{inspect(feedback_fn)}"}
   end
 end

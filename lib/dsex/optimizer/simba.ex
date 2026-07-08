@@ -5,7 +5,7 @@ defmodule DSEx.Optimizer.SIMBA do
 
   @option_schema [
     steps: [type: :non_neg_integer, default: 8],
-    judge_lm: [type: :any, default: nil],
+    judge_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil],
     demos_per_step: [type: :non_neg_integer, default: 3]
   ]
 

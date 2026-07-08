@@ -479,8 +479,16 @@ defmodule OptimizerBehavioralCorpusTest do
                  fn -> DSEx.Optimizer.GEPA.new(fn _example, _prediction, _trace -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.GEPA\.new\/2 expects :feedback_fn to be nil or an arity-1 function/,
+                 ~r/DSEx\.Optimizer\.GEPA\.new\/2: invalid value for :feedback_fn option: expected nil or an arity-1 function/,
                  fn -> DSEx.Optimizer.GEPA.new(metric(), feedback_fn: fn -> "feedback" end) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :proposer_lm option: expected nil, an LM module/,
+                 fn -> DSEx.Optimizer.COPRO.new(metric(), proposer_lm: %{provider: :missing}) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :judge_lm option: expected nil, an LM module/,
+                 fn -> DSEx.Optimizer.SIMBA.new(metric(), judge_lm: %{provider: :missing}) end
   end
 
   test "COPRO can use LM-generated score-informed instruction proposals" do

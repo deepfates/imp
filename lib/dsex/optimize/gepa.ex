@@ -52,7 +52,7 @@ defmodule DSEx.Optimize.GEPA do
       type: {:custom, __MODULE__, :validate_mutation_fn, []},
       default: nil
     ],
-    reflection_lm: [type: :any, default: nil]
+    reflection_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil]
   ]
 
   def optimize(artifact, evaluator, opts \\ [])

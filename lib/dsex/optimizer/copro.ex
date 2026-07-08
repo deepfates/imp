@@ -6,7 +6,7 @@ defmodule DSEx.Optimizer.COPRO do
   @option_schema [
     breadth: [type: :non_neg_integer, default: 5],
     depth: [type: :non_neg_integer, default: 2],
-    proposer_lm: [type: :any, default: nil],
+    proposer_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil],
     extra_instructions: [type: {:list, :string}, default: []]
   ]
 
