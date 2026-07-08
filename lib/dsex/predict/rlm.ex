@@ -64,12 +64,14 @@ defmodule DSEx.Predict.RLM do
       sub_lm: Keyword.get(opts, :sub_lm, Keyword.get(opts, :lm)),
       tools: Keyword.get(opts, :tools, []) |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
       tool_policy: Keyword.get(opts, :tool_policy, :allow),
-      max_iterations: Keyword.get(opts, :max_iterations, 10),
-      max_llm_calls: Keyword.get(opts, :max_llm_calls, 20),
-      max_time_ms: Keyword.get(opts, :max_time_ms),
-      max_preview_chars: Keyword.get(opts, :max_preview_chars, 2_000),
+      max_iterations: non_negative_integer(Keyword.get(opts, :max_iterations, 10)),
+      max_llm_calls: non_negative_integer(Keyword.get(opts, :max_llm_calls, 20)),
+      max_time_ms: non_negative_integer_or_nil(Keyword.get(opts, :max_time_ms)),
+      max_preview_chars: non_negative_integer(Keyword.get(opts, :max_preview_chars, 2_000)),
       max_observation_chars:
-        Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000)),
+        non_negative_integer(
+          Keyword.get(opts, :max_output_chars, Keyword.get(opts, :max_observation_chars, 10_000))
+        ),
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
       dynamic_sub_lm?: not Keyword.has_key?(opts, :sub_lm) and not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
@@ -453,4 +455,10 @@ defmodule DSEx.Predict.RLM do
     Protocol.UndefinedError -> inspect(value)
     ArgumentError -> inspect(value)
   end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
+
+  defp non_negative_integer_or_nil(nil), do: nil
+  defp non_negative_integer_or_nil(value), do: non_negative_integer(value)
 end

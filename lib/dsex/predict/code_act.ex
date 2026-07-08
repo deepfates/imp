@@ -25,7 +25,7 @@ defmodule DSEx.Predict.CodeAct do
     %__MODULE__{
       program_of_thought: DSEx.Predict.ProgramOfThought.new(signature, opts),
       tools: tools |> Enum.map(&coerce_tool/1) |> Map.new(&{&1.name, &1}),
-      max_iters: Keyword.get(opts, :max_iters, 5),
+      max_iters: non_negative_integer(Keyword.get(opts, :max_iters, 5)),
       tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
   end
@@ -171,4 +171,7 @@ defmodule DSEx.Predict.CodeAct do
   end
 
   defp normalize_tool_args(arguments), do: arguments
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

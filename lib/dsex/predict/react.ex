@@ -64,7 +64,7 @@ defmodule DSEx.Predict.ReAct do
       signature: signature,
       react: DSEx.Predict.Predict.new(react_signature, react_opts),
       tools: tools,
-      max_iters: Keyword.get(opts, :max_iters, 20),
+      max_iters: non_negative_integer(Keyword.get(opts, :max_iters, 20)),
       tool_policy: Keyword.get(opts, :tool_policy, :allow)
     }
   end
@@ -295,4 +295,7 @@ defmodule DSEx.Predict.ReAct do
   rescue
     ArgumentError -> to_string(key)
   end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

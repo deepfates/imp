@@ -50,6 +50,27 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "non-positive max_iters fails before calling the model" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          send(parent, :react_lm_called)
+          %{tool_calls: []}
+        end
+      ]
+    }
+
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: -3)
+
+    assert {:error, {:react_max_iters, []}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+
+    refute_received :react_lm_called
+  end
+
   test "tool policy denial stops ReAct before executing LM-selected tool" do
     lm = %{
       module: DSEx.LM.Static,

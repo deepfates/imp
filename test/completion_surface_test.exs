@@ -170,6 +170,27 @@ defmodule CompletionSurfaceTest do
              trace
   end
 
+  test "CodeAct non-positive max_iters fails before calling the planner" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          send(parent, :code_act_lm_called)
+          %{program: "1 + 1"}
+        end
+      ]
+    }
+
+    code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: -2)
+
+    assert {:error, {:code_act_max_iters, 0, []}} =
+             DSEx.Predict.CodeAct.call(code_act, %{question: "q"})
+
+    refute_received :code_act_lm_called
+  end
+
   test "streaming exposes predictions as an enumerable" do
     lm = %{
       module: DSEx.LM.Static,

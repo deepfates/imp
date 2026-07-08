@@ -89,6 +89,51 @@ defmodule RLMPublicSurfaceTest do
              DSEx.Predict.RLM.call(rlm, %{question: "q"})
   end
 
+  test "RLM normalizes non-positive budgets and preview limits conservatively" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:rlm_messages, messages})
+          %{action: "submit", result: %{answer: "ok"}}
+        end
+      ]
+    }
+
+    exhausted =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: lm,
+        max_iterations: -2,
+        max_llm_calls: -3,
+        max_time_ms: -4
+      )
+
+    assert {:error, {:rlm_max_iterations, 0, []}} =
+             DSEx.Predict.RLM.call(exhausted, %{question: "q"})
+
+    refute_received {:rlm_messages, _messages}
+
+    preview =
+      DSEx.Predict.RLM.new("context, values -> answer",
+        lm: lm,
+        max_preview_chars: -1,
+        max_observation_chars: -1
+      )
+
+    assert {:ok, prediction} =
+             DSEx.Predict.RLM.call(preview, %{context: "secret", values: [1, 2, 3]})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "ok"
+    assert_received {:rlm_messages, messages}
+    prompt = Enum.map_join(messages, "\n", & &1.content)
+    assert prompt =~ ~s("preview":"")
+    assert prompt =~ ~s("preview":[])
+    refute prompt =~ "secret"
+    refute prompt =~ "1,2,3"
+  end
+
   test "RLM supports persistent assignment and tool actions" do
     actions = [
       %{action: "assign", name: "scratch", value: "Paris"},
