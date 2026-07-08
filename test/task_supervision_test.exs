@@ -64,6 +64,57 @@ defmodule TaskSupervisionTest do
     assert Task.await(task) == :ok
   end
 
+  test "DSEx.Tasks reports invalid task boundaries clearly" do
+    assert_raise ArgumentError, ~r/DSEx.Tasks.async\/1 expects a zero-arity function/, fn ->
+      DSEx.Tasks.async(fn value -> value end)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Tasks.async_nolink\/1 expects a zero-arity function/,
+                 fn ->
+                   DSEx.Tasks.async_nolink(:not_a_function)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3 expects enumerable input/, fn ->
+      DSEx.Tasks.async_stream(:not_enumerable, fn value -> value end) |> Enum.to_list()
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3 expects an arity-1 function/, fn ->
+      DSEx.Tasks.async_stream([1], fn -> :ok end) |> Enum.to_list()
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3: expected keyword options/, fn ->
+      DSEx.Tasks.async_stream([1], fn value -> value end, %{ordered: true}) |> Enum.to_list()
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Tasks.async_stream\/3.*:ordered.*expected.*boolean/s,
+                 fn ->
+                   DSEx.Tasks.async_stream([1], fn value -> value end, ordered: :sometimes)
+                   |> Enum.to_list()
+                 end
+  end
+
+  test "DSEx.Tasks.async_stream preserves context and accepts Task options" do
+    DSEx.configure(task_marker: :outside)
+
+    results =
+      DSEx.context([task_marker: :inside], fn ->
+        [1, 2]
+        |> DSEx.Tasks.async_stream(
+          fn value -> {value, DSEx.Settings.fetch!(:task_marker)} end,
+          ordered: true,
+          max_concurrency: 2,
+          timeout: 1_000,
+          on_timeout: :kill_task,
+          zip_input_on_exit: true
+        )
+        |> Enum.to_list()
+      end)
+
+    assert results == [ok: {1, :inside}, ok: {2, :inside}]
+  end
+
   test "parallel prediction uses the DSEx task boundary" do
     program =
       DSEx.predict("question -> answer",

@@ -10,6 +10,14 @@ defmodule DSEx.Tasks do
   @supervisor DSEx.TaskSupervisor
   @unlinked_supervisor DSEx.UnlinkedTaskSupervisor
 
+  @async_stream_option_schema [
+    max_concurrency: [type: :pos_integer],
+    ordered: [type: :boolean],
+    timeout: [type: {:or, [:timeout, :pos_integer]}],
+    on_timeout: [type: {:in, [:exit, :kill_task]}],
+    zip_input_on_exit: [type: :boolean]
+  ]
+
   def supervisor, do: @supervisor
   def unlinked_supervisor, do: @unlinked_supervisor
 
@@ -26,6 +34,10 @@ defmodule DSEx.Tasks do
     end
   end
 
+  def async(fun) do
+    raise ArgumentError, "DSEx.Tasks.async/1 expects a zero-arity function, got: #{inspect(fun)}"
+  end
+
   def async_nolink(fun) when is_function(fun, 0) do
     fun = inherit_context(fun)
 
@@ -39,13 +51,36 @@ defmodule DSEx.Tasks do
     end
   end
 
-  def async_stream(enumerable, fun, opts \\ []) when is_function(fun, 1) do
+  def async_nolink(fun) do
+    raise ArgumentError,
+          "DSEx.Tasks.async_nolink/1 expects a zero-arity function, got: #{inspect(fun)}"
+  end
+
+  def async_stream(enumerable, fun, opts \\ [])
+
+  def async_stream(enumerable, fun, opts) when is_function(fun, 1) do
+    enumerable = validate_enumerable!(enumerable)
+    opts = DSEx.Options.validate!(opts, @async_stream_option_schema, "DSEx.Tasks.async_stream/3")
     context_stack = DSEx.Settings.context_stack()
     fun = fn item -> DSEx.Settings.with_context_stack(context_stack, fn -> fun.(item) end) end
 
     case ensure_supervisor(@supervisor) do
       nil -> Task.async_stream(enumerable, fun, opts)
       _pid -> Task.Supervisor.async_stream(@supervisor, enumerable, fun, opts)
+    end
+  end
+
+  def async_stream(_enumerable, fun, _opts) do
+    raise ArgumentError,
+          "DSEx.Tasks.async_stream/3 expects an arity-1 function, got: #{inspect(fun)}"
+  end
+
+  defp validate_enumerable!(enumerable) do
+    if Enumerable.impl_for(enumerable) do
+      enumerable
+    else
+      raise ArgumentError,
+            "DSEx.Tasks.async_stream/3 expects enumerable input, got: #{inspect(enumerable)}"
     end
   end
 
