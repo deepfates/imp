@@ -57,6 +57,7 @@ mix integration.check
 mix protocol.check
 mix benchmark.trace.check
 mix package.check
+mix livebook.check
 mix quality.check
 LIVE_PROVIDER=1 mix live.check
 ```
@@ -85,27 +86,28 @@ DSEx is production complete when:
 5. `mix protocol.check` passes.
 6. `mix benchmark.trace.check` passes.
 7. `mix package.check` passes.
-8. `mix quality.check` passes.
-9. GitHub Actions runs the deterministic release gates:
+8. `mix livebook.check` validates the shipped notebooks under `livebooks/`.
+9. `mix quality.check` passes.
+10. GitHub Actions runs the deterministic release gates:
    `production.check`, `integration.check`, `protocol.check`,
-   `package.check`, and `quality.check`.
-10. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
-11. Any public production claim about paid training, external retrievers, or
+   `package.check`, `livebook.check`, and `quality.check`.
+11. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
+12. Any public production claim about paid training, external retrievers, or
    external MCP servers is backed by dedicated external-service tests, or the
    claim is removed.
-12. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
-13. `mix benchmark.dashboard` produces a current
+13. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+14. `mix benchmark.dashboard` produces a current
     `parity-dashboard-*.json` artifact.
-14. `mix benchmark.dashboard.full` passes, and the dashboard reports
+15. `mix benchmark.dashboard.full` passes, and the dashboard reports
     `full_parity: true`, before the release claims full DSPy parity.
     When this gate fails, its terminal error must name the blocking release
     requirements so the next operator can continue from the failure without
     hand-inspecting the dashboard JSON first.
-15. The parity dashboard reports `performance_claim_supported: true` before the
+16. The parity dashboard reports `performance_claim_supported: true` before the
     release claims DSEx is faster than DSPy on any named path.
-16. Live latency claims cite dashboard or matrix instrumentation that separates
+17. Live latency claims cite dashboard or matrix instrumentation that separates
     provider/model time from DSEx local overhead and adapter recovery.
-17. Live matched-model claims cite artifacts whose prompt/signature contract is
+18. Live matched-model claims cite artifacts whose prompt/signature contract is
     current for every selected model lane.
-18. Any missing parity lane is reflected in public docs as a limitation, not
+19. Any missing parity lane is reflected in public docs as a limitation, not
     hidden behind a passing smoke benchmark.

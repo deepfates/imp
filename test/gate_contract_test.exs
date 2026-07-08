@@ -9,6 +9,7 @@ defmodule GateContractTest do
              "compile --warnings-as-errors",
              "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
              "package.check",
+             "livebook.check",
              "docs"
            ]
 
@@ -86,6 +87,10 @@ defmodule GateContractTest do
     assert Keyword.fetch!(aliases, :"package.check") == [
              "test test/package_contract_test.exs",
              "cmd mix hex.build --unpack --output tmp/package-check"
+           ]
+
+    assert Keyword.fetch!(aliases, :"livebook.check") == [
+             "test.livebooks --path livebooks"
            ]
 
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".training.check"))

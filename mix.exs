@@ -53,6 +53,7 @@ defmodule DSEx.MixProject do
         "benchmark.parity.check": :test,
         "benchmark.parity.full": :test,
         "live.check": :test,
+        "livebook.check": :test,
         "package.check": :test,
         "quality.check": :test
       ]
@@ -135,6 +136,7 @@ defmodule DSEx.MixProject do
         "compile --warnings-as-errors",
         "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "package.check",
+        "livebook.check",
         "docs"
       ],
       "evidence.check": [
@@ -205,6 +207,9 @@ defmodule DSEx.MixProject do
       "package.check": [
         "test test/package_contract_test.exs",
         "cmd mix hex.build --unpack --output tmp/package-check"
+      ],
+      "livebook.check": [
+        "test.livebooks --path livebooks"
       ],
       "quality.check": [
         "credo --only warning"
