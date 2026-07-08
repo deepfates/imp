@@ -1,10 +1,45 @@
 defmodule DSEx.Predict.MultiChainComparison do
-  @moduledoc "Compare multiple chain-of-thought completions and ask a predictor for the final output."
+  @moduledoc """
+  Compare several candidate completions and ask a predictor for the final output.
+
+  `MultiChainComparison` is a composition primitive for self-consistency style
+  workflows. You generate `m` candidate predictions elsewhere, pass them under
+  `:completions` or `"completions"`, and this module builds a comparison
+  prompt with one `:reasoning_attempt_N` input per candidate.
+
+  Completions may be maps with atom or string keys, or `%DSEx.Prediction{}`
+  values. DSEx reads `:rationale`/`:reasoning` plus the signature's final
+  output field and sends those attempt summaries to the wrapped predictor.
+
+  ## Example
+
+      iex> lm = %{
+      ...>   module: DSEx.LM.Static,
+      ...>   opts: [handler: fn _messages, _opts -> %{rationale: "two attempts agree", answer: "Paris"} end]
+      ...> }
+      iex> program = DSEx.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 2)
+      iex> {:ok, prediction} =
+      ...>   DSEx.Predict.MultiChainComparison.call(program, %{
+      ...>     "question" => "Capital of France?",
+      ...>     "completions" => [
+      ...>       %{"reasoning" => "geography", "answer" => "Paris"},
+      ...>       DSEx.Prediction.new(reasoning: "landmark clue", answer: "Paris")
+      ...>     ]
+      ...>   })
+      iex> DSEx.Prediction.get(prediction, :answer)
+      "Paris"
+  """
 
   @behaviour DSEx.Module
 
   defstruct [:predict, :last_key, m: 3]
 
+  @doc """
+  Builds a multi-chain comparison program.
+
+  `:m` (or uppercase `:M`) is the exact number of completions expected at call
+  time and must be a positive integer.
+  """
   def new(signature, opts \\ []) do
     signature = DSEx.Signature.ensure(signature)
     last_key = signature |> DSEx.Signature.output_names() |> List.last()
@@ -28,6 +63,14 @@ defmodule DSEx.Predict.MultiChainComparison do
   end
 
   @impl true
+  @doc """
+  Runs the comparison over a map or keyword list containing completions.
+
+  Returns `{:error, {:wrong_completion_count, expected: m, got: count}}` when
+  the completion count does not match the configured `m`, and
+  `{:error, {:invalid_completions, value}}` when the completions field is not a
+  list.
+  """
   def call(%__MODULE__{} = mcc, inputs) do
     inputs = Map.new(inputs)
     completions = Map.get(inputs, :completions, Map.get(inputs, "completions", []))
