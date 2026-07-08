@@ -191,6 +191,36 @@ defmodule DSExTest do
              DSEx.Predict.Predict.call(program, %{question: "q"})
   end
 
+  test "predict constructor and call report invalid inputs clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.predict("question -> answer", :not_options)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2.*:config.*expected.*keyword/s,
+                 fn ->
+                   DSEx.predict("question -> answer", config: :not_config)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Predict\.new\/2.*:metadata.*expected.*map/s,
+                 fn ->
+                   DSEx.predict("question -> answer", metadata: :not_metadata)
+                 end
+
+    program = DSEx.predict("question -> answer", lm: %{module: DSEx.LM.Static, opts: []})
+
+    assert {:error, {:invalid_predict_inputs, message}} =
+             DSEx.Predict.Predict.call(program, :not_inputs)
+
+    assert message =~ "expected a map or field pair list"
+
+    assert {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.Predict.Predict.call(program, [:not_a_pair])
+  end
+
   test "predict accepts string-key inputs and allows optional inputs to be absent" do
     lm = %{
       module: DSEx.LM.Static,

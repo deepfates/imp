@@ -48,14 +48,24 @@ defmodule DSEx.Predict.Predict do
   `:metadata` are retained on the program and participate in dump/load where
   supported.
   """
+  @option_schema [
+    lm: [type: :any],
+    adapter: [type: :any],
+    demos: [type: {:list, :any}, default: []],
+    config: [type: :keyword_list, default: []],
+    metadata: [type: {:map, :any, :any}, default: %{}]
+  ]
+
   def new(signature, opts \\ []) do
+    {opts, predict_opts} = validate_opts!(opts)
+
     %__MODULE__{
       signature: DSEx.Signature.ensure(signature),
-      lm: Keyword.get(opts, :lm),
-      adapter: Keyword.get(opts, :adapter),
-      demos: Keyword.get(opts, :demos, []),
-      config: Keyword.get(opts, :config, []),
-      metadata: Keyword.get(opts, :metadata, %{}),
+      lm: predict_opts[:lm],
+      adapter: predict_opts[:adapter],
+      demos: predict_opts[:demos],
+      config: predict_opts[:config],
+      metadata: predict_opts[:metadata],
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
     }
@@ -72,7 +82,7 @@ defmodule DSEx.Predict.Predict do
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
     with {:ok, lm} <- require_lm(resolve_lm(predict)),
          adapter <- resolve_adapter(predict),
-         inputs <- Map.new(inputs),
+         {:ok, inputs} <- normalize_inputs(inputs),
          :ok <- validate_inputs(predict.signature, inputs),
          messages <- adapter.format(predict.signature, inputs, demos: predict.demos),
          lm_opts <- adapter_lm_opts(adapter, predict.signature, predict.config),
@@ -91,6 +101,11 @@ defmodule DSEx.Predict.Predict do
       {:ok, add_trace(prediction, trace_messages, trace_raw)}
     end
   end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_predict_inputs, "expected a map or field pair list, got: #{inspect(inputs)}"}}
 
   @doc "Returns a copy of the program with demonstrations attached."
   def with_demos(%__MODULE__{} = predict, demos), do: %{predict | demos: List.wrap(demos)}
@@ -126,6 +141,34 @@ defmodule DSEx.Predict.Predict do
 
   defp require_lm(nil), do: {:error, :lm_not_configured}
   defp require_lm(lm), do: {:ok, lm}
+
+  defp validate_opts!(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      predict_opts =
+        DSEx.Options.validate!(
+          Keyword.take(opts, Keyword.keys(@option_schema)),
+          @option_schema,
+          "DSEx.Predict.Predict.new/2"
+        )
+
+      {opts, predict_opts}
+    else
+      raise ArgumentError,
+            "DSEx.Predict.Predict.new/2: expected keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts) do
+    raise ArgumentError,
+          "DSEx.Predict.Predict.new/2: expected keyword options, got: #{inspect(opts)}"
+  end
+
+  defp normalize_inputs(inputs) do
+    {:ok, Map.new(inputs)}
+  rescue
+    _error ->
+      {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}}
+  end
 
   defp validate_inputs(signature, inputs) do
     required =
