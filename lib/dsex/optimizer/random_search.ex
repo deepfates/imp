@@ -41,8 +41,8 @@ defmodule DSEx.Optimizer.RandomSearch do
   defstruct [:metric, candidates: 8, demos_per_candidate: 4]
 
   @option_schema [
-    candidates: [type: :any, default: 8],
-    demos_per_candidate: [type: :any, default: 4]
+    candidates: [type: :non_neg_integer, default: 8],
+    demos_per_candidate: [type: :non_neg_integer, default: 4]
   ]
 
   def new(metric, opts \\ []) do
@@ -51,8 +51,8 @@ defmodule DSEx.Optimizer.RandomSearch do
 
     %__MODULE__{
       metric: metric,
-      candidates: non_negative_integer(opts[:candidates]),
-      demos_per_candidate: non_negative_integer(opts[:demos_per_candidate])
+      candidates: opts[:candidates],
+      demos_per_candidate: opts[:demos_per_candidate]
     }
   end
 
@@ -171,9 +171,6 @@ defmodule DSEx.Optimizer.RandomSearch do
 
   defp candidate_indices(count) when count > 0, do: 1..count
   defp candidate_indices(_count), do: []
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
 

@@ -14,7 +14,7 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   defstruct [:metric, max_bootstrapped_demos: 4]
 
   @option_schema [
-    max_bootstrapped_demos: [type: :any, default: 4]
+    max_bootstrapped_demos: [type: :non_neg_integer, default: 4]
   ]
 
   def new(metric, opts \\ []) do
@@ -23,7 +23,7 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
 
     %__MODULE__{
       metric: metric,
-      max_bootstrapped_demos: non_negative_integer(opts[:max_bootstrapped_demos])
+      max_bootstrapped_demos: opts[:max_bootstrapped_demos]
     }
   end
 
@@ -172,9 +172,6 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
     |> Enum.sum()
     |> Kernel./(length(candidates))
   end
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2), do: :ok
 

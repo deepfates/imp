@@ -11,12 +11,12 @@ defmodule DSEx.Optimizer.LabeledFewShot do
   defstruct k: 4
 
   @option_schema [
-    k: [type: :any, default: 4]
+    k: [type: :non_neg_integer, default: 4]
   ]
 
   def new(opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.LabeledFewShot.new/1")
-    %__MODULE__{k: non_negative_integer(opts[:k])}
+    %__MODULE__{k: opts[:k]}
   end
 
   def compile(%__MODULE__{k: k}, program, trainset) do
@@ -59,9 +59,6 @@ defmodule DSEx.Optimizer.LabeledFewShot do
     do: %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
 
   defp put_demos(program, _demos), do: program
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

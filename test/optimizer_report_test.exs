@@ -187,6 +187,30 @@ defmodule OptimizerReportTest do
                  end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.LabeledFewShot\.new\/1: invalid value for :k option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.LabeledFewShot.new(k: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.RandomSearch\.new\/2: invalid value for :candidates option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.RandomSearch.new(metric, candidates: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.RandomSearch\.new\/2: invalid value for :demos_per_candidate option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.RandomSearch.new(metric, demos_per_candidate: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFewShot\.new\/2: invalid value for :max_bootstrapped_demos option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFewShot.new(metric, max_bootstrapped_demos: -1)
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3: expected keyword options/,
                  fn ->
                    DSEx.Optimizer.KNNFewShot.new(1, [], %{field: :question})
