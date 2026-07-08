@@ -161,6 +161,9 @@ Pass condition:
   sample size with matched generation and strict score/latency parity
 - runner/API error rows, including quota/rate-limit rows with null answers, are
   counted as incomplete evidence and remain rerunnable
+- selected live campaign artifacts record a single consistent `max_concurrency`
+  setting; mixed serial/concurrent chunks are diagnostic evidence only until
+  rerun or reaggregated into a comparable campaign lineage
 - aggregate and per-task score gaps are within configured thresholds
 - error-rate deltas are within threshold
 - latency ratio is reported and meets the threshold for operational parity

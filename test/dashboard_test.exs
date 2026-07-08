@@ -166,6 +166,18 @@ defmodule DashboardTest do
           "total_models" => 1,
           "complete" => false
         },
+        "execution" => %{
+          "models_with_consistent_max_concurrency" => 0,
+          "total_models" => 1,
+          "complete" => false,
+          "by_model" => %{
+            "gpt-test-mini" => %{
+              "max_concurrency_consistent" => false,
+              "max_concurrency" => nil,
+              "max_concurrency_values" => [4, 8]
+            }
+          }
+        },
         "latency" => %{
           "complete" => false,
           "failing_models" => ["gpt-test-mini"],
@@ -225,6 +237,16 @@ defmodule DashboardTest do
           "lane_tags" => ["current_low_cost"],
           "parity" => %{"latency_parity" => false},
           "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
+          "execution" => %{
+            "max_concurrency_consistent" => false,
+            "max_concurrency" => nil,
+            "max_concurrency_values" => [4, 8]
+          },
+          "proof" => %{
+            "max_concurrency_consistent" => false,
+            "max_concurrency" => nil,
+            "max_concurrency_values" => [4, 8]
+          },
           "transport" => %{"req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}},
           "artifact" => %{"path" => "benchmarks/results/gpt-test-mini.json"}
         }
@@ -271,6 +293,7 @@ defmodule DashboardTest do
              "live_lane_missing",
              "live_lane_missing",
              "live_latency_parity_false",
+             "live_max_concurrency_inconsistent",
              "prompt_contract_incomplete",
              "runtime_shape_incomplete"
            ]
@@ -279,6 +302,7 @@ defmodule DashboardTest do
              "current_low_cost",
              "frontier_sanity",
              "historical_research",
+             nil,
              nil,
              nil,
              nil
@@ -304,6 +328,22 @@ defmodule DashboardTest do
                    "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
                    "transport" => %{
                      "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
+                   }
+                 }
+               ]
+             },
+             %{
+               "kind" => "live_max_concurrency_inconsistent",
+               "failures" => [
+                 %{
+                   "model" => "gpt-test-mini",
+                   "execution" => %{
+                     "max_concurrency_consistent" => false,
+                     "max_concurrency_values" => [4, 8]
+                   },
+                   "proof" => %{
+                     "max_concurrency_consistent" => false,
+                     "max_concurrency_values" => [4, 8]
                    }
                  }
                ]
@@ -409,6 +449,7 @@ defmodule DashboardTest do
     assert error.message =~ "8720 rows remaining"
     assert error.message =~ "frontier_sanity: missing matched live evidence"
     assert error.message =~ "historical_research: missing matched live evidence"
+    assert error.message =~ "live max_concurrency evidence is missing or inconsistent"
     assert error.message =~ "Runtime shape evidence is not complete"
   end
 

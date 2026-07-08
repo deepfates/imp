@@ -129,6 +129,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     wire_api_matched = if generation["wire_api_matched"], do: 1, else: 0
     prompt_contract_current = if generation["prompt_contract_current"], do: 1, else: 0
     evidence_policy_current = if current_evidence_policy?(artifact), do: 1, else: 0
+    execution = execution_proof(artifact["execution"])
+    execution_consistent = if execution["max_concurrency_consistent"], do: 1, else: 0
     instrumentation_complete = if artifact_instrumentation_complete?(artifact), do: 1, else: 0
     runtime_shape_complete = if artifact_runtime_shape_complete?(artifact), do: 1, else: 0
     fresh = if fresh?(artifact, max_age_hours), do: 1, else: 0
@@ -139,6 +141,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       generation_consistent,
       prompt_contract_current,
       evidence_policy_current,
+      execution_consistent,
       instrumentation_complete,
       runtime_shape_complete,
       coverage,
@@ -190,6 +193,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "matrix_complete" => complete,
         "required_lanes" => required,
         "prompt_contract" => matrix_prompt_contract_summary(models),
+        "execution" => matrix_execution_summary(models),
         "dsex_instrumentation" => matrix_instrumentation_summary(models),
         "runtime_shape" => matrix_runtime_shape_summary(models),
         "disagreements" => matrix_disagreement_summary(models),
@@ -213,11 +217,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     full_parity = get_in(artifact, ["parity", "full_parity"]) == true
     fresh = fresh?(artifact, max_age_hours)
     generation_proof = generation_proof(artifact["generation"])
+    execution_proof = execution_proof(artifact["execution"])
 
     full_evidence =
       fresh and full_parity and generation_proof["requested_consistent"] and
         generation_proof["complete"] and generation_proof["matched"] and
-        generation_proof["wire_api_matched"] and generation_proof["prompt_contract_current"]
+        generation_proof["wire_api_matched"] and generation_proof["prompt_contract_current"] and
+        execution_proof["max_concurrency_consistent"]
 
     %{
       "provider" => artifact["provider"],
@@ -236,6 +242,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         "full_parity" => full_parity,
         "evidence_policy_current" => current_evidence_policy?(artifact),
         "evidence_policy" => artifact["evidence_policy"],
+        "max_concurrency_consistent" => execution_proof["max_concurrency_consistent"],
+        "max_concurrency" => execution_proof["max_concurrency"],
+        "max_concurrency_values" => execution_proof["max_concurrency_values"],
         "requested_generation_consistent" => generation_proof["requested_consistent"],
         "effective_generation_complete" => generation_proof["complete"],
         "effective_generation_matched" => generation_proof["matched"],
@@ -252,6 +261,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
           "dspy_duration_ms",
           "latency_ratio_dsex_over_dspy"
         ]),
+      "execution" => artifact["execution"],
       "transport" => model_transport(artifact["generation"]),
       "dsex_instrumentation" => model_instrumentation_summary(artifact["tasks"] || []),
       "runtime_shape" => model_runtime_shape_summary(artifact["tasks"] || []),
@@ -333,6 +343,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "prompt_contract_current" => false
     }
 
+  defp execution_proof(%{"max_concurrency_consistent" => consistent} = execution) do
+    %{
+      "max_concurrency_consistent" => consistent == true,
+      "max_concurrency" => execution["max_concurrency"],
+      "max_concurrency_values" => execution["max_concurrency_values"] || []
+    }
+  end
+
+  defp execution_proof(%{"max_concurrency" => max_concurrency})
+       when is_integer(max_concurrency) and max_concurrency > 0 do
+    %{
+      "max_concurrency_consistent" => true,
+      "max_concurrency" => max_concurrency,
+      "max_concurrency_values" => [max_concurrency]
+    }
+  end
+
+  defp execution_proof(_execution) do
+    %{
+      "max_concurrency_consistent" => false,
+      "max_concurrency" => nil,
+      "max_concurrency_values" => []
+    }
+  end
+
   defp generation_prompt_contract(%{"value" => %{"prompt_contract" => prompt_contract}})
        when is_map(prompt_contract),
        do: prompt_contract
@@ -390,6 +425,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         end),
       "note" =>
         "Prompt-contract currency means the selected artifact was produced with the benchmark prompt/signature contract shipped by this DSEx version. Obsolete prompt contracts are retained as historical evidence, not release evidence."
+    }
+  end
+
+  defp matrix_execution_summary(models) do
+    consistent =
+      Enum.filter(models, &get_in(&1, ["proof", "max_concurrency_consistent"]))
+
+    %{
+      "models_with_consistent_max_concurrency" => length(consistent),
+      "total_models" => length(models),
+      "complete" => models != [] and length(consistent) == length(models),
+      "by_model" =>
+        Map.new(models, fn model ->
+          {
+            model["model"],
+            %{
+              "max_concurrency_consistent" =>
+                get_in(model, ["proof", "max_concurrency_consistent"]) == true,
+              "max_concurrency" => get_in(model, ["proof", "max_concurrency"]),
+              "max_concurrency_values" => get_in(model, ["proof", "max_concurrency_values"]) || []
+            }
+          }
+        end),
+      "note" =>
+        "Release live evidence requires one consistent max_concurrency setting per selected campaign artifact, so latency and throughput claims do not mix serial and concurrent runs."
     }
   end
 
@@ -762,7 +822,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       proof["effective_generation_complete"] == true and
       proof["effective_generation_matched"] == true and
       proof["wire_api_matched"] == true and
-      proof["prompt_contract_current"] == true
+      proof["prompt_contract_current"] == true and
+      proof["max_concurrency_consistent"] == true
   end
 
   defp score_parity?(%{} = parity) do

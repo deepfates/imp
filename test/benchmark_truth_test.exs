@@ -1896,6 +1896,47 @@ defmodule BenchmarkTruthTest do
     assert required["historical_research"]["policy"]["required_scale"] == "research_sample"
   end
 
+  test "live matrix refuses research-sample release proof without consistent concurrency" do
+    out_dir = tmp_dir("live-matrix-concurrency-proof")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "frontier-mixed-concurrency.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "execution" => %{
+        "max_concurrency_values" => [2, 8],
+        "max_concurrency" => nil,
+        "max_concurrency_consistent" => false
+      },
+      "tasks" => instrumented_task_pair(100)
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    [model] = matrix["models"]
+
+    refute matrix["summary"]["required_lanes"]["frontier_sanity"]["satisfied"]
+    refute matrix["summary"]["execution"]["complete"]
+    refute model["proof"]["max_concurrency_consistent"]
+    assert model["proof"]["max_concurrency_values"] == [2, 8]
+  end
+
   test "live matrix tags modern non-OpenAI model lanes" do
     out_dir = tmp_dir("live-matrix-non-openai-lanes")
     in_dir = Path.join(out_dir, "campaigns")
@@ -2110,7 +2151,8 @@ defmodule BenchmarkTruthTest do
       "old-policy-higher-coverage.json",
       Map.merge(base, %{
         "generated_at" => "2026-07-07T00:00:00Z",
-        "coverage" => %{"covered" => 300, "expected" => 8724, "full" => false}
+        "coverage" => %{"covered" => 300, "expected" => 8724, "full" => false},
+        "evidence_policy" => %{"version" => 1}
       })
     )
 
@@ -3132,6 +3174,15 @@ defmodule BenchmarkTruthTest do
   end
 
   defp write_campaign_artifact(out_dir, name, artifact) do
+    artifact =
+      artifact
+      |> Map.put_new("evidence_policy", current_evidence_policy())
+      |> Map.put_new("execution", %{
+        "max_concurrency_values" => [1],
+        "max_concurrency" => 1,
+        "max_concurrency_consistent" => true
+      })
+
     File.write!(Path.join(out_dir, name), Jason.encode!(artifact, pretty: true) <> "\n")
   end
 

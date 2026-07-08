@@ -205,6 +205,25 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     "live latency parity failed for #{models}#{suffix}"
   end
 
+  defp format_blocking_requirement(
+         _parent_lane,
+         %{"kind" => "live_max_concurrency_inconsistent"} = req
+       ) do
+    models =
+      req["failures"]
+      |> List.wrap()
+      |> Enum.map(& &1["model"])
+      |> Enum.reject(&is_nil/1)
+
+    suffix =
+      case models do
+        [] -> ""
+        values -> " for #{Enum.join(values, ", ")}"
+      end
+
+    "live max_concurrency evidence is missing or inconsistent#{suffix}"
+  end
+
   defp format_blocking_requirement(parent_lane, %{"message" => message}) when is_binary(message),
     do: "#{parent_lane}: #{message}"
 
@@ -404,6 +423,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
            "required_lanes" => get_in(artifact, ["summary", "required_lanes"]),
            "blocking_requirements" => live_matrix_blocking_requirements(artifact),
            "prompt_contract" => get_in(artifact, ["summary", "prompt_contract"]),
+           "execution" => get_in(artifact, ["summary", "execution"]),
            "dsex_instrumentation" => get_in(artifact, ["summary", "dsex_instrumentation"]),
            "runtime_shape" => get_in(artifact, ["summary", "runtime_shape"]),
            "disagreements" => get_in(artifact, ["summary", "disagreements"]),
@@ -564,6 +584,30 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         }
       )
       |> maybe_add_requirement(
+        execution_failures(artifact) != [],
+        %{
+          "kind" => "live_max_concurrency_inconsistent",
+          "failures" =>
+            Enum.map(execution_failures(artifact), fn model ->
+              %{
+                "model" => model["model"],
+                "lane_tags" => model["lane_tags"],
+                "execution" => model["execution"],
+                "proof" =>
+                  Map.take(model["proof"] || %{}, [
+                    "max_concurrency_consistent",
+                    "max_concurrency",
+                    "max_concurrency_values"
+                  ]),
+                "artifact" => model["artifact"]
+              }
+            end),
+          "execution" => summary["execution"],
+          "message" =>
+            "One or more selected live model artifacts lack a single consistent max_concurrency setting; rerun or reaggregate with matched concurrency before claiming live parity."
+        }
+      )
+      |> maybe_add_requirement(
         get_in(summary, ["prompt_contract", "complete"]) != true,
         %{
           "kind" => "prompt_contract_incomplete",
@@ -597,6 +641,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     artifact
     |> Map.get("models", [])
     |> Enum.filter(&(get_in(&1, ["parity", "latency_parity"]) == false))
+  end
+
+  defp execution_failures(artifact) do
+    artifact
+    |> Map.get("models", [])
+    |> Enum.filter(&(get_in(&1, ["proof", "max_concurrency_consistent"]) != true))
   end
 
   defp live_campaign_blocking_requirements(artifact) do

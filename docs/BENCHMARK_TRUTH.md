@@ -431,7 +431,10 @@ invocation. Reuse an explicit id when resuming a long full campaign later.
 Concurrency improves wall-clock time by issuing independent row calls in
 parallel on both the DSEx and Python DSPy sides. It does not reduce the number
 of benchmark rows or provider calls, and reports record `max_concurrency` so
-serial and concurrent artifacts are auditable.
+serial and concurrent artifacts are auditable. Campaign aggregates require one
+consistent `max_concurrency` value before `full_parity` can be true; the live
+matrix and dashboard surface mixed or missing concurrency evidence as a release
+blocker because latency and throughput claims are not comparable otherwise.
 
 Aggregate chunk artifacts into a campaign report:
 
@@ -468,10 +471,11 @@ missing ranges instead of being treated as both-failed parity rows. It reports:
 
 `full_parity` is false unless every canonical row is covered, the prompt
 contract and effective generation settings are consistent, complete, and
-matched, aggregate and per-task score gaps are within the configured strict
-thresholds, and the DSEx/DSPy latency ratio is within the configured
-`--max-latency-ratio` threshold (`1.5` by default). Latency is part of the
-decision because parity is about operational behavior, not only answer quality.
+matched, `max_concurrency` is consistent across the campaign evidence, aggregate
+and per-task score gaps are within the configured strict thresholds, and the
+DSEx/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
+(`1.5` by default). Latency is part of the decision because parity is about
+operational behavior, not only answer quality.
 
 The current v4 canonical-answer campaign for `gpt-5.4-mini` is a research
 sample, not release proof: `300/8724` canonical rows are covered, aggregate gap

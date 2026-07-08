@@ -112,5 +112,9 @@ DSEx is production complete when:
     provider/model time from DSEx local overhead and adapter recovery.
 19. Live matched-model claims cite artifacts whose prompt/signature contract is
     current for every selected model lane.
-20. Any missing parity lane is reflected in public docs as a limitation, not
+20. Live matched-model claims cite artifacts with one consistent
+    `max_concurrency` setting per selected campaign artifact. Mixed or missing
+    concurrency evidence blocks full parity and performance claims until rerun
+    or isolated.
+21. Any missing parity lane is reflected in public docs as a limitation, not
     hidden behind a passing smoke benchmark.
