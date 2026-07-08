@@ -78,6 +78,68 @@ defmodule OptimizerReportTest do
     assert length(compiled.demos) == 1
   end
 
+  test "few-shot optimizers attach demos through wrapper programs" do
+    {train, _dev} = sets()
+
+    pot =
+      "question -> answer"
+      |> DSEx.program_of_thought()
+      |> then(
+        &DSEx.Optimizer.LabeledFewShot.compile(DSEx.Optimizer.LabeledFewShot.new(k: 1), &1, train)
+      )
+
+    assert [%DSEx.Example{}] = pot.predict.demos
+    assert DSEx.Optimizer.Report.fetch(pot).optimizer == :labeled_few_shot
+
+    code_act =
+      "question -> answer"
+      |> DSEx.code_act()
+      |> then(
+        &DSEx.Optimizer.LabeledFewShot.compile(DSEx.Optimizer.LabeledFewShot.new(k: 1), &1, train)
+      )
+
+    assert [%DSEx.Example{}] = code_act.program_of_thought.predict.demos
+    assert DSEx.Optimizer.Report.fetch(code_act).optimizer == :labeled_few_shot
+
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France: Paris."}]))
+      |> then(
+        &DSEx.Optimizer.LabeledFewShot.compile(DSEx.Optimizer.LabeledFewShot.new(k: 1), &1, train)
+      )
+
+    assert [%DSEx.Example{}] = rag.program.demos
+    assert DSEx.Optimizer.Report.fetch(rag).optimizer == :labeled_few_shot
+  end
+
+  test "instruction search helpers traverse wrapper programs" do
+    pot =
+      "question -> answer"
+      |> DSEx.program_of_thought()
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Answer briefly.")
+
+    assert DSEx.Optimizer.InstructionSearch.current_instruction(pot) == "Answer briefly."
+    assert pot.predict.signature.instructions == "Answer briefly."
+
+    code_act =
+      "question -> answer"
+      |> DSEx.code_act()
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Use code sparingly.")
+
+    assert DSEx.Optimizer.InstructionSearch.current_instruction(code_act) == "Use code sparingly."
+    assert code_act.program_of_thought.predict.signature.instructions == "Use code sparingly."
+
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France: Paris."}]))
+      |> DSEx.Optimizer.InstructionSearch.put_instruction("Use retrieved context.")
+
+    assert DSEx.Optimizer.InstructionSearch.current_instruction(rag) == "Use retrieved context."
+    assert rag.program.signature.instructions == "Use retrieved context."
+  end
+
   test "optimizer reports attach and fetch through wrapper programs" do
     report = DSEx.Optimizer.Report.new(%{optimizer: :wrapper_probe, metadata: %{status: :ok}})
 

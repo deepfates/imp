@@ -162,6 +162,15 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   defp put_demos(%DSEx.Predict.ChainOfThought{predict: predict} = program, demos),
     do: %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
 
+  defp put_demos(%DSEx.Predict.ProgramOfThought{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
+  defp put_demos(%DSEx.Predict.CodeAct{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
+  defp put_demos(%DSEx.Predict.RAG{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
   defp put_demos(program, _demos), do: program
 
   defp average_score([]), do: 0.0

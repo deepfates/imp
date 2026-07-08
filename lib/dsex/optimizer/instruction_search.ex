@@ -85,6 +85,18 @@ defmodule DSEx.Optimizer.InstructionSearch do
     %{program | predict: put_instruction(predict, instruction)}
   end
 
+  def put_instruction(%DSEx.Predict.ProgramOfThought{predict: predict} = program, instruction) do
+    %{program | predict: put_instruction(predict, instruction)}
+  end
+
+  def put_instruction(%DSEx.Predict.CodeAct{program_of_thought: pot} = program, instruction) do
+    %{program | program_of_thought: put_instruction(pot, instruction)}
+  end
+
+  def put_instruction(%DSEx.Predict.RAG{program: inner} = program, instruction) do
+    %{program | program: put_instruction(inner, instruction)}
+  end
+
   def put_instruction(program, _instruction), do: program
 
   def current_instruction(%DSEx.Predict.Predict{signature: signature}),
@@ -92,6 +104,15 @@ defmodule DSEx.Optimizer.InstructionSearch do
 
   def current_instruction(%DSEx.Predict.ChainOfThought{predict: predict}),
     do: current_instruction(predict)
+
+  def current_instruction(%DSEx.Predict.ProgramOfThought{predict: predict}),
+    do: current_instruction(predict)
+
+  def current_instruction(%DSEx.Predict.CodeAct{program_of_thought: pot}),
+    do: current_instruction(pot)
+
+  def current_instruction(%DSEx.Predict.RAG{program: inner}),
+    do: current_instruction(inner)
 
   def current_instruction(_program), do: nil
 
@@ -154,11 +175,18 @@ defmodule DSEx.Optimizer.InstructionSearch do
   defp maybe_put_demos(program, []), do: program
 
   defp maybe_put_demos(%DSEx.Predict.Predict{} = program, demos),
-    do: DSEx.Predict.Predict.with_demos(program, demos)
+    do: DSEx.with_demos(program, demos)
 
-  defp maybe_put_demos(%DSEx.Predict.ChainOfThought{predict: predict} = program, demos) do
-    %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
-  end
+  defp maybe_put_demos(%DSEx.Predict.ChainOfThought{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
+  defp maybe_put_demos(%DSEx.Predict.ProgramOfThought{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
+  defp maybe_put_demos(%DSEx.Predict.CodeAct{} = program, demos),
+    do: DSEx.with_demos(program, demos)
+
+  defp maybe_put_demos(%DSEx.Predict.RAG{} = program, demos), do: DSEx.with_demos(program, demos)
 
   defp maybe_put_demos(program, _demos), do: program
 
@@ -170,6 +198,24 @@ defmodule DSEx.Optimizer.InstructionSearch do
          metadata
        ) do
     %{program | predict: attach_optimizer_metadata(predict, metadata)}
+  end
+
+  defp attach_optimizer_metadata(
+         %DSEx.Predict.ProgramOfThought{predict: predict} = program,
+         metadata
+       ) do
+    %{program | predict: attach_optimizer_metadata(predict, metadata)}
+  end
+
+  defp attach_optimizer_metadata(
+         %DSEx.Predict.CodeAct{program_of_thought: pot} = program,
+         metadata
+       ) do
+    %{program | program_of_thought: attach_optimizer_metadata(pot, metadata)}
+  end
+
+  defp attach_optimizer_metadata(%DSEx.Predict.RAG{program: inner} = program, metadata) do
+    %{program | program: attach_optimizer_metadata(inner, metadata)}
   end
 
   defp attach_optimizer_metadata(program, _metadata), do: program
