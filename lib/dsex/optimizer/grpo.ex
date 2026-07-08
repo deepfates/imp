@@ -26,12 +26,7 @@ defmodule DSEx.Optimizer.GRPO do
         DSEx.Example.put(example, :reward, reward)
       end)
 
-    lm =
-      case program do
-        %DSEx.Predict.Predict{lm: lm} -> lm
-        %DSEx.Predict.ChainOfThought{predict: %DSEx.Predict.Predict{lm: lm}} -> lm
-        _ -> %{}
-      end
+    lm = DSEx.ProgramAccess.lm(program) || %{}
 
     DSEx.Clients.Trainer.finetune(optimizer.trainer, lm, enriched, method: :grpo)
   end

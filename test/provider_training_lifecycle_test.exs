@@ -442,4 +442,66 @@ defmodule ProviderTrainingLifecycleTest do
                    DSEx.Optimizer.BootstrapFinetune.new(metric, max_demos: -1)
                  end
   end
+
+  test "BootstrapFinetune extracts demos and LM through composed program wrappers" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
+    }
+
+    retriever = DSEx.Retrieve.Memory.new([%{text: "multiplication by two"}], k: 1)
+
+    program =
+      "x, context -> doubled"
+      |> DSEx.program_of_thought(lm: lm, output_field: :doubled)
+      |> DSEx.rag(retriever, query_field: :x, k: 1)
+
+    trainset = [
+      DSEx.example(x: 21, doubled: 42) |> DSEx.with_inputs(:x)
+    ]
+
+    metric = DSEx.Metrics.exact_match(:doubled)
+
+    trainer = fn trainer_lm, demos, opts ->
+      send(self(), {:bootstrap_finetune, trainer_lm, demos, opts})
+      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_wrapped", provider: :test})}
+    end
+
+    result =
+      metric
+      |> DSEx.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: 1)
+      |> DSEx.Optimizer.BootstrapFinetune.compile(program, trainset)
+
+    assert %{
+             program: %DSEx.Predict.RAG{
+               program: %DSEx.Predict.ProgramOfThought{predict: %{demos: [demo]}}
+             },
+             job: %DSEx.Clients.TrainingJob{id: "job_wrapped"}
+           } = result
+
+    assert DSEx.Example.get(demo, :doubled) == 42
+    assert_received {:bootstrap_finetune, ^lm, [^demo], []}
+  end
+
+  test "GRPO extracts the provider LM through CodeAct and ProgramOfThought wrappers" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: "42"} end]
+    }
+
+    program = DSEx.code_act("question -> answer", [], lm: lm)
+    trainset = [DSEx.example(question: "life?", answer: "42") |> DSEx.with_inputs(:question)]
+
+    trainer = fn trainer_lm, enriched, opts ->
+      send(self(), {:grpo_finetune, trainer_lm, enriched, opts})
+      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_grpo", provider: :test})}
+    end
+
+    assert {:ok, %DSEx.Clients.TrainingJob{id: "job_grpo"}} =
+             DSEx.Optimizer.GRPO.new(fn _example -> 0.75 end, trainer: trainer)
+             |> DSEx.Optimizer.GRPO.compile(program, trainset)
+
+    assert_received {:grpo_finetune, ^lm, [enriched], [method: :grpo]}
+    assert DSEx.Example.get(enriched, :reward) == 0.75
+  end
 end

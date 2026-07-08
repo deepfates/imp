@@ -32,8 +32,8 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
       )
 
     compiled = DSEx.Optimizer.BootstrapFewShot.compile(boot, program, trainset)
-    demos = get_demos(compiled)
-    lm = get_lm(compiled)
+    demos = DSEx.ProgramAccess.demos(compiled)
+    lm = DSEx.ProgramAccess.lm(compiled)
 
     case optimizer.trainer do
       nil ->
@@ -46,12 +46,4 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
         end
     end
   end
-
-  defp get_demos(%DSEx.Predict.Predict{demos: demos}), do: demos
-  defp get_demos(%DSEx.Predict.ChainOfThought{predict: predict}), do: get_demos(predict)
-  defp get_demos(_program), do: []
-
-  defp get_lm(%DSEx.Predict.Predict{lm: lm}), do: lm
-  defp get_lm(%DSEx.Predict.ChainOfThought{predict: predict}), do: get_lm(predict)
-  defp get_lm(_program), do: nil
 end
