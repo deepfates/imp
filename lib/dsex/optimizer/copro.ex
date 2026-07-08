@@ -6,11 +6,42 @@ defmodule DSEx.Optimizer.COPRO do
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
-      breadth: Keyword.get(opts, :breadth, 5),
-      depth: Keyword.get(opts, :depth, 2),
+      breadth: non_negative_integer(Keyword.get(opts, :breadth, 5)),
+      depth: non_negative_integer(Keyword.get(opts, :depth, 2)),
       proposer_lm: Keyword.get(opts, :proposer_lm),
       extra_instructions: Keyword.get(opts, :extra_instructions, [])
     }
+  end
+
+  def compile(%__MODULE__{depth: 0} = optimizer, program, trainset, devset) do
+    baseline =
+      DSEx.Optimizer.InstructionSearch.compile(
+        program,
+        optimizer.metric,
+        trainset,
+        devset,
+        []
+      )
+
+    baseline_report = DSEx.Optimizer.Report.fetch(baseline)
+
+    DSEx.Optimizer.Report.attach(
+      baseline,
+      DSEx.Optimizer.Report.new(%{
+        optimizer: :copro,
+        best_score: baseline_report.best_score,
+        candidate_count: 0,
+        candidates: [],
+        errors: baseline_report.errors,
+        metadata: %{
+          breadth: optimizer.breadth,
+          depth: 0,
+          rounds: [],
+          baseline_score: baseline_report.metadata[:baseline_score],
+          status: :baseline_only
+        }
+      })
+    )
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
@@ -66,4 +97,7 @@ defmodule DSEx.Optimizer.COPRO do
     |> Enum.flat_map(& &1.candidates)
     |> Enum.map(&Map.take(&1, [:instruction, :score, :round]))
   end
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

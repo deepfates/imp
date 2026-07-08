@@ -6,9 +6,9 @@ defmodule DSEx.Optimizer.SIMBA do
   def new(metric, opts \\ []) do
     %__MODULE__{
       metric: metric,
-      steps: Keyword.get(opts, :steps, 8),
+      steps: non_negative_integer(Keyword.get(opts, :steps, 8)),
       judge_lm: Keyword.get(opts, :judge_lm),
-      demos_per_step: Keyword.get(opts, :demos_per_step, 3)
+      demos_per_step: non_negative_integer(Keyword.get(opts, :demos_per_step, 3))
     }
   end
 
@@ -17,7 +17,7 @@ defmodule DSEx.Optimizer.SIMBA do
     initial = {DSEx.Evaluate.run(evaluator, program).score, program}
 
     {best_score, best_program, candidates} =
-      1..optimizer.steps
+      step_indices(optimizer.steps)
       |> Enum.reduce({elem(initial, 0), elem(initial, 1), []}, fn step,
                                                                   {best_score, best_program,
                                                                    candidates} ->
@@ -95,4 +95,10 @@ defmodule DSEx.Optimizer.SIMBA do
     |> Stream.drop(offset)
     |> Enum.take(k)
   end
+
+  defp step_indices(steps) when steps > 0, do: 1..steps
+  defp step_indices(_steps), do: []
+
+  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
+  defp non_negative_integer(_value), do: 0
 end

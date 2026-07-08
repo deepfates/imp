@@ -125,6 +125,23 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.any?(report.candidates, & &1.accepted)
   end
 
+  test "SIMBA treats non-positive steps as a baseline-only compile" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.SIMBA.new(metric(), steps: 0, demos_per_step: -3)
+      |> DSEx.Optimizer.SIMBA.compile(program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :simba
+    assert report.best_score == baseline_score
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.baseline_score == baseline_score
+  end
+
   test "SIMBA can use introspective LM feedback for candidate instructions" do
     judge_lm = %{
       module: DSEx.LM.Static,
@@ -166,6 +183,26 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.depth == 2
     assert Enum.map(report.metadata.rounds, & &1.metadata.round) == [1, 2]
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
+  end
+
+  test "COPRO treats non-positive depth as a baseline-only compile" do
+    program = france_program()
+    baseline_score = evaluator(program).score
+
+    compiled =
+      DSEx.Optimizer.COPRO.new(metric(), breadth: -2, depth: 0)
+      |> DSEx.Optimizer.COPRO.compile(program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :copro
+    assert report.best_score == baseline_score
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.breadth == 0
+    assert report.metadata.depth == 0
+    assert report.metadata.rounds == []
+    assert report.metadata.status == :baseline_only
   end
 
   test "COPRO can use LM-generated score-informed instruction proposals" do
