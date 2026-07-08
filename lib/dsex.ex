@@ -240,6 +240,18 @@ defmodule DSEx do
           "DSEx.optimize/4 expects an optimizer struct with compile/4 or compile/3; got: #{inspect(optimizer)}"
   end
 
+  @doc "Returns a JSON-safe portable representation of a DSEx program."
+  defdelegate dump(program), to: DSEx.Saving
+
+  @doc "Loads a DSEx program from a portable saved representation."
+  defdelegate load(state), to: DSEx.Saving
+
+  @doc "Writes a DSEx program artifact to disk as JSON."
+  defdelegate save!(program, path), to: DSEx.Saving
+
+  @doc "Loads a DSEx program artifact from disk."
+  defdelegate load!(path), to: DSEx.Saving
+
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: DSEx.Clients.ReqLLM.new(model_spec, opts)
 end

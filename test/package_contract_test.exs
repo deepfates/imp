@@ -258,8 +258,8 @@ defmodule PackageContractTest do
 
     loaded =
       compiled
-      |> DSEx.Saving.dump()
-      |> DSEx.Saving.load()
+      |> DSEx.dump()
+      |> DSEx.load()
 
     {:ok, loaded_prediction} =
       DSEx.call(loaded, %{question: "What city is the Eiffel Tower in?"})
@@ -304,7 +304,7 @@ defmodule PackageContractTest do
     end
 
     provider = DSEx.req_llm("openai:gpt-test", api_key: "sk-redacted-test", temperature: 0)
-    dump = DSEx.Saving.dump(DSEx.predict("question -> answer", lm: provider))
+    dump = DSEx.dump(DSEx.predict("question -> answer", lm: provider))
 
     if inspect(dump) =~ "sk-redacted-test" do
       raise "provider credential leaked through save/load boundary"

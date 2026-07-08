@@ -126,8 +126,8 @@ credentials at runtime.
 
 ```elixir
 path = Path.join(System.tmp_dir!(), "dsex-livebook-program.json")
-DSEx.Saving.save!(qa_program, path)
-loaded = DSEx.Saving.load!(path)
+DSEx.save!(qa_program, path)
+loaded = DSEx.load!(path)
 File.rm(path)
 
 loaded.signature |> DSEx.Signature.to_spec()

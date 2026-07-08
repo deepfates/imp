@@ -104,9 +104,9 @@ lm = DSEx.req_llm("openai:gpt-test", api_key: "not-persisted", temperature: 0)
 program = DSEx.predict("question -> answer", lm: lm)
 
 path = Path.join(System.tmp_dir!(), "dsex-no-secret.json")
-DSEx.Saving.save!(program, path)
+DSEx.save!(program, path)
 state = File.read!(path)
-loaded = DSEx.Saving.load!(path)
+loaded = DSEx.load!(path)
 File.rm(path)
 
 {

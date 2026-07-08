@@ -238,8 +238,8 @@ the configured context field, calls the wrapped program, and records retrieval
 metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
 program, or any other callable DSEx module that expects a context input.
 RAG programs backed by `DSEx.Retrieve.Memory` can be saved and loaded with
-`DSEx.Saving`; network retrievers and functions should be rebound by the caller
-instead of serialized.
+`DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, and `DSEx.load!/1`; network
+retrievers and functions should be rebound by the caller instead of serialized.
 
 ## Local Embeddings
 
@@ -503,8 +503,8 @@ RLM controller actions:
 program = DSEx.predict("question -> answer")
 
 path = Path.join(System.tmp_dir!(), "dsex-program.json")
-DSEx.Saving.save!(program, path)
-loaded = DSEx.Saving.load!(path)
+DSEx.save!(program, path)
+loaded = DSEx.load!(path)
 File.rm(path)
 ```
 

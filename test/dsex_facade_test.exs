@@ -186,12 +186,37 @@ defmodule DSExFacadeTest do
       "question -> answer"
       |> DSEx.program_of_thought()
       |> DSEx.with_demos([demo])
-      |> DSEx.Saving.dump()
-      |> DSEx.Saving.load()
+      |> DSEx.dump()
+      |> DSEx.load()
 
     assert %DSEx.Predict.ProgramOfThought{predict: %{demos: [loaded_demo]}} = loaded
     assert DSEx.Example.to_map(loaded_demo) == DSEx.Example.to_map(demo)
     assert loaded_demo.input_keys == demo.input_keys
+  end
+
+  test "facade saves and loads portable programs" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+    loaded = program |> DSEx.dump() |> DSEx.load()
+
+    assert {:ok, prediction} =
+             DSEx.context([lm: lm], fn ->
+               DSEx.call(loaded, %{question: "Capital of France?"})
+             end)
+
+    assert DSEx.get(prediction, :answer) == "Paris"
+
+    path =
+      Path.join(System.tmp_dir!(), "dsex-facade-save-#{System.unique_integer([:positive])}.json")
+
+    on_exit(fn -> File.rm(path) end)
+
+    assert :ok = DSEx.save!(program, path)
+    assert %DSEx.Predict.Predict{} = DSEx.load!(path)
   end
 
   test "facade evaluates and optimizes through the golden path" do
