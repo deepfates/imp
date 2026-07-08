@@ -28,9 +28,20 @@ defmodule DSEx.Predict.RAG do
     query = query_text(inputs, rag.query_field)
 
     with {:ok, docs} <- DSEx.Retrieve.retrieve(rag.retriever, query, k: rag.k),
-         enriched <- Map.put(inputs, rag.context_field, render_context(docs)),
-         {:ok, prediction} <- DSEx.Module.call(rag.program, enriched) do
-      {:ok, attach_retrieval(prediction, query, docs)}
+         enriched <- Map.put(inputs, rag.context_field, render_context(docs)) do
+      case DSEx.Module.call(rag.program, enriched) do
+        {:ok, %DSEx.Prediction{} = prediction} ->
+          {:ok, attach_retrieval(prediction, query, docs)}
+
+        {:ok, other} ->
+          {:error, {:invalid_rag_prediction, inspect(other)}}
+
+        {:error, reason} ->
+          {:error, reason}
+
+        other ->
+          {:error, {:invalid_rag_result, inspect(other)}}
+      end
     end
   end
 

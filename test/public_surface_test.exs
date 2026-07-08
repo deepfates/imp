@@ -124,6 +124,22 @@ defmodule PublicSurfaceTest do
     def call(%__MODULE__{}, _inputs), do: raise("program exploded")
   end
 
+  defmodule InvalidPredictionProgram do
+    @behaviour DSEx.Module
+    defstruct []
+
+    @impl true
+    def call(%__MODULE__{}, _inputs), do: {:ok, %{answer: "not a prediction"}}
+  end
+
+  defmodule ErrorProgram do
+    @behaviour DSEx.Module
+    defstruct []
+
+    @impl true
+    def call(%__MODULE__{}, _inputs), do: {:error, :wrapped_failed}
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -220,6 +236,19 @@ defmodule PublicSurfaceTest do
     assert DSEx.Prediction.get(prediction, :answer) == "Paris"
     assert prediction.metadata.retrieval.count == 1
     assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
+  end
+
+  test "rag reports invalid and failed wrapped program results without crashing" do
+    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+
+    invalid = DSEx.rag(%InvalidPredictionProgram{}, retriever, k: 1)
+
+    assert {:error, {:invalid_rag_prediction, "%{answer: \"not a prediction\"}"}} =
+             DSEx.call(invalid, %{question: "capital France"})
+
+    failed = DSEx.rag(%ErrorProgram{}, retriever, k: 1)
+
+    assert {:error, :wrapped_failed} = DSEx.call(failed, %{question: "capital France"})
   end
 
   test "react and code act execute operational loops" do
