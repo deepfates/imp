@@ -240,6 +240,8 @@ defmodule DSEx.MixProject do
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
+        "dsex.benchmark.fetch --tasks ifbench_instruction_following,hard_math --full --out tmp/benchmark-truth-local",
+        "dsex.benchmark.run --ifbench-instruction-following tmp/benchmark-truth-local/ifbench_instruction_following-test-0-3.jsonl --hard-math tmp/benchmark-truth-local/hard_math-test-0-3.jsonl --max-examples 3 --out tmp/benchmark-truth-local-results",
         "dsex.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
       ],
       "benchmark.catalog": [

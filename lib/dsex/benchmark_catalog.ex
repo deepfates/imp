@@ -242,9 +242,14 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "instruction + constraints -> answer satisfying verifier",
       metric: "constraint satisfaction score",
       tiers: ["smoke", "research", "full"],
-      status: "missing",
-      commands: [],
-      next_step: "Add IFBench sampler and verifier-backed metric."
+      status: "provider_free_implemented",
+      commands: [
+        "mix dsex.benchmark.fetch --tasks ifbench_instruction_following --full --out benchmarks/data",
+        "mix dsex.benchmark.run --ifbench-instruction-following benchmarks/data/ifbench_instruction_following-test-0-3.jsonl",
+        "mix benchmark.truth.check"
+      ],
+      next_step:
+        "Scale from local verifier smoke rows to a pinned IFBench snapshot when research-tier evidence is required."
     },
     %{
       id: "hard_math",
@@ -254,9 +259,14 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "problem -> numeric or symbolic answer",
       metric: "normalized exact match",
       tiers: ["smoke", "research"],
-      status: "loader_only",
-      commands: ["mix test test/datasets_contract_test.exs"],
-      next_step: "Add MATH/AIME-style sampler and CoT matched smoke."
+      status: "provider_free_implemented",
+      commands: [
+        "mix dsex.benchmark.fetch --tasks hard_math --full --out benchmarks/data",
+        "mix dsex.benchmark.run --hard-math benchmarks/data/hard_math-test-0-3.jsonl",
+        "mix benchmark.truth.check"
+      ],
+      next_step:
+        "Scale from local AIME/MATH-style smoke rows to pinned public snapshots for research-tier evidence."
     },
     %{
       id: "privacy_delegation",

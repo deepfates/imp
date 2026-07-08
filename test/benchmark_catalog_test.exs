@@ -25,8 +25,8 @@ defmodule BenchmarkCatalogTest do
     assert by_id["mipro_tabular"].status == "missing"
     assert by_id["mipro_scone"].status == "missing"
     assert by_id["hover_verification"].status == "missing"
-    assert by_id["ifbench_instruction_following"].status == "missing"
-    assert by_id["hard_math"].status == "loader_only"
+    assert by_id["ifbench_instruction_following"].status == "provider_free_implemented"
+    assert by_id["hard_math"].status == "provider_free_implemented"
     assert by_id["privacy_delegation"].status == "missing"
     assert by_id["livebench_math"].status == "deferred"
 
@@ -46,6 +46,8 @@ defmodule BenchmarkCatalogTest do
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
+    assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands
+    assert "mix benchmark.truth.check" in by_id["hard_math"].commands
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"
   end
 

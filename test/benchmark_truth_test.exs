@@ -159,6 +159,37 @@ defmodule BenchmarkTruthTest do
     assert question =~ "France"
   end
 
+  test "fetcher writes IFBench-style and hard-math samples with fixed manifests" do
+    out_dir = tmp_dir("fetch-local-ifbench-hard-math")
+
+    [ifbench, hard_math] =
+      DSEx.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    ifbench_manifest = Jason.decode!(File.read!(ifbench.manifest_path))
+    ifbench_rows = ifbench.data_path |> File.read!() |> read_jsonl()
+
+    assert ifbench.task == "ifbench_instruction_following"
+    assert ifbench_manifest["source"] == "local-fixture"
+    assert ifbench_manifest["input_keys"] == ["instruction"]
+    assert ifbench_manifest["label_key"] == "answer"
+    assert ifbench_manifest["rows"] == 3
+    assert [%{"constraints" => [%{"type" => "exact", "value" => "OK"} | _]} | _] = ifbench_rows
+
+    hard_math_manifest = Jason.decode!(File.read!(hard_math.manifest_path))
+    hard_math_rows = hard_math.data_path |> File.read!() |> read_jsonl()
+
+    assert hard_math.task == "hard_math"
+    assert hard_math_manifest["source"] == "local-fixture"
+    assert hard_math_manifest["input_keys"] == ["problem"]
+    assert hard_math_manifest["label_key"] == "answer"
+    assert hard_math_manifest["rows"] == 3
+    assert [%{"problem" => problem, "canonical_answer" => "5"} | _] = hard_math_rows
+    assert problem =~ "7x"
+  end
+
   test "fetcher paginates full-size requests and records source pages" do
     out_dir = tmp_dir("fetch-pages")
     parent = self()
@@ -361,6 +392,53 @@ defmodule BenchmarkTruthTest do
     assert scenarios["parallel"]["max_concurrency"] == 2
     assert scenarios["knn"]["demo_count"] == 2
     assert File.exists?(result.out_path)
+  end
+
+  test "fixture benchmark truth runner evaluates IFBench constraints and hard math exact answers" do
+    out_dir = tmp_dir("ifbench-hard-math-results")
+
+    [ifbench, hard_math] =
+      DSEx.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
+        out_dir: out_dir,
+        length: :full
+      )
+
+    result =
+      DSEx.BenchmarkTruth.run(
+        tasks: [
+          ifbench_instruction_following: ifbench.data_path,
+          hard_math: hard_math.data_path
+        ],
+        out_dir: out_dir,
+        max_examples: 3,
+        optimizer_comparisons: false
+      )
+
+    assert result.report["aggregate_score"] == 1.0
+
+    by_task = Map.new(result.report["tasks"], &{&1["task"], &1})
+    ifbench_task = by_task["ifbench_instruction_following"]
+    hard_math_task = by_task["hard_math"]
+
+    assert ifbench_task["score"] == 1.0
+    assert ifbench_task["aggregate_metrics"]["mean_constraint_score"] == 1.0
+    assert ifbench_task["aggregate_metrics"]["full_constraint_rows"] == 3
+
+    assert Enum.all?(ifbench_task["rows"], fn row ->
+             row["metric_metadata"]["task_metric"] == "ifbench_constraint_satisfaction" and
+               row["metric_metadata"]["constraint_count"] >= 1 and
+               row["metric_metadata"]["satisfied_constraints"] ==
+                 row["metric_metadata"]["constraint_count"]
+           end)
+
+    assert hard_math_task["score"] == 1.0
+    assert hard_math_task["aggregate_metrics"]["accuracy"] == 1.0
+    assert hard_math_task["aggregate_metrics"]["exact_rows"] == 3
+
+    assert Enum.all?(hard_math_task["rows"], fn row ->
+             row["metric_metadata"]["task_metric"] == "hard_math_normalized_exact_match" and
+               row["metric_metadata"]["numeric_equivalent"] == true
+           end)
   end
 
   test "benchmark truth rows include compact diagnostics for failed predictions" do

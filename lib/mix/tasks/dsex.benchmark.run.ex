@@ -5,6 +5,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
       mix dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-20.jsonl \\
         --hotpotqa benchmarks/data/hotpotqa-validation-0-20.jsonl --max-examples 20
       mix dsex.benchmark.run --colors benchmarks/data/colors-test-0-6.jsonl
+      mix dsex.benchmark.run --ifbench-instruction-following benchmarks/data/ifbench_instruction_following-test-0-3.jsonl \\
+        --hard-math benchmarks/data/hard_math-test-0-3.jsonl
 
   By default this runs in fixture mode. Use `--live` to use the ReqLLM-backed
   OpenAI provider from `OPENAI_API_KEY`/`OPENAI_MODEL`.
@@ -30,6 +32,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
           retrieval_qa: :string,
           claim_verification: :string,
           composition_orchestration: :string,
+          ifbench_instruction_following: :string,
+          hard_math: :string,
           offset: :integer,
           max_examples: :integer,
           max_concurrency: :integer,
@@ -45,7 +49,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
 
     if tasks == [] do
       Mix.raise(
-        "provide at least one dataset path with --gsm8k, --hotpotqa, --colors, --iris-typo, --heart-disease, --retrieval-qa, --claim-verification, or --composition-orchestration"
+        "provide at least one dataset path with --gsm8k, --hotpotqa, --colors, --iris-typo, --heart-disease, --retrieval-qa, --claim-verification, --composition-orchestration, --ifbench-instruction-following, or --hard-math"
       )
     end
 
@@ -78,6 +82,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Run do
     |> maybe_put(:retrieval_qa, Keyword.get(opts, :retrieval_qa))
     |> maybe_put(:claim_verification, Keyword.get(opts, :claim_verification))
     |> maybe_put(:composition_orchestration, Keyword.get(opts, :composition_orchestration))
+    |> maybe_put(
+      :ifbench_instruction_following,
+      Keyword.get(opts, :ifbench_instruction_following)
+    )
+    |> maybe_put(:hard_math, Keyword.get(opts, :hard_math))
   end
 
   defp maybe_put(tasks, _task, nil), do: tasks

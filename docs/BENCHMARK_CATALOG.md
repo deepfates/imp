@@ -53,8 +53,8 @@ The sampling harness must preserve:
 | MIPRO tabular classification | MIPRO optimizer benchmarks include Iris, Iris-Typo, and Heart Disease. | Not implemented as benchmark lanes. | None | Add tiny full-split samplers and optimizer-lift runs. |
 | ScoNe logical classification | MIPRO optimizer benchmarks include ScoNe. | Not implemented as benchmark lane. | None | Pin a public dataset source and add accuracy metric. |
 | HoVer claim verification | MIPRO and GEPA benchmark lineage includes HoVer multi-hop verification. | Not implemented as benchmark lane. | None | Add HoVer sampler and retrieval-aware metric after source/license check. |
-| IFBench instruction following | GEPA benchmark lineage includes verifiable instruction following. | Not implemented as benchmark lane. | None | Add IFBench sampler and verifier-backed metric. |
-| Hard math/competition reasoning | GEPA and modern optimizer work often uses AIME/MATH-style tasks. | `DSEx.Datasets.MATH` loader exists; no benchmark fetch or parity runner. | Loader tests only | Add MATH/AIME-style sampler and small CoT matched smoke. |
+| IFBench instruction following | GEPA benchmark lineage includes verifiable instruction following. | Provider-free local verifier smoke exists with executable constraint scoring. | `mix dsex.benchmark.fetch --tasks ifbench_instruction_following --full --out benchmarks/data`, `mix dsex.benchmark.run --ifbench-instruction-following benchmarks/data/ifbench_instruction_following-test-0-3.jsonl`, `mix benchmark.truth.check` | Scale to a pinned IFBench snapshot when research-tier evidence is required. |
+| Hard math/competition reasoning | GEPA and modern optimizer work often uses AIME/MATH-style tasks. | Provider-free AIME/MATH-style smoke exists with normalized exact answer scoring. | `mix dsex.benchmark.fetch --tasks hard_math --full --out benchmarks/data`, `mix dsex.benchmark.run --hard-math benchmarks/data/hard_math-test-0-3.jsonl`, `mix benchmark.truth.check` | Scale to pinned public MATH/AIME snapshots for research-tier evidence. |
 | Privacy-conscious delegation | GEPA/PAPILLON/PUPA lineage evaluates useful delegation without leaking private information. | Not implemented as benchmark lane. | None | Start with synthetic PII smoke before adopting licensed research data. |
 | LiveBench-Math | GEPA benchmark lineage includes date-versioned LiveBench-Math. | Deferred. | None | Adopt only with a frozen dated snapshot to avoid moving-target evidence. |
 | Long-form writing / STORM-style research | DSPy-related paper list includes writing Wikipedia-like articles from scratch. | Out of current product proof. | None | Track as deferred; do not block production unless DSEx claims long-form writing optimization. |
@@ -78,8 +78,9 @@ The sampling harness must preserve:
 5. **Scaled optimizer lift.** Extend the current natural classification, QA,
    retrieval, and instruction-following lift lanes to larger sampled datasets
    when DSEx needs model-quality claims beyond provider-free product proof.
-6. **Hard math sampler.** Add MATH/AIME-style rows for CoT smoke and optimizer
-   sanity.
+6. **Research-scale instruction and hard-math data.** Extend the current
+   provider-free IFBench and hard-math smoke rows to pinned public snapshots
+   when release policy requires research-tier model-quality evidence.
 
 ## Sources
 

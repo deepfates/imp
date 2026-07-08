@@ -37,6 +37,9 @@ real provider/model comparisons over fixed train/dev/test manifests.
 The broader benchmark backlog is intentionally larger than this minimum. See
 `docs/BENCHMARK_CATALOG.md` for classification/factuality, retrieval-indexed
 QA, hard math, optimizer-lift, tool-use, and deferred long-form writing lanes.
+Current source-checkout smoke evidence includes local IFBench-style rows with
+executable constraint verifiers and local AIME/MATH-style rows with normalized
+exact answer scoring.
 
 ## Fetch Data
 

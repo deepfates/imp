@@ -236,6 +236,62 @@ defmodule DSEx.BenchmarkTruth.Fetcher do
         %{"question" => "What is the capital city of Germany?", "answer" => "Berlin"},
         %{"question" => "What answer should an unknown branch return?", "answer" => "unknown"}
       ]
+    },
+    "ifbench_instruction_following" => %{
+      task: "ifbench_instruction_following",
+      dataset: "dsex/local-ifbench",
+      config: "verifier-smoke",
+      split: "test",
+      input_keys: ["instruction"],
+      label_key: "answer",
+      rows: [
+        %{
+          "instruction" => "Return exactly OK.",
+          "answer" => "OK",
+          "constraints" => [%{"type" => "exact", "value" => "OK"}]
+        },
+        %{
+          "instruction" => "Answer with the word BEAM and do not mention Python.",
+          "answer" => "BEAM",
+          "constraints" => [
+            %{"type" => "contains", "value" => "BEAM"},
+            %{"type" => "forbid", "value" => "Python"}
+          ]
+        },
+        %{
+          "instruction" => "Reply with at most three words and include Elixir.",
+          "answer" => "Elixir works",
+          "constraints" => [
+            %{"type" => "contains", "value" => "Elixir"},
+            %{"type" => "max_words", "value" => 3}
+          ]
+        }
+      ]
+    },
+    "hard_math" => %{
+      task: "hard_math",
+      dataset: "dsex/local-hard-math",
+      config: "aime-math-smoke",
+      split: "test",
+      input_keys: ["problem"],
+      label_key: "answer",
+      rows: [
+        %{
+          "problem" => "If 7x + 5 = 40, what is x?",
+          "answer" => "5",
+          "canonical_answer" => "5"
+        },
+        %{
+          "problem" => "A rectangle has sides 9 and 14. What is its area?",
+          "answer" => "126",
+          "canonical_answer" => "126"
+        },
+        %{
+          "problem" => "What is the value of 2^5 + 3^3?",
+          "answer" => "59",
+          "canonical_answer" => "59"
+        }
+      ]
     }
   }
 

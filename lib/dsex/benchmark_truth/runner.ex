@@ -162,6 +162,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp load_examples(:claim_verification, path), do: DSEx.Datasets.jsonl(path, [:claim])
   defp load_examples(:composition_orchestration, path), do: DSEx.Datasets.jsonl(path, [:question])
 
+  defp load_examples(:ifbench_instruction_following, path),
+    do: DSEx.Datasets.jsonl(path, [:instruction])
+
+  defp load_examples(:hard_math, path), do: DSEx.Datasets.jsonl(path, [:problem])
+
   defp load_examples(task, path) when task in [:iris, :iris_typo, :heart_disease],
     do: DSEx.Datasets.jsonl(path, [:features])
 
@@ -207,6 +212,18 @@ defmodule DSEx.BenchmarkTruth.Runner do
       |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
 
     DSEx.rag(base, memory_retriever(path), query_field: :claim, k: 2)
+  end
+
+  defp program(:ifbench_instruction_following, lm, _path) do
+    "instruction -> answer: string \"constraint-satisfying response\""
+    |> DSEx.signature("Follow the instruction exactly. Return only the requested answer.")
+    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+  end
+
+  defp program(:hard_math, lm, _path) do
+    "problem -> answer: string \"final numeric or symbolic answer\""
+    |> DSEx.signature("Solve the hard math problem. Return only the final answer.")
+    |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.Chat)
   end
 
   defp metric(:gsm8k) do
@@ -283,6 +300,53 @@ defmodule DSEx.BenchmarkTruth.Runner do
     end
   end
 
+  defp metric(:ifbench_instruction_following) do
+    fn example, prediction ->
+      predicted = DSEx.Prediction.get(prediction, :answer)
+      constraints = DSEx.Example.get(example, :constraints, [])
+      constraint_results = Enum.map(constraints, &verify_constraint(predicted, &1))
+      passed? = constraint_results != [] and Enum.all?(constraint_results, & &1.passed?)
+
+      score =
+        if constraint_results == [],
+          do: 0.0,
+          else: average(Enum.map(constraint_results, & &1.score))
+
+      %DSEx.Metrics.Result{
+        score: score,
+        passed?: passed?,
+        metadata: %{
+          "task_metric" => "ifbench_constraint_satisfaction",
+          "constraint_count" => length(constraint_results),
+          "satisfied_constraints" => Enum.count(constraint_results, & &1.passed?),
+          "constraints" => Enum.map(constraint_results, & &1.metadata)
+        }
+      }
+    end
+  end
+
+  defp metric(:hard_math) do
+    fn example, prediction ->
+      predicted = DSEx.Prediction.get(prediction, :answer)
+      gold = DSEx.Example.get(example, :canonical_answer, DSEx.Example.get(example, :answer))
+
+      exact? =
+        numeric_answer_equal?(predicted, gold) ||
+          normalized_answer(predicted) == normalized_answer(gold)
+
+      %DSEx.Metrics.Result{
+        score: if(exact?, do: 1.0, else: 0.0),
+        passed?: exact?,
+        metadata: %{
+          "task_metric" => "hard_math_normalized_exact_match",
+          "predicted_normalized" => normalized_answer(predicted),
+          "gold_normalized" => normalized_answer(gold),
+          "numeric_equivalent" => numeric_answer_equal?(predicted, gold)
+        }
+      }
+    end
+  end
+
   defp aggregate_metrics(task, rows) when task in [:colors, :iris, :iris_typo, :heart_disease] do
     pairs =
       Enum.map(rows, fn row ->
@@ -306,6 +370,26 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "examples" => length(rows),
       "mean_retrieval_recall" => average(recalls),
       "full_retrieval_recall_rows" => Enum.count(recalls, &(&1 >= 1.0))
+    }
+  end
+
+  defp aggregate_metrics(:ifbench_instruction_following, rows) do
+    scores = Enum.map(rows, & &1.score)
+
+    %{
+      "task_metric" => "ifbench_constraint_report",
+      "examples" => length(rows),
+      "mean_constraint_score" => average(scores),
+      "full_constraint_rows" => Enum.count(rows, & &1.passed?)
+    }
+  end
+
+  defp aggregate_metrics(:hard_math, rows) do
+    %{
+      "task_metric" => "hard_math_exact_report",
+      "examples" => length(rows),
+      "accuracy" => average(Enum.map(rows, & &1.score)),
+      "exact_rows" => Enum.count(rows, & &1.passed?)
     }
   end
 
@@ -507,6 +591,53 @@ defmodule DSEx.BenchmarkTruth.Runner do
     end
   end
 
+  defp normalized_answer(value) do
+    value
+    |> to_string()
+    |> String.trim()
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim(".")
+    |> String.downcase()
+  end
+
+  defp verify_constraint(answer, %{"type" => "exact", "value" => value}) do
+    passed? = DSEx.Metrics.normalize_text(answer) == DSEx.Metrics.normalize_text(value)
+    constraint_result("exact", passed?, %{"value" => value})
+  end
+
+  defp verify_constraint(answer, %{"type" => "contains", "value" => value}) do
+    passed? =
+      String.contains?(String.downcase(to_string(answer)), String.downcase(to_string(value)))
+
+    constraint_result("contains", passed?, %{"value" => value})
+  end
+
+  defp verify_constraint(answer, %{"type" => "forbid", "value" => value}) do
+    passed? =
+      not String.contains?(String.downcase(to_string(answer)), String.downcase(to_string(value)))
+
+    constraint_result("forbid", passed?, %{"value" => value})
+  end
+
+  defp verify_constraint(answer, %{"type" => "max_words", "value" => max_words}) do
+    words = answer |> DSEx.Metrics.normalize_text() |> String.split()
+    passed? = length(words) <= max_words
+
+    constraint_result("max_words", passed?, %{"value" => max_words, "word_count" => length(words)})
+  end
+
+  defp verify_constraint(_answer, constraint) do
+    constraint_result("unknown", false, %{"constraint" => safe_json(constraint)})
+  end
+
+  defp constraint_result(type, passed?, metadata) do
+    %DSEx.Metrics.Result{
+      score: if(passed?, do: 1.0, else: 0.0),
+      passed?: passed?,
+      metadata: Map.put(metadata, "type", type) |> Map.put("passed", passed?)
+    }
+  end
+
   defp optimizer_comparisons(_task, examples, _lm, _metric, _path) when length(examples) < 2,
     do: []
 
@@ -634,6 +765,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp fixture_prompt_field(task) when task in [:iris, :iris_typo, :heart_disease], do: "features"
   defp fixture_prompt_field(:retrieval_qa), do: "question"
   defp fixture_prompt_field(:claim_verification), do: "claim"
+  defp fixture_prompt_field(:ifbench_instruction_following), do: "instruction"
+  defp fixture_prompt_field(:hard_math), do: "problem"
   defp fixture_prompt_field(_task), do: "question"
 
   defp prompt_field(text, field) do
@@ -662,6 +795,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
 
   defp fixture_lookup_key(:retrieval_qa, example), do: DSEx.Example.get(example, :question)
   defp fixture_lookup_key(:claim_verification, example), do: DSEx.Example.get(example, :claim)
+
+  defp fixture_lookup_key(:ifbench_instruction_following, example),
+    do: DSEx.Example.get(example, :instruction)
+
+  defp fixture_lookup_key(:hard_math, example), do: DSEx.Example.get(example, :problem)
   defp fixture_lookup_key(_task, example), do: DSEx.Example.get(example, :question)
 
   defp fixture_fields(:gsm8k, example) do
@@ -680,6 +818,16 @@ defmodule DSEx.BenchmarkTruth.Runner do
 
   defp fixture_fields(:claim_verification, example),
     do: %{label: DSEx.Example.get(example, :label)}
+
+  defp fixture_fields(:ifbench_instruction_following, example),
+    do: %{answer: DSEx.Example.get(example, :answer)}
+
+  defp fixture_fields(:hard_math, example) do
+    %{
+      reasoning: "Use the canonical answer from the benchmark row.",
+      answer: DSEx.Example.get(example, :canonical_answer, DSEx.Example.get(example, :answer))
+    }
+  end
 
   defp fixture_empty_fields(task) when task in [:colors, :iris, :iris_typo, :heart_disease],
     do: %{label: ""}
