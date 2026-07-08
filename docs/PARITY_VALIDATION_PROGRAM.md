@@ -62,8 +62,6 @@ Pass condition:
 - all required fixtures pass exact normalized parity, or each difference is
   recorded as an intentional Elixir-native deviation with a test and rationale.
 
-Ticket: `de-i4o5`.
-
 Initial executable command:
 
 ```sh
@@ -190,10 +188,8 @@ Pass condition:
   can be separated from deterministic row-shape estimates. The matrix selects a
   complete-instrumentation/runtime-shape artifact over a larger incomplete
   artifact for the same provider/model identity; nominal coverage from
-  quota-tainted chunks is not release proof.
-  and deterministic row-estimated fallback evidence remain distinguishable.
-
-Ticket: `de-ztx7`.
+  quota-tainted chunks is not release proof, and deterministic row-estimated
+  fallback evidence must remain distinguishable from exact LM-history evidence.
 
 ## Lane 3: Optimizer Lift Parity
 
@@ -262,8 +258,6 @@ Pass condition:
   intentional algorithmic deviation is documented
 - DSEx reports enough trace/evidence to debug every optimizer decision
 
-Ticket: `de-vge9`.
-
 ## Lane 4: RAG, Tools, Agents, and Production Semantics
 
 DSPy parity includes program composition, retrieval, tools, tracing, and
@@ -302,8 +296,6 @@ Pass condition:
 - deterministic replay proves trace/tool semantics
 - live matched slices prove provider-facing paths
 - all production traces redact secrets and include enough metadata for audit
-
-Ticket: `de-t0c8`.
 
 ## Lane 5: Provider-Free Performance
 
@@ -351,9 +343,7 @@ Pass condition:
 - DSEx performance claims name the benchmark they come from
 - provider-free overhead is lower than DSPy for the claimed paths, or the claim
   is not made
-- regressions have tickets before release
-
-Ticket: `de-dd3k`.
+- regressions have tracked remediation before release
 
 ## Lane 6: Evidence Dashboard and Release Gate
 
@@ -400,8 +390,6 @@ Pass condition:
   support it
 - live latency conclusions identify whether observed gaps are provider/model
   dominated, prompt/output-shape dominated, or DSEx local-overhead dominated
-
-Ticket: `de-m27t`.
 
 ## What Counts As Done
 

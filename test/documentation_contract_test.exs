@@ -20,6 +20,8 @@ defmodule DocumentationContractTest do
     refute body =~ "DSEx.MCP.HTTP`"
     refute body =~ "DSEx.MCP.Stdio`"
     refute body =~ "DSEx.MCP.StreamableHTTP`"
+    refute body =~ "before closing"
+    refute body =~ "waiting on live release evidence"
 
     assert body =~ "mix integration.check"
     assert body =~ "mix protocol.training.check"
@@ -62,6 +64,14 @@ defmodule DocumentationContractTest do
     assert body =~ "mix benchmark.dashboard.full"
     assert body =~ "mix livebook.execute.check"
     assert body =~ "docs/BENCHMARK_CATALOG.md"
+  end
+
+  test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
+    body = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+
+    refute_closed_ticket_refs(body)
+    refute body =~ "Ticket:"
+    refute body =~ "regressions have tickets"
   end
 
   test "user-facing docs name the executable Livebook proof" do
@@ -418,6 +428,10 @@ defmodule DocumentationContractTest do
     refute body =~ "de-i8cc"
     refute body =~ "de-qvwf"
     refute body =~ "de-i4o5"
+    refute body =~ "de-ztx7"
+    refute body =~ "de-vge9"
+    refute body =~ "de-t0c8"
+    refute body =~ "de-dd3k"
   end
 
   defp documented_module_references do
