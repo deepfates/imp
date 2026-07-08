@@ -101,6 +101,77 @@ defmodule DSEx.BenchmarkCatalog do
         "Add sampled controller tasks that measure action success, budget use, and answer quality across larger contexts."
     },
     %{
+      id: "program_composition_orchestration",
+      family: "Program composition and orchestration",
+      source_lineage:
+        "DSPy modules compose predictors, ensembles, comparison, refinement, parallel fan-out, and retrieval-aware variants.",
+      task_shape:
+        "multiple candidate programs or attempts -> aggregation/refinement/selection -> answer",
+      metric:
+        "non-regression, selected-answer quality, failure isolation, concurrency safety, and trace shape",
+      tiers: ["smoke", "research"],
+      status: "deterministic_implemented",
+      commands: [
+        "mix test test/public_surface_test.exs test/refine_feedback_test.exs",
+        "mix benchmark.optimizer_lift.check",
+        "LIVE_PROVIDER=1 mix live.check"
+      ],
+      next_step:
+        "Add sampled orchestration tasks for BestOfN, Refine, MultiChainComparison, Ensemble, KNN, and Parallel under shared metrics."
+    },
+    %{
+      id: "adapter_streaming_structured_io",
+      family: "Adapters, streaming, and structured I/O",
+      source_lineage:
+        "DSPy adapters and Ax-style signatures make output parsing, schema negotiation, retries, and streaming part of the programming contract.",
+      task_shape:
+        "typed signature + raw/provider output stream -> validated prediction or structured error",
+      metric:
+        "schema validity, parse recovery, incremental field correctness, stream ordering, and provider option shape",
+      tiers: ["smoke", "research"],
+      status: "deterministic_and_live_implemented",
+      commands: [
+        "mix benchmark.trace.check",
+        "mix test test/schema_constraints_test.exs test/req_llm_client_test.exs",
+        "LIVE_PROVIDER=1 mix live.check"
+      ],
+      next_step:
+        "Add adversarial structured-output samples with malformed JSON/XML/chat, partial streams, and provider-native schema fallbacks."
+    },
+    %{
+      id: "operations_persistence_observability",
+      family: "Persistence, cache, telemetry, and OTP operations",
+      source_lineage:
+        "Production DSP-style systems need save/load, cache behavior, redaction, observability, and supervised concurrency to be trusted outside notebooks.",
+      task_shape:
+        "program lifecycle and runtime events -> reloadable artifact, redacted traces, stable telemetry, supervised tasks",
+      metric:
+        "round-trip fidelity, secret absence, event completeness, cache correctness, and failure isolation",
+      tiers: ["smoke", "research"],
+      status: "deterministic_implemented",
+      commands: [
+        "mix production.check",
+        "mix integration.check",
+        "mix benchmark.overhead.check"
+      ],
+      next_step:
+        "Add lifecycle stress scenarios that combine save/load, cache, telemetry, streaming, and parallel execution in one sampled workflow."
+    },
+    %{
+      id: "multimodal_primitives",
+      family: "Multimodal primitives",
+      source_lineage:
+        "Modern provider surfaces and Ax-style schemas include image, audio, file, document, and code content blocks.",
+      task_shape:
+        "typed content parts -> provider-compatible message blocks -> decoded DSEx content",
+      metric: "round-trip encoding fidelity and provider-shape validity",
+      tiers: ["smoke"],
+      status: "deterministic_implemented",
+      commands: ["mix test test/multimodal_adapter_test.exs"],
+      next_step:
+        "Keep as primitive proof until DSEx claims live multimodal reasoning; add live multimodal benchmark only when public docs claim it."
+    },
+    %{
       id: "optimizer_lift",
       family: "Optimizer lift",
       source_lineage:
