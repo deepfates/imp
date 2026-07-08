@@ -369,6 +369,10 @@ when lanes are incomplete. `mix benchmark.dashboard.full` is the release gate:
 it reads the same artifacts and fails unless every required lane has fresh,
 passing, full-evidence status. This is intentionally stricter than
 `production.check`; a green deterministic gate is not a full DSPy-parity claim.
+When the full gate fails, the terminal error summarizes the blocking lanes and
+requirements directly, such as missing live model lanes, remaining benchmark
+rows, stale prompt contracts, or incomplete runtime-shape evidence. The JSON
+dashboard remains the authoritative artifact for audit and automation.
 
 Pass condition:
 

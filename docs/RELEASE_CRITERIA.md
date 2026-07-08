@@ -98,6 +98,9 @@ DSEx is production complete when:
     `parity-dashboard-*.json` artifact.
 14. `mix benchmark.dashboard.full` passes, and the dashboard reports
     `full_parity: true`, before the release claims full DSPy parity.
+    When this gate fails, its terminal error must name the blocking release
+    requirements so the next operator can continue from the failure without
+    hand-inspecting the dashboard JSON first.
 15. The parity dashboard reports `performance_claim_supported: true` before the
     release claims DSEx is faster than DSPy on any named path.
 16. Live latency claims cite dashboard or matrix instrumentation that separates

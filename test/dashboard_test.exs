@@ -333,29 +333,84 @@ defmodule DashboardTest do
 
     assert dashboard["lanes"]["rag_tool_agent"]["status"] == "full"
 
-    assert_raise Mix.Error, ~r/full parity release gate failed/, fn ->
-      capture_io(fn ->
-        Mix.Tasks.Dsex.Benchmark.Dashboard.run([
-          "--trace-dir",
-          trace_dir,
-          "--overhead-dir",
-          overhead_dir,
-          "--optimizer-dir",
-          optimizer_dir,
-          "--rag-tool-agent-dir",
-          rag_tool_agent_dir,
-          "--live-matrix-dir",
-          live_matrix_dir,
-          "--results-dir",
-          results_dir,
-          "--out",
-          out_dir,
-          "--max-age-hours",
-          "100000",
-          "--require-full"
-        ])
-      end)
-    end
+    error =
+      assert_raise Mix.Error, fn ->
+        capture_io(fn ->
+          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+            "--trace-dir",
+            trace_dir,
+            "--overhead-dir",
+            overhead_dir,
+            "--optimizer-dir",
+            optimizer_dir,
+            "--rag-tool-agent-dir",
+            rag_tool_agent_dir,
+            "--live-matrix-dir",
+            live_matrix_dir,
+            "--results-dir",
+            results_dir,
+            "--out",
+            out_dir,
+            "--max-age-hours",
+            "100000",
+            "--require-full"
+          ])
+        end)
+      end
+
+    assert error.message =~ "full parity release gate failed"
+    assert error.message =~ "blocking requirements:"
+    assert error.message =~ "current_low_cost"
+    assert error.message =~ "8720 rows remaining"
+    assert error.message =~ "frontier_sanity: missing matched live evidence"
+    assert error.message =~ "historical_research: missing matched live evidence"
+    assert error.message =~ "Runtime shape evidence is not complete"
+  end
+
+  test "require-full failure summarizes campaign aggregate blockers" do
+    root = tmp_dir("dashboard-campaign-blockers")
+    results_dir = Path.join(root, "results")
+    out_dir = Path.join(root, "out")
+
+    Enum.each([results_dir, out_dir], &File.mkdir_p!/1)
+
+    write_json!(Path.join(results_dir, "dsex-dspy-parity-campaign-test-20260707T000000Z.json"), %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "provider" => "req_llm",
+      "model" => "test-model",
+      "coverage" => %{"covered" => 10, "expected" => 8724, "full" => false},
+      "parity" => %{"full_parity" => false, "aggregate_gap" => 0.02}
+    })
+
+    error =
+      assert_raise Mix.Error, fn ->
+        capture_io(fn ->
+          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+            "--trace-dir",
+            Path.join(root, "missing-trace"),
+            "--overhead-dir",
+            Path.join(root, "missing-overhead"),
+            "--optimizer-dir",
+            Path.join(root, "missing-optimizer"),
+            "--rag-tool-agent-dir",
+            Path.join(root, "missing-rag"),
+            "--live-matrix-dir",
+            Path.join(root, "missing-matrix"),
+            "--results-dir",
+            results_dir,
+            "--out",
+            out_dir,
+            "--max-age-hours",
+            "100000",
+            "--require-full"
+          ])
+        end)
+      end
+
+    assert error.message =~ "live campaign coverage incomplete (10/8724 rows covered)"
+    assert error.message =~ "live campaign parity thresholds not satisfied (gap 0.02)"
   end
 
   test "dashboard uses the freshest live matrix across canonical output dirs" do

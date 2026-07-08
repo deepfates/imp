@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     Mix.shell().info("performance claim supported: #{dashboard["performance_claim_supported"]}")
 
     if Keyword.get(opts, :require_full, false) and not dashboard["full_parity"] do
-      Mix.raise("full parity release gate failed; inspect #{out_path}")
+      Mix.raise(release_gate_failure_message(dashboard, out_path))
     end
   end
 
@@ -136,6 +136,99 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       }
     end)
   end
+
+  defp release_gate_failure_message(dashboard, out_path) do
+    blocking =
+      dashboard
+      |> get_in(["release_gate", "checks"])
+      |> List.wrap()
+      |> Enum.reject(& &1["passing"])
+      |> Enum.flat_map(&blocking_lines/1)
+
+    """
+    full parity release gate failed; inspect #{out_path}
+    blocking requirements:
+    #{Enum.map_join(blocking, "\n", &"- #{&1}")}
+    """
+    |> String.trim()
+  end
+
+  defp blocking_lines(%{"lane" => lane, "blocking_requirements" => requirements})
+       when is_list(requirements) and requirements != [] do
+    Enum.map(requirements, &format_blocking_requirement(lane, &1))
+  end
+
+  defp blocking_lines(%{"lane" => lane, "limitation" => limitation}) when is_binary(limitation),
+    do: ["#{lane}: #{limitation}"]
+
+  defp blocking_lines(%{"lane" => lane, "status" => status}),
+    do: ["#{lane}: status #{inspect(status)} is not full passing evidence"]
+
+  defp format_blocking_requirement(parent_lane, %{"kind" => "live_lane_full_evidence"} = req) do
+    lane = req["lane"] || parent_lane
+    status = req["status"] || "present"
+    model = req["best_model"] || req["models"] || "unknown model"
+    suffix = coverage_suffix(req["coverage"]) <> cost_suffix(req["cost"])
+
+    "#{lane}: #{model} is #{status}, not full live evidence#{suffix}"
+  end
+
+  defp format_blocking_requirement(parent_lane, %{"kind" => "live_lane_missing"} = req) do
+    lane = req["lane"] || parent_lane
+    "#{lane}: missing matched live evidence"
+  end
+
+  defp format_blocking_requirement(
+         _parent_lane,
+         %{"kind" => "campaign_coverage_incomplete"} = req
+       ),
+       do: "live campaign coverage incomplete#{coverage_suffix(req["coverage"])}"
+
+  defp format_blocking_requirement(_parent_lane, %{"kind" => "campaign_full_parity_false"} = req),
+    do: "live campaign parity thresholds not satisfied#{parity_suffix(req["parity"])}"
+
+  defp format_blocking_requirement(parent_lane, %{"message" => message}) when is_binary(message),
+    do: "#{parent_lane}: #{message}"
+
+  defp format_blocking_requirement(parent_lane, requirement) when is_binary(requirement),
+    do: "#{parent_lane}: #{requirement}"
+
+  defp format_blocking_requirement(parent_lane, requirement),
+    do: "#{parent_lane}: #{inspect(requirement)}"
+
+  defp coverage_suffix(%{} = coverage) do
+    cond do
+      is_number(coverage["remaining_rows"]) ->
+        " (#{coverage["remaining_rows"]} rows remaining)"
+
+      is_number(coverage["covered"]) and is_number(coverage["expected"]) ->
+        " (#{coverage["covered"]}/#{coverage["expected"]} rows covered)"
+
+      is_number(coverage["covered_rows"]) and is_number(coverage["expected_rows"]) ->
+        " (#{coverage["covered_rows"]}/#{coverage["expected_rows"]} rows covered)"
+
+      true ->
+        ""
+    end
+  end
+
+  defp coverage_suffix(_coverage), do: ""
+
+  defp cost_suffix(%{"estimated_remaining_total_tokens" => tokens}) when is_number(tokens),
+    do: "; estimated remaining tokens #{tokens}"
+
+  defp cost_suffix(_cost), do: ""
+
+  defp parity_suffix(%{} = parity) do
+    gap =
+      parity["aggregate_gap"] ||
+        parity["max_task_score_gap"] ||
+        parity["score_delta"]
+
+    if is_number(gap), do: " (gap #{gap})", else: ""
+  end
+
+  defp parity_suffix(_parity), do: ""
 
   defp golden_trace_lane(dir, max_age_hours) do
     with {:ok, path} <- latest(Path.join(dir, "golden-trace-parity-*.json")),
