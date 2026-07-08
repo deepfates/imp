@@ -19,14 +19,14 @@ defmodule DSEx.HTTP do
 
   defp do_post(module, url, headers, body, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :post, 4) do
-      module.post(url, headers, body, opts)
+      safe_transport_call(module, fn -> module.post(url, headers, body, opts) end)
     else
       {:error, {:not_http_transport, module}}
     end
   end
 
   defp do_post(fun, url, headers, body, opts) when is_function(fun, 4),
-    do: fun.(url, headers, body, opts)
+    do: safe_transport_call(:anonymous_http_transport, fn -> fun.(url, headers, body, opts) end)
 
   defp do_post(transport, _url, _headers, _body, _opts),
     do: {:error, {:not_http_transport, transport}}
@@ -41,7 +41,7 @@ defmodule DSEx.HTTP do
   defp do_stream(module, url, headers, body, opts) when is_atom(module) do
     cond do
       Code.ensure_loaded?(module) and function_exported?(module, :stream, 4) ->
-        module.stream(url, headers, body, opts)
+        safe_stream(module, fn -> module.stream(url, headers, body, opts) end)
 
       Code.ensure_loaded?(module) and function_exported?(module, :post, 4) ->
         post_stream(module, url, headers, body, opts)
@@ -52,7 +52,7 @@ defmodule DSEx.HTTP do
   end
 
   defp do_stream(fun, url, headers, body, opts) when is_function(fun, 4),
-    do: Stream.map([fun.(url, headers, body, opts)], & &1)
+    do: post_stream(fun, url, headers, body, opts)
 
   defp do_stream(transport, _url, _headers, _body, _opts),
     do: error_stream({:not_http_transport, transport})
@@ -70,6 +70,22 @@ defmodule DSEx.HTTP do
   end
 
   defp error_stream(reason), do: Stream.map([{:error, reason}], & &1)
+
+  defp safe_stream(transport, fun) do
+    case safe_transport_call(transport, fun) do
+      {:error, {:http_transport_failed, ^transport, _reason} = reason} -> error_stream(reason)
+      {:error, reason} -> error_stream(reason)
+      stream -> stream
+    end
+  end
+
+  defp safe_transport_call(transport, fun) do
+    fun.()
+  rescue
+    error -> {:error, {:http_transport_failed, transport, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:http_transport_failed, transport, {kind, reason}}}
+  end
 
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do

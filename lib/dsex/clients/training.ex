@@ -79,6 +79,9 @@ defmodule DSEx.Clients.TrainingJob do
       {:ok, %{status: status, body: response}} ->
         {:error, {:http_error, status, response}}
 
+      {:error, {:http_transport_failed, _transport, reason}} ->
+        {:error, {:training_refresh_failed, reason}}
+
       {:error, reason} ->
         {:error, reason}
 
@@ -365,6 +368,9 @@ defmodule DSEx.Clients.HTTPTrainer do
 
       {:ok, %{status: status, body: response}} ->
         {:error, {:http_error, status, response}}
+
+      {:error, {:http_transport_failed, _transport, reason}} ->
+        {:error, {:training_transport_failed, reason}}
 
       {:error, reason} ->
         {:error, reason}

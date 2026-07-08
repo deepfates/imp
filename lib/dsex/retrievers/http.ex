@@ -87,6 +87,9 @@ defmodule DSEx.Retrievers.HTTP do
       {:ok, %{status: status, body: response}} ->
         {:error, {:http_error, status, response}}
 
+      {:error, {:http_transport_failed, _transport, reason}} ->
+        {:error, {:retriever_transport_failed, reason}}
+
       {:error, reason} ->
         {:error, reason}
 

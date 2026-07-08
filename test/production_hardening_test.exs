@@ -58,6 +58,14 @@ defmodule ProductionHardeningTest do
     def post(_url, _headers, _body, _opts), do: {:ok, %{status: 200, body: "ok", headers: []}}
   end
 
+  defmodule RaisingHTTPTransport do
+    def post(_url, _headers, _body, _opts), do: raise("post exploded")
+  end
+
+  defmodule RaisingStreamTransport do
+    def stream(_url, _headers, _body, _opts), do: raise("stream exploded")
+  end
+
   defmodule StructLM do
     defstruct [:prefix]
 
@@ -263,6 +271,18 @@ defmodule ProductionHardeningTest do
     assert {:error, {:not_http_transport, :not_a_transport}} =
              DSEx.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
 
+    assert {:error, {:http_transport_failed, RaisingHTTPTransport, "post exploded"}} =
+             DSEx.HTTP.post(RaisingHTTPTransport, "https://example.test", [], "{}", [])
+
+    assert {:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}} =
+             DSEx.HTTP.post(
+               fn _url, _headers, _body, _opts -> raise "post exploded" end,
+               "https://example.test",
+               [],
+               "{}",
+               []
+             )
+
     assert [{:error, _reason}] =
              DSEx.HTTP.stream(
                DSEx.HTTP.Hackneyless,
@@ -275,6 +295,20 @@ defmodule ProductionHardeningTest do
 
     assert [{:error, {:not_http_transport, :not_a_transport}}] =
              DSEx.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
+             |> Enum.to_list()
+
+    assert [{:error, {:http_transport_failed, RaisingStreamTransport, "stream exploded"}}] =
+             DSEx.HTTP.stream(RaisingStreamTransport, "https://example.test", [], "{}", [])
+             |> Enum.to_list()
+
+    assert [{:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}}] =
+             DSEx.HTTP.stream(
+               fn _url, _headers, _body, _opts -> raise "post exploded" end,
+               "https://example.test",
+               [],
+               "{}",
+               []
+             )
              |> Enum.to_list()
 
     assert ["ok"] =
