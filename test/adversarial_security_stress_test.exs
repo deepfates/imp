@@ -6,7 +6,7 @@ defmodule AdversarialSecurityStressTest do
 
     def call(%__MODULE__{}, sleep_ms) do
       Process.sleep(sleep_ms)
-      {:ok, sleep_ms}
+      {:ok, DSEx.Prediction.new(value: sleep_ms)}
     end
   end
 
@@ -16,27 +16,33 @@ defmodule AdversarialSecurityStressTest do
     def call(%__MODULE__{}, :raise), do: raise("parallel exploded")
     def call(%__MODULE__{}, :throw), do: throw(:parallel_thrown)
     def call(%__MODULE__{}, :invalid), do: :not_a_module_result
-    def call(%__MODULE__{}, value), do: {:ok, value}
+    def call(%__MODULE__{}, value), do: {:ok, DSEx.Prediction.new(value: value)}
   end
 
   test "parallel prediction timeouts kill slow tasks without exiting the caller" do
-    assert [{:error, :timeout}, {:ok, 0}] =
+    assert [{:error, :timeout}, {:ok, prediction}] =
              DSEx.Predict.Parallel.map(%SlowProgram{}, [50, 0],
                max_concurrency: 2,
                timeout: 5
              )
+
+    assert DSEx.Prediction.get(prediction, :value) == 0
   end
 
   test "parallel prediction records per-input crashes and invalid returns" do
     assert [
-             {:ok, :ok},
+             {:ok, %DSEx.Prediction{} = ok_prediction},
              {:error, {:parallel_program_failed, "parallel exploded"}},
              {:error, {:parallel_program_failed, "{:throw, :parallel_thrown}"}},
-             {:error, {:invalid_parallel_result, ":not_a_module_result"}}
+             {:error,
+              {:invalid_module_result, AdversarialSecurityStressTest.ExplodingProgram,
+               ":not_a_module_result"}}
            ] =
              DSEx.Predict.Parallel.map(%ExplodingProgram{}, [:ok, :raise, :throw, :invalid],
                max_concurrency: 0
              )
+
+    assert DSEx.Prediction.get(ok_prediction, :value) == :ok
   end
 
   test "cache contention remains bounded and returns stored values" do

@@ -13,6 +13,18 @@ defmodule DSExFacadeTest do
     def call(%__MODULE__{}, _inputs), do: throw(:program_thrown)
   end
 
+  defmodule InvalidOkProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: {:ok, %{answer: "not a prediction"}}
+  end
+
+  defmodule InvalidReturnProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: :not_a_module_result
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -187,6 +199,15 @@ defmodule DSExFacadeTest do
 
     assert DSEx.call(%ThrowingProgram{}, %{question: "q"}) ==
              {:error, {:module_call_failed, ThrowingProgram, "{:throw, :program_thrown}"}}
+  end
+
+  test "call reports invalid module return shapes at the public boundary" do
+    assert DSEx.call(%InvalidOkProgram{}, %{question: "q"}) ==
+             {:error,
+              {:invalid_module_prediction, InvalidOkProgram, "%{answer: \"not a prediction\"}"}}
+
+    assert DSEx.call(%InvalidReturnProgram{}, %{question: "q"}) ==
+             {:error, {:invalid_module_result, InvalidReturnProgram, ":not_a_module_result"}}
   end
 
   test "canonical facade builds and calls directly" do

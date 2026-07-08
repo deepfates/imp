@@ -252,7 +252,9 @@ defmodule DSEx.BenchmarkTruth.OperationsStress do
           {:ok, %DSEx.Prediction{}},
           {:error, {:parallel_program_failed, "ops branch failed"}},
           {:error, {:parallel_program_failed, "{:throw, :ops_branch_thrown}"}},
-          {:error, {:invalid_parallel_result, ":not_a_module_result"}}
+          {:error,
+           {:invalid_module_result, DSEx.BenchmarkTruth.OperationsStress.IsolatedProgram,
+            ":not_a_module_result"}}
         ],
         results
       )

@@ -66,7 +66,9 @@ defmodule RefineFeedbackTest do
   test "Refine converts invalid program returns into contract errors" do
     metric = fn _example, _prediction -> true end
 
-    assert {:error, {:invalid_refine_result, ":not_a_module_result"}, []} =
+    assert {:error,
+            {:invalid_module_result, RefineFeedbackTest.InvalidResultProgram,
+             ":not_a_module_result"}, []} =
              DSEx.Predict.Refine.new(%InvalidResultProgram{}, metric, max_attempts: 1)
              |> DSEx.Predict.Refine.call(%{question: "q"})
   end

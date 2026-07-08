@@ -283,7 +283,9 @@ defmodule PublicSurfaceTest do
 
     invalid = DSEx.rag(%InvalidPredictionProgram{}, retriever, k: 1)
 
-    assert {:error, {:invalid_rag_prediction, "%{answer: \"not a prediction\"}"}} =
+    assert {:error,
+            {:invalid_module_prediction, PublicSurfaceTest.InvalidPredictionProgram,
+             "%{answer: \"not a prediction\"}"}} =
              DSEx.call(invalid, %{question: "capital France"})
 
     failed = DSEx.rag(%ErrorProgram{}, retriever, k: 1)
