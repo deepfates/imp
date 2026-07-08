@@ -143,7 +143,10 @@ defmodule DSEx.Optimize.Anything do
     seed: [type: :integer, default: 0],
     examples: [type: {:list, :any}, default: []],
     trials: [type: :non_neg_integer, default: 8],
-    mutation_fn: [type: :any, default: nil]
+    mutation_fn: [
+      type: {:custom, __MODULE__, :validate_mutation_fn, []},
+      default: nil
+    ]
   ]
 
   def new_artifact(kind, text, opts \\ [])
@@ -184,7 +187,6 @@ defmodule DSEx.Optimize.Anything do
     examples = opts[:examples]
     trials = opts[:trials]
     mutation_fn = opts[:mutation_fn] || (&default_mutation/3)
-    validate_mutation_fn!(mutation_fn)
 
     baseline = evaluate_candidate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
@@ -322,11 +324,11 @@ defmodule DSEx.Optimize.Anything do
   defp trial_indices(count) when is_integer(count) and count > 0, do: 1..count
   defp trial_indices(_count), do: []
 
-  defp validate_mutation_fn!(mutation_fn) when is_function(mutation_fn, 3), do: :ok
+  def validate_mutation_fn(nil), do: {:ok, nil}
+  def validate_mutation_fn(mutation_fn) when is_function(mutation_fn, 3), do: {:ok, mutation_fn}
 
-  defp validate_mutation_fn!(mutation_fn) do
-    raise ArgumentError,
-          "DSEx.Optimize.Anything.optimize/3 expects :mutation_fn to be an arity-3 function; got: #{inspect(mutation_fn)}"
+  def validate_mutation_fn(mutation_fn) do
+    {:error, "expected nil or an arity-3 function, got: #{inspect(mutation_fn)}"}
   end
 
   defp default_mutation(%Artifact{} = artifact, trial, seed) do

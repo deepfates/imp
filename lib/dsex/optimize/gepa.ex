@@ -42,7 +42,10 @@ defmodule DSEx.Optimize.GEPA do
     examples: [type: {:list, :any}, default: []],
     dev_examples: [type: {:list, :any}, default: []],
     generations: [type: :non_neg_integer, default: 4],
-    mutation_fn: [type: :any, default: nil],
+    mutation_fn: [
+      type: {:custom, __MODULE__, :validate_mutation_fn, []},
+      default: nil
+    ],
     reflection_lm: [type: :any, default: nil]
   ]
 
@@ -54,7 +57,6 @@ defmodule DSEx.Optimize.GEPA do
     dev_examples = opts[:dev_examples]
     generations = opts[:generations]
     mutation_fn = opts[:mutation_fn] || reflection_mutation_fn(opts)
-    validate_mutation_fn!(mutation_fn)
 
     baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
 
@@ -417,10 +419,10 @@ defmodule DSEx.Optimize.GEPA do
   defp average([]), do: 0.0
   defp average(scores), do: Enum.sum(scores) / length(scores)
 
-  defp validate_mutation_fn!(mutation_fn) when is_function(mutation_fn, 3), do: :ok
+  def validate_mutation_fn(nil), do: {:ok, nil}
+  def validate_mutation_fn(mutation_fn) when is_function(mutation_fn, 3), do: {:ok, mutation_fn}
 
-  defp validate_mutation_fn!(mutation_fn) do
-    raise ArgumentError,
-          "DSEx.Optimize.GEPA.optimize/3 expects :mutation_fn to be an arity-3 function; got: #{inspect(mutation_fn)}"
+  def validate_mutation_fn(mutation_fn) do
+    {:error, "expected nil or an arity-3 function, got: #{inspect(mutation_fn)}"}
   end
 end

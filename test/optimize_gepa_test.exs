@@ -97,7 +97,7 @@ defmodule OptimizeGEPATest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3 expects :mutation_fn to be an arity-3 function/,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3: invalid value for :mutation_fn option: expected nil or an arity-3 function/,
                  fn ->
                    GEPA.optimize(artifact, evaluator, mutation_fn: fn _artifact -> "bad" end)
                  end
