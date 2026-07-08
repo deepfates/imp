@@ -39,7 +39,7 @@ defmodule DSEx.MCP do
     ]
 
     @option_schema [
-      transport: [type: :any],
+      transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
       headers: [type: {:list, {:tuple, [:any, :any]}}],
       protocol_version: [type: :string]
     ]
@@ -315,7 +315,7 @@ defmodule DSEx.MCP do
     ]
 
     @option_schema [
-      transport: [type: :any],
+      transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
       headers: [type: {:list, {:tuple, [:any, :any]}}],
       session_id: [type: {:or, [:string, nil]}],
       protocol_version: [type: :string]

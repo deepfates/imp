@@ -262,7 +262,7 @@ defmodule DSEx.Clients.HTTPTrainer do
   @option_schema [
     status_url: [type: {:or, [:string, nil]}],
     api_key: [type: {:or, [:string, nil]}],
-    transport: [type: :any],
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
     payload_builder: [type: {:fun, 3}],
     response_mapper: [type: {:fun, 4}]
@@ -459,7 +459,7 @@ defmodule DSEx.Clients.OpenAITrainer do
   @option_schema [
     base_url: [type: :string],
     api_key: [type: {:or, [:string, nil]}],
-    transport: [type: :any],
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     training_file: [type: :string],
     validation_file: [type: :string],
     suffix: [type: :string],
@@ -527,7 +527,7 @@ defmodule DSEx.Clients.DatabricksTrainer do
   @option_schema [
     base_url: [type: :string],
     api_key: [type: {:or, [:string, nil]}],
-    transport: [type: :any]
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}]
   ]
 
   def new(opts \\ []) do

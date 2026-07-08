@@ -435,9 +435,38 @@ defmodule ProductionHardeningTest do
   end
 
   test "network-facing constructors reject unknown or malformed options" do
+    callback = fn _url, _headers, _body, _opts ->
+      {:ok, %{status: 200, body: "{}", headers: []}}
+    end
+
+    assert {:ok, ^callback} = DSEx.HTTP.validate_transport(callback)
+    assert {:ok, String} = DSEx.HTTP.validate_transport(String)
+    assert {:error, message} = DSEx.HTTP.validate_transport(fn _url -> :ok end)
+    assert message =~ "expected an HTTP transport module or arity-4 callback"
+
     assert_raise ArgumentError, ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/, fn ->
       DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Retrievers.HTTP\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 fn ->
+                   DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+                     transport: fn _url -> :ok end
+                   )
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.MCP.HTTPClient\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 fn ->
+                   DSEx.MCP.HTTPClient.new("https://mcp.example", transport: %{bad: :transport})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.OpenAITrainer\.new\/1: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 fn ->
+                   DSEx.Clients.OpenAITrainer.new(transport: fn _url, _headers -> :ok end)
+                 end
 
     assert_raise ArgumentError,
                  ~r/DSEx.MCP.StdioClient\.new\/2: invalid value for :timeout/,

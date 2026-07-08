@@ -133,8 +133,14 @@ databricks =
     "https://workspace.example",
     "catalog.schema.index",
     token: System.fetch_env!("DATABRICKS_TOKEN")
-  )
+)
 ```
+
+Network-facing protocol clients share the same transport boundary: `transport:`
+accepts an HTTP transport module or an arity-4 callback with
+`(url, headers, body, opts)`. Malformed transport shapes are rejected when the
+client is built, before an MCP, retriever, or provider-training call can reach
+the network.
 
 Provider training is also explicit. `BootstrapFinetune` and `GRPO` build
 provider training jobs only when a real trainer backend is supplied; they do not

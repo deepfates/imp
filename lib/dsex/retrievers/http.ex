@@ -30,7 +30,7 @@ defmodule DSEx.Retrievers.HTTP do
   ]
 
   @option_schema [
-    transport: [type: :any],
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
     body_builder: [type: {:fun, 2}],
     response_mapper: [type: {:fun, 1}],
@@ -152,7 +152,7 @@ defmodule DSEx.Retrievers.Weaviate do
   @moduledoc "Weaviate GraphQL retriever."
 
   @option_schema [
-    transport: [type: :any],
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
     k: [type: :pos_integer],
     field: [type: :string]
@@ -213,7 +213,7 @@ defmodule DSEx.Retrievers.Databricks do
   @moduledoc "Databricks Vector Search retriever."
 
   @option_schema [
-    transport: [type: :any],
+    transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
     token: [type: {:or, [:string, nil]}],
     k: [type: :pos_integer],

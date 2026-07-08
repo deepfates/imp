@@ -188,6 +188,8 @@ defmodule DocumentationContractTest do
     assert advanced =~ "DSEx.Retrievers.HTTP.new"
     assert advanced =~ "DSEx.Clients.OpenAITrainer.new"
     assert advanced =~ ~r/do not\s+train models in-process/
+    assert advanced =~ "Network-facing protocol clients share the same transport boundary"
+    assert advanced =~ "accepts an HTTP transport module or an arity-4 callback"
 
     assert advanced =~
              "Trainer options accept `nil`, a trainer module, a configured trainer struct, or\nan arity-3 callback"

@@ -17,6 +17,13 @@ defmodule DSEx.HTTP do
     do_post(transport, url, headers, body, opts)
   end
 
+  def validate_transport(transport) when is_atom(transport), do: {:ok, transport}
+  def validate_transport(transport) when is_function(transport, 4), do: {:ok, transport}
+
+  def validate_transport(_transport) do
+    {:error, "expected an HTTP transport module or arity-4 callback"}
+  end
+
   defp do_post(module, url, headers, body, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :post, 4) do
       safe_transport_call(module, fn -> module.post(url, headers, body, opts) end)
