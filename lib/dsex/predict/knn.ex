@@ -1,20 +1,49 @@
 defmodule DSEx.Predict.KNN do
-  @moduledoc "Callable KNN predictor over examples."
+  @moduledoc """
+  Callable KNN predictor over examples.
 
-  defstruct [:retriever]
+  `KNN` retrieves nearest examples from a trainset using token overlap. The
+  `:field` option controls both sides of the match: which field is read from
+  training examples and which input field is used as the query at call time.
+  Pass a list of fields to concatenate several input fields.
+  """
+
+  defstruct [:retriever, :field]
 
   def new(k, trainset, opts \\ []) do
     field = Keyword.get(opts, :field, :question)
-    %__MODULE__{retriever: DSEx.Retrievers.KNN.new(trainset, k: k, field: field)}
+
+    %__MODULE__{
+      retriever: DSEx.Retrievers.KNN.new(trainset, k: k, field: field),
+      field: field
+    }
   end
 
-  def call(%__MODULE__{retriever: retriever}, inputs) do
-    query =
-      inputs
-      |> Map.new()
-      |> Map.values()
-      |> Enum.join(" ")
+  def call(%__MODULE__{retriever: retriever, field: field}, inputs) do
+    query = inputs |> Map.new() |> query_text(field)
 
     retriever |> DSEx.Retrievers.KNN.call(query)
+  end
+
+  defp query_text(inputs, fields) when is_list(fields) do
+    fields
+    |> Enum.map(&Map.get(inputs, &1, Map.get(inputs, to_string(&1), "")))
+    |> Enum.map_join(" ", &safe_text/1)
+  end
+
+  defp query_text(inputs, nil) do
+    inputs
+    |> Map.values()
+    |> Enum.map_join(" ", &safe_text/1)
+  end
+
+  defp query_text(inputs, field),
+    do: inputs |> Map.get(field, Map.get(inputs, to_string(field), "")) |> safe_text()
+
+  defp safe_text(value) do
+    case String.Chars.impl_for(value) do
+      nil -> inspect(value)
+      _impl -> to_string(value)
+    end
   end
 end

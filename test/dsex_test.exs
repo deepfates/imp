@@ -269,6 +269,39 @@ defmodule DSExTest do
     assert DSEx.Prediction.get(prediction, :answer) == "4"
   end
 
+  test "KNN predictor uses configured query fields instead of all inputs" do
+    trainset = [
+      DSEx.example(question: "capital france", answer: "Paris") |> DSEx.with_inputs(:question),
+      DSEx.example(question: "color sky", answer: "blue") |> DSEx.with_inputs(:question)
+    ]
+
+    knn = DSEx.Predict.KNN.new(1, trainset, field: :question)
+
+    assert [%DSEx.Example{} = nearest] =
+             DSEx.Predict.KNN.call(knn, %{
+               "question" => "capital",
+               distractor: "sky sky sky"
+             })
+
+    assert DSEx.Example.get(nearest, :answer) == "Paris"
+  end
+
+  test "KNN predictor can query from multiple fields" do
+    trainset = [
+      DSEx.example(subject: "paris", detail: "france", answer: "capital")
+      |> DSEx.with_inputs([:subject, :detail]),
+      DSEx.example(subject: "beam", detail: "concurrency", answer: "otp")
+      |> DSEx.with_inputs([:subject, :detail])
+    ]
+
+    knn = DSEx.Predict.KNN.new(1, trainset, field: [:subject, :detail])
+
+    assert [%DSEx.Example{} = nearest] =
+             DSEx.Predict.KNN.call(knn, %{subject: "beam", detail: "process concurrency"})
+
+    assert DSEx.Example.get(nearest, :answer) == "otp"
+  end
+
   test "evaluate scores a program against examples" do
     lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
     program = DSEx.predict("question -> answer", lm: lm)

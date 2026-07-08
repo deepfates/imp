@@ -16,12 +16,20 @@ defmodule DSEx.Retrievers.KNN do
 
     knn.examples
     |> Enum.map(fn example ->
-      {score(DSEx.Example.get(example, knn.field), query_terms), example}
+      {score(example_text(example, knn.field), query_terms), example}
     end)
     |> Enum.sort_by(fn {score, _example} -> -score end)
     |> Enum.take(knn.k)
     |> Enum.map(fn {_score, example} -> example end)
   end
+
+  defp example_text(example, fields) when is_list(fields) do
+    fields
+    |> Enum.map(&DSEx.Example.get(example, &1, ""))
+    |> Enum.map_join(" ", &safe_text/1)
+  end
+
+  defp example_text(example, field), do: example |> DSEx.Example.get(field, "") |> safe_text()
 
   defp score(text, query_terms),
     do: MapSet.intersection(MapSet.new(terms(text)), MapSet.new(query_terms)) |> MapSet.size()
@@ -34,4 +42,11 @@ defmodule DSEx.Retrievers.KNN do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp safe_text(value) do
+    case String.Chars.impl_for(value) do
+      nil -> inspect(value)
+      _impl -> to_string(value)
+    end
+  end
 end
