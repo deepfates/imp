@@ -178,9 +178,10 @@ defmodule DSEx.Metrics do
   type, and span-relation metadata for dashboards and parity reports.
   """
   def extractive_qa(prediction, answer, opts \\ []) do
+    opts = validate_metric_opts!(opts, "DSEx.Metrics.extractive_qa/3")
     exact_match? = em(prediction, answer)
     f1_score = f1(prediction, answer)
-    metric_name = Keyword.get(opts, :metric_name, "extractive_qa_exact_match")
+    metric_name = metric_name(opts, "extractive_qa_exact_match", "DSEx.Metrics.extractive_qa/3")
 
     %Result{
       score: if(exact_match?, do: 1.0, else: 0.0),
@@ -203,7 +204,8 @@ defmodule DSEx.Metrics do
   be computed with `classification_report/2`.
   """
   def classification(prediction, label, opts \\ []) do
-    metric_name = Keyword.get(opts, :metric_name, "classification_accuracy")
+    opts = validate_metric_opts!(opts, "DSEx.Metrics.classification/3")
+    metric_name = metric_name(opts, "classification_accuracy", "DSEx.Metrics.classification/3")
     predicted = normalize_text(prediction)
     gold = normalize_text(label)
     correct? = predicted == gold and gold != ""
@@ -227,7 +229,9 @@ defmodule DSEx.Metrics do
   (or string-keyed equivalents).
   """
   def classification_report(rows, opts \\ []) do
-    pairs = Enum.map(rows, &classification_pair/1)
+    opts = validate_metric_opts!(opts, "DSEx.Metrics.classification_report/2")
+    rows = validate_rows!(rows, "DSEx.Metrics.classification_report/2")
+    pairs = Enum.map(rows, &classification_pair!(&1, "DSEx.Metrics.classification_report/2"))
 
     labels =
       pairs |> Enum.flat_map(fn {gold, pred} -> [gold, pred] end) |> Enum.uniq() |> Enum.sort()
@@ -238,7 +242,8 @@ defmodule DSEx.Metrics do
     supports = Map.new(by_label, fn {label, stats} -> {label, stats["support"]} end)
 
     %{
-      "task_metric" => Keyword.get(opts, :metric_name, "classification_report"),
+      "task_metric" =>
+        metric_name(opts, "classification_report", "DSEx.Metrics.classification_report/2"),
       "examples" => total,
       "accuracy" => if(total == 0, do: 0.0, else: correct / total),
       "macro_f1" => mean_metric(by_label, "f1"),
@@ -255,7 +260,9 @@ defmodule DSEx.Metrics do
   list of retrieved document maps. Expected ids can be strings or atoms.
   """
   def retrieval_recall(prediction, expected_ids, opts \\ []) do
-    metric_name = Keyword.get(opts, :metric_name, "retrieval_recall")
+    opts = validate_metric_opts!(opts, "DSEx.Metrics.retrieval_recall/3")
+    metric_name = metric_name(opts, "retrieval_recall", "DSEx.Metrics.retrieval_recall/3")
+    min_recall = min_recall(opts, "DSEx.Metrics.retrieval_recall/3")
     expected = expected_ids |> List.wrap() |> Enum.map(&to_string/1) |> MapSet.new()
     retrieved = prediction |> retrieved_ids() |> MapSet.new()
     hits = MapSet.intersection(expected, retrieved)
@@ -265,7 +272,7 @@ defmodule DSEx.Metrics do
 
     %Result{
       score: recall,
-      passed?: recall >= Keyword.get(opts, :min_recall, 1.0),
+      passed?: recall >= min_recall,
       metadata: %{
         "task_metric" => metric_name,
         "expected_evidence_ids" => Enum.sort(MapSet.to_list(expected)),
@@ -306,10 +313,10 @@ defmodule DSEx.Metrics do
     end
   end
 
-  defp classification_pair({gold, predicted}),
+  defp classification_pair!({gold, predicted}, _context),
     do: {normalize_text(gold), normalize_text(predicted)}
 
-  defp classification_pair(%{} = row) do
+  defp classification_pair!(%{} = row, context) do
     gold = Map.get(row, :gold, Map.get(row, "gold", Map.get(row, :label, Map.get(row, "label"))))
 
     predicted =
@@ -319,7 +326,17 @@ defmodule DSEx.Metrics do
         Map.get(row, "predicted", Map.get(row, :prediction, Map.get(row, "prediction")))
       )
 
+    if is_nil(gold) or is_nil(predicted) do
+      raise ArgumentError,
+            "#{context} rows must include gold/label and predicted/prediction fields, got: #{inspect(row)}"
+    end
+
     {normalize_text(gold), normalize_text(predicted)}
+  end
+
+  defp classification_pair!(row, context) do
+    raise ArgumentError,
+          "#{context} rows must be {gold, predicted} tuples or maps, got: #{inspect(row)}"
   end
 
   defp retrieved_ids(%DSEx.Prediction{metadata: metadata}) do
@@ -334,6 +351,48 @@ defmodule DSEx.Metrics do
 
   defp doc_id(%{} = doc), do: doc |> Map.get(:id, Map.get(doc, "id", "")) |> to_string()
   defp doc_id(_doc), do: ""
+
+  defp validate_metric_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_metric_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+  end
+
+  defp metric_name(opts, default, context) do
+    case Keyword.get(opts, :metric_name, default) do
+      name when is_binary(name) ->
+        name
+
+      name ->
+        raise ArgumentError,
+              "#{context} expects :metric_name to be a string, got: #{inspect(name)}"
+    end
+  end
+
+  defp min_recall(opts, context) do
+    case Keyword.get(opts, :min_recall, 1.0) do
+      value when is_number(value) and value >= 0.0 and value <= 1.0 ->
+        value * 1.0
+
+      value ->
+        raise ArgumentError,
+              "#{context} expects :min_recall to be a number between 0.0 and 1.0, got: #{inspect(value)}"
+    end
+  end
+
+  defp validate_rows!(rows, context) do
+    if Enumerable.impl_for(rows) do
+      rows
+    else
+      raise ArgumentError, "#{context} expects rows to be an enumerable, got: #{inspect(rows)}"
+    end
+  end
 
   defp label_stats(label, pairs) do
     true_positive = Enum.count(pairs, fn {gold, pred} -> gold == label and pred == label end)

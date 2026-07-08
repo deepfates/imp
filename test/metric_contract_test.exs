@@ -297,6 +297,38 @@ defmodule MetricContractTest do
              DSEx.Metrics.retrieval_recall(prediction, ["city-france"], min_recall: 1.0)
   end
 
+  test "built-in metrics reject malformed options and row shapes clearly" do
+    assert_raise ArgumentError, ~r/DSEx.Metrics.extractive_qa\/3 expects keyword options/, fn ->
+      DSEx.Metrics.extractive_qa("Paris", "Paris", %{metric_name: "qa"})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Metrics.classification\/3 expects :metric_name to be a string/,
+                 fn ->
+                   DSEx.Metrics.classification("warm", "warm", metric_name: :colors)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Metrics.classification_report\/2 expects rows to be an enumerable/,
+                 fn ->
+                   DSEx.Metrics.classification_report(:not_rows)
+                 end
+
+    assert_raise ArgumentError, ~r/rows must be \{gold, predicted\} tuples or maps/, fn ->
+      DSEx.Metrics.classification_report([:not_a_row])
+    end
+
+    assert_raise ArgumentError,
+                 ~r/rows must include gold\/label and predicted\/prediction fields/,
+                 fn ->
+                   DSEx.Metrics.classification_report([%{label: "warm"}])
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx.Metrics.retrieval_recall\/3 expects :min_recall/, fn ->
+      DSEx.Metrics.retrieval_recall([], ["doc"], min_recall: 1.5)
+    end
+  end
+
   test "BestOfN Refine and few-shot optimizers accept structured metric results" do
     good = DSEx.prediction(answer: "good")
     bad = DSEx.prediction(answer: "bad")
