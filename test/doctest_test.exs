@@ -3,6 +3,7 @@ defmodule DSExDoctestTest do
 
   doctest DSEx.Adapter.JSON
   doctest DSEx.Evaluate
+  doctest DSEx.Example
   doctest DSEx.Metrics
   doctest DSEx.Optimizer.RandomSearch
   doctest DSEx.Signature
