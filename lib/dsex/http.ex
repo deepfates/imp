@@ -101,12 +101,7 @@ defmodule DSEx.HTTP do
 end
 
 defmodule DSEx.HTTP.Hackneyless do
-  @moduledoc """
-  Default HTTP transport implemented with Erlang `:httpc`.
-
-  It is intentionally boring and dependency-light. Tests inject their own
-  transport so provider contracts are verified without live credentials.
-  """
+  @moduledoc false
 
   @behaviour DSEx.HTTP
 

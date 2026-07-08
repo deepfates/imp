@@ -51,6 +51,15 @@ defmodule DocumentationContractTest do
     assert missing == []
   end
 
+  test "user-facing docs keep the default HTTP transport out of the public vocabulary" do
+    docs =
+      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
+      |> Enum.map_join("\n", &File.read!/1)
+
+    assert docs =~ "DSEx.HTTP"
+    refute docs =~ "DSEx.HTTP.Hackneyless"
+  end
+
   test "release criteria are expressed as current product evidence, not historical tickets" do
     body = File.read!("docs/RELEASE_CRITERIA.md")
 
