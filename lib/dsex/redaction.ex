@@ -34,6 +34,35 @@ defmodule DSEx.Redaction do
   def default_keys, do: @default_redact_keys
 
   @doc """
+  Validates custom redaction keys.
+
+  Redaction keys must be atoms or strings because DSEx compares them with map
+  keys after normalizing ordinary Elixir key names.
+
+      iex> DSEx.Redaction.validate_keys([:api_key, "authorization"])
+      {:ok, [:api_key, "authorization"]}
+
+      iex> {:error, message} = DSEx.Redaction.validate_keys([:api_key, 123])
+      iex> message =~ "expected a list of atom or string key names"
+      true
+
+  """
+  def validate_keys(keys) when is_list(keys) do
+    case Enum.find(keys, &(not valid_key?(&1))) do
+      nil ->
+        {:ok, keys}
+
+      invalid ->
+        {:error,
+         "expected a list of atom or string key names, got invalid key: #{inspect(invalid)}"}
+    end
+  end
+
+  def validate_keys(keys) do
+    {:error, "expected a list of atom or string key names, got: #{inspect(keys)}"}
+  end
+
+  @doc """
   Redacts sensitive keys and secret-looking string values.
 
   Key matching is intentionally conservative around common credential names:
@@ -86,6 +115,8 @@ defmodule DSEx.Redaction do
         String.contains?(normalized, redact_key)
     end)
   end
+
+  defp valid_key?(key), do: is_atom(key) or is_binary(key)
 
   defp secret_value?(value) do
     String.match?(value, ~r/\bsk-[A-Za-z0-9_-]{8,}\b/) or

@@ -747,6 +747,17 @@ defmodule ProductionHardeningTest do
     assert redacted.nested.refresh_token == "[REDACTED]"
   end
 
+  test "redaction key policy accepts only atom or string key names" do
+    assert {:ok, [:api_key, "authorization"]} =
+             DSEx.Redaction.validate_keys([:api_key, "authorization"])
+
+    assert {:error, message} = DSEx.Redaction.validate_keys([:api_key, {:tuple, :key}])
+    assert message =~ "expected a list of atom or string key names"
+
+    assert {:error, message} = DSEx.Redaction.validate_keys(:api_key)
+    assert message =~ "expected a list of atom or string key names"
+  end
+
   test "examples and predictions do not intern arbitrary external keys" do
     external_key = "external_key_#{System.unique_integer([:positive])}"
 

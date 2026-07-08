@@ -14,7 +14,10 @@ defmodule DSEx.Agent.Runtime do
     event_sink: [
       type: {:custom, __MODULE__, :validate_event_sink, []}
     ],
-    redact_keys: [type: {:list, :any}, default: DSEx.Redaction.default_keys()]
+    redact_keys: [
+      type: {:custom, DSEx.Redaction, :validate_keys, []},
+      default: DSEx.Redaction.default_keys()
+    ]
   ]
 
   def new(opts \\ []) do
@@ -25,7 +28,7 @@ defmodule DSEx.Agent.Runtime do
       memory: opts[:memory],
       traces: opts[:traces],
       event_sink: opts[:event_sink],
-      redact_keys: opts[:redact_keys]
+      redact_keys: normalize_redact_keys(opts[:redact_keys])
     }
   end
 
@@ -71,6 +74,11 @@ defmodule DSEx.Agent.Runtime do
 
   def validate_event_sink(event_sink) do
     {:error, "expected nil or an arity-1 function, got: #{inspect(event_sink)}"}
+  end
+
+  defp normalize_redact_keys(keys) do
+    (DSEx.Redaction.default_keys() ++ keys)
+    |> Enum.uniq()
   end
 
   defp normalize_key(key) when is_atom(key), do: key

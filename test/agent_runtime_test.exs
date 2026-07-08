@@ -139,6 +139,12 @@ defmodule AgentRuntimeTest do
                  fn ->
                    Runtime.new(event_sink: fn _event, _runtime -> :ok end)
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :redact_keys option: expected a list of atom or string key names/,
+                 fn ->
+                   Runtime.new(redact_keys: [:api_key, 123])
+                 end
   end
 
   test "arity-3 handlers receive the agent without process dictionary self-reference" do
@@ -341,6 +347,24 @@ defmodule AgentRuntimeTest do
                output: %{api_key: "[REDACTED]", nested: %{token: "[REDACTED]"}}
              },
              %{output: %{api_key: "[REDACTED]", nested: %{token: "[REDACTED]"}}}
+           ] = runtime.traces
+  end
+
+  test "runtime accepts custom redaction key names" do
+    runtime =
+      Runtime.new(redact_keys: [:tenant_id, "customer-secret"])
+      |> Runtime.trace(%{
+        "customer-secret" => "visible but sensitive",
+        tenant_id: "tenant-public",
+        api_key: "sk-live"
+      })
+
+    assert [
+             %{
+               "customer-secret" => "[REDACTED]",
+               tenant_id: "[REDACTED]",
+               api_key: "[REDACTED]"
+             }
            ] = runtime.traces
   end
 
