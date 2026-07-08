@@ -17,8 +17,22 @@ examples, retrieval, tools, agents, and repeatable evaluation.
 
 ```elixir
 Mix.install([
+  {:dsex, "~> 0.1.0"}
+])
+```
+
+When running this snippet from a source checkout before DSEx is published, use
+the local path dependency instead:
+
+```elixir
+Mix.install([
   {:dsex, path: "."}
 ])
+```
+
+Then declare and call the program:
+
+```elixir
 
 lm =
   %{

@@ -135,6 +135,14 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
+  test "README starts with a package install path and labels source-checkout path installs" do
+    readme = File.read!("README.md")
+
+    assert readme =~ ~s({:dsex, "~> 0.1.0"})
+    assert readme =~ "source checkout"
+    assert readme =~ ~s({:dsex, path: "."})
+  end
+
   defp assert_release_files(files) do
     for file <- @product_files do
       assert file in files
@@ -215,8 +223,15 @@ defmodule PackageContractTest do
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
-    {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+
+    program =
+      "question -> answer: short_span"
+      |> DSEx.signature("Answer with the shortest correct span. Do not explain.")
+      |> DSEx.predict()
+
+    {:ok, prediction} =
+      DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
 
     unless DSEx.get(prediction, :answer) == "Paris" do
       raise "unexpected DSEx prediction: \#{inspect(prediction)}"
