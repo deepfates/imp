@@ -332,6 +332,12 @@ defmodule ExternalRetrieverTest do
                  fn ->
                    DSEx.Retrievers.KNN.new([], k: -1)
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Retrievers\.KNN\.new\/2: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 fn ->
+                   DSEx.Retrievers.KNN.new([], field: [])
+                 end
   end
 
   test "generic HTTP retriever reports request transport decode and mapper failures" do

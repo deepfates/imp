@@ -11,7 +11,10 @@ defmodule DSEx.Predict.ProgramOfThought do
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
-    output_field: [type: :any, default: :answer]
+    output_field: [
+      type: {:custom, DSEx.FieldSelector, :validate_name, []},
+      default: :answer
+    ]
   ]
 
   def new(signature, opts \\ []) do

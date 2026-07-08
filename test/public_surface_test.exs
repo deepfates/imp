@@ -182,6 +182,12 @@ defmodule PublicSurfaceTest do
                    DSEx.majority(["A"], normalize: :not_a_function)
                  end
 
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Aggregation\.majority\/2: invalid value for :field option: expected nil or an atom\/string field name/,
+                 fn ->
+                   DSEx.majority(["A"], field: [])
+                 end
+
     assert {:ok, pred} = DSEx.Predict.Predict.call(program, %{question: "2+2?"})
     assert DSEx.Prediction.get(pred, :answer) == "4"
 
@@ -295,6 +301,18 @@ defmodule PublicSurfaceTest do
                  ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :k option: expected non negative integer/,
                  fn ->
                    DSEx.rag(base, retriever, k: -3)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :query_field option: expected an atom\/string field name or a non-empty list of field names/,
+                 fn ->
+                   DSEx.rag(base, retriever, query_field: [])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :context_field option: expected an atom\/string field name/,
+                 fn ->
+                   DSEx.rag(base, retriever, context_field: [:context])
                  end
   end
 
@@ -434,6 +452,18 @@ defmodule PublicSurfaceTest do
                    DSEx.Optimizer.KNNFewShot.new(-2, [
                      DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
                    ])
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 fn ->
+                   DSEx.Optimizer.KNNFewShot.new(
+                     1,
+                     [
+                       DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+                     ],
+                     field: ""
+                   )
                  end
   end
 

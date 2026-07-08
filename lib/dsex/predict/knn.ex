@@ -11,7 +11,10 @@ defmodule DSEx.Predict.KNN do
   defstruct [:retriever, :field]
 
   @option_schema [
-    field: [type: :any, default: :question]
+    field: [
+      type: {:custom, DSEx.FieldSelector, :validate_selector, []},
+      default: :question
+    ]
   ]
 
   def new(k, trainset, opts \\ []) do
@@ -51,12 +54,6 @@ defmodule DSEx.Predict.KNN do
   defp query_text(inputs, fields) when is_list(fields) do
     fields
     |> Enum.map(&Map.get(inputs, &1, Map.get(inputs, to_string(&1), "")))
-    |> Enum.map_join(" ", &safe_text/1)
-  end
-
-  defp query_text(inputs, nil) do
-    inputs
-    |> Map.values()
     |> Enum.map_join(" ", &safe_text/1)
   end
 

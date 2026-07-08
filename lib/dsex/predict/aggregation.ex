@@ -45,7 +45,10 @@ defmodule DSEx.Predict.Aggregation do
   - `:normalize` supplies a custom one-argument grouping function.
   """
   @option_schema [
-    field: [type: :any, default: nil],
+    field: [
+      type: {:custom, DSEx.FieldSelector, :validate_optional_name, []},
+      default: nil
+    ],
     normalize: [
       type: {:custom, __MODULE__, :validate_normalize, []},
       default: &__MODULE__.default_normalize/1

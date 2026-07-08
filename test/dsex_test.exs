@@ -452,6 +452,12 @@ defmodule DSExTest do
     end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.KNN\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 fn ->
+                   DSEx.Predict.KNN.new(1, [], field: nil)
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
                  fn ->
                    DSEx.Predict.KNN.new(1, :not_trainset)

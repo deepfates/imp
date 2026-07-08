@@ -5,7 +5,10 @@ defmodule DSEx.Retrievers.KNN do
 
   @option_schema [
     k: [type: :non_neg_integer, default: 3],
-    field: [type: :any, default: :question]
+    field: [
+      type: {:custom, DSEx.FieldSelector, :validate_selector, []},
+      default: :question
+    ]
   ]
 
   def new(examples, opts \\ []) do

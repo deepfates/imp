@@ -18,8 +18,14 @@ defmodule DSEx.Predict.RAG do
   defstruct [:program, :retriever, query_field: :question, context_field: :context, k: 3]
 
   @option_schema [
-    query_field: [type: :any, default: :question],
-    context_field: [type: :any, default: :context],
+    query_field: [
+      type: {:custom, DSEx.FieldSelector, :validate_selector, []},
+      default: :question
+    ],
+    context_field: [
+      type: {:custom, DSEx.FieldSelector, :validate_name, []},
+      default: :context
+    ],
     k: [type: :non_neg_integer, default: 3]
   ]
 

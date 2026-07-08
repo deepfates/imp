@@ -27,7 +27,10 @@ defmodule DSEx.Predict.CodeAct do
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
-    output_field: [type: :any, default: :answer],
+    output_field: [
+      type: {:custom, DSEx.FieldSelector, :validate_name, []},
+      default: :answer
+    ],
     max_iters: [type: :non_neg_integer, default: 5],
     tool_policy: [
       type: {:custom, DSEx.ToolPolicy, :validate, []},

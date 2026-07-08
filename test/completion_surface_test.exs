@@ -73,6 +73,12 @@ defmodule CompletionSurfaceTest do
                  fn ->
                    DSEx.Predict.ProgramOfThought.new("x -> answer", %{lm: nil})
                  end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.ProgramOfThought\.new\/2: invalid value for :output_field option: expected an atom\/string field name/,
+                 fn ->
+                   DSEx.Predict.ProgramOfThought.new("x -> answer", output_field: [])
+                 end
   end
 
   test "ProgramOfThought reports malformed generated code explicitly" do
@@ -271,6 +277,12 @@ defmodule CompletionSurfaceTest do
                    DSEx.Predict.CodeAct.new("question -> answer", [],
                      tool_policy: %{only: :lookup}
                    )
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3: invalid value for :output_field option: expected an atom\/string field name/,
+                 fn ->
+                   DSEx.Predict.CodeAct.new("question -> answer", [], output_field: [])
                  end
 
     code_act = DSEx.Predict.CodeAct.new("question -> answer", [], lm: nil)

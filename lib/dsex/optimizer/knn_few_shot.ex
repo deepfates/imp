@@ -76,7 +76,10 @@ defmodule DSEx.Optimizer.KNNFewShot do
   defstruct [:knn, :bootstrap]
 
   @option_schema [
-    field: [type: :any, default: :question]
+    field: [
+      type: {:custom, DSEx.FieldSelector, :validate_selector, []},
+      default: :question
+    ]
   ]
 
   def new(k, trainset, opts \\ []) do
