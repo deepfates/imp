@@ -51,6 +51,74 @@ defmodule OptimizeAnythingTest do
     File.rm(path)
   end
 
+  test "report loading accepts atom-key maps and rejects malformed persisted shapes clearly" do
+    state = %{
+      type: "optimize_anything_report",
+      best: %{
+        id: "baseline",
+        artifact: %{
+          id: "artifact-1",
+          kind: "prompt",
+          text: "Answer directly.",
+          parameters: %{main: "Answer directly."},
+          metadata: %{"external-note" => "kept"}
+        },
+        score: 1.0,
+        parent_id: nil,
+        mutation: "baseline",
+        diagnostics: [],
+        metadata: %{source: "atom-map"}
+      },
+      baseline: nil,
+      candidates: [],
+      errors: [],
+      metadata: %{"external-report-key" => "kept", artifact_kind: "prompt"}
+    }
+
+    report = Anything.Report.from_map(state)
+
+    assert report.best.artifact.kind == :prompt
+    assert report.best.artifact.parameters.main == "Answer directly."
+    assert report.best.artifact.metadata["external-note"] == "kept"
+    assert report.metadata.artifact_kind == :prompt
+    assert report.metadata["external-report-key"] == "kept"
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.Report\.from_map\/1 expects a map/,
+                 fn -> Anything.Report.from_map(:not_a_report) end
+
+    assert_raise ArgumentError,
+                 ~r/expects type "optimize_anything_report"/,
+                 fn -> Anything.Report.from_map(%{"type" => "wrong"}) end
+
+    assert_raise ArgumentError,
+                 ~r/:candidates expects a list/,
+                 fn ->
+                   Anything.Report.from_map(%{
+                     "type" => "optimize_anything_report",
+                     "candidates" => :not_a_list
+                   })
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/expects candidates to be maps or nil/,
+                 fn ->
+                   Anything.Report.from_map(%{
+                     "type" => "optimize_anything_report",
+                     "candidates" => [:bad_candidate]
+                   })
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/expects artifacts to be maps or nil/,
+                 fn ->
+                   Anything.Report.from_map(%{
+                     "type" => "optimize_anything_report",
+                     "candidates" => [%{"artifact" => :bad_artifact}]
+                   })
+                 end
+  end
+
   test "zero trials evaluate only the baseline artifact" do
     artifact = Anything.new_artifact(:prompt, "baseline")
 

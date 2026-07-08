@@ -52,13 +52,36 @@ defmodule DSEx.Optimize.Anything do
       }
     end
 
-    def from_map(%{"type" => "optimize_anything_report"} = state) do
+    def from_map(state) when is_map(state) do
+      case fetch_value(state, :type) do
+        "optimize_anything_report" ->
+          report_from_map(state)
+
+        other ->
+          raise ArgumentError,
+                "DSEx.Optimize.Anything.Report.from_map/1 expects type #{inspect("optimize_anything_report")}; got: #{inspect(other)}"
+      end
+    end
+
+    def from_map(state) do
+      raise ArgumentError,
+            "DSEx.Optimize.Anything.Report.from_map/1 expects a map; got: #{inspect(state)}"
+    end
+
+    defp report_from_map(state) do
       %__MODULE__{
-        best: candidate_from_map(state["best"]),
-        baseline: candidate_from_map(state["baseline"]),
-        candidates: Enum.map(state["candidates"] || [], &candidate_from_map/1),
-        errors: state["errors"] || [],
-        metadata: normalize_report_metadata(state["metadata"] || %{})
+        best: candidate_from_map(fetch_value(state, :best)),
+        baseline: candidate_from_map(fetch_value(state, :baseline)),
+        candidates:
+          state
+          |> fetch_value(:candidates, [])
+          |> require_list!("DSEx.Optimize.Anything.Report.from_map/1 :candidates")
+          |> Enum.map(&candidate_from_map/1),
+        errors: fetch_value(state, :errors, []),
+        metadata:
+          state
+          |> fetch_value(:metadata, %{})
+          |> normalize_report_metadata()
       }
     end
 
@@ -78,16 +101,21 @@ defmodule DSEx.Optimize.Anything do
 
     defp candidate_from_map(nil), do: nil
 
-    defp candidate_from_map(state) do
+    defp candidate_from_map(state) when is_map(state) do
       %Candidate{
-        id: state["id"],
-        artifact: artifact_from_map(state["artifact"]),
-        score: state["score"],
-        parent_id: state["parent_id"],
-        mutation: state["mutation"],
-        diagnostics: state["diagnostics"] || [],
-        metadata: normalize_keys(state["metadata"] || %{})
+        id: fetch_value(state, :id),
+        artifact: artifact_from_map(fetch_value(state, :artifact)),
+        score: fetch_value(state, :score),
+        parent_id: fetch_value(state, :parent_id),
+        mutation: fetch_value(state, :mutation),
+        diagnostics: fetch_value(state, :diagnostics, []),
+        metadata: state |> fetch_value(:metadata, %{}) |> normalize_keys()
       }
+    end
+
+    defp candidate_from_map(state) do
+      raise ArgumentError,
+            "DSEx.Optimize.Anything.Report.from_map/1 expects candidates to be maps or nil; got: #{inspect(state)}"
     end
 
     defp artifact_to_map(%Artifact{} = artifact) do
@@ -100,14 +128,21 @@ defmodule DSEx.Optimize.Anything do
       }
     end
 
-    defp artifact_from_map(state) do
+    defp artifact_from_map(nil), do: nil
+
+    defp artifact_from_map(state) when is_map(state) do
       %Artifact{
-        id: state["id"],
-        kind: existing_atom_or_string(state["kind"]),
-        text: state["text"],
-        parameters: normalize_keys(state["parameters"] || %{}),
-        metadata: normalize_keys(state["metadata"] || %{})
+        id: fetch_value(state, :id),
+        kind: state |> fetch_value(:kind) |> existing_atom_or_string(),
+        text: fetch_value(state, :text),
+        parameters: state |> fetch_value(:parameters, %{}) |> normalize_keys(),
+        metadata: state |> fetch_value(:metadata, %{}) |> normalize_keys()
       }
+    end
+
+    defp artifact_from_map(state) do
+      raise ArgumentError,
+            "DSEx.Optimize.Anything.Report.from_map/1 expects artifacts to be maps or nil; got: #{inspect(state)}"
     end
 
     defp stringify_keys(map), do: Map.new(map, fn {key, value} -> {to_string(key), value} end)
@@ -121,8 +156,31 @@ defmodule DSEx.Optimize.Anything do
       end)
     end
 
-    defp normalize_keys(map),
-      do: Map.new(map, fn {key, value} -> {existing_atom_or_string(to_string(key)), value} end)
+    defp normalize_keys(map) when is_map(map) or is_list(map) do
+      Map.new(map, fn
+        {key, value} -> {existing_atom_or_string(to_string(key)), value}
+        invalid -> invalid_key_value!(invalid)
+      end)
+    end
+
+    defp normalize_keys(value) do
+      raise ArgumentError,
+            "DSEx.Optimize.Anything.Report.from_map/1 expects metadata and parameters to be maps or key-value lists; got: #{inspect(value)}"
+    end
+
+    defp invalid_key_value!(invalid) do
+      raise ArgumentError,
+            "DSEx.Optimize.Anything.Report.from_map/1 expects metadata and parameters as key-value pairs; got entry: #{inspect(invalid)}"
+    end
+
+    defp require_list!(value, _context) when is_list(value), do: value
+
+    defp require_list!(value, context) do
+      raise ArgumentError, "#{context} expects a list; got: #{inspect(value)}"
+    end
+
+    defp fetch_value(map, key, default \\ nil) when is_atom(key),
+      do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
 
     defp existing_atom_or_string(value) when is_atom(value), do: value
 
