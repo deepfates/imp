@@ -16,7 +16,10 @@ defmodule DSEx.Datasets do
   ]
 
   @split_option_schema [
-    train: [type: :any, default: 0.8],
+    train: [
+      type: {:custom, __MODULE__, :validate_train_fraction, []},
+      default: 0.8
+    ],
     shuffle: [type: :boolean, default: true]
   ]
 
@@ -79,11 +82,17 @@ defmodule DSEx.Datasets do
   def split(examples, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @split_option_schema, "DSEx.Datasets.split/2")
     examples = validate_enumerable!(examples, "DSEx.Datasets.split/2", "examples")
-    train = train_fraction!(opts[:train])
+    train = opts[:train]
     shuffled = if opts[:shuffle], do: Enum.shuffle(examples), else: examples
     count = floor(length(shuffled) * train)
     Enum.split(shuffled, count)
   end
+
+  def validate_train_fraction(value) when is_number(value) and value >= 0 and value <= 1,
+    do: {:ok, value}
+
+  def validate_train_fraction(value),
+    do: {:error, "expected a number between 0.0 and 1.0, got: #{inspect(value)}"}
 
   @doc false
   def validate_path!(path, _context) when is_binary(path), do: path
@@ -197,14 +206,6 @@ defmodule DSEx.Datasets do
     :ok
   end
 
-  defp train_fraction!(value) when is_number(value) and value >= 0 and value <= 1,
-    do: value
-
-  defp train_fraction!(value) do
-    raise ArgumentError,
-          "dataset train split must be a number between 0.0 and 1.0, got: #{inspect(value)}"
-  end
-
   defp existing_keys(record),
     do: Map.new(record, fn {key, value} -> {normalize_key(key), value} end)
 
@@ -244,7 +245,10 @@ defmodule DSEx.Datasets.Dataset do
   defstruct train: [], dev: [], test: [], metadata: %{}
 
   @option_schema [
-    train: [type: :any, default: 0.8],
+    train: [
+      type: {:custom, DSEx.Datasets, :validate_train_fraction, []},
+      default: 0.8
+    ],
     shuffle: [type: :boolean, default: false],
     metadata: [type: {:map, :any, :any}, default: %{}]
   ]

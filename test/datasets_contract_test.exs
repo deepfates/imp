@@ -52,13 +52,23 @@ defmodule DatasetsContractTest do
       DSEx.example(question: "a", answer: "b") |> DSEx.with_inputs(:question)
     ]
 
-    assert_raise ArgumentError, ~r/train split must be a number between 0.0 and 1.0/, fn ->
-      Datasets.split(examples, train: 1.5)
-    end
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 fn ->
+                   Datasets.split(examples, train: 1.5)
+                 end
 
-    assert_raise ArgumentError, ~r/train split must be a number between 0.0 and 1.0/, fn ->
-      Datasets.Dataset.new(examples, train: -0.1)
-    end
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 fn ->
+                   Datasets.split(examples, train: "0.8")
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Datasets\.Dataset\.new\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 fn ->
+                   Datasets.Dataset.new(examples, train: -0.1)
+                 end
   end
 
   test "dataset APIs report invalid option containers clearly" do
