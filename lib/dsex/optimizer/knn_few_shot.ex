@@ -75,11 +75,16 @@ defmodule DSEx.Optimizer.KNNFewShot do
 
   defstruct [:knn, :bootstrap]
 
+  @option_schema [
+    field: [type: :any, default: :question]
+  ]
+
   def new(k, trainset, opts \\ []) do
     k = non_negative_integer(k)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.KNNFewShot.new/3")
 
     %__MODULE__{
-      knn: DSEx.Predict.KNN.new(k, trainset, field: Keyword.get(opts, :field, :question)),
+      knn: DSEx.Predict.KNN.new(k, trainset, field: opts[:field]),
       bootstrap: DSEx.Optimizer.LabeledFewShot.new(k: k)
     }
   end

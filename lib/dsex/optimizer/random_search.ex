@@ -40,11 +40,19 @@ defmodule DSEx.Optimizer.RandomSearch do
 
   defstruct [:metric, candidates: 8, demos_per_candidate: 4]
 
+  @option_schema [
+    candidates: [type: :any, default: 8],
+    demos_per_candidate: [type: :any, default: 4]
+  ]
+
   def new(metric, opts \\ []) do
+    validate_metric!(metric)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.RandomSearch.new/2")
+
     %__MODULE__{
       metric: metric,
-      candidates: non_negative_integer(Keyword.get(opts, :candidates, 8)),
-      demos_per_candidate: non_negative_integer(Keyword.get(opts, :demos_per_candidate, 4))
+      candidates: non_negative_integer(opts[:candidates]),
+      demos_per_candidate: non_negative_integer(opts[:demos_per_candidate])
     }
   end
 
@@ -145,6 +153,13 @@ defmodule DSEx.Optimizer.RandomSearch do
 
   defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
   defp non_negative_integer(_value), do: 0
+
+  defp validate_metric!(metric) when is_function(metric, 2) or is_function(metric, 3), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Optimizer.RandomSearch.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
+  end
 
   defp sampled_success_count(candidates),
     do: Enum.count(candidates, &(&1.index != :baseline))

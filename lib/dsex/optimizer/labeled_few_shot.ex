@@ -10,7 +10,14 @@ defmodule DSEx.Optimizer.LabeledFewShot do
 
   defstruct k: 4
 
-  def new(opts \\ []), do: %__MODULE__{k: non_negative_integer(Keyword.get(opts, :k, 4))}
+  @option_schema [
+    k: [type: :any, default: 4]
+  ]
+
+  def new(opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.LabeledFewShot.new/1")
+    %__MODULE__{k: non_negative_integer(opts[:k])}
+  end
 
   def compile(%__MODULE__{k: k}, program, trainset) do
     {demos, errors} = take_demos(trainset, k)

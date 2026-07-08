@@ -137,6 +137,50 @@ defmodule OptimizerReportTest do
     assert Enum.map(report.candidates, & &1.index) == [:baseline]
   end
 
+  test "optimizer constructors reject invalid option containers at the boundary" do
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.LabeledFewShot\.new\/1: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.LabeledFewShot.new(%{k: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.RandomSearch\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.RandomSearch.new(metric, %{candidates: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFewShot\.new\/2: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFewShot.new(metric, %{max_bootstrapped_demos: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3: expected keyword options/,
+                 fn ->
+                   DSEx.Optimizer.KNNFewShot.new(1, [], %{field: :question})
+                 end
+  end
+
+  test "search optimizer constructors reject invalid metric callbacks at the boundary" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.RandomSearch\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn ->
+                   DSEx.Optimizer.RandomSearch.new(fn _example -> true end)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFewShot\.new\/2 expects a metric function with arity 2/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFewShot.new(fn _example, _prediction, _trace ->
+                     true
+                   end)
+                 end
+  end
+
   test "random search returns the original program with diagnostics when all trials fail" do
     {train, _dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
