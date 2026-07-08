@@ -80,6 +80,22 @@ defmodule DSExFacadeTest do
              DSEx.Optimizer.Report.fetch(compiled)
   end
 
+  test "facade reports unsupported demos and optimizers clearly" do
+    assert_raise ArgumentError, ~r/DSEx\.with_demos\/2 supports Predict/, fn ->
+      DSEx.with_demos(:not_a_program, [])
+    end
+
+    program = DSEx.predict("question -> answer")
+
+    assert_raise ArgumentError, ~r/DSEx\.optimize\/3 expects an optimizer struct/, fn ->
+      DSEx.optimize(program, :not_an_optimizer, [])
+    end
+
+    assert_raise ArgumentError, ~r/DSEx\.optimize\/4 expects an optimizer struct/, fn ->
+      DSEx.optimize(program, :not_an_optimizer, [], [])
+    end
+  end
+
   test "call reports non-callable values instead of raising" do
     assert DSEx.call(%{}, %{question: "q"}) == {:error, {:not_callable, %{}}}
   end

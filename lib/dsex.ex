@@ -134,6 +134,11 @@ defmodule DSEx do
 
   def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
 
+  def with_demos(program_or_example, _demos) do
+    raise ArgumentError,
+          "DSEx.with_demos/2 supports Predict, ChainOfThought, RAG wrappers, and examples; got: #{inspect(program_or_example)}"
+  end
+
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
 
@@ -193,6 +198,11 @@ defmodule DSEx do
     end
   end
 
+  def optimize(_program, optimizer, _trainset) do
+    raise ArgumentError,
+          "DSEx.optimize/3 expects an optimizer struct with compile/3; got: #{inspect(optimizer)}"
+  end
+
   def optimize(program, optimizer, trainset, devset)
 
   def optimize(program, %module{} = optimizer, trainset, devset) do
@@ -207,6 +217,11 @@ defmodule DSEx do
         raise ArgumentError,
               "#{inspect(module)} is not a DSEx optimizer with compile/3 or compile/4"
     end
+  end
+
+  def optimize(_program, optimizer, _trainset, _devset) do
+    raise ArgumentError,
+          "DSEx.optimize/4 expects an optimizer struct with compile/4 or compile/3; got: #{inspect(optimizer)}"
   end
 
   @doc "Creates a ReqLLM-backed multi-provider LM client."
