@@ -115,6 +115,16 @@ defmodule MCPImportTest do
     def list_tools(%__MODULE__{result: result}), do: result
   end
 
+  defmodule RaisingCatalog do
+    defstruct []
+
+    def list_tools(%__MODULE__{}), do: raise("catalog exploded")
+  end
+
+  defmodule MissingToolsCatalog do
+    defstruct [:name]
+  end
+
   test "imports MCP-style catalog tools and runs them through an agent" do
     catalog =
       MCP.Catalog.new([
@@ -234,6 +244,18 @@ defmodule MCPImportTest do
     assert_raise ArgumentError, ~r/MCP catalog list_tools\/1 must return a list/, fn ->
       MCP.import_tools(%MalformedCatalog{result: %{tools: []}})
     end
+
+    assert_raise ArgumentError,
+                 ~r/MCP catalog .*RaisingCatalog.* list_tools\/1 failed: catalog exploded/,
+                 fn ->
+                   MCP.import_tools(%RaisingCatalog{})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/MCP catalog .*MissingToolsCatalog.* must export list_tools\/1 or contain a :tools field/,
+                 fn ->
+                   MCP.import_tools(%MissingToolsCatalog{name: :empty})
+                 end
 
     assert_raise ArgumentError, ~r/MCP tool schema must be a map/, fn ->
       MCP.import_tools(["not-a-tool-schema"])

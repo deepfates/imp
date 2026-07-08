@@ -435,12 +435,31 @@ defmodule DSEx.MCP do
 
   defp list_tools(%{__struct__: module} = catalog) do
     cond do
-      function_exported?(module, :list_tools, 1) -> module.list_tools(catalog)
-      true -> Map.fetch!(catalog, :tools)
+      Code.ensure_loaded?(module) and function_exported?(module, :list_tools, 1) ->
+        call_catalog(fn -> module.list_tools(catalog) end, module)
+
+      Map.has_key?(catalog, :tools) ->
+        Map.fetch!(catalog, :tools)
+
+      true ->
+        raise ArgumentError,
+              "MCP catalog #{inspect(module)} must export list_tools/1 or contain a :tools field"
     end
   end
 
   defp list_tools(tools) when is_list(tools), do: tools
+
+  defp call_catalog(fun, module) do
+    fun.()
+  rescue
+    error ->
+      raise ArgumentError,
+            "MCP catalog #{inspect(module)} list_tools/1 failed: #{Exception.message(error)}"
+  catch
+    kind, reason ->
+      raise ArgumentError,
+            "MCP catalog #{inspect(module)} list_tools/1 failed: #{inspect({kind, reason})}"
+  end
 
   defp validate_tool_list!(tools) when is_list(tools), do: tools
 
