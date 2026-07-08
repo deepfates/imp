@@ -1,4 +1,4 @@
-# DSEx 04: Local Gates And Live Provider Smoke
+# DSEx 05: Operate And Live Checks
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)

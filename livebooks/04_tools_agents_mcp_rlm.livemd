@@ -1,4 +1,4 @@
-# DSEx 03: Agents, Tools, MCP, And RLM
+# DSEx 04: Tools, Agents, MCP, And RLM
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)

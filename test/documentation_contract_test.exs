@@ -100,10 +100,27 @@ defmodule DocumentationContractTest do
   test "README teaches the new-app onboarding path" do
     body = File.read!("README.md")
 
+    assert body =~ "Program, don't prompt"
     assert body =~ "mix new qa_bot --sup"
     assert body =~ "DSEx.LM.Static"
     assert body =~ "DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat]"
     assert body =~ "OPENAI_MODEL"
+    assert body =~ "livebooks/01_real_lm_front_door.livemd"
+    refute body =~ "05_real_lm_wow_path"
+  end
+
+  test "docs teach the cutover Livebook sequence with real LM first" do
+    readme = File.read!("README.md")
+    docs = File.read!("docs/README.md")
+    learning = File.read!("docs/LEARNING_PATH.md")
+
+    assert readme =~ "- `01_real_lm_front_door.livemd`"
+    assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
+    assert learning =~ "Open `livebooks/01_real_lm_front_door.livemd`"
+
+    refute readme =~ "01_programming_not_prompting"
+    refute docs =~ "05 Real LM Wow Path"
+    refute learning =~ "Open `livebooks/02_programming_not_prompting.livemd`."
   end
 
   test "README distinguishes ReAct programs from agent runtimes in the quick path" do

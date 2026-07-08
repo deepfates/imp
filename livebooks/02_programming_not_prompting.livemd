@@ -1,4 +1,4 @@
-# DSEx 01: Programming, Not Prompting
+# DSEx 02: Programming, Not Prompting
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)

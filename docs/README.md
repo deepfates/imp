@@ -24,14 +24,16 @@ Elixir programs. This manual is organized by what you are trying to do.
 
 ## Learn By Running Code
 
-The notebooks in `livebooks/` are written to run with deterministic local LMs by
-default. The live-provider notebook has an explicit opt-in cell for `.env`
-credentials.
+The notebooks in `livebooks/` start with the real-provider shape, then show how
+to develop the same programs deterministically. Live-provider cells skip cleanly
+unless `OPENAI_API_KEY` and `OPENAI_MODEL` are present, so the notebooks remain
+safe in local gates.
 
-- [01 Programming, Not Prompting](../livebooks/01_programming_not_prompting.livemd)
-- [02 Evaluate And Optimize](../livebooks/02_evaluate_and_optimize.livemd)
-- [03 Agents, Tools, MCP, Recursive Control](../livebooks/03_agents_tools_mcp_rlm.livemd)
-- [04 Local Gates And Live Provider Smoke](../livebooks/04_local_gates_and_live_provider_smoke.livemd)
+- [01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)
+- [02 Programming, Not Prompting](../livebooks/02_programming_not_prompting.livemd)
+- [03 Evaluate And Optimize](../livebooks/03_evaluate_and_optimize.livemd)
+- [04 Tools, Agents, MCP, Recursive Control](../livebooks/04_tools_agents_mcp_rlm.livemd)
+- [05 Operate And Live Checks](../livebooks/05_operate_and_live_checks.livemd)
 
 ## Operate It
 
@@ -42,7 +44,7 @@ credentials.
 
 1. Follow the [30-minute path](LEARNING_PATH.md).
 2. Run the first example in [API Guide](API_GUIDE.md).
-3. Open [Livebook 01](../livebooks/01_programming_not_prompting.livemd).
+3. Open [Livebook 01](../livebooks/01_real_lm_front_door.livemd).
 4. Add one metric and one tiny dev set.
 5. From the source checkout, run `mix production.check` before trusting a change.
 6. From the source checkout, run `mix livebook.execute.check` after changing public examples or notebooks.

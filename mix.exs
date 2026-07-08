@@ -143,10 +143,11 @@ defmodule DSEx.MixProject do
 
   defp livebooks do
     [
-      "livebooks/01_programming_not_prompting.livemd",
-      "livebooks/02_evaluate_and_optimize.livemd",
-      "livebooks/03_agents_tools_mcp_rlm.livemd",
-      "livebooks/04_local_gates_and_live_provider_smoke.livemd"
+      "livebooks/01_real_lm_front_door.livemd",
+      "livebooks/02_programming_not_prompting.livemd",
+      "livebooks/03_evaluate_and_optimize.livemd",
+      "livebooks/04_tools_agents_mcp_rlm.livemd",
+      "livebooks/05_operate_and_live_checks.livemd"
     ]
   end
 

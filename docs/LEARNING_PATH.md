@@ -8,12 +8,14 @@ you with something runnable, inspectable, and testable.
 Goal: understand the shape of a DSEx program.
 
 1. Read the first example in `README.md`.
-2. Open `livebooks/01_programming_not_prompting.livemd`.
-3. Run a `Predict` program with `DSEx.LM.Static`.
-4. Inspect `prediction.metadata.trace.messages`.
-5. Change the signature from `question -> answer` to a typed output such as
+2. Open `livebooks/01_real_lm_front_door.livemd`.
+3. Run the live cells if `OPENAI_API_KEY` and `OPENAI_MODEL` are configured.
+4. Open `livebooks/02_programming_not_prompting.livemd` and run the same shape
+   with `DSEx.LM.Static`.
+5. Inspect `prediction.metadata.trace.messages`.
+6. Change the signature from `question -> answer` to a typed output such as
    `question -> answer: short_span`.
-6. If you are starting a real app, follow "Your First DSEx App" in `README.md`
+7. If you are starting a real app, follow "Your First DSEx App" in `README.md`
    and put the deterministic program under ExUnit before adding live providers.
 
 You should leave this step knowing that the prompt is generated from a
@@ -25,7 +27,7 @@ API.
 Goal: turn a prompt-like task into a measurable program.
 
 1. Read `docs/API_GUIDE.md` through "Optimize A Program".
-2. Open `livebooks/02_evaluate_and_optimize.livemd`.
+2. Open `livebooks/03_evaluate_and_optimize.livemd`.
 3. Build three examples and mark their input fields.
 4. Write one metric.
 5. Evaluate a baseline.

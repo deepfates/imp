@@ -1,13 +1,13 @@
 # DSEx
 
-Declarative, testable language-model programs for Elixir.
+Program, don't prompt, your LMs on the BEAM.
 
-DSEx lets you describe an LM task as a small typed signature, run it through
-ordinary Elixir data structures, evaluate it on examples, and improve it with
-optimizers. It is inspired by the DSPy family of ideas, but designed as an
-Elixir library: explicit structs, behaviours, OTP-friendly clients, supervised
-runtime boundaries, process-local configuration, and local quality gates you can
-run in CI.
+DSEx lets you describe an LM task as a typed signature, run it as an ordinary
+Elixir program, evaluate it on examples, improve it with optimizers, and save
+the result. It follows the DSPy philosophy of signatures, modules, tools, and
+compilers, but the shape is Elixir: explicit structs, behaviours,
+OTP-friendly clients, supervised runtime boundaries, process-local
+configuration, and local quality gates you can run in CI.
 
 Use DSEx when prompts have grown into application logic and you want them to
 become code: named inputs and outputs, schema validation, traces, metrics,
@@ -56,7 +56,8 @@ DSEx.get(prediction, :answer)
 #=> "Paris"
 ```
 
-Swap in a real provider by changing only the LM client:
+For the live-model version of the same idea, use ReqLLM and keep the program
+shape unchanged:
 
 ```elixir
 lm =
@@ -71,6 +72,11 @@ DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
 The program stays the same. That is the point: your task contract, adapters,
 metrics, and optimizers are ordinary Elixir values, while the LM is just a
 runtime dependency.
+
+For the canonical real-LM walkthrough, open
+`livebooks/01_real_lm_front_door.livemd`. It walks through structured extraction,
+changing modules, ReAct tools, evaluation, optimization, and save/load using
+`OPENAI_API_KEY` and `OPENAI_MODEL`.
 
 You can also build the same program without the pipe:
 
@@ -283,10 +289,11 @@ Start here:
 
 The `livebooks/` directory contains runnable tutorials:
 
-- `01_programming_not_prompting.livemd`
-- `02_evaluate_and_optimize.livemd`
-- `03_agents_tools_mcp_rlm.livemd`
-- `04_local_gates_and_live_provider_smoke.livemd`
+- `01_real_lm_front_door.livemd`
+- `02_programming_not_prompting.livemd`
+- `03_evaluate_and_optimize.livemd`
+- `04_tools_agents_mcp_rlm.livemd`
+- `05_operate_and_live_checks.livemd`
 
 ## Validation
 

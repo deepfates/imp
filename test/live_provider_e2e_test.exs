@@ -12,7 +12,7 @@ defmodule LiveProviderE2ETest do
 
     DSEx.req_llm(
       "openai:#{model}",
-      Keyword.merge([temperature: 0, max_completion_tokens: 120], opts)
+      Keyword.merge([api_key: api_key, temperature: 0, max_completion_tokens: 120], opts)
     )
   end
 
@@ -25,7 +25,7 @@ defmodule LiveProviderE2ETest do
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.ChainOfThought.call(program, %{
+             DSEx.call(program, %{
                question:
                  "Return JSON with reasoning and answer. Reason briefly, then set answer to exactly pong."
              })
@@ -39,6 +39,30 @@ defmodule LiveProviderE2ETest do
       |> String.downcase()
 
     assert String.contains?(answer, "pong")
+  end
+
+  test "live provider extracts structured event details through the front-door API" do
+    program =
+      DSEx.predict(
+        DSEx.signature(
+          "email -> event_name: string, date: string",
+          "Extract the event name and date from the email. Return JSON only."
+        ),
+        lm: live_lm(max_completion_tokens: 120),
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1]
+      )
+
+    assert {:ok, prediction} =
+             DSEx.call(program, %{
+               email: "Team Offsite moved to Thursday, June 5. Bring questions for planning."
+             })
+
+    event_name = prediction |> DSEx.get(:event_name, "") |> to_string() |> String.downcase()
+    date = prediction |> DSEx.get(:date, "") |> to_string() |> String.downcase()
+
+    assert event_name =~ "offsite"
+    assert date =~ "june" or date =~ "thursday" or date =~ "6/5" or date =~ "06-05"
   end
 
   test "live provider streams OpenAI-compatible chunks through DSEx.Streaming" do
@@ -99,7 +123,7 @@ defmodule LiveProviderE2ETest do
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.ReAct.call(agent, %{
+             DSEx.call(agent, %{
                question: "What is the capital of France?"
              })
 
@@ -118,7 +142,7 @@ defmodule LiveProviderE2ETest do
       )
 
     parallel_results =
-      DSEx.Predict.Parallel.map(
+      DSEx.parallel(
         base,
         [
           %{question: "Return JSON with answer exactly alpha."},
@@ -135,13 +159,13 @@ defmodule LiveProviderE2ETest do
     assert beta |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~ "beta"
 
     best =
-      DSEx.Predict.BestOfN.new(base, fn _example, prediction ->
+      DSEx.best_of_n(base, fn _example, prediction ->
         prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
           "pong"
       end)
 
     assert {:ok, best_prediction} =
-             DSEx.Predict.BestOfN.call(best, %{
+             DSEx.call(best, %{
                question: "Return JSON with answer exactly pong."
              })
 
@@ -149,13 +173,13 @@ defmodule LiveProviderE2ETest do
              "pong"
 
     refine =
-      DSEx.Predict.Refine.new(base, fn _example, prediction ->
+      DSEx.refine(base, fn _example, prediction ->
         prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
           "pong"
       end)
 
     assert {:ok, refined} =
-             DSEx.Predict.Refine.call(refine, %{
+             DSEx.call(refine, %{
                question: "Return JSON with answer exactly pong."
              })
 
@@ -172,7 +196,7 @@ defmodule LiveProviderE2ETest do
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.ProgramOfThought.call(program, %{
+             DSEx.call(program, %{
                question: "Return JSON with program exactly \"1 + 2\"."
              })
 

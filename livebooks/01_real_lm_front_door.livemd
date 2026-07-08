@@ -1,0 +1,182 @@
+# DSEx 01: Real LM Front Door
+
+```elixir
+repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
+Mix.install([{:dsex, path: repo}])
+```
+
+## Program, Don't Prompt
+
+This notebook is the DSEx front door. It mirrors the core DSP idea:
+declare a task, run it as a program, then grow the same task into tools,
+evaluation, optimization, and persistence.
+
+It expects `OPENAI_API_KEY` and `OPENAI_MODEL` in the environment. Without
+those variables the live cells return `{:skip, reason}` so the notebook remains
+safe to execute in local gates.
+
+```elixir
+live_lm = fn opts ->
+  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+    {:ok,
+     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+       Keyword.merge(
+         [
+           api_key: System.fetch_env!("OPENAI_API_KEY"),
+           temperature: 0,
+           max_completion_tokens: 180
+         ],
+         opts
+       )
+     )}
+  else
+    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live cells."}
+  end
+end
+```
+
+## Extract Structured Data
+
+```elixir
+case live_lm.(max_completion_tokens: 120) do
+  {:ok, lm} ->
+    extract =
+      DSEx.predict(
+        DSEx.signature(
+          "email -> event_name: string, date: string",
+          "Extract the event name and date from the email. Return JSON only."
+        ),
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1]
+      )
+
+    DSEx.call(extract, %{
+      email: "Team Offsite moved to Thursday, June 5. Bring questions for planning."
+    })
+
+  skip ->
+    skip
+end
+```
+
+## Change The Module, Keep The Task
+
+The task contract stays stable while the execution strategy changes.
+
+```elixir
+case live_lm.(max_completion_tokens: 160) do
+  {:ok, lm} ->
+    classify =
+      DSEx.chain_of_thought(
+        DSEx.signature(
+          "ticket -> reasoning: string, urgency: enum[low,high], team: string",
+          "Route the support ticket. Return JSON only."
+        ),
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1]
+      )
+
+    DSEx.call(classify, %{
+      ticket: "Production checkout is failing for all EU customers."
+    })
+
+  skip ->
+    skip
+end
+```
+
+## Add Tools With ReAct
+
+```elixir
+case live_lm.(max_completion_tokens: 180) do
+  {:ok, lm} ->
+    lookup =
+      DSEx.tool(:lookup, "Lookup a fact by query.", fn
+        %{query: "capital-france"} -> "Paris"
+        %{"query" => "capital-france"} -> "Paris"
+        other -> {:error, {:unexpected_query, other}}
+      end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{"query" => %{"type" => "string", "enum" => ["capital-france"]}},
+          "required" => ["query"]
+        }
+      )
+
+    react =
+      DSEx.react(
+        DSEx.signature(
+          "question -> answer",
+          """
+          Use lookup first with query "capital-france".
+          If lookup returns Paris, call submit with answer "Paris".
+          """
+        ),
+        [lookup],
+        lm: lm,
+        tool_policy: [:lookup, :submit],
+        max_iters: 4
+      )
+
+    DSEx.call(react, %{question: "What is the capital of France?"})
+
+  skip ->
+    skip
+end
+```
+
+## Evaluate And Compile
+
+Use deterministic examples to prove your metric and workflow before spending
+provider calls on larger runs.
+
+```elixir
+static_lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = DSEx.predict("question -> answer", lm: static_lm)
+
+trainset = [
+  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
+
+devset = [
+  DSEx.example(question: "Capital of France?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
+
+metric = DSEx.exact_match(:answer)
+
+compiled =
+  program
+  |> DSEx.optimize(
+    DSEx.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
+    trainset,
+    devset
+  )
+
+{DSEx.evaluate(program, devset, metric).score, DSEx.evaluate(compiled, devset, metric).score}
+```
+
+## Save Without Secrets
+
+```elixir
+case live_lm.(temperature: 0) do
+  {:ok, lm} ->
+    program = DSEx.predict("question -> answer", lm: lm)
+    state = DSEx.dump(program)
+
+    %{
+      credential_leaked?: inspect(state) =~ System.fetch_env!("OPENAI_API_KEY"),
+      loadable?: match?(%{__struct__: DSEx.Predict.Predict}, DSEx.load(state))
+    }
+
+  skip ->
+    skip
+end
+```

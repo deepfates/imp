@@ -1,4 +1,4 @@
-# DSEx 02: Evaluate And Optimize
+# DSEx 03: Evaluate And Optimize
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)

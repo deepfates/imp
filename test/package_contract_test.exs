@@ -9,7 +9,8 @@ defmodule PackageContractTest do
     "lib/dsex/lm/static.ex",
     "README.md",
     "docs/API_GUIDE.md",
-    "livebooks/01_programming_not_prompting.livemd"
+    "livebooks/01_real_lm_front_door.livemd",
+    "livebooks/02_programming_not_prompting.livemd"
   ]
 
   @excluded_prefixes [

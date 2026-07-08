@@ -45,6 +45,10 @@ This delegates provider/model lookup, Req/Finch transport, streaming, and
 provider option translation to the Elixir `req_llm` ecosystem. DSEx still owns
 the signature, adapter, optimizer, evaluation, and trace vocabulary.
 
+For a runnable real-provider walkthrough, open
+`livebooks/01_real_lm_front_door.livemd`. It is the best first stop after this
+guide when you want the "this is actually an LM program" moment.
+
 ## Basic Predict
 
 ```elixir
