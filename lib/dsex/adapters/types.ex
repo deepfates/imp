@@ -1,5 +1,12 @@
 defmodule DSEx.Adapters.Types do
-  @moduledoc "Lightweight multimodal and tool-call value structs matching DSEx's adapter vocabulary."
+  @moduledoc """
+  Lightweight multimodal and tool-call value structs matching DSEx's adapter vocabulary.
+
+  The conversion helpers are deliberately permissive for plain text values and
+  deliberately strict for DSEx's typed structs. A free-form value can be rendered
+  as text, but a `%File{}` without `:path`, `:url`, or `:data` is a malformed
+  attachment and should fail at this boundary instead of becoming provider text.
+  """
 
   defmodule Image, do: defstruct([:url, :data, :mime_type, metadata: %{}])
   defmodule Audio, do: defstruct([:url, :data, :mime_type, metadata: %{}])
@@ -23,12 +30,16 @@ defmodule DSEx.Adapters.Types do
     %{type: "image_url", image_url: %{url: data_uri(mime_type || "image/png", data)}}
   end
 
+  def to_openai(%Image{} = image), do: invalid_type!(Image, "binary :url or binary :data", image)
+
   def to_openai(%Audio{data: data, mime_type: mime_type}) when is_binary(data) do
     %{
       type: "input_audio",
       input_audio: %{data: strip_data_uri(data), format: media_format(mime_type || "audio/wav")}
     }
   end
+
+  def to_openai(%Audio{} = audio), do: invalid_type!(Audio, "binary :data", audio)
 
   def to_openai(%File{url: url}) when is_binary(url) do
     %{type: "file", file: %{file_url: url}}
@@ -43,20 +54,37 @@ defmodule DSEx.Adapters.Types do
     %{type: "file", file: %{file_data: data_uri(mime_type || "application/octet-stream", data)}}
   end
 
-  def to_openai(%Document{text: text, metadata: metadata}) do
+  def to_openai(%File{} = file),
+    do: invalid_type!(File, "binary :url, binary :path, or binary :data", file)
+
+  def to_openai(%Document{text: text, metadata: metadata})
+      when is_binary(text) and is_map(metadata) do
     %{type: "text", text: metadata_prefix(metadata) <> to_string(text)}
   end
 
-  def to_openai(%Code{code: code, language: language}) do
+  def to_openai(%Document{} = document),
+    do: invalid_type!(Document, "binary :text and map :metadata", document)
+
+  def to_openai(%Code{code: code, language: language}) when is_binary(code) do
     fence = language || ""
     %{type: "text", text: "```#{fence}\n#{code}\n```"}
   end
 
-  def to_openai(%Reasoning{text: text}), do: %{type: "text", text: to_string(text)}
-  def to_openai(%History{messages: messages}), do: Enum.map(messages, &message_to_openai/1)
+  def to_openai(%Code{} = code), do: invalid_type!(Code, "binary :code", code)
 
-  def to_openai(%Citation{text: text, source: source}),
+  def to_openai(%Reasoning{text: text}) when is_binary(text), do: %{type: "text", text: text}
+  def to_openai(%Reasoning{} = reasoning), do: invalid_type!(Reasoning, "binary :text", reasoning)
+
+  def to_openai(%History{messages: messages}) when is_list(messages),
+    do: Enum.map(messages, &message_to_openai/1)
+
+  def to_openai(%History{} = history), do: invalid_type!(History, "list :messages", history)
+
+  def to_openai(%Citation{text: text, source: source}) when is_binary(text) and is_binary(source),
     do: %{type: "text", text: "#{text}\nSource: #{source}"}
+
+  def to_openai(%Citation{} = citation),
+    do: invalid_type!(Citation, "binary :text and binary :source", citation)
 
   def to_openai(%Type{value: value}), do: to_openai(value)
   def to_openai(text) when is_binary(text), do: %{type: "text", text: text}
@@ -100,7 +128,15 @@ defmodule DSEx.Adapters.Types do
     %{role: to_string(role), content: content_to_openai(content)}
   end
 
-  defp message_to_openai(message), do: message
+  defp message_to_openai(message) do
+    raise ArgumentError,
+          "DSEx.Adapters.Types.History messages must be maps with :role and :content; got: #{inspect(message)}"
+  end
+
+  defp invalid_type!(module, expectation, value) do
+    raise ArgumentError,
+          "#{inspect(Module.concat(__MODULE__, module))} expects #{expectation}; got: #{inspect(value)}"
+  end
 
   defp metadata_prefix(metadata) when map_size(metadata) == 0, do: ""
   defp metadata_prefix(metadata), do: "[metadata: #{Jason.encode!(metadata)}]\n"

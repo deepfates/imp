@@ -63,4 +63,27 @@ defmodule MultimodalAdapterTest do
              %Types.Document{text: "notes"}
            ] = decoded
   end
+
+  test "reports malformed typed content at the adapter boundary" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Adapters\.Types\.File expects binary :url, binary :path, or binary :data/,
+                 fn -> Types.to_openai(%Types.File{}) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Adapters\.Types\.Image expects binary :url or binary :data/,
+                 fn -> Types.to_openai(%Types.Image{url: 123}) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Adapters\.Types\.Document expects binary :text and map :metadata/,
+                 fn -> Types.to_openai(%Types.Document{text: nil}) end
+
+    assert_raise ArgumentError,
+                 ~r/History messages must be maps with :role and :content/,
+                 fn -> Types.to_openai(%Types.History{messages: [:bad_message]}) end
+  end
+
+  test "keeps plain fallback values textual without hiding malformed DSEx structs" do
+    assert Types.to_openai(%{arbitrary: :value}) == %{type: "text", text: "%{arbitrary: :value}"}
+    assert Types.content_to_openai("hello") == [%{type: "text", text: "hello"}]
+  end
 end
