@@ -12,32 +12,76 @@ defmodule DSEx.HTTP do
 
   def post(transport, url, headers, body, opts \\ [])
 
-  def post(module, url, headers, body, opts) when is_atom(module),
-    do: module.post(url, headers, body, opts)
+  def post(transport, url, headers, body, opts) do
+    opts = validate_opts!(opts, "DSEx.HTTP.post/5")
+    do_post(transport, url, headers, body, opts)
+  end
 
-  def post(fun, url, headers, body, opts) when is_function(fun, 4),
-    do: fun.(url, headers, body, opts)
-
-  def stream(transport, url, headers, body, opts \\ [])
-
-  def stream(module, url, headers, body, opts) when is_atom(module) do
-    if function_exported?(module, :stream, 4) do
-      module.stream(url, headers, body, opts)
+  defp do_post(module, url, headers, body, opts) when is_atom(module) do
+    if function_exported?(module, :post, 4) do
+      module.post(url, headers, body, opts)
     else
-      Stream.resource(
-        fn -> post(module, url, headers, body, opts) end,
-        fn
-          {:ok, %{body: response}} -> {[response], :done}
-          {:error, reason} -> {[{:error, reason}], :done}
-          :done -> {:halt, :done}
-        end,
-        fn _ -> :ok end
-      )
+      {:error, {:not_http_transport, module}}
     end
   end
 
-  def stream(fun, url, headers, body, opts) when is_function(fun, 4),
+  defp do_post(fun, url, headers, body, opts) when is_function(fun, 4),
+    do: fun.(url, headers, body, opts)
+
+  defp do_post(transport, _url, _headers, _body, _opts),
+    do: {:error, {:not_http_transport, transport}}
+
+  def stream(transport, url, headers, body, opts \\ [])
+
+  def stream(transport, url, headers, body, opts) do
+    opts = validate_opts!(opts, "DSEx.HTTP.stream/5")
+    do_stream(transport, url, headers, body, opts)
+  end
+
+  defp do_stream(module, url, headers, body, opts) when is_atom(module) do
+    cond do
+      function_exported?(module, :stream, 4) ->
+        module.stream(url, headers, body, opts)
+
+      function_exported?(module, :post, 4) ->
+        post_stream(module, url, headers, body, opts)
+
+      true ->
+        error_stream({:not_http_transport, module})
+    end
+  end
+
+  defp do_stream(fun, url, headers, body, opts) when is_function(fun, 4),
     do: Stream.map([fun.(url, headers, body, opts)], & &1)
+
+  defp do_stream(transport, _url, _headers, _body, _opts),
+    do: error_stream({:not_http_transport, transport})
+
+  defp post_stream(module, url, headers, body, opts) do
+    Stream.resource(
+      fn -> post(module, url, headers, body, opts) end,
+      fn
+        {:ok, %{body: response}} -> {[response], :done}
+        {:error, reason} -> {[{:error, reason}], :done}
+        :done -> {:halt, :done}
+      end,
+      fn _ -> :ok end
+    )
+  end
+
+  defp error_stream(reason), do: Stream.map([{:error, reason}], & &1)
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+  end
 end
 
 defmodule DSEx.HTTP.Hackneyless do
@@ -54,6 +98,8 @@ defmodule DSEx.HTTP.Hackneyless do
 
   @impl true
   def post(url, headers, body, opts) do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.post/4")
+
     :inets.start()
     :ssl.start()
 
@@ -79,16 +125,20 @@ defmodule DSEx.HTTP.Hackneyless do
   end
 
   def secure_http_opts(http_opts) do
+    validate_nested_opts!(http_opts, "#{inspect(__MODULE__)}.secure_http_opts/1")
+
     Keyword.update(http_opts, :ssl, default_ssl_opts(), fn ssl_opts ->
       Keyword.merge(default_ssl_opts(), ssl_opts)
     end)
   end
 
   def http_opts(opts) do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.http_opts/1")
     timeout = Keyword.get(opts, :timeout, @default_timeout)
+    http_opts = Keyword.get(opts, :http_opts, [])
+    validate_nested_opts!(http_opts, "#{inspect(__MODULE__)}.http_opts/1 :http_opts")
 
-    opts
-    |> Keyword.get(:http_opts, [])
+    http_opts
     |> Keyword.put_new(:timeout, timeout)
     |> Keyword.put_new(:connect_timeout, timeout)
     |> secure_http_opts()
@@ -118,5 +168,27 @@ defmodule DSEx.HTTP.Hackneyless do
       "/etc/pki/tls/certs/ca-bundle.crt",
       "/etc/ssl/ca-bundle.pem"
     ]
+  end
+
+  defp validate_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_nested_opts!(opts, context) when is_list(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "#{context} expects a keyword list, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_nested_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects a keyword list, got: #{inspect(opts)}"
   end
 end

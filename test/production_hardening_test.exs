@@ -54,6 +54,10 @@ defmodule ProductionHardeningTest do
     end
   end
 
+  defmodule PostOnlyTransport do
+    def post(_url, _headers, _body, _opts), do: {:ok, %{status: 200, body: "ok", headers: []}}
+  end
+
   test "ReqLLM-backed LM reports provider failures without caching them" do
     Process.delete(:flaky_count)
 
@@ -208,6 +212,35 @@ defmodule ProductionHardeningTest do
     Task.await(task, 6_000)
     :ssl.close(listen_socket)
     File.rm_rf!(dir)
+  end
+
+  test "HTTP transport boundary rejects malformed options and unknown transports explicitly" do
+    assert_raise ArgumentError, ~r/DSEx.HTTP.post\/5 expects keyword options/, fn ->
+      DSEx.HTTP.post(PostOnlyTransport, "https://example.test", [], "{}", %{timeout: 1})
+    end
+
+    assert_raise ArgumentError, ~r/DSEx.HTTP.stream\/5 expects keyword options/, fn ->
+      DSEx.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [:timeout])
+    end
+
+    assert {:error, {:not_http_transport, :not_a_transport}} =
+             DSEx.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
+
+    assert [{:error, {:not_http_transport, :not_a_transport}}] =
+             DSEx.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
+             |> Enum.to_list()
+
+    assert ["ok"] =
+             DSEx.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [])
+             |> Enum.to_list()
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.HTTP.Hackneyless.http_opts\/1 expects keyword options/,
+                 fn -> DSEx.HTTP.Hackneyless.http_opts(%{timeout: 1}) end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.HTTP.Hackneyless.http_opts\/1 :http_opts expects a keyword list/,
+                 fn -> DSEx.HTTP.Hackneyless.http_opts(http_opts: %{timeout: 1}) end
   end
 
   test "invalid test harness provider mode fails closed" do
