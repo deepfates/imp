@@ -12,7 +12,7 @@ defmodule DSEx.Predict.BestOfN do
     }
 
   def call(%__MODULE__{} = best, inputs) do
-    1..best.n
+    attempts(best.n)
     |> Enum.map(fn _ -> DSEx.Module.call(best.program, inputs) end)
     |> Enum.filter(&match?({:ok, _}, &1))
     |> Enum.map(fn {:ok, prediction} -> prediction end)
@@ -27,6 +27,9 @@ defmodule DSEx.Predict.BestOfN do
          |> attach_feedback(best.feedback_fn, predictions)}
     end
   end
+
+  defp attempts(n) when is_integer(n) and n > 0, do: 1..n
+  defp attempts(_n), do: []
 
   defp score(metric, prediction) do
     metric.(%DSEx.Example{}, prediction) |> DSEx.Metrics.score()

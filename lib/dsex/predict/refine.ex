@@ -12,9 +12,10 @@ defmodule DSEx.Predict.Refine do
     }
 
   def call(%__MODULE__{} = refine, inputs) do
-    Enum.reduce_while(1..refine.max_attempts, {:error, :no_attempts, []}, fn attempt,
-                                                                             {_status, _last,
-                                                                              history} ->
+    Enum.reduce_while(attempts(refine.max_attempts), {:error, :no_attempts, []}, fn attempt,
+                                                                                    {_status,
+                                                                                     _last,
+                                                                                     history} ->
       inputs = maybe_add_hint(inputs, refine.feedback_fn, history)
 
       case DSEx.Module.call(refine.program, inputs) do
@@ -37,6 +38,11 @@ defmodule DSEx.Predict.Refine do
         other
     end
   end
+
+  defp attempts(max_attempts) when is_integer(max_attempts) and max_attempts > 0,
+    do: 1..max_attempts
+
+  defp attempts(_max_attempts), do: []
 
   defp maybe_add_hint(inputs, nil, _history), do: inputs
   defp maybe_add_hint(inputs, _feedback_fn, []), do: inputs
