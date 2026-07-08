@@ -44,9 +44,15 @@ defmodule DSEx.Predict.Aggregation do
   - `:field` extracts a field from predictions or maps before voting.
   - `:normalize` supplies a custom one-argument grouping function.
   """
+  @option_schema [
+    field: [type: :any, default: nil],
+    normalize: [type: :any, default: &__MODULE__.default_normalize/1]
+  ]
+
   def majority(predictions, opts \\ []) do
-    field = Keyword.get(opts, :field)
-    normalize = Keyword.get(opts, :normalize, &default_normalize/1)
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.Aggregation.majority/2")
+    field = opts[:field]
+    normalize = validate_normalize!(opts[:normalize])
 
     predictions
     |> Enum.map(&value_for(&1, field))
@@ -55,6 +61,13 @@ defmodule DSEx.Predict.Aggregation do
     |> Enum.max_by(fn {_key, values} -> length(values) end, fn -> {nil, []} end)
     |> elem(1)
     |> List.first()
+  end
+
+  defp validate_normalize!(normalize) when is_function(normalize, 1), do: normalize
+
+  defp validate_normalize!(normalize) do
+    raise ArgumentError,
+          "DSEx.Predict.Aggregation.majority/2 expects :normalize to be a unary function; got: #{inspect(normalize)}"
   end
 
   defp value_for(%DSEx.Prediction{} = prediction, nil), do: prediction

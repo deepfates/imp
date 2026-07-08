@@ -144,4 +144,42 @@ defmodule RefineFeedbackTest do
              DSEx.Predict.BestOfN.new(%ExplodingProgram{}, metric, n: -3)
              |> DSEx.Predict.BestOfN.call(%{question: "q"})
   end
+
+  test "BestOfN reports invalid constructor inputs clearly" do
+    metric = fn _example, _prediction -> true end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.BestOfN\.new\/3: expected keyword options/,
+                 fn ->
+                   DSEx.Predict.BestOfN.new(%HintProgram{}, metric, :not_options)
+                 end
+
+    assert_raise ArgumentError, ~r/BestOfN\.new\/3 expects a metric function with arity 2/, fn ->
+      DSEx.Predict.BestOfN.new(%HintProgram{}, :not_a_metric)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/BestOfN\.new\/3 expects :feedback_fn to be nil or a unary function/,
+                 fn ->
+                   DSEx.Predict.BestOfN.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
+                 end
+  end
+
+  test "Refine reports invalid constructor inputs clearly" do
+    metric = fn _example, _prediction -> true end
+
+    assert_raise ArgumentError, ~r/DSEx\.Predict\.Refine\.new\/3: expected keyword options/, fn ->
+      DSEx.Predict.Refine.new(%HintProgram{}, metric, :not_options)
+    end
+
+    assert_raise ArgumentError, ~r/Refine\.new\/3 expects a metric function with arity 2/, fn ->
+      DSEx.Predict.Refine.new(%HintProgram{}, :not_a_metric)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/Refine\.new\/3 expects :feedback_fn to be nil or a unary function/,
+                 fn ->
+                   DSEx.Predict.Refine.new(%HintProgram{}, metric, feedback_fn: :not_a_function)
+                 end
+  end
 end

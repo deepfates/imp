@@ -3,13 +3,23 @@ defmodule DSEx.Predict.BestOfN do
 
   defstruct [:program, :metric, :feedback_fn, n: 3]
 
-  def new(program, metric, opts \\ []),
-    do: %__MODULE__{
+  @option_schema [
+    n: [type: :any, default: 3],
+    feedback_fn: [type: :any, default: nil]
+  ]
+
+  def new(program, metric, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.BestOfN.new/3")
+    validate_metric!(metric)
+    validate_feedback_fn!(opts[:feedback_fn])
+
+    %__MODULE__{
       program: program,
       metric: metric,
-      n: Keyword.get(opts, :n, 3),
-      feedback_fn: Keyword.get(opts, :feedback_fn)
+      n: opts[:n],
+      feedback_fn: opts[:feedback_fn]
     }
+  end
 
   def call(%__MODULE__{} = best, inputs) do
     attempts(best.n)
@@ -30,6 +40,21 @@ defmodule DSEx.Predict.BestOfN do
 
   defp attempts(n) when is_integer(n) and n > 0, do: 1..n
   defp attempts(_n), do: []
+
+  defp validate_metric!(metric) when is_function(metric, 2), do: :ok
+
+  defp validate_metric!(metric) do
+    raise ArgumentError,
+          "DSEx.Predict.BestOfN.new/3 expects a metric function with arity 2; got: #{inspect(metric)}"
+  end
+
+  defp validate_feedback_fn!(nil), do: :ok
+  defp validate_feedback_fn!(feedback_fn) when is_function(feedback_fn, 1), do: :ok
+
+  defp validate_feedback_fn!(feedback_fn) do
+    raise ArgumentError,
+          "DSEx.Predict.BestOfN.new/3 expects :feedback_fn to be nil or a unary function; got: #{inspect(feedback_fn)}"
+  end
 
   defp score(metric, prediction) do
     metric
