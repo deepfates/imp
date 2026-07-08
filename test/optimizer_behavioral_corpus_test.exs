@@ -372,6 +372,33 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.status == :baseline_only
   end
 
+  test "COPRO records instruction proposal failures without aborting rounds" do
+    program = france_program()
+
+    compiled =
+      DSEx.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
+      |> DSEx.Optimizer.COPRO.compile(program, [:not_an_example], devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :copro
+    assert report.metadata.status == :with_errors
+    assert report.metadata.depth == 1
+    assert [_round] = report.metadata.rounds
+
+    assert [
+             %{
+               stage: :instruction_proposal,
+               reason: reason,
+               round: 1
+             }
+             | _rest
+           ] = report.errors
+
+    assert String.contains?(reason, "function clause")
+    assert Enum.any?(report.candidates, &(&1.round == 1))
+  end
+
   test "advanced optimizer constructors reject invalid option containers at the boundary" do
     assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.COPRO\.new\/2: expected keyword options/,

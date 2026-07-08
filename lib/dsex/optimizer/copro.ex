@@ -58,14 +58,12 @@ defmodule DSEx.Optimizer.COPRO do
     {compiled, round_reports} =
       1..optimizer.depth
       |> Enum.reduce({program, []}, fn round, {current, reports} ->
-        candidates =
-          current
-          |> DSEx.Optimizer.InstructionSearch.candidate_instructions(trainset,
+        {candidates, proposal_errors} =
+          candidate_instructions(current, trainset,
             lm: optimizer.proposer_lm,
             scores: round_score_summary(reports),
             extra_instructions: optimizer.extra_instructions
           )
-          |> Enum.take(optimizer.breadth)
 
         next =
           DSEx.Optimizer.InstructionSearch.compile(
@@ -73,11 +71,17 @@ defmodule DSEx.Optimizer.COPRO do
             optimizer.metric,
             trainset,
             devset,
-            candidates
+            Enum.take(candidates, optimizer.breadth)
           )
 
         report = DSEx.Optimizer.Report.fetch(next)
-        {next, reports ++ [Map.put(report, :metadata, Map.put(report.metadata, :round, round))]}
+
+        report =
+          report
+          |> Map.update!(:errors, &(proposal_errors ++ &1))
+          |> Map.put(:metadata, Map.put(report.metadata, :round, round))
+
+        {next, reports ++ [report]}
       end)
 
     final_report = List.last(round_reports)
@@ -93,13 +97,36 @@ defmodule DSEx.Optimizer.COPRO do
             round = report.metadata.round
             Enum.map(report.candidates, &Map.put(&1, :round, round))
           end),
+        errors:
+          Enum.flat_map(round_reports, fn report ->
+            round = report.metadata.round
+            Enum.map(report.errors, &Map.put(&1, :round, round))
+          end),
         metadata: %{
           breadth: optimizer.breadth,
           depth: optimizer.depth,
-          rounds: round_reports
+          rounds: round_reports,
+          status: if(Enum.any?(round_reports, &(&1.errors != [])), do: :with_errors, else: :ok)
         }
       })
     )
+  end
+
+  defp candidate_instructions(program, trainset, opts) do
+    {DSEx.Optimizer.InstructionSearch.candidate_instructions(program, trainset, opts), []}
+  rescue
+    error ->
+      {fallback_candidate(program, opts),
+       [%{stage: :instruction_proposal, reason: error_message(error)}]}
+  catch
+    kind, reason ->
+      {fallback_candidate(program, opts),
+       [%{stage: :instruction_proposal, reason: error_message({kind, reason})}]}
+  end
+
+  defp fallback_candidate(program, opts) do
+    base = DSEx.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
+    [base | Keyword.get(opts, :extra_instructions, [])]
   end
 
   defp round_score_summary(reports) do
@@ -117,4 +144,7 @@ defmodule DSEx.Optimizer.COPRO do
     raise ArgumentError,
           "DSEx.Optimizer.COPRO.new/2 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
