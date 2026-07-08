@@ -112,6 +112,8 @@ defmodule PublicSurfaceTest do
     DSEx.Signature.Field,
     DSEx.Streaming,
     DSEx.Streaming.Messages,
+    DSEx.Streaming.Messages.StreamListener,
+    DSEx.Streaming.Messages.StreamResponse,
     DSEx.Streaming.Messages.StatusMessage,
     DSEx.Streaming.Messages.StatusMessageProvider,
     DSEx.Tasks,
@@ -601,6 +603,15 @@ defmodule PublicSurfaceTest do
       )
 
     assert length(provider.messages) == 1
+
+    listener =
+      %DSEx.Streaming.Messages.StreamListener{}
+      |> DSEx.Streaming.Messages.StreamListener.record(:chunk)
+
+    assert listener.events == [:chunk]
+
+    assert %DSEx.Streaming.Messages.StreamResponse{chunk: "ok", done: true} =
+             %DSEx.Streaming.Messages.StreamResponse{chunk: "ok", done: true}
 
     examples =
       DSEx.Datasets.Colors.load([

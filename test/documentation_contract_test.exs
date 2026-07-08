@@ -215,6 +215,23 @@ defmodule DocumentationContractTest do
     assert coverage =~ "one numeric vector per input text"
   end
 
+  test "streaming response structs are deliberate public vocabulary" do
+    assert match?(
+             {:docs_v1, _, _, _, %{"en" => _}, _, _},
+             Code.fetch_docs(DSEx.Streaming.Messages)
+           )
+
+    assert match?(
+             {:docs_v1, _, _, _, %{"en" => _}, _, _},
+             Code.fetch_docs(DSEx.Streaming.Messages.StreamResponse)
+           )
+
+    assert match?(
+             {:docs_v1, _, _, _, %{"en" => _}, _, _},
+             Code.fetch_docs(DSEx.Streaming.Messages.StreamListener)
+           )
+  end
+
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
 
