@@ -13,14 +13,46 @@ defmodule DSEx.Embeddings do
 
   defp dispatch(module, texts, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :embed, 2) do
-      module.embed(texts, opts)
+      call_embedder(fn -> module.embed(texts, opts) end, module)
     else
       {:error, {:not_embedding_provider, module}}
     end
   end
 
-  defp dispatch(fun, texts, opts) when is_function(fun, 2), do: fun.(texts, opts)
+  defp dispatch(fun, texts, opts) when is_function(fun, 2),
+    do: call_embedder(fn -> fun.(texts, opts) end, :anonymous_embedder)
+
   defp dispatch(embedder, _texts, _opts), do: {:error, {:not_embedding_provider, embedder}}
+
+  defp call_embedder(fun, provider) do
+    case fun.() do
+      {:ok, vectors} when is_list(vectors) ->
+        if valid_vectors?(vectors) do
+          {:ok, vectors}
+        else
+          {:error, {:invalid_embedding_result, vectors}}
+        end
+
+      {:error, _reason} = error ->
+        error
+
+      other ->
+        {:error, {:invalid_embedding_result, other}}
+    end
+  rescue
+    error ->
+      {:error, {:embedding_provider_failed, provider, Exception.message(error)}}
+  catch
+    kind, reason ->
+      {:error, {:embedding_provider_failed, provider, {kind, reason}}}
+  end
+
+  defp valid_vectors?(vectors) do
+    Enum.all?(vectors, fn
+      vector when is_list(vector) -> Enum.all?(vector, &is_number/1)
+      _other -> false
+    end)
+  end
 
   defmodule BagOfWords do
     @moduledoc "Deterministic hashing bag-of-words embedder."

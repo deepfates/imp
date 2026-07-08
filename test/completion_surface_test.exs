@@ -1,6 +1,12 @@
 defmodule CompletionSurfaceTest do
   use ExUnit.Case
 
+  defmodule RaisingEmbedder do
+    @behaviour DSEx.Embeddings
+
+    def embed(_texts, _opts), do: raise("embed exploded")
+  end
+
   setup do
     DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
     :ok
@@ -466,13 +472,24 @@ defmodule CompletionSurfaceTest do
                    DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, [:beam], dims: 8)
                  end
 
-    assert_raise ArgumentError,
-                 ~r/DSEx.Embeddings.BagOfWords.embed\/2: invalid value for :dims/,
-                 fn ->
-                   DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, ["beam"], dims: 0)
-                 end
+    assert {:error,
+            {:embedding_provider_failed, DSEx.Embeddings.BagOfWords,
+             "DSEx.Embeddings.BagOfWords.embed/2: invalid value for :dims option: expected positive integer, got: 0"}} =
+             DSEx.Embeddings.embed(DSEx.Embeddings.BagOfWords, ["beam"], dims: 0)
 
     assert {:error, {:not_embedding_provider, :not_an_embedder}} =
              DSEx.Embeddings.embed(:not_an_embedder, ["beam"], [])
+
+    assert {:error, {:invalid_embedding_result, :not_a_result}} =
+             DSEx.Embeddings.embed(fn _texts, _opts -> :not_a_result end, ["beam"], [])
+
+    assert {:error, {:invalid_embedding_result, [[1.0, "bad"]]}} =
+             DSEx.Embeddings.embed(fn _texts, _opts -> {:ok, [[1.0, "bad"]]} end, ["beam"], [])
+
+    assert {:error, {:embedding_provider_failed, :anonymous_embedder, "embed exploded"}} =
+             DSEx.Embeddings.embed(fn _texts, _opts -> raise "embed exploded" end, ["beam"], [])
+
+    assert {:error, {:embedding_provider_failed, RaisingEmbedder, "embed exploded"}} =
+             DSEx.Embeddings.embed(RaisingEmbedder, ["beam"], [])
   end
 end
