@@ -22,6 +22,24 @@ defmodule DSEx.Adapters.Types do
   defmodule ToolCalls, do: defstruct(tool_calls: [])
   defmodule ToolCallResults, do: defstruct(tool_call_results: [])
 
+  @doc """
+  Converts one DSEx content value into an OpenAI-compatible content block.
+
+  Typed DSEx structs are validated strictly. Plain strings and unknown values
+  are still rendered as text, which keeps simple prompts ergonomic while making
+  malformed attachments visible.
+
+      iex> alias DSEx.Adapters.Types
+      iex> Types.to_openai(%Types.Image{url: "https://example.com/cat.png"})
+      %{type: "image_url", image_url: %{url: "https://example.com/cat.png"}}
+
+      iex> DSEx.Adapters.Types.to_openai("hello")
+      %{type: "text", text: "hello"}
+
+      iex> DSEx.Adapters.Types.to_openai(%DSEx.Adapters.Types.File{})
+      ** (ArgumentError) DSEx.Adapters.Types.File expects binary :url, binary :path, or binary :data; got: %DSEx.Adapters.Types.File{path: nil, url: nil, data: nil, mime_type: nil, metadata: %{}}
+
+  """
   def to_openai(%Image{url: url}) when is_binary(url) do
     %{type: "image_url", image_url: %{url: url}}
   end
@@ -90,9 +108,39 @@ defmodule DSEx.Adapters.Types do
   def to_openai(text) when is_binary(text), do: %{type: "text", text: text}
   def to_openai(value), do: %{type: "text", text: inspect(value)}
 
+  @doc """
+  Converts a single value or list of values into OpenAI-compatible content blocks.
+
+      iex> alias DSEx.Adapters.Types
+      iex> Types.content_to_openai(["hello", %Types.Document{text: "world"}])
+      [%{type: "text", text: "hello"}, %{type: "text", text: "world"}]
+
+      iex> DSEx.Adapters.Types.content_to_openai("hello")
+      [%{type: "text", text: "hello"}]
+
+  """
   def content_to_openai(values) when is_list(values), do: Enum.map(values, &to_openai/1)
   def content_to_openai(value), do: [to_openai(value)]
 
+  @doc """
+  Decodes a known OpenAI-compatible content block into a DSEx content struct.
+
+  Known block types are strict: if a value claims to be an `image_url`,
+  `input_audio`, `file`, or `text` block, it must have the expected payload.
+  Unknown future provider block types pass through unchanged.
+
+      iex> alias DSEx.Adapters.Types
+      iex> Types.from_openai(%{"type" => "text", "text" => "notes"})
+      %DSEx.Adapters.Types.Document{text: "notes", metadata: %{}}
+
+      iex> future = %{"type" => "provider_future_block", "payload" => %{}}
+      iex> DSEx.Adapters.Types.from_openai(future)
+      %{"type" => "provider_future_block", "payload" => %{}}
+
+      iex> DSEx.Adapters.Types.from_openai(%{"type" => "file", "file" => %{}})
+      ** (ArgumentError) OpenAI-compatible content block "file" has malformed payload: %{"file" => %{}, "type" => "file"}
+
+  """
   def from_openai(%{"type" => "image_url", "image_url" => %{"url" => url}}) when is_binary(url),
     do: image_from_url(url)
 
@@ -134,6 +182,14 @@ defmodule DSEx.Adapters.Types do
 
   def from_openai(value), do: value
 
+  @doc """
+  Decodes a single OpenAI-compatible content block or a list of blocks.
+
+      iex> alias DSEx.Adapters.Types
+      iex> Types.content_from_openai([%{"type" => "text", "text" => "hello"}])
+      [%DSEx.Adapters.Types.Document{text: "hello", metadata: %{}}]
+
+  """
   def content_from_openai(values) when is_list(values), do: Enum.map(values, &from_openai/1)
   def content_from_openai(value), do: from_openai(value)
 
@@ -148,7 +204,7 @@ defmodule DSEx.Adapters.Types do
 
   defp invalid_type!(module, expectation, value) do
     raise ArgumentError,
-          "#{inspect(Module.concat(__MODULE__, module))} expects #{expectation}; got: #{inspect(value)}"
+          "#{inspect(module)} expects #{expectation}; got: #{inspect(value)}"
   end
 
   defp invalid_openai_block!(type, value) do

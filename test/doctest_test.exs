@@ -1,6 +1,7 @@
 defmodule DSExDoctestTest do
   use ExUnit.Case, async: true
 
+  doctest DSEx.Adapters.Types
   doctest DSEx.Adapter.JSON
   doctest DSEx.Evaluate
   doctest DSEx.Example
