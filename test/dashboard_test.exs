@@ -294,7 +294,6 @@ defmodule DashboardTest do
              "live_lane_missing",
              "live_latency_parity_false",
              "live_max_concurrency_inconsistent",
-             "prompt_contract_incomplete",
              "runtime_shape_incomplete"
            ]
 
@@ -302,7 +301,6 @@ defmodule DashboardTest do
              "current_low_cost",
              "frontier_sanity",
              "historical_research",
-             nil,
              nil,
              nil,
              nil
@@ -348,7 +346,6 @@ defmodule DashboardTest do
                  }
                ]
              },
-             %{"kind" => "prompt_contract_incomplete"},
              %{
                "kind" => "runtime_shape_incomplete",
                "runtime_shape" => %{

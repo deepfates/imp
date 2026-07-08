@@ -660,11 +660,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         get_in(status, ["availability", "status"]) == "explicit_unavailable" ->
           []
 
-        is_binary(status["best_model"]) ->
+        status["satisfied"] == true and is_binary(status["best_model"]) ->
           [status["best_model"]]
 
-        true ->
+        status["satisfied"] == true ->
           status["models"] || []
+
+        true ->
+          []
       end
     end)
     |> Enum.uniq()
