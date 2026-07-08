@@ -221,7 +221,7 @@ docs = [
   %{text: "Germany has capital Berlin."}
 ]
 
-retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
+retriever = DSEx.memory(docs, k: 1)
 
 program =
   "question, context -> answer"
@@ -237,7 +237,7 @@ prediction.metadata.retrieval
 the configured context field, calls the wrapped program, and records retrieval
 metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
 program, or any other callable DSEx module that expects a context input.
-RAG programs backed by `DSEx.Retrieve.Memory` can be saved and loaded with
+RAG programs backed by `DSEx.memory/2` can be saved and loaded with
 `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, and `DSEx.load!/1`; network
 retrievers and functions should be rebound by the caller instead of serialized.
 
@@ -511,7 +511,7 @@ File.rm(path)
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
 credentials; reconfigure credentials explicitly before live use. Portable
 saving supports `Predict`, `ChainOfThought`, and RAG programs backed by
-`DSEx.Retrieve.Memory`. Programs that hold functions, external service clients,
+`DSEx.memory/2`. Programs that hold functions, external service clients,
 or live tool closures should be rebuilt by application code.
 
 ## Streaming

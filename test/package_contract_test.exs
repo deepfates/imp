@@ -268,6 +268,13 @@ defmodule PackageContractTest do
       raise "saved and loaded program did not remain executable"
     end
 
+    retriever = DSEx.memory([[text: "France capital: Paris."]], k: 1)
+    {:ok, [doc]} = DSEx.retrieve(retriever, "capital France")
+
+    unless doc.text == "France capital: Paris." do
+      raise "memory retriever failed from package consumer: \#{inspect(doc)}"
+    end
+
     {:ok, queue} =
       Agent.start_link(fn ->
         [

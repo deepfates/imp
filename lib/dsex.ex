@@ -161,6 +161,12 @@ defmodule DSEx do
   @doc "Wraps a program with retrieval-augmented context injection."
   def rag(program, retriever, opts \\ []), do: RAG.new(program, retriever, opts)
 
+  @doc "Builds a deterministic in-memory retriever for local RAG workflows."
+  def memory(docs, opts \\ []), do: DSEx.Retrieve.Memory.new(docs, opts)
+
+  @doc "Calls any DSEx retriever and normalizes returned documents."
+  defdelegate retrieve(retriever, query, opts \\ []), to: DSEx.Retrieve
+
   @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
 

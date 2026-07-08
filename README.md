@@ -94,6 +94,7 @@ program = DSEx.predict(signature)
 | Providers | `DSEx.req_llm/2` | ReqLLM-backed access to production model APIs |
 | Evaluation | `DSEx.evaluate/4`, `DSEx.Metrics` | Scores, feedback, traces, metric metadata |
 | Optimization | `DSEx.optimize/4`, `DSEx.Optimizer.*` | Better demos, instructions, and program variants |
+| Retrieval | `DSEx.memory/2`, `DSEx.retrieve/3`, `DSEx.rag/3` | Local retrieval and retrieval-augmented programs |
 | Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
 | Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
 | Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |

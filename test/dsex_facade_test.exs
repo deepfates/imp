@@ -112,7 +112,7 @@ defmodule DSExFacadeTest do
     cot = DSEx.chain_of_thought("question -> answer")
     pot = DSEx.program_of_thought("question -> answer")
     code_act = DSEx.code_act("question -> answer")
-    rag = DSEx.rag(program, DSEx.Retrieve.Memory.new([%{text: "2+2 is 4"}]))
+    rag = DSEx.rag(program, DSEx.memory([%{text: "2+2 is 4"}]))
     demo = DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
 
     assert %{demos: [^demo]} = DSEx.with_demos(program, [demo])
@@ -129,11 +129,33 @@ defmodule DSExFacadeTest do
     assert DSEx.Tool.call(tool, %{key: "x"}) == "y"
   end
 
+  test "facade builds and calls local memory retrievers" do
+    retriever = DSEx.memory([[text: "France has capital Paris"]], k: 1)
+
+    assert {:ok, [%{text: "France has capital Paris", score: score}]} =
+             DSEx.retrieve(retriever, "capital France")
+
+    assert score > 0
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program =
+      "question, context -> answer"
+      |> DSEx.predict(lm: lm)
+      |> DSEx.rag(retriever, k: 1)
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "capital France"})
+    assert DSEx.get(prediction, :answer) == "Paris"
+  end
+
   test "internal program access separates task and LM-facing signatures" do
     pot =
       "x, context -> doubled"
       |> DSEx.program_of_thought(output_field: :doubled)
-      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "double x"}]))
+      |> DSEx.rag(DSEx.memory([%{text: "double x"}]))
 
     assert "x, context -> doubled" =
              pot
