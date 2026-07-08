@@ -100,6 +100,11 @@ defmodule DSEx do
   def to_map(%Prediction{} = prediction), do: Prediction.to_map(prediction)
   def to_map(%Example{} = example), do: Example.to_map(example)
 
+  def to_map(container) do
+    raise ArgumentError,
+          "DSEx.to_map/1 expects a DSEx.Prediction or DSEx.Example; got: #{inspect(container)}"
+  end
+
   @doc "Reads a field from a prediction or example."
   def get(container, key, default \\ nil)
 
@@ -108,6 +113,11 @@ defmodule DSEx do
 
   def get(%Example{} = example, key, default),
     do: Example.get(example, key, default)
+
+  def get(container, _key, _default) do
+    raise ArgumentError,
+          "DSEx.get/3 expects a DSEx.Prediction or DSEx.Example; got: #{inspect(container)}"
+  end
 
   @doc "Returns the majority value across predictions."
   defdelegate majority(predictions, opts \\ []), to: DSEx.Predict.Aggregation

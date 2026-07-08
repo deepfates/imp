@@ -47,6 +47,20 @@ defmodule DSExFacadeTest do
     assert DSEx.to_map(DSEx.labels(example)) == %{answer: "4"}
   end
 
+  test "facade readers report unsupported containers clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx\.get\/3 expects a DSEx\.Prediction or DSEx\.Example/,
+                 fn ->
+                   DSEx.get(%{answer: "4"}, :answer)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.to_map\/1 expects a DSEx\.Prediction or DSEx\.Example/,
+                 fn ->
+                   DSEx.to_map(%{answer: "4"})
+                 end
+  end
+
   test "facade attaches demos and builds tools" do
     program = DSEx.predict("question -> answer")
     cot = DSEx.chain_of_thought("question -> answer")
