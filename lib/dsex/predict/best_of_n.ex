@@ -23,7 +23,7 @@ defmodule DSEx.Predict.BestOfN do
       predictions ->
         {:ok,
          predictions
-         |> Enum.max_by(&score(best.metric, &1))
+         |> Enum.max_by(&score(best.metric, &1).score)
          |> attach_feedback(best.feedback_fn, predictions)}
     end
   end
@@ -32,11 +32,36 @@ defmodule DSEx.Predict.BestOfN do
   defp attempts(_n), do: []
 
   defp score(metric, prediction) do
-    metric.(%DSEx.Example{}, prediction) |> DSEx.Metrics.score()
+    metric
+    |> apply([%DSEx.Example{}, prediction])
+    |> DSEx.Metrics.normalize_result()
+  rescue
+    error ->
+      %DSEx.Metrics.Result{
+        feedback: {:metric_error, error_message(error)},
+        metadata: %{error: error}
+      }
+  catch
+    kind, reason ->
+      %DSEx.Metrics.Result{
+        feedback: {:metric_error, error_message({kind, reason})},
+        metadata: %{error: {kind, reason}}
+      }
   end
 
   defp attach_feedback(prediction, nil, _predictions), do: prediction
 
   defp attach_feedback(prediction, feedback_fn, predictions),
-    do: DSEx.Prediction.put(prediction, :feedback, feedback_fn.(predictions))
+    do: DSEx.Prediction.put(prediction, :feedback, safe_feedback(feedback_fn, predictions))
+
+  defp safe_feedback(feedback_fn, predictions) do
+    feedback_fn.(predictions)
+  rescue
+    error -> {:feedback_error, error_message(error)}
+  catch
+    kind, reason -> {:feedback_error, error_message({kind, reason})}
+  end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end

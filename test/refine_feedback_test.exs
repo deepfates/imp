@@ -70,6 +70,30 @@ defmodule RefineFeedbackTest do
              |> DSEx.Predict.Refine.call(%{question: "q"})
   end
 
+  test "Refine treats metric callback failures as failed attempts" do
+    metric = fn _example, _prediction -> raise "metric exploded" end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%HintProgram{}, metric, max_attempts: 1)
+             |> DSEx.Predict.Refine.call(%{question: "q"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "bad"
+  end
+
+  test "Refine converts feedback callback failures into repair hints" do
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) == "fixed" end
+    feedback = fn _history -> throw(:bad_feedback) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%HintProgram{}, metric,
+               max_attempts: 2,
+               feedback_fn: feedback
+             )
+             |> DSEx.Predict.Refine.call(%{question: "q"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "fixed"
+  end
+
   test "BestOfN attaches comparison feedback to selected prediction" do
     program = %HintProgram{}
 
@@ -84,6 +108,28 @@ defmodule RefineFeedbackTest do
              |> DSEx.Predict.BestOfN.call(%{})
 
     assert DSEx.Prediction.get(prediction, :feedback) == "compared 2 attempts"
+  end
+
+  test "BestOfN treats metric callback failures as zero-score attempts" do
+    metric = fn _example, _prediction -> throw(:bad_metric) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.BestOfN.new(%HintProgram{}, metric, n: 1)
+             |> DSEx.Predict.BestOfN.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "bad"
+  end
+
+  test "BestOfN converts feedback callback failures into prediction feedback" do
+    metric = fn _example, _prediction -> 1.0 end
+    feedback = fn _predictions -> raise "feedback exploded" end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.BestOfN.new(%HintProgram{}, metric, n: 1, feedback_fn: feedback)
+             |> DSEx.Predict.BestOfN.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :feedback) ==
+             {:feedback_error, "feedback exploded"}
   end
 
   test "BestOfN with non-positive attempts does not call the wrapped program" do

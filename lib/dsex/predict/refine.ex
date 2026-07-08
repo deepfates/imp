@@ -22,7 +22,7 @@ defmodule DSEx.Predict.Refine do
         {:ok, prediction} = ok ->
           history = history ++ [%{attempt: attempt, prediction: prediction}]
 
-          if refine.metric.(%DSEx.Example{}, prediction) |> DSEx.Metrics.pass?(),
+          if safe_metric(refine.metric, prediction) |> DSEx.Metrics.pass?(),
             do: {:halt, ok},
             else: {:cont, {:ok, prediction, history}}
 
@@ -53,6 +53,35 @@ defmodule DSEx.Predict.Refine do
   defp maybe_add_hint(inputs, feedback_fn, history) do
     inputs
     |> Map.new()
-    |> Map.put(:hint_, feedback_fn.(history))
+    |> Map.put(:hint_, safe_feedback(feedback_fn, history))
   end
+
+  defp safe_metric(metric, prediction) do
+    metric
+    |> apply([%DSEx.Example{}, prediction])
+    |> DSEx.Metrics.normalize_result()
+  rescue
+    error ->
+      %DSEx.Metrics.Result{
+        feedback: {:metric_error, error_message(error)},
+        metadata: %{error: error}
+      }
+  catch
+    kind, reason ->
+      %DSEx.Metrics.Result{
+        feedback: {:metric_error, error_message({kind, reason})},
+        metadata: %{error: {kind, reason}}
+      }
+  end
+
+  defp safe_feedback(feedback_fn, history) do
+    feedback_fn.(history)
+  rescue
+    error -> {:feedback_error, error_message(error)}
+  catch
+    kind, reason -> {:feedback_error, error_message({kind, reason})}
+  end
+
+  defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error), do: inspect(error)
 end
