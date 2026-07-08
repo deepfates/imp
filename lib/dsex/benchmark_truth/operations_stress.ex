@@ -41,6 +41,7 @@ defmodule DSEx.BenchmarkTruth.OperationsStress do
       malformed_chat_check(),
       partial_stream_check(),
       native_schema_shape_check(),
+      multimodal_primitive_boundary_check(),
       save_load_round_trip_check(),
       cache_telemetry_check(),
       redacted_telemetry_check(),
@@ -111,6 +112,48 @@ defmodule DSEx.BenchmarkTruth.OperationsStress do
         get_in(schema, ["properties", "score", "type"]) == "number"
 
     check("provider_native_schema_shape", "structured_io", pass?, %{"lm_opts" => json_safe(opts)})
+  end
+
+  defp multimodal_primitive_boundary_check do
+    alias DSEx.Adapters.Types
+
+    values = [
+      %Types.Image{url: "https://example.com/image.png"},
+      %Types.Image{data: "iVBORw0KGgo=", mime_type: "image/png"},
+      %Types.Audio{data: "data:audio/wav;base64,UklGRg==", mime_type: "audio/wav"},
+      %Types.File{data: "Zm9v", mime_type: "text/plain"},
+      %Types.Document{text: "release note", metadata: %{id: "doc-1"}},
+      %Types.Code{code: "IO.puts(:ok)", language: "elixir"}
+    ]
+
+    encoded = Types.content_to_openai(values)
+    decoded = encoded |> Enum.take(4) |> Types.content_from_openai()
+
+    pass? =
+      Enum.map(encoded, & &1.type) == [
+        "image_url",
+        "image_url",
+        "input_audio",
+        "file",
+        "text",
+        "text"
+      ] and
+        match?(
+          [
+            %Types.Image{url: "https://example.com/image.png"},
+            %Types.Image{data: "iVBORw0KGgo=", mime_type: "image/png"},
+            %Types.Audio{data: "UklGRg==", mime_type: "audio/wav"},
+            %Types.File{data: "Zm9v", mime_type: "text/plain"}
+          ],
+          decoded
+        )
+
+    check("multimodal_content_parts_primitive_boundary", "multimodal_primitives", pass?, %{
+      "encoded_types" => Enum.map(encoded, & &1.type),
+      "decoded_structs" => Enum.map(decoded, &(&1.__struct__ |> Module.split() |> List.last())),
+      "live_multimodal_reasoning_claimed" => false,
+      "provider_backed_benchmark_required_for_live_claim" => true
+    })
   end
 
   defp save_load_round_trip_check do

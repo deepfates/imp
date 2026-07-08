@@ -7,7 +7,7 @@ defmodule OperationsStressTest do
     artifact = DSEx.BenchmarkTruth.OperationsStress.run(max_concurrency: 4)
 
     assert artifact["summary"]["complete"]
-    assert artifact["summary"]["passing"] == 9
+    assert artifact["summary"]["passing"] == 10
 
     by_id = Map.new(artifact["checks"], &{&1["id"], &1})
 
@@ -17,6 +17,7 @@ defmodule OperationsStressTest do
           "malformed_chat_missing_fields_rejected",
           "partial_stream_incremental_fields",
           "provider_native_schema_shape",
+          "multimodal_content_parts_primitive_boundary",
           "save_load_round_trip_redacts_credentials",
           "cache_hit_miss_telemetry_redacted",
           "telemetry_metadata_redaction",
@@ -26,6 +27,11 @@ defmodule OperationsStressTest do
     end
 
     assert by_id["cache_hit_miss_telemetry_redacted"]["evidence"]["calls"] == 1
+
+    assert by_id["multimodal_content_parts_primitive_boundary"]["evidence"][
+             "live_multimodal_reasoning_claimed"
+           ] == false
+
     assert by_id["parallel_failure_isolation"]["evidence"]["max_concurrency"] == 4
     refute inspect(artifact) =~ "sk-test"
   end

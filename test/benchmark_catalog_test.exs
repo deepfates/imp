@@ -12,7 +12,7 @@ defmodule BenchmarkCatalogTest do
 
     assert by_id["math_gsm8k"].status == "implemented"
     assert by_id["qa_hotpotqa"].status == "partially_implemented"
-    assert by_id["classification_colors"].status == "loader_only"
+    assert by_id["classification_colors"].status == "provider_free_implemented"
     assert by_id["rag_retrieval"].status == "provider_free_implemented"
     assert by_id["tools_react"].status == "provider_free_implemented"
     assert by_id["rlm_recursive_control"].status == "deterministic_implemented"
@@ -31,6 +31,7 @@ defmodule BenchmarkCatalogTest do
     assert by_id["livebench_math"].status == "deferred"
 
     assert "mix benchmark.parity.full" in by_id["math_gsm8k"].commands
+    assert "mix benchmark.truth.check" in by_id["classification_colors"].commands
     assert by_id["factuality_classification"].next_step =~ "generic classification/QA sampler"
     assert by_id["rag_retrieval"].next_step =~ "real small corpus retrieval benchmark"
     assert by_id["rlm_recursive_control"].metric =~ "budget"
@@ -44,6 +45,7 @@ defmodule BenchmarkCatalogTest do
 
     assert by_id["adapter_streaming_structured_io"].metric =~ "incremental field"
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
+    assert "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
     assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands

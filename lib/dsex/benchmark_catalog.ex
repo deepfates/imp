@@ -51,9 +51,14 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "input -> class label",
       metric: "accuracy or macro F1",
       tiers: ["smoke", "research"],
-      status: "loader_only",
-      commands: ["mix test test/datasets_contract_test.exs"],
-      next_step: "Add cheap matched smoke and optimizer-lift classification lane."
+      status: "provider_free_implemented",
+      commands: [
+        "mix dsex.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease --full --out benchmarks/data",
+        "mix dsex.benchmark.run --colors benchmarks/data/colors-test-0-6.jsonl --iris benchmarks/data/iris-test-0-6.jsonl --iris-typo benchmarks/data/iris_typo-test-0-3.jsonl --heart-disease benchmarks/data/heart_disease-test-0-4.jsonl",
+        "mix benchmark.truth.check"
+      ],
+      next_step:
+        "Scale to larger pinned classification/factuality datasets when research-tier evidence is required."
     },
     %{
       id: "rag_retrieval",
@@ -171,9 +176,12 @@ defmodule DSEx.BenchmarkCatalog do
       metric: "round-trip encoding fidelity and provider-shape validity",
       tiers: ["smoke"],
       status: "deterministic_implemented",
-      commands: ["mix test test/multimodal_adapter_test.exs"],
+      commands: [
+        "mix test test/multimodal_adapter_test.exs",
+        "mix benchmark.operations_stress.check"
+      ],
       next_step:
-        "Keep as primitive proof until DSEx claims live multimodal reasoning; add live multimodal benchmark only when public docs claim it."
+        "Keep artifact evidence as primitive encoding/decoding proof; add a provider-backed multimodal benchmark only if public docs claim live multimodal reasoning."
     },
     %{
       id: "optimizer_lift",
