@@ -20,23 +20,24 @@ defmodule DSEx.Clients.ReqLLM do
         }
 
   @new_option_schema [
-    req_module: [type: :any, default: ReqLLM],
+    req_module: [type: {:custom, __MODULE__, :validate_req_module, []}, default: ReqLLM],
     opts: [type: :keyword_list, default: []]
   ]
 
   def new(model_spec, opts \\ []) do
     {req_module, nested_opts} = validate_new_opts!(opts)
 
-    unless is_atom(req_module) do
-      raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects :req_module atom and :opts keyword list"
-    end
-
     %__MODULE__{
       model: model_spec,
       opts: Keyword.merge(nested_opts, Keyword.drop(opts, [:opts, :req_module])),
       req_module: req_module
     }
+  end
+
+  def validate_req_module(module) when is_atom(module), do: {:ok, module}
+
+  def validate_req_module(module) do
+    {:error, "expected a ReqLLM-compatible module atom, got: #{inspect(module)}"}
   end
 
   @impl true

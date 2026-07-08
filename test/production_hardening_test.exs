@@ -451,9 +451,15 @@ defmodule ProductionHardeningTest do
     assert {:error, message} = DSEx.Adapter.validate_adapter(String)
     assert message =~ "expected an adapter module exporting format/3 and parse/3"
 
-    assert_raise ArgumentError, ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/, fn ->
-      DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
-    end
+    assert {:ok, ReqLLM} = DSEx.Clients.ReqLLM.validate_req_module(ReqLLM)
+    assert {:error, message} = DSEx.Clients.ReqLLM.validate_req_module("not-a-module")
+    assert message =~ "expected a ReqLLM-compatible module atom"
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
+                 fn ->
+                   DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
+                 end
 
     assert_raise ArgumentError,
                  ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,

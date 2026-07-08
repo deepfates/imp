@@ -97,7 +97,7 @@ defmodule ReqLLMClientTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/,
+                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
                  fn ->
                    DSEx.Clients.ReqLLM.new("openai:gpt-test", req_module: "not-a-module")
                  end
