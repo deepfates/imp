@@ -260,7 +260,7 @@ defmodule CompletionSurfaceTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.CodeAct\.new\/3 expects tools to contain DSEx\.Tool structs/,
+                 ~r/DSEx\.Predict\.CodeAct\.new\/3 expects tools to be a list of DSEx\.Tool structs/,
                  fn ->
                    DSEx.Predict.CodeAct.new("question -> answer", [:not_a_tool])
                  end

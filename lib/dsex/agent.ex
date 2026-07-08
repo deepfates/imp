@@ -65,7 +65,7 @@ defmodule DSEx.Agent do
     %__MODULE__{
       name: normalize_name(name),
       handler: handler,
-      tools: index_tools(opts[:tools]),
+      tools: DSEx.Tool.index_tools!(opts[:tools], "DSEx.Agent.new/3"),
       children: index_children(opts[:children]),
       input_schema: opts[:input_schema],
       output_schema: opts[:output_schema],
@@ -269,17 +269,6 @@ defmodule DSEx.Agent do
       [] -> :ok
       keys -> {:error, {:missing_required, keys}}
     end
-  end
-
-  defp index_tools(values) do
-    Map.new(values, fn
-      %DSEx.Tool{name: name} = tool ->
-        {name, tool}
-
-      invalid ->
-        raise ArgumentError,
-              "DSEx.Agent.new/3 expects :tools to contain DSEx.Tool structs; got: #{inspect(invalid)}"
-    end)
   end
 
   defp index_children(values) do

@@ -48,7 +48,7 @@ defmodule DSEx.Predict.ReAct do
   def new(signature, tools, opts \\ []) do
     signature = DSEx.Signature.ensure(signature)
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.ReAct.new/3")
-    tool_map = normalize_tools!(tools)
+    tool_map = DSEx.Tool.index_tools!(tools, "DSEx.Predict.ReAct.new/3")
     submit = DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
     tools = Map.put(tool_map, :submit, submit)
 
@@ -272,21 +272,6 @@ defmodule DSEx.Predict.ReAct do
     do: schema
 
   defp tool_parameters(_tool, _signature), do: %{"type" => "object", "properties" => %{}}
-
-  defp normalize_tools!(tools) when is_list(tools),
-    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
-
-  defp normalize_tools!(tools) do
-    raise ArgumentError,
-          "DSEx.Predict.ReAct.new/3 expects tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
-  end
-
-  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
-
-  defp coerce_tool!(tool) do
-    raise ArgumentError,
-          "DSEx.Predict.ReAct.new/3 expects tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
-  end
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->

@@ -74,7 +74,7 @@ defmodule DSEx.Predict.RLM do
   def new(signature, opts \\ []) do
     signature = DSEx.Signature.ensure(signature)
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.RLM.new/2")
-    tools = normalize_tools!(opts[:tools])
+    tools = DSEx.Tool.index_tools!(opts[:tools], "DSEx.Predict.RLM.new/2")
 
     %__MODULE__{
       signature: signature,
@@ -378,21 +378,6 @@ defmodule DSEx.Predict.RLM do
     tools
     |> Map.values()
     |> Enum.map(&%{name: &1.name, description: &1.description, schema: &1.schema})
-  end
-
-  defp normalize_tools!(tools) when is_list(tools),
-    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
-
-  defp normalize_tools!(tools) do
-    raise ArgumentError,
-          "DSEx.Predict.RLM.new/2 expects :tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
-  end
-
-  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
-
-  defp coerce_tool!(tool) do
-    raise ArgumentError,
-          "DSEx.Predict.RLM.new/2 expects :tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
   end
 
   defp normalize_tool_name(tools, name) do

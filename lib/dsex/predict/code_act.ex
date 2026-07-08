@@ -40,7 +40,7 @@ defmodule DSEx.Predict.CodeAct do
 
   def new(signature, tools \\ [], opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.CodeAct.new/3")
-    tools = normalize_tools!(tools)
+    tools = DSEx.Tool.index_tools!(tools, "DSEx.Predict.CodeAct.new/3")
     pot_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata, :output_field])
 
     %__MODULE__{
@@ -167,21 +167,6 @@ defmodule DSEx.Predict.CodeAct do
   end
 
   defp present?(value), do: value not in [nil, ""]
-
-  defp normalize_tools!(tools) when is_list(tools),
-    do: tools |> Enum.map(&coerce_tool!/1) |> Map.new(&{&1.name, &1})
-
-  defp normalize_tools!(tools) do
-    raise ArgumentError,
-          "DSEx.Predict.CodeAct.new/3 expects tools to be a list of DSEx.Tool structs; got: #{inspect(tools)}"
-  end
-
-  defp coerce_tool!(%DSEx.Tool{} = tool), do: tool
-
-  defp coerce_tool!(tool) do
-    raise ArgumentError,
-          "DSEx.Predict.CodeAct.new/3 expects tools to contain DSEx.Tool structs; got: #{inspect(tool)}"
-  end
 
   defp normalize_tool_name(tools, name) do
     Enum.find_value(Map.keys(tools), fn known ->

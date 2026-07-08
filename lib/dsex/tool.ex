@@ -71,6 +71,17 @@ defmodule DSEx.Tool do
     {:error, "expected a list of DSEx.Tool structs, got: #{inspect(tools)}"}
   end
 
+  def index_tools!(tools, context) do
+    case validate_tools(tools) do
+      {:ok, tools} ->
+        Map.new(tools, &{&1.name, &1})
+
+      {:error, message} ->
+        raise ArgumentError,
+              "#{context} expects tools to be #{String.replace_prefix(message, "expected ", "")}"
+    end
+  end
+
   @doc """
   Calls a tool with one argument.
 
