@@ -262,6 +262,23 @@ defmodule LocalServiceE2ETest do
 
     assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
              DSEx.Optimizer.Report.fetch(compiled.program)
+
+    save_path =
+      Path.join(System.tmp_dir!(), "dsex-rag-compiled-#{System.unique_integer([:positive])}.json")
+
+    assert :ok = DSEx.Saving.save!(compiled, save_path)
+    loaded = DSEx.Saving.load!(save_path)
+    File.rm(save_path)
+
+    reloaded =
+      DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+        DSEx.Evaluate.run(evaluator, loaded)
+      end)
+
+    assert reloaded.score == 1.0
+
+    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
+             DSEx.Optimizer.Report.fetch(loaded.program)
   end
 
   defp assert_react_json_tool_arguments(tool) do

@@ -168,6 +168,9 @@ prediction.metadata.retrieval
 the configured context field, calls the wrapped program, and records retrieval
 metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
 program, or any other callable DSEx module that expects a context input.
+RAG programs backed by `DSEx.Retrieve.Memory` can be saved and loaded with
+`DSEx.Saving`; network retrievers and functions should be rebound by the caller
+instead of serialized.
 
 ## Optimize A Program
 

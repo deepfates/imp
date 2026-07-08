@@ -8,6 +8,7 @@ defmodule DSEx.Saving do
   """
 
   @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
+  @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k"]
 
   def save!(program, path) do
     path
@@ -30,6 +31,17 @@ defmodule DSEx.Saving do
 
   def dump(%DSEx.Predict.ChainOfThought{predict: predict}) do
     predict |> dump() |> Map.put("type", "chain_of_thought")
+  end
+
+  def dump(%DSEx.Predict.RAG{} = rag) do
+    %{
+      "type" => "rag",
+      "program" => dump(rag.program),
+      "retriever" => dump_retriever(rag.retriever),
+      "query_field" => DSEx.Optimizer.Report.json_safe(rag.query_field),
+      "context_field" => DSEx.Optimizer.Report.json_safe(rag.context_field),
+      "k" => rag.k
+    }
   end
 
   def load(%{"type" => "predict"} = state) do
@@ -58,6 +70,18 @@ defmodule DSEx.Saving do
   def load(%{"type" => "chain_of_thought"} = state) do
     predict = state |> Map.put("type", "predict") |> load()
     %DSEx.Predict.ChainOfThought{predict: predict}
+  end
+
+  def load(%{"type" => "rag"} = state) do
+    require_keys!(state, @rag_required_keys)
+
+    DSEx.Predict.RAG.new(
+      load(Map.fetch!(state, "program")),
+      load_retriever!(Map.fetch!(state, "retriever")),
+      query_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "query_field")),
+      context_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "context_field")),
+      k: Map.fetch!(state, "k")
+    )
   end
 
   def load(%{"type" => type}) do
@@ -140,6 +164,34 @@ defmodule DSEx.Saving do
 
   defp decode_lm(lm) do
     raise ArgumentError, "invalid saved DSEx LM client: #{inspect(lm)}"
+  end
+
+  defp dump_retriever(%DSEx.Retrieve.Memory{} = retriever) do
+    %{
+      "type" => "memory",
+      "docs" => DSEx.Optimizer.Report.json_safe(retriever.docs),
+      "k" => retriever.k
+    }
+  end
+
+  defp dump_retriever(retriever) do
+    raise ArgumentError,
+          "unsupported saved DSEx retriever: #{inspect(retriever)}; only DSEx.Retrieve.Memory is portable"
+  end
+
+  defp load_retriever!(%{"type" => "memory"} = state) do
+    DSEx.Retrieve.Memory.new(
+      state |> Map.fetch!("docs") |> DSEx.Optimizer.Report.restore_json_safe(),
+      k: Map.fetch!(state, "k")
+    )
+  end
+
+  defp load_retriever!(%{"type" => type}) do
+    raise ArgumentError, "unsupported saved DSEx retriever: #{inspect(type)}"
+  end
+
+  defp load_retriever!(retriever) do
+    raise ArgumentError, "invalid saved DSEx retriever: #{inspect(retriever)}"
   end
 
   defp decode_config_key(key) when is_atom(key), do: key

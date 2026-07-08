@@ -413,4 +413,55 @@ defmodule ProductionAdapterPersistenceTest do
     assert DSEx.Example.get(example, :answer) == "Paris"
     assert length(loaded.demos) == 1
   end
+
+  test "save/load preserves local memory RAG programs" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "France has capital Paris",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      ]
+    }
+
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1),
+        k: 1
+      )
+
+    path =
+      Path.join(System.tmp_dir!(), "DSEx-rag-save-#{System.unique_integer([:positive])}.json")
+
+    assert :ok = DSEx.Saving.save!(rag, path)
+    loaded = DSEx.Saving.load!(path)
+    File.rm(path)
+
+    assert %DSEx.Predict.RAG{retriever: %DSEx.Retrieve.Memory{}, program: program} = loaded
+    assert program.dynamic_lm?
+
+    assert {:ok, prediction} =
+             DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+               DSEx.call(loaded, %{question: "capital France"})
+             end)
+
+    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert prediction.metadata.retrieval.count == 1
+  end
+
+  test "save rejects non-portable RAG retrievers explicitly" do
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(fn _query, _opts -> {:ok, []} end)
+
+    assert_raise ArgumentError, ~r/only DSEx.Retrieve.Memory is portable/, fn ->
+      DSEx.Saving.dump(rag)
+    end
+  end
 end
