@@ -16,6 +16,18 @@ defmodule RefineFeedbackTest do
     def call(%__MODULE__{}, _inputs), do: raise("program should not be called")
   end
 
+  defmodule ErrorProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: {:error, :provider_unavailable}
+  end
+
+  defmodule InvalidResultProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: :not_a_module_result
+  end
+
   test "Refine injects feedback hints from prior attempts" do
     metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) == "fixed" end
     feedback = fn history -> "repair after #{length(history)} miss" end
@@ -39,6 +51,22 @@ defmodule RefineFeedbackTest do
 
     assert {:error, :no_attempts, []} =
              DSEx.Predict.Refine.new(%ExplodingProgram{}, metric, max_attempts: -2)
+             |> DSEx.Predict.Refine.call(%{question: "q"})
+  end
+
+  test "Refine preserves wrapped program errors with history context" do
+    metric = fn _example, _prediction -> true end
+
+    assert {:error, :provider_unavailable, []} =
+             DSEx.Predict.Refine.new(%ErrorProgram{}, metric, max_attempts: 1)
+             |> DSEx.Predict.Refine.call(%{question: "q"})
+  end
+
+  test "Refine converts invalid program returns into contract errors" do
+    metric = fn _example, _prediction -> true end
+
+    assert {:error, {:invalid_refine_result, ":not_a_module_result"}, []} =
+             DSEx.Predict.Refine.new(%InvalidResultProgram{}, metric, max_attempts: 1)
              |> DSEx.Predict.Refine.call(%{question: "q"})
   end
 

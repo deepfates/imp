@@ -26,8 +26,11 @@ defmodule DSEx.Predict.Refine do
             do: {:halt, ok},
             else: {:cont, {:ok, prediction, history}}
 
-        error ->
-          {:cont, {elem(error, 0), elem(error, 1), history}}
+        {:error, reason} ->
+          {:cont, {:error, reason, history}}
+
+        other ->
+          {:cont, {:error, {:invalid_refine_result, inspect(other)}, history}}
       end
     end)
     |> case do
