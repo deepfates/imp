@@ -8,10 +8,13 @@ defmodule DocumentationContractTest do
     refute body =~ "integration gate should"
     refute body =~ "integration gate required"
     refute body =~ "integration gate needed"
+    refute body =~ "DSEx.Embeddings.Hash"
 
     assert body =~ "mix integration.check"
     assert body =~ "mix protocol.training.check"
     assert body =~ "mix protocol.check"
+    assert body =~ "DSEx.Embeddings.BagOfWords"
+    assert Code.ensure_loaded?(DSEx.Embeddings.BagOfWords)
   end
 
   test "release criteria are expressed as current product evidence, not historical tickets" do

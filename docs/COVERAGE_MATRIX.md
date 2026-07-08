@@ -63,7 +63,7 @@ Status values:
 | MCP HTTP, stdio, Streamable HTTP transports | Implemented | `DSEx.MCP.HTTP`, `DSEx.MCP.Stdio`, `DSEx.MCP.StreamableHTTP` | `test/mcp_import_test.exs` | `mix integration.check` proves HTTP and stdio local E2E; Streamable HTTP remains deterministic contract coverage | `docs/API_GUIDE.md`, `docs/ARCHITECTURE.md` | Keep |
 | Memory retrieval | Implemented | `DSEx.Retrieve.Memory`, `DSEx.Retrieve` | `test/dsex_test.exs` | Local RAG integration exercises memory retrieval through evaluation, optimization, and save/load | `docs/API_GUIDE.md` | Keep |
 | External HTTP retrievers | Implemented | `DSEx.Retrievers.HTTP`, `Weaviate`, `Databricks` | `test/external_retriever_test.exs` | `mix integration.check` proves generic HTTP retriever local E2E; Weaviate/Databricks stay payload-contract tested | `docs/API_GUIDE.md`, `docs/ARCHITECTURE.md` | Keep as payload-contract clients; live external retriever gate optional |
-| Embeddings | Implemented | `DSEx.Embeddings`, `DSEx.Embeddings.Hash` | `test/completion_surface_test.exs`, `test/public_surface_test.exs` | Live embedding provider proof is not required for the current production claim | `docs/API_GUIDE.md` | Keep hash embedder as deterministic local baseline |
+| Embeddings | Implemented | `DSEx.Embeddings`, `DSEx.Embeddings.BagOfWords` | `test/completion_surface_test.exs`, `test/public_surface_test.exs` | Live embedding provider proof is not required for the current production claim | `docs/API_GUIDE.md` | Keep bag-of-words embedder as deterministic local baseline |
 
 ## Evaluation and Optimization
 

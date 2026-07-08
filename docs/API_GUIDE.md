@@ -235,6 +235,24 @@ RAG programs backed by `DSEx.Retrieve.Memory` can be saved and loaded with
 `DSEx.Saving`; network retrievers and functions should be rebound by the caller
 instead of serialized.
 
+## Local Embeddings
+
+```elixir
+{:ok, vectors} =
+  DSEx.Embeddings.embed(
+    DSEx.Embeddings.BagOfWords,
+    ["elixir language model programs", "python prompt scripts"],
+    dims: 8
+  )
+
+length(hd(vectors))
+```
+
+`DSEx.Embeddings.BagOfWords` is deterministic and local. It is useful for
+examples, tests, and small retrieval experiments. Production semantic embeddings
+should be injected behind the `DSEx.Embeddings` behaviour so credentials,
+network calls, and model choice stay explicit.
+
 ## Optimize A Program
 
 ```elixir

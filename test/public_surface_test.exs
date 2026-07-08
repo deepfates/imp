@@ -262,6 +262,7 @@ defmodule PublicSurfaceTest do
       DSEx.Clients.Trainer,
       DSEx.Datasets,
       DSEx.Embeddings,
+      DSEx.Embeddings.BagOfWords,
       DSEx.Evaluate,
       DSEx.Example,
       DSEx.LM.Static,
