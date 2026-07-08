@@ -247,6 +247,17 @@ defmodule DSEx.Clients.ReqLLM do
          )
        ]
 
+  defp content_part(%DSEx.Adapters.Types.File{path: path, mime_type: mime_type})
+       when is_binary(path) do
+    [
+      ReqLLM.Message.ContentPart.file(
+        read_file_attachment!(path),
+        Path.basename(path),
+        mime_type || mime_type_from_path(path)
+      )
+    ]
+  end
+
   defp content_part(%DSEx.Adapters.Types.Document{text: text}),
     do: [ReqLLM.Message.ContentPart.text(to_string(text))]
 
@@ -273,6 +284,36 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   defp content_to_text(content), do: inspect(content)
+
+  defp read_file_attachment!(path) do
+    case File.read(path) do
+      {:ok, data} ->
+        data
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "could not read DSEx file attachment #{inspect(path)}: #{:file.format_error(reason)}"
+    end
+  end
+
+  defp mime_type_from_path(path) do
+    case path |> Path.extname() |> String.downcase() do
+      ".txt" -> "text/plain"
+      ".md" -> "text/markdown"
+      ".json" -> "application/json"
+      ".csv" -> "text/csv"
+      ".pdf" -> "application/pdf"
+      ".png" -> "image/png"
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".webp" -> "image/webp"
+      ".gif" -> "image/gif"
+      ".wav" -> "audio/wav"
+      ".mp3" -> "audio/mpeg"
+      ".m4a" -> "audio/mp4"
+      _ -> "application/octet-stream"
+    end
+  end
 
   defp normalize_tool_calls(nil), do: nil
 

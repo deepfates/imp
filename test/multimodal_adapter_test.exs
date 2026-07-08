@@ -33,6 +33,18 @@ defmodule MultimodalAdapterTest do
     assert Enum.at(blocks, 6) == %{type: "text", text: "because"}
   end
 
+  test "encodes local file path attachments to OpenAI-compatible file data" do
+    path = Path.join(System.tmp_dir!(), "dsex-types-#{System.unique_integer([:positive])}.txt")
+    File.write!(path, "hello file")
+
+    on_exit(fn -> File.rm(path) end)
+
+    assert %{
+             type: "file",
+             file: %{file_data: "data:text/plain;base64,aGVsbG8gZmlsZQ=="}
+           } = Types.to_openai(%Types.File{path: path})
+  end
+
   test "decodes OpenAI-compatible multimodal content blocks back to adapter structs" do
     decoded =
       Types.content_from_openai([

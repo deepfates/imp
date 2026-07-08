@@ -115,6 +115,35 @@ defmodule ReqLLMClientTest do
     assert DSEx.Prediction.get(prediction, :score) == 7
   end
 
+  test "ReqLLM client translates local file path attachments into file content parts" do
+    path = Path.join(System.tmp_dir!(), "dsex-req-llm-#{System.unique_integer([:positive])}.md")
+    File.write!(path, "# Attachment\n")
+
+    on_exit(fn -> File.rm(path) end)
+
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    assert {:ok, _prediction} =
+             DSEx.Clients.ReqLLM.generate(
+               lm,
+               [%{role: :user, content: [%DSEx.Adapters.Types.File{path: path}]}],
+               []
+             )
+
+    assert_received {:req_llm_generate, "openai:gpt-test", [%ReqLLM.Message{} = message], _opts}
+
+    assert [
+             %ReqLLM.Message.ContentPart{
+               type: :file,
+               data: "# Attachment\n",
+               filename: filename,
+               media_type: "text/markdown"
+             }
+           ] = message.content
+
+    assert filename == Path.basename(path)
+  end
+
   test "ReqLLM client pre-normalizes OpenAI reasoning model options" do
     lm =
       DSEx.req_llm("openai:gpt-5.4-mini",

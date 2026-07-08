@@ -34,6 +34,11 @@ defmodule DSEx.Adapters.Types do
     %{type: "file", file: %{file_url: url}}
   end
 
+  def to_openai(%File{path: path, mime_type: mime_type}) when is_binary(path) do
+    data = path |> read_file_attachment!() |> Base.encode64()
+    %{type: "file", file: %{file_data: data_uri(mime_type || mime_type_from_path(path), data)}}
+  end
+
   def to_openai(%File{data: data, mime_type: mime_type}) when is_binary(data) do
     %{type: "file", file: %{file_data: data_uri(mime_type || "application/octet-stream", data)}}
   end
@@ -140,4 +145,34 @@ defmodule DSEx.Adapters.Types do
 
   defp mime_type(_kind, nil), do: nil
   defp mime_type(kind, format), do: "#{kind}/#{format}"
+
+  defp read_file_attachment!(path) do
+    case Elixir.File.read(path) do
+      {:ok, data} ->
+        data
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "could not read DSEx file attachment #{inspect(path)}: #{:file.format_error(reason)}"
+    end
+  end
+
+  defp mime_type_from_path(path) do
+    case path |> Path.extname() |> String.downcase() do
+      ".txt" -> "text/plain"
+      ".md" -> "text/markdown"
+      ".json" -> "application/json"
+      ".csv" -> "text/csv"
+      ".pdf" -> "application/pdf"
+      ".png" -> "image/png"
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".webp" -> "image/webp"
+      ".gif" -> "image/gif"
+      ".wav" -> "audio/wav"
+      ".mp3" -> "audio/mpeg"
+      ".m4a" -> "audio/mp4"
+      _ -> "application/octet-stream"
+    end
+  end
 end
