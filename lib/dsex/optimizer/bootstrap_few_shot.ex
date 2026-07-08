@@ -29,34 +29,38 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     {demos, candidates, errors} =
-      trainset
-      |> Enum.with_index()
-      |> Enum.reduce({[], [], []}, fn {example, index}, {demos, candidates, errors} ->
-        selected? = length(demos) < optimizer.max_bootstrapped_demos
-        result = evaluate_example(optimizer, program, example, index, selected?)
+      case indexed_trainset(trainset) do
+        {:ok, indexed} ->
+          Enum.reduce(indexed, {[], [], []}, fn {example, index}, {demos, candidates, errors} ->
+            selected? = length(demos) < optimizer.max_bootstrapped_demos
+            result = evaluate_example(optimizer, program, example, index, selected?)
 
-        demos =
-          if result.selected? do
-            [example | demos]
-          else
-            demos
-          end
+            demos =
+              if result.selected? do
+                [example | demos]
+              else
+                demos
+              end
 
-        errors =
-          case result.error do
-            nil -> errors
-            error -> [error | errors]
-          end
+            errors =
+              case result.error do
+                nil -> errors
+                error -> [error | errors]
+              end
 
-        {demos, [Map.delete(result, :error) | candidates], errors}
-      end)
+            {demos, [Map.delete(result, :error) | candidates], errors}
+          end)
+
+        {:error, error} ->
+          {[], [], [%{stage: :trainset, reason: error_message(error)}]}
+      end
 
     demos = Enum.reverse(demos)
     candidates = Enum.reverse(candidates)
     errors = Enum.reverse(errors)
+    compiled = if trainset_error?(errors), do: program, else: put_demos(program, demos)
 
-    program
-    |> put_demos(demos)
+    compiled
     |> DSEx.Optimizer.Report.attach(
       DSEx.Optimizer.Report.new(%{
         optimizer: :bootstrap_few_shot,
@@ -67,10 +71,19 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
         metadata: %{
           selected_count: length(demos),
           max_bootstrapped_demos: optimizer.max_bootstrapped_demos,
-          trainset_size: length(candidates)
+          trainset_size: length(candidates),
+          status: report_status(errors)
         }
       })
     )
+  end
+
+  defp indexed_trainset(trainset) do
+    {:ok, Enum.with_index(trainset)}
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
   end
 
   defp evaluate_example(optimizer, program, example, index, can_select?) do
@@ -137,6 +150,11 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   end
 
   defp metric_error(_index, _result), do: nil
+
+  defp report_status([]), do: :ok
+  defp report_status(errors) when is_list(errors), do: :with_errors
+
+  defp trainset_error?(errors), do: Enum.any?(errors, &(&1.stage == :trainset))
 
   defp put_demos(%DSEx.Predict.Predict{} = program, demos),
     do: DSEx.Predict.Predict.with_demos(program, demos)

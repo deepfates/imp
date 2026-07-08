@@ -123,6 +123,28 @@ defmodule OptimizerReportTest do
     assert compiled.demos == []
   end
 
+  test "labeled few-shot preserves existing demos when trainset enumeration fails" do
+    {train, _dev} = sets()
+    [existing_demo] = train
+
+    program =
+      "question -> answer"
+      |> DSEx.predict(lm: lm())
+      |> DSEx.Predict.Predict.with_demos([existing_demo])
+
+    compiled =
+      DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      |> DSEx.Optimizer.LabeledFewShot.compile(program, :not_an_enumerable_trainset)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert compiled.demos == [existing_demo]
+    assert report.metadata.status == :trainset_error
+    assert report.metadata.selected_count == 0
+    assert [%{stage: :trainset, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
+  end
+
   test "random search treats zero requested trials as a baseline-only compile" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
@@ -249,6 +271,34 @@ defmodule OptimizerReportTest do
 
     assert [%{passed?: false, selected?: false, feedback: {:metric_error, "metric exploded"}}] =
              report.candidates
+  end
+
+  test "bootstrap few-shot reports trainset failures without erasing existing demos" do
+    {train, _dev} = sets()
+    [existing_demo] = train
+
+    program =
+      "question -> answer"
+      |> DSEx.predict(lm: lm())
+      |> DSEx.Predict.Predict.with_demos([existing_demo])
+
+    compiled =
+      DSEx.Optimizer.BootstrapFewShot.new(DSEx.Metrics.exact_match(:answer),
+        max_bootstrapped_demos: 1
+      )
+      |> DSEx.Optimizer.BootstrapFewShot.compile(program, :not_an_enumerable_trainset)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert compiled.demos == [existing_demo]
+    assert report.optimizer == :bootstrap_few_shot
+    assert report.best_score == 0.0
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.status == :with_errors
+    assert report.metadata.trainset_size == 0
+    assert [%{stage: :trainset, reason: reason}] = report.errors
+    assert String.contains?(reason, "Enumerable")
   end
 
   test "instruction search attaches candidate score report" do

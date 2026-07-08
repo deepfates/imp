@@ -21,9 +21,9 @@ defmodule DSEx.Optimizer.LabeledFewShot do
 
   def compile(%__MODULE__{k: k}, program, trainset) do
     {demos, errors} = take_demos(trainset, k)
+    compiled = if errors == [], do: put_demos(program, demos), else: program
 
-    program
-    |> put_demos(demos)
+    compiled
     |> DSEx.Optimizer.Report.attach(
       DSEx.Optimizer.Report.new(%{
         optimizer: :labeled_few_shot,
@@ -37,7 +37,8 @@ defmodule DSEx.Optimizer.LabeledFewShot do
         errors: errors,
         metadata: %{
           requested_k: k,
-          selected_count: length(demos)
+          selected_count: length(demos),
+          status: if(errors == [], do: :ok, else: :trainset_error)
         }
       })
     )
