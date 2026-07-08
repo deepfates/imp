@@ -738,6 +738,37 @@ defmodule BenchmarkTruthTest do
     refute campaign["parity"]["full_parity"]
   end
 
+  test "parity aggregate records mixed max concurrency as non-release-safe evidence" do
+    out_dir = tmp_dir("parity-aggregate-mixed-concurrency")
+
+    write_parity_report(out_dir, "concurrency-4.json", "2026-07-06T00:00:00Z", 0, [true],
+      max_concurrency: 4
+    )
+
+    write_parity_report(out_dir, "concurrency-8.json", "2026-07-06T00:01:00Z", 1, [true],
+      max_concurrency: 8
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+
+    assert campaign["execution"]["max_concurrency_values"] == [4, 8]
+    assert campaign["execution"]["max_concurrency_consistent"] == false
+    assert campaign["parity"]["max_concurrency_consistent"] == false
+    refute campaign["parity"]["full_parity"]
+  end
+
   test "parity aggregate treats ReqLLM and LiteLLM chat completion labels as one endpoint family" do
     out_dir = tmp_dir("parity-aggregate-wire-api-chat-family")
 
@@ -2926,6 +2957,7 @@ defmodule BenchmarkTruthTest do
           "task" => "gsm8k",
           "offset" => offset,
           "examples" => length(rows),
+          "max_concurrency" => Keyword.get(opts, :max_concurrency, 1),
           "dsex_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows

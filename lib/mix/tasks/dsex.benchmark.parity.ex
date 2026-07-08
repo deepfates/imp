@@ -467,6 +467,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
       "runner_order" => Atom.to_string(runner_order),
       "dsex" => Map.take(dsex, ["git_sha", "elixir", "otp", "model", "mode"]),
       "dspy" => Map.take(dspy, ["git_sha", "python", "dspy_version", "model", "mode"]),
+      "execution" => %{
+        "max_concurrency" =>
+          tasks
+          |> Enum.map(&(&1["max_concurrency"] || 1))
+          |> Enum.max(fn -> 1 end),
+        "runner_order" => Atom.to_string(runner_order)
+      },
       "generation" => %{
         "temperature" => Keyword.fetch!(generation_opts, :temperature),
         "max_tokens" => Keyword.fetch!(generation_opts, :max_tokens),

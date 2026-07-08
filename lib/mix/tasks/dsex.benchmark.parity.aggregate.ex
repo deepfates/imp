@@ -151,6 +151,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     full_coverage? = Enum.all?(task_reports, &get_in(&1, ["coverage", "full"]))
     generation = generation_summary(reports)
     effective_generation = generation["effective"] || %{}
+    execution = execution_summary(reports)
 
     latency_ratio =
       ratio(
@@ -168,6 +169,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "evidence_policy" => evidence_policy(),
       "source_reports" => source_reports(reports),
       "generation" => generation,
+      "execution" => execution,
       "runner_order" => runner_order_summary(reports),
       "coverage" => %{
         "covered" => covered,
@@ -187,6 +189,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "parity" => %{
         "full_parity" =>
           full_coverage? and generation["consistent"] == true and
+            execution["max_concurrency_consistent"] == true and
             effective_generation["complete"] == true and effective_generation["matched"] == true and
             effective_generation["wire_api_matched"] == true and
             within?(aggregate_gap, strict_aggregate_gap) and
@@ -194,6 +197,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
             latency_within?(latency_ratio, max_latency_ratio),
         "full_coverage" => full_coverage?,
         "latency_parity" => latency_within?(latency_ratio, max_latency_ratio),
+        "max_concurrency_consistent" => execution["max_concurrency_consistent"],
         "aggregate_gap" => aggregate_gap,
         "max_task_score_gap" => max_task_gap,
         "max_latency_ratio_dsex_over_dspy" => max_latency_ratio,
@@ -207,7 +211,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
             strict_aggregate_gap,
             strict_task_gap,
             latency_ratio,
-            max_latency_ratio
+            max_latency_ratio,
+            execution["max_concurrency_consistent"]
           )
       }
     }
@@ -829,6 +834,27 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
 
   defp balanced_runner_order?(_values), do: false
 
+  defp execution_summary(reports) do
+    max_concurrency_values =
+      reports
+      |> Enum.map(&report_max_concurrency/1)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    %{
+      "max_concurrency_values" => max_concurrency_values,
+      "max_concurrency" =>
+        case max_concurrency_values do
+          [value] -> value
+          _other -> nil
+        end,
+      "max_concurrency_consistent" => length(max_concurrency_values) <= 1,
+      "source_count" => length(reports),
+      "note" =>
+        "Full live parity requires DSEx and DSPy campaign chunks to use one consistent max_concurrency setting; runner_order may vary intentionally to balance order bias."
+    }
+  end
+
   defp generation_summary(reports) do
     values =
       reports
@@ -973,9 +999,23 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
          _strict_aggregate_gap,
          _strict_task_gap,
          _latency_ratio,
-         _max_latency_ratio
+         _max_latency_ratio,
+         _execution_consistent?
        ) do
     "Full parity cannot be claimed because not every canonical benchmark row is covered."
+  end
+
+  defp parity_note(
+         true,
+         _aggregate_gap,
+         _max_task_gap,
+         _strict_aggregate_gap,
+         _strict_task_gap,
+         _latency_ratio,
+         _max_latency_ratio,
+         false
+       ) do
+    "Full coverage passed, but campaign chunks do not use one consistent max_concurrency setting."
   end
 
   defp parity_note(
@@ -985,7 +1025,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
          strict_aggregate_gap,
          strict_task_gap,
          latency_ratio,
-         max_latency_ratio
+         max_latency_ratio,
+         true
        )
        when aggregate_gap <= strict_aggregate_gap + 1.0e-12 and
               max_task_gap <= strict_task_gap + 1.0e-12 and
@@ -1000,7 +1041,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
          _strict_aggregate_gap,
          _strict_task_gap,
          _latency_ratio,
-         _max_latency_ratio
+         _max_latency_ratio,
+         _execution_consistent?
        ) do
     "Full coverage passed, but strict score or latency parity did not."
   end
