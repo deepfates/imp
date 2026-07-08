@@ -24,6 +24,57 @@ defmodule LocalServiceE2ETest do
              DSEx.Retrieve.retrieve(retriever, "beam", k: 2)
   end
 
+  test "RAG answers through a real local HTTP retriever service" do
+    base_url =
+      DSEx.Test.LocalHTTP.start(fn request ->
+        assert request.method == "POST"
+        assert request.path == "/retrieve"
+        payload = Jason.decode!(request.body)
+
+        doc =
+          case payload["query"] do
+            "capital France" ->
+              %{text: "France has capital Paris.", score: 1.0, source: "local"}
+
+            "capital Germany" ->
+              %{text: "Germany has capital Berlin.", score: 1.0, source: "local"}
+          end
+
+        {200, %{documents: [doc]}}
+      end)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            prompt =~ "France has capital Paris" -> %{answer: "Paris"}
+            prompt =~ "Germany has capital Berlin" -> %{answer: "Berlin"}
+            true -> %{answer: "unknown"}
+          end
+        end
+      ]
+    }
+
+    retriever = DSEx.Retrievers.HTTP.new(base_url <> "/retrieve")
+    program = DSEx.predict("question, context -> answer", lm: lm) |> DSEx.rag(retriever, k: 1)
+
+    devset = [
+      DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question),
+      DSEx.example(question: "capital Germany", answer: "Berlin") |> DSEx.with_inputs(:question)
+    ]
+
+    result =
+      devset
+      |> DSEx.Evaluate.new(DSEx.Metrics.exact_match(:answer))
+      |> DSEx.Evaluate.run(program)
+
+    assert result.score == 1.0
+    assert Enum.all?(result.rows, &(&1.prediction.metadata.retrieval.count == 1))
+  end
+
   test "HTTP MCP client discovers and calls a local JSON-RPC tool server" do
     base_url =
       DSEx.Test.LocalHTTP.start(fn request ->
