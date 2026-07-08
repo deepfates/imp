@@ -7,6 +7,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Metrics
   doctest DSEx.Optimizer.RandomSearch
   doctest DSEx.Prediction
+  doctest DSEx.Predict.Aggregation
   doctest DSEx.Predict.MultiChainComparison
   doctest DSEx.Predict.Predict
   doctest DSEx.Signature

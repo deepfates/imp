@@ -1,8 +1,49 @@
 defmodule DSEx.Predict.Aggregation do
-  @moduledoc "Aggregation helpers for multiple predictions."
+  @moduledoc """
+  Aggregation helpers for multiple predictions or raw values.
 
-  def default_normalize(value), do: value |> to_string() |> String.trim() |> String.downcase()
+  `majority/2` is the common helper for self-consistency style workflows: run a
+  program several times, then keep the most common answer. Pass `field: :answer`
+  when aggregating `%DSEx.Prediction{}` values by a named output field. Without
+  a field, maps and structs are still safe to compare because the default
+  normalizer falls back to `inspect/1` for values that do not implement
+  `String.Chars`.
 
+  Ties keep the first value from the winning normalized group.
+
+  ## Example
+
+      iex> predictions = [
+      ...>   DSEx.Prediction.new(answer: "Paris"),
+      ...>   DSEx.Prediction.new(answer: "paris"),
+      ...>   DSEx.Prediction.new(answer: "Lyon")
+      ...> ]
+      iex> DSEx.Predict.Aggregation.majority(predictions, field: :answer)
+      "Paris"
+  """
+
+  @doc """
+  Normalizes values for majority grouping.
+
+  Strings, atoms, numbers, and other `String.Chars` values use `to_string/1`.
+  Maps and structs fall back to `inspect/1`, avoiding crashes when callers
+  aggregate full prediction values.
+  """
+  def default_normalize(value) do
+    value
+    |> stringable_text()
+    |> String.trim()
+    |> String.downcase()
+  end
+
+  @doc """
+  Returns the most common value after normalization.
+
+  Options:
+
+  - `:field` extracts a field from predictions or maps before voting.
+  - `:normalize` supplies a custom one-argument grouping function.
+  """
   def majority(predictions, opts \\ []) do
     field = Keyword.get(opts, :field)
     normalize = Keyword.get(opts, :normalize, &default_normalize/1)
@@ -25,4 +66,11 @@ defmodule DSEx.Predict.Aggregation do
     do: Map.get(map, field) || Map.get(map, to_string(field))
 
   defp value_for(value, _field), do: value
+
+  defp stringable_text(value) do
+    case String.Chars.impl_for(value) do
+      nil -> inspect(value)
+      _impl -> to_string(value)
+    end
+  end
 end

@@ -138,6 +138,18 @@ defmodule PublicSurfaceTest do
     program = DSEx.predict("question -> answer", lm: lm)
 
     assert DSEx.majority(["A", "a", "B"]) == "A"
+
+    assert %DSEx.Prediction{} =
+             DSEx.majority([
+               DSEx.Prediction.new(answer: "A"),
+               DSEx.Prediction.new(answer: "A"),
+               DSEx.Prediction.new(answer: "B")
+             ])
+
+    assert DSEx.majority([%{"answer" => "Paris"}, %{answer: "paris"}, %{answer: "Lyon"}],
+             field: :answer
+           ) == "Paris"
+
     assert {:ok, pred} = DSEx.Predict.Predict.call(program, %{question: "2+2?"})
     assert DSEx.Prediction.get(pred, :answer) == "4"
 
