@@ -47,6 +47,27 @@ defmodule MoxContractTest do
              |> Enum.map(& &1.chunk)
   end
 
+  test "DSEx.Streaming provider mode streams through ChainOfThought wrappers" do
+    expect(DSEx.Test.LMMock, :stream, fn lm, messages, _opts ->
+      assert lm == DSEx.Test.LMMock
+      rendered = Enum.map_join(messages, "\n", & &1.content)
+      assert rendered =~ "[[ ## reasoning ## ]]"
+      assert rendered =~ "[[ ## answer ## ]]"
+
+      [
+        %DSEx.Streaming.Messages.StreamResponse{chunk: "because "},
+        %DSEx.Streaming.Messages.StreamResponse{chunk: "Paris", done: true}
+      ]
+    end)
+
+    program = DSEx.chain_of_thought("question -> answer", lm: DSEx.Test.LMMock)
+
+    assert ["because ", "Paris"] =
+             program
+             |> DSEx.Streaming.stream(%{question: "France?"}, provider_stream: true)
+             |> Enum.map(& &1.chunk)
+  end
+
   test "DSEx.Retrieve behaviour contract is verified by Mox" do
     expect(DSEx.Test.RetrieverMock, :retrieve, fn query, opts ->
       assert query == "beam"

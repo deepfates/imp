@@ -462,6 +462,24 @@ defmodule CompletionSurfaceTest do
     assert Enum.take(DSEx.Streaming.stream(program, %{question: "order?"}), 6) == ~w(o n e t w o)
   end
 
+  test "streaming fallback collects wrapper outputs through their task contracts" do
+    pot_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
+    }
+
+    pot = DSEx.program_of_thought("x -> doubled", lm: pot_lm, output_field: :doubled)
+    assert DSEx.Streaming.collect(pot, %{x: 21}) == "42"
+
+    cot_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris", reasoning: "known"} end]
+    }
+
+    cot = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
+    assert DSEx.Streaming.collect(cot, %{question: "France capital?"}) == "knownParis"
+  end
+
   test "dataset loaders produce examples with declared inputs" do
     path =
       Path.join(
