@@ -175,7 +175,7 @@ defmodule DSEx.Predict.ReAct do
     args =
       (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
          %{})
-      |> normalize_args()
+      |> DSEx.Tool.normalize_arguments()
 
     {name, args, execute_tool_call(agent, name, requested_name, args)}
   end
@@ -273,31 +273,7 @@ defmodule DSEx.Predict.ReAct do
 
   defp tool_parameters(_tool, _signature), do: %{"type" => "object", "properties" => %{}}
 
-  defp normalize_tool_name(tools, name) do
-    Enum.find_value(Map.keys(tools), fn known ->
-      if to_string(known) == to_string(name), do: known
-    end)
-  end
-
-  defp normalize_args(args) when is_map(args),
-    do: Map.new(args, fn {key, value} -> {safe_existing_atom(key), value} end)
-
-  defp normalize_args(args) when is_binary(args) do
-    case Jason.decode(args) do
-      {:ok, decoded} -> normalize_args(decoded)
-      {:error, _reason} -> args
-    end
-  end
-
-  defp normalize_args(args), do: args
-
-  defp safe_existing_atom(key) when is_atom(key), do: key
-
-  defp safe_existing_atom(key) do
-    String.to_existing_atom(to_string(key))
-  rescue
-    ArgumentError -> to_string(key)
-  end
+  defp normalize_tool_name(tools, name), do: DSEx.Tool.resolve_name(tools, name)
 
   defp non_negative_integer(value) when is_integer(value) and value >= 0, do: value
 end

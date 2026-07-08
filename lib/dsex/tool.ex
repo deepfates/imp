@@ -83,6 +83,48 @@ defmodule DSEx.Tool do
   end
 
   @doc """
+  Resolves a model/provider tool name to the canonical name in a tool catalog.
+
+  Provider payloads commonly send names as strings, while Elixir code usually
+  stores tool names as atoms. This helper performs string-equivalent lookup
+  without creating atoms from model output.
+
+      iex> tools = [DSEx.Tool.new(:lookup, "lookup", fn _ -> :ok end)]
+      iex> catalog = DSEx.Tool.index_tools!(tools, "example")
+      iex> DSEx.Tool.resolve_name(catalog, "lookup")
+      :lookup
+      iex> DSEx.Tool.resolve_name(catalog, "missing")
+      nil
+  """
+  def resolve_name(tools, name) when is_map(tools) do
+    Enum.find_value(Map.keys(tools), fn known ->
+      if to_string(known) == to_string(name), do: known
+    end)
+  end
+
+  @doc """
+  Normalizes model/provider tool arguments into the DSEx tool-call shape.
+
+  JSON string arguments are decoded. Map keys become existing atoms when the
+  atom is already loaded and stay strings otherwise, avoiding atom leaks from
+  untrusted model output while keeping idiomatic Elixir tool functions pleasant.
+
+      iex> DSEx.Tool.normalize_arguments(~s({"query":"capital"}))
+      %{query: "capital"}
+  """
+  def normalize_arguments(arguments) when is_binary(arguments) do
+    case Jason.decode(arguments) do
+      {:ok, decoded} -> normalize_arguments(decoded)
+      {:error, _reason} -> arguments
+    end
+  end
+
+  def normalize_arguments(arguments) when is_map(arguments),
+    do: Map.new(arguments, fn {key, value} -> {safe_existing_atom(key), value} end)
+
+  def normalize_arguments(arguments), do: arguments
+
+  @doc """
   Calls a tool with one argument.
 
   This executes the underlying function inside a `[:dsex, :tool]` telemetry
@@ -105,5 +147,13 @@ defmodule DSEx.Tool do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> name
+  end
+
+  defp safe_existing_atom(key) when is_atom(key), do: key
+
+  defp safe_existing_atom(key) do
+    String.to_existing_atom(to_string(key))
+  rescue
+    ArgumentError -> to_string(key)
   end
 end

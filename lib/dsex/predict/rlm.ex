@@ -380,20 +380,9 @@ defmodule DSEx.Predict.RLM do
     |> Enum.map(&%{name: &1.name, description: &1.description, schema: &1.schema})
   end
 
-  defp normalize_tool_name(tools, name) do
-    Enum.find_value(Map.keys(tools), fn known ->
-      if to_string(known) == to_string(name), do: known
-    end)
-  end
+  defp normalize_tool_name(tools, name), do: DSEx.Tool.resolve_name(tools, name)
 
-  defp normalize_tool_args(args) when is_binary(args) do
-    case Jason.decode(args) do
-      {:ok, decoded} -> decoded
-      {:error, _reason} -> args
-    end
-  end
-
-  defp normalize_tool_args(args), do: args
+  defp normalize_tool_args(args), do: DSEx.Tool.normalize_arguments(args)
 
   defp execute_tool_call(_rlm, nil, requested_name, _args),
     do: {:error, {:unknown_tool, requested_name}}

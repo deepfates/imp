@@ -197,7 +197,7 @@ defmodule RLMPublicSurfaceTest do
       ]
     }
 
-    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
+    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
     rlm =
@@ -229,7 +229,7 @@ defmodule RLMPublicSurfaceTest do
       ]
     }
 
-    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
+    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
     rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 3)

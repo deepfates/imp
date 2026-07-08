@@ -168,18 +168,7 @@ defmodule DSEx.Predict.CodeAct do
 
   defp present?(value), do: value not in [nil, ""]
 
-  defp normalize_tool_name(tools, name) do
-    Enum.find_value(Map.keys(tools), fn known ->
-      if to_string(known) == to_string(name), do: known
-    end)
-  end
+  defp normalize_tool_name(tools, name), do: DSEx.Tool.resolve_name(tools, name)
 
-  defp normalize_tool_args(arguments) when is_binary(arguments) do
-    case Jason.decode(arguments) do
-      {:ok, decoded} -> decoded
-      {:error, _reason} -> arguments
-    end
-  end
-
-  defp normalize_tool_args(arguments), do: arguments
+  defp normalize_tool_args(arguments), do: DSEx.Tool.normalize_arguments(arguments)
 end

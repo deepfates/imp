@@ -179,6 +179,16 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "tool argument normalization keeps unknown provider keys as strings" do
+    unknown_key = "model_generated_key_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
+
+    assert %{^unknown_key => "kept", query: "capital"} =
+             DSEx.Tool.normalize_arguments(%{"query" => "capital", unknown_key => "kept"})
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
+  end
+
   test "string tool policies authorize normalized ReAct tool names" do
     lm = %{
       module: DSEx.LM.Static,
