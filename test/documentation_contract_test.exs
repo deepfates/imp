@@ -9,12 +9,24 @@ defmodule DocumentationContractTest do
     refute body =~ "integration gate required"
     refute body =~ "integration gate needed"
     refute body =~ "DSEx.Embeddings.Hash"
+    refute body =~ "DSEx.MCP.InProcess"
+    refute body =~ "DSEx.MCP.HTTP`"
+    refute body =~ "DSEx.MCP.Stdio`"
+    refute body =~ "DSEx.MCP.StreamableHTTP`"
 
     assert body =~ "mix integration.check"
     assert body =~ "mix protocol.training.check"
     assert body =~ "mix protocol.check"
     assert body =~ "DSEx.Embeddings.BagOfWords"
     assert Code.ensure_loaded?(DSEx.Embeddings.BagOfWords)
+    assert body =~ "DSEx.MCP.Catalog"
+    assert body =~ "DSEx.MCP.HTTPClient"
+    assert body =~ "DSEx.MCP.StdioClient"
+    assert body =~ "DSEx.MCP.StreamableHTTPClient"
+    assert Code.ensure_loaded?(DSEx.MCP.Catalog)
+    assert Code.ensure_loaded?(DSEx.MCP.HTTPClient)
+    assert Code.ensure_loaded?(DSEx.MCP.StdioClient)
+    assert Code.ensure_loaded?(DSEx.MCP.StreamableHTTPClient)
   end
 
   test "release criteria are expressed as current product evidence, not historical tickets" do
