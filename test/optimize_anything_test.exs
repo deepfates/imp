@@ -100,6 +100,12 @@ defmodule OptimizeAnythingTest do
                  end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.optimize\/3: invalid value for :seed option: expected integer/,
+                 fn ->
+                   Anything.optimize(artifact, evaluator, seed: "seven")
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Optimize\.Anything\.optimize\/3 expects :mutation_fn to be an arity-3 function/,
                  fn ->
                    Anything.optimize(artifact, evaluator, mutation_fn: fn _artifact -> "bad" end)

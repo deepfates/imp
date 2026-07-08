@@ -140,7 +140,7 @@ defmodule DSEx.Optimize.Anything do
   ]
 
   @optimize_option_schema [
-    seed: [type: :any, default: 0],
+    seed: [type: :integer, default: 0],
     examples: [type: {:list, :any}, default: []],
     trials: [type: :non_neg_integer, default: 8],
     mutation_fn: [type: :any, default: nil]
