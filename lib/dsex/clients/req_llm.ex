@@ -19,15 +19,15 @@ defmodule DSEx.Clients.ReqLLM do
           req_module: module()
         }
 
+  @new_option_schema [
+    req_module: [type: :any, default: ReqLLM],
+    opts: [type: :keyword_list, default: []]
+  ]
+
   def new(model_spec, opts \\ []) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "#{inspect(__MODULE__)}.new/2 expects keyword options"
-    end
+    {req_module, nested_opts} = validate_new_opts!(opts)
 
-    req_module = Keyword.get(opts, :req_module, ReqLLM)
-    nested_opts = Keyword.get(opts, :opts, [])
-
-    unless is_atom(req_module) and Keyword.keyword?(nested_opts) do
+    unless is_atom(req_module) do
       raise ArgumentError,
             "#{inspect(__MODULE__)}.new/2 expects :req_module atom and :opts keyword list"
     end
@@ -40,10 +40,18 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   @impl true
-  def generate(messages, opts),
-    do: generate(new(Keyword.fetch!(opts, :model), opts), messages, opts)
+  def generate(messages, opts) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/2")
+
+    case Keyword.fetch(opts, :model) do
+      {:ok, model} -> generate(new(model, opts), messages, opts)
+      :error -> {:error, :req_llm_model_required}
+    end
+  end
 
   def generate(%__MODULE__{} = lm, messages, opts) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
+
     opts =
       lm.opts
       |> Keyword.merge(opts)
@@ -116,6 +124,8 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   def cache_key(%__MODULE__{} = lm, messages, opts) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.cache_key/3")
+
     opts =
       opts
       |> Keyword.drop([:api_key, :headers, :req_module])
@@ -130,11 +140,15 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate_async/3")
+
     DSEx.Tasks.async(fn -> generate(lm, messages, opts) end)
   end
 
   @impl true
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.stream/3")
+
     opts =
       lm.opts
       |> Keyword.merge(opts)
@@ -183,6 +197,37 @@ defmodule DSEx.Clients.ReqLLM do
         |> Keyword.drop([:api_key, :authorization, :headers])
         |> Enum.map(fn {k, v} -> [Atom.to_string(k), v] end)
     }
+  end
+
+  defp validate_new_opts!(opts) when is_list(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+    end
+
+    owned_opts =
+      opts
+      |> Keyword.take([:req_module, :opts])
+      |> DSEx.Options.validate!(@new_option_schema, "#{inspect(__MODULE__)}.new/2")
+
+    {Keyword.fetch!(owned_opts, :req_module), Keyword.fetch!(owned_opts, :opts)}
+  end
+
+  defp validate_new_opts!(opts) do
+    raise ArgumentError,
+          "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+  end
+
+  defp validate_call_opts!(opts, context) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      opts
+    else
+      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    end
+  end
+
+  defp validate_call_opts!(opts, context) do
+    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
 
   defp to_req_messages(messages) do

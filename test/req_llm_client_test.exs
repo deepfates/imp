@@ -76,6 +76,70 @@ defmodule ReqLLMClientTest do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
 
+  test "ReqLLM constructor validates DSEx-owned options while preserving provider passthrough" do
+    lm =
+      DSEx.Clients.ReqLLM.new("openai:gpt-test",
+        opts: [temperature: 0],
+        top_p: 0.9,
+        req_module: TextStub
+      )
+
+    assert %DSEx.Clients.ReqLLM{
+             model: "openai:gpt-test",
+             opts: [temperature: 0, top_p: 0.9],
+             req_module: TextStub
+           } = lm
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.new\/2 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.new("openai:gpt-test", %{temperature: 0})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.new\/2 expects :req_module atom/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.new("openai:gpt-test", req_module: "not-a-module")
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :opts option/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.new("openai:gpt-test", opts: %{temperature: 0})
+                 end
+  end
+
+  test "ReqLLM call surfaces reject malformed option containers before provider work starts" do
+    lm = DSEx.Clients.ReqLLM.new("openai:gpt-test", req_module: TextStub)
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.generate\/3 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], %{
+                     cache: false
+                   })
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.generate_async\/3 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "hello"}], %{
+                     cache: false
+                   })
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Clients.ReqLLM\.stream\/3 expects keyword options/,
+                 fn ->
+                   DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], %{
+                     provider_stream: true
+                   })
+                 end
+
+    assert {:error, :req_llm_model_required} =
+             DSEx.Clients.ReqLLM.generate([%{role: :user, content: "hello"}], [])
+  end
+
   test "ReqLLM client drives DSEx prediction and translates JSON/schema options" do
     lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
 
