@@ -83,6 +83,41 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "malformed provider tool calls become structured ReAct errors" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: ["not-a-tool-call"]}
+        end
+      ]
+    }
+
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
+
+    assert {:error, {:malformed_tool_call, "not-a-tool-call"}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "provider JSON string tool arguments are decoded before execution" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: :lookup, arguments: ~s({"query":"capital"})}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> %{answer: "Paris"} end)
+    agent = DSEx.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
+
+    assert {:error,
+            {:react_max_iters,
+             [%{tool: :lookup, arguments: %{query: "capital"}, result: %{answer: "Paris"}}]}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
   test "tool exceptions become structured ReAct errors" do
     lm = %{
       module: DSEx.LM.Static,

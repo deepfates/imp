@@ -127,15 +127,7 @@ defmodule DSEx.Predict.ReAct do
 
   defp execute_calls(agent, calls) do
     Enum.reduce_while(calls, {[], nil}, fn call, {events, final} ->
-      requested_name = Map.get(call, :name) || Map.get(call, "name")
-      name = normalize_tool_name(agent.tools, requested_name)
-
-      args =
-        (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
-           %{})
-        |> normalize_args()
-
-      result = execute_tool_call(agent, name, requested_name, args)
+      {name, args, result} = prepare_tool_call(agent, call)
 
       event = DSEx.Redaction.redact(%{tool: name, arguments: args, result: result})
       final = if name == :submit and is_map(result), do: Map.new(result), else: final
@@ -147,6 +139,20 @@ defmodule DSEx.Predict.ReAct do
       end
     end)
   end
+
+  defp prepare_tool_call(agent, call) when is_map(call) do
+    requested_name = Map.get(call, :name) || Map.get(call, "name")
+    name = normalize_tool_name(agent.tools, requested_name)
+
+    args =
+      (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
+         %{})
+      |> normalize_args()
+
+    {name, args, execute_tool_call(agent, name, requested_name, args)}
+  end
+
+  defp prepare_tool_call(_agent, call), do: {nil, %{}, {:error, {:malformed_tool_call, call}}}
 
   defp execute_tool_call(_agent, nil, requested_name, _args),
     do: {:error, {:unknown_tool, requested_name}}
@@ -272,6 +278,13 @@ defmodule DSEx.Predict.ReAct do
 
   defp normalize_args(args) when is_map(args),
     do: Map.new(args, fn {key, value} -> {safe_existing_atom(key), value} end)
+
+  defp normalize_args(args) when is_binary(args) do
+    case Jason.decode(args) do
+      {:ok, decoded} -> normalize_args(decoded)
+      {:error, _reason} -> args
+    end
+  end
 
   defp normalize_args(args), do: args
 

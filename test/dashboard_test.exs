@@ -216,7 +216,9 @@ defmodule DashboardTest do
         "--results-dir",
         results_dir,
         "--out",
-        out_dir
+        out_dir,
+        "--max-age-hours",
+        "100000"
       ])
     end)
 
@@ -348,6 +350,8 @@ defmodule DashboardTest do
           results_dir,
           "--out",
           out_dir,
+          "--max-age-hours",
+          "100000",
           "--require-full"
         ])
       end)
