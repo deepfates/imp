@@ -5,7 +5,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
 
   @option_schema [
     trainer: [type: :any, default: nil],
-    max_demos: [type: :any, default: 32]
+    max_demos: [type: :non_neg_integer, default: 32]
   ]
 
   def new(metric, opts \\ []) do
@@ -15,7 +15,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
     %__MODULE__{
       metric: metric,
       trainer: opts[:trainer],
-      max_demos: non_negative_integer(opts[:max_demos])
+      max_demos: opts[:max_demos]
     }
   end
 
@@ -48,9 +48,6 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   defp get_lm(%DSEx.Predict.Predict{lm: lm}), do: lm
   defp get_lm(%DSEx.Predict.ChainOfThought{predict: predict}), do: get_lm(predict)
   defp get_lm(_program), do: nil
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_metric!(metric) when is_function(metric, 2), do: :ok
 

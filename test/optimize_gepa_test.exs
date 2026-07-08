@@ -91,6 +91,12 @@ defmodule OptimizeGEPATest do
                  end
 
     assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.GEPA\.optimize\/3: invalid value for :generations option: expected non negative integer/,
+                 fn ->
+                   GEPA.optimize(artifact, evaluator, generations: -1)
+                 end
+
+    assert_raise ArgumentError,
                  ~r/DSEx\.Optimize\.GEPA\.optimize\/3 expects :mutation_fn to be an arity-3 function/,
                  fn ->
                    GEPA.optimize(artifact, evaluator, mutation_fn: fn _artifact -> "bad" end)

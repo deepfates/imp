@@ -391,7 +391,7 @@ defmodule ProviderTrainingLifecycleTest do
                  end
   end
 
-  test "BootstrapFinetune clamps non-positive max_demos before training" do
+  test "BootstrapFinetune treats zero max_demos as no provider demos and rejects negative counts" do
     lm = DSEx.req_llm("gpt-test")
     program = DSEx.predict("question -> answer", lm: lm)
     metric = DSEx.Metrics.exact_match(:answer)
@@ -403,10 +403,16 @@ defmodule ProviderTrainingLifecycleTest do
 
     result =
       metric
-      |> DSEx.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: -5)
+      |> DSEx.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: 0)
       |> DSEx.Optimizer.BootstrapFinetune.compile(program, examples())
 
     assert %{program: %DSEx.Predict.Predict{}, job: %DSEx.Clients.TrainingJob{}} = result
     assert_received {:finetune_demos, []}
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2: invalid value for :max_demos option: expected non negative integer/,
+                 fn ->
+                   DSEx.Optimizer.BootstrapFinetune.new(metric, max_demos: -1)
+                 end
   end
 end

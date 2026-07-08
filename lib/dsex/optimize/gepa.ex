@@ -41,7 +41,7 @@ defmodule DSEx.Optimize.GEPA do
   @option_schema [
     examples: [type: {:list, :any}, default: []],
     dev_examples: [type: {:list, :any}, default: []],
-    generations: [type: :any, default: 4],
+    generations: [type: :non_neg_integer, default: 4],
     mutation_fn: [type: :any, default: nil],
     reflection_lm: [type: :any, default: nil]
   ]
@@ -52,7 +52,7 @@ defmodule DSEx.Optimize.GEPA do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimize.GEPA.optimize/3")
     examples = opts[:examples]
     dev_examples = opts[:dev_examples]
-    generations = non_negative_integer(opts[:generations])
+    generations = opts[:generations]
     mutation_fn = opts[:mutation_fn] || reflection_mutation_fn(opts)
     validate_mutation_fn!(mutation_fn)
 
@@ -116,9 +116,6 @@ defmodule DSEx.Optimize.GEPA do
 
   defp generation_indices(count) when is_integer(count) and count > 0, do: 1..count
   defp generation_indices(_count), do: []
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   def pareto_frontier(candidates) do
     candidates

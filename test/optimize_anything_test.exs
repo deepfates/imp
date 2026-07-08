@@ -51,7 +51,7 @@ defmodule OptimizeAnythingTest do
     File.rm(path)
   end
 
-  test "non-positive trials evaluate only the baseline artifact" do
+  test "zero trials evaluate only the baseline artifact" do
     artifact = Anything.new_artifact(:prompt, "baseline")
 
     report =
@@ -60,7 +60,7 @@ defmodule OptimizeAnythingTest do
         fn artifact, _examples ->
           if artifact.text == "baseline", do: 0.75, else: flunk("unexpected candidate")
         end,
-        trials: -2,
+        trials: 0,
         mutation_fn: fn _artifact, _trial, _seed -> flunk("unexpected mutation") end
       )
 
@@ -91,6 +91,12 @@ defmodule OptimizeAnythingTest do
                  ~r/DSEx\.Optimize\.Anything\.optimize\/3: expected keyword options/,
                  fn ->
                    Anything.optimize(artifact, evaluator, %{trials: 1})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Optimize\.Anything\.optimize\/3: invalid value for :trials option: expected non negative integer/,
+                 fn ->
+                   Anything.optimize(artifact, evaluator, trials: -1)
                  end
 
     assert_raise ArgumentError,

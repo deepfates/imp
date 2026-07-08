@@ -142,7 +142,7 @@ defmodule DSEx.Optimize.Anything do
   @optimize_option_schema [
     seed: [type: :any, default: 0],
     examples: [type: {:list, :any}, default: []],
-    trials: [type: :any, default: 8],
+    trials: [type: :non_neg_integer, default: 8],
     mutation_fn: [type: :any, default: nil]
   ]
 
@@ -182,7 +182,7 @@ defmodule DSEx.Optimize.Anything do
 
     seed = opts[:seed]
     examples = opts[:examples]
-    trials = non_negative_integer(opts[:trials])
+    trials = opts[:trials]
     mutation_fn = opts[:mutation_fn] || (&default_mutation/3)
     validate_mutation_fn!(mutation_fn)
 
@@ -321,9 +321,6 @@ defmodule DSEx.Optimize.Anything do
 
   defp trial_indices(count) when is_integer(count) and count > 0, do: 1..count
   defp trial_indices(_count), do: []
-
-  defp non_negative_integer(value) when is_integer(value) and value > 0, do: value
-  defp non_negative_integer(_value), do: 0
 
   defp validate_mutation_fn!(mutation_fn) when is_function(mutation_fn, 3), do: :ok
 
