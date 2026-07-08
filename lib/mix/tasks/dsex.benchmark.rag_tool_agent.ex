@@ -220,7 +220,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
     result = DSEx.Predict.ReAct.call(agent, %{question: "What is France's capital?"})
 
     passing =
-      match?({:error, {:react_max_iters, [%{result: {:error, :unknown_tool}}]}}, result)
+      match?({:error, {:unknown_tool, :missing_tool}}, result)
 
     %{
       "id" => "react_unknown_tool_error_trace",
@@ -310,7 +310,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
       ]
     }
 
-    lookup = DSEx.Tool.new(:lookup, "lookup a number", fn %{"key" => "n"} -> 41 end)
+    lookup = DSEx.Tool.new(:lookup, "lookup a number", fn %{key: "n"} -> 41 end)
     code_act = DSEx.Predict.CodeAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
     {:ok, prediction} = DSEx.Predict.CodeAct.call(code_act, %{question: "life?"})
     Process.delete(:rag_tool_agent_code_act_actions)
