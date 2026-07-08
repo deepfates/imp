@@ -43,14 +43,29 @@ defmodule DSEx.Evaluate do
 
   defstruct [:devset, :metric, display_progress: false, failure_score: 0.0, max_errors: :infinity]
 
-  def new(devset, metric, opts \\ []) when is_function(metric, 2) or is_function(metric, 3) do
+  @option_schema [
+    display_progress: [type: :boolean, default: false],
+    failure_score: [type: {:or, [:integer, :float]}, default: 0.0],
+    max_errors: [type: :any, default: :infinity]
+  ]
+
+  def new(devset, metric, opts \\ [])
+
+  def new(devset, metric, opts) when is_function(metric, 2) or is_function(metric, 3) do
+    opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Evaluate.new/3")
+
     %__MODULE__{
       devset: devset,
       metric: metric,
-      display_progress: Keyword.get(opts, :display_progress, false),
-      failure_score: Keyword.get(opts, :failure_score, 0.0),
-      max_errors: Keyword.get(opts, :max_errors, :infinity)
+      display_progress: opts[:display_progress],
+      failure_score: opts[:failure_score],
+      max_errors: normalize_max_errors!(opts[:max_errors])
     }
+  end
+
+  def new(_devset, metric, _opts) do
+    raise ArgumentError,
+          "DSEx.Evaluate.new/3 expects a metric function with arity 2 or 3; got: #{inspect(metric)}"
   end
 
   def run(%__MODULE__{} = evaluator, program) do
@@ -171,6 +186,14 @@ defmodule DSEx.Evaluate do
 
   defp too_many_errors?(_errors, :infinity), do: false
   defp too_many_errors?(errors, max_errors), do: length(errors) > max_errors
+
+  defp normalize_max_errors!(:infinity), do: :infinity
+  defp normalize_max_errors!(value) when is_integer(value) and value >= 0, do: value
+
+  defp normalize_max_errors!(value) do
+    raise ArgumentError,
+          "DSEx.Evaluate.new/3 expects :max_errors to be :infinity or a non-negative integer; got: #{inspect(value)}"
+  end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

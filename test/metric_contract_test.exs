@@ -71,6 +71,35 @@ defmodule MetricContractTest do
     assert length(result.rows) == 1
   end
 
+  test "Evaluate constructor reports invalid metrics and options clearly" do
+    devset = [example("one", "1")]
+    metric = fn _example, _prediction -> true end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Evaluate\.new\/3 expects a metric function with arity 2 or 3/,
+                 fn ->
+                   DSEx.Evaluate.new(devset, :not_a_metric)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Evaluate\.new\/3: expected keyword options/, fn ->
+      DSEx.Evaluate.new(devset, metric, :not_options)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Evaluate\.new\/3.*:display_progress.*expected.*boolean/s,
+                 fn ->
+                   DSEx.Evaluate.new(devset, metric, display_progress: :sometimes)
+                 end
+
+    assert_raise ArgumentError, ~r/DSEx\.Evaluate\.new\/3.*:failure_score/s, fn ->
+      DSEx.Evaluate.new(devset, metric, failure_score: :zero)
+    end
+
+    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+      DSEx.Evaluate.new(devset, metric, max_errors: -1)
+    end
+  end
+
   test "Evaluate records program crashes and invalid returns as failed rows" do
     metric = fn _example, _prediction -> true end
 
