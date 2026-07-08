@@ -190,6 +190,13 @@ field is missing or violates the schema.
 ### Evaluation
 
 ```elixir
+qa_lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+qa_program = DSEx.predict("question -> answer", lm: qa_lm)
+
 devset = [
   DSEx.example(question: "Capital of France?", answer: "Paris")
   |> DSEx.with_inputs(:question)
@@ -197,7 +204,7 @@ devset = [
 
 metric = DSEx.Metrics.exact_match(:answer)
 
-report = DSEx.evaluate(program, devset, metric)
+report = DSEx.evaluate(qa_program, devset, metric)
 
 report.score
 ```
@@ -209,6 +216,11 @@ record exact match, F1, answer type, and span relation.
 ### Optimization
 
 ```elixir
+trainset = [
+  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
+
 optimizer =
   DSEx.Optimizer.RandomSearch.new(metric,
     candidates: 8,
@@ -217,7 +229,7 @@ optimizer =
 
 compiled =
   DSEx.optimize(
-    program,
+    qa_program,
     optimizer,
     trainset,
     devset
@@ -230,6 +242,15 @@ data, so you can inspect what changed and why.
 ### Tools And Agents
 
 ```elixir
+tool_lm = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+    end
+  ]
+}
+
 lookup =
   DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
     "Paris"
@@ -237,6 +258,7 @@ lookup =
 
 agent =
   DSEx.react("question -> answer: short_span", [lookup],
+    lm: tool_lm,
     tool_policy: [:lookup, :submit]
   )
 ```

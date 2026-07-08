@@ -84,6 +84,75 @@ defmodule DocumentationContractTest do
     assert body =~ "OPENAI_MODEL"
   end
 
+  test "README common workflow snippets compose as one coherent path" do
+    typed_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{sentiment: "positive", confidence: 0.9} end]
+    }
+
+    signature =
+      DSEx.signature(
+        "text -> sentiment: enum[positive,negative], confidence: number",
+        "Classify the sentiment of the text."
+      )
+
+    typed_program = DSEx.predict(signature, lm: typed_lm, adapter: DSEx.Adapter.JSON)
+
+    assert {:ok, typed_prediction} = DSEx.call(typed_program, %{text: "DSEx is useful."})
+    assert DSEx.get(typed_prediction, :sentiment) == "positive"
+    assert DSEx.get(typed_prediction, :confidence) == 0.9
+
+    qa_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    qa_program = DSEx.predict("question -> answer", lm: qa_lm)
+
+    trainset = [
+      DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    devset = [
+      DSEx.example(question: "Capital of France?", answer: "Paris")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(qa_program, devset, metric)
+
+    optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1)
+    compiled = DSEx.optimize(qa_program, optimizer, trainset, devset)
+
+    assert %DSEx.Optimizer.Report{optimizer: :random_search} =
+             DSEx.Optimizer.Report.fetch(compiled)
+
+    tool_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+        end
+      ]
+    }
+
+    lookup =
+      DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
+        "Paris"
+      end)
+
+    agent =
+      DSEx.react("question -> answer: short_span", [lookup],
+        lm: tool_lm,
+        tool_policy: [:lookup, :submit]
+      )
+
+    assert {:ok, agent_prediction} = DSEx.call(agent, %{question: "Capital of France?"})
+    assert DSEx.get(agent_prediction, :answer) == "Paris"
+  end
+
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
     advanced = File.read!("docs/ADVANCED.md")
