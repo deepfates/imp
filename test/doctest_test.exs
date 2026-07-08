@@ -15,6 +15,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Predict.MultiChainComparison
   doctest DSEx.Predict.Predict
   doctest DSEx.Redaction
+  doctest DSEx.Settings
   doctest DSEx.Signature
   doctest DSEx.Telemetry
   doctest DSEx.Tool

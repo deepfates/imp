@@ -18,6 +18,13 @@ defmodule DSEx.Settings do
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
+  @doc """
+  Updates node-local DSEx defaults.
+
+  Use this for application-level defaults such as the LM client or adapter. For
+  request, test, Livebook cell, or task-local overrides, prefer `context/2` so
+  the override is restored automatically.
+  """
   def configure(opts) when is_list(opts) or is_map(opts) do
     updates = normalize_settings(opts, "DSEx.configure/1")
     ensure_started()
@@ -30,6 +37,16 @@ defmodule DSEx.Settings do
           "DSEx.configure/1 expects a map or settings pair list; got: #{inspect(opts)}"
   end
 
+  @doc """
+  Returns the effective settings for the current process.
+
+  Effective settings are the global defaults plus any nested `context/2`
+  overrides in the current process.
+
+      iex> DSEx.Settings.context([lm: :local], fn -> DSEx.Settings.get().lm end)
+      :local
+
+  """
   def get do
     ensure_started()
     global = Agent.get(@name, & &1)
@@ -40,14 +57,53 @@ defmodule DSEx.Settings do
     |> Enum.reduce(global, &Map.merge(&2, &1))
   end
 
+  @doc """
+  Fetches one effective setting or raises when the key is absent.
+
+      iex> DSEx.Settings.context([request_id: "req-1"], fn -> DSEx.Settings.fetch!(:request_id) end)
+      "req-1"
+
+  """
   def fetch!(key), do: get() |> Map.fetch!(key)
 
+  @doc """
+  Restores global settings to DSEx defaults.
+
+  Process-local `context/2` overrides are not global state and are restored by
+  the context call itself.
+  """
   def reset do
     ensure_started()
     Agent.update(@name, fn _settings -> @defaults end)
     :ok
   end
 
+  @doc """
+  Runs a zero-arity function with process-local settings overrides.
+
+  Overrides are stack-based and restored even if the function raises. Child
+  processes do not inherit ordinary process-local settings automatically; use
+  DSEx-owned task helpers when you want context propagation through supervised
+  async work.
+
+      iex> DSEx.Settings.context([lm: :outer], fn ->
+      ...>   DSEx.Settings.context([adapter: :inner], fn ->
+      ...>     {DSEx.Settings.get().lm, DSEx.Settings.get().adapter}
+      ...>   end)
+      ...> end)
+      {:outer, :inner}
+
+      iex> parent = self()
+      iex> DSEx.Settings.context([lm: :parent_only], fn ->
+      ...>   task = Task.async(fn -> send(parent, {:child_lm, DSEx.Settings.get().lm}) end)
+      ...>   Task.await(task)
+      ...> end)
+      iex> receive do
+      ...>   {:child_lm, value} -> value
+      ...> end
+      nil
+
+  """
   def context(opts, fun) when is_function(fun, 0) do
     settings = normalize_settings(opts, "DSEx.context/2")
     previous = Process.get(@context_key, [])
