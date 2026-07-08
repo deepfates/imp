@@ -14,7 +14,14 @@ defmodule DSEx.Signature.Field do
         }
 
   def new(%__MODULE__{} = field, _kind), do: field
-  def new({name, opts}, kind), do: new(Map.put(Map.new(opts), :name, name), kind)
+
+  def new({name, opts}, kind) when is_list(opts) or is_map(opts),
+    do: new(Map.put(Map.new(opts), :name, name), kind)
+
+  def new({_name, opts}, _kind) do
+    raise ArgumentError,
+          "DSEx.Signature.Field.new/2 expects field options as a map or keyword list, got: #{inspect(opts)}"
+  end
 
   def new(%{} = attrs, kind) do
     name = attrs |> Map.get(:name, Map.get(attrs, "name")) |> normalize_name()
@@ -37,6 +44,11 @@ defmodule DSEx.Signature.Field do
     {name, type} = parse_name_and_type(name)
     name = normalize_name(name)
     %__MODULE__{name: name, kind: normalize_kind(kind), type: type, prefix: infer_prefix(name)}
+  end
+
+  def new(name, _kind) do
+    raise ArgumentError,
+          "DSEx.Signature.Field.new/2 expects field name or map to use an atom or string name, got: #{inspect(name)}"
   end
 
   def dump(%__MODULE__{} = field) do
@@ -75,11 +87,29 @@ defmodule DSEx.Signature.Field do
   defp normalize_name(name) when is_binary(name),
     do: name |> String.trim() |> existing_atom_or_string()
 
+  defp normalize_name(name) do
+    raise ArgumentError,
+          "DSEx.Signature.Field.new/2 expects field name to be an atom or string, got: #{inspect(name)}"
+  end
+
   defp normalize_kind(kind) when kind in [:input, :output], do: kind
   defp normalize_kind("input"), do: :input
   defp normalize_kind("output"), do: :output
+
+  defp normalize_kind(kind),
+    do:
+      raise(
+        ArgumentError,
+        "DSEx.Signature.Field.new/2 expects kind to be :input or :output, got: #{inspect(kind)}"
+      )
+
   defp normalize_type(type) when is_atom(type), do: type
   defp normalize_type(type) when is_binary(type), do: normalize_type_alias(type)
+
+  defp normalize_type(type) do
+    raise ArgumentError,
+          "DSEx.Signature.Field.new/2 expects field type to be an atom or string, got: #{inspect(type)}"
+  end
 
   defp parse_name_and_type(raw) do
     case String.split(raw, ":", parts: 2) do

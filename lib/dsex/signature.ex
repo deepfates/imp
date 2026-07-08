@@ -73,8 +73,8 @@ defmodule DSEx.Signature do
             "signature map requires :inputs/:outputs or \"inputs\"/\"outputs\" keys"
     end
 
-    inputs = Enum.map(inputs, &Field.new(&1, :input))
-    outputs = Enum.map(outputs, &Field.new(&1, :output))
+    inputs = build_fields!(inputs, :input, "DSEx.Signature.new/2 :inputs")
+    outputs = build_fields!(outputs, :output, "DSEx.Signature.new/2 :outputs")
 
     %__MODULE__{
       inputs: inputs,
@@ -105,12 +105,17 @@ defmodule DSEx.Signature do
   `fields` accepts the same field shapes as `DSEx.Signature.Field.new/2`.
   """
   def extend(%__MODULE__{} = signature, fields, kind) when kind in [:input, :output] do
-    parsed = Enum.map(List.wrap(fields), &Field.new(&1, kind))
+    parsed = build_fields!(List.wrap(fields), kind, "DSEx.Signature.extend/3 fields")
 
     case kind do
       :input -> %{signature | inputs: signature.inputs ++ parsed}
       :output -> %{signature | outputs: signature.outputs ++ parsed}
     end
+  end
+
+  def extend(%__MODULE__{}, _fields, kind) do
+    raise ArgumentError,
+          "DSEx.Signature.extend/3 expects kind to be :input or :output, got: #{inspect(kind)}"
   end
 
   @doc """
@@ -148,17 +153,33 @@ defmodule DSEx.Signature do
   @doc "Loads a signature produced by `dump/1`."
   def load(%{"inputs" => inputs, "outputs" => outputs} = state) do
     %__MODULE__{
-      inputs: Enum.map(inputs, &Field.load/1),
-      outputs: Enum.map(outputs, &Field.load/1),
+      inputs: build_fields!(inputs, :input, "DSEx.Signature.load/1 \"inputs\""),
+      outputs: build_fields!(outputs, :output, "DSEx.Signature.load/1 \"outputs\""),
       instructions: Map.get(state, "instructions"),
       metadata: Map.get(state, "metadata", %{})
     }
+  end
+
+  def load(state) do
+    raise ArgumentError,
+          "DSEx.Signature.load/1 expects a map with \"inputs\" and \"outputs\", got: #{inspect(state)}"
   end
 
   defp default_instructions(inputs, outputs) do
     input_names = inputs |> Enum.map(&"`#{&1.name}`") |> Enum.join(", ")
     output_names = outputs |> Enum.map(&"`#{&1.name}`") |> Enum.join(", ")
     "Given the fields #{input_names}, produce the fields #{output_names}."
+  end
+
+  defp build_fields!(fields, kind, context) do
+    if Enumerable.impl_for(fields) do
+      Enum.map(fields, &Field.new(&1, kind))
+    else
+      raise ArgumentError, "#{context} expects an enumerable of fields, got: #{inspect(fields)}"
+    end
+  rescue
+    error in ArgumentError ->
+      reraise ArgumentError, [message: "#{context}: #{Exception.message(error)}"], __STACKTRACE__
   end
 
   defp join_names(fields), do: fields |> Enum.map(&to_string(&1.name)) |> Enum.join(", ")

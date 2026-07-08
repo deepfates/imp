@@ -88,6 +88,41 @@ defmodule DSExTest do
     end
   end
 
+  test "signature constructors report malformed structured fields clearly" do
+    assert_raise ArgumentError,
+                 ~r/DSEx.Signature.new\/2 :inputs expects an enumerable of fields/,
+                 fn ->
+                   DSEx.Signature.new(%{inputs: :question, outputs: [:answer]})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Signature.new\/2 :outputs: DSEx.Signature.Field.new\/2 expects field name/,
+                 fn ->
+                   DSEx.Signature.new(%{inputs: [:question], outputs: [1]})
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Signature.new\/2 :outputs: DSEx.Signature.Field.new\/2 expects field type/,
+                 fn ->
+                   DSEx.Signature.new(%{
+                     inputs: [:question],
+                     outputs: [%{name: :answer, type: 123}]
+                   })
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Signature.extend\/3 expects kind to be :input or :output/,
+                 fn ->
+                   DSEx.Signature.extend(DSEx.signature("question -> answer"), :context, :middle)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Signature.load\/1 expects a map with "inputs" and "outputs"/,
+                 fn ->
+                   DSEx.Signature.load(%{"input" => []})
+                 end
+  end
+
   test "examples and predictions report invalid field containers clearly" do
     assert_raise ArgumentError,
                  ~r/DSEx\.Example\.new\/1 expects a map, field pair list, or DSEx\.Example/,
