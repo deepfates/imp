@@ -52,22 +52,12 @@ defmodule DSEx.Optimizer.LabeledFewShot do
     kind, reason -> {[], [%{stage: :trainset, reason: error_message({kind, reason})}]}
   end
 
-  defp put_demos(%DSEx.Predict.Predict{} = program, demos),
-    do: DSEx.Predict.Predict.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.ChainOfThought{predict: predict} = program, demos),
-    do: %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
-
-  defp put_demos(%DSEx.Predict.ProgramOfThought{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.CodeAct{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.RAG{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(program, _demos), do: program
+  defp put_demos(program, demos) do
+    case DSEx.ProgramAccess.predict(program) do
+      nil -> program
+      _predict -> DSEx.with_demos(program, demos)
+    end
+  end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

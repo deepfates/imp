@@ -181,21 +181,12 @@ defmodule DSEx.Optimizer.InstructionSearch do
 
   defp maybe_put_demos(program, []), do: program
 
-  defp maybe_put_demos(%DSEx.Predict.Predict{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp maybe_put_demos(%DSEx.Predict.ChainOfThought{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp maybe_put_demos(%DSEx.Predict.ProgramOfThought{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp maybe_put_demos(%DSEx.Predict.CodeAct{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp maybe_put_demos(%DSEx.Predict.RAG{} = program, demos), do: DSEx.with_demos(program, demos)
-
-  defp maybe_put_demos(program, _demos), do: program
+  defp maybe_put_demos(program, demos) do
+    case DSEx.ProgramAccess.predict(program) do
+      nil -> program
+      _predict -> DSEx.with_demos(program, demos)
+    end
+  end
 
   defp attach_optimizer_metadata(%DSEx.Predict.Predict{} = program, metadata),
     do: %{program | metadata: Map.merge(program.metadata, metadata)}

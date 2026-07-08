@@ -503,6 +503,25 @@ defmodule OptimizerReportTest do
     assert Enum.all?(report.errors, &String.contains?(&1.error, "Enumerable"))
   end
 
+  test "instruction search does not hide malformed demo payloads" do
+    {_train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    assert_raise ArgumentError,
+                 ~r/DSEx.Predict.Predict.with_demos\/2 expects demos as DSEx.Example structs/,
+                 fn ->
+                   DSEx.Optimizer.InstructionSearch.compile(
+                     program,
+                     metric,
+                     [],
+                     dev,
+                     ["Always answer Paris."],
+                     demos: [:not_a_demo]
+                   )
+                 end
+  end
+
   test "better together reports unknown strategy keys without crashing" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)

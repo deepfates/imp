@@ -156,22 +156,12 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
 
   defp trainset_error?(errors), do: Enum.any?(errors, &(&1.stage == :trainset))
 
-  defp put_demos(%DSEx.Predict.Predict{} = program, demos),
-    do: DSEx.Predict.Predict.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.ChainOfThought{predict: predict} = program, demos),
-    do: %{program | predict: DSEx.Predict.Predict.with_demos(predict, demos)}
-
-  defp put_demos(%DSEx.Predict.ProgramOfThought{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.CodeAct{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(%DSEx.Predict.RAG{} = program, demos),
-    do: DSEx.with_demos(program, demos)
-
-  defp put_demos(program, _demos), do: program
+  defp put_demos(program, demos) do
+    case DSEx.ProgramAccess.predict(program) do
+      nil -> program
+      _predict -> DSEx.with_demos(program, demos)
+    end
+  end
 
   defp average_score([]), do: 0.0
 
