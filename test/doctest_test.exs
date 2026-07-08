@@ -13,6 +13,7 @@ defmodule DSExDoctestTest do
   doctest DSEx.Predict.Aggregation
   doctest DSEx.Predict.MultiChainComparison
   doctest DSEx.Predict.Predict
+  doctest DSEx.Redaction
   doctest DSEx.Signature
   doctest DSEx.Tool
 end

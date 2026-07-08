@@ -1,5 +1,13 @@
 defmodule DSEx.Redaction do
-  @moduledoc "Shared redaction helpers for traces and runtime metadata."
+  @moduledoc """
+  Shared redaction helpers for traces, telemetry, and runtime metadata.
+
+  DSEx keeps prompts, tool inputs, provider metadata, and optimizer reports
+  inspectable, but credentials and credential-shaped strings must not leak into
+  those artifacts. `redact/2` walks ordinary Elixir maps, lists, and structs,
+  replacing known secret fields and secret-looking string values with
+  `"[REDACTED]"`.
+  """
 
   @default_redact_keys [
     :api_key,
@@ -13,8 +21,38 @@ defmodule DSEx.Redaction do
     :"x-api-key"
   ]
 
+  @doc """
+  Returns the default key names treated as sensitive.
+
+      iex> :api_key in DSEx.Redaction.default_keys()
+      true
+
+      iex> :"x-api-key" in DSEx.Redaction.default_keys()
+      true
+
+  """
   def default_keys, do: @default_redact_keys
 
+  @doc """
+  Redacts sensitive keys and secret-looking string values.
+
+  Key matching is intentionally conservative around common credential names:
+  exact keys, hyphen/underscore variants, suffixes, and containing names such as
+  `:openai_api_key` are redacted.
+
+      iex> DSEx.Redaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
+      %{api_key: "[REDACTED]", model: "demo"}
+
+      iex> DSEx.Redaction.redact(%{nested: [%{"authorization" => "Bearer abcdefghijklmnop"}]})
+      %{nested: [%{"authorization" => "[REDACTED]"}]}
+
+      iex> DSEx.Redaction.redact("sk-test-secret-1234567890")
+      "[REDACTED]"
+
+      iex> DSEx.Redaction.redact(%{tenant_id: "public"}, [:tenant_id])
+      %{tenant_id: "[REDACTED]"}
+
+  """
   def redact(value, keys \\ @default_redact_keys)
 
   def redact(value, keys) when is_struct(value) do
