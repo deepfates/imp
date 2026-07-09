@@ -93,7 +93,6 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     program = spec["program"]
     signature = spec["signature"]
     input_keys = spec["input_keys"]
-    output_key = spec["output_key"]
     budget = spec["metric_calls"]
     paths = split_paths(dataset_root, family)
 
@@ -104,7 +103,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     {wall_us, seed_results} =
       :timer.tc(fn ->
         Enum.map(seeds, fn seed ->
-          run_seed(spec, trainset, devset, testset, output_key, lm, generations, seed)
+          run_seed(spec, trainset, devset, testset, lm, generations, seed)
         end)
       end)
 
@@ -154,8 +153,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     }
   end
 
-  defp run_seed(spec, trainset, devset, testset, output_key, lm, generations, seed) do
-    metric = exact_metric(output_key)
+  defp run_seed(spec, trainset, devset, testset, lm, generations, seed) do
+    metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec)
 
     program =
       spec["signature"]
@@ -185,14 +184,6 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       candidate_count: report.candidate_count,
       frontier_size: Map.get(report.metadata, :frontier_size, 0)
     }
-  end
-
-  defp exact_metric(output_key) do
-    fn example, prediction ->
-      predicted = DSEx.Prediction.get(prediction, output_key)
-      gold = DSEx.Example.get(example, output_key)
-      DSEx.Metrics.normalize_text(predicted) == DSEx.Metrics.normalize_text(gold)
-    end
   end
 
   defp score(program, examples, metric) do

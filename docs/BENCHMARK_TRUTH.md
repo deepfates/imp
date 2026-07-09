@@ -240,11 +240,12 @@ rows. It refuses missing families, missing comparator outputs, ambiguous
 artifact models, and rows that do not satisfy the full-evidence contract after
 merge.
 
-The exported `families.json` records upstream metric names. DSEx's current GEPA
-campaign runner scores the configured output key by exact normalized match; do
-not claim metric-identical GEPA-family quality for Papillon, HoVer, IFBench, or
-LiveBench until dedicated DSEx metric adapters are implemented for those
-upstream metrics.
+The exported `families.json` records upstream metric names. DSEx currently
+ports deterministic metric adapters for AIME integer exact match, HotPotQA
+answer exact match, and HoVer supporting-title retrieval. Unknown or
+judge/parser-heavy metrics fall back to normalized output-key exact match; do
+not claim metric-identical Papillon, IFBench, or LiveBench quality until their
+dedicated DSEx adapters are implemented.
 
 ## Run RAG, Tool, And Agent Parity
 
