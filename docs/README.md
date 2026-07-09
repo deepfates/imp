@@ -75,11 +75,5 @@ for DSEx maintainers validating this repository before release.
 The repository also keeps release-evidence notes for maintainers and reviewers.
 They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
 separate from the packaged user manual. In the source checkout, the benchmark
-catalog is the maintainer starting point for outside-view validation work.
-
-- `docs/UPSTREAM_FIDELITY_AUDIT.md`: current gap map
-  against DSPy, DeepWiki, GEPA, optimize_anything, and the associated papers.
-- `docs/UPSTREAM_SURFACE_MAP.md`: generated maintainer map of
-  tracked upstream surfaces and their current DSEx mapping.
-- `docs/ADAPTER_FIDELITY.md`: Chat, JSON, XML, TwoStep, tool,
-  history, and provider-native adapter semantics.
+catalog and release-evidence notes are the maintainer starting point for
+outside-view validation work.

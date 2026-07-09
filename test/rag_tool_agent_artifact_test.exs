@@ -21,6 +21,8 @@ defmodule RagToolAgentArtifactTest do
     rows = Map.new(artifact["rows"], &{&1["id"], &1})
 
     assert rows["rag_memory_retrieval"]["passing"]
+    assert rows["rag_multi_hop_retrieval"]["passing"]
+    assert get_in(rows, ["rag_multi_hop_retrieval", "dsex", "trace", "hops"]) |> length() == 2
     assert rows["react_lookup_tool"]["passing"]
     assert rows["code_act_tool_program"]["passing"]
     assert get_in(rows, ["code_act_tool_program", "dsex", "trace"]) |> length() == 2

@@ -51,6 +51,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
   defp dsex_report do
     rows = [
       rag_memory_retrieval_row(),
+      rag_multi_hop_retrieval_row(),
       http_retriever_protocol_row(),
       react_lookup_tool_row(),
       react_unknown_tool_error_row(),
@@ -103,6 +104,60 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
       "answer" => answer,
       "retrieved" => [normalize(doc)],
       "trace" => %{"retriever" => "DSEx.Retrieve.Memory", "documents" => 1}
+    }
+  end
+
+  defp rag_multi_hop_retrieval_row do
+    retriever = fn query, _opts ->
+      cond do
+        String.contains?(query, "Paris") ->
+          {:ok, [%{id: "answer", text: "Paris is the capital of France."}]}
+
+        String.contains?(query, "Eiffel") ->
+          {:ok, [%{id: "bridge", text: "The Eiffel Tower is in Paris."}]}
+
+        true ->
+          {:ok, []}
+      end
+    end
+
+    lm = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+
+      answer =
+        if String.contains?(prompt, "The Eiffel Tower is in Paris.") and
+             String.contains?(prompt, "Paris is the capital of France."),
+           do: "France",
+           else: "unknown"
+
+      {:ok, %{answer: answer}}
+    end
+
+    program =
+      "question, context -> answer"
+      |> DSEx.predict(lm: lm)
+      |> DSEx.rag(retriever, k: 1, hops: 2)
+
+    {:ok, prediction} =
+      DSEx.call(program, %{question: "Which country has the capital of Eiffel's city?"})
+
+    retrieval = prediction.metadata.retrieval
+
+    %{
+      "id" => "rag_multi_hop_retrieval",
+      "category" => "rag",
+      "comparison_status" => "dsex_only",
+      "passing" =>
+        DSEx.Prediction.get(prediction, :answer) == "France" and retrieval.count == 2 and
+          Enum.map(retrieval.docs, & &1.id) == ["bridge", "answer"] and
+          Enum.map(retrieval.hops, & &1.count) == [1, 1],
+      "answer" => DSEx.Prediction.get(prediction, :answer),
+      "retrieved" => Enum.map(retrieval.docs, &normalize/1),
+      "trace" => %{
+        "hops" => Enum.map(retrieval.hops, &normalize/1)
+      },
+      "deviation" =>
+        "DSEx multi-hop RAG is a native iterative retrieval option on DSEx.rag/3; DSPy rows cover one-shot RAG directly while this row proves DSEx-owned hop semantics."
     }
   end
 
@@ -464,7 +519,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
         "dsex_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
         "full_rag_tool_agent_parity" => true,
         "note" =>
-          "Provider-free RAG/tool/agent artifact. Direct DSPy comparisons cover deterministic RAG retrieval and ReAct lookup. DSEx production rows cover HTTP retriever protocol shape, MCP import, agent policy denial, ReAct error traces, CodeAct, ProgramOfThought success/error policy, streaming, async, and save/load redaction."
+          "Provider-free RAG/tool/agent artifact. Direct DSPy comparisons cover deterministic one-shot RAG retrieval and ReAct lookup. DSEx production rows cover multi-hop RAG, HTTP retriever protocol shape, MCP import, agent policy denial, ReAct error traces, CodeAct, ProgramOfThought success/error policy, streaming, async, and save/load redaction."
       },
       "dsex" => Map.take(dsex, ["runner", "elixir", "otp", "git_sha"]),
       "dspy" => Map.take(dspy, ["runner", "python", "dspy_version", "git_sha"]),

@@ -36,13 +36,14 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "question + context/retrieval -> short answer",
       metric: "exact match plus F1 diagnostics",
       tiers: ["smoke", "research", "full"],
-      status: "partially_implemented",
+      status: "provider_free_implemented",
       commands: [
         "mix benchmark.truth.check",
         "mix benchmark.rag_tool_agent.check",
         "mix benchmark.parity.check"
       ],
-      next_step: "Add retrieval-indexed HotPotQA/Baleen-style sampled lane."
+      next_step:
+        "Scale retrieval-indexed HotPotQA/Baleen-style sampled lanes when research-tier model-quality evidence is required."
     },
     %{
       id: "classification_colors",
@@ -70,7 +71,8 @@ defmodule DSEx.BenchmarkCatalog do
       tiers: ["smoke", "research"],
       status: "provider_free_implemented",
       commands: ["mix benchmark.rag_tool_agent.check", "mix protocol.retriever.check"],
-      next_step: "Add real small corpus retrieval benchmark with matched DSEx/DSPy generation."
+      next_step:
+        "Scale to matched DSEx/DSPy generation over larger retrieval corpora when making research-tier quality claims."
     },
     %{
       id: "tools_react",

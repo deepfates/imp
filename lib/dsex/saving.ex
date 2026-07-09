@@ -41,7 +41,8 @@ defmodule DSEx.Saving do
       "retriever" => dump_retriever(rag.retriever),
       "query_field" => DSEx.Optimizer.Report.json_safe(rag.query_field),
       "context_field" => DSEx.Optimizer.Report.json_safe(rag.context_field),
-      "k" => rag.k
+      "k" => rag.k,
+      "hops" => rag.hops
     }
   end
 
@@ -96,7 +97,8 @@ defmodule DSEx.Saving do
       load_retriever!(Map.fetch!(state, "retriever")),
       query_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "query_field")),
       context_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "context_field")),
-      k: Map.fetch!(state, "k")
+      k: Map.fetch!(state, "k"),
+      hops: Map.get(state, "hops", 1)
     )
   end
 

@@ -87,7 +87,8 @@ defmodule DocumentationContractTest do
     body = File.read!("docs/ADAPTER_FIDELITY.md")
     readme = File.read!("docs/README.md")
 
-    assert readme =~ "ADAPTER_FIDELITY.md"
+    assert readme =~ "release-evidence notes"
+    refute readme =~ "ADAPTER_FIDELITY.md"
     assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
     assert body =~ "JSON fallback"
     assert body =~ "DSEx.Adapter.JSON.lm_opts/2"

@@ -561,6 +561,23 @@ defmodule ProductionAdapterPersistenceTest do
     assert %DSEx.Predict.RAG{k: 0} = DSEx.Saving.load(state)
   end
 
+  test "save/load preserves multi-hop RAG settings and defaults old artifacts to one hop" do
+    rag =
+      "question, context -> answer"
+      |> DSEx.predict()
+      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1),
+        k: 1,
+        hops: 2
+      )
+
+    state = DSEx.Saving.dump(rag)
+    assert state["hops"] == 2
+    assert %DSEx.Predict.RAG{hops: 2} = DSEx.Saving.load(state)
+
+    legacy_state = Map.delete(state, "hops")
+    assert %DSEx.Predict.RAG{hops: 1} = DSEx.Saving.load(legacy_state)
+  end
+
   test "save/load preserves ProgramOfThought programs" do
     lm = %{
       module: DSEx.LM.Static,

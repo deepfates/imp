@@ -5,7 +5,9 @@ defmodule DSEx.Predict.RAG do
   `RAG` composes an ordinary DSEx program with a retriever. On each call it
   retrieves documents for the input query, writes a rendered context field into
   the program inputs, calls the wrapped program, and attaches retrieval metadata
-  to the returned prediction.
+  to the returned prediction. Set `hops: 2` or higher for iterative multi-hop
+  retrieval: each hop expands the original query with previously retrieved
+  passages before retrieving again.
 
   Use RAG when retrieval is part of the program, not when a caller has already
   prepared all context. The wrapped program remains an ordinary DSEx executable
@@ -15,7 +17,7 @@ defmodule DSEx.Predict.RAG do
 
   @behaviour DSEx.Module
 
-  defstruct [:program, :retriever, query_field: :question, context_field: :context, k: 3]
+  defstruct [:program, :retriever, query_field: :question, context_field: :context, k: 3, hops: 1]
 
   @option_schema [
     query_field: [
@@ -26,7 +28,8 @@ defmodule DSEx.Predict.RAG do
       type: {:custom, DSEx.FieldSelector, :validate_name, []},
       default: :context
     ],
-    k: [type: :non_neg_integer, default: 3]
+    k: [type: :non_neg_integer, default: 3],
+    hops: [type: :pos_integer, default: 1]
   ]
 
   def new(program, retriever, opts \\ []) do
@@ -37,7 +40,8 @@ defmodule DSEx.Predict.RAG do
       retriever: retriever,
       query_field: opts[:query_field],
       context_field: opts[:context_field],
-      k: opts[:k]
+      k: opts[:k],
+      hops: opts[:hops]
     }
   end
 
@@ -63,10 +67,10 @@ defmodule DSEx.Predict.RAG do
   def call(%__MODULE__{} = rag, inputs) when is_list(inputs) or is_map(inputs) do
     with {:ok, inputs} <- normalize_inputs(inputs),
          query <- query_text(inputs, rag.query_field),
-         {:ok, docs} <- DSEx.Retrieve.retrieve(rag.retriever, query, k: rag.k),
-         {:ok, context} <- render_context(docs),
+         {:ok, retrieval} <- retrieve_hops(rag, query),
+         {:ok, context} <- render_context(retrieval.docs),
          enriched <- Map.put(inputs, rag.context_field, context) do
-      call_wrapped_program(rag, enriched, query, docs)
+      call_wrapped_program(rag, enriched, query, retrieval)
     end
   end
 
@@ -75,10 +79,52 @@ defmodule DSEx.Predict.RAG do
       {:error,
        {:invalid_rag_inputs, "expected a map or field pair list, got: #{inspect(inputs)}"}}
 
-  defp call_wrapped_program(rag, enriched, query, docs) do
+  defp retrieve_hops(%__MODULE__{} = rag, original_query) do
+    1..rag.hops
+    |> Enum.reduce_while({:ok, %{docs: [], hops: [], query: to_string(original_query)}}, fn hop,
+                                                                                            {:ok,
+                                                                                             acc} ->
+      with {:ok, raw_docs} <- DSEx.Retrieve.retrieve(rag.retriever, acc.query, k: rag.k),
+           {:ok, docs} <- normalize_docs(raw_docs) do
+        all_docs = dedupe_docs(acc.docs ++ docs)
+        hop_record = %{hop: hop, query: acc.query, count: length(docs), docs: docs}
+
+        {:cont,
+         {:ok,
+          %{
+            docs: all_docs,
+            hops: acc.hops ++ [hop_record],
+            query: expand_query(original_query, all_docs)
+          }}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, retrieval} -> {:ok, Map.delete(retrieval, :query)}
+      error -> error
+    end
+  end
+
+  defp expand_query(original_query, docs) do
+    [to_string(original_query) | Enum.map(docs, &doc_text/1)]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  defp dedupe_docs(docs), do: Enum.uniq_by(docs, &doc_key/1)
+
+  defp doc_key(doc) do
+    Map.get(doc, :id) || Map.get(doc, "id") || Map.get(doc, :text) || Map.get(doc, "text") ||
+      inspect(doc)
+  end
+
+  defp doc_text(doc), do: doc |> Map.get(:text, Map.get(doc, "text", "")) |> to_string()
+
+  defp call_wrapped_program(rag, enriched, query, retrieval) do
     case DSEx.Module.call(rag.program, enriched) do
       {:ok, %DSEx.Prediction{} = prediction} ->
-        attach_retrieval(prediction, query, docs)
+        attach_retrieval(prediction, query, retrieval)
 
       {:ok, other} ->
         {:error, {:invalid_rag_prediction, inspect(other)}}
@@ -147,17 +193,21 @@ defmodule DSEx.Predict.RAG do
     end
   end
 
-  defp attach_retrieval(%DSEx.Prediction{metadata: metadata} = prediction, query, docs) do
-    with {:ok, docs} <- normalize_docs(docs) do
-      retrieval = %{
-        query: query,
-        count: length(docs),
-        docs: docs
-      }
+  defp attach_retrieval(%DSEx.Prediction{metadata: metadata} = prediction, query, retrieval) do
+    docs = retrieval.docs
 
-      {:ok,
-       %{prediction | metadata: Map.put(metadata, :retrieval, DSEx.Redaction.redact(retrieval))}}
-    end
+    metadata_retrieval = %{
+      query: query,
+      count: length(docs),
+      docs: docs,
+      hops: Map.get(retrieval, :hops, [])
+    }
+
+    {:ok,
+     %{
+       prediction
+       | metadata: Map.put(metadata, :retrieval, DSEx.Redaction.redact(metadata_retrieval))
+     }}
   end
 
   defp normalize_docs(docs) do

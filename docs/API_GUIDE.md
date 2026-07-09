@@ -386,7 +386,10 @@ prediction.metadata.retrieval
 `DSEx.rag/3` is intentionally small: it retrieves documents, renders them into
 the configured context field, calls the wrapped program, and records retrieval
 metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
-program, or any other callable DSEx module that expects a context input.
+program, or any other callable DSEx module that expects a context input. For
+multi-hop retrieval, pass `hops: 2` or higher; each hop expands the original
+query with previously retrieved passages, deduplicates documents, injects the
+combined context, and records per-hop retrieval metadata.
 RAG programs backed by `DSEx.memory/2` can be saved and loaded with
 `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, and `DSEx.load!/1`; network
 retrievers and functions should be rebound by the caller instead of serialized.

@@ -395,6 +395,58 @@ defmodule PublicSurfaceTest do
                  end
   end
 
+  test "rag can perform multi-hop retrieval by expanding the query with prior passages" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "The Eiffel Tower is in Paris." and
+               prompt =~ "Paris is the capital of France.",
+             do: %{answer: "France"},
+             else: %{answer: "unknown"}
+        end
+      ]
+    }
+
+    base = DSEx.predict("question, context -> answer", lm: lm)
+    parent = self()
+
+    retriever = fn query, opts ->
+      send(parent, {:retrieval_hop, query, opts[:k]})
+
+      cond do
+        query =~ "Paris" ->
+          {:ok, [%{id: "answer", text: "Paris is the capital of France."}]}
+
+        query =~ "Eiffel" ->
+          {:ok, [%{id: "bridge", text: "The Eiffel Tower is in Paris."}]}
+
+        true ->
+          {:ok, []}
+      end
+    end
+
+    rag = DSEx.rag(base, retriever, k: 1, hops: 2)
+
+    assert {:ok, prediction} =
+             DSEx.call(rag, %{question: "Which country has the capital of Eiffel's city?"})
+
+    assert DSEx.get(prediction, :answer) == "France"
+    assert prediction.metadata.retrieval.count == 2
+    assert Enum.map(prediction.metadata.retrieval.docs, & &1.id) == ["bridge", "answer"]
+    assert Enum.map(prediction.metadata.retrieval.hops, & &1.count) == [1, 1]
+
+    assert_receive {:retrieval_hop, first_query, 1}
+    assert first_query =~ "Eiffel"
+    refute first_query =~ "Paris"
+
+    assert_receive {:retrieval_hop, second_query, 1}
+    assert second_query =~ "Eiffel"
+    assert second_query =~ "The Eiffel Tower is in Paris."
+  end
+
   test "rag reports invalid and failed wrapped program results without crashing" do
     retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
 
@@ -417,6 +469,12 @@ defmodule PublicSurfaceTest do
     assert_raise ArgumentError, ~r/DSEx\.Predict\.RAG\.new\/3: expected keyword options/, fn ->
       DSEx.rag(base, retriever, :not_options)
     end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :hops option: expected positive integer/,
+                 fn ->
+                   DSEx.rag(base, retriever, hops: 0)
+                 end
 
     rag = DSEx.rag(base, retriever)
 
