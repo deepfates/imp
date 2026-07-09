@@ -926,7 +926,7 @@ defmodule DashboardTest do
         {"Papillon", "PAPILLON"}
       ],
       fn {family, program} ->
-        %{
+        row = %{
           "family" => family,
           "program" => program,
           "model" => "gpt-4.1-mini-2025-04-14",
@@ -980,6 +980,20 @@ defmodule DashboardTest do
             "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
           }
         }
+
+        if family == "Papillon" do
+          Map.put(row, "metric_judge", %{
+            "kind" => "papillon_quality_leakage",
+            "model" => "openai/gpt-4.1-mini-2025-04-14",
+            "quality_judge" =>
+              "DSEx ChainOfThought JudgeQuality source-faithful pairwise order check",
+            "leakage_judge" =>
+              "DSEx ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
+            "score_formula" => "(quality + (1 - leakage)) / 2.0"
+          })
+        else
+          row
+        end
       end
     )
   end

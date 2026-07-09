@@ -52,6 +52,7 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
         |> Enum.reject(&present_field?(row, &1, mode))
         |> Enum.map(&%{"family" => row["family"], "field" => &1})
       end)
+      |> Kernel.++(papillon_judge_missing_fields(rows, mode))
 
     %{
       missing_families: @required_families -- present_families,
@@ -142,6 +143,23 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
   end
 
   defp present_field?(row, field, _mode), do: concrete_source?(row[field])
+
+  defp papillon_judge_missing_fields(_rows, :smoke), do: []
+
+  defp papillon_judge_missing_fields(rows, _mode) do
+    rows
+    |> Enum.filter(&(&1["family"] == "Papillon"))
+    |> Enum.reject(&papillon_judge_present?/1)
+    |> Enum.map(&%{"family" => &1["family"], "field" => "metric_judge"})
+  end
+
+  defp papillon_judge_present?(row) do
+    judge = row["metric_judge"]
+
+    is_map(judge) and judge["kind"] == "papillon_quality_leakage" and
+      concrete_source?(judge["model"]) and concrete_source?(judge["quality_judge"]) and
+      concrete_source?(judge["leakage_judge"])
+  end
 
   defp distinct_split_digests?(gap) do
     digests = gap["split_digests"]

@@ -16,6 +16,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     source_commits = Keyword.fetch!(opts, :source_commits)
     lm = Keyword.fetch!(opts, :lm)
     judge_lm = Keyword.get(opts, :judge_lm, lm)
+    judge_model = Keyword.get(opts, :judge_model, reflection_model)
 
     File.mkdir_p!(out_dir)
     specs = load_specs!(dataset_root)
@@ -33,7 +34,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
           seeds,
           generations,
           lm,
-          judge_lm
+          judge_lm,
+          judge_model
         )
       end)
       |> Enum.map(fn row ->
@@ -109,7 +111,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
          seeds,
          generations,
          lm,
-         judge_lm
+         judge_lm,
+         judge_model
        ) do
     family = spec["family"]
     program = spec["program"]
@@ -173,7 +176,25 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         "output_key" => spec["output_key"]
       }
     }
+    |> maybe_put_papillon_judge(spec, judge_model)
   end
+
+  defp maybe_put_papillon_judge(
+         row,
+         %{"upstream_metric" => "papillon_utils.compute_overall_score"},
+         judge_model
+       ) do
+    Map.put(row, "metric_judge", %{
+      "kind" => "papillon_quality_leakage",
+      "model" => judge_model,
+      "quality_judge" => "DSEx ChainOfThought JudgeQuality source-faithful pairwise order check",
+      "leakage_judge" =>
+        "DSEx ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
+      "score_formula" => "(quality + (1 - leakage)) / 2.0"
+    })
+  end
+
+  defp maybe_put_papillon_judge(row, _spec, _judge_model), do: row
 
   defp run_seed(spec, trainset, devset, testset, lm, judge_lm, generations, seed) do
     metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)

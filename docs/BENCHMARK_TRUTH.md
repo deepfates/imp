@@ -245,10 +245,13 @@ ports deterministic metric adapters for AIME integer exact match, HotPotQA
 answer exact match, HoVer supporting-title retrieval, IFBench
 instruction-registry constraints, Papillon LLM-judge quality/leakage scoring,
 and the deterministic LiveBenchMath AMC/AIME parser paths. Papillon campaigns
-must pass a judge LM; unknown and symbolic-parser-heavy metrics fall back to
-normalized output-key exact match. Do not claim full IFBench registry parity or
-LiveBenchMath `imo`/`usamo`/`amps_hard` parity until their dedicated DSEx
-adapters are implemented and validated against upstream.
+must pass a judge LM and emitted research rows must include `metric_judge`
+metadata naming the judge model plus quality/leakage judge semantics; the full
+GEPA replication contract rejects Papillon rows without that provenance. Unknown
+and symbolic-parser-heavy metrics fall back to normalized output-key exact
+match. Do not claim full IFBench registry parity or LiveBenchMath
+`imo`/`usamo`/`amps_hard` parity until their dedicated DSEx adapters are
+implemented and validated against upstream.
 
 ## Run RAG, Tool, And Agent Parity
 

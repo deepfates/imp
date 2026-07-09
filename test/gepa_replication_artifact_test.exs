@@ -86,6 +86,39 @@ defmodule GepaReplicationArtifactTest do
            ]
   end
 
+  test "GEPA replication task rejects Papillon research rows without judge metadata" do
+    out_dir = tmp_dir("gepa-replication-papillon-judge")
+
+    forged =
+      full_rows()
+      |> Enum.map(fn
+        %{"family" => "Papillon"} = row -> Map.delete(row, "metric_judge")
+        row -> row
+      end)
+
+    input_path = write_rows!("forged-papillon-judge", forged)
+
+    assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
+      capture_io(fn ->
+        Mix.Task.reenable("dsex.benchmark.gepa_replication")
+
+        Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+          "--input",
+          input_path,
+          "--out",
+          out_dir
+        ])
+      end)
+    end
+
+    [path] = Path.wildcard(Path.join(out_dir, "gepa-replication-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    assert %{"family" => "Papillon", "field" => "metric_judge"} in artifact["summary"][
+             "missing_fields"
+           ]
+  end
+
   test "GEPA replication task converts upstream GEPA artifact outputs plus DSEx rows" do
     artifact_dir = tmp_dir("gepa-artifact-output")
     out_dir = tmp_dir("gepa-artifact-converted")
@@ -211,7 +244,7 @@ defmodule GepaReplicationArtifactTest do
   end
 
   defp full_row(family, program, budget) do
-    %{
+    row = %{
       "family" => family,
       "program" => program,
       "campaign_id" => "gepa-replication-test-campaign",
@@ -265,5 +298,19 @@ defmodule GepaReplicationArtifactTest do
         "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
       }
     }
+
+    if family == "Papillon" do
+      Map.put(row, "metric_judge", %{
+        "kind" => "papillon_quality_leakage",
+        "model" => "openai/gpt-4.1-mini-2025-04-14",
+        "quality_judge" =>
+          "DSEx ChainOfThought JudgeQuality source-faithful pairwise order check",
+        "leakage_judge" =>
+          "DSEx ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
+        "score_formula" => "(quality + (1 - leakage)) / 2.0"
+      })
+    else
+      row
+    end
   end
 end

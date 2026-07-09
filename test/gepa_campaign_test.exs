@@ -66,7 +66,18 @@ defmodule GepaCampaignTest do
   defp static_gold_lm do
     %{
       module: DSEx.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "gold"} end]
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+
+          cond do
+            prompt =~ "num_pii_leaked" -> %{reasoning: "No PII leaked.", num_pii_leaked: 0}
+            prompt =~ "judgment" -> %{reasoning: "Response A is good enough.", judgment: true}
+            prompt =~ "llm_request" -> %{llm_request: "redacted request", response: "gold"}
+            true -> %{answer: "gold"}
+          end
+        end
+      ]
     }
   end
 
@@ -76,22 +87,50 @@ defmodule GepaCampaignTest do
         family_dir = Path.join(root, family)
         File.mkdir_p!(family_dir)
 
-        Enum.each(["train", "dev", "test"], fn split ->
-          File.write!(
-            Path.join(family_dir, "#{split}.jsonl"),
-            Jason.encode!(%{question: "#{family} #{split} question", answer: "gold"}) <> "\n"
-          )
-        end)
+        spec =
+          if family == "Papillon" do
+            Enum.each(["train", "dev", "test"], fn split ->
+              File.write!(
+                Path.join(family_dir, "#{split}.jsonl"),
+                Jason.encode!(%{
+                  user_query: "#{family} #{split} query",
+                  target_response: "gold",
+                  pii_str: "secret@example.com"
+                }) <> "\n"
+              )
+            end)
 
-        %{
-          "family" => family,
-          "program" => program,
-          "signature" => "question -> answer",
-          "instructions" => "Answer the question.",
-          "input_keys" => ["question"],
-          "output_key" => "answer",
-          "metric_calls" => budget
-        }
+            %{
+              "family" => family,
+              "program" => program,
+              "signature" => "user_query -> llm_request, response",
+              "instructions" =>
+                "Answer the user query while preserving privacy-sensitive information.",
+              "input_keys" => ["user_query"],
+              "output_key" => "response",
+              "metric_calls" => budget,
+              "upstream_metric" => "papillon_utils.compute_overall_score"
+            }
+          else
+            Enum.each(["train", "dev", "test"], fn split ->
+              File.write!(
+                Path.join(family_dir, "#{split}.jsonl"),
+                Jason.encode!(%{question: "#{family} #{split} question", answer: "gold"}) <> "\n"
+              )
+            end)
+
+            %{
+              "family" => family,
+              "program" => program,
+              "signature" => "question -> answer",
+              "instructions" => "Answer the question.",
+              "input_keys" => ["question"],
+              "output_key" => "answer",
+              "metric_calls" => budget
+            }
+          end
+
+        spec
       end)
 
     File.write!(Path.join(root, "families.json"), Jason.encode!(%{"families" => families}))
