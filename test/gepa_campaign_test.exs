@@ -45,6 +45,7 @@ defmodule GepaCampaignTest do
     assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
     assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
     assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
+    assert get_in(hover, ["results", "dsex_gepa", "score"]) == 1.0
 
     Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
@@ -162,7 +163,7 @@ defmodule GepaCampaignTest do
               "upstream_metric" => "papillon_utils.compute_overall_score"
             }
           else
-            contract = campaign_contract(family)
+            contract = campaign_contract(family, family_dir)
 
             Enum.each(["train", "dev", "test"], fn split ->
               File.write!(
@@ -232,7 +233,7 @@ defmodule GepaCampaignTest do
     raise ArgumentError, "unknown campaign fixture #{inspect({family, split})}"
   end
 
-  defp campaign_contract("AIMEBench") do
+  defp campaign_contract("AIMEBench", _family_dir) do
     %{
       signature: "problem -> answer",
       input_keys: ["problem"],
@@ -241,7 +242,7 @@ defmodule GepaCampaignTest do
     }
   end
 
-  defp campaign_contract("HotpotQABench") do
+  defp campaign_contract("HotpotQABench", _family_dir) do
     %{
       signature: "question -> answer",
       input_keys: ["question"],
@@ -250,7 +251,25 @@ defmodule GepaCampaignTest do
     }
   end
 
-  defp campaign_contract("hoverBench") do
+  defp campaign_contract("hoverBench", family_dir) do
+    corpus_path = Path.join(family_dir, "wiki.abstracts.2017.jsonl")
+    index_dir = Path.join(family_dir, "bm25s_retriever")
+    File.mkdir_p!(index_dir)
+
+    File.write!(
+      corpus_path,
+      Enum.map_join(
+        [
+          %{title: "gold", text: ["supporting document for hoverBench claims"]},
+          %{title: "distractor", text: ["unrelated astronomy note"]}
+        ],
+        "\n",
+        &Jason.encode!/1
+      ) <> "\n"
+    )
+
+    File.write!(Path.join(index_dir, "params.json"), Jason.encode!(%{k1: 0.9, b: 0.4}))
+
     %{
       signature: "claim -> retrieved_docs",
       input_keys: ["claim"],
@@ -261,8 +280,8 @@ defmodule GepaCampaignTest do
         "status" => "present",
         "source_url" =>
           "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
-        "corpus_path" => "test/fixtures/hover/wiki.abstracts.2017.jsonl",
-        "index_path" => "test/fixtures/hover/bm25s_retriever",
+        "corpus_path" => corpus_path,
+        "index_path" => index_dir,
         "corpus_checksum" =>
           "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "index_checksum" =>
@@ -271,7 +290,7 @@ defmodule GepaCampaignTest do
     }
   end
 
-  defp campaign_contract("IFBench") do
+  defp campaign_contract("IFBench", _family_dir) do
     %{
       signature: "prompt -> response",
       input_keys: ["prompt"],
@@ -280,7 +299,7 @@ defmodule GepaCampaignTest do
     }
   end
 
-  defp campaign_contract("LiveBenchMathBench") do
+  defp campaign_contract("LiveBenchMathBench", _family_dir) do
     %{
       signature: "question -> answer",
       input_keys: ["question"],

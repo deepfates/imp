@@ -133,6 +133,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     trainset = DSEx.Datasets.jsonl(paths.train, input_keys)
     devset = DSEx.Datasets.jsonl(paths.dev, input_keys)
     testset = DSEx.Datasets.jsonl(paths.test, input_keys)
+    validate_family_spec!(spec)
 
     {wall_us, seed_results} =
       :timer.tc(fn ->
@@ -219,11 +220,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
 
   defp run_seed(spec, trainset, devset, testset, lm, judge_lm, generations, seed) do
     metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)
-
-    program =
-      spec["signature"]
-      |> DSEx.signature(spec["instructions"])
-      |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+    program = program_for(spec, lm)
 
     baseline_train = score(program, trainset, metric)
     baseline_dev = score(program, devset, metric)
@@ -238,7 +235,13 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       )
       |> DSEx.Optimizer.GEPA.compile(program, trainset, devset)
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report =
+      DSEx.Optimizer.Report.fetch(compiled) ||
+        DSEx.Optimizer.Report.new(%{
+          optimizer: :gepa,
+          candidate_count: 0,
+          metadata: %{frontier_size: 0, status: :not_attached}
+        })
 
     %{
       seed: seed,
@@ -249,6 +252,25 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       frontier_size: Map.get(report.metadata, :frontier_size, 0)
     }
   end
+
+  defp program_for(%{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec, _lm) do
+    DSEx.BenchmarkTruth.HoverBM25.new(Map.fetch!(spec, "retrieval"))
+  end
+
+  defp program_for(spec, lm) do
+    spec["signature"]
+    |> DSEx.signature(spec["instructions"])
+    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+  end
+
+  defp validate_family_spec!(%{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec) do
+    unless hover_retrieval_provenance?(spec["retrieval"]) do
+      raise ArgumentError,
+            "DSEx GEPA hoverBench row requires source-exact BM25/wiki retrieval provenance"
+    end
+  end
+
+  defp validate_family_spec!(_spec), do: :ok
 
   defp score(program, examples, metric) do
     DSEx.Evaluate.run(DSEx.Evaluate.new(examples, metric, max_errors: :infinity), program).score

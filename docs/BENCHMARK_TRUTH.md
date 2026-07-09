@@ -252,7 +252,8 @@ retrieved_docs`); the metric scores retrieved document titles against
 must include `dataset.retrieval` provenance for the upstream
 `wiki.abstracts.2017` BM25 corpus and index, including corpus and index
 checksums; the DSEx campaign runner rejects HoVer research rows without that
-provenance.
+provenance and uses a native BM25 corpus retriever for HoVer rows instead of
+asking the LM to invent `retrieved_docs`.
 IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages
