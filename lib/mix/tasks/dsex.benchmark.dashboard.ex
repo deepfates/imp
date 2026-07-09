@@ -29,6 +29,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           overhead_dir: :string,
           optimizer_dir: :string,
           rag_tool_agent_dir: :string,
+          rlm_dir: :string,
           live_matrix_dir: :string,
           results_dir: :string,
           gate_dir: :string,
@@ -107,6 +108,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           Keyword.get(opts, :rag_tool_agent_dir, "tmp/rag-tool-agent"),
           max_age_hours
         ),
+      "rlm_benchmark" =>
+        rlm_benchmark_lane(
+          Keyword.get(opts, :rlm_dir, "tmp/rlm-benchmark"),
+          max_age_hours
+        ),
       "provider_free_overhead" =>
         overhead_lane(Keyword.get(opts, :overhead_dir, "tmp/overhead"), max_age_hours)
     }
@@ -120,6 +126,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "live_matched_model",
       "optimizer_lift",
       "rag_tool_agent",
+      "rlm_benchmark",
       "provider_free_overhead"
     ]
 
@@ -491,6 +498,35 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       )
     else
       _ -> missing_lane("rag_tool_agent", "no rag-tool-agent-parity artifact found in #{dir}")
+    end
+  end
+
+  defp rlm_benchmark_lane(dir, max_age_hours) do
+    with {:ok, path} <- latest(Path.join(dir, "rlm-benchmark-parity-*.json")),
+         {:ok, artifact} <- read_artifact(path) do
+      passing = get_in(artifact, ["summary", "all_passing"]) == true
+      full = get_in(artifact, ["summary", "full_rlm_benchmark_parity"]) == true
+
+      artifact_lane("rlm_benchmark", path, artifact, max_age_hours,
+        passing: passing,
+        full_evidence: passing and full,
+        scale: if(full, do: "full", else: "sample"),
+        summary: %{
+          "total" => get_in(artifact, ["summary", "total"]),
+          "passing" => get_in(artifact, ["summary", "passing"]),
+          "approaches" => get_in(artifact, ["summary", "approaches"]),
+          "uncertainty" => get_in(artifact, ["summary", "uncertainty"]),
+          "full_rlm_benchmark_parity" => full
+        },
+        limitation:
+          if(full,
+            do: nil,
+            else:
+              "RLM benchmark artifact is not full evidence; run mix benchmark.rlm.check for provider-free RLM parity."
+          )
+      )
+    else
+      _ -> missing_lane("rlm_benchmark", "no rlm-benchmark-parity artifact found in #{dir}")
     end
   end
 

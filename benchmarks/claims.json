@@ -124,6 +124,25 @@
       ]
     },
     {
+      "id": "claim.rlm.provider_free_benchmark",
+      "statement": "DSEx RLM has provider-free operational parity evidence against Python DSPy RLM on long-context benchmark-shaped tasks.",
+      "category": "rlm",
+      "surface": ["rlm", "long_context", "recursive_control", "dspy_rlm"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dspy",
+      "release_blocking": true,
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
+      "requirements": [
+        {
+          "id": "rlm_benchmark.full",
+          "kind": "parity",
+          "lane": "rlm_benchmark",
+          "evidence": "full",
+          "threshold": "rlm-benchmark artifact reports full_rlm_benchmark_parity"
+        }
+      ]
+    },
+    {
       "id": "claim.performance.provider_free",
       "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made.",
       "category": "performance",

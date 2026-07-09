@@ -9,6 +9,7 @@ defmodule DashboardTest do
     overhead_dir = Path.join(root, "overhead")
     optimizer_dir = Path.join(root, "optimizer")
     rag_tool_agent_dir = Path.join(root, "rag-tool-agent")
+    rlm_dir = Path.join(root, "rlm-benchmark")
     live_matrix_dir = Path.join(root, "live-matrix")
     results_dir = Path.join(root, "results")
     gate_dir = Path.join(root, "gate-evidence")
@@ -20,6 +21,7 @@ defmodule DashboardTest do
         overhead_dir,
         optimizer_dir,
         rag_tool_agent_dir,
+        rlm_dir,
         live_matrix_dir,
         results_dir,
         gate_dir,
@@ -104,6 +106,24 @@ defmodule DashboardTest do
         "direct_comparisons" => 2,
         "dsex_only_or_deviation" => 10,
         "full_rag_tool_agent_parity" => true
+      }
+    })
+
+    write_json!(Path.join(rlm_dir, "rlm-benchmark-parity-20260707T000000Z.json"), %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "summary" => %{
+        "total" => 6,
+        "passing" => 6,
+        "all_passing" => true,
+        "full_rlm_benchmark_parity" => true,
+        "approaches" => %{
+          "direct_prompt" => %{"examples" => 2, "accuracy" => 1.0},
+          "simple_rag" => %{"examples" => 2, "accuracy" => 1.0},
+          "rlm" => %{"examples" => 2, "accuracy" => 1.0}
+        },
+        "uncertainty" => %{"n" => 6, "accuracy" => 1.0}
       }
     })
 
@@ -269,6 +289,8 @@ defmodule DashboardTest do
         optimizer_dir,
         "--rag-tool-agent-dir",
         rag_tool_agent_dir,
+        "--rlm-dir",
+        rlm_dir,
         "--live-matrix-dir",
         live_matrix_dir,
         "--results-dir",
@@ -295,10 +317,10 @@ defmodule DashboardTest do
              "public_claims"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 10
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 11
     assert dashboard["claims"]["status"] == "failing"
-    assert dashboard["claims"]["summary"]["total"] == 8
-    assert dashboard["claims"]["summary"]["proven"] == 6
+    assert dashboard["claims"]["summary"]["total"] == 9
+    assert dashboard["claims"]["summary"]["proven"] == 7
     assert dashboard["claims"]["summary"]["blocked"] == 2
 
     proven_claim_ids =
@@ -313,7 +335,8 @@ defmodule DashboardTest do
              "claim.performance.provider_free",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
-             "claim.rag_tools_agents.full"
+             "claim.rag_tools_agents.full",
+             "claim.rlm.provider_free_benchmark"
            ]
 
     assert dashboard["lanes"]["product_package"]["status"] == "full"
@@ -330,6 +353,7 @@ defmodule DashboardTest do
            ]
 
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
+    assert dashboard["lanes"]["rlm_benchmark"]["status"] == "full"
     assert dashboard["lanes"]["provider_free_overhead"]["status"] == "full"
     assert dashboard["lanes"]["live_matched_model"]["status"] == "failing"
     assert dashboard["lanes"]["live_matched_model"]["summary"]["matrix_complete"] == false

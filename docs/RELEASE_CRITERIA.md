@@ -28,8 +28,8 @@ The release standard is grounded in:
   optimized with per-task/per-metric feedback and Pareto-aware search:
   <https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/>
 - DSEx's parity validation program: golden trace parity, live matched-model
-  parity, optimizer lift, production semantics, and provider-free performance
-  evidence: `docs/PARITY_VALIDATION_PROGRAM.md`
+  parity, optimizer lift, production semantics, RLM benchmark parity, and
+  provider-free performance evidence: `docs/PARITY_VALIDATION_PROGRAM.md`
 - DSEx's benchmark catalog: a source-grounded outside-view map of DSPy-derived
   benchmark families and which ones are runnable, sampled, deferred, or
   release-blocking: `docs/BENCHMARK_CATALOG.md`

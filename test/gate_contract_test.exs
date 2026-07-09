@@ -24,6 +24,7 @@ defmodule GateContractTest do
              "benchmark.overhead.check",
              "benchmark.optimizer_lift.check",
              "benchmark.rag_tool_agent.check",
+             "benchmark.rlm.check",
              "upstream_fidelity.check"
            ]
 
@@ -73,16 +74,20 @@ defmodule GateContractTest do
              "dsex.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
            ]
 
+    assert Keyword.fetch!(aliases, :"benchmark.rlm.check") == [
+             "dsex.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"
+           ]
+
     assert Keyword.fetch!(aliases, :"benchmark.live_matrix") == [
              "dsex.benchmark.live_matrix --in benchmarks/results/dsex-dspy-parity-campaign-*.json --out tmp/live-matrix"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard") == [
-             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard.full") == [
-             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.live.check") == [

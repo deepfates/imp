@@ -195,6 +195,18 @@ ProgramOfThought success and sandbox rejection, streaming incremental fields,
 BEAM async execution, and save/load redaction. Provider behavior over real
 models remains covered by the live matched-model lane.
 
+## Run RLM Benchmark Parity
+
+```sh
+mix benchmark.rlm.check
+```
+
+This provider-free lane compares DSEx RLM and Python DSPy RLM over
+HotPotQA-shaped long-context fixture rows. The artifact includes direct prompt,
+simple RAG, and RLM approaches with score, latency, subcall count, trace shape,
+and statistical uncertainty. It proves operational parity for the RLM execution
+surface; live model-quality RLM claims require a separate sampled live campaign.
+
 ## Run Live Benchmark Smoke
 
 ```sh

@@ -281,6 +281,7 @@ Initial executable command:
 
 ```sh
 mix benchmark.rag_tool_agent.check
+mix benchmark.rlm.check
 ```
 
 The current artifact directly compares DSEx and DSPy on deterministic RAG
@@ -291,6 +292,12 @@ ProgramOfThought success and sandbox rejection, streaming incremental fields,
 BEAM async execution, and save/load credential redaction. This is full
 provider-free production evidence; live matched-model campaigns remain the
 separate provider-behavior lane.
+
+The RLM artifact separately compares DSEx RLM and Python DSPy RLM on
+HotPotQA-shaped long-context fixture rows, alongside direct prompt and simple
+RAG baselines. It reports score, latency, subcall count, trace shape, and
+statistical uncertainty; it is provider-free operational parity, not a live model
+leaderboard.
 
 Pass condition:
 
