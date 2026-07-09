@@ -16,6 +16,112 @@ defmodule DSEx.UpstreamFidelity do
   }
 
   @surfaces [
+    %{category: :deepwiki, name: "Overview", tokens: ["Overview"]},
+    %{
+      category: :deepwiki,
+      name: "Introduction & Core Concepts",
+      tokens: ["Core Programming Model"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Use Cases & Applications",
+      tokens: ["Tutorial and real-world example parity"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Installation & Quick Start",
+      tokens: ["Getting Started", "Learning Path"]
+    },
+    %{category: :deepwiki, name: "Community & Resources", tokens: ["Prior Art"]},
+    %{category: :deepwiki, name: "Core Architecture", tokens: ["Architecture"]},
+    %{category: :deepwiki, name: "Package Structure & Public API", tokens: ["Public facade"]},
+    %{category: :deepwiki, name: "Language Model Integration", tokens: ["ReqLLM", "DSEx.LM"]},
+    %{category: :deepwiki, name: "Signatures & Task Definition", tokens: ["DSEx.Signature"]},
+    %{category: :deepwiki, name: "Adapter System", tokens: ["Adapter fidelity audit"]},
+    %{category: :deepwiki, name: "Module System & Base Classes", tokens: ["DSEx.Module"]},
+    %{category: :deepwiki, name: "Example & Data Primitives", tokens: ["DSEx.Example"]},
+    %{category: :deepwiki, name: "Building DSPy Programs", tokens: ["Build With DSEx"]},
+    %{category: :deepwiki, name: "Predict Module", tokens: ["Predict"]},
+    %{
+      category: :deepwiki,
+      name: "Reasoning Strategies",
+      tokens: ["ChainOfThought", "ProgramOfThought"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Tool Integration & Function Calling",
+      tokens: ["ToolCalls", "ReAct"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Custom Types & Multimodal Support",
+      tokens: ["Multimodal primitives"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Module Composition & Refinement",
+      tokens: ["Refine", "BestOfN"]
+    },
+    %{category: :deepwiki, name: "History & Conversation Management", tokens: ["History"]},
+    %{category: :deepwiki, name: "Program Optimization", tokens: ["Optimization"]},
+    %{category: :deepwiki, name: "Optimization Overview", tokens: ["Optimizers"]},
+    %{category: :deepwiki, name: "Evaluation Framework", tokens: ["Evaluation"]},
+    %{category: :deepwiki, name: "Few-Shot Optimizers", tokens: ["FewShot"]},
+    %{
+      category: :deepwiki,
+      name: "MIPROv2: Instruction & Parameter Optimization",
+      tokens: ["MIPROv2"]
+    },
+    %{
+      category: :deepwiki,
+      name: "GEPA & SIMBA: Reflective and Stochastic Optimization",
+      tokens: ["GEPA", "SIMBA"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Fine-tuning & Weight Optimization",
+      tokens: ["BootstrapFinetune", "GRPO"]
+    },
+    %{category: :deepwiki, name: "Advanced Features", tokens: ["Advanced DSEx"]},
+    %{
+      category: :deepwiki,
+      name: "Caching & Performance Optimization",
+      tokens: ["Cache", "performance"]
+    },
+    %{category: :deepwiki, name: "Parallel & Async Execution", tokens: ["Parallel", "async"]},
+    %{category: :deepwiki, name: "Streaming Output", tokens: ["Streaming"]},
+    %{
+      category: :deepwiki,
+      name: "State Management & Serialization",
+      tokens: ["save/load", "serialization"]
+    },
+    %{category: :deepwiki, name: "Assertions & Output Validation", tokens: ["Assertions"]},
+    %{category: :deepwiki, name: "Code Execution & Sandboxing", tokens: ["DSEx.Sandbox"]},
+    %{
+      category: :deepwiki,
+      name: "Configuration & Integration",
+      tokens: ["configure", "integration"]
+    },
+    %{
+      category: :deepwiki,
+      name: "Settings & Configuration Management",
+      tokens: ["DSEx.Settings"]
+    },
+    %{category: :deepwiki, name: "Model Providers & LiteLLM Integration", tokens: ["ReqLLM"]},
+    %{
+      category: :deepwiki,
+      name: "Vector Databases & Retrieval",
+      tokens: ["Retrieval and vector database parity"]
+    },
+    %{category: :deepwiki, name: "Observability & Monitoring", tokens: ["observability"]},
+    %{category: :deepwiki, name: "External Framework Integration", tokens: ["MCP", "ReqLLM"]},
+    %{category: :deepwiki, name: "Model Context Protocol (MCP)", tokens: ["MCP"]},
+    %{category: :deepwiki, name: "Development & Contributing", tokens: ["release gates"]},
+    %{category: :deepwiki, name: "Build System & CI/CD", tokens: ["production.check"]},
+    %{category: :deepwiki, name: "Testing Framework", tokens: ["test/"]},
+    %{category: :deepwiki, name: "Documentation System", tokens: ["docs", "Livebooks"]},
+    %{category: :deepwiki, name: "Package Metadata & Release Process", tokens: ["package.check"]},
+    %{category: :deepwiki, name: "Glossary", tokens: ["Glossary"]},
     %{category: :adapters, name: "Adapter", tokens: ["DSEx.Adapter"]},
     %{category: :adapters, name: "ChatAdapter", tokens: ["DSEx.Adapter.Chat"]},
     %{category: :adapters, name: "JSONAdapter", tokens: ["DSEx.Adapter.JSON"]},

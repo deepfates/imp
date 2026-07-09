@@ -4,7 +4,7 @@ defmodule DSEx.UpstreamFidelityTest do
   test "upstream fidelity report maps every tracked upstream surface" do
     report = DSEx.UpstreamFidelity.report()
 
-    assert report.summary.total > 50
+    assert report.summary.total > 100
     assert report.summary.unmapped == 0
     assert report.summary.passing
 
@@ -22,6 +22,16 @@ defmodule DSEx.UpstreamFidelityTest do
           "Recursive Language Models paper"
         ] do
       assert MapSet.member?(names, required)
+    end
+
+    for deepwiki_category <- [
+          "History & Conversation Management",
+          "Assertions & Output Validation",
+          "Vector Databases & Retrieval",
+          "Build System & CI/CD",
+          "Package Metadata & Release Process"
+        ] do
+      assert MapSet.member?(names, deepwiki_category)
     end
   end
 

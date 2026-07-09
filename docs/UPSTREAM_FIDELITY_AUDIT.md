@@ -44,11 +44,14 @@ surface is unmapped:
 mix dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped
 ```
 
+The current generated maintainer-readable map is
+[Upstream Surface Map](UPSTREAM_SURFACE_MAP.md).
+
 ## Current High-Risk Gaps
 
 | Area | Current finding | Ticket |
 | --- | --- | --- |
-| Upstream diffing | DSEx now has a generated 74-surface upstream-fidelity artifact and a local gate; future work should automate manifest refresh from upstream docs/source. | `de-0mhi` |
+| Upstream diffing | DSEx now has a generated 120-surface upstream-fidelity artifact and a local gate; future work should automate manifest refresh from upstream docs/source. | `de-0mhi` |
 | No-blind-spots audit | The previous audit missed RLM depth until prompted. Every dspy.ai and DeepWiki category needs explicit mapping. | `de-9mcw` |
 | RLM semantics | DSEx has a JSON-action RLM controller, but DSPy RLM includes persistent REPL semantics, `llm_query_batched`, extract fallback, `SandboxSerializable`, and optimizer-visible action/extract predictors. | `de-ciht` |
 | RLM benchmarks | Existing live RLM proof is an immediate-submit smoke, not a long-context RLM benchmark or DSPy comparison. | `de-m7aa` |
