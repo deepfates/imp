@@ -169,18 +169,30 @@ defmodule DSEx.Predict.ReAct do
   end
 
   defp prepare_tool_call(agent, call) when is_map(call) do
-    requested_name = Map.get(call, :name) || Map.get(call, "name")
+    requested_name = tool_call_name(call)
     name = normalize_tool_name(agent.tools, requested_name)
 
-    args =
-      (Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
-         %{})
-      |> DSEx.Tool.normalize_arguments()
+    args = call |> tool_call_arguments() |> DSEx.Tool.normalize_arguments()
 
     {name, args, execute_tool_call(agent, name, requested_name, args)}
   end
 
   defp prepare_tool_call(_agent, call), do: {nil, %{}, {:error, {:malformed_tool_call, call}}}
+
+  defp tool_call_name(call) do
+    function = Map.get(call, :function) || Map.get(call, "function") || %{}
+
+    Map.get(call, :name) || Map.get(call, "name") || Map.get(function, :name) ||
+      Map.get(function, "name")
+  end
+
+  defp tool_call_arguments(call) do
+    function = Map.get(call, :function) || Map.get(call, "function") || %{}
+
+    Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
+      Map.get(call, "args") || Map.get(function, :arguments) || Map.get(function, :args) ||
+      Map.get(function, "arguments") || Map.get(function, "args") || %{}
+  end
 
   defp execute_tool_call(_agent, nil, requested_name, _args),
     do: {:error, {:unknown_tool, requested_name}}

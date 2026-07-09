@@ -179,6 +179,47 @@ defmodule ReActContractTest do
              DSEx.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "OpenAI-style nested function tool calls are normalized before execution" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{
+            tool_calls: [
+              %{
+                id: "call_lookup",
+                type: "function",
+                function: %{
+                  name: "lookup",
+                  arguments: ~s({"query":"capital"})
+                }
+              },
+              %{
+                id: "call_submit",
+                type: "function",
+                function: %{
+                  name: "submit",
+                  arguments: ~s({"answer":"Paris"})
+                }
+              }
+            ]
+          }
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
+    agent = DSEx.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+
+    assert [
+             %{tool: :lookup, arguments: %{query: "capital"}, result: "Paris"},
+             %{tool: :submit, arguments: %{answer: "Paris"}, result: %{answer: "Paris"}}
+           ] = DSEx.Prediction.get(prediction, :history)
+  end
+
   test "tool argument normalization keeps unknown provider keys as strings" do
     unknown_key = "model_generated_key_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
