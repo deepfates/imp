@@ -263,8 +263,11 @@ artifact shape rather than generic optimizer lift. Full evidence requires
 non-smoke campaign rows for AIME, HotpotQA, HoVer, IFBench,
 LiveBench-Math, and Papillon/privacy delegation, with baseline, DSPy GEPA,
 DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock, seed variance,
-and train/dev/test gap. SIMBA is optional extra comparator evidence, not a
-required optimizer in the upstream GEPA artifact.
+and train/dev/test gap. Full rows must include campaign provenance, dataset
+source and split checksums, DSPy/DSEx/GEPA-artifact commits, concrete
+non-placeholder comparator sources, distinct train/dev/test split digests, and
+positive live token/cost accounting. SIMBA is optional extra comparator
+evidence, not a required optimizer in the upstream GEPA artifact.
 
 Pass condition:
 

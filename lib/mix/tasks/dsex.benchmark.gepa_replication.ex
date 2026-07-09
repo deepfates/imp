@@ -19,24 +19,6 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
 
   @default_out_dir "benchmarks/results"
 
-  @required_families [
-    "AIMEBench",
-    "HotpotQABench",
-    "hoverBench",
-    "IFBench",
-    "LiveBenchMathBench",
-    "Papillon"
-  ]
-
-  @optimizer_fields ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"]
-  @required_fields [
-    "metric_calls",
-    "token_cost",
-    "wall_clock_ms",
-    "seed_variance",
-    "train_dev_test_gap"
-  ]
-
   @impl true
   def run(args) do
     {opts, _argv, invalid} =
@@ -69,9 +51,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
           Mix.raise("--input or --smoke is required")
       end
 
-    validation = validate_rows(rows)
-    passing = validation.missing_families == [] and validation.missing_fields == []
-    full_research = passing and not Keyword.get(opts, :smoke, false)
+    smoke? = Keyword.get(opts, :smoke, false)
+
+    validation =
+      DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows,
+        mode: if(smoke?, do: :smoke, else: :research)
+      )
+
+    passing = validation.passing
+    full_research = passing and not smoke?
 
     artifact = %{
       "schema_version" => 1,
@@ -82,7 +70,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
         "input" => input,
         "input_sha256" => if(input, do: file_sha256(input)),
         "mode" => if(Keyword.get(opts, :smoke, false), do: "smoke", else: "input"),
-        "families_required" => @required_families
+        "families_required" => DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
       },
       "summary" => %{
         "total" => length(rows),
@@ -113,30 +101,6 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
       "GEPA replication input must be a list of rows or a map with \"rows\", got: #{inspect(other)}"
     )
   end
-
-  defp validate_rows(rows) do
-    present_families = rows |> Enum.map(& &1["family"]) |> Enum.uniq()
-
-    %{
-      missing_families: @required_families -- present_families,
-      missing_fields:
-        rows
-        |> Enum.flat_map(fn row ->
-          (@optimizer_fields ++ @required_fields)
-          |> Enum.reject(&present_field?(row, &1))
-          |> Enum.map(&%{"family" => row["family"], "field" => &1})
-        end)
-    }
-  end
-
-  defp present_field?(row, field) when field in @optimizer_fields do
-    row
-    |> Map.get("results", %{})
-    |> Map.get(field)
-    |> is_map()
-  end
-
-  defp present_field?(row, field), do: Map.has_key?(row, field)
 
   defp smoke_rows do
     [

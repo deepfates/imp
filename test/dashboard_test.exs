@@ -99,8 +99,10 @@ defmodule DashboardTest do
 
     write_json!(Path.join(gepa_dir, "gepa-replication-20260707T000000Z.json"), %{
       "schema_version" => 1,
+      "runner" => "dsex-gepa-replication",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
+      "source" => %{"mode" => "input"},
       "summary" => %{
         "all_passing" => true,
         "full_gepa_replication" => true,
@@ -550,6 +552,86 @@ defmodule DashboardTest do
     refute error.message =~ "claim claim.protocols.production_boundaries"
   end
 
+  test "dashboard does not trust forged GEPA full summary without row provenance" do
+    root = tmp_dir("dashboard-forged-gepa")
+
+    dirs =
+      Map.new(
+        [
+          :trace_dir,
+          :overhead_dir,
+          :optimizer_dir,
+          :gepa_dir,
+          :rag_tool_agent_dir,
+          :rlm_dir,
+          :live_matrix_dir,
+          :results_dir,
+          :gate_dir,
+          :out_dir
+        ],
+        fn key -> {key, Path.join(root, Atom.to_string(key))} end
+      )
+
+    Enum.each(Map.values(dirs), &File.mkdir_p!/1)
+
+    write_json!(Path.join(dirs.gepa_dir, "gepa-replication-forged.json"), %{
+      "schema_version" => 1,
+      "runner" => "dsex-gepa-replication",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "source" => %{"mode" => "input"},
+      "summary" => %{
+        "all_passing" => true,
+        "full_gepa_replication" => true,
+        "evidence_level" => "research_campaign"
+      },
+      "rows" =>
+        Enum.map(gepa_rows(), fn row ->
+          row
+          |> Map.delete("dataset")
+          |> Map.update!("results", &put_in(&1, ["dspy_gepa", "source"], "placeholder row"))
+        end)
+    })
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--trace-dir",
+        dirs.trace_dir,
+        "--overhead-dir",
+        dirs.overhead_dir,
+        "--optimizer-dir",
+        dirs.optimizer_dir,
+        "--gepa-dir",
+        dirs.gepa_dir,
+        "--rag-tool-agent-dir",
+        dirs.rag_tool_agent_dir,
+        "--rlm-dir",
+        dirs.rlm_dir,
+        "--live-matrix-dir",
+        dirs.live_matrix_dir,
+        "--results-dir",
+        dirs.results_dir,
+        "--gate-dir",
+        dirs.gate_dir,
+        "--out",
+        dirs.out_dir
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(dirs.out_dir, "parity-dashboard-*.json"))
+    dashboard = path |> File.read!() |> Jason.decode!()
+
+    assert dashboard["lanes"]["gepa_replication"]["status"] == "failing"
+    refute dashboard["lanes"]["gepa_replication"]["summary"]["full_gepa_replication"]
+
+    gepa_claim =
+      Enum.find(dashboard["claims"]["claims"], &(&1["id"] == "claim.gepa_replication.full"))
+
+    refute gepa_claim["proven"]
+  end
+
   test "require-full fails when the public claims inventory is unreadable" do
     root = tmp_dir("dashboard-missing-claims")
     out_dir = Path.join(root, "out")
@@ -848,17 +930,54 @@ defmodule DashboardTest do
           "family" => family,
           "program" => program,
           "model" => "gpt-4.1-mini-2025-04-14",
+          "campaign_id" => "gepa-dashboard-test-campaign",
+          "reflection_model" => "gpt-5-2026-01-01",
+          "evidence_level" => "research_campaign",
           "metric_calls" => 150,
-          "token_cost" => %{"usd" => 1.25, "input_tokens" => 10_000, "output_tokens" => 2_000},
+          "optimizer_budgets" => %{
+            "baseline" => 1,
+            "dspy_gepa" => 150,
+            "dsex_gepa" => 150,
+            "mipro_v2" => 150
+          },
+          "dataset" => %{
+            "source" => "github.com/gepa-ai/gepa-artifact@abcdef1",
+            "split" => "train_dev_test",
+            "checksums" => %{
+              "train" => "sha256:#{family}:train",
+              "dev" => "sha256:#{family}:dev",
+              "test" => "sha256:#{family}:test"
+            }
+          },
+          "source_commits" => %{
+            "dspy" => "stanfordnlp/dspy@abcdef1",
+            "dsex" => "deepfates/dsex@abcdef2",
+            "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+          },
+          "token_cost" => %{
+            "usd" => 1.25,
+            "input_tokens" => 10_000,
+            "output_tokens" => 2_000,
+            "pricing_source" => "openai pricing table 2026-07-09"
+          },
           "wall_clock_ms" => 12_345,
           "seed_variance" => %{"seeds" => [0, 1, 2], "stddev" => 0.01},
-          "train_dev_test_gap" => %{"train" => 0.8, "dev" => 0.75, "test" => 0.73},
+          "train_dev_test_gap" => %{
+            "train" => 0.8,
+            "dev" => 0.75,
+            "test" => 0.73,
+            "split_digests" => %{
+              "train" => "sha256:#{family}:train",
+              "dev" => "sha256:#{family}:dev",
+              "test" => "sha256:#{family}:test"
+            }
+          },
           "results" => %{
-            "baseline" => %{"score" => 0.5},
-            "dspy_gepa" => %{"score" => 0.6},
-            "dsex_gepa" => %{"score" => 0.61},
-            "mipro_v2" => %{"score" => 0.55},
-            "simba" => %{"score" => 0.56}
+            "baseline" => %{"score" => 0.5, "source" => "DSEx baseline runner artifact"},
+            "dspy_gepa" => %{"score" => 0.6, "source" => "DSPy GEPA runner artifact"},
+            "dsex_gepa" => %{"score" => 0.61, "source" => "DSEx GEPA runner artifact"},
+            "mipro_v2" => %{"score" => 0.55, "source" => "DSPy MIPROv2 runner artifact"},
+            "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
           }
         }
       end

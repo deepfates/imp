@@ -71,9 +71,12 @@ GEPA research claims use the `gepa_replication` lane, not the generic
 `optimizer_lift` lane. The dashboard only accepts those claims when a fresh
 non-smoke `gepa-replication-*.json` artifact covers the required GEPA paper
 families and reports baseline, DSPy GEPA, DSEx GEPA, MIPROv2, metric-call
-budget, token/cost, wall-clock, seed variance, and train/dev/test gap. SIMBA
-may be reported as extra comparator evidence when present, but it is not
-required by the upstream GEPA artifact.
+budget, token/cost, wall-clock, seed variance, and train/dev/test gap. The
+dashboard recomputes full evidence from the row contract: campaign provenance,
+dataset checksums, source commits, concrete comparator sources, distinct split
+digests, and positive live token/cost accounting are required. SIMBA may be
+reported as extra comparator evidence when present, but it is not required by
+the upstream GEPA artifact.
 
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the

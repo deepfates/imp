@@ -193,9 +193,12 @@ optimizer lift or smoke rows into a paper claim. A full artifact must cover
 `AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
 `LiveBenchMathBench`, and `Papillon`; for each row it must report baseline,
 DSPy GEPA, DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock,
-seed variance, and train/dev/test gap. SIMBA can appear as an extra comparator
-when a campaign includes it, but it is not part of the upstream GEPA artifact's
-required optimizer list.
+seed variance, and train/dev/test gap. Full rows must also carry a campaign id,
+dataset source and split checksums, source commits for DSPy, DSEx, and the GEPA
+artifact, concrete non-placeholder comparator sources, distinct train/dev/test
+split digests, and positive live token/cost accounting. SIMBA can appear as an
+extra comparator when a campaign includes it, but it is not part of the upstream
+GEPA artifact's required optimizer list.
 
 ## Run RAG, Tool, And Agent Parity
 

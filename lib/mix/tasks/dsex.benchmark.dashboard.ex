@@ -480,39 +480,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   end
 
   defp gepa_replication_lane(dir, max_age_hours) do
-    required_families = [
-      "AIMEBench",
-      "HotpotQABench",
-      "hoverBench",
-      "IFBench",
-      "LiveBenchMathBench",
-      "Papillon"
-    ]
-
-    required_fields = [
-      "baseline",
-      "dspy_gepa",
-      "dsex_gepa",
-      "mipro_v2",
-      "metric_calls",
-      "token_cost",
-      "wall_clock_ms",
-      "seed_variance",
-      "train_dev_test_gap"
-    ]
+    required_families = DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+    optimizer_fields = DSEx.BenchmarkTruth.GepaReplicationContract.optimizer_fields()
 
     with {:ok, path} <- latest(Path.join(dir, "gepa-replication-*.json")),
          {:ok, artifact} <- read_artifact(path) do
       rows = Map.get(artifact, "rows", [])
+      validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
       present_families = rows |> Enum.map(& &1["family"]) |> Enum.uniq()
-      missing_families = required_families -- present_families
-      missing_fields = gepa_missing_fields(rows, required_fields)
+      missing_families = validation.missing_families
+      missing_fields = validation.missing_fields
 
       passing = get_in(artifact, ["summary", "all_passing"]) == true
-
-      full =
-        missing_families == [] and missing_fields == [] and
-          get_in(artifact, ["summary", "full_gepa_replication"]) == true
+      full = DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(artifact)
 
       artifact_lane("gepa_replication", path, artifact, max_age_hours,
         passing: passing and full,
@@ -526,20 +506,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "missing_fields" => missing_fields,
           "models" => rows |> Enum.map(& &1["model"]) |> Enum.reject(&is_nil/1) |> Enum.uniq(),
           "evidence_level" => get_in(artifact, ["summary", "evidence_level"]),
-          "optimizers" =>
-            required_fields --
-              [
-                "metric_calls",
-                "token_cost",
-                "wall_clock_ms",
-                "seed_variance",
-                "train_dev_test_gap"
-              ],
+          "optimizers" => optimizer_fields,
           "all_passing" => passing,
           "full_gepa_replication" => full
         },
         blocking_requirements:
-          gepa_blocking_requirements(missing_families, missing_fields, passing),
+          gepa_blocking_requirements(missing_families, missing_fields, passing, full),
         limitation:
           if(passing and full,
             do: nil,
@@ -552,33 +524,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp gepa_missing_fields(rows, required_fields) do
-    rows
-    |> Enum.flat_map(fn row ->
-      required_fields
-      |> Enum.reject(fn field -> present_gepa_field?(row, field) end)
-      |> Enum.map(&%{"family" => row["family"], "field" => &1})
-    end)
-  end
+  defp gepa_blocking_requirements([], [], true, true), do: []
 
-  defp present_gepa_field?(row, field)
-       when field in ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"] do
-    row
-    |> Map.get("results", %{})
-    |> Map.get(field)
-    |> is_map()
-  end
-
-  defp present_gepa_field?(row, field), do: Map.has_key?(row, field)
-
-  defp gepa_blocking_requirements([], [], true), do: []
-
-  defp gepa_blocking_requirements(missing_families, missing_fields, passing) do
+  defp gepa_blocking_requirements(missing_families, missing_fields, passing, full) do
     Enum.reject(
       [
         if(passing, do: nil, else: "artifact summary.all_passing must be true"),
         if(missing_families == [], do: nil, else: %{"missing_families" => missing_families}),
-        if(missing_fields == [], do: nil, else: %{"missing_fields" => missing_fields})
+        if(missing_fields == [], do: nil, else: %{"missing_fields" => missing_fields}),
+        if(full,
+          do: nil,
+          else:
+            "artifact must be a non-smoke dsex-gepa-replication input artifact with research_campaign evidence"
+        )
       ],
       &is_nil/1
     )
