@@ -58,7 +58,7 @@ The current generated maintainer-readable map is
 | GEPA research evidence | DSEx has GEPA-style optimizer coverage, but not paper-level GEPA replication against DSPy GEPA on public tasks/models/budgets. | `de-izej` |
 | optimize_anything evidence | DSEx has arbitrary artifact optimization APIs, but not replication across non-prompt artifact classes. | `de-16fo` |
 | Assertions | Schema validation is not equivalent to DSPy Assertions and self-refinement behavior. | `de-b79l` |
-| History | DSEx has a `History` type, but not yet a fully audited conversation-management surface. | `de-vm37` |
+| History | DSEx now has signature-shaped `DSEx.History` matching DSPy's task-turn primitive, Chat adapter rendering, JSON-safe dump/load, redaction, streaming composition, and an explicit boundary from provider-native role-message history. | `de-vm37` |
 | Native reasoning/BaseLM | DSEx has LM behaviours and reasoning types, but needs explicit parity around typed LM surfaces and provider-native reasoning fields. | `de-erg0` |
 | ToolCalls | DSEx has tool-call structs and ReAct paths, but primitive-level provider-native tool-call round trips need explicit tests/evidence. | `de-e84o` |
 | Multimodal | DSEx has encoding primitives and operations stress, but not live multimodal quality benchmarks. | `de-ezg9` |

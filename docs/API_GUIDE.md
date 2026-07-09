@@ -69,6 +69,38 @@ program =
 DSEx.get(pred, :answer)
 ```
 
+## Conversation History
+
+Use `DSEx.history/1` when a signature should see prior task turns. History is
+signature-shaped data, not provider chat logs: each turn is a field map with the
+same input/output names the program already understands.
+
+```elixir
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Rome"} end]
+}
+
+program = DSEx.predict("question, history -> answer", lm: lm)
+
+history =
+  DSEx.history([
+    %{question: "What is the capital of France?", answer: "Paris"},
+    %{question: "What is the capital of Germany?", answer: "Berlin"}
+  ])
+
+{:ok, prediction} =
+  DSEx.call(program, %{question: "What is the capital of Italy?", history: history})
+
+DSEx.get(prediction, :answer)
+```
+
+The Chat adapter renders history turns before the current request, splitting
+each turn into prior user/assistant messages according to the active signature.
+`DSEx.History.dump/1` and `DSEx.History.load/1` give a JSON-safe boundary for
+application state, while `DSEx.History.redact/1` supports safe inspection.
+Provider-native role messages remain explicit as `DSEx.Adapters.Types.History`.
+
 ## The Canonical Path
 
 Start with one typed program, evaluate it, attach examples, then optimize only

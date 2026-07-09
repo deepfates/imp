@@ -77,9 +77,9 @@ They audit DSEx-vs-DSPy parity and performance claims, but they are intentionall
 separate from the packaged user manual. In the source checkout, the benchmark
 catalog is the maintainer starting point for outside-view validation work.
 
-- [Upstream Fidelity Audit](UPSTREAM_FIDELITY_AUDIT.md): current gap map
+- `docs/UPSTREAM_FIDELITY_AUDIT.md`: current gap map
   against DSPy, DeepWiki, GEPA, optimize_anything, and the associated papers.
-- [Upstream Surface Map](UPSTREAM_SURFACE_MAP.md): generated maintainer map of
+- `docs/UPSTREAM_SURFACE_MAP.md`: generated maintainer map of
   tracked upstream surfaces and their current DSEx mapping.
-- [Adapter Fidelity](ADAPTER_FIDELITY.md): Chat, JSON, XML, TwoStep, tool,
+- `docs/ADAPTER_FIDELITY.md`: Chat, JSON, XML, TwoStep, tool,
   history, and provider-native adapter semantics.

@@ -27,7 +27,7 @@ trying to byte-match Python prompt templates.
 | JSON structured-output options | `DSEx.Adapter.JSON.lm_opts/2` requests JSON object or JSON Schema response formats | `test/schema_constraints_test.exs`, `test/production_adapter_persistence_test.exs` |
 | XML fields | `DSEx.Adapter.XML` parses `<field>...</field>` and validates through the shared schema path | `test/production_adapter_persistence_test.exs` |
 | Two-step planning | `DSEx.Adapter.TwoStep` prepends a `plan` field before final outputs | `test/completion_surface_test.exs` |
-| Demos/history | `DSEx.Adapter.Chat` renders examples as user/assistant turns, including partial demos with explicit missing-field markers | `test/production_adapter_persistence_test.exs` |
+| Demos/history | `DSEx.Adapter.Chat` renders examples and `DSEx.History` task turns as user/assistant turns, including partial demos with explicit missing-field markers | `test/production_adapter_persistence_test.exs`, `test/history_test.exs` |
 | Tool formatting | Provider-native tools flow through `DSEx.Clients.ReqLLM`; iterative tool use flows through `DSEx.Predict.ReAct`, `CodeAct`, and `RLM` | `test/req_llm_client_test.exs`, `test/golden_trace_test.exs`, `test/integration/local_service_e2e_test.exs` |
 | Streaming chunks | Field chunk parsing is handled by `DSEx.Streaming` over adapter delimiters | `test/completion_surface_test.exs`, `mix benchmark.operations_stress.check` |
 

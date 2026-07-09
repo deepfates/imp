@@ -16,14 +16,16 @@ defmodule DSEx.Adapter.Chat do
     opts = validate_format_opts!(opts, "#{inspect(__MODULE__)}.format/3")
     demos = opts[:demos]
     response_instruction? = opts[:response_instruction]
+    {history_messages, history_fields} = extract_history(signature, inputs)
 
     [%{role: :system, content: render_system(signature)}] ++
       render_demos(signature, demos) ++
+      history_messages ++
       [
         %{
           role: :user,
           content:
-            render_inputs(signature, inputs) <>
+            render_inputs(signature, inputs, skip: history_fields) <>
               render_response_instruction(signature, response_instruction?)
         }
       ]
@@ -168,12 +170,13 @@ defmodule DSEx.Adapter.Chat do
 
   defp render_inputs(signature, inputs, opts \\ []) do
     prefix = Keyword.get(opts, :prefix, "")
+    skip = opts |> Keyword.get(:skip, MapSet.new()) |> MapSet.new()
 
     signature.inputs
     |> Enum.reduce([], fn field, acc ->
       value = fetch_field(inputs, field.name)
 
-      if is_nil(value) do
+      if is_nil(value) or MapSet.member?(skip, field.name) do
         acc
       else
         [
@@ -381,6 +384,51 @@ defmodule DSEx.Adapter.Chat do
       |> Enum.flat_map(&render_demo(signature, &1, :complete))
     )
   end
+
+  defp extract_history(signature, inputs) do
+    signature.inputs
+    |> Enum.reduce({[], MapSet.new()}, fn field, {messages, fields} ->
+      case fetch_field(inputs, field.name) do
+        %DSEx.History{} = history ->
+          {messages ++ render_history_turns(signature, DSEx.History.messages(history)),
+           MapSet.put(fields, field.name)}
+
+        _other ->
+          {messages, fields}
+      end
+    end)
+  end
+
+  defp render_history_turns(signature, turns) do
+    turns
+    |> Enum.flat_map(fn turn ->
+      turn = DSEx.Example.new(turn) |> DSEx.Example.to_map()
+
+      [
+        %{
+          role: :user,
+          content: render_inputs(signature, turn, skip: history_input_fields(signature))
+        },
+        %{
+          role: :assistant,
+          content:
+            render_outputs(signature, turn,
+              missing_field_message: "Not supplied for this conversation history message. "
+            )
+        }
+      ]
+      |> Enum.reject(&blank_message?/1)
+    end)
+  end
+
+  defp history_input_fields(signature) do
+    signature.inputs
+    |> Enum.filter(&(&1.type == :history or &1.name == :history))
+    |> Enum.map(& &1.name)
+    |> MapSet.new()
+  end
+
+  defp blank_message?(%{content: content}), do: String.trim(content) == ""
 
   defp complete_demo?(signature, demo) do
     (signature.inputs ++ signature.outputs)

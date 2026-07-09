@@ -48,6 +48,7 @@ defmodule PublicSurfaceTest do
     DSEx.Evaluate.SemanticF1,
     DSEx.Example,
     DSEx.HTTP,
+    DSEx.History,
     DSEx.LM,
     DSEx.LMError,
     DSEx.LM.Static,

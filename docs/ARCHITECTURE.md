@@ -301,7 +301,7 @@ Large or expensive values can enter the loop as
 `DSEx.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
 only their metadata; the `load` action materializes the value into variable
 space when needed. RLM also exposes internal action, extract, and subquery
-predictors through `DSEx.ProgramAccess` so optimizers and audits can see the
+predictors through the program-access helper so optimizers and audits can see the
 parts that govern behavior.
 
 ## Persistence

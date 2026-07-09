@@ -114,6 +114,46 @@ case live_lm.(max_completion_tokens: 160) do
 end
 ```
 
+## Add Conversation History
+
+History is prior task data keyed by the signature fields. DSEx renders it as
+prior turns for the model, while the program still receives named inputs and
+returns named outputs.
+
+```elixir
+case live_lm.(max_completion_tokens: 120) do
+  {:ok, lm} ->
+    qa =
+      DSEx.predict(
+        DSEx.signature(
+          "question, history -> answer: short_span",
+          "Answer the latest question using the conversation history when relevant."
+        ),
+        lm: lm
+      )
+
+    history =
+      DSEx.history([
+        %{question: "What is the capital of France?", answer: "Paris"},
+        %{question: "What country is Paris in?", answer: "France"}
+      ])
+
+    {:ok, prediction} =
+      DSEx.call(qa, %{question: "What city did we identify first?", history: history})
+
+    answer = prediction |> DSEx.get(:answer, "") |> to_string() |> String.downcase()
+
+    unless String.contains?(answer, "paris") do
+      raise "live history proof failed: #{inspect(DSEx.to_map(prediction))}"
+    end
+
+    DSEx.to_map(prediction)
+
+  skip ->
+    skip
+end
+```
+
 ## Add Tools With ReAct
 
 Only add tools when the task needs action outside the LM. ReAct keeps tool use

@@ -107,6 +107,12 @@ defmodule DSEx do
   @doc "Builds a structured prediction."
   defdelegate prediction(fields), to: Prediction, as: :new
 
+  @doc "Builds signature-shaped conversation history for history-aware programs."
+  defdelegate history(messages \\ []), to: DSEx.History, as: :new
+
+  @doc "Appends a signature-shaped turn to conversation history."
+  defdelegate append_history(history, turn), to: DSEx.History, as: :append
+
   @doc "Converts a prediction or example to its field map."
   def to_map(container)
 

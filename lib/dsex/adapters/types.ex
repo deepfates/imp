@@ -93,6 +93,14 @@ defmodule DSEx.Adapters.Types do
   def to_openai(%Reasoning{text: text}) when is_binary(text), do: %{type: "text", text: text}
   def to_openai(%Reasoning{} = reasoning), do: invalid_type!(Reasoning, "binary :text", reasoning)
 
+  def to_openai(%DSEx.History{} = history),
+    do:
+      invalid_type!(
+        DSEx.History,
+        "provider chat messages use DSEx.Adapters.Types.History; DSEx.History stores signature-shaped field turns",
+        history
+      )
+
   def to_openai(%History{messages: messages}) when is_list(messages),
     do: Enum.map(messages, &message_to_openai/1)
 
