@@ -155,7 +155,7 @@ defmodule GepaMetricsTest do
       DSEx.example(
         prompt: "p",
         response: "",
-        instruction_id_list: ["ratio:stop_words"],
+        instruction_id_list: ["ratio:not_a_real_instruction"],
         kwargs: [%{"percentage" => 20}]
       )
       |> DSEx.with_inputs(:prompt)
@@ -194,6 +194,7 @@ defmodule GepaMetricsTest do
       {"ratio:sentence_balance", %{}, "One. Two? Three!"},
       {"ratio:overlap", %{"reference_text" => "abcdef", "percentage" => 100}, "abcdef"},
       {"ratio:sentence_words", %{}, "Aaa. Bbb. Ccc."},
+      {"ratio:stop_words", %{"percentage" => 50}, "quartz azure vector"},
       {"format:options", %{"options" => "yes/no/maybe"}, "yes"},
       {"format:title_case", %{}, "This Is Title Case"},
       {"format:no_whitespace", %{}, "NoWhitespace"},
@@ -205,6 +206,7 @@ defmodule GepaMetricsTest do
       {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha\nSEPARATOR beta"},
       {"format:sub-bullets", %{}, "* alpha\n- child\n* beta\n- child"},
       {"format:no_bullets_bullets", %{}, "Alpha ends. Beta ends.\n* first\n* second"},
+      {"format:emoji", %{}, "First sentence 🙂. Second sentence 🚀."},
       {"format:thesis", %{}, "<i>Main claim</i> supporting text"},
       {"format:output_template", %{},
        "My Answer: alpha My Conclusion: beta Future Outlook: gamma"},
@@ -215,6 +217,8 @@ defmodule GepaMetricsTest do
        "level radar civic madam rotor refer kayak reviver racecar redder"},
       {"words:prime_lengths", %{}, "to cat seven prime"},
       {"words:repeats", %{"small_n" => 2}, "alpha beta alpha gamma"},
+      {"words:start_verb", %{}, "Write the answer."},
+      {"words:odd_even_syllables", %{}, "cat pizza dog"},
       {"words:last_first", %{}, "Alpha beta. Beta gamma. Gamma delta."},
       {"words:paragraph_last_first", %{}, "alpha beta alpha\nomega middle omega"},
       {"words:no_consecutive", %{}, "alpha beta carrot delta"},
@@ -294,12 +298,14 @@ defmodule GepaMetricsTest do
       {"ratio:sentence_balance", %{}, "One. Two?"},
       {"ratio:overlap", %{"reference_text" => "abcdef", "percentage" => 100}, "abcxyz"},
       {"ratio:sentence_words", %{}, "Aaa. Bbbb. Ccc."},
+      {"ratio:stop_words", %{"percentage" => 20}, "the and of in"},
       {"format:parentheses", %{}, "(one [two {three}])"},
       {"format:quotes", %{}, ~s("alpha 'beta' gamma")},
       {"format:newline", %{}, "alpha beta"},
       {"format:quote_unquote", %{}, ~s("term")},
       {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha"},
       {"format:no_bullets_bullets", %{}, "Only one sentence.\n* first\n* second"},
+      {"format:emoji", %{}, "First sentence. Second sentence."},
       {"format:thesis", %{}, "<i></i> body"},
       {"format:output_template", %{}, "My Answer: alpha"},
       {"words:alphabet", %{}, "apple carrot"},
@@ -308,6 +314,8 @@ defmodule GepaMetricsTest do
       {"words:palindrome", %{}, "level radar"},
       {"words:prime_lengths", %{}, "to four"},
       {"words:repeats", %{"small_n" => 1}, "alpha beta alpha"},
+      {"words:start_verb", %{}, "Table answer."},
+      {"words:odd_even_syllables", %{}, "cat dog"},
       {"words:last_first", %{}, "Alpha beta. Gamma delta."},
       {"words:paragraph_last_first", %{}, "alpha beta gamma"},
       {"words:no_consecutive", %{}, "alpha apricot"},
@@ -350,6 +358,67 @@ defmodule GepaMetricsTest do
       assert metric.(example, DSEx.prediction(response: response)) == 0.0,
              "expected #{instruction_id} to fail"
     end)
+  end
+
+  test "IFBench NLP-backed checks can delegate to a source-exact Python bridge" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric",
+        "output_key" => "response"
+      })
+
+    bridge =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-ifbench-nlp-bridge-#{System.unique_integer([:positive])}.py"
+      )
+
+    File.write!(bridge, """
+    import json, sys
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["instruction_id"] in {
+        "ratio:stop_words",
+        "format:emoji",
+        "words:start_verb",
+        "words:odd_even_syllables",
+    }
+    assert payload["value"] == "bridge-ok"
+    print(json.dumps({"following": True}))
+    """)
+
+    previous_bridge = System.get_env("DSEX_IFBENCH_NLP_BRIDGE")
+    previous_python = System.get_env("DSEX_IFBENCH_NLP_PYTHON")
+    System.put_env("DSEX_IFBENCH_NLP_BRIDGE", bridge)
+    System.put_env("DSEX_IFBENCH_NLP_PYTHON", System.find_executable("python3") || "python3")
+
+    on_exit(fn ->
+      if previous_bridge,
+        do: System.put_env("DSEX_IFBENCH_NLP_BRIDGE", previous_bridge),
+        else: System.delete_env("DSEX_IFBENCH_NLP_BRIDGE")
+
+      if previous_python,
+        do: System.put_env("DSEX_IFBENCH_NLP_PYTHON", previous_python),
+        else: System.delete_env("DSEX_IFBENCH_NLP_PYTHON")
+
+      File.rm(bridge)
+    end)
+
+    example =
+      DSEx.example(
+        prompt: "p",
+        response: "",
+        instruction_id_list: [
+          "ratio:stop_words",
+          "format:emoji",
+          "words:start_verb",
+          "words:odd_even_syllables"
+        ],
+        kwargs: [%{"percentage" => 10}, %{}, %{}, %{}]
+      )
+      |> DSEx.with_inputs(:prompt)
+
+    assert metric.(example, DSEx.prediction(response: "bridge-ok")) == 1.0
   end
 
   test "LiveBenchMath metric ports AMC answer parsing cases" do

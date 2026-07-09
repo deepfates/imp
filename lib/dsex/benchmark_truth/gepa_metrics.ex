@@ -281,6 +281,20 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     end)
   end
 
+  defp ifbench_following?("ratio:stop_words", args, _prompt, value) do
+    ifbench_nlp_bridge("ratio:stop_words", args, value, fn ->
+      tokens = word_tokens(value)
+
+      if tokens == [] do
+        false
+      else
+        stopwords = ifbench_stopwords()
+        stopword_count = tokens |> Enum.map(&String.downcase/1) |> Enum.count(&(&1 in stopwords))
+        stopword_count / length(tokens) * 100 <= Map.get(args, "percentage", 0)
+      end
+    end)
+  end
+
   defp ifbench_following?("ratio:sentence_type", _args, _prompt, value) do
     sentences = split_sentences(value)
     declarative_count = Enum.count(sentences, &String.ends_with?(&1, "."))
@@ -592,6 +606,40 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
       String.contains?(value, "Future Outlook:")
   end
 
+  defp ifbench_following?("format:emoji", args, _prompt, value) do
+    ifbench_nlp_bridge("format:emoji", args, value, fn ->
+      sentences = split_sentences(value)
+
+      sentences != [] and
+        sentences
+        |> Enum.with_index()
+        |> Enum.all?(fn {sentence, index} ->
+          stripped = sentence |> strip_all_punctuation() |> String.trim()
+          chars = String.graphemes(stripped)
+          last = List.last(chars)
+          second_last = Enum.at(chars, -2, last)
+
+          cond do
+            emoji?(last) or emoji?(second_last) ->
+              true
+
+            index < length(sentences) - 1 ->
+              next =
+                sentences
+                |> Enum.at(index + 1)
+                |> strip_all_punctuation()
+                |> String.trim()
+                |> String.first()
+
+              emoji?(next)
+
+            true ->
+              false
+          end
+        end)
+    end)
+  end
+
   defp ifbench_following?("format:thesis", _args, _prompt, value) do
     with {index, tag, close_tag} <- first_italics_tag(value),
          value <- String.slice(value, index..-1//1),
@@ -728,6 +776,28 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     |> String.split(~r/\s+/, trim: true)
     |> Enum.frequencies()
     |> Enum.all?(fn {_word, count} -> count <= max_repeats end)
+  end
+
+  defp ifbench_following?("words:start_verb", args, _prompt, value) do
+    ifbench_nlp_bridge("words:start_verb", args, value, fn ->
+      case word_tokens(value) do
+        [first | _rest] -> start_verb?(String.downcase(first))
+        [] -> false
+      end
+    end)
+  end
+
+  defp ifbench_following?("words:odd_even_syllables", args, _prompt, value) do
+    ifbench_nlp_bridge("words:odd_even_syllables", args, value, fn ->
+      value
+      |> strip_all_punctuation()
+      |> String.downcase()
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.map(&syllable_count/1)
+      |> Enum.map(&rem(&1, 2))
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.all?(fn [left, right] -> left != right end)
+    end)
   end
 
   defp ifbench_following?("words:last_first", _args, _prompt, value) do
@@ -1121,6 +1191,48 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
           "unsupported IFBench instruction #{inspect(instruction_id)}; DSEx cannot claim IFBench parity until this id is ported or explicitly gated"
   end
 
+  defp ifbench_nlp_bridge(instruction_id, args, value, fallback) do
+    case System.get_env("DSEX_IFBENCH_NLP_BRIDGE") do
+      nil ->
+        fallback.()
+
+      "" ->
+        fallback.()
+
+      bridge ->
+        python = System.get_env("DSEX_IFBENCH_NLP_PYTHON") || "python3"
+        payload = Jason.encode!(%{instruction_id: instruction_id, args: args, value: value})
+
+        payload_path =
+          Path.join(
+            System.tmp_dir!(),
+            "dsex-ifbench-nlp-#{System.unique_integer([:positive])}.json"
+          )
+
+        File.write!(payload_path, payload)
+
+        try do
+          case System.cmd(python, [bridge, payload_path], stderr_to_stdout: true) do
+            {output, 0} ->
+              case Jason.decode!(output) do
+                %{"following" => following} when is_boolean(following) ->
+                  following
+
+                decoded ->
+                  raise ArgumentError,
+                        "IFBench NLP bridge returned invalid payload: #{inspect(decoded)}"
+              end
+
+            {output, status} ->
+              raise ArgumentError,
+                    "IFBench NLP bridge failed with status #{status}: #{String.trim(output)}"
+          end
+        after
+          File.rm(payload_path)
+        end
+    end
+  end
+
   defp compare_count(count, expected, "less than"), do: count < expected
   defp compare_count(count, expected, "at least"), do: count >= expected
   defp compare_count(_count, _expected, _relation), do: false
@@ -1272,6 +1384,272 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     ~r/[[:alnum:]_]+/
     |> Regex.scan(value)
     |> Enum.map(fn [word] -> word end)
+  end
+
+  defp ifbench_stopwords do
+    MapSet.new([
+      "i",
+      "me",
+      "my",
+      "myself",
+      "we",
+      "our",
+      "ours",
+      "ourselves",
+      "you",
+      "you're",
+      "you've",
+      "you'll",
+      "you'd",
+      "your",
+      "yours",
+      "yourself",
+      "yourselves",
+      "he",
+      "him",
+      "his",
+      "himself",
+      "she",
+      "she's",
+      "her",
+      "hers",
+      "herself",
+      "it",
+      "it's",
+      "its",
+      "itself",
+      "they",
+      "them",
+      "their",
+      "theirs",
+      "themselves",
+      "what",
+      "which",
+      "who",
+      "whom",
+      "this",
+      "that",
+      "that'll",
+      "these",
+      "those",
+      "am",
+      "is",
+      "are",
+      "was",
+      "were",
+      "be",
+      "been",
+      "being",
+      "have",
+      "has",
+      "had",
+      "having",
+      "do",
+      "does",
+      "did",
+      "doing",
+      "a",
+      "an",
+      "the",
+      "and",
+      "but",
+      "if",
+      "or",
+      "because",
+      "as",
+      "until",
+      "while",
+      "of",
+      "at",
+      "by",
+      "for",
+      "with",
+      "about",
+      "against",
+      "between",
+      "into",
+      "through",
+      "during",
+      "before",
+      "after",
+      "above",
+      "below",
+      "to",
+      "from",
+      "up",
+      "down",
+      "in",
+      "out",
+      "on",
+      "off",
+      "over",
+      "under",
+      "again",
+      "further",
+      "then",
+      "once",
+      "here",
+      "there",
+      "when",
+      "where",
+      "why",
+      "how",
+      "all",
+      "any",
+      "both",
+      "each",
+      "few",
+      "more",
+      "most",
+      "other",
+      "some",
+      "such",
+      "no",
+      "nor",
+      "not",
+      "only",
+      "own",
+      "same",
+      "so",
+      "than",
+      "too",
+      "very",
+      "s",
+      "t",
+      "can",
+      "will",
+      "just",
+      "don",
+      "don't",
+      "should",
+      "should've",
+      "now",
+      "d",
+      "ll",
+      "m",
+      "o",
+      "re",
+      "ve",
+      "y",
+      "ain",
+      "aren",
+      "aren't",
+      "couldn",
+      "couldn't",
+      "didn",
+      "didn't",
+      "doesn",
+      "doesn't",
+      "hadn",
+      "hadn't",
+      "hasn",
+      "hasn't",
+      "haven",
+      "haven't",
+      "isn",
+      "isn't",
+      "ma",
+      "mightn",
+      "mightn't",
+      "mustn",
+      "mustn't",
+      "needn",
+      "needn't",
+      "shan",
+      "shan't",
+      "shouldn",
+      "shouldn't",
+      "wasn",
+      "wasn't",
+      "weren",
+      "weren't",
+      "won",
+      "won't",
+      "wouldn",
+      "wouldn't"
+    ])
+  end
+
+  defp emoji?(nil), do: false
+
+  defp emoji?(grapheme) do
+    Regex.match?(
+      ~r/[\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]/u,
+      grapheme
+    )
+  end
+
+  defp start_verb?(word) do
+    verbs =
+      MapSet.new([
+        "act",
+        "add",
+        "answer",
+        "ask",
+        "be",
+        "begin",
+        "build",
+        "calculate",
+        "choose",
+        "compare",
+        "continue",
+        "count",
+        "create",
+        "define",
+        "describe",
+        "draft",
+        "draw",
+        "eat",
+        "explain",
+        "find",
+        "generate",
+        "give",
+        "go",
+        "help",
+        "identify",
+        "include",
+        "list",
+        "make",
+        "move",
+        "name",
+        "parse",
+        "print",
+        "provide",
+        "read",
+        "repeat",
+        "respond",
+        "return",
+        "run",
+        "say",
+        "solve",
+        "start",
+        "summarize",
+        "take",
+        "tell",
+        "use",
+        "walk",
+        "write"
+      ])
+
+    MapSet.member?(verbs, word) or String.ends_with?(word, "ing")
+  end
+
+  defp syllable_count(word) do
+    word = String.downcase(word)
+
+    count =
+      ~r/[aeiouy]+/
+      |> Regex.scan(word)
+      |> length()
+
+    count =
+      if String.ends_with?(word, "e") and count > 1 do
+        count - 1
+      else
+        count
+      end
+
+    max(count, 1)
   end
 
   defp first_italics_tag(value) do
