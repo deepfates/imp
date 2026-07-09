@@ -75,6 +75,4 @@ for DSEx maintainers validating this repository before release.
 The repository also keeps release-evidence notes for maintainers and reviewers.
 They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
 separate from the packaged user manual. In the source checkout, the benchmark
-catalog is the maintainer starting point for outside-view validation work, and
-[Public Claim Inventory](BENCHMARK_CLAIMS.md) explains how public claims map to
-dashboard evidence.
+catalog is the maintainer starting point for outside-view validation work.

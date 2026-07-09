@@ -114,6 +114,7 @@ defmodule DSEx.MixProject do
   defp package_files do
     excluded_lib =
       Path.wildcard("lib/mix/tasks/dsex.benchmark*.ex") ++
+        Path.wildcard("lib/mix/tasks/dsex.gate_evidence.ex") ++
         Path.wildcard("lib/dsex/benchmark*.ex") ++
         Path.wildcard("lib/dsex/benchmark_truth/**/*.ex")
 
@@ -218,6 +219,18 @@ defmodule DSEx.MixProject do
       "quality.check": [
         "credo --only warning",
         "hex.audit"
+      ],
+      "gate.package.evidence": [
+        "dsex.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"
+      ],
+      "gate.livebook.evidence": [
+        "dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check --out tmp/gate-evidence"
+      ],
+      "gate.protocol.evidence": [
+        "dsex.gate_evidence --gate protocol_gates --mix-task protocol.check --out tmp/gate-evidence"
+      ],
+      "gate.live_provider.evidence": [
+        "dsex.gate_evidence --gate live_provider_smoke --mix-task live.check --env-file .env --env LIVE_PROVIDER=1 --out tmp/gate-evidence"
       ]
     ]
 
@@ -269,10 +282,10 @@ defmodule DSEx.MixProject do
         "dsex.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.full": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard --require-full"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

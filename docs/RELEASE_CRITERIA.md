@@ -117,6 +117,10 @@ DSEx is production complete when:
     The gate also evaluates `benchmarks/claims.json`; every release-blocking
     public claim must map to fresh passing evidence before the full dashboard
     gate passes. See `docs/BENCHMARK_CLAIMS.md`.
+    Source-checkout release gates that are not benchmark tasks produce
+    dashboard evidence through `mix gate.package.evidence`,
+    `mix gate.livebook.evidence`, `mix gate.protocol.evidence`, and
+    `mix gate.live_provider.evidence`.
 17. The parity dashboard reports `performance_claim_supported: true` before the
     release claims DSEx is faster than DSPy on any named path.
 18. Live latency claims cite dashboard or matrix instrumentation that separates

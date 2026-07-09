@@ -11,6 +11,7 @@ defmodule DashboardTest do
     rag_tool_agent_dir = Path.join(root, "rag-tool-agent")
     live_matrix_dir = Path.join(root, "live-matrix")
     results_dir = Path.join(root, "results")
+    gate_dir = Path.join(root, "gate-evidence")
     out_dir = Path.join(root, "out")
 
     Enum.each(
@@ -21,10 +22,15 @@ defmodule DashboardTest do
         rag_tool_agent_dir,
         live_matrix_dir,
         results_dir,
+        gate_dir,
         out_dir
       ],
       &File.mkdir_p!/1
     )
+
+    write_gate_evidence!(gate_dir, "product_package", "package.check")
+    write_gate_evidence!(gate_dir, "livebook_execute", "livebook.execute.check")
+    write_gate_evidence!(gate_dir, "protocol_gates", "protocol.check")
 
     write_json!(Path.join(trace_dir, "golden-trace-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -267,6 +273,8 @@ defmodule DashboardTest do
         live_matrix_dir,
         "--results-dir",
         results_dir,
+        "--gate-dir",
+        gate_dir,
         "--out",
         out_dir,
         "--max-age-hours",
@@ -280,12 +288,18 @@ defmodule DashboardTest do
     refute dashboard["full_parity"]
     assert dashboard["performance_claim_supported"]
     refute dashboard["release_gate"]["passing"]
-    assert dashboard["release_gate"]["blocking_lanes"] == ["live_matched_model", "public_claims"]
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 6
+
+    assert dashboard["release_gate"]["blocking_lanes"] == [
+             "live_provider_smoke",
+             "live_matched_model",
+             "public_claims"
+           ]
+
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 10
     assert dashboard["claims"]["status"] == "failing"
     assert dashboard["claims"]["summary"]["total"] == 8
-    assert dashboard["claims"]["summary"]["proven"] == 4
-    assert dashboard["claims"]["summary"]["blocked"] == 4
+    assert dashboard["claims"]["summary"]["proven"] == 6
+    assert dashboard["claims"]["summary"]["blocked"] == 2
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -297,7 +311,22 @@ defmodule DashboardTest do
              "claim.dspy_semantics.golden_trace",
              "claim.optimizer_lift.full",
              "claim.performance.provider_free",
+             "claim.product.public_api_installable",
+             "claim.protocols.production_boundaries",
              "claim.rag_tools_agents.full"
+           ]
+
+    assert dashboard["lanes"]["product_package"]["status"] == "full"
+    assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
+    assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
+    assert dashboard["lanes"]["live_provider_smoke"]["status"] == "missing"
+
+    assert Enum.map(
+             dashboard["claims"]["blocking_requirements"],
+             &{&1["claim_id"], &1["missing_requirements"]}
+           ) == [
+             {"claim.docs.livebooks_real_provider", ["live.provider.smoke"]},
+             {"claim.live_matched_model.full_parity", ["live_matched_model.full"]}
            ]
 
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
@@ -449,6 +478,8 @@ defmodule DashboardTest do
             live_matrix_dir,
             "--results-dir",
             results_dir,
+            "--gate-dir",
+            gate_dir,
             "--out",
             out_dir,
             "--max-age-hours",
@@ -466,9 +497,9 @@ defmodule DashboardTest do
     assert error.message =~ "historical_research: missing matched live evidence"
     assert error.message =~ "live max_concurrency evidence is missing or inconsistent"
     assert error.message =~ "Runtime shape evidence is not complete"
-    assert error.message =~ "claim claim.product.public_api_installable"
     assert error.message =~ "claim claim.docs.livebooks_real_provider"
-    assert error.message =~ "claim claim.protocols.production_boundaries"
+    refute error.message =~ "claim claim.product.public_api_installable"
+    refute error.message =~ "claim claim.protocols.production_boundaries"
   end
 
   test "require-full fails when the public claims inventory is unreadable" do
@@ -675,6 +706,24 @@ defmodule DashboardTest do
   end
 
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp write_gate_evidence!(dir, gate, mix_task) do
+    write_json!(Path.join(dir, "gate-evidence-#{gate}-20260707T000000Z.json"), %{
+      "schema_version" => 1,
+      "runner" => "dsex-gate-evidence",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "gate" => gate,
+      "command" => %{"executable" => "mix", "args" => [mix_task], "env" => []},
+      "summary" => %{
+        "mix_task" => mix_task,
+        "passing" => true,
+        "exit_status" => 0,
+        "duration_ms" => 123
+      },
+      "output_tail" => "ok"
+    })
+  end
 
   defp live_model(model, lane_tags, prompt_current?) do
     %{

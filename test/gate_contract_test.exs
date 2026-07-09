@@ -73,11 +73,11 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard") == [
-             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard"
+             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard.full") == [
-             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --out tmp/dashboard --require-full"
+             "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.live.check") == [
@@ -115,6 +115,22 @@ defmodule GateContractTest do
     assert Keyword.fetch!(aliases, :"quality.check") == [
              "credo --only warning",
              "hex.audit"
+           ]
+
+    assert Keyword.fetch!(aliases, :"gate.package.evidence") == [
+             "dsex.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"
+           ]
+
+    assert Keyword.fetch!(aliases, :"gate.livebook.evidence") == [
+             "dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check --out tmp/gate-evidence"
+           ]
+
+    assert Keyword.fetch!(aliases, :"gate.protocol.evidence") == [
+             "dsex.gate_evidence --gate protocol_gates --mix-task protocol.check --out tmp/gate-evidence"
+           ]
+
+    assert Keyword.fetch!(aliases, :"gate.live_provider.evidence") == [
+             "dsex.gate_evidence --gate live_provider_smoke --mix-task live.check --env-file .env --env LIVE_PROVIDER=1 --out tmp/gate-evidence"
            ]
 
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".training.check"))

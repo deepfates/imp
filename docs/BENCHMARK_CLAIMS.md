@@ -47,9 +47,20 @@ passing smoke or wiring evidence.
 Run the dashboard before making release claims:
 
 ```sh
+mix gate.package.evidence
+mix gate.livebook.evidence
+mix gate.protocol.evidence
+mix gate.live_provider.evidence
 mix benchmark.dashboard
 mix benchmark.dashboard.full
 ```
+
+The `gate.*.evidence` aliases run real source-checkout gates and write
+`gate-evidence-*.json` artifacts under `tmp/gate-evidence/`. The dashboard
+consumes those artifacts as the `product_package`, `livebook_execute`,
+`protocol_gates`, and `live_provider_smoke` lanes. `gate.live_provider.evidence`
+loads `.env` and sets `LIVE_PROVIDER=1`; it still requires provider credentials
+in the ignored local `.env` file.
 
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the

@@ -7,6 +7,9 @@ different question than the release dashboard:
 - this catalog asks whether DSEx is sampling the right task families from the
   DSPy literature, docs, and examples.
 
+The machine-readable public claim inventory lives in `benchmarks/claims.json`;
+see `docs/BENCHMARK_CLAIMS.md` for the dashboard claim-gate operating loop.
+
 The commands in this document are source-checkout evidence commands for DSEx
 maintainers. They are not part of the Hex package API or a normal application
 install path.

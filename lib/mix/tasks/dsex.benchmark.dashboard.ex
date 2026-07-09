@@ -31,6 +31,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           rag_tool_agent_dir: :string,
           live_matrix_dir: :string,
           results_dir: :string,
+          gate_dir: :string,
           claims_file: :string,
           out: :string,
           max_age_hours: :integer,
@@ -60,6 +61,34 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     max_age_hours = Keyword.get(opts, :max_age_hours, 24)
 
     lanes = %{
+      "product_package" =>
+        gate_lane(
+          "product_package",
+          Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
+          max_age_hours,
+          "package.check"
+        ),
+      "livebook_execute" =>
+        gate_lane(
+          "livebook_execute",
+          Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
+          max_age_hours,
+          "livebook.execute.check"
+        ),
+      "live_provider_smoke" =>
+        gate_lane(
+          "live_provider_smoke",
+          Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
+          max_age_hours,
+          "live.check"
+        ),
+      "protocol_gates" =>
+        gate_lane(
+          "protocol_gates",
+          Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
+          max_age_hours,
+          "protocol.check"
+        ),
       "golden_trace" =>
         golden_trace_lane(Keyword.get(opts, :trace_dir, "tmp/golden-trace"), max_age_hours),
       "live_matched_model" =>
@@ -83,6 +112,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     }
 
     required = [
+      "product_package",
+      "livebook_execute",
+      "live_provider_smoke",
+      "protocol_gates",
       "golden_trace",
       "live_matched_model",
       "optimizer_lift",
@@ -325,6 +358,54 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       )
     else
       _ -> missing_lane("golden_trace", "no golden-trace-parity artifact found in #{dir}")
+    end
+  end
+
+  defp gate_lane(id, dir, max_age_hours, expected_mix_task) do
+    with {:ok, path} <- latest(Path.join(dir, "gate-evidence-#{id}-*.json")),
+         {:ok, artifact} <- read_artifact(path) do
+      passing =
+        artifact["gate"] == id and
+          get_in(artifact, ["summary", "mix_task"]) == expected_mix_task and
+          get_in(artifact, ["summary", "passing"]) == true
+
+      artifact_lane(id, path, artifact, max_age_hours,
+        passing: passing,
+        full_evidence: passing,
+        scale: "full",
+        summary: %{
+          "mix_task" => get_in(artifact, ["summary", "mix_task"]),
+          "exit_status" => get_in(artifact, ["summary", "exit_status"]),
+          "duration_ms" => get_in(artifact, ["summary", "duration_ms"]),
+          "command" => artifact["command"],
+          "output_tail" => artifact["output_tail"]
+        },
+        limitation:
+          if(passing,
+            do: nil,
+            else:
+              "#{id} evidence artifact exists, but it does not prove #{expected_mix_task} passed."
+          ),
+        blocking_requirements:
+          if(passing,
+            do: [],
+            else: [
+              %{
+                "kind" => "source_gate_failed",
+                "gate" => id,
+                "mix_task" => expected_mix_task,
+                "message" =>
+                  "#{expected_mix_task} did not pass in the latest #{id} evidence artifact."
+              }
+            ]
+          )
+      )
+    else
+      _ ->
+        missing_lane(
+          id,
+          "no #{id} source-checkout gate evidence artifact found in #{dir}; run mix dsex.gate_evidence --gate #{id} --mix-task #{expected_mix_task}"
+        )
     end
   end
 

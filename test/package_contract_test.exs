@@ -16,6 +16,7 @@ defmodule PackageContractTest do
   @excluded_prefixes [
     "benchmarks/",
     "lib/mix/tasks/dsex.benchmark",
+    "lib/mix/tasks/dsex.gate_evidence.ex",
     "lib/dsex/benchmark_truth",
     "scripts/dspy_",
     "test/",
