@@ -4,8 +4,9 @@ This guide is organized around the things you build.
 
 Most examples use the public `DSEx` facade. Reach for deeper `DSEx.*` modules
 when you need direct control over adapters, optimizer reports, tools, agents, or
-persistence. The golden path is `Predict -> Evaluate -> Add demos -> Optimize
--> Tools`.
+persistence. The canonical path is:
+
+`signature -> program -> call -> evaluate -> optimize -> tools/agents -> operate`
 
 ## Configure An LM
 
@@ -68,7 +69,7 @@ program =
 DSEx.get(pred, :answer)
 ```
 
-## The Golden Path
+## The Canonical Path
 
 Start with one typed program, evaluate it, attach examples, then optimize only
 after the metric is meaningful:

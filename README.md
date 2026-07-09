@@ -13,6 +13,16 @@ Use DSEx when prompts have grown into application logic and you want them to
 become code: named inputs and outputs, schema validation, traces, metrics,
 examples, retrieval, tools, agents, and repeatable evaluation.
 
+The manual teaches one path all the way through:
+
+1. Declare a typed task and run it against a real LM.
+2. Develop the same task deterministically with `DSEx.LM.Static`.
+3. Add examples, metrics, and optimizers.
+4. Add tools, retrieval, agents, or recursive control only when the task needs
+   them.
+5. Operate the result with explicit credentials, redaction, gates, and live
+   checks.
+
 ## A Tiny Program
 
 ```elixir
@@ -274,7 +284,7 @@ react =
 Tool policies make side effects explicit. ReAct uses provider tool calls when
 the configured LM supports them and validates final submissions against the
 original signature. For long-running agent runtimes with event streams, see
-the Agents section in `docs/API_GUIDE.md` or Livebook 03.
+the Agents section in `docs/API_GUIDE.md` or Livebook 04.
 
 ## Documentation
 
@@ -289,11 +299,15 @@ Start here:
 
 The `livebooks/` directory contains runnable tutorials:
 
-- `01_real_lm_front_door.livemd`
-- `02_programming_not_prompting.livemd`
-- `03_evaluate_and_optimize.livemd`
-- `04_tools_agents_mcp_rlm.livemd`
-- `05_operate_and_live_checks.livemd`
+- `01_real_lm_front_door.livemd`: the canonical real-LM program shape.
+- `02_programming_not_prompting.livemd`: the same shape with deterministic
+  local development and inspectable traces.
+- `03_evaluate_and_optimize.livemd`: examples, metrics, optimizers, and
+  artifact improvement.
+- `04_tools_agents_mcp_rlm.livemd`: tools, ReAct, agents, MCP, and RLM when a
+  task needs controlled action.
+- `05_operate_and_live_checks.livemd`: source-checkout gates, live checks,
+  security posture, and persistence.
 
 ## Validation
 

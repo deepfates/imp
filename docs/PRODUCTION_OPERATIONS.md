@@ -3,6 +3,12 @@
 This document is the authoritative source-checkout release gate contract for
 DSEx.
 
+It is the final chapter of the same manual path used by the README, API guide,
+and Livebooks: after a DSEx program has a signature, examples, metrics,
+optimization, and any needed tools, this page explains how maintainers prove the
+repository and how applications run live providers without hiding credentials or
+transport behavior.
+
 ## Required Gates
 
 Run from a clean source checkout tree before shipping ordinary product changes:
@@ -116,7 +122,8 @@ campaigns, or parity dashboards.
 
 `mix livebook.execute.check` runs every shipped notebook. Keep it out of the
 ordinary fast gate, but run it when changing public examples, notebook code, or
-the learning path.
+the learning path. With `OPENAI_API_KEY` and `OPENAI_MODEL` loaded, the same
+command also executes the notebooks' live-provider proof cells.
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other

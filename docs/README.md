@@ -3,6 +3,19 @@
 DSEx turns language-model work into declared, callable, measurable, improvable
 Elixir programs. This manual is organized by what you are trying to do.
 
+## Manual Spine
+
+Every guide and notebook follows the same product story:
+
+1. **Declare** the task as a typed signature.
+2. **Run** it as a DSEx program through `DSEx.call/2`.
+3. **Develop** it deterministically with `DSEx.LM.Static`.
+4. **Measure** behavior with examples, metrics, and evaluation reports.
+5. **Improve** the program with optimizers.
+6. **Extend** it with tools, retrieval, agents, or RLM only when needed.
+7. **Operate** it with ReqLLM, explicit credentials, redaction, telemetry, and
+   release gates.
+
 ## Learn The Model
 
 - [Learning Path](LEARNING_PATH.md): what to read and run in 30 minutes,
@@ -25,9 +38,11 @@ Elixir programs. This manual is organized by what you are trying to do.
 ## Learn By Running Code
 
 The notebooks in `livebooks/` start with the real-provider shape, then show how
-to develop the same programs deterministically. Live-provider cells skip cleanly
-unless `OPENAI_API_KEY` and `OPENAI_MODEL` are present, so the notebooks remain
-safe in local gates.
+to develop the same programs deterministically. Every notebook includes at
+least one live-provider proof cell for the surface it teaches. Those cells skip
+cleanly unless `OPENAI_API_KEY` and `OPENAI_MODEL` are present, so the notebooks
+remain safe in local gates while still becoming real end-to-end demos when
+credentials are loaded.
 
 - [01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)
 - [02 Programming, Not Prompting](../livebooks/02_programming_not_prompting.livemd)
@@ -43,9 +58,12 @@ safe in local gates.
 ## First Things To Try
 
 1. Follow the [30-minute path](LEARNING_PATH.md).
-2. Run the first example in [API Guide](API_GUIDE.md).
-3. Open [Livebook 01](../livebooks/01_real_lm_front_door.livemd).
-4. Add one metric and one tiny dev set.
+2. Open [Livebook 01](../livebooks/01_real_lm_front_door.livemd) for the live
+   provider shape.
+3. Open [Livebook 02](../livebooks/02_programming_not_prompting.livemd) for the
+   deterministic local version of that shape.
+4. Add one metric and one tiny dev set with
+   [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd).
 5. From the source checkout, run `mix production.check` before trusting a change.
 6. From the source checkout, run `mix livebook.execute.check` after changing public examples or notebooks.
 

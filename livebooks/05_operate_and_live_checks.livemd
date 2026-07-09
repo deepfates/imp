@@ -7,6 +7,10 @@ Mix.install([{:dsex, path: repo}])
 
 ## Local Quality Gates
 
+The earlier notebooks built DSEx programs. This chapter is about trust: what
+maintainers run before shipping the library, and what application developers
+should decide before putting provider calls in production.
+
 Run these in a terminal from the source checkout repo root:
 
 ```sh
@@ -95,13 +99,43 @@ end
 
 ## Live Gate
 
-In a terminal:
+In a terminal from the source checkout:
 
 ```sh
 set -a
 . ./.env
 set +a
 LIVE_PROVIDER=1 mix live.check
+```
+
+## Live Operations Proof
+
+This cell validates the same live provider path and asserts the expected output
+when credentials are present.
+
+```elixir
+if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+  model = System.fetch_env!("OPENAI_MODEL")
+
+  lm =
+    DSEx.req_llm("openai:#{model}",
+      api_key: System.fetch_env!("OPENAI_API_KEY"),
+      temperature: 0,
+      max_completion_tokens: 40
+    )
+
+  program = DSEx.predict("question -> answer", lm: lm)
+  {:ok, prediction} = DSEx.call(program, %{question: "Reply with exactly: pong"})
+  answer = prediction |> DSEx.get(:answer, "") |> to_string() |> String.downcase()
+
+  unless String.contains?(answer, "pong") do
+    raise "live operations proof failed: #{inspect(DSEx.to_map(prediction))}"
+  end
+
+  DSEx.to_map(prediction)
+else
+  {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live operations proof."}
+end
 ```
 
 ## Saving Without Secrets

@@ -13,6 +13,10 @@ Elixir.
 DSEx turns language-model work into declared, callable, measurable, improvable
 Elixir programs.
 
+The practical sequence is stable across the project: signature, program, call,
+deterministic development, metric, optimizer, optional action boundaries, then
+operations.
+
 ## The Pieces
 
 - Signatures are data: `%DSEx.Signature{}` declares inputs, outputs,
@@ -100,8 +104,8 @@ programs, or arbitrary text artifacts.
 ## Vocabulary
 
 Use `DSEx` for application examples and `DSEx.*` for implementation modules.
-There is no parallel namespace. Prefer “program”, “signature”,
-“prediction”, “metric”, and “optimizer” over prompt-engineering vocabulary.
+There is no parallel namespace. Prefer "program", "signature", "prediction",
+"metric", and "optimizer" over prompt-engineering vocabulary.
 
 ## Production Principle
 

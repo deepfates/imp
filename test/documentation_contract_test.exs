@@ -113,14 +113,25 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     learning = File.read!("docs/LEARNING_PATH.md")
+    api = File.read!("docs/API_GUIDE.md")
+    philosophy = File.read!("docs/DSEX_PHILOSOPHY.md")
 
+    assert readme =~ "The manual teaches one path all the way through"
+    assert docs =~ "## Manual Spine"
     assert readme =~ "- `01_real_lm_front_door.livemd`"
     assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
     assert learning =~ "Open `livebooks/01_real_lm_front_door.livemd`"
+    assert learning =~ "The sequence is deliberately the same everywhere"
+
+    assert api =~
+             "signature -> program -> call -> evaluate -> optimize -> tools/agents -> operate"
+
+    assert philosophy =~ "signature, program, call"
 
     refute readme =~ "01_programming_not_prompting"
     refute docs =~ "05 Real LM Wow Path"
     refute learning =~ "Open `livebooks/02_programming_not_prompting.livemd`."
+    refute learning =~ "Optimize A Program"
   end
 
   test "README distinguishes ReAct programs from agent runtimes in the quick path" do

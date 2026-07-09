@@ -3,6 +3,10 @@
 DSEx uses a small vocabulary. These words are meant to describe ordinary
 Elixir values, not magic.
 
+The main workflow is: define a signature, build a program, call it, evaluate
+predictions with examples and metrics, optimize the program, and operate it
+through an explicit LM dependency.
+
 ## Adapter
 
 An adapter turns a signature, inputs, and demos into model messages, then turns

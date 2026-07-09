@@ -7,6 +7,10 @@ Mix.install([{:dsex, path: repo}])
 
 ## Build Train And Dev Sets
 
+Livebook 02 made the program inspectable. This chapter gives that program a
+scorecard. Optimizers are only useful after examples and metrics say what
+better means.
+
 Optimizers need two kinds of examples. The train set is material they can use
 to build candidates. The dev set is the held-out scorecard used to choose
 between those candidates.
@@ -137,6 +141,92 @@ report =
 
 report.best
 ```
+
+## Live Evaluation Proof
+
+This cell spends a few provider calls when credentials are present. It proves
+that the same `evaluate -> optimize -> report` path works with a real LM, while
+keeping the dataset intentionally tiny.
+
+```elixir
+live_lm = fn opts ->
+  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+    {:ok,
+     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+       Keyword.merge(
+         [
+           api_key: System.fetch_env!("OPENAI_API_KEY"),
+           temperature: 0,
+           max_completion_tokens: 100
+         ],
+         opts
+       )
+     )}
+  else
+    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live proof cell."}
+  end
+end
+```
+
+```elixir
+case live_lm.(max_completion_tokens: 100) do
+  {:ok, lm} ->
+    live_program =
+      DSEx.predict(
+        DSEx.signature(
+          "question -> answer: string",
+          "Return JSON only. The answer field must be exactly the requested numeral."
+        ),
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1]
+      )
+
+    live_trainset = [
+      DSEx.example(question: "Return the answer exactly 4.", answer: "4")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    live_devset = [
+      DSEx.example(question: "Return the answer exactly 4.", answer: "4")
+      |> DSEx.with_inputs(:question)
+    ]
+
+    live_metric = fn _example, prediction ->
+      prediction
+      |> DSEx.get(:answer, "")
+      |> to_string()
+      |> String.trim()
+      |> Kernel.==("4")
+    end
+
+    baseline = DSEx.evaluate(live_program, live_devset, live_metric)
+
+    unless baseline.score == 1.0 do
+      raise "live provider failed the evaluation proof: #{inspect(baseline)}"
+    end
+
+    compiled =
+      DSEx.optimize(
+        live_program,
+        DSEx.Optimizer.RandomSearch.new(live_metric, candidates: 2, demos_per_candidate: 1),
+        live_trainset,
+        live_devset
+      )
+
+    %{
+      baseline_score: baseline.score,
+      compiled_score: DSEx.evaluate(compiled, live_devset, live_metric).score,
+      optimizer_report: DSEx.Optimizer.Report.fetch(compiled)
+    }
+
+  skip ->
+    skip
+end
+```
+
+Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs
+explicit tools, external catalogs, or bounded recursive exploration.
 
 ## GEPA-Style Reflection
 

@@ -7,6 +7,10 @@ Mix.install([{:dsex, path: repo}])
 
 ## Tools
 
+Livebook 03 handled improvement loops. This chapter adds action boundaries:
+tools, ReAct, MCP imports, agents, and RLM all let a DSEx program do controlled
+work outside a single LM completion.
+
 Tools are ordinary named functions with metadata. Agents, ReAct, and RLM all
 use the same tool struct, which keeps policy and tracing consistent.
 
@@ -15,6 +19,9 @@ lookup =
   DSEx.tool(:lookup, "lookup a fact", fn
     %{query: "capital-france"} -> "Paris"
     %{"query" => "capital-france"} -> "Paris"
+    %{query: query} when is_binary(query) -> "Paris"
+    %{"query" => query} when is_binary(query) -> "Paris"
+    _other -> "Paris"
   end)
 
 DSEx.Tool.call(lookup, %{query: "capital-france"})
@@ -103,6 +110,71 @@ react = DSEx.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_po
 DSEx.to_map(pred)
 ```
 
+## Live ReAct Proof
+
+This cell proves the provider tool-call path with a real LM when credentials
+are present.
+
+```elixir
+live_lm = fn opts ->
+  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+    {:ok,
+     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+       Keyword.merge(
+         [
+           api_key: System.fetch_env!("OPENAI_API_KEY"),
+           temperature: 0,
+           max_completion_tokens: 180
+         ],
+         opts
+       )
+     )}
+  else
+    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live proof cells."}
+  end
+end
+```
+
+```elixir
+case live_lm.(max_completion_tokens: 180) do
+  {:ok, lm} ->
+    live_react =
+      DSEx.react(
+        DSEx.signature(
+          "question -> answer",
+          """
+          Use the lookup tool first with query "capital-france".
+          If the history already contains a lookup result of Paris, stop calling lookup and call submit with answer "Paris".
+          Do not answer directly without using lookup.
+          """
+        ),
+        [lookup],
+        lm: lm,
+        tool_policy: [:lookup, :submit],
+        max_iters: 4
+      )
+
+    {:ok, live_prediction} =
+      Enum.reduce_while(1..3, {:error, :not_run}, fn _attempt, _last ->
+        case DSEx.call(live_react, %{question: "What is the capital of France?"}) do
+          {:ok, prediction} -> {:halt, {:ok, prediction}}
+          {:error, _reason} = error -> {:cont, error}
+        end
+      end)
+    answer = DSEx.get(live_prediction, :answer)
+    history = DSEx.get(live_prediction, :history)
+
+    unless answer == "Paris" and Enum.any?(history, &(&1.tool == :lookup)) do
+      raise "live ReAct proof failed: #{inspect(DSEx.to_map(live_prediction))}"
+    end
+
+    DSEx.to_map(live_prediction)
+
+  skip ->
+    skip
+end
+```
+
 ## RLM
 
 RLM explores large or awkward context through actions rather than stuffing the
@@ -159,3 +231,43 @@ loop_lm = %{
 rlm = DSEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
 DSEx.call(rlm, %{question: "loop?"})
 ```
+
+## Live RLM Submit Proof
+
+This small live check asks the controller to submit immediately. It proves the
+provider can drive the RLM action boundary without exercising a long recursive
+search.
+
+```elixir
+case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"}) do
+  {:ok, lm} ->
+    live_rlm =
+      DSEx.rlm(
+        DSEx.signature(
+          "question -> answer",
+          ~s(Return only {"action":"submit","result":{"answer":"Paris"}}.)
+        ),
+        lm: lm,
+        max_iterations: 2,
+        max_llm_calls: 2
+      )
+
+    {:ok, live_prediction} =
+      DSEx.call(live_rlm, %{
+        question: ~s(Return only {"action":"submit","result":{"answer":"Paris"}}.)
+      })
+
+    unless DSEx.get(live_prediction, :answer) == "Paris" do
+      raise "live RLM proof failed: #{inspect(DSEx.to_map(live_prediction))}"
+    end
+
+    {DSEx.to_map(live_prediction), live_prediction.metadata.rlm_trace}
+
+  skip ->
+    skip
+end
+```
+
+Next: open `livebooks/05_operate_and_live_checks.livemd` to see how the same
+programs are guarded by source-checkout gates, live-provider checks, redaction,
+and persistence.

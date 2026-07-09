@@ -7,6 +7,12 @@ Mix.install([{:dsex, path: repo}])
 
 ## The Idea
 
+Livebook 01 showed the real-provider shape. This chapter removes provider
+variance so you can inspect the same DSEx ideas with a deterministic local LM.
+
+It also includes a live-provider proof cell near the end. The point is that
+`DSEx.LM.Static` is a development tool, not a different product path.
+
 DSEx-style programming means declaring the task boundary first:
 
 The signature is the smallest useful unit in DSEx. It says what data enters the
@@ -117,6 +123,69 @@ example =
 
 {DSEx.to_map(DSEx.inputs(example)), DSEx.to_map(DSEx.labels(example))}
 ```
+
+## Live Provider Proof
+
+This is the same programming model against a real LM. The cell validates the
+typed JSON result when `OPENAI_API_KEY` and `OPENAI_MODEL` are present.
+
+```elixir
+live_lm = fn opts ->
+  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+    {:ok,
+     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+       Keyword.merge(
+         [
+           api_key: System.fetch_env!("OPENAI_API_KEY"),
+           temperature: 0,
+           max_completion_tokens: 120
+         ],
+         opts
+       )
+     )}
+  else
+    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live proof cell."}
+  end
+end
+```
+
+```elixir
+case live_lm.(max_completion_tokens: 120) do
+  {:ok, lm} ->
+    live_program =
+      DSEx.predict(
+        DSEx.signature(
+          "text -> sentiment: enum[positive,negative], confidence: number",
+          "Classify the text. Return JSON only."
+        ),
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1]
+      )
+
+    {:ok, live_prediction} =
+      DSEx.call(live_program, %{text: "DSEx makes LM programs testable and useful."})
+
+    sentiment = DSEx.get(live_prediction, :sentiment)
+    confidence = DSEx.get(live_prediction, :confidence)
+
+    unless sentiment == "positive" and is_number(confidence) do
+      raise "live provider returned an invalid typed prediction: #{inspect(DSEx.to_map(live_prediction))}"
+    end
+
+    %{
+      sentiment: sentiment,
+      confidence: confidence,
+      trace_messages: length(live_prediction.metadata.trace.messages)
+    }
+
+  skip ->
+    skip
+end
+```
+
+Next: open `livebooks/03_evaluate_and_optimize.livemd` to turn examples into a
+metric, evaluate the baseline, and compile a better program.
 
 ## Save And Load
 

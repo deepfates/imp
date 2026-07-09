@@ -60,6 +60,46 @@ defmodule LivebookContractTest do
     assert body =~ "OPENAI_MODEL"
   end
 
+  test "each Livebook has a live-provider proof path" do
+    expected = %{
+      "livebooks/01_real_lm_front_door.livemd" => [
+        "live extraction proof failed",
+        "live ChainOfThought proof failed",
+        "live ReAct proof failed",
+        "live save/load proof failed"
+      ],
+      "livebooks/02_programming_not_prompting.livemd" => [
+        "## Live Provider Proof",
+        "live provider returned an invalid typed prediction"
+      ],
+      "livebooks/03_evaluate_and_optimize.livemd" => [
+        "## Live Evaluation Proof",
+        "live provider failed the evaluation proof"
+      ],
+      "livebooks/04_tools_agents_mcp_rlm.livemd" => [
+        "## Live ReAct Proof",
+        "## Live RLM Submit Proof",
+        "live ReAct proof failed",
+        "live RLM proof failed"
+      ],
+      "livebooks/05_operate_and_live_checks.livemd" => [
+        "## Live Operations Proof",
+        "live operations proof failed"
+      ]
+    }
+
+    for {path, snippets} <- expected do
+      body = File.read!(path)
+
+      assert body =~ "OPENAI_API_KEY"
+      assert body =~ "OPENAI_MODEL"
+
+      for snippet <- snippets do
+        assert body =~ snippet
+      end
+    end
+  end
+
   test "Livebooks teach the ReqLLM provider path only" do
     body = Path.wildcard("livebooks/*.livemd") |> Enum.map_join("\n", &File.read!/1)
 
@@ -78,5 +118,23 @@ defmodule LivebookContractTest do
     refute body =~ "05_real_lm_wow_path"
     refute body =~ "04_local_gates_and_live_provider_smoke"
     refute body =~ "03_agents_tools_mcp_rlm"
+  end
+
+  test "Livebooks read as one cohesive manual path" do
+    first = File.read!("livebooks/01_real_lm_front_door.livemd")
+    second = File.read!("livebooks/02_programming_not_prompting.livemd")
+    third = File.read!("livebooks/03_evaluate_and_optimize.livemd")
+    fourth = File.read!("livebooks/04_tools_agents_mcp_rlm.livemd")
+    fifth = File.read!("livebooks/05_operate_and_live_checks.livemd")
+
+    assert first =~ "Manual path: real provider shape first"
+    assert first =~ "Next: open `livebooks/02_programming_not_prompting.livemd`"
+    assert second =~ "Livebook 01 showed the real-provider shape"
+    assert second =~ "Next: open `livebooks/03_evaluate_and_optimize.livemd`"
+    assert third =~ "Livebook 02 made the program inspectable"
+    assert third =~ "Next: open `livebooks/04_tools_agents_mcp_rlm.livemd`"
+    assert fourth =~ "Livebook 03 handled improvement loops"
+    assert fourth =~ "Next: open `livebooks/05_operate_and_live_checks.livemd`"
+    assert fifth =~ "The earlier notebooks built DSEx programs"
   end
 end

@@ -3,6 +3,10 @@
 DSEx is easiest to learn as a sequence of small powers. Each step should leave
 you with something runnable, inspectable, and testable.
 
+The sequence is deliberately the same everywhere in the docs: declare the
+signature, call a program, make it deterministic, measure it, optimize it, add
+action boundaries, then operate it.
+
 ## In 30 Minutes
 
 Goal: understand the shape of a DSEx program.
@@ -20,13 +24,17 @@ Goal: understand the shape of a DSEx program.
 
 You should leave this step knowing that the prompt is generated from a
 signature, demos, inputs, and an adapter. The prompt matters, but it is not the
-API.
+API. You should also know that the same DSEx program can move between a real
+provider and `DSEx.LM.Static` without rewriting the task.
+
+When credentials are loaded, each Livebook's proof cells should either return a
+validated result or raise. They are demos, but they are also tests.
 
 ## In 2 Hours
 
 Goal: turn a prompt-like task into a measurable program.
 
-1. Read `docs/API_GUIDE.md` through "Optimize A Program".
+1. Read `docs/API_GUIDE.md` through "The Canonical Path".
 2. Open `livebooks/03_evaluate_and_optimize.livemd`.
 3. Build three examples and mark their input fields.
 4. Write one metric.
@@ -43,9 +51,11 @@ Goal: build a useful local workflow.
 
 1. Add schema-constrained outputs with `DSEx.Adapter.JSON`.
 2. Add one retrieval or tool boundary.
-3. Run the program against deterministic local examples.
-4. Save and load the program.
-5. From the source checkout, run `mix production.check`.
+3. Open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs
+   controlled action or context exploration.
+4. Run the program against deterministic local examples.
+5. Save and load the program.
+6. From the source checkout, run `mix production.check`.
 
 At this point DSEx should feel like ordinary Elixir: structs, functions,
 tests, docs, and explicit dependencies.
@@ -81,4 +91,4 @@ Use advanced modules when the simpler flow has a real limitation:
 - `DSEx.Agent` when you want an explicit Elixir runtime with tools, child
   agents, traces, and event streams.
 
-Start boring. Add power only when the task earns it.
+Start with the front-door program. Add power only when the task earns it.
