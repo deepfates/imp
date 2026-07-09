@@ -152,6 +152,7 @@ or build custom orchestration.
 | `DSEx.multi_chain_comparison/2` | You already have candidate completions and want a self-consistency chooser. |
 | `DSEx.best_of_n/3` | You want to run one program several times and keep the highest-scored result. |
 | `DSEx.refine/3` | You want bounded retry with feedback until a metric passes. |
+| `DSEx.assert/3` | You want named runtime constraints to produce feedback and self-repair attempts. |
 | `DSEx.parallel/3` | You want supervised concurrent batch calls with one result per input. |
 | `DSEx.knn/3`, `DSEx.nearest/2` | You want nearest-neighbor examples from a local trainset. |
 | `DSEx.react/3` | The model should choose tools and then submit a validated answer. |
@@ -186,6 +187,27 @@ batch =
   )
 
 {DSEx.get(best, :answer), DSEx.get(refined, :answer), length(batch)}
+```
+
+Use assertion-guided refinement when the constraint is clearer than a full task
+metric:
+
+```elixir
+one_word =
+  DSEx.assertion(:one_word, fn prediction ->
+    prediction
+    |> DSEx.get(:answer, "")
+    |> to_string()
+    |> String.split()
+    |> length() == 1
+  end, message: "Answer with one word.")
+
+{:ok, constrained} =
+  program
+  |> DSEx.assert(one_word, max_attempts: 2)
+  |> DSEx.call(%{question: "Capital of France?"})
+
+{DSEx.get(constrained, :answer), DSEx.get(constrained, :assertion_score)}
 ```
 
 `DSEx.multi_chain_comparison/2` is useful when candidate completions are

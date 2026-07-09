@@ -57,7 +57,7 @@ The current generated maintainer-readable map is
 | RLM benchmarks | DSEx now has a provider-free HotPotQA-shaped RLM benchmark lane comparing DSEx RLM, Python DSPy RLM, direct prompting, and simple RAG. Live model-quality RLM campaigns remain a separate scale-up question. | `de-m7aa` |
 | GEPA research evidence | DSEx has GEPA-style optimizer coverage, but not paper-level GEPA replication against DSPy GEPA on public tasks/models/budgets. | `de-izej` |
 | optimize_anything evidence | DSEx has arbitrary artifact optimization APIs, but not replication across non-prompt artifact classes. | `de-16fo` |
-| Assertions | Schema validation is not equivalent to DSPy Assertions and self-refinement behavior. | `de-b79l` |
+| Assertions | DSEx now exposes named Elixir assertions plus assertion-guided self-refinement over ordinary programs, with feedback hints, strict mode, best-attempt metadata, streaming composition, and docs/tests. Current installed DSPy exposes `Refine`, not the older public `Assert`/`Suggest` surface, so DSEx intentionally implements the current refinement behavior rather than stale compatibility names. | `de-b79l` |
 | History | DSEx now has signature-shaped `DSEx.History` matching DSPy's task-turn primitive, Chat adapter rendering, JSON-safe dump/load, redaction, streaming composition, and an explicit boundary from provider-native role-message history. | `de-vm37` |
 | Native reasoning/BaseLM | DSEx has LM behaviours and reasoning types, but needs explicit parity around typed LM surfaces and provider-native reasoning fields. | `de-erg0` |
 | ToolCalls | DSEx has tool-call structs and ReAct paths, but primitive-level provider-native tool-call round trips need explicit tests/evidence. | `de-e84o` |

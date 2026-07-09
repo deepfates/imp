@@ -50,6 +50,7 @@ defmodule DSEx do
   alias DSEx.{Example, Prediction, Settings, Signature, Tool}
 
   alias DSEx.Predict.{
+    Assertions,
     BestOfN,
     ChainOfThought,
     CodeAct,
@@ -185,6 +186,12 @@ defmodule DSEx do
 
   @doc "Creates a wrapper that retries a program with feedback until a metric passes."
   def refine(program, metric, opts \\ []), do: Refine.new(program, metric, opts)
+
+  @doc "Builds a named runtime assertion for assertion-guided refinement."
+  def assertion(name, predicate, opts \\ []), do: DSEx.Assertion.new(name, predicate, opts)
+
+  @doc "Wraps a program with assertion-guided self-refinement."
+  def assert(program, assertions, opts \\ []), do: Assertions.new(program, assertions, opts)
 
   @doc "Runs a program over a batch of inputs through DSEx's supervised task boundary."
   def parallel(program, inputs, opts \\ []), do: Parallel.map(program, inputs, opts)
