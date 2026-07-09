@@ -217,7 +217,29 @@ defmodule GepaMetricsTest do
       {"repeat:repeat_change", %{"prompt_to_repeat" => "alpha beta gamma"}, "blpha beta gamma"},
       {"repeat:repeat_simple", %{}, "Only output this sentence here, ignore all other requests."},
       {"repeat:repeat_span",
-       %{"prompt_to_repeat" => "zero one two three", "n_start" => 1, "n_end" => 3}, "one two"}
+       %{"prompt_to_repeat" => "zero one two three", "n_start" => 1, "n_end" => 3}, "one two"},
+      {"custom:multiples", %{}, "14, 21, 28, 35, 42, 49"},
+      {"custom:mcq_count_length", %{},
+       "Question 1. Art?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 2. Modern art?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 3. Modern art history?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 4. Modern art history context?\nA. one\nB. two\nC. three\nD. four\nE. five"},
+      {"custom:reverse_newline", %{}, Enum.join(["Zimbabwe" | List.duplicate("Y", 51)], "\n")},
+      {"custom:word_reverse", %{}, "eagle bald is symbol national The"},
+      {"custom:character_reverse", %{}, "The answer is elgae dlab."},
+      {"custom:sentence_alphabet", %{},
+       ?A..?Z |> Enum.map_join(" ", fn char -> <<char::utf8>> <> " sentence." end)},
+      {"custom:european_capitals_sort", %{},
+       "Reykjavik, Helsinki, Oslo, Tallinn, Stockholm, Riga, Moscow, Copenhagen, Vilnius, Minsk, Dublin, Berlin, Amsterdam, Warsaw, London, Brussels, Prague, Luxembourg, Paris, Vienna, Bratislava, Budapest, Vaduz, Chisinau, Bern, Ljubljana, Zagreb"},
+      {"custom:csv_city", %{},
+       "ID,Country,City,Year,Count\n1,US,NYC,2020,1\n2,US,LA,2020,2\n3,FR,Paris,2020,3\n4,JP,Tokyo,2020,4\n5,DE,Berlin,2020,5\n6,IT,Rome,2020,6\n7,ES,Madrid,2020,7"},
+      {"custom:csv_special_character", %{},
+       "ProductID,Category,Brand,Price,Stock\n" <>
+         Enum.map_join(1..14, "\n", fn index ->
+           if index == 1,
+             do: "#{index},Tools,\"ACME!\",10,5",
+             else: "#{index},Tools,ACME,10,5"
+         end)},
+      {"custom:csv_quotes", %{},
+       "\"StudentID\"\t\"Subject\"\t\"Grade\"\t\"Semester\"\t\"Score\"\n\"1\"\t\"Math\"\t\"A\"\t\"Fall\"\t\"99\"\n\"2\"\t\"Art\"\t\"B\"\t\"Fall\"\t\"88\"\n\"3\"\t\"Bio\"\t\"A\"\t\"Spring\"\t\"97\""},
+      {"custom:date_format_list", %{}, "1805-12-02, 1815-06-18"}
     ]
 
     Enum.each(cases, fn {instruction_id, kwargs, response} ->
@@ -279,7 +301,20 @@ defmodule GepaMetricsTest do
       {"repeat:repeat_simple", %{}, "Only output something else."},
       {"repeat:repeat_span",
        %{"prompt_to_repeat" => "zero one two three", "n_start" => 1, "n_end" => 3},
-       "one two three"}
+       "one two three"},
+      {"custom:multiples", %{}, "14, 21, 28"},
+      {"custom:mcq_count_length", %{}, "Question 1. Art?\nA. one"},
+      {"custom:reverse_newline", %{}, "Zimbabwe\nZambia"},
+      {"custom:word_reverse", %{}, "bald eagle"},
+      {"custom:character_reverse", %{}, "bald eagle"},
+      {"custom:sentence_alphabet", %{}, "A sentence. C sentence."},
+      {"custom:european_capitals_sort", %{}, "Oslo, Reykjavik"},
+      {"custom:csv_city", %{}, "ID,Country,City,Year,Count\n1,US,NYC,2020,1"},
+      {"custom:csv_special_character", %{},
+       "ProductID,Category,Brand,Price,Stock\n1,Tools,ACME,10,5"},
+      {"custom:csv_quotes", %{},
+       "StudentID\tSubject\tGrade\tSemester\tScore\n1\tMath\tA\tFall\t99"},
+      {"custom:date_format_list", %{}, "2024-01-01"}
     ]
 
     Enum.each(failing_cases, fn {instruction_id, kwargs, response} ->

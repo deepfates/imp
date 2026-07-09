@@ -773,6 +773,210 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     actual == expected
   end
 
+  defp ifbench_following?("custom:multiples", _args, _prompt, value) do
+    numbers = Regex.scan(~r/\d+/, String.replace(value, ",", ", ")) |> Enum.map(fn [n] -> n end)
+    numbers == Enum.map(14..50//7, &to_string/1)
+  end
+
+  defp ifbench_following?("custom:mcq_count_length", _args, _prompt, value) do
+    if String.starts_with?(value, "Question") do
+      questions =
+        ~r/\n*(?:Question \d+[\.|\):;]?\s*)/
+        |> Regex.split(value)
+        |> Enum.reject(&(String.trim(&1) == ""))
+
+      question_lengths =
+        Enum.map(questions, fn question ->
+          {text, option_count, _done?} =
+            question
+            |> String.split("\n")
+            |> Enum.reduce({"", 0, false}, fn line, {text, option_count, done?} ->
+              if Regex.match?(~r/^[A-Ea-e][\.|\)]\s*\w+/, String.trim(line)) do
+                {text, option_count + 1, true}
+              else
+                if done?,
+                  do: {text, option_count, done?},
+                  else: {text <> " " <> String.trim(line), option_count, done?}
+              end
+            end)
+
+          if option_count == 5, do: String.length(String.trim(text)), else: :invalid
+        end)
+
+      length(questions) == 4 and Enum.all?(question_lengths, &is_integer/1) and
+        strictly_increasing?(question_lengths)
+    else
+      false
+    end
+  end
+
+  defp ifbench_following?("custom:reverse_newline", _args, _prompt, value) do
+    lines =
+      value
+      |> String.split("\n")
+      |> Enum.map(&trim_punctuation/1)
+      |> Enum.filter(&(String.trim(&1) != ""))
+
+    with index when is_integer(index) <- Enum.find_index(lines, &String.contains?(&1, "Zimbabwe")),
+         target_lines <- Enum.drop(lines, index),
+         true <- length(target_lines) >= 52 do
+      normalized = Enum.map(target_lines, &ascii_fold/1)
+      normalized == Enum.sort(normalized, :desc)
+    else
+      _other -> false
+    end
+  end
+
+  defp ifbench_following?("custom:word_reverse", _args, _prompt, value) do
+    reversed =
+      value
+      |> String.downcase()
+      |> String.trim()
+      |> strip_all_punctuation()
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.reverse()
+      |> Enum.join(" ")
+
+    String.contains?(reversed, "bald eagle") and reversed in split_sentences(reversed)
+  end
+
+  defp ifbench_following?("custom:character_reverse", _args, _prompt, value) do
+    String.contains?(String.downcase(value), "elgae dlab")
+  end
+
+  defp ifbench_following?("custom:sentence_alphabet", _args, _prompt, value) do
+    sentences = split_sentences(value)
+
+    length(sentences) == 26 and
+      sentences
+      |> Enum.with_index()
+      |> Enum.all?(fn {sentence, index} ->
+        sentence
+        |> String.trim_leading()
+        |> String.first()
+        |> to_string()
+        |> String.downcase()
+        |> Kernel.==(<<?a + index::utf8>>)
+      end)
+  end
+
+  defp ifbench_following?("custom:european_capitals_sort", _args, _prompt, value) do
+    expected = [
+      "Reykjavik",
+      "Helsinki",
+      "Oslo",
+      "Tallinn",
+      "Stockholm",
+      "Riga",
+      "Moscow",
+      "Copenhagen",
+      "Vilnius",
+      "Minsk",
+      "Dublin",
+      "Berlin",
+      "Amsterdam",
+      "Warsaw",
+      "London",
+      "Brussels",
+      "Prague",
+      "Luxembourg",
+      "Paris",
+      "Vienna",
+      "Bratislava",
+      "Budapest",
+      "Vaduz",
+      "Chisinau",
+      "Bern",
+      "Ljubljana",
+      "Zagreb"
+    ]
+
+    value
+    |> ascii_fold()
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Kernel.==(expected)
+  end
+
+  defp ifbench_following?("custom:csv_city", _args, _prompt, value) do
+    case parse_csv(value, ",") do
+      [["ID", "Country", "City", "Year", "Count"] | rows] ->
+        length(rows) == 7 and Enum.all?(rows, &(length(&1) == 5))
+
+      _other ->
+        false
+    end
+  end
+
+  defp ifbench_following?("custom:csv_special_character", _args, _prompt, value) do
+    rows = parse_csv(value, ",")
+
+    case rows do
+      [header | data] ->
+        Enum.map(header, &String.trim(&1, "\"")) == [
+          "ProductID",
+          "Category",
+          "Brand",
+          "Price",
+          "Stock"
+        ] and
+          length(data) == 14 and Enum.all?(data, &(length(&1) == 5)) and
+          Enum.any?(data, fn row -> Enum.any?(row, &Regex.match?(~r/[^\d\w\s]/, &1)) end)
+
+      _other ->
+        false
+    end
+  end
+
+  defp ifbench_following?("custom:csv_quotes", _args, _prompt, value) do
+    rows = parse_csv(value, "\t")
+
+    case rows do
+      [header | data] ->
+        Enum.map(header, &String.trim(&1, "\"")) == [
+          "StudentID",
+          "Subject",
+          "Grade",
+          "Semester",
+          "Score"
+        ] and
+          length(data) == 3 and Enum.all?(data, &(length(&1) == 5)) and
+          value
+          |> String.split("\n", trim: true)
+          |> Enum.all?(fn line ->
+            line
+            |> String.split("\t")
+            |> Enum.all?(
+              &(String.starts_with?(String.trim(&1), "\"") and
+                  String.ends_with?(String.trim(&1), "\""))
+            )
+          end)
+
+      _other ->
+        false
+    end
+  end
+
+  defp ifbench_following?("custom:date_format_list", _args, _prompt, value) do
+    value
+    |> String.trim()
+    |> String.split(",")
+    |> Enum.all?(fn date ->
+      case Regex.run(~r/^(\d{4})-(\d{2})-(\d{2})$/, String.trim(date)) do
+        [_, year, month, day] ->
+          valid_napoleon_date?(
+            String.to_integer(year),
+            String.to_integer(month),
+            String.to_integer(day)
+          )
+
+        _other ->
+          false
+      end
+    end)
+  end
+
   defp ifbench_following?("combination:two_responses", _args, _prompt, value) do
     responses =
       value
@@ -843,6 +1047,58 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     |> String.split(substring)
     |> length()
     |> Kernel.-(1)
+  end
+
+  defp strictly_increasing?(values) do
+    values
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.all?(fn [left, right] -> left < right end)
+  end
+
+  defp ascii_fold(value) do
+    value
+    |> :unicode.characters_to_nfd_binary()
+    |> String.replace(~r/\p{Mn}/u, "")
+  end
+
+  defp parse_csv(value, delimiter) do
+    value
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_csv_line(&1, delimiter))
+  end
+
+  defp parse_csv_line(line, delimiter) do
+    {fields, current, in_quotes?} =
+      line
+      |> String.graphemes()
+      |> Enum.reduce({[], "", false}, fn char, {fields, current, in_quotes?} ->
+        cond do
+          char == "\"" ->
+            {fields, current <> char, not in_quotes?}
+
+          char == delimiter and not in_quotes? ->
+            {[String.trim(current) | fields], "", in_quotes?}
+
+          true ->
+            {fields, current <> char, in_quotes?}
+        end
+      end)
+
+    _ = in_quotes?
+
+    [String.trim(current) | fields]
+    |> Enum.reverse()
+    |> Enum.map(&String.trim(&1, "\""))
+  end
+
+  defp valid_napoleon_date?(year, month, day) do
+    cond do
+      year < 1769 or year > 1821 -> false
+      month < 1 or month > 12 -> false
+      month in [1, 3, 5, 7, 8, 10, 12] -> day >= 1 and day <= 31
+      month in [4, 6, 9, 11] -> day >= 1 and day <= 30
+      month == 2 -> day >= 1 and day <= 29
+    end
   end
 
   defp first_italics_tag(value) do
