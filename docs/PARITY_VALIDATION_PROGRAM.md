@@ -292,10 +292,11 @@ plus a `families.json` manifest. The manifest records upstream metric names.
 DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
 supporting-title retrieval, IFBench instruction-registry constraints, Papillon
 LLM-judge quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME
-parser paths. Papillon campaigns must pass a judge LM and include
-`metric_judge` provenance in research rows. Dedicated adapters and upstream
-fixture comparisons are still required before claiming full IFBench registry
-parity or LiveBenchMath `imo`/`usamo`/`amps_hard` symbolic-parser parity.
+parser paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring.
+Papillon campaigns must pass a judge LM and include `metric_judge` provenance in
+research rows. Dedicated upstream fixture comparisons are still required before
+claiming full IFBench registry parity. LiveBenchMath `amps_hard` remains guarded
+until the SymPy/Lark symbolic bridge is installed and validated.
 
 Pass condition:
 

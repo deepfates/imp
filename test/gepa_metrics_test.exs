@@ -167,6 +167,59 @@ defmodule GepaMetricsTest do
     refute metric.(example, DSEx.prediction(answer: "729" <> String.duplicate("x", 60)))
   end
 
+  test "LiveBenchMath metric ports IMO and USAMO proof-rearrangement edit-distance scoring" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "livebench_math.calculate_livebench_score",
+        "output_key" => "answer"
+      })
+
+    example =
+      DSEx.example(
+        question: "Order the proof steps.",
+        answer: "1,2,3,4",
+        question_d: %{
+          "task" => "proof_rearrangement",
+          "subtask" => "imo_2024_proof_rearrangement",
+          "turns" => ["Order the proof steps."],
+          "ground_truth" => "1,2,3,4"
+        }
+      )
+      |> DSEx.with_inputs(:question)
+
+    assert metric.(example, DSEx.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
+    assert metric.(example, DSEx.prediction(answer: "Therefore \\\\boxed{1,2,4,3}")) == 0.5
+    assert metric.(example, DSEx.prediction(answer: "Final ordering\n1, 2, 3, 4.")) == 1.0
+
+    usamo = put_in(example.fields[:question_d]["subtask"], "usamo_2024_proof_rearrangement")
+    assert metric.(usamo, DSEx.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
+  end
+
+  test "LiveBenchMath AMPS_Hard branch is guarded until the symbolic bridge is installed" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "livebench_math.calculate_livebench_score",
+        "output_key" => "answer"
+      })
+
+    example =
+      DSEx.example(
+        question: "Solve.",
+        answer: "\\frac{1}{2}",
+        question_d: %{
+          "task" => "amps_hard",
+          "subtask" => "amps_hard_algebra",
+          "turns" => ["Solve."],
+          "ground_truth" => "\\frac{1}{2}"
+        }
+      )
+      |> DSEx.with_inputs(:question)
+
+    assert_raise ArgumentError, ~r/AMPS_Hard scoring requires/, fn ->
+      metric.(example, DSEx.prediction(answer: "\\boxed{1/2}"))
+    end
+  end
+
   test "Papillon metric uses DSEx judges for quality and leakage arithmetic" do
     {:ok, calls} = Agent.start_link(fn -> [] end)
 

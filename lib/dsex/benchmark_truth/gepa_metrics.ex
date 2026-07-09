@@ -346,8 +346,16 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
       Enum.at(splits, 0) == "aime" ->
         String.contains?(String.slice(answer, -50, 50) || "", to_string(ground_truth))
 
+      Enum.at(splits, 0) in ["imo", "usamo"] ->
+        livebench_proof_rearrangement_score(to_string(ground_truth), answer)
+
+      String.contains?(to_string(task), "amps_hard") ->
+        raise ArgumentError,
+              "LiveBenchMath AMPS_Hard scoring requires the upstream SymPy/Lark symbolic bridge; install the Python math dependencies before claiming AMPS_Hard parity"
+
       true ->
-        false
+        raise ArgumentError,
+              "unsupported LiveBenchMath task #{inspect(task)}; DSEx only claims AMC/SMC, AIME, IMO/USAMO, and guarded AMPS_Hard scoring"
     end
   end
 
@@ -468,6 +476,202 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
         [_, value] -> String.downcase(value) == String.downcase(ground_truth)
         _ -> false
       end
+  end
+
+  defp livebench_proof_rearrangement_score(ground_truth, answer) do
+    gold = ground_truth |> String.split(",") |> Enum.map(&parse_int!/1)
+    completions = extract_expression_completions(answer)
+    distance = levenshtein(completions, gold)
+    denominator = max(length(completions), length(gold))
+
+    if denominator == 0 do
+      0.0
+    else
+      1.0 - distance / denominator
+    end
+  end
+
+  defp extract_expression_completions(generation) do
+    cond do
+      String.contains?(String.downcase(generation), "answer:") ->
+        extract_answer_line_numbers(generation)
+
+      String.contains?(generation, "\\boxed") ->
+        generation
+        |> last_boxed()
+        |> case do
+          nil -> generation
+          boxed -> remove_boxed(boxed)
+        end
+        |> String.replace("\\text{", "")
+        |> String.replace("}", "")
+        |> String.replace("\\", "")
+        |> comma_numbers()
+        |> maybe_numbers(generation)
+
+      true ->
+        generation
+        |> String.trim()
+        |> String.downcase()
+        |> String.split("\n")
+        |> List.last()
+        |> comma_numbers_with_trimmed_edges()
+        |> maybe_numbers_from_fallback(generation)
+    end
+  end
+
+  defp extract_answer_line_numbers(generation) do
+    lines = generation |> String.downcase() |> String.trim() |> String.split("\n")
+
+    {answer_line, answer_index} =
+      lines
+      |> Enum.with_index()
+      |> Enum.filter(fn {line, _index} -> String.contains?(line, "answer:") end)
+      |> List.last()
+
+    answer =
+      answer_line
+      |> String.split("answer:")
+      |> List.last()
+      |> String.replace("answer:", "")
+      |> String.replace("**", "")
+      |> String.replace(".", "")
+      |> String.trim()
+
+    answer =
+      if answer == "" and answer_index < length(lines) - 1 do
+        lines
+        |> Enum.at(answer_index + 1)
+        |> String.replace("answer:", "")
+        |> String.replace("**", "")
+        |> String.replace(".", "")
+        |> String.trim()
+      else
+        answer
+      end
+
+    answer
+    |> String.split(",")
+    |> Enum.map(fn number ->
+      number
+      |> String.trim()
+      |> String.split(" ")
+      |> List.last()
+      |> String.replace("$", "")
+      |> String.replace("{", "")
+      |> String.replace("}", "")
+      |> String.replace("\\", "")
+      |> String.replace("boxed", "")
+      |> String.replace("<", "")
+      |> String.replace(">", "")
+      |> parse_int_or_no_answer()
+    end)
+    |> reject_no_answer_or_fallback(fn -> extract_trailing_answer_numbers(generation) end)
+  end
+
+  defp maybe_numbers(numbers, generation) do
+    reject_no_answer_or_fallback(numbers, fn -> extract_trailing_answer_numbers(generation) end)
+  end
+
+  defp maybe_numbers_from_fallback(numbers, generation) do
+    reject_no_answer_or_fallback(numbers, fn -> extract_trailing_answer_numbers(generation) end)
+  end
+
+  defp extract_trailing_answer_numbers(generation) do
+    generation
+    |> String.downcase()
+    |> String.split("answer:")
+    |> List.last()
+    |> String.split(",")
+    |> Enum.reduce_while([], fn item, acc ->
+      {number, removed} = remove_nonnumeric_chars_at_ends(item)
+
+      cond do
+        number == "" or number == "₂" ->
+          {:cont, acc}
+
+        true ->
+          next = acc ++ [parse_int!(number)]
+          if length(acc) > 0 and removed > 0, do: {:halt, next}, else: {:cont, next}
+      end
+    end)
+  end
+
+  defp comma_numbers(value) do
+    value
+    |> String.trim()
+    |> String.split(",")
+    |> Enum.map(&parse_int_or_no_answer(String.trim(&1)))
+  end
+
+  defp comma_numbers_with_trimmed_edges(value) do
+    value
+    |> String.trim()
+    |> String.split(",")
+    |> Enum.flat_map(fn item ->
+      {number, _removed} = remove_nonnumeric_chars_at_ends(item)
+      if String.trim(number) == "", do: [], else: [parse_int_or_no_answer(String.trim(number))]
+    end)
+  end
+
+  defp remove_nonnumeric_chars_at_ends(value) do
+    graphemes = String.graphemes(value)
+    start_index = Enum.find_index(graphemes, &Regex.match?(~r/\d/, &1)) || length(graphemes)
+
+    {digits, rest} =
+      graphemes
+      |> Enum.drop(start_index)
+      |> Enum.split_while(&Regex.match?(~r/\d/, &1))
+
+    number = Enum.join(digits)
+    removed = length(graphemes) - length(digits)
+    {number, removed + length(rest) - length(rest)}
+  end
+
+  defp reject_no_answer_or_fallback(numbers, fallback) do
+    if numbers == [] or Enum.all?(numbers, &(&1 == :no_answer)) do
+      fallback.()
+    else
+      numbers
+    end
+  end
+
+  defp parse_int!(value) do
+    value |> String.trim() |> String.to_integer()
+  end
+
+  defp parse_int_or_no_answer(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, ""} -> int
+      {int, _rest} -> int
+      :error -> :no_answer
+    end
+  end
+
+  defp levenshtein(left, right) do
+    rows = length(left)
+    cols = length(right)
+
+    initial = Map.new(0..cols, &{{0, &1}, &1})
+
+    table =
+      Enum.reduce(1..rows, initial, fn i, table ->
+        table = Map.put(table, {i, 0}, i)
+
+        Enum.reduce(1..cols, table, fn j, table ->
+          cost = if Enum.at(left, i - 1) == Enum.at(right, j - 1), do: 0, else: 1
+
+          value =
+            min(
+              Map.fetch!(table, {i - 1, j}) + 1,
+              min(Map.fetch!(table, {i, j - 1}) + 1, Map.fetch!(table, {i - 1, j - 1}) + cost)
+            )
+
+          Map.put(table, {i, j}, value)
+        end)
+      end)
+
+    Map.fetch!(table, {rows, cols})
   end
 
   defp papillon_overall(nil) do
