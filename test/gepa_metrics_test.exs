@@ -144,6 +144,27 @@ defmodule GepaMetricsTest do
     assert metric.(example, DSEx.prediction(response: "This has NASA words.")) == 1 / 3
   end
 
+  test "IFBench metric fails closed for unsupported extended registry ids" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric",
+        "output_key" => "response"
+      })
+
+    example =
+      DSEx.example(
+        prompt: "p",
+        response: "",
+        instruction_id_list: ["count:word_count_range"],
+        kwargs: [%{"min_words" => 1, "max_words" => 3}]
+      )
+      |> DSEx.with_inputs(:prompt)
+
+    assert_raise ArgumentError, ~r/unsupported IFBench instruction/, fn ->
+      metric.(example, DSEx.prediction(response: "two words"))
+    end
+  end
+
   test "LiveBenchMath metric ports AMC answer parsing cases" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{

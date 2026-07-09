@@ -307,7 +307,10 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
   defp ifbench_following?("change_case:english_lowercase", _args, _prompt, value),
     do: value == String.downcase(value)
 
-  defp ifbench_following?(_instruction_id, _args, _prompt, _value), do: false
+  defp ifbench_following?(instruction_id, _args, _prompt, _value) do
+    raise ArgumentError,
+          "unsupported IFBench instruction #{inspect(instruction_id)}; DSEx cannot claim IFBench parity until this id is ported or explicitly gated"
+  end
 
   defp compare_count(count, expected, "less than"), do: count < expected
   defp compare_count(count, expected, "at least"), do: count >= expected

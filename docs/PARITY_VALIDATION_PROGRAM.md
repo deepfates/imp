@@ -290,13 +290,15 @@ path/to/gepa-artifact --out benchmarks/data/gepa-campaign`. This imports the
 upstream GEPA artifact benchmark classes and writes source-derived split JSONL
 plus a `families.json` manifest. The manifest records upstream metric names.
 DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
-supporting-title retrieval, IFBench instruction-registry constraints, Papillon
-LLM-judge quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME
-parser paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring.
-Papillon campaigns must pass a judge LM and include `metric_judge` provenance in
-research rows. Dedicated upstream fixture comparisons are still required before
-claiming full IFBench registry parity. LiveBenchMath `amps_hard` remains guarded
-until the SymPy/Lark symbolic bridge is installed and validated.
+supporting-title retrieval, IFBench IFEval-style constraints, Papillon LLM-judge
+quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME parser
+paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
+IFBench imports the larger AllenAI extended registry; unsupported extended ids
+fail closed until that ticket is complete. Papillon campaigns must pass a judge
+LM and include `metric_judge` provenance in research rows. Dedicated upstream
+fixture comparisons are still required before claiming full IFBench registry
+parity. LiveBenchMath `amps_hard` remains guarded until the SymPy/Lark symbolic
+bridge is installed and validated.
 
 Pass condition:
 

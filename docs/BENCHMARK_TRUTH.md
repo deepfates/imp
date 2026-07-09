@@ -243,18 +243,20 @@ merge.
 The exported `families.json` records upstream metric names. DSEx currently
 ports deterministic metric adapters for AIME integer exact match, HotPotQA
 answer exact match, HoVer supporting-title retrieval, IFBench
-instruction-registry constraints, Papillon LLM-judge quality/leakage scoring,
-the deterministic LiveBenchMath AMC/AIME parser paths, and LiveBenchMath
-`imo`/`usamo` proof-rearrangement edit-distance scoring. Papillon campaigns must
-pass a judge LM and emitted research rows must include `metric_judge` metadata
-naming the judge model plus quality/leakage judge semantics; the full GEPA
-replication contract rejects Papillon rows without that provenance. Unknown
-LiveBenchMath task branches now fail closed. LiveBenchMath `amps_hard` remains
-guarded because upstream uses SymPy/Lark symbolic equivalence; install and
-validate the symbolic Python bridge before claiming AMPS_Hard parity. The
-default bridge is `scripts/livebench_math_score.py`; pin
-`DSEX_LIVEBENCH_MATH_PYTHON` and, when needed, `DSEX_LIVEBENCH_MATH_BRIDGE` for
-research campaigns.
+IFEval-style instruction constraints, Papillon LLM-judge quality/leakage
+scoring, the deterministic LiveBenchMath AMC/AIME parser paths, and
+LiveBenchMath `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
+IFBench imports the larger AllenAI `instructions_registry`; unsupported extended
+registry ids fail closed rather than silently scoring as false, and full IFBench
+claims require the extended-registry ticket to pass. Papillon campaigns must pass
+a judge LM and emitted research rows must include `metric_judge` metadata naming
+the judge model plus quality/leakage judge semantics; the full GEPA replication
+contract rejects Papillon rows without that provenance. Unknown LiveBenchMath
+task branches now fail closed. LiveBenchMath `amps_hard` remains guarded because
+upstream uses SymPy/Lark symbolic equivalence; install and validate the symbolic
+Python bridge before claiming AMPS_Hard parity. The default bridge is
+`scripts/livebench_math_score.py`; pin `DSEX_LIVEBENCH_MATH_PYTHON` and, when
+needed, `DSEX_LIVEBENCH_MATH_BRIDGE` for research campaigns.
 
 ## Run RAG, Tool, And Agent Parity
 
