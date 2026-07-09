@@ -155,14 +155,57 @@ defmodule GepaMetricsTest do
       DSEx.example(
         prompt: "p",
         response: "",
-        instruction_id_list: ["count:word_count_range"],
-        kwargs: [%{"min_words" => 1, "max_words" => 3}]
+        instruction_id_list: ["ratio:stop_words"],
+        kwargs: [%{"percentage" => 20}]
       )
       |> DSEx.with_inputs(:prompt)
 
     assert_raise ArgumentError, ~r/unsupported IFBench instruction/, fn ->
       metric.(example, DSEx.prediction(response: "two words"))
     end
+  end
+
+  test "IFBench metric supports dependency-light extended registry checks" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric",
+        "output_key" => "response"
+      })
+
+    cases = [
+      {"count:word_count_range", %{"min_words" => 3, "max_words" => 5}, "one two three"},
+      {"count:unique_word_count", %{"N" => 3}, "one two two three"},
+      {"count:numbers", %{"N" => 3}, "alpha 1 beta 2 gamma 3"},
+      {"count:punctuation", %{}, "Use . , ! ? ; : and ?! now"},
+      {"format:options", %{"options" => "yes/no/maybe"}, "yes"},
+      {"format:title_case", %{}, "This Is Title Case"},
+      {"format:no_whitespace", %{}, "NoWhitespace"}
+    ]
+
+    Enum.each(cases, fn {instruction_id, kwargs, response} ->
+      example =
+        DSEx.example(
+          prompt: "p",
+          response: "",
+          instruction_id_list: [instruction_id],
+          kwargs: [kwargs]
+        )
+        |> DSEx.with_inputs(:prompt)
+
+      assert metric.(example, DSEx.prediction(response: response)) == 1.0,
+             "expected #{instruction_id} to pass"
+    end)
+
+    example =
+      DSEx.example(
+        prompt: "p",
+        response: "",
+        instruction_id_list: ["format:no_whitespace"],
+        kwargs: [%{}]
+      )
+      |> DSEx.with_inputs(:prompt)
+
+    assert metric.(example, DSEx.prediction(response: "has whitespace")) == 0.0
   end
 
   test "LiveBenchMath metric ports AMC answer parsing cases" do

@@ -150,6 +150,44 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     ifbench_language?(language, value)
   end
 
+  defp ifbench_following?("count:word_count_range", args, _prompt, value) do
+    count = count_words(value)
+    count >= Map.get(args, "min_words", 0) and count <= Map.get(args, "max_words", 0)
+  end
+
+  defp ifbench_following?("count:unique_word_count", args, _prompt, value) do
+    unique =
+      value
+      |> String.downcase()
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.map(&trim_punctuation/1)
+      |> MapSet.new()
+      |> MapSet.size()
+
+    unique >= Map.get(args, "N", 0)
+  end
+
+  defp ifbench_following?("count:numbers", args, _prompt, value) do
+    stripped = String.replace(value, ~r/[[:punct:]]/, "")
+    length(Regex.scan(~r/\d+/, stripped)) == Map.get(args, "N", 0)
+  end
+
+  defp ifbench_following?("count:punctuation", _args, _prompt, value) do
+    punctuation = MapSet.new([".", ",", "!", "?", ";", ":"])
+
+    if String.contains?(value, "!?") or String.contains?(value, "?!") or
+         String.contains?(value, "‽") do
+      value
+      |> String.replace("?!", "", global: false)
+      |> String.replace("!?", "", global: false)
+      |> String.graphemes()
+      |> MapSet.new()
+      |> then(&MapSet.subset?(punctuation, &1))
+    else
+      false
+    end
+  end
+
   defp ifbench_following?("length_constraints:number_sentences", args, _prompt, value) do
     count = sentence_count(value)
     compare_count(count, Map.get(args, "num_sentences", 0), Map.get(args, "relation"))
@@ -255,6 +293,49 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     |> Enum.any?(fn [title] -> title |> String.trim("<>") |> String.trim() |> Kernel.!=("") end)
   end
 
+  defp ifbench_following?("format:options", args, _prompt, value) do
+    options_text = Map.get(args, "options", "")
+    strict? = Regex.match?(~r/\W*[aA]\W*[bB]\W*[cC]\W*/, options_text)
+
+    separator =
+      cond do
+        String.contains?(options_text, "/") -> "/"
+        String.contains?(options_text, "or") -> "or"
+        true -> ","
+      end
+
+    options = options_text |> String.split(separator) |> Enum.map(&String.trim/1)
+
+    if strict? do
+      value in options
+    else
+      normalized = normalize_option(value)
+      Enum.any?(options, &(normalize_option(&1) == normalized))
+    end
+  end
+
+  defp ifbench_following?("format:title_case", _args, _prompt, value) do
+    ~r/[[:alpha:]][[:alpha:]']*/
+    |> Regex.scan(value)
+    |> Enum.map(fn [word] -> word end)
+    |> Enum.all?(fn
+      <<first::binary-size(1), rest::binary>> ->
+        cond do
+          first == String.upcase(first) and rest == String.downcase(rest) -> true
+          first == String.downcase(first) and rest == String.upcase(rest) -> false
+          first == String.downcase(first) and rest == String.downcase(rest) -> false
+          true -> true
+        end
+
+      _word ->
+        true
+    end)
+  end
+
+  defp ifbench_following?("format:no_whitespace", _args, _prompt, value) do
+    not Regex.match?(~r/\s/, value)
+  end
+
   defp ifbench_following?("combination:two_responses", _args, _prompt, value) do
     responses =
       value
@@ -315,6 +396,20 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
   defp compare_count(count, expected, "less than"), do: count < expected
   defp compare_count(count, expected, "at least"), do: count >= expected
   defp compare_count(_count, _expected, _relation), do: false
+
+  defp count_words(value), do: value |> String.split(~r/\s+/, trim: true) |> length()
+
+  defp normalize_option(value) do
+    value
+    |> trim_punctuation()
+    |> String.downcase()
+  end
+
+  defp trim_punctuation(value) do
+    value
+    |> String.replace(~r/^[[:punct:]\s]+/, "")
+    |> String.replace(~r/[[:punct:]\s]+$/, "")
+  end
 
   defp regex_contains?(_value, "", _opts), do: true
 
