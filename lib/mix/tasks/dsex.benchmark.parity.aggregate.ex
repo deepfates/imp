@@ -142,6 +142,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     provider = identity["provider"]
     model = identity["model"]
     rows_by_task = rows_by_task(reports)
+    contributing_reports = contributing_reports(reports, rows_by_task)
 
     task_reports =
       Enum.map(@full_lengths, fn {task, expected} ->
@@ -162,9 +163,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
     max_latency_ratio = Keyword.fetch!(opts, :max_latency_ratio)
     campaign_id = Keyword.get(opts, :campaign_id)
     full_coverage? = Enum.all?(task_reports, &get_in(&1, ["coverage", "full"]))
-    generation = generation_summary(reports)
+    generation = generation_summary(contributing_reports)
     effective_generation = generation["effective"] || %{}
-    execution = execution_summary(reports)
+    execution = execution_summary(contributing_reports)
 
     latency_ratio =
       ratio(
@@ -180,10 +181,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "provider" => provider,
       "model" => model,
       "evidence_policy" => evidence_policy(),
-      "source_reports" => source_reports(reports),
+      "source_reports" => source_reports(contributing_reports),
+      "ignored_source_reports" => ignored_source_reports(reports, contributing_reports),
       "generation" => generation,
       "execution" => execution,
-      "runner_order" => runner_order_summary(reports),
+      "runner_order" => runner_order_summary(contributing_reports),
       "coverage" => %{
         "covered" => covered,
         "expected" => expected,
@@ -229,6 +231,28 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
           )
       }
     }
+  end
+
+  defp contributing_reports(reports, rows_by_task) do
+    paths =
+      rows_by_task
+      |> Enum.flat_map(fn {task, rows} ->
+        expected = Map.fetch!(@full_lengths, task)
+
+        rows
+        |> Enum.filter(fn {index, row} ->
+          canonical_index?(index, expected) and row["row_evidence_complete"] == true
+        end)
+        |> Enum.map(fn {_index, row} -> row["source_report"] end)
+      end)
+      |> MapSet.new()
+
+    contributing = Enum.filter(reports, &MapSet.member?(paths, &1["__path__"]))
+
+    case contributing do
+      [] -> reports
+      _ -> contributing
+    end
   end
 
   defp evidence_policy do
@@ -822,6 +846,24 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
         "generation" => report["generation"],
         "runner_order" => report["runner_order"] || "dsex_first",
         "coverage" => report["evidence"]
+      }
+    end)
+  end
+
+  defp ignored_source_reports(reports, contributing_reports) do
+    contributing_paths = contributing_reports |> Enum.map(& &1["__path__"]) |> MapSet.new()
+
+    reports
+    |> Enum.reject(&MapSet.member?(contributing_paths, &1["__path__"]))
+    |> Enum.map(fn report ->
+      %{
+        "path" => report["__path__"],
+        "generated_at" => report["generated_at"],
+        "campaign_id" => report["campaign_id"],
+        "provider" => report_provider(report),
+        "model" => report_model(report),
+        "max_concurrency" => report_max_concurrency(report),
+        "reason" => "no winning complete canonical rows"
       }
     end)
   end

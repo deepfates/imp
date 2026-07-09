@@ -1063,6 +1063,76 @@ defmodule BenchmarkTruthTest do
     refute campaign["parity"]["full_parity"]
   end
 
+  test "parity aggregate ignores superseded chunks for generation proof" do
+    out_dir = tmp_dir("parity-aggregate-superseded-generation")
+
+    write_parity_report(
+      out_dir,
+      "older-wrong-wire.json",
+      "2026-07-06T00:00:00Z",
+      0,
+      [true],
+      generation: %{
+        "temperature" => 0.0,
+        "max_tokens" => 700,
+        "dsex" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "anthropic_messages"
+        },
+        "dspy" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "litellm_chat_completion"
+        }
+      }
+    )
+
+    write_parity_report(
+      out_dir,
+      "newer-right-wire.json",
+      "2026-07-06T00:01:00Z",
+      0,
+      [true],
+      generation: %{
+        "temperature" => 0.0,
+        "max_tokens" => 700,
+        "dsex" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "anthropic_messages"
+        },
+        "dspy" => %{
+          "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
+          "wire_api" => "litellm_anthropic_messages"
+        }
+      }
+    )
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+    effective = campaign["generation"]["effective"]
+
+    assert effective["wire_api_matched"]
+    assert effective["dspy_wire_api_distinct"] == ["litellm_anthropic_messages"]
+
+    assert Enum.map(campaign["source_reports"], & &1["path"]) == [
+             Path.join(out_dir, "newer-right-wire.json")
+           ]
+
+    assert Enum.map(campaign["ignored_source_reports"], & &1["path"]) == [
+             Path.join(out_dir, "older-wrong-wire.json")
+           ]
+  end
+
   test "parity aggregate records mixed max concurrency as non-release-safe evidence" do
     out_dir = tmp_dir("parity-aggregate-mixed-concurrency")
 
