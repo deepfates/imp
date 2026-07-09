@@ -11,7 +11,6 @@ import re
 import sys
 import traceback
 import warnings
-from multiprocessing import Process, Queue
 
 
 def last_boxed_only_string(string):
@@ -46,29 +45,6 @@ def remove_boxed(s):
     if "\\boxed " in s:
         return s[len("\\boxed ") :]
     return s[len("\\boxed{") : -1]
-
-
-def run_with_timeout(func, args=(), timeout=8):
-    def wrapper(queue):
-        try:
-            queue.put(func(*args))
-        except Exception as exc:
-            queue.put(exc)
-
-    queue = Queue()
-    process = Process(target=wrapper, args=(queue,))
-    process.start()
-    process.join(timeout)
-
-    if process.is_alive():
-        process.terminate()
-        process.join()
-        raise TimeoutError("Operation timed out")
-
-    result = queue.get()
-    if isinstance(result, Exception):
-        raise result
-    return result
 
 
 def parse_latex_expr(value):
@@ -194,7 +170,7 @@ def amps_hard_process_results(ground_truth, llm_answer):
             parsed_answer = normalize_final_answer(math)
 
     if parsed_answer is not None:
-        if run_with_timeout(is_equiv, args=(ground_truth, parsed_answer), timeout=8):
+        if is_equiv(ground_truth, parsed_answer):
             retval = 1
     else:
         if len(llm_answer) > 0 and llm_answer[-1] == ".":
