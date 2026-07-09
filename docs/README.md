@@ -76,3 +76,6 @@ The repository also keeps release-evidence notes for maintainers and reviewers.
 They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
 separate from the packaged user manual. In the source checkout, the benchmark
 catalog is the maintainer starting point for outside-view validation work.
+
+- [Upstream Fidelity Audit](UPSTREAM_FIDELITY_AUDIT.md): current gap map
+  against DSPy, DeepWiki, GEPA, optimize_anything, and the associated papers.
