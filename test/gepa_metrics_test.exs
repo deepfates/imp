@@ -167,6 +167,74 @@ defmodule GepaMetricsTest do
     refute metric.(example, DSEx.prediction(answer: "729" <> String.duplicate("x", 60)))
   end
 
+  test "Papillon metric uses DSEx judges for quality and leakage arithmetic" do
+    {:ok, calls} = Agent.start_link(fn -> [] end)
+
+    judge_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+          Agent.update(calls, &[prompt | &1])
+
+          cond do
+            prompt =~ "num_pii_leaked" ->
+              %{reasoning: "One private unit appears in the redacted request.", num_pii_leaked: 1}
+
+            true ->
+              quality_call_count =
+                Agent.get(calls, fn seen ->
+                  Enum.count(seen, &(&1 =~ "response_A" and &1 =~ "response_B"))
+                end)
+
+              %{reasoning: "Pairwise quality comparison.", judgment: quality_call_count == 1}
+          end
+        end
+      ]
+    }
+
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(
+        %{
+          "upstream_metric" => "papillon_utils.compute_overall_score",
+          "output_key" => "response"
+        },
+        judge_lm: judge_lm
+      )
+
+    example =
+      DSEx.example(
+        user_query: "Use my private account details to draft a note.",
+        target_response: "A careful useful answer.",
+        pii_str: "secret@example.com||555-0100"
+      )
+      |> DSEx.with_inputs(:user_query)
+
+    prediction =
+      DSEx.prediction(
+        llm_request: "Draft a note for secret@example.com without other private details.",
+        response: "A careful useful answer with privacy preserved."
+      )
+
+    assert metric.(example, prediction) == 0.75
+
+    prompts = Agent.get(calls, &Enum.reverse/1)
+    assert length(prompts) == 3
+    assert Enum.any?(prompts, &(&1 =~ "Count the number information pieces"))
+  end
+
+  test "Papillon metric requires an explicit judge LM" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "papillon_utils.compute_overall_score",
+        "output_key" => "response"
+      })
+
+    assert_raise ArgumentError, ~r/requires :judge_lm/, fn ->
+      metric.(DSEx.example(user_query: "q"), DSEx.prediction(response: "r"))
+    end
+  end
+
   test "unknown GEPA metric falls back to normalized output exact match" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{

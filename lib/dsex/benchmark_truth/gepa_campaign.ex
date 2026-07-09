@@ -15,6 +15,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     token_cost = Keyword.fetch!(opts, :token_cost)
     source_commits = Keyword.fetch!(opts, :source_commits)
     lm = Keyword.fetch!(opts, :lm)
+    judge_lm = Keyword.get(opts, :judge_lm, lm)
 
     File.mkdir_p!(out_dir)
     specs = load_specs!(dataset_root)
@@ -22,7 +23,18 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     rows =
       Enum.map(@required_families, fn family ->
         spec = Map.fetch!(specs, family)
-        row(spec, dataset_root, campaign_id, model, reflection_model, seeds, generations, lm)
+
+        row(
+          spec,
+          dataset_root,
+          campaign_id,
+          model,
+          reflection_model,
+          seeds,
+          generations,
+          lm,
+          judge_lm
+        )
       end)
       |> Enum.map(fn row ->
         row
@@ -88,7 +100,17 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     :ok
   end
 
-  defp row(spec, dataset_root, campaign_id, model, reflection_model, seeds, generations, lm) do
+  defp row(
+         spec,
+         dataset_root,
+         campaign_id,
+         model,
+         reflection_model,
+         seeds,
+         generations,
+         lm,
+         judge_lm
+       ) do
     family = spec["family"]
     program = spec["program"]
     signature = spec["signature"]
@@ -103,7 +125,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     {wall_us, seed_results} =
       :timer.tc(fn ->
         Enum.map(seeds, fn seed ->
-          run_seed(spec, trainset, devset, testset, lm, generations, seed)
+          run_seed(spec, trainset, devset, testset, lm, judge_lm, generations, seed)
         end)
       end)
 
@@ -153,8 +175,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     }
   end
 
-  defp run_seed(spec, trainset, devset, testset, lm, generations, seed) do
-    metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec)
+  defp run_seed(spec, trainset, devset, testset, lm, judge_lm, generations, seed) do
+    metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)
 
     program =
       spec["signature"]

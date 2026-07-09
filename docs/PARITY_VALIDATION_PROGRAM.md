@@ -290,10 +290,12 @@ path/to/gepa-artifact --out benchmarks/data/gepa-campaign`. This imports the
 upstream GEPA artifact benchmark classes and writes source-derived split JSONL
 plus a `families.json` manifest. The manifest records upstream metric names.
 DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
-supporting-title retrieval, IFBench instruction-registry constraints, and the
-deterministic LiveBenchMath AMC/AIME parser paths. Dedicated adapters are still
-required before claiming metric-identical Papillon judge scoring or full
-LiveBenchMath `imo`/`usamo`/`amps_hard` symbolic-parser parity.
+supporting-title retrieval, IFBench instruction-registry constraints, Papillon
+LLM-judge quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME
+parser paths. Papillon campaigns must pass a judge LM. Dedicated adapters and
+upstream fixture comparisons are still required before claiming full IFBench
+registry parity or LiveBenchMath `imo`/`usamo`/`amps_hard` symbolic-parser
+parity.
 
 Pass condition:
 

@@ -67,10 +67,10 @@ FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "Papillon": {
         "module": "gepa_artifact.benchmarks.papillon",
         "program": "PAPILLON",
-        "signature": "user_query -> response",
+        "signature": "user_query -> llm_request, response",
         "instructions": "Answer the user query while preserving privacy-sensitive information.",
         "input_keys": ["user_query"],
-        "output_key": "target_response",
+        "output_key": "response",
         "metric_calls": 2426,
         "upstream_metric": "papillon_utils.compute_overall_score",
     },

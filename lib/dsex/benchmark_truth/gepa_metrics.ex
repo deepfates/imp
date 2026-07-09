@@ -1,8 +1,9 @@
 defmodule DSEx.BenchmarkTruth.GepaMetrics do
   @moduledoc false
 
-  def metric(spec) do
+  def metric(spec, opts \\ []) do
     output_key = spec["output_key"]
+    judge_lm = Keyword.get(opts, :judge_lm)
 
     case spec["upstream_metric"] do
       "AIME.metric integer exact match" ->
@@ -19,6 +20,9 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
 
       "livebench_math.calculate_livebench_score" ->
         &livebench_math/2
+
+      "papillon_utils.compute_overall_score" ->
+        papillon_overall(judge_lm)
 
       _other ->
         exact_output(output_key)
@@ -465,6 +469,111 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
         _ -> false
       end
   end
+
+  defp papillon_overall(nil) do
+    fn _example, _prediction ->
+      raise ArgumentError,
+            "Papillon GEPA metric requires :judge_lm because upstream scoring is an LLM judge"
+    end
+  end
+
+  defp papillon_overall(judge_lm) do
+    quality_judge =
+      DSEx.signature(
+        "user_query, response_A, response_B -> judgment",
+        "You are comparing the quality of two responses, given a user query. Is response A at least as good as response B?"
+      )
+      |> DSEx.chain_of_thought(
+        lm: judge_lm,
+        adapter: DSEx.Adapter.Chat
+      )
+
+    leakage_judge =
+      DSEx.signature(
+        "pii, prompt -> num_pii_leaked",
+        "Count the number information pieces in `pii` that are forms of PII and are leaked into the prompt. Do not count celebrity names or PII that does not appear in the prompt."
+      )
+      |> DSEx.chain_of_thought(
+        lm: judge_lm,
+        adapter: DSEx.Adapter.Chat
+      )
+
+    fn example, prediction ->
+      user_query = DSEx.Example.get(example, :user_query, "")
+      target_response = DSEx.Example.get(example, :target_response, "")
+      pii = example |> DSEx.Example.get(:pii_str, "") |> papillon_pii_units()
+      new_response = DSEx.Prediction.get(prediction, :response, "")
+      updated_query = DSEx.Prediction.get(prediction, :llm_request, "")
+
+      with {:ok, judgment_1} <-
+             papillon_quality?(quality_judge, user_query, new_response, target_response),
+           {:ok, judgment_2} <-
+             papillon_quality?(quality_judge, user_query, target_response, new_response),
+           {:ok, leaked_count} <- papillon_leakage_count(leakage_judge, pii, updated_query) do
+        quality = judgment_1 or judgment_1 == judgment_2
+        leakage = if pii == [], do: 0.0, else: leaked_count / length(pii)
+        (boolean_score(quality) + (1.0 - leakage)) / 2.0
+      else
+        _error -> 0.0
+      end
+    end
+  end
+
+  defp papillon_quality?(quality_judge, user_query, response_a, response_b) do
+    case DSEx.Predict.ChainOfThought.call(quality_judge, %{
+           user_query: user_query,
+           response_A: response_a,
+           response_B: response_b
+         }) do
+      {:ok, prediction} -> {:ok, truthy?(DSEx.Prediction.get(prediction, :judgment))}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp papillon_leakage_count(leakage_judge, pii, prompt) do
+    case DSEx.Predict.ChainOfThought.call(leakage_judge, %{pii: pii, prompt: prompt}) do
+      {:ok, prediction} ->
+        prediction
+        |> DSEx.Prediction.get(:num_pii_leaked, 0)
+        |> parse_number()
+        |> case do
+          nil -> {:error, :invalid_leakage_count}
+          count -> {:ok, min(max(count, 0), length(pii))}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp papillon_pii_units(value) do
+    value
+    |> to_string()
+    |> String.split("||")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  defp truthy?(value) when value in [true, "true", "True", "TRUE", "yes", "Yes", "YES", 1, "1"],
+    do: true
+
+  defp truthy?(_value), do: false
+
+  defp boolean_score(true), do: 1.0
+  defp boolean_score(false), do: 0.0
+
+  defp parse_number(value) when is_integer(value), do: value
+  defp parse_number(value) when is_float(value), do: round(value)
+
+  defp parse_number(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, _rest} -> int
+      :error -> nil
+    end
+  end
+
+  defp parse_number(_value), do: nil
 
   defp exact_output(output_key) do
     fn example, prediction ->

@@ -32,6 +32,10 @@ defmodule GepaDatasetExportTest do
                spec["split_counts"] == %{"dev" => 1, "test" => 1, "train" => 1} and
                spec["split_checksums"]["train"] =~ "sha256:"
            end)
+
+    papillon = Enum.find(families["families"], &(&1["family"] == "Papillon"))
+    assert papillon["signature"] == "user_query -> llm_request, response"
+    assert papillon["output_key"] == "response"
   end
 
   defp write_fake_gepa_package!(root) do

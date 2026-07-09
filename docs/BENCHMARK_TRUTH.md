@@ -243,11 +243,12 @@ merge.
 The exported `families.json` records upstream metric names. DSEx currently
 ports deterministic metric adapters for AIME integer exact match, HotPotQA
 answer exact match, HoVer supporting-title retrieval, IFBench
-instruction-registry constraints, and the deterministic LiveBenchMath AMC/AIME
-parser paths. Unknown, judge-heavy, and symbolic-parser-heavy metrics fall back
-to normalized output-key exact match; do not claim metric-identical Papillon
-judge scoring or full LiveBenchMath `imo`/`usamo`/`amps_hard` parity until their
-dedicated DSEx adapters are implemented.
+instruction-registry constraints, Papillon LLM-judge quality/leakage scoring,
+and the deterministic LiveBenchMath AMC/AIME parser paths. Papillon campaigns
+must pass a judge LM; unknown and symbolic-parser-heavy metrics fall back to
+normalized output-key exact match. Do not claim full IFBench registry parity or
+LiveBenchMath `imo`/`usamo`/`amps_hard` parity until their dedicated DSEx
+adapters are implemented and validated against upstream.
 
 ## Run RAG, Tool, And Agent Parity
 
