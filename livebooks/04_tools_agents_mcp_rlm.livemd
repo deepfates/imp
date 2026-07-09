@@ -220,12 +220,110 @@ Process.delete(:rlm_actions)
 {DSEx.to_map(pred), pred.metadata.rlm_trace}
 ```
 
+## RLM Lazy Context Loading
+
+Use a serializable handle when a value is too large or expensive to show in the
+first controller prompt. The controller loads it only if needed.
+
+```elixir
+lazy_context =
+  DSEx.rlm_serializable(:context, fn ->
+    "large private context"
+  end,
+    metadata: %{source: "demo"}
+  )
+
+Process.put(:rlm_lazy_actions, [
+  %{action: "load", name: "context"},
+  %{action: "eval", code: "String.length(context)"},
+  %{action: "submit", result: %{answer: "loaded"}}
+])
+
+lazy_controller = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      [action | rest] = Process.get(:rlm_lazy_actions)
+      Process.put(:rlm_lazy_actions, rest)
+      action
+    end
+  ]
+}
+
+lazy_rlm = DSEx.rlm("context, question -> answer", lm: lazy_controller)
+{:ok, lazy_pred} = DSEx.call(lazy_rlm, %{context: lazy_context, question: "q"})
+Process.delete(:rlm_lazy_actions)
+
+{DSEx.to_map(lazy_pred), lazy_pred.metadata.rlm_trace}
+```
+
+## RLM Batched Subqueries
+
+RLM can ask a sub-LM several ordered questions in one action. Each batch item
+counts against `max_llm_calls`.
+
+```elixir
+parent = self()
+
+batch_controller = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      [action | rest] = Process.get(:rlm_batch_actions)
+      Process.put(:rlm_batch_actions, rest)
+      action
+    end
+  ]
+}
+
+batch_sub_lm = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      send(parent, {:rlm_batch_prompt, prompt})
+      %{answer: if(prompt =~ "first", do: "one", else: "two")}
+    end
+  ]
+}
+
+Process.put(:rlm_batch_actions, [
+  %{
+    action: "llm_query_batched",
+    signature: "question -> answer",
+    inputs: [%{question: "first"}, %{question: "second"}]
+  },
+  %{action: "submit", result: %{answer: "batched"}}
+])
+
+batch_rlm =
+  DSEx.rlm("question -> answer",
+    lm: batch_controller,
+    sub_lm: batch_sub_lm,
+    max_iterations: 3,
+    max_llm_calls: 2
+  )
+
+{:ok, batch_pred} = DSEx.call(batch_rlm, %{question: "parent"})
+Process.delete(:rlm_batch_actions)
+
+{DSEx.to_map(batch_pred), batch_pred.metadata.rlm_trace}
+```
+
 ## RLM Budget Failure
 
 ```elixir
 loop_lm = %{
   module: DSEx.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{action: "eval", code: "1 + 1"} end]
+  opts: [
+    handler: fn messages, _opts ->
+      if Enum.map_join(messages, "\n", & &1.content) =~ "RLM extract pass" do
+        %{answer: "recovered by extract"}
+      else
+        %{action: "eval", code: "1 + 1"}
+      end
+    end
+  ]
 }
 
 rlm = DSEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)

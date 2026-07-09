@@ -220,6 +220,10 @@ defmodule DSEx do
   @doc "Creates a recursive controller loop for large-context exploration."
   def rlm(signature, opts \\ []), do: DSEx.Predict.RLM.new(signature, opts)
 
+  @doc "Creates a lazy RLM input that can be loaded with a controller `load` action."
+  def rlm_serializable(name, loader, opts \\ []),
+    do: DSEx.Predict.RLM.sandbox_serializable(name, loader, opts)
+
   @doc "Calls any DSEx program struct."
   defdelegate call(program, inputs), to: DSEx.Module
 

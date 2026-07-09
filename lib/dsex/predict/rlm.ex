@@ -10,7 +10,9 @@ defmodule DSEx.Predict.RLM do
   Supported controller actions are:
 
   - `%{action: "eval", code: "x + 1"}` to evaluate a safe expression.
+  - `%{action: "load", name: "context"}` to load a lazy `SandboxSerializable` input.
   - `%{action: "llm_query", signature: "...", inputs: %{...}}` to call a sub-LM.
+  - `%{action: "llm_query_batched", signature: "...", inputs: [%{...}]}` to call a sub-LM over a batch.
   - `%{action: "recurse", signature: "...", inputs: %{...}}` to invoke a smaller child RLM.
   - `%{action: "submit", result: %{...}}` to return signature outputs.
 
@@ -95,6 +97,19 @@ defmodule DSEx.Predict.RLM do
     }
   end
 
+  @doc "Creates a lazy value handle that an RLM controller can load explicitly."
+  def sandbox_serializable(name, loader, opts \\ []),
+    do: DSEx.Predict.RLM.SandboxSerializable.new(name, loader, opts)
+
+  @doc false
+  def internal_predictors(%__MODULE__{} = rlm) do
+    %{
+      action: controller_predictor(rlm),
+      extract: extract_predictor(rlm),
+      subquery: subquery_predictor(rlm)
+    }
+  end
+
   @impl true
   @doc """
   Runs the RLM loop.
@@ -130,8 +145,13 @@ defmodule DSEx.Predict.RLM do
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration)
-       when iteration > rlm.max_iterations do
+       when iteration > rlm.max_iterations and rlm.max_iterations == 0 do
     {:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}
+  end
+
+  defp run_loop(%__MODULE__{} = rlm, state, iteration)
+       when iteration > rlm.max_iterations do
+    extract_fallback(rlm, state, iteration)
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration) do
@@ -161,7 +181,7 @@ defmodule DSEx.Predict.RLM do
       %{
         role: :system,
         content:
-          "You are an RLM controller. Return JSON with action eval, assign, tool, llm_query, recurse, or submit."
+          "You are an RLM controller. Return JSON with action eval, assign, load, tool, llm_query, llm_query_batched, recurse, or submit."
       },
       %{
         role: :user,
@@ -218,7 +238,12 @@ defmodule DSEx.Predict.RLM do
         {:done, prediction, state}
 
       {:error, reason} ->
-        {:error, {:invalid_rlm_submit, reason}}
+        state =
+          state
+          |> add_observation(%{action: :submit, result: result, error: inspect(reason)})
+          |> trace(iteration, :submit_error, result, {:error, reason})
+
+        {:cont, state}
     end
   end
 
@@ -230,6 +255,58 @@ defmodule DSEx.Predict.RLM do
 
     state = add_observation(state, %{action: :eval, code: code, result: observation})
     {:cont, trace(state, iteration, :eval, code, observation)}
+  end
+
+  defp step(rlm, %{"action" => "load", "name" => name}, state, iteration)
+       when is_binary(name) do
+    key = find_var_key(state.vars, name)
+
+    case Map.fetch(state.vars, key) do
+      {:ok, %DSEx.Predict.RLM.SandboxSerializable{} = serializable} ->
+        case DSEx.Predict.RLM.SandboxSerializable.load(serializable) do
+          {:ok, loaded} ->
+            state = %{state | vars: Map.put(state.vars, key, loaded)}
+
+            observation = %{
+              action: :load,
+              name: key,
+              result: describe_value(loaded, rlm.max_preview_chars)
+            }
+
+            {:cont,
+             state
+             |> add_observation(observation)
+             |> trace(iteration, :load, %{name: key}, observation.result)}
+
+          {:error, reason} ->
+            observation = %{action: :load, name: key, error: reason}
+
+            {:cont,
+             state
+             |> add_observation(observation)
+             |> trace(iteration, :load_error, %{name: key}, {:error, reason})}
+        end
+
+      {:ok, loaded} ->
+        observation = %{
+          action: :load,
+          name: key,
+          result: describe_value(loaded, rlm.max_preview_chars)
+        }
+
+        {:cont,
+         state
+         |> add_observation(observation)
+         |> trace(iteration, :load, %{name: key}, observation.result)}
+
+      :error ->
+        observation = %{action: :load, name: key, error: {:unknown_variable, key}}
+
+        {:cont,
+         state
+         |> add_observation(observation)
+         |> trace(iteration, :load_error, %{name: key}, {:error, {:unknown_variable, key}})}
+    end
   end
 
   defp step(_rlm, %{"action" => "assign", "name" => name, "value" => value}, state, iteration)
@@ -267,6 +344,49 @@ defmodule DSEx.Predict.RLM do
         |> trace(iteration, :llm_query, action, result)
 
       {:cont, state}
+    end
+  end
+
+  defp step(%__MODULE__{} = rlm, %{"action" => "llm_query_batched"} = action, state, iteration) do
+    with {:ok, inputs_list} <- batched_inputs(action) do
+      required_calls = length(inputs_list)
+
+      if state.llm_calls + required_calls > rlm.max_llm_calls do
+        {:error, {:rlm_max_llm_calls, rlm.max_llm_calls, Enum.reverse(state.trace)}}
+      else
+        signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
+
+        program =
+          DSEx.Predict.Predict.new(signature,
+            lm: resolve_sub_lm(rlm),
+            adapter: resolve_adapter(rlm)
+          )
+
+        results =
+          inputs_list
+          |> Task.async_stream(&DSEx.Predict.Predict.call(program, &1),
+            ordered: true,
+            max_concurrency: min(max(required_calls, 1), 8),
+            timeout: :infinity
+          )
+          |> Enum.map(fn
+            {:ok, result} -> result
+            {:exit, reason} -> {:error, {:batched_llm_query_exit, reason}}
+          end)
+
+        state =
+          state
+          |> Map.update!(:llm_calls, &(&1 + required_calls))
+          |> add_observation(%{
+            action: :llm_query_batched,
+            signature: signature,
+            inputs: inputs_list,
+            result: results
+          })
+          |> trace(iteration, :llm_query_batched, action, results)
+
+        {:cont, state}
+      end
     end
   end
 
@@ -316,6 +436,62 @@ defmodule DSEx.Predict.RLM do
 
   defp step(_rlm, action, _state, _iteration), do: {:error, {:unsupported_rlm_action, action}}
 
+  defp batched_inputs(action) do
+    inputs =
+      Map.get(action, "inputs", Map.get(action, "batch", Map.get(action, "inputs_list", [])))
+
+    cond do
+      is_list(inputs) and Enum.all?(inputs, &is_map/1) ->
+        {:ok, inputs}
+
+      is_map(inputs) ->
+        {:ok, Map.values(inputs)}
+
+      true ->
+        {:error, {:invalid_rlm_batched_inputs, inputs}}
+    end
+  end
+
+  defp extract_fallback(%__MODULE__{} = rlm, state, iteration) do
+    case resolve_lm(rlm) do
+      nil ->
+        {:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}
+
+      lm ->
+        extract_fallback_with_lm(rlm, lm, state, iteration)
+    end
+  end
+
+  defp extract_fallback_with_lm(%__MODULE__{} = rlm, lm, state, iteration) do
+    messages = [
+      %{
+        role: :system,
+        content:
+          "You are the RLM extract pass. Return only the final structured output for the signature, not another action."
+      },
+      %{
+        role: :user,
+        content:
+          Jason.encode!(%{
+            signature: DSEx.Signature.to_spec(rlm.signature),
+            exhausted_at_iteration: iteration,
+            variables: variable_metadata(state.vars, rlm.max_preview_chars),
+            observations: Enum.map(state.observations, &safe_json/1),
+            trace: state.trace |> Enum.reverse() |> Enum.map(&safe_json/1)
+          })
+      }
+    ]
+
+    with {:ok, raw} <- DSEx.LM.generate(lm, messages, []),
+         {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []) do
+      state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
+      {:ok, add_trace(prediction, state)}
+    else
+      {:error, reason} ->
+        {:error, {:rlm_extract_failed, reason, Enum.reverse(state.trace)}}
+    end
+  end
+
   defp add_observation(state, observation),
     do: Map.update!(state, :observations, &[DSEx.Redaction.redact(observation) | &1])
 
@@ -333,6 +509,15 @@ defmodule DSEx.Predict.RLM do
 
   defp variable_metadata(vars, preview_chars) do
     Map.new(vars, fn {key, value} -> {key, describe_value(value, preview_chars)} end)
+  end
+
+  defp describe_value(%DSEx.Predict.RLM.SandboxSerializable{} = value, _preview_chars) do
+    %{
+      type: :sandbox_serializable,
+      name: value.name,
+      metadata: value.metadata,
+      loaded: false
+    }
   end
 
   defp describe_value(value, preview_chars) when is_binary(value) do
@@ -437,10 +622,43 @@ defmodule DSEx.Predict.RLM do
   defp resolve_adapter(%__MODULE__{adapter: nil}), do: DSEx.Settings.get().adapter
   defp resolve_adapter(%__MODULE__{adapter: adapter}), do: adapter
 
+  defp controller_predictor(%__MODULE__{} = rlm) do
+    signature =
+      "signature, iteration, variables, observations, tools, budget -> action"
+      |> DSEx.Signature.ensure()
+
+    DSEx.Predict.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
+  end
+
+  defp extract_predictor(%__MODULE__{} = rlm) do
+    signature =
+      "signature, variables, observations, trace -> output"
+      |> DSEx.Signature.ensure()
+
+    DSEx.Predict.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
+  end
+
+  defp subquery_predictor(%__MODULE__{} = rlm) do
+    DSEx.Predict.Predict.new(rlm.signature,
+      lm: resolve_sub_lm(rlm),
+      adapter: resolve_adapter(rlm)
+    )
+  end
+
   defp existing_atom_or_string(name) do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> name
+  end
+
+  defp find_var_key(vars, name) do
+    atom_or_string = existing_atom_or_string(name)
+
+    cond do
+      Map.has_key?(vars, atom_or_string) -> atom_or_string
+      Map.has_key?(vars, name) -> name
+      true -> atom_or_string
+    end
   end
 
   defp safe_json(value) do

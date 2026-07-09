@@ -553,11 +553,37 @@ RLM controller actions:
 ```elixir
 %{action: "eval", code: "x + 1"}
 %{action: "assign", name: "scratch", value: "note"}
+%{action: "load", name: "large_context"}
 %{action: "tool", name: "lookup", arguments: %{"key" => "x"}}
 %{action: "llm_query", signature: "question -> answer", inputs: %{question: "q"}}
+%{action: "llm_query_batched", signature: "question -> answer", inputs: [%{question: "q1"}, %{question: "q2"}]}
 %{action: "recurse", signature: "question -> answer", inputs: %{question: "q"}}
 %{action: "submit", result: %{answer: "final"}}
 ```
+
+For large or expensive context, pass a lazy handle and let the controller load
+it explicitly:
+
+```elixir
+context =
+  DSEx.rlm_serializable(:large_context, fn ->
+    File.read!("large-report.txt")
+  end,
+    metadata: %{source: "large-report.txt"}
+  )
+
+DSEx.call(rlm, %{large_context: context, question: "What changed?"})
+```
+
+The controller initially sees only metadata for the serializable value. The
+`load` action materializes it once into the RLM variable space. `llm_query_batched`
+runs sub-LM calls concurrently, preserves result order, and counts every item
+against `max_llm_calls`. If a controller submits malformed output, DSEx records
+the parse feedback as an observation and gives the controller another turn. If
+the loop exhausts its iteration budget, DSEx runs an extract pass over the
+variables, observations, and trace to recover final structured output when
+possible. A zero-iteration RLM still fails immediately without spending a
+provider call.
 
 ## Save And Load
 

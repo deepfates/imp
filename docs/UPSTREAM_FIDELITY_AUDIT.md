@@ -53,7 +53,7 @@ The current generated maintainer-readable map is
 | --- | --- | --- |
 | Upstream diffing | DSEx now has a generated 120-surface upstream-fidelity artifact and a local gate; future work should automate manifest refresh from upstream docs/source. | `de-0mhi` |
 | No-blind-spots audit | The previous audit missed RLM depth until prompted. Every dspy.ai and DeepWiki category needs explicit mapping. | `de-9mcw` |
-| RLM semantics | DSEx has a JSON-action RLM controller, but DSPy RLM includes persistent REPL semantics, `llm_query_batched`, extract fallback, `SandboxSerializable`, and optimizer-visible action/extract predictors. | `de-ciht` |
+| RLM semantics | DSEx now covers the upstream RLM semantic checklist: persistent variable-space loop, explicit lazy loading, `llm_query_batched`, sub-LM call budgets, invalid-submit retry, extract fallback, and optimizer-visible internal predictors. | `de-ciht` |
 | RLM benchmarks | Existing live RLM proof is an immediate-submit smoke, not a long-context RLM benchmark or DSPy comparison. | `de-m7aa` |
 | GEPA research evidence | DSEx has GEPA-style optimizer coverage, but not paper-level GEPA replication against DSPy GEPA on public tasks/models/budgets. | `de-izej` |
 | optimize_anything evidence | DSEx has arbitrary artifact optimization APIs, but not replication across non-prompt artifact classes. | `de-16fo` |

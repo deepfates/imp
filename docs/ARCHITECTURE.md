@@ -284,12 +284,25 @@ The controller may return actions:
 
 - `eval`
 - `assign`
+- `load`
 - `tool`
 - `llm_query`
+- `llm_query_batched`
 - `recurse`
 - `submit`
 
-The implementation uses a BEAM-safe sandbox for production control.
+The implementation uses a BEAM-safe sandbox for production control. Batched
+subqueries run concurrently with bounded fan-out and count each item against
+`max_llm_calls`. Malformed submits are returned to the controller as
+observations, and normal iteration exhaustion invokes an extract pass over the
+trace instead of discarding work.
+
+Large or expensive values can enter the loop as
+`DSEx.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
+only their metadata; the `load` action materializes the value into variable
+space when needed. RLM also exposes internal action, extract, and subquery
+predictors through `DSEx.ProgramAccess` so optimizers and audits can see the
+parts that govern behavior.
 
 ## Persistence
 

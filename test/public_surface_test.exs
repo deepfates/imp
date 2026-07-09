@@ -94,6 +94,7 @@ defmodule PublicSurfaceTest do
     DSEx.Predict.ProgramOfThought,
     DSEx.Predict.RAG,
     DSEx.Predict.RLM,
+    DSEx.Predict.RLM.SandboxSerializable,
     DSEx.Predict.ReAct,
     DSEx.Predict.Refine,
     DSEx.Prediction,
@@ -776,6 +777,8 @@ defmodule PublicSurfaceTest do
       code_act: 3,
       rlm: 1,
       rlm: 2,
+      rlm_serializable: 2,
+      rlm_serializable: 3,
       call: 2,
       req_llm: 1,
       req_llm: 2
