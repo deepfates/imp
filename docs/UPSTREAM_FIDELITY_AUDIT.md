@@ -65,7 +65,7 @@ The current generated maintainer-readable map is
 | Optimizer completeness | InferRules and exact semantics for less-emphasized optimizer variants need explicit mapping. | `de-9x31` |
 | ReAct/CodeAct/PoT | Existing implementations need a current-source fidelity audit, including ReActV2 behavior. | `de-3uxx` |
 | Adapters | Chat/JSON/XML/TwoStep behavior is now audited against current DSPy docs, including delimiter formatting, JSON fallback, demos/history, provider-native tool-call ownership, and intentional DSEx deviations. | `de-t3uh` |
-| Evaluation/metrics | Evaluate, SemanticF1, CompleteAndGrounded, feedback-rich metrics, and aggregate behavior need source-level parity mapping. | `de-bova` |
+| Evaluation/metrics | DSEx now maps evaluation and metric parity explicitly: bounded concurrent `Evaluate`, trace-aware metrics, feedback-rich metric results, evaluator error budgeting, SemanticF1/CompleteAndGrounded helper modules, extractive QA EM/F1, classification reports, passage match, retrieval recall, and dataset-backed QA/classification/retrieval evidence. | `de-bova` |
 | Retrieval/vector DBs | ColBERTv2, embeddings, KNN, KNNFewShot, external stores, and multi-hop RAG need explicit mapping and evidence. | `de-c2we` |
 | Runtime | Settings, cache, async, streaming, and performance semantics need a current DSPy comparison. | `de-tt5j` |
 | Persistence/deployment | Save/load, compiled artifacts, credential rebinding, package usage, and deployment semantics need source-level parity mapping. | `de-g3wa` |

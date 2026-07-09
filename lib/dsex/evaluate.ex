@@ -41,7 +41,14 @@ defmodule DSEx.Evaluate do
   searching and report diagnostics.
   """
 
-  defstruct [:devset, :metric, display_progress: false, failure_score: 0.0, max_errors: :infinity]
+  defstruct [
+    :devset,
+    :metric,
+    display_progress: false,
+    failure_score: 0.0,
+    max_errors: :infinity,
+    max_concurrency: 1
+  ]
 
   @option_schema [
     display_progress: [type: :boolean, default: false],
@@ -49,7 +56,8 @@ defmodule DSEx.Evaluate do
     max_errors: [
       type: {:custom, __MODULE__, :validate_max_errors, []},
       default: :infinity
-    ]
+    ],
+    max_concurrency: [type: :pos_integer, default: 1]
   ]
 
   def new(devset, metric, opts \\ []) do
@@ -62,7 +70,8 @@ defmodule DSEx.Evaluate do
       metric: metric,
       display_progress: opts[:display_progress],
       failure_score: opts[:failure_score],
-      max_errors: opts[:max_errors]
+      max_errors: opts[:max_errors],
+      max_concurrency: opts[:max_concurrency]
     }
   end
 
@@ -74,47 +83,94 @@ defmodule DSEx.Evaluate do
   end
 
   def run(%__MODULE__{} = evaluator, program) do
-    {rows, errors} =
-      evaluator.devset
-      |> Enum.with_index()
-      |> Enum.reduce_while({[], []}, fn {example, index}, {rows, errors} ->
-        {row, errors} =
-          with {:ok, example} <- normalize_example(example),
-               inputs <- example |> DSEx.Example.inputs() |> DSEx.Example.to_map() do
-            case call_program(program, inputs) do
-              {:ok, prediction} ->
-                result = metric_result(evaluator.metric, example, prediction)
-                error = metric_error(index, result)
+    {rows, errors} = run_rows(evaluator, program)
 
-                {%{
-                   index: index,
-                   example: example,
-                   prediction: prediction,
-                   score: result.score,
-                   passed?: result.passed?,
-                   feedback: result.feedback,
-                   metric_metadata: result.metadata,
-                   error: error
-                 }, add_error(errors, error)}
+    rows = Enum.reverse(rows)
+    errors = Enum.reverse(errors)
+    %DSEx.Evaluate.Result{score: average(rows), rows: rows, errors: errors}
+  end
 
-              {:error, reason} ->
-                failed_row(index, example, evaluator.failure_score, reason, errors)
-            end
-          else
-            {:error, reason} ->
-              failed_row(index, example, evaluator.failure_score, reason, errors)
-          end
+  defp run_rows(%__MODULE__{max_concurrency: 1} = evaluator, program) do
+    evaluator.devset
+    |> Enum.with_index()
+    |> Enum.reduce_while({[], []}, fn {example, index}, {rows, errors} ->
+      {row, error} = evaluate_row(evaluator, program, example, index)
+      errors = add_error(errors, error)
+
+      if too_many_errors?(errors, evaluator.max_errors) do
+        {:halt, {[row | rows], errors}}
+      else
+        {:cont, {[row | rows], errors}}
+      end
+    end)
+  end
+
+  defp run_rows(%__MODULE__{} = evaluator, program) do
+    evaluator.devset
+    |> Enum.with_index()
+    |> DSEx.Tasks.async_stream(
+      fn {example, index} -> evaluate_row(evaluator, program, example, index) end,
+      ordered: true,
+      max_concurrency: evaluator.max_concurrency
+    )
+    |> Enum.reduce_while({[], []}, fn
+      {:ok, {row, error}}, {rows, errors} ->
+        errors = add_error(errors, error)
 
         if too_many_errors?(errors, evaluator.max_errors) do
           {:halt, {[row | rows], errors}}
         else
           {:cont, {[row | rows], errors}}
         end
-      end)
 
-    rows = Enum.reverse(rows)
-    errors = Enum.reverse(errors)
-    %DSEx.Evaluate.Result{score: average(rows), rows: rows, errors: errors}
+      {:exit, reason}, {rows, errors} ->
+        index = length(rows)
+        error = %{index: index, reason: {:evaluation_task_exit, reason}}
+        row = failed_row_data(index, nil, evaluator.failure_score, error.reason)
+        errors = [error | errors]
+
+        if too_many_errors?(errors, evaluator.max_errors) do
+          {:halt, {[row | rows], errors}}
+        else
+          {:cont, {[row | rows], errors}}
+        end
+    end)
+  end
+
+  defp evaluate_row(evaluator, program, example, index) do
+    with {:ok, example} <- normalize_example(example),
+         inputs <- example |> DSEx.Example.inputs() |> DSEx.Example.to_map() do
+      case call_program(program, inputs) do
+        {:ok, prediction} ->
+          result = metric_result(evaluator.metric, example, prediction)
+          error = metric_error(index, result)
+
+          {%{
+             index: index,
+             example: example,
+             prediction: prediction,
+             score: result.score,
+             passed?: result.passed?,
+             feedback: result.feedback,
+             metric_metadata: result.metadata,
+             error: error
+           }, error}
+
+        {:error, reason} ->
+          {failed_row_data(index, example, evaluator.failure_score, reason),
+           %{
+             index: index,
+             reason: reason
+           }}
+      end
+    else
+      {:error, reason} ->
+        {failed_row_data(index, example, evaluator.failure_score, reason),
+         %{
+           index: index,
+           reason: reason
+         }}
+    end
   end
 
   defp validate_devset!(devset) do
@@ -136,19 +192,17 @@ defmodule DSEx.Evaluate do
 
   defp normalize_example(example), do: {:error, {:invalid_evaluation_example, inspect(example)}}
 
-  defp failed_row(index, example, failure_score, reason, errors) do
-    error = %{index: index, reason: reason}
-
-    {%{
-       index: index,
-       example: example,
-       prediction: nil,
-       score: failure_score,
-       passed?: false,
-       feedback: nil,
-       metric_metadata: %{},
-       error: reason
-     }, [error | errors]}
+  defp failed_row_data(index, example, failure_score, reason) do
+    %{
+      index: index,
+      example: example,
+      prediction: nil,
+      score: failure_score,
+      passed?: false,
+      feedback: nil,
+      metric_metadata: %{},
+      error: reason
+    }
   end
 
   defp call_program(%_module{} = program, inputs) do

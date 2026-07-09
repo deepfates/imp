@@ -71,6 +71,46 @@ defmodule MetricContractTest do
     assert length(result.rows) == 1
   end
 
+  test "Evaluate can run rows concurrently while preserving row order and process context" do
+    parent = self()
+
+    program = %Program{
+      handler: fn inputs ->
+        send(parent, {:worker_context, inputs.question, DSEx.Settings.fetch!(:tenant)})
+        {:ok, DSEx.prediction(answer: inputs.question)}
+      end
+    }
+
+    metric = fn example, prediction ->
+      DSEx.Example.get(example, :answer) == DSEx.Prediction.get(prediction, :answer)
+    end
+
+    devset =
+      for value <- ["one", "two", "three"] do
+        example(value, value)
+      end
+
+    result =
+      DSEx.context([tenant: :eval_test], fn ->
+        devset
+        |> DSEx.Evaluate.new(metric, max_concurrency: 2)
+        |> DSEx.Evaluate.run(program)
+      end)
+
+    assert result.score == 1.0
+    assert Enum.map(result.rows, & &1.index) == [0, 1, 2]
+
+    assert Enum.map(result.rows, &DSEx.Prediction.get(&1.prediction, :answer)) == [
+             "one",
+             "two",
+             "three"
+           ]
+
+    assert_received {:worker_context, "one", :eval_test}
+    assert_received {:worker_context, "two", :eval_test}
+    assert_received {:worker_context, "three", :eval_test}
+  end
+
   test "Evaluate constructor reports invalid metrics and options clearly" do
     devset = [example("one", "1")]
     metric = fn _example, _prediction -> true end
@@ -111,6 +151,12 @@ defmodule MetricContractTest do
                  ~r/:max_errors.*expected :infinity or a non-negative integer/s,
                  fn ->
                    DSEx.Evaluate.new(devset, metric, max_errors: "forever")
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/:max_concurrency.*expected.*positive integer/s,
+                 fn ->
+                   DSEx.Evaluate.new(devset, metric, max_concurrency: 0)
                  end
   end
 

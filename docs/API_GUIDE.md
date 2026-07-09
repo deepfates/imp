@@ -141,7 +141,9 @@ compiled =
 
 Use deeper modules such as `DSEx.Evaluate` or `DSEx.Optimizer.RandomSearch`
 directly when you need to hold evaluator structs, inspect optimizer internals,
-or build custom orchestration.
+or build custom orchestration. `DSEx.Evaluate.new/3` accepts
+`max_concurrency:` for bounded parallel row evaluation while preserving row
+order, process-local settings, feedback, metric metadata, and error budgeting.
 
 ## Which Program Shape?
 
@@ -340,6 +342,21 @@ Metrics may return booleans, numbers, maps with `:score` / `:feedback`, or a
 `DSEx.Prediction` carrying score and feedback. DSEx normalizes those returns
 into row scores, pass/fail state, feedback, and metric metadata. Arity-3 metrics
 receive the prediction trace as their third argument.
+
+Built-in metric helpers cover common benchmark shapes:
+
+```elixir
+qa = DSEx.extractive_qa("since 2000", "2000")
+
+report =
+  DSEx.classification_report([
+    {"warm", "warm"},
+    {"warm", "cool"},
+    {"cool", "cool"}
+  ])
+
+{qa.metadata["f1"], report["macro_f1"]}
+```
 
 ## Retrieval-Augmented Programs
 
