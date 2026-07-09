@@ -248,9 +248,11 @@ scoring, the deterministic LiveBenchMath AMC/AIME parser paths, and
 LiveBenchMath `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
 HoVer uses the upstream `HoverMultiHop` output contract (`claim ->
 retrieved_docs`); the metric scores retrieved document titles against
-`supporting_facts`, not the entailment label. Source-exact HoVer campaign
-claims must still pin the BM25/wiki corpus provenance used for retrieval.
-GEPA
+`supporting_facts`, not the entailment label. Source-exact HoVer campaign rows
+must include `dataset.retrieval` provenance for the upstream
+`wiki.abstracts.2017` BM25 corpus and index, including corpus and index
+checksums; the DSEx campaign runner rejects HoVer research rows without that
+provenance.
 IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages

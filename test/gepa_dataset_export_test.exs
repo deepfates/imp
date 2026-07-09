@@ -41,6 +41,10 @@ defmodule GepaDatasetExportTest do
     assert hover["signature"] == "claim -> retrieved_docs"
     assert hover["output_key"] == "retrieved_docs"
     assert hover["upstream_metric"] == "hover_utils.discrete_retrieval_eval"
+    assert hover["retrieval"]["kind"] == "bm25s_wiki_abstracts_2017"
+    assert hover["retrieval"]["status"] == "present"
+    assert hover["retrieval"]["corpus_checksum"] =~ "sha256:"
+    assert hover["retrieval"]["index_checksum"] =~ "sha256:"
   end
 
   defp write_fake_gepa_package!(root) do
@@ -54,6 +58,17 @@ defmodule GepaDatasetExportTest do
       dir = Path.join(root, "gepa_artifact/benchmarks/#{family}")
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "__init__.py"), benchmark_module(class_name))
+
+      if family == "hover" do
+        File.write!(
+          Path.join(dir, "wiki.abstracts.2017.jsonl"),
+          ~s({"title":"gold","text":["supporting document"]}\n)
+        )
+
+        index_dir = Path.join(dir, "bm25s_retriever")
+        File.mkdir_p!(index_dir)
+        File.write!(Path.join(index_dir, "params.json"), ~s({"k1":0.9,"b":0.4}\n))
+      end
     end)
   end
 

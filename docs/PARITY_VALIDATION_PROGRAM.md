@@ -293,6 +293,9 @@ DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
 supporting-title retrieval, IFBench IFEval-style constraints, Papillon LLM-judge
 quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME parser
 paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
+HoVer rows must carry `dataset.retrieval` provenance for the upstream
+`wiki.abstracts.2017` BM25 corpus/index checksums; generic `retrieved_docs`
+predictions without that provenance are rejected for research campaign rows.
 IFBench imports the larger AllenAI extended registry; DSEx ports those registry
 checks in Elixir and keeps unknown ids fail-closed. Four IFBench NLP-dependent
 checks have native deterministic fallbacks plus a source-exact Python bridge for

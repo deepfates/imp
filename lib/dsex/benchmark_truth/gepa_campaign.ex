@@ -97,6 +97,15 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         raise ArgumentError,
               "DSEx GEPA campaign row missing research metadata for #{row["family"]}"
       end
+
+      if row["family"] == "hoverBench" do
+        retrieval = get_in(row, ["dataset", "retrieval"])
+
+        unless hover_retrieval_provenance?(retrieval) do
+          raise ArgumentError,
+                "DSEx GEPA hoverBench row requires source-exact BM25/wiki retrieval provenance"
+        end
+      end
     end)
 
     :ok
@@ -151,7 +160,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "dataset" => %{
         "source" => "DSEx GEPA dataset root #{Path.expand(dataset_root)}",
         "split" => "train_dev_test",
-        "checksums" => split_checksums(paths)
+        "checksums" => split_checksums(paths),
+        "retrieval" => spec["retrieval"]
       },
       "wall_clock_ms" => System.convert_time_unit(wall_us, :microsecond, :millisecond),
       "seed_variance" => seed_variance(seed_results),
@@ -195,6 +205,17 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   end
 
   defp maybe_put_papillon_judge(row, _spec, _judge_model), do: row
+
+  defp hover_retrieval_provenance?(%{
+         "kind" => "bm25s_wiki_abstracts_2017",
+         "status" => "present",
+         "corpus_checksum" => "sha256:" <> corpus_hash,
+         "index_checksum" => "sha256:" <> index_hash
+       }) do
+    byte_size(corpus_hash) == 64 and byte_size(index_hash) == 64
+  end
+
+  defp hover_retrieval_provenance?(_other), do: false
 
   defp run_seed(spec, trainset, devset, testset, lm, judge_lm, generations, seed) do
     metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)

@@ -119,6 +119,7 @@ def main() -> int:
                 "dataset_source": f"{gepa_root}@{git_sha(gepa_root)}",
                 "split_counts": split_counts,
                 "split_checksums": split_checksums,
+                **family_extra_metadata(gepa_root, family),
                 "metric_fidelity": (
                     "upstream_metric_named_for_adapter; DSEx campaign runner ports "
                     "deterministic adapters, Papillon judge scoring, IFBench registry "
@@ -152,6 +153,34 @@ def instantiate_benchmark(module_name: str, family: str):
     if expected_name != family:
         raise RuntimeError(f"expected family {family}, got benchmark {expected_name}")
     return benchmark
+
+
+def family_extra_metadata(gepa_root: Path, family: str) -> Dict[str, Any]:
+    if family != "hoverBench":
+        return {}
+
+    hover_dir = gepa_root / "gepa_artifact" / "benchmarks" / "hover"
+    corpus = hover_dir / "wiki.abstracts.2017.jsonl"
+    index = hover_dir / "bm25s_retriever"
+
+    retrieval: Dict[str, Any] = {
+        "kind": "bm25s_wiki_abstracts_2017",
+        "source_url": "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
+        "corpus_path": str(corpus),
+        "index_path": str(index),
+        "status": "present" if corpus.exists() and index.exists() else "missing",
+    }
+
+    if corpus.exists():
+        retrieval["corpus_checksum"] = "sha256:" + sha256(corpus)
+
+    if index.exists():
+        if index.is_file():
+            retrieval["index_checksum"] = "sha256:" + sha256(index)
+        else:
+            retrieval["index_checksum"] = "sha256:" + sha256_tree(index)
+
+    return {"retrieval": retrieval}
 
 
 def example_to_record(example: Any) -> Dict[str, Any]:
@@ -189,6 +218,19 @@ def sha256(path: Path) -> str:
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
+    return h.hexdigest()
+
+
+def sha256_tree(path: Path) -> str:
+    h = hashlib.sha256()
+    for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
+        rel = file_path.relative_to(path).as_posix()
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        with file_path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        h.update(b"\0")
     return h.hexdigest()
 
 

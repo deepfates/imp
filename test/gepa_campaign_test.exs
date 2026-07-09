@@ -41,6 +41,11 @@ defmodule GepaCampaignTest do
                row["seed_variance"]["seeds"] == [0, 1]
            end)
 
+    hover = Enum.find(rows, &(&1["family"] == "hoverBench"))
+    assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
+    assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
+    assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
+
     Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
     Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
@@ -61,6 +66,49 @@ defmodule GepaCampaignTest do
 
     assert artifact["summary"]["full_gepa_replication"]
     assert DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(artifact)
+  end
+
+  test "DSEx GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
+    dataset_root = tmp_dir("gepa-campaign-hover-missing-retrieval")
+    rows_dir = tmp_dir("gepa-campaign-hover-missing-rows")
+    write_dataset_root!(dataset_root)
+
+    families_path = Path.join(dataset_root, "families.json")
+
+    families =
+      families_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> update_in(["families"], fn families ->
+        Enum.map(families, fn
+          %{"family" => "hoverBench"} = spec -> Map.delete(spec, "retrieval")
+          spec -> spec
+        end)
+      end)
+
+    File.write!(families_path, Jason.encode!(families))
+
+    assert_raise ArgumentError,
+                 ~r/hoverBench row requires source-exact BM25\/wiki retrieval provenance/,
+                 fn ->
+                   DSEx.BenchmarkTruth.GepaCampaign.run(
+                     dataset_root: dataset_root,
+                     campaign_id: "gepa-campaign-hover-missing-retrieval",
+                     model: "openai:gpt-4.1-mini-2025-04-14",
+                     reflection_model: "openai:gpt-5",
+                     out_dir: rows_dir,
+                     seeds: [0],
+                     generations: 1,
+                     pricing_source: "test provider usage export",
+                     token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
+                     source_commits: %{
+                       "dspy" => "stanfordnlp/dspy@abcdef1",
+                       "dsex" => "deepfates/dsex@abcdef2",
+                       "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+                     },
+                     lm: static_gold_lm()
+                   )
+                 end
   end
 
   defp static_gold_lm do
@@ -131,7 +179,8 @@ defmodule GepaCampaignTest do
               "input_keys" => contract.input_keys,
               "output_key" => contract.output_key,
               "metric_calls" => budget,
-              "upstream_metric" => contract.upstream_metric
+              "upstream_metric" => contract.upstream_metric,
+              "retrieval" => Map.get(contract, :retrieval)
             }
           end
 
@@ -206,7 +255,19 @@ defmodule GepaCampaignTest do
       signature: "claim -> retrieved_docs",
       input_keys: ["claim"],
       output_key: "retrieved_docs",
-      upstream_metric: "hover_utils.discrete_retrieval_eval"
+      upstream_metric: "hover_utils.discrete_retrieval_eval",
+      retrieval: %{
+        "kind" => "bm25s_wiki_abstracts_2017",
+        "status" => "present",
+        "source_url" =>
+          "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
+        "corpus_path" => "test/fixtures/hover/wiki.abstracts.2017.jsonl",
+        "index_path" => "test/fixtures/hover/bm25s_retriever",
+        "corpus_checksum" =>
+          "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "index_checksum" =>
+          "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      }
     }
   end
 
