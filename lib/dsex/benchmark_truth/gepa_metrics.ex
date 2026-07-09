@@ -145,6 +145,11 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     compare_count(count, Map.get(args, "let_frequency", 0), Map.get(args, "let_relation"))
   end
 
+  defp ifbench_following?("language:response_language", args, _prompt, value) do
+    language = args |> Map.get("language", "en") |> to_string()
+    ifbench_language?(language, value)
+  end
+
   defp ifbench_following?("length_constraints:number_sentences", args, _prompt, value) do
     count = sentence_count(value)
     compare_count(count, Map.get(args, "num_sentences", 0), Map.get(args, "relation"))
@@ -276,6 +281,23 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     value |> String.trim() |> String.trim("\"") |> String.downcase() |> String.ends_with?(ending)
   end
 
+  defp ifbench_following?("startend:quotation", _args, _prompt, value) do
+    value = String.trim(value)
+
+    String.length(value) > 1 and String.starts_with?(value, "\"") and
+      String.ends_with?(value, "\"")
+  end
+
+  defp ifbench_following?("change_case:capital_word_frequency", args, _prompt, value) do
+    count =
+      ~r/[[:alnum:]]+(?:-[[:alnum:]]+)*/
+      |> Regex.scan(value)
+      |> Enum.map(fn [word] -> word end)
+      |> Enum.count(&(&1 == String.upcase(&1) and Regex.match?(~r/[A-Z]/, &1)))
+
+    compare_count(count, Map.get(args, "capital_frequency", 0), Map.get(args, "capital_relation"))
+  end
+
   defp ifbench_following?("punctuation:no_comma", _args, _prompt, value),
     do: not String.contains?(value, ",")
 
@@ -327,6 +349,13 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
         |> String.downcase()
     end
   end
+
+  defp ifbench_language?("en", value) do
+    cleaned = String.replace(value, ~r/[^A-Za-z\s.,!?'"-]/, "")
+    String.trim(cleaned) != "" and String.length(cleaned) >= div(String.length(value), 2)
+  end
+
+  defp ifbench_language?(_language, _value), do: false
 
   defp livebench_math(example, prediction) do
     question = DSEx.Example.get(example, :question_d, %{})

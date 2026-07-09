@@ -116,6 +116,34 @@ defmodule GepaMetricsTest do
     assert metric.(example, DSEx.prediction(response: "prefix\n{\"ok\": true}\nsuffix")) == 1.0
   end
 
+  test "IFBench metric covers remaining active deterministic registry checks" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric",
+        "output_key" => "response"
+      })
+
+    example =
+      DSEx.example(
+        prompt: "p",
+        response: "",
+        instruction_id_list: [
+          "change_case:capital_word_frequency",
+          "startend:quotation",
+          "language:response_language"
+        ],
+        kwargs: [
+          %{"capital_frequency" => 2, "capital_relation" => "at least"},
+          %{},
+          %{"language" => "en"}
+        ]
+      )
+      |> DSEx.with_inputs(:prompt)
+
+    assert metric.(example, DSEx.prediction(response: "\"This has NASA and HTTP words.\"")) == 1.0
+    assert metric.(example, DSEx.prediction(response: "This has NASA words.")) == 1 / 3
+  end
+
   test "LiveBenchMath metric ports AMC answer parsing cases" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{
