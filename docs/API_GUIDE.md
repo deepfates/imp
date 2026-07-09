@@ -508,6 +508,27 @@ DSEx.get(prediction, :answer)
 them. A reserved `submit` tool validates final outputs against the original
 signature.
 
+### Tool Call Primitives
+
+Use `DSEx.Adapters.Types.ToolCall` and `ToolCalls` when you need to inspect,
+persist, or pass provider-native tool-call values outside a full ReAct loop.
+They normalize DSEx maps and OpenAI-style nested function calls into the same
+shape:
+
+```elixir
+calls =
+  DSEx.Adapters.Types.ToolCalls.from_dict_list([
+    %{id: "call_lookup", name: "lookup", arguments: %{query: "beam"}},
+    %{id: "call_translate", function: %{name: "translate", arguments: ~s({"text":"hello"})}}
+  ])
+
+DSEx.Adapters.Types.ToolCalls.format(calls)
+```
+
+ReqLLM-backed assistant messages accept the same primitive values through the
+ordinary `%{role: :assistant, tool_calls: calls}` message boundary, and provider
+streaming exposes tool-call chunks as `%{tool_calls: [...]}` stream chunks.
+
 ## Agents
 
 ```elixir

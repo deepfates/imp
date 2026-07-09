@@ -16,11 +16,148 @@ defmodule DSEx.Adapters.Types do
   defmodule Reasoning, do: defstruct([:text, metadata: %{}])
   defmodule History, do: defstruct(messages: [])
   defmodule Citation, do: defstruct([:text, :source, metadata: %{}])
-  defmodule ToolCall, do: defstruct([:name, :arguments, id: nil])
-  defmodule ToolResult, do: defstruct([:name, :result, id: nil])
+
+  defmodule ToolCall do
+    @moduledoc "Provider-native tool call value with stable id, name, and arguments."
+    defstruct [:name, arguments: %{}, id: nil]
+
+    def new(name, arguments \\ %{}, opts \\ []) do
+      %__MODULE__{
+        name: name,
+        arguments: normalize_arguments(arguments),
+        id: Keyword.get(opts, :id)
+      }
+    end
+
+    def format(%__MODULE__{} = call) do
+      %{name: to_string(call.name), args: normalize_arguments(call.arguments)}
+      |> maybe_put(:id, call.id)
+    end
+
+    def from_map(%__MODULE__{} = call), do: call
+
+    def from_map(%{function: function} = call) do
+      from_function(function, Map.get(call, :id))
+    end
+
+    def from_map(%{"function" => function} = call) do
+      from_function(function, Map.get(call, "id"))
+    end
+
+    def from_map(%{} = call) do
+      name = Map.get(call, :name, Map.get(call, "name"))
+
+      arguments =
+        Map.get(
+          call,
+          :arguments,
+          Map.get(call, "arguments", Map.get(call, :args, Map.get(call, "args", %{})))
+        )
+
+      id = Map.get(call, :id, Map.get(call, "id"))
+
+      if is_nil(name) do
+        raise ArgumentError, "tool call requires :name or \"name\"; got: #{inspect(call)}"
+      end
+
+      %__MODULE__{name: name, arguments: normalize_arguments(arguments), id: id}
+    end
+
+    def from_map(call) do
+      raise ArgumentError, "tool call must be a map; got: #{inspect(call)}"
+    end
+
+    defp from_function(function, id) when is_map(function) do
+      name = Map.get(function, :name, Map.get(function, "name"))
+      arguments = Map.get(function, :arguments, Map.get(function, "arguments", %{}))
+
+      if is_nil(name) do
+        raise ArgumentError,
+              "OpenAI-style tool call function requires name; got: #{inspect(function)}"
+      end
+
+      %__MODULE__{name: name, arguments: normalize_arguments(arguments), id: id}
+    end
+
+    defp from_function(function, _id) do
+      raise ArgumentError,
+            "OpenAI-style tool call function must be a map; got: #{inspect(function)}"
+    end
+
+    defp normalize_arguments(arguments) when is_binary(arguments) do
+      case Jason.decode(arguments) do
+        {:ok, decoded} when is_map(decoded) -> decoded
+        {:ok, decoded} -> %{"value" => decoded}
+        {:error, _reason} -> arguments
+      end
+    end
+
+    defp normalize_arguments(nil), do: %{}
+    defp normalize_arguments(arguments) when is_map(arguments), do: arguments
+    defp normalize_arguments(arguments), do: arguments
+
+    defp maybe_put(map, _key, nil), do: map
+    defp maybe_put(map, key, value), do: Map.put(map, key, value)
+  end
+
+  defmodule ToolResult do
+    @moduledoc "Provider-native result for a previous tool call."
+    defstruct [:name, :result, id: nil]
+
+    def new(name, result, opts \\ []),
+      do: %__MODULE__{name: name, result: result, id: Keyword.get(opts, :id)}
+
+    def format(%__MODULE__{} = result) do
+      %{name: to_string(result.name), result: result.result}
+      |> maybe_put(:id, result.id)
+    end
+
+    defp maybe_put(map, _key, nil), do: map
+    defp maybe_put(map, key, value), do: Map.put(map, key, value)
+  end
+
   defmodule Type, do: defstruct([:value, metadata: %{}])
-  defmodule ToolCalls, do: defstruct(tool_calls: [])
-  defmodule ToolCallResults, do: defstruct(tool_call_results: [])
+
+  defmodule ToolCalls do
+    @moduledoc "Collection of provider-native tool calls."
+    defstruct tool_calls: []
+
+    def new(tool_calls \\ []),
+      do: %__MODULE__{tool_calls: Enum.map(tool_calls, &DSEx.Adapters.Types.ToolCall.from_map/1)}
+
+    def from_dict_list(tool_calls) when is_list(tool_calls), do: new(tool_calls)
+
+    def from_dict_list(tool_calls) do
+      raise ArgumentError,
+            "ToolCalls.from_dict_list/1 expects a list, got: #{inspect(tool_calls)}"
+    end
+
+    def format(%__MODULE__{tool_calls: tool_calls}) do
+      %{tool_calls: Enum.map(tool_calls, &DSEx.Adapters.Types.ToolCall.format/1)}
+    end
+  end
+
+  defmodule ToolCallResults do
+    @moduledoc "Collection of provider-native tool results."
+    defstruct tool_call_results: []
+
+    def new(results \\ []),
+      do: %__MODULE__{tool_call_results: Enum.map(results, &normalize_result/1)}
+
+    def format(%__MODULE__{tool_call_results: results}) do
+      %{tool_call_results: Enum.map(results, &DSEx.Adapters.Types.ToolResult.format/1)}
+    end
+
+    defp normalize_result(%DSEx.Adapters.Types.ToolResult{} = result), do: result
+
+    defp normalize_result(%{} = result) do
+      DSEx.Adapters.Types.ToolResult.new(
+        Map.get(result, :name, Map.get(result, "name")),
+        Map.get(result, :result, Map.get(result, "result")),
+        id: Map.get(result, :id, Map.get(result, "id"))
+      )
+    end
+  end
 
   @doc """
   Converts one DSEx content value into an OpenAI-compatible content block.
@@ -111,6 +248,11 @@ defmodule DSEx.Adapters.Types do
 
   def to_openai(%Citation{} = citation),
     do: invalid_type!(Citation, "binary :text and binary :source", citation)
+
+  def to_openai(%ToolCall{} = call), do: ToolCall.format(call)
+  def to_openai(%ToolCalls{} = calls), do: ToolCalls.format(calls)
+  def to_openai(%ToolResult{} = result), do: ToolResult.format(result)
+  def to_openai(%ToolCallResults{} = results), do: ToolCallResults.format(results)
 
   def to_openai(%Type{value: value}), do: to_openai(value)
   def to_openai(text) when is_binary(text), do: %{type: "text", text: text}

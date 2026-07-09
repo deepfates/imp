@@ -67,6 +67,31 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule ToolStreamStub do
+    def stream_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_stream, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.StreamResponse{
+         stream: [
+           %ReqLLM.StreamChunk{
+             type: :tool_call,
+             name: "lookup",
+             arguments: %{"query" => "beam"},
+             metadata: %{id: "call_stream"}
+           },
+           ReqLLM.StreamChunk.meta(%{finish_reason: "tool_calls"})
+         ],
+         metadata_handle: self(),
+         cancel: fn -> :ok end,
+         model: model,
+         context: ReqLLM.Context.new(messages)
+       }}
+    end
+
+    def generate_text(_model, _messages, _opts), do: {:error, :not_used}
+  end
+
   defmodule FailingStub do
     def generate_text(_model, _messages, _opts), do: raise("transport exploded")
     def stream_text(_model, _messages, _opts), do: throw(:stream_exploded)
@@ -291,6 +316,48 @@ defmodule ReqLLMClientTest do
              Keyword.fetch!(opts, :tools)
   end
 
+  test "ReqLLM serializes DSEx and OpenAI-style assistant tool calls" do
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    calls =
+      DSEx.Adapters.Types.ToolCalls.new([
+        DSEx.Adapters.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
+        %{
+          id: "call_translate",
+          function: %{name: "translate", arguments: ~s({"text":"world"})}
+        }
+      ])
+
+    assert {:ok, _response} =
+             DSEx.Clients.ReqLLM.generate(
+               lm,
+               [
+                 %{role: :assistant, content: "", tool_calls: calls},
+                 %{role: :tool, content: "ok", tool_calls: [%{id: "call_lookup"}]}
+               ],
+               []
+             )
+
+    assert_received {:req_llm_generate, "openai:gpt-test",
+                     [
+                       %ReqLLM.Message{role: :assistant} = assistant,
+                       %ReqLLM.Message{role: :tool} = tool
+                     ], _opts}
+
+    assert [
+             %ReqLLM.ToolCall{
+               id: "call_lookup",
+               function: %{name: "lookup", arguments: ~s({"query":"beam"})}
+             },
+             %ReqLLM.ToolCall{
+               id: "call_translate",
+               function: %{name: "translate", arguments: ~s({"text":"world"})}
+             }
+           ] = assistant.tool_calls
+
+    assert tool.tool_call_id == "call_lookup"
+  end
+
   test "ReqLLM stream chunks are exposed through DSEx streaming vocabulary" do
     lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
     program = DSEx.predict("question -> answer", lm: lm)
@@ -310,6 +377,27 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+  end
+
+  test "ReqLLM tool-call stream chunks are exposed as normalized DSEx chunks" do
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStreamStub)
+    program = DSEx.predict("question -> tool_calls", lm: lm)
+
+    chunks =
+      program
+      |> DSEx.Streaming.stream(%{question: "lookup beam"}, provider_stream: true)
+      |> Enum.to_list()
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: %{
+                 tool_calls: [
+                   %{id: "call_stream", name: "lookup", arguments: %{"query" => "beam"}}
+                 ]
+               }
+             },
+             %DSEx.Streaming.Messages.StreamResponse{done: true}
+           ] = chunks
   end
 
   test "ReqLLM client reports provider module failures without crashing callers" do

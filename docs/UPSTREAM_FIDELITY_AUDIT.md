@@ -60,7 +60,7 @@ The current generated maintainer-readable map is
 | Assertions | DSEx now exposes named Elixir assertions plus assertion-guided self-refinement over ordinary programs, with feedback hints, strict mode, best-attempt metadata, streaming composition, and docs/tests. Current installed DSPy exposes `Refine`, not the older public `Assert`/`Suggest` surface, so DSEx intentionally implements the current refinement behavior rather than stale compatibility names. | `de-b79l` |
 | History | DSEx now has signature-shaped `DSEx.History` matching DSPy's task-turn primitive, Chat adapter rendering, JSON-safe dump/load, redaction, streaming composition, and an explicit boundary from provider-native role-message history. | `de-vm37` |
 | Native reasoning/BaseLM | DSEx has LM behaviours and reasoning types, but needs explicit parity around typed LM surfaces and provider-native reasoning fields. | `de-erg0` |
-| ToolCalls | DSEx has tool-call structs and ReAct paths, but primitive-level provider-native tool-call round trips need explicit tests/evidence. | `de-e84o` |
+| ToolCalls | DSEx now has primitive-level tool-call constructors, OpenAI-style nested function-call normalization, formatting, tool results, ReqLLM assistant/tool message serialization, stream chunk normalization, malformed-call errors, and composition outside ReAct. | `de-e84o` |
 | Multimodal | DSEx has encoding primitives and operations stress, but not live multimodal quality benchmarks. | `de-ezg9` |
 | Optimizer completeness | InferRules and exact semantics for less-emphasized optimizer variants need explicit mapping. | `de-9x31` |
 | ReAct/CodeAct/PoT | Existing implementations need a current-source fidelity audit, including ReActV2 behavior. | `de-3uxx` |

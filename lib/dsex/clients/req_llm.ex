@@ -363,21 +363,53 @@ defmodule DSEx.Clients.ReqLLM do
 
   defp normalize_tool_calls(nil), do: nil
 
+  defp normalize_tool_calls(%DSEx.Adapters.Types.ToolCalls{tool_calls: tool_calls}),
+    do: normalize_tool_calls(tool_calls)
+
   defp normalize_tool_calls(tool_calls) when is_list(tool_calls) do
-    Enum.map(tool_calls, fn
-      %{id: id, name: name, arguments: arguments} ->
-        ReqLLM.ToolCall.new(id, to_string(name), Jason.encode!(arguments || %{}))
-
-      %{"id" => id, "name" => name, "arguments" => arguments} ->
-        ReqLLM.ToolCall.new(id, to_string(name), Jason.encode!(arguments || %{}))
-
-      other ->
-        other
-    end)
+    Enum.map(tool_calls, &normalize_tool_call/1)
   end
+
+  defp normalize_tool_calls(other), do: other
+
+  defp normalize_tool_call(%ReqLLM.ToolCall{} = call), do: call
+
+  defp normalize_tool_call(%DSEx.Adapters.Types.ToolCall{} = call) do
+    ReqLLM.ToolCall.new(
+      tool_call_id(call),
+      to_string(call.name),
+      Jason.encode!(call.arguments || %{})
+    )
+  end
+
+  defp normalize_tool_call(%{function: _function} = call),
+    do: call |> DSEx.Adapters.Types.ToolCall.from_map() |> normalize_tool_call()
+
+  defp normalize_tool_call(%{"function" => _function} = call),
+    do: call |> DSEx.Adapters.Types.ToolCall.from_map() |> normalize_tool_call()
+
+  defp normalize_tool_call(%{id: id, name: name, arguments: arguments}) do
+    ReqLLM.ToolCall.new(
+      id || tool_call_id(name),
+      to_string(name),
+      Jason.encode!(arguments || %{})
+    )
+  end
+
+  defp normalize_tool_call(%{"id" => id, "name" => name, "arguments" => arguments}) do
+    ReqLLM.ToolCall.new(
+      id || tool_call_id(name),
+      to_string(name),
+      Jason.encode!(arguments || %{})
+    )
+  end
+
+  defp normalize_tool_call(other), do: other
 
   defp tool_call_id([%{id: id} | _]), do: id
   defp tool_call_id([%{"id" => id} | _]), do: id
+  defp tool_call_id(%DSEx.Adapters.Types.ToolCall{id: id}) when not is_nil(id), do: id
+  defp tool_call_id(name) when is_atom(name) or is_binary(name), do: "call_#{name}"
   defp tool_call_id(_), do: "tool_result"
 
   defp normalize_opts(opts) do

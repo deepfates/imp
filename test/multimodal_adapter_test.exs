@@ -115,4 +115,61 @@ defmodule MultimodalAdapterTest do
     future_block = %{"type" => "provider_future_block", "payload" => %{}}
     assert Types.from_openai(future_block) == future_block
   end
+
+  test "normalizes ToolCalls primitive maps and formats provider payloads" do
+    calls =
+      Types.ToolCalls.from_dict_list([
+        %{"id" => "call_search", "name" => "search", "args" => %{"query" => "cats"}},
+        %{
+          id: "call_translate",
+          type: "function",
+          function: %{name: "translate", arguments: ~s({"text":"world"})}
+        }
+      ])
+
+    assert %Types.ToolCalls{
+             tool_calls: [
+               %Types.ToolCall{
+                 id: "call_search",
+                 name: "search",
+                 arguments: %{"query" => "cats"}
+               },
+               %Types.ToolCall{
+                 id: "call_translate",
+                 name: "translate",
+                 arguments: %{"text" => "world"}
+               }
+             ]
+           } = calls
+
+    assert Types.ToolCalls.format(calls) == %{
+             tool_calls: [
+               %{id: "call_search", name: "search", args: %{"query" => "cats"}},
+               %{id: "call_translate", name: "translate", args: %{"text" => "world"}}
+             ]
+           }
+
+    assert Types.to_openai(calls) == Types.ToolCalls.format(calls)
+  end
+
+  test "formats tool results and reports malformed tool calls" do
+    result = Types.ToolResult.new(:lookup, %{answer: "Paris"}, id: "call_lookup")
+    results = Types.ToolCallResults.new([result])
+
+    assert Types.to_openai(result) == %{
+             id: "call_lookup",
+             name: "lookup",
+             result: %{answer: "Paris"}
+           }
+
+    assert Types.to_openai(results) == %{
+             tool_call_results: [
+               %{id: "call_lookup", name: "lookup", result: %{answer: "Paris"}}
+             ]
+           }
+
+    assert_raise ArgumentError, ~r/tool call requires :name/, fn ->
+      Types.ToolCall.from_map(%{arguments: %{query: "x"}})
+    end
+  end
 end
