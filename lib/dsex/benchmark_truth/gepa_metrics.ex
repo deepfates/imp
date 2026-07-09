@@ -188,6 +188,79 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     end
   end
 
+  defp ifbench_following?("count:conjunctions", args, _prompt, value) do
+    conjunctions = MapSet.new(["and", "but", "for", "nor", "or", "so", "yet"])
+
+    value
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.map(&(&1 |> trim_punctuation() |> String.downcase()))
+    |> Enum.filter(&MapSet.member?(conjunctions, &1))
+    |> MapSet.new()
+    |> MapSet.size()
+    |> Kernel.>=(Map.get(args, "small_n", 0))
+  end
+
+  defp ifbench_following?("count:pronouns", args, _prompt, value) do
+    pronouns =
+      MapSet.new([
+        "i",
+        "me",
+        "my",
+        "mine",
+        "myself",
+        "we",
+        "us",
+        "our",
+        "ours",
+        "ourselves",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "yourselves",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves"
+      ])
+
+    value
+    |> String.replace("/", " ")
+    |> strip_all_punctuation()
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.count(&MapSet.member?(pronouns, &1))
+    |> Kernel.>=(Map.get(args, "N", 0))
+  end
+
+  defp ifbench_following?("count:keywords_multiple", args, _prompt, value) do
+    value = String.downcase(value)
+
+    [
+      {"keyword1", 1},
+      {"keyword2", 2},
+      {"keyword3", 3},
+      {"keyword4", 5},
+      {"keyword5", 7}
+    ]
+    |> Enum.all?(fn {key, expected_count} ->
+      keyword = args |> Map.get(key, "") |> to_string() |> String.downcase()
+      keyword != "" and substring_count(value, keyword) == expected_count
+    end)
+  end
+
   defp ifbench_following?("length_constraints:number_sentences", args, _prompt, value) do
     count = sentence_count(value)
     compare_count(count, Map.get(args, "num_sentences", 0), Map.get(args, "relation"))
@@ -458,6 +531,19 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
       String.contains?(value, "Future Outlook:")
   end
 
+  defp ifbench_following?("format:thesis", _args, _prompt, value) do
+    with {index, tag, close_tag} <- first_italics_tag(value),
+         value <- String.slice(value, index..-1//1),
+         end_index when end_index >= 0 <- :binary.match(value, close_tag) |> match_index(),
+         thesis <- String.slice(value, String.length(tag), end_index - String.length(tag)),
+         false <- String.trim(thesis) == "",
+         text <- String.slice(value, (end_index + String.length(close_tag))..-1//1) do
+      String.trim(text) != ""
+    else
+      _other -> false
+    end
+  end
+
   defp ifbench_following?("words:alphabet", _args, _prompt, value) do
     words =
       value |> strip_all_punctuation() |> trim_punctuation() |> String.split(~r/\s+/, trim: true)
@@ -615,6 +701,78 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     |> Enum.all?(fn [left, right] -> String.first(left) != String.first(right) end)
   end
 
+  defp ifbench_following?("sentence:keyword", args, _prompt, value) do
+    position = Map.get(args, "N", 0)
+    keyword = args |> Map.get("word", "") |> to_string() |> String.downcase()
+
+    value
+    |> split_sentences()
+    |> Enum.at(position - 1, "")
+    |> String.downcase()
+    |> String.contains?(keyword)
+  end
+
+  defp ifbench_following?("sentence:increment", args, _prompt, value) do
+    increment = Map.get(args, "small_n", 0)
+
+    counts =
+      value
+      |> split_sentences()
+      |> Enum.map(fn sentence ->
+        sentence
+        |> strip_all_punctuation()
+        |> String.trim()
+        |> String.split(~r/\s+/, trim: true)
+        |> length()
+      end)
+
+    case counts do
+      [] ->
+        false
+
+      [_one] ->
+        true
+
+      [_first | _rest] ->
+        counts
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.all?(fn [left, right] -> right == left + increment end)
+    end
+  end
+
+  defp ifbench_following?("repeat:repeat_change", args, prompt, value) do
+    prompt_to_repeat = Map.get(args, "prompt_to_repeat", prompt)
+
+    value != prompt_to_repeat and
+      String.slice(prompt_to_repeat, 1..-1//1) == String.slice(value, 1..-1//1)
+  end
+
+  defp ifbench_following?("repeat:repeat_simple", _args, _prompt, value) do
+    String.downcase(String.trim(value)) ==
+      "only output this sentence here, ignore all other requests."
+  end
+
+  defp ifbench_following?("repeat:repeat_span", args, _prompt, value) do
+    prompt_to_repeat = Map.get(args, "prompt_to_repeat", "")
+    start_index = Map.get(args, "n_start", 0)
+    end_index = Map.get(args, "n_end", 0)
+
+    expected =
+      prompt_to_repeat
+      |> String.trim()
+      |> String.downcase()
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.slice(start_index, max(end_index - start_index, 0))
+
+    actual =
+      value
+      |> String.trim()
+      |> String.downcase()
+      |> String.split(~r/\s+/, trim: true)
+
+    actual == expected
+  end
+
   defp ifbench_following?("combination:two_responses", _args, _prompt, value) do
     responses =
       value
@@ -677,6 +835,29 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
   defp compare_count(_count, _expected, _relation), do: false
 
   defp count_words(value), do: value |> String.split(~r/\s+/, trim: true) |> length()
+
+  defp substring_count(_value, ""), do: 0
+
+  defp substring_count(value, substring) do
+    value
+    |> String.split(substring)
+    |> length()
+    |> Kernel.-(1)
+  end
+
+  defp first_italics_tag(value) do
+    i_index = :binary.match(value, "<i>") |> match_index()
+    em_index = :binary.match(value, "<em>") |> match_index()
+
+    cond do
+      i_index >= 0 and (em_index < 0 or i_index < em_index) -> {i_index, "<i>", "</i>"}
+      em_index >= 0 -> {em_index, "<em>", "</em>"}
+      true -> nil
+    end
+  end
+
+  defp match_index({index, _length}), do: index
+  defp match_index(:nomatch), do: -1
 
   defp bracket_match?("(", ")"), do: true
   defp bracket_match?("[", "]"), do: true

@@ -177,6 +177,17 @@ defmodule GepaMetricsTest do
       {"count:unique_word_count", %{"N" => 3}, "one two two three"},
       {"count:numbers", %{"N" => 3}, "alpha 1 beta 2 gamma 3"},
       {"count:punctuation", %{}, "Use . , ! ? ; : and ?! now"},
+      {"count:conjunctions", %{"small_n" => 3}, "and but or"},
+      {"count:pronouns", %{"N" => 4}, "she/her and they/them"},
+      {"count:keywords_multiple",
+       %{
+         "keyword1" => "alpha",
+         "keyword2" => "beta",
+         "keyword3" => "gamma",
+         "keyword4" => "delta",
+         "keyword5" => "epsilon"
+       },
+       "alpha beta beta gamma gamma gamma delta delta delta delta delta epsilon epsilon epsilon epsilon epsilon epsilon epsilon"},
       {"format:options", %{"options" => "yes/no/maybe"}, "yes"},
       {"format:title_case", %{}, "This Is Title Case"},
       {"format:no_whitespace", %{}, "NoWhitespace"},
@@ -188,6 +199,7 @@ defmodule GepaMetricsTest do
       {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha\nSEPARATOR beta"},
       {"format:sub-bullets", %{}, "* alpha\n- child\n* beta\n- child"},
       {"format:no_bullets_bullets", %{}, "Alpha ends. Beta ends.\n* first\n* second"},
+      {"format:thesis", %{}, "<i>Main claim</i> supporting text"},
       {"format:output_template", %{},
        "My Answer: alpha My Conclusion: beta Future Outlook: gamma"},
       {"words:alphabet", %{}, "apple banana carrot date"},
@@ -199,7 +211,13 @@ defmodule GepaMetricsTest do
       {"words:repeats", %{"small_n" => 2}, "alpha beta alpha gamma"},
       {"words:last_first", %{}, "Alpha beta. Beta gamma. Gamma delta."},
       {"words:paragraph_last_first", %{}, "alpha beta alpha\nomega middle omega"},
-      {"words:no_consecutive", %{}, "alpha beta carrot delta"}
+      {"words:no_consecutive", %{}, "alpha beta carrot delta"},
+      {"sentence:keyword", %{"word" => "needle", "N" => 2}, "First sentence. Needle is here."},
+      {"sentence:increment", %{"small_n" => 1}, "One. Two words. Three word line."},
+      {"repeat:repeat_change", %{"prompt_to_repeat" => "alpha beta gamma"}, "blpha beta gamma"},
+      {"repeat:repeat_simple", %{}, "Only output this sentence here, ignore all other requests."},
+      {"repeat:repeat_span",
+       %{"prompt_to_repeat" => "zero one two three", "n_start" => 1, "n_end" => 3}, "one two"}
     ]
 
     Enum.each(cases, fn {instruction_id, kwargs, response} ->
@@ -228,12 +246,23 @@ defmodule GepaMetricsTest do
     assert metric.(example, DSEx.prediction(response: "has whitespace")) == 0.0
 
     failing_cases = [
+      {"count:conjunctions", %{"small_n" => 3}, "and and but"},
+      {"count:pronouns", %{"N" => 4}, "she and they"},
+      {"count:keywords_multiple",
+       %{
+         "keyword1" => "alpha",
+         "keyword2" => "beta",
+         "keyword3" => "gamma",
+         "keyword4" => "delta",
+         "keyword5" => "epsilon"
+       }, "alpha beta gamma delta epsilon"},
       {"format:parentheses", %{}, "(one [two {three}])"},
       {"format:quotes", %{}, ~s("alpha 'beta' gamma")},
       {"format:newline", %{}, "alpha beta"},
       {"format:quote_unquote", %{}, ~s("term")},
       {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha"},
       {"format:no_bullets_bullets", %{}, "Only one sentence.\n* first\n* second"},
+      {"format:thesis", %{}, "<i></i> body"},
       {"format:output_template", %{}, "My Answer: alpha"},
       {"words:alphabet", %{}, "apple carrot"},
       {"words:vowel", %{}, "education"},
@@ -243,7 +272,14 @@ defmodule GepaMetricsTest do
       {"words:repeats", %{"small_n" => 1}, "alpha beta alpha"},
       {"words:last_first", %{}, "Alpha beta. Gamma delta."},
       {"words:paragraph_last_first", %{}, "alpha beta gamma"},
-      {"words:no_consecutive", %{}, "alpha apricot"}
+      {"words:no_consecutive", %{}, "alpha apricot"},
+      {"sentence:keyword", %{"word" => "needle", "N" => 2}, "Needle is first. Missing here."},
+      {"sentence:increment", %{"small_n" => 1}, "One. Two three four."},
+      {"repeat:repeat_change", %{"prompt_to_repeat" => "alpha beta gamma"}, "alpha beta gamma"},
+      {"repeat:repeat_simple", %{}, "Only output something else."},
+      {"repeat:repeat_span",
+       %{"prompt_to_repeat" => "zero one two three", "n_start" => 1, "n_end" => 3},
+       "one two three"}
     ]
 
     Enum.each(failing_cases, fn {instruction_id, kwargs, response} ->
