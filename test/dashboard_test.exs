@@ -280,8 +280,26 @@ defmodule DashboardTest do
     refute dashboard["full_parity"]
     assert dashboard["performance_claim_supported"]
     refute dashboard["release_gate"]["passing"]
-    assert dashboard["release_gate"]["blocking_lanes"] == ["live_matched_model"]
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 5
+    assert dashboard["release_gate"]["blocking_lanes"] == ["live_matched_model", "public_claims"]
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 6
+    assert dashboard["claims"]["status"] == "failing"
+    assert dashboard["claims"]["summary"]["total"] == 8
+    assert dashboard["claims"]["summary"]["proven"] == 4
+    assert dashboard["claims"]["summary"]["blocked"] == 4
+
+    proven_claim_ids =
+      dashboard["claims"]["claims"]
+      |> Enum.filter(&(&1["status"] == "proven"))
+      |> Enum.map(& &1["id"])
+      |> Enum.sort()
+
+    assert proven_claim_ids == [
+             "claim.dspy_semantics.golden_trace",
+             "claim.optimizer_lift.full",
+             "claim.performance.provider_free",
+             "claim.rag_tools_agents.full"
+           ]
+
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
     assert dashboard["lanes"]["provider_free_overhead"]["status"] == "full"
     assert dashboard["lanes"]["live_matched_model"]["status"] == "failing"
@@ -448,6 +466,32 @@ defmodule DashboardTest do
     assert error.message =~ "historical_research: missing matched live evidence"
     assert error.message =~ "live max_concurrency evidence is missing or inconsistent"
     assert error.message =~ "Runtime shape evidence is not complete"
+    assert error.message =~ "claim claim.product.public_api_installable"
+    assert error.message =~ "claim claim.docs.livebooks_real_provider"
+    assert error.message =~ "claim claim.protocols.production_boundaries"
+  end
+
+  test "require-full fails when the public claims inventory is unreadable" do
+    root = tmp_dir("dashboard-missing-claims")
+    out_dir = Path.join(root, "out")
+    File.mkdir_p!(out_dir)
+
+    error =
+      assert_raise Mix.Error, fn ->
+        capture_io(fn ->
+          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+            "--out",
+            out_dir,
+            "--claims-file",
+            Path.join(root, "missing-claims.json"),
+            "--require-full"
+          ])
+        end)
+      end
+
+    assert error.message =~ "claim claims_inventory"
+    assert error.message =~ "machine-readable public claims inventory exists"
+    assert error.message =~ "missing_claims_file"
   end
 
   test "require-full failure summarizes campaign aggregate blockers" do

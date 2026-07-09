@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "purpose": "Machine-readable DSEx public claim inventory. The benchmark dashboard evaluates these rows against evidence lanes and refuses claim-ready/full-parity status while release-blocking claims are missing fresh evidence.",
+  "claims": [
+    {
+      "id": "claim.product.public_api_installable",
+      "statement": "DSEx is installable as a clean Elixir package and its documented public API works outside the source checkout.",
+      "category": "package",
+      "surface": ["package", "public_api", "docs"],
+      "claim_type": "feature_completeness",
+      "comparison": "dsex_native",
+      "release_blocking": true,
+      "sources": ["README.md", "docs/RELEASE_CRITERIA.md", "test/package_contract_test.exs"],
+      "requirements": [
+        {
+          "id": "package.clean_room",
+          "kind": "package",
+          "lane": "product_package",
+          "evidence": "full",
+          "threshold": "fresh clean-room package consumer proof passes"
+        }
+      ]
+    },
+    {
+      "id": "claim.docs.livebooks_real_provider",
+      "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
+      "category": "docs",
+      "surface": ["README", "docs", "livebooks", "ReqLLM"],
+      "claim_type": "live_provider_proof",
+      "comparison": "dsex_native",
+      "release_blocking": true,
+      "sources": ["docs/README.md", "livebooks/*.livemd", "test/livebook_contract_test.exs"],
+      "requirements": [
+        {
+          "id": "livebooks.executable",
+          "kind": "docs",
+          "lane": "livebook_execute",
+          "evidence": "full",
+          "threshold": "all shipped Livebooks execute successfully"
+        },
+        {
+          "id": "live.provider.smoke",
+          "kind": "live",
+          "lane": "live_provider_smoke",
+          "evidence": "full",
+          "threshold": "LIVE_PROVIDER=1 mix live.check passes"
+        }
+      ]
+    },
+    {
+      "id": "claim.dspy_semantics.golden_trace",
+      "statement": "DSEx implements DSPy-shaped core semantics for signatures, Predict, ChainOfThought, typed adapters, ReAct tool traces, streaming, save/load redaction, and cache behavior.",
+      "category": "dspy_parity",
+      "surface": ["signature", "predict", "chain_of_thought", "adapters", "react", "streaming", "save_load", "cache"],
+      "claim_type": "conformance",
+      "comparison": "dspy",
+      "release_blocking": true,
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
+      "requirements": [
+        {
+          "id": "golden_trace.full",
+          "kind": "parity",
+          "lane": "golden_trace",
+          "evidence": "full",
+          "threshold": "all golden trace parity cases and DSEx semantic checks pass"
+        }
+      ]
+    },
+    {
+      "id": "claim.live_matched_model.full_parity",
+      "statement": "DSEx matches Python DSPy on live matched-model benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings.",
+      "category": "dspy_parity",
+      "surface": ["gsm8k", "hotpotqa", "predict", "chain_of_thought", "rag"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dspy",
+      "release_blocking": true,
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "docs/RELEASE_CRITERIA.md"],
+      "requirements": [
+        {
+          "id": "live_matched_model.full",
+          "kind": "live_parity",
+          "lane": "live_matched_model",
+          "evidence": "full",
+          "threshold": "required current_low_cost, frontier_sanity, and historical_research lanes satisfy their policies"
+        }
+      ]
+    },
+    {
+      "id": "claim.optimizer_lift.full",
+      "statement": "DSEx optimizer behavior has direct or intentionally-deviating evidence against DSPy for the optimizer surfaces it claims.",
+      "category": "optimizer",
+      "surface": ["LabeledFewShot", "BootstrapFewShot", "RandomSearch", "COPRO", "MIPROv2", "SIMBA", "GEPA", "InstructionSearch", "BootstrapFinetune", "GRPO"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dspy",
+      "release_blocking": true,
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "requirements": [
+        {
+          "id": "optimizer_lift.full",
+          "kind": "optimizer_parity",
+          "lane": "optimizer_lift",
+          "evidence": "full",
+          "threshold": "optimizer-lift artifact reports full_optimizer_parity"
+        }
+      ]
+    },
+    {
+      "id": "claim.rag_tools_agents.full",
+      "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence.",
+      "category": "tools_agents_rag",
+      "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
+      "claim_type": "feature_completeness",
+      "comparison": "dspy_and_dsex_native",
+      "release_blocking": true,
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
+      "requirements": [
+        {
+          "id": "rag_tool_agent.full",
+          "kind": "parity",
+          "lane": "rag_tool_agent",
+          "evidence": "full",
+          "threshold": "rag-tool-agent artifact reports full_rag_tool_agent_parity"
+        }
+      ]
+    },
+    {
+      "id": "claim.performance.provider_free",
+      "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made.",
+      "category": "performance",
+      "surface": ["signature_parse", "adapter_format_parse", "schema_validation", "evaluation", "metrics", "optimizer_scheduling", "redaction", "cache", "concurrency"],
+      "claim_type": "performance",
+      "comparison": "dspy",
+      "release_blocking": true,
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/RELEASE_CRITERIA.md"],
+      "requirements": [
+        {
+          "id": "provider_free_overhead.full",
+          "kind": "performance",
+          "lane": "provider_free_overhead",
+          "evidence": "full",
+          "threshold": "all provider-free overhead cases pass within configured ratio"
+        }
+      ]
+    },
+    {
+      "id": "claim.protocols.production_boundaries",
+      "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
+      "category": "operations",
+      "surface": ["training_protocol", "retriever_protocol", "mcp_protocol"],
+      "claim_type": "feature_completeness",
+      "comparison": "dsex_native",
+      "release_blocking": true,
+      "sources": ["docs/PRODUCTION_OPERATIONS.md", "docs/RELEASE_CRITERIA.md", "test/protocol_training", "test/protocol_retriever", "test/protocol_mcp"],
+      "requirements": [
+        {
+          "id": "protocols.local",
+          "kind": "protocol",
+          "lane": "protocol_gates",
+          "evidence": "full",
+          "threshold": "mix protocol.check passes"
+        }
+      ]
+    }
+  ]
+}

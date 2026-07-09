@@ -7,6 +7,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   By default the task writes a dashboard even when lanes are missing. Use
   `--require-full` for the release gate that refuses full parity claims unless
   every required lane is present and passing at full-evidence scale.
+
+  Public claims are evaluated from `benchmarks/claims.json` by default. Pass
+  `--claims-file path/to/claims.json` to evaluate a different inventory.
   """
 
   use Mix.Task
@@ -28,6 +31,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           rag_tool_agent_dir: :string,
           live_matrix_dir: :string,
           results_dir: :string,
+          claims_file: :string,
           out: :string,
           max_age_hours: :integer,
           require_full: :boolean
@@ -86,7 +90,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "provider_free_overhead"
     ]
 
-    gate_checks = release_gate_checks(required, lanes)
+    claims = claims_gate(Keyword.get(opts, :claims_file, "benchmarks/claims.json"), lanes)
+    gate_checks = release_gate_checks(required, lanes, claims)
     full_parity = Enum.all?(gate_checks, &(&1["passing"] == true))
     performance_supported = get_in(lanes, ["provider_free_overhead", "passing"]) == true
 
@@ -108,10 +113,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         "note" =>
           "Full parity requires every required lane to be fresh, passing, and backed by full-evidence artifacts."
       },
+      "claims" => claims,
       "summary" => %{
         "passing_lanes" => Enum.count(lanes, fn {_id, lane} -> lane["passing"] end),
         "full_evidence_lanes" => Enum.count(lanes, fn {_id, lane} -> lane["full_evidence"] end),
         "total_lanes" => map_size(lanes),
+        "public_claims" => claims["summary"],
         "note" =>
           "Full parity is true only when all required lanes pass with full-evidence artifacts. Passing smoke or deterministic slices are preserved but cannot authorize full parity claims."
       },
@@ -121,20 +128,34 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp results_dir(opts), do: Keyword.get(opts, :results_dir, @default_results_dir)
 
-  defp release_gate_checks(required, lanes) do
-    Enum.map(required, fn lane_id ->
-      lane = Map.fetch!(lanes, lane_id)
+  defp release_gate_checks(required, lanes, claims) do
+    lane_checks =
+      Enum.map(required, fn lane_id ->
+        lane = Map.fetch!(lanes, lane_id)
 
-      %{
-        "lane" => lane_id,
-        "status" => lane["status"],
-        "passing" => lane["passing"] == true and lane["full_evidence"] == true,
-        "fresh" => lane["fresh"],
-        "full_evidence" => lane["full_evidence"],
-        "limitation" => lane["limitation"],
-        "blocking_requirements" => lane["blocking_requirements"] || []
-      }
-    end)
+        %{
+          "lane" => lane_id,
+          "status" => lane["status"],
+          "passing" => lane["passing"] == true and lane["full_evidence"] == true,
+          "fresh" => lane["fresh"],
+          "full_evidence" => lane["full_evidence"],
+          "limitation" => lane["limitation"],
+          "blocking_requirements" => lane["blocking_requirements"] || []
+        }
+      end)
+
+    lane_checks ++
+      [
+        %{
+          "lane" => "public_claims",
+          "status" => claims["status"],
+          "passing" => claims["passing"] == true,
+          "fresh" => true,
+          "full_evidence" => claims["passing"] == true,
+          "limitation" => claims["limitation"],
+          "blocking_requirements" => claims["blocking_requirements"] || []
+        }
+      ]
   end
 
   defp release_gate_failure_message(dashboard, out_path) do
@@ -171,6 +192,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     suffix = coverage_suffix(req["coverage"]) <> cost_suffix(req["cost"])
 
     "#{lane}: #{model} is #{status}, not full live evidence#{suffix}"
+  end
+
+  defp format_blocking_requirement(_parent_lane, %{"kind" => "public_claim_blocked"} = req) do
+    claim = req["claim_id"] || "unknown_claim"
+    statement = req["statement"] || "public claim"
+    missing = req["missing_requirements"] || []
+
+    suffix =
+      case missing do
+        [] -> ""
+        values -> " (missing #{Enum.join(values, ", ")})"
+      end
+
+    "claim #{claim}: #{statement}#{suffix}"
   end
 
   defp format_blocking_requirement(parent_lane, %{"kind" => "live_lane_missing"} = req) do
@@ -374,6 +409,136 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     else
       _ -> missing_lane("rag_tool_agent", "no rag-tool-agent-parity artifact found in #{dir}")
     end
+  end
+
+  defp claims_gate(path, lanes) do
+    case read_claims(path) do
+      {:ok, claims} ->
+        evaluated = Enum.map(claims, &evaluate_claim(&1, lanes))
+
+        blocking =
+          Enum.filter(evaluated, &(&1["release_blocking"] == true and &1["status"] != "proven"))
+
+        %{
+          "status" => if(blocking == [], do: "full", else: "failing"),
+          "passing" => blocking == [],
+          "artifact" => %{"path" => path, "sha256" => file_sha256(path)},
+          "summary" => %{
+            "total" => length(evaluated),
+            "proven" => Enum.count(evaluated, &(&1["status"] == "proven")),
+            "blocked" => length(blocking),
+            "non_blocking" => Enum.count(evaluated, &(&1["release_blocking"] != true))
+          },
+          "claims" => evaluated,
+          "blocking_requirements" =>
+            Enum.map(blocking, fn claim ->
+              %{
+                "kind" => "public_claim_blocked",
+                "claim_id" => claim["id"],
+                "statement" => claim["statement"],
+                "missing_requirements" =>
+                  claim
+                  |> Map.get("requirements", [])
+                  |> Enum.reject(&(&1["satisfied"] == true))
+                  |> Enum.map(& &1["id"])
+              }
+            end),
+          "limitation" =>
+            if(blocking == [],
+              do: nil,
+              else: "One or more release-blocking public claims lack fresh passing evidence."
+            )
+        }
+
+      {:error, reason} ->
+        %{
+          "status" => "missing",
+          "passing" => false,
+          "artifact" => nil,
+          "summary" => %{"total" => 0, "proven" => 0, "blocked" => 1, "non_blocking" => 0},
+          "claims" => [],
+          "blocking_requirements" => [
+            %{
+              "kind" => "public_claim_blocked",
+              "claim_id" => "claims_inventory",
+              "statement" => "machine-readable public claims inventory exists",
+              "missing_requirements" => [inspect(reason)]
+            }
+          ],
+          "limitation" => "No readable public claims inventory found at #{path}."
+        }
+    end
+  end
+
+  defp read_claims(path) do
+    with true <- File.exists?(path),
+         {:ok, artifact} <- read_artifact(path),
+         claims when is_list(claims) <- artifact["claims"] do
+      {:ok, claims}
+    else
+      false -> {:error, :missing_claims_file}
+      nil -> {:error, :missing_claims_array}
+      _other -> {:error, :invalid_claims_file}
+    end
+  end
+
+  defp evaluate_claim(claim, lanes) do
+    requirements =
+      claim
+      |> Map.get("requirements", [])
+      |> Enum.map(&evaluate_claim_requirement(&1, lanes))
+
+    satisfied? = requirements != [] and Enum.all?(requirements, &(&1["satisfied"] == true))
+    release_blocking = Map.get(claim, "release_blocking", true)
+
+    claim
+    |> Map.take([
+      "id",
+      "statement",
+      "category",
+      "surface",
+      "claim_type",
+      "comparison",
+      "sources",
+      "release_blocking"
+    ])
+    |> Map.put("release_blocking", release_blocking)
+    |> Map.put(
+      "status",
+      cond do
+        satisfied? -> "proven"
+        release_blocking -> "blocked"
+        true -> "not_release_blocking"
+      end
+    )
+    |> Map.put("requirements", requirements)
+  end
+
+  defp evaluate_claim_requirement(%{"lane" => lane_id} = requirement, lanes) do
+    lane = lanes[lane_id]
+    evidence = requirement["evidence"] || "full"
+
+    satisfied? =
+      case {lane, evidence} do
+        {%{"full_evidence" => true}, "full"} -> true
+        {%{"passing" => true}, "passing"} -> true
+        _other -> false
+      end
+
+    requirement
+    |> Map.take(["id", "kind", "lane", "evidence", "threshold", "notes"])
+    |> Map.put("evidence", evidence)
+    |> Map.put("satisfied", satisfied?)
+    |> Map.put("lane_status", lane && lane["status"])
+    |> Map.put("artifact", lane && lane["artifact"])
+    |> Map.put("blocking_requirements", (lane && lane["blocking_requirements"]) || [])
+  end
+
+  defp evaluate_claim_requirement(requirement, _lanes) do
+    requirement
+    |> Map.take(["id", "kind", "evidence", "threshold", "notes"])
+    |> Map.put("satisfied", false)
+    |> Map.put("blocking_requirements", ["claim requirement does not name a dashboard lane"])
   end
 
   defp row_names_by_status(artifact, status) do
