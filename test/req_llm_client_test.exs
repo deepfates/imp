@@ -48,6 +48,70 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule ThinkingStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
+
+      details = [
+        %ReqLLM.Message.ReasoningDetails{
+          text: "native plan",
+          signature: "sig_1",
+          provider: :anthropic,
+          format: "anthropic-thinking-v1",
+          index: 0
+        }
+      ]
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_thinking",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: %ReqLLM.Message{
+           role: :assistant,
+           content: [
+             ReqLLM.Message.ContentPart.thinking("native plan"),
+             ReqLLM.Message.ContentPart.text(~s({"answer":"Paris"}))
+           ],
+           reasoning_details: details
+         },
+         object: %{"answer" => "Paris"}
+       }}
+    end
+
+    def stream_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_stream, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.StreamResponse{
+         stream: [
+           ReqLLM.StreamChunk.thinking("native plan", %{provider: :anthropic}),
+           ReqLLM.StreamChunk.text("Paris"),
+           ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
+         ],
+         metadata_handle: self(),
+         cancel: fn -> :ok end,
+         model: model,
+         context: ReqLLM.Context.new(messages)
+       }}
+    end
+  end
+
+  defmodule ManualReasoningStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_manual_reasoning",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(""),
+         object: %{"reasoning" => "manual field", "answer" => "pong", "score" => 7}
+       }}
+    end
+  end
+
   defmodule ToolStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -254,6 +318,66 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(opts, :top_p)
   end
 
+  test "ReqLLM client preserves provider-native reasoning in prediction metadata" do
+    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
+
+    program = DSEx.predict("question -> answer", lm: lm, adapter: DSEx.Adapter.JSON)
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    assert DSEx.get(prediction, :answer) == "Paris"
+    assert prediction.metadata.native_reasoning == "native plan"
+
+    assert [
+             %ReqLLM.Message.ReasoningDetails{
+               text: "native plan",
+               signature: "sig_1",
+               provider: :anthropic
+             }
+           ] = prediction.metadata.reasoning_details
+
+    assert prediction.metadata.trace.raw == %{"answer" => "Paris"}
+    assert prediction.metadata.trace.lm_metadata.native_reasoning == "native plan"
+  end
+
+  test "manual reasoning fields still work without provider-native thinking" do
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ManualReasoningStub)
+
+    program =
+      DSEx.chain_of_thought("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "pong?"})
+    refute Map.has_key?(prediction.metadata, :native_reasoning)
+    assert DSEx.get(prediction, :reasoning) == "manual field"
+    assert DSEx.get(prediction, :answer) == "pong"
+  end
+
+  test "ReqLLM outbound reasoning values become thinking content parts" do
+    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: TextStub)
+
+    assert {:ok, _response} =
+             DSEx.Clients.ReqLLM.generate(
+               lm,
+               [
+                 %{
+                   role: :user,
+                   content: [
+                     %DSEx.Adapters.Types.Reasoning{text: "prior native reasoning"},
+                     "question"
+                   ]
+                 }
+               ],
+               []
+             )
+
+    assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6",
+                     [%ReqLLM.Message{} = message], _opts}
+
+    assert [
+             %ReqLLM.Message.ContentPart{type: :thinking, text: "prior native reasoning"},
+             %ReqLLM.Message.ContentPart{type: :text, text: "question"}
+           ] = message.content
+  end
+
   test "ReqLLM client translates native JSON schema options for Anthropic" do
     lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ObjectStub)
 
@@ -377,6 +501,25 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+  end
+
+  test "ReqLLM thinking stream chunks are exposed as reasoning chunks" do
+    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    chunks =
+      program
+      |> DSEx.Streaming.stream(%{question: "Capital of France?"}, provider_stream: true)
+      |> Enum.to_list()
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: %{reasoning: "native plan"},
+               metadata: %{provider: :anthropic, type: :reasoning}
+             },
+             %DSEx.Streaming.Messages.StreamResponse{chunk: "Paris"},
+             %DSEx.Streaming.Messages.StreamResponse{done: true}
+           ] = chunks
   end
 
   test "ReqLLM tool-call stream chunks are exposed as normalized DSEx chunks" do

@@ -254,6 +254,23 @@ DSEx.get(pred, :reasoning)
 DSEx.get(pred, :answer)
 ```
 
+Manual reasoning fields are ordinary signature outputs. Provider-native
+reasoning is separate: ReqLLM-backed providers can return thinking/reasoning
+tokens, and DSEx preserves them in prediction metadata without pretending they
+are a declared output field:
+
+```elixir
+{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+
+prediction.metadata[:native_reasoning]
+prediction.metadata[:reasoning_details]
+```
+
+Streaming provider-native thinking chunks arrive as `%{reasoning: text}` chunks
+with `metadata.type == :reasoning`; ordinary answer text still streams as text.
+Outbound `DSEx.Adapters.Types.Reasoning` values become ReqLLM thinking content
+parts for providers that support reasoning continuity.
+
 ## Schema-Constrained JSON
 
 ```elixir

@@ -557,20 +557,67 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   defp from_response(%ReqLLM.Response{} = response) do
-    case ReqLLM.Response.tool_calls(response) do
-      [] ->
-        response.object || ReqLLM.Response.text(response) || ""
+    raw =
+      case ReqLLM.Response.tool_calls(response) do
+        [] ->
+          response.object || ReqLLM.Response.text(response) || ""
 
-      tool_calls ->
-        %{tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)}
+        tool_calls ->
+          %{tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)}
+      end
+
+    metadata = native_reasoning_metadata(response)
+
+    if metadata == %{} do
+      raw
+    else
+      %{__dsex_lm_output__: raw, __dsex_lm_metadata__: metadata}
     end
   end
 
   defp from_response(other), do: other
 
+  defp native_reasoning_metadata(%ReqLLM.Response{} = response) do
+    thinking = ReqLLM.Response.thinking(response)
+    details = reasoning_details(response)
+
+    %{}
+    |> maybe_put(:native_reasoning, blank_to_nil(thinking))
+    |> maybe_put(:reasoning_details, empty_to_nil(details))
+  end
+
+  defp reasoning_details(%ReqLLM.Response{message: %{reasoning_details: details}})
+       when is_list(details),
+       do: details
+
+  defp reasoning_details(_response), do: []
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
+
+  defp empty_to_nil([]), do: nil
+  defp empty_to_nil(value), do: value
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
   defp from_stream_chunk(%ReqLLM.StreamChunk{type: :content, text: text}) when is_binary(text) do
     emit_stream_chunk(text)
     [%DSEx.Streaming.Messages.StreamResponse{chunk: text}]
+  end
+
+  defp from_stream_chunk(%ReqLLM.StreamChunk{type: :thinking, text: text, metadata: metadata})
+       when is_binary(text) do
+    payload = %{reasoning: text}
+    emit_stream_chunk(payload)
+
+    [
+      %DSEx.Streaming.Messages.StreamResponse{
+        chunk: payload,
+        metadata: Map.put(metadata, :type, :reasoning)
+      }
+    ]
   end
 
   defp from_stream_chunk(%ReqLLM.StreamChunk{type: :tool_call} = chunk) do
