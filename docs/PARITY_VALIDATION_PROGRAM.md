@@ -288,11 +288,12 @@ claim artifact.
 Build the dataset root with `mix dsex.benchmark.gepa_dataset --gepa-root
 path/to/gepa-artifact --out benchmarks/data/gepa-campaign`. This imports the
 upstream GEPA artifact benchmark classes and writes source-derived split JSONL
-plus a `families.json` manifest. The manifest records upstream metric names;
-DSEx currently ports AIME integer exact match, HotPotQA answer exact match, and
-HoVer supporting-title retrieval. Dedicated DSEx metric adapters are still
-required before claiming metric-identical Papillon, IFBench, or LiveBench
-scoring.
+plus a `families.json` manifest. The manifest records upstream metric names.
+DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
+supporting-title retrieval, IFBench instruction-registry constraints, and the
+deterministic LiveBenchMath AMC/AIME parser paths. Dedicated adapters are still
+required before claiming metric-identical Papillon judge scoring or full
+LiveBenchMath `imo`/`usamo`/`amps_hard` symbolic-parser parity.
 
 Pass condition:
 

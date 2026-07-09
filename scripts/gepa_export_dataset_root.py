@@ -119,7 +119,11 @@ def main() -> int:
                 "dataset_source": f"{gepa_root}@{git_sha(gepa_root)}",
                 "split_counts": split_counts,
                 "split_checksums": split_checksums,
-                "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner currently scores output_key exact match unless extended",
+                "metric_fidelity": (
+                    "upstream_metric_named_for_adapter; DSEx campaign runner ports "
+                    "deterministic adapters and falls back to output_key exact match "
+                    "for unsupported judge/symbolic branches"
+                ),
             }
         )
 
