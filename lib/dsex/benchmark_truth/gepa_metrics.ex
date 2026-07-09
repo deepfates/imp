@@ -336,6 +336,285 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     not Regex.match?(~r/\s/, value)
   end
 
+  defp ifbench_following?("format:parentheses", _args, _prompt, value) do
+    value
+    |> String.graphemes()
+    |> Enum.reduce_while({[], 0}, fn char, {stack, max_depth} ->
+      cond do
+        char in ["(", "[", "{"] ->
+          stack = [char | stack]
+          {:cont, {stack, max(max_depth, length(stack))}}
+
+        char in [")", "]", "}"] and bracket_match?(List.first(stack), char) ->
+          if max_depth >= 5, do: {:halt, true}, else: {:cont, {tl(stack), max_depth}}
+
+        char in [")", "]", "}"] ->
+          {:cont, {[], 0}}
+
+        true ->
+          {:cont, {stack, max_depth}}
+      end
+    end)
+    |> case do
+      true -> true
+      {_stack, _max_depth} -> false
+    end
+  end
+
+  defp ifbench_following?("format:quotes", _args, _prompt, value) do
+    value
+    |> String.graphemes()
+    |> Enum.reduce_while({[], 0, 0}, fn char, {stack, current_depth, reached_depth} ->
+      cond do
+        stack != [] and char == hd(stack) ->
+          current_depth = current_depth - 1
+
+          if reached_depth - current_depth >= 3,
+            do: {:halt, true},
+            else: {:cont, {tl(stack), current_depth, reached_depth}}
+
+        char in ["\"", "'"] ->
+          current_depth = current_depth + 1
+          {:cont, {[char | stack], current_depth, max(reached_depth, current_depth)}}
+
+        true ->
+          {:cont, {stack, current_depth, reached_depth}}
+      end
+    end)
+    |> case do
+      true -> true
+      {_stack, _current_depth, _reached_depth} -> false
+    end
+  end
+
+  defp ifbench_following?("format:newline", _args, _prompt, value) do
+    stripped = strip_all_punctuation(value)
+    lines = stripped |> String.trim() |> String.split("\n") |> Enum.reject(&(&1 == ""))
+    length(lines) == length(String.split(String.trim(stripped), ~r/\s+/, trim: true))
+  end
+
+  defp ifbench_following?("format:line_indent", _args, _prompt, value) do
+    lines = value |> String.split("\n") |> Enum.reject(&(String.trim(&1) == ""))
+
+    lines
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.all?(fn [left, right] -> leading_spaces(right) > leading_spaces(left) end)
+  end
+
+  defp ifbench_following?("format:quote_unquote", _args, _prompt, value) do
+    stripped =
+      value
+      |> String.replace("“", "\"")
+      |> String.replace("”", "\"")
+      |> String.replace("'\"'", "")
+      |> String.replace(~r/\s+/, "")
+
+    terminal = String.trim(stripped, ~s|0123456789!#$%&'()*+,-./:;<=>?@[\\]^_`{}~|)
+
+    terminal != "" and not String.contains?(stripped, "\"\"") and
+      not String.ends_with?(terminal, "\"")
+  end
+
+  defp ifbench_following?("format:list", args, _prompt, value) do
+    sep = Map.get(args, "sep", "")
+    sep != "" and length(Regex.scan(Regex.compile!(Regex.escape(sep)), value)) >= 2
+  end
+
+  defp ifbench_following?("format:sub-bullets", _args, _prompt, value) do
+    value
+    |> String.split("*")
+    |> Enum.drop(1)
+    |> Enum.all?(&String.contains?(&1, "-"))
+  end
+
+  defp ifbench_following?("format:no_bullets_bullets", _args, _prompt, value) do
+    lines = String.split(value, "\n")
+
+    {valid?, _sentence_count, bullet_count, _in_sentences?} =
+      Enum.reduce_while(lines, {true, 0, 0, true}, fn line,
+                                                      {_valid?, sentence_count, bullet_count,
+                                                       in_sentences?} ->
+        cond do
+          String.starts_with?(String.trim(line), "*") ->
+            if sentence_count < 2,
+              do: {:halt, {false, sentence_count, bullet_count, in_sentences?}},
+              else: {:cont, {true, sentence_count, bullet_count + 1, false}}
+
+          in_sentences? ->
+            {:cont,
+             {true, sentence_count + length(split_sentences(String.trim(line))), bullet_count,
+              true}}
+
+          true ->
+            {:halt, {false, sentence_count, bullet_count, false}}
+        end
+      end)
+
+    valid? and bullet_count >= 2
+  end
+
+  defp ifbench_following?("format:output_template", _args, _prompt, value) do
+    String.contains?(value, "My Answer:") and String.contains?(value, "My Conclusion:") and
+      String.contains?(value, "Future Outlook:")
+  end
+
+  defp ifbench_following?("words:alphabet", _args, _prompt, value) do
+    words =
+      value |> strip_all_punctuation() |> trim_punctuation() |> String.split(~r/\s+/, trim: true)
+
+    alphabet = Enum.map(?a..?z, &<<&1::utf8>>)
+
+    case words do
+      [] ->
+        false
+
+      [first | rest] ->
+        first_letter = first |> String.downcase() |> String.first()
+
+        first_letter in alphabet and
+          rest
+          |> Enum.reduce_while(first_letter, fn word, expected_previous ->
+            next =
+              Enum.at(
+                alphabet,
+                rem(Enum.find_index(alphabet, &(&1 == expected_previous)) + 1, 26)
+              )
+
+            actual = word |> trim_punctuation() |> String.downcase() |> String.first()
+
+            cond do
+              is_nil(actual) -> {:cont, expected_previous}
+              actual == next -> {:cont, next}
+              true -> {:halt, false}
+            end
+          end)
+          |> Kernel.!=(false)
+    end
+  end
+
+  defp ifbench_following?("words:vowel", _args, _prompt, value) do
+    paragraphs = value |> String.trim() |> String.split("\n")
+
+    case paragraphs do
+      [paragraph] ->
+        paragraph
+        |> String.downcase()
+        |> String.graphemes()
+        |> Enum.filter(&(&1 in ["a", "e", "i", "o", "u"]))
+        |> MapSet.new()
+        |> MapSet.size()
+        |> Kernel.<=(3)
+
+      _paragraphs ->
+        false
+    end
+  end
+
+  defp ifbench_following?("words:consonants", _args, _prompt, value) do
+    consonants = MapSet.new(Enum.map(~c"bcdfghjklmnpqrstvwxyz", &<<&1::utf8>>))
+
+    value
+    |> String.downcase()
+    |> String.trim()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.all?(fn word ->
+      word
+      |> String.graphemes()
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.any?(fn [left, right] ->
+        MapSet.member?(consonants, left) and MapSet.member?(consonants, right)
+      end)
+    end)
+  end
+
+  defp ifbench_following?("words:palindrome", _args, _prompt, value) do
+    value
+    |> strip_all_punctuation()
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.count(fn word -> String.length(word) >= 5 and word == String.reverse(word) end)
+    |> Kernel.>=(10)
+  end
+
+  defp ifbench_following?("words:prime_lengths", _args, _prompt, value) do
+    primes =
+      MapSet.new([
+        2,
+        3,
+        5,
+        7,
+        11,
+        13,
+        17,
+        19,
+        23,
+        29,
+        31,
+        37,
+        41,
+        43,
+        47,
+        53,
+        59,
+        61,
+        67,
+        71,
+        73,
+        79,
+        83,
+        89,
+        97
+      ])
+
+    value
+    |> strip_all_punctuation()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.all?(&(String.length(&1) in primes))
+  end
+
+  defp ifbench_following?("words:repeats", args, _prompt, value) do
+    max_repeats = Map.get(args, "small_n", 0)
+
+    value
+    |> strip_all_punctuation()
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.frequencies()
+    |> Enum.all?(fn {_word, count} -> count <= max_repeats end)
+  end
+
+  defp ifbench_following?("words:last_first", _args, _prompt, value) do
+    sentences = split_sentences(value)
+
+    sentences
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.all?(fn [left, right] -> last_word(left) == first_word(right) end)
+  end
+
+  defp ifbench_following?("words:paragraph_last_first", _args, _prompt, value) do
+    value
+    |> String.split("\n")
+    |> Enum.all?(fn paragraph ->
+      paragraph = paragraph |> String.trim() |> String.downcase()
+
+      if paragraph == "" do
+        true
+      else
+        words = paragraph |> trim_punctuation() |> String.split(~r/\s+/, trim: true)
+        List.first(words) == List.last(words)
+      end
+    end)
+  end
+
+  defp ifbench_following?("words:no_consecutive", _args, _prompt, value) do
+    value
+    |> strip_all_punctuation()
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.all?(fn [left, right] -> String.first(left) != String.first(right) end)
+  end
+
   defp ifbench_following?("combination:two_responses", _args, _prompt, value) do
     responses =
       value
@@ -399,6 +678,24 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
 
   defp count_words(value), do: value |> String.split(~r/\s+/, trim: true) |> length()
 
+  defp bracket_match?("(", ")"), do: true
+  defp bracket_match?("[", "]"), do: true
+  defp bracket_match?("{", "}"), do: true
+  defp bracket_match?(_left, _right), do: false
+
+  defp strip_all_punctuation(value), do: String.replace(value, ~r/[[:punct:]]/, "")
+
+  defp leading_spaces(value) do
+    String.length(value) - String.length(String.trim_leading(value, " "))
+  end
+
+  defp split_sentences(value) do
+    value
+    |> String.replace("\n", " ")
+    |> String.split(~r/(?<=[.!?])\s+/, trim: true)
+    |> Enum.reject(&(&1 == ""))
+  end
+
   defp normalize_option(value) do
     value
     |> trim_punctuation()
@@ -444,6 +741,22 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
         word
         |> String.trim_leading("'\"")
         |> String.replace(~r/[.,?!'"].*$/, "")
+        |> String.downcase()
+    end
+  end
+
+  defp last_word(sentence) do
+    sentence
+    |> String.trim()
+    |> String.split(~r/\s+/, trim: true)
+    |> List.last()
+    |> case do
+      nil ->
+        ""
+
+      word ->
+        word
+        |> String.replace(~r/[[:punct:]\s]+$/, "")
         |> String.downcase()
     end
   end

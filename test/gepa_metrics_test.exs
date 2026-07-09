@@ -179,7 +179,27 @@ defmodule GepaMetricsTest do
       {"count:punctuation", %{}, "Use . , ! ? ; : and ?! now"},
       {"format:options", %{"options" => "yes/no/maybe"}, "yes"},
       {"format:title_case", %{}, "This Is Title Case"},
-      {"format:no_whitespace", %{}, "NoWhitespace"}
+      {"format:no_whitespace", %{}, "NoWhitespace"},
+      {"format:parentheses", %{}, "alpha (beta [gamma {delta (epsilon [zeta])}])"},
+      {"format:quotes", %{}, ~s("alpha 'beta "gamma"' delta")},
+      {"format:newline", %{}, "alpha\nbeta\ngamma"},
+      {"format:line_indent", %{}, "one\n two\n  three"},
+      {"format:quote_unquote", %{}, ~s("term" means explanation.)},
+      {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha\nSEPARATOR beta"},
+      {"format:sub-bullets", %{}, "* alpha\n- child\n* beta\n- child"},
+      {"format:no_bullets_bullets", %{}, "Alpha ends. Beta ends.\n* first\n* second"},
+      {"format:output_template", %{},
+       "My Answer: alpha My Conclusion: beta Future Outlook: gamma"},
+      {"words:alphabet", %{}, "apple banana carrot date"},
+      {"words:vowel", %{}, "A lean green sentence keeps three vowel types"},
+      {"words:consonants", %{}, "black strong craft"},
+      {"words:palindrome", %{},
+       "level radar civic madam rotor refer kayak reviver racecar redder"},
+      {"words:prime_lengths", %{}, "to cat seven prime"},
+      {"words:repeats", %{"small_n" => 2}, "alpha beta alpha gamma"},
+      {"words:last_first", %{}, "Alpha beta. Beta gamma. Gamma delta."},
+      {"words:paragraph_last_first", %{}, "alpha beta alpha\nomega middle omega"},
+      {"words:no_consecutive", %{}, "alpha beta carrot delta"}
     ]
 
     Enum.each(cases, fn {instruction_id, kwargs, response} ->
@@ -206,6 +226,39 @@ defmodule GepaMetricsTest do
       |> DSEx.with_inputs(:prompt)
 
     assert metric.(example, DSEx.prediction(response: "has whitespace")) == 0.0
+
+    failing_cases = [
+      {"format:parentheses", %{}, "(one [two {three}])"},
+      {"format:quotes", %{}, ~s("alpha 'beta' gamma")},
+      {"format:newline", %{}, "alpha beta"},
+      {"format:quote_unquote", %{}, ~s("term")},
+      {"format:list", %{"sep" => "SEPARATOR"}, "SEPARATOR alpha"},
+      {"format:no_bullets_bullets", %{}, "Only one sentence.\n* first\n* second"},
+      {"format:output_template", %{}, "My Answer: alpha"},
+      {"words:alphabet", %{}, "apple carrot"},
+      {"words:vowel", %{}, "education"},
+      {"words:consonants", %{}, "black alone"},
+      {"words:palindrome", %{}, "level radar"},
+      {"words:prime_lengths", %{}, "to four"},
+      {"words:repeats", %{"small_n" => 1}, "alpha beta alpha"},
+      {"words:last_first", %{}, "Alpha beta. Gamma delta."},
+      {"words:paragraph_last_first", %{}, "alpha beta gamma"},
+      {"words:no_consecutive", %{}, "alpha apricot"}
+    ]
+
+    Enum.each(failing_cases, fn {instruction_id, kwargs, response} ->
+      example =
+        DSEx.example(
+          prompt: "p",
+          response: "",
+          instruction_id_list: [instruction_id],
+          kwargs: [kwargs]
+        )
+        |> DSEx.with_inputs(:prompt)
+
+      assert metric.(example, DSEx.prediction(response: response)) == 0.0,
+             "expected #{instruction_id} to fail"
+    end)
   end
 
   test "LiveBenchMath metric ports AMC answer parsing cases" do
