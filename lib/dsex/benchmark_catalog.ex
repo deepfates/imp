@@ -199,6 +199,20 @@ defmodule DSEx.BenchmarkCatalog do
         "Scale natural classification, QA, retrieval, and instruction-following lift lanes to larger sampled datasets when release policy requires model-quality evidence."
     },
     %{
+      id: "gepa_paper_replication",
+      family: "GEPA paper replication",
+      source_lineage:
+        "GEPA artifact repo covers AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon with baseline, MIPROv2, GEPA, GEPA-MERGE, ablation, and GRPO rows.",
+      task_shape: "paper-family benchmark + model + optimizer budget -> scored optimized program",
+      metric:
+        "task score plus cost, metric calls, wall-clock, seed variance, and train/dev/test gap",
+      tiers: ["research", "full"],
+      status: "artifact_contract_implemented",
+      commands: ["mix benchmark.gepa_replication.check"],
+      next_step:
+        "Run fresh paid/source-checkout campaigns to populate real DSEx-vs-DSPy GEPA rows before making dominance claims."
+    },
+    %{
       id: "factuality_classification",
       family: "Hallucination/factuality classification",
       source_lineage:

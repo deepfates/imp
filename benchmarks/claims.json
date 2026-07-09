@@ -105,6 +105,25 @@
       ]
     },
     {
+      "id": "claim.gepa_replication.full",
+      "statement": "DSEx GEPA research claims are supported only by fresh GEPA paper-family replication artifacts that compare baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
+      "category": "optimizer",
+      "surface": ["GEPA", "MIPROv2", "SIMBA", "AIMEBench", "HotpotQABench", "hoverBench", "IFBench", "LiveBenchMathBench", "Papillon"],
+      "claim_type": "research_replication",
+      "comparison": "dspy_gepa",
+      "release_blocking": true,
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
+      "requirements": [
+        {
+          "id": "gepa_replication.full",
+          "kind": "gepa_paper_replication",
+          "lane": "gepa_replication",
+          "evidence": "full",
+          "threshold": "gepa-replication artifact covers AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon with required optimizer, budget, cost, seed, and split-gap fields"
+        }
+      ]
+    },
+    {
       "id": "claim.rag_tools_agents.full",
       "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence.",
       "category": "tools_agents_rag",

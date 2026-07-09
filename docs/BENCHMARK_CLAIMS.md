@@ -67,6 +67,14 @@ for documented external model unavailability. That file can unblock a historical
 lane only when the historical endpoint itself is no longer a stable provider
 baseline; it cannot replace current-model coverage.
 
+GEPA research claims use the `gepa_replication` lane, not the generic
+`optimizer_lift` lane. The dashboard only accepts those claims when a fresh
+`gepa-replication-*.json` artifact covers the required GEPA paper families and
+reports baseline, DSPy GEPA, DSEx GEPA, MIPROv2, metric-call budget,
+token/cost, wall-clock, seed variance, and train/dev/test gap. SIMBA may be
+reported as extra comparator evidence when present, but it is not required by
+the upstream GEPA artifact.
+
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
 work queue: either produce the missing evidence, narrow or remove the claim, or

@@ -168,6 +168,8 @@ Source-checkout maintainer aliases:
   `mix benchmark.trace.check`
 - overhead checks through `mix benchmark.overhead.check`
 - optimizer lift checks through `mix benchmark.optimizer_lift.check`
+- GEPA paper-family artifact validation through
+  `mix benchmark.gepa_replication.check`
 - RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
 
 The live provider tests prove a real provider can execute:

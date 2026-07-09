@@ -72,6 +72,7 @@ defmodule DSEx.MixProject do
           "dsex.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
           "benchmark.optimizer_lift.check": :test,
+          "benchmark.gepa_replication.check": :test,
           "benchmark.overhead.check": :test,
           "benchmark.rag_tool_agent.check": :test,
           "benchmark.rlm.check": :test,
@@ -251,6 +252,7 @@ defmodule DSEx.MixProject do
         "benchmark.operations_stress.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
+        "benchmark.gepa_replication.check",
         "benchmark.rag_tool_agent.check",
         "benchmark.rlm.check",
         "upstream_fidelity.check"
@@ -279,6 +281,9 @@ defmodule DSEx.MixProject do
       "benchmark.optimizer_lift.check": [
         "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"
       ],
+      "benchmark.gepa_replication.check": [
+        "dsex.benchmark.gepa_replication --input test/fixtures/gepa_replication/complete.json --out tmp/gepa-replication"
+      ],
       "benchmark.rag_tool_agent.check": [
         "dsex.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
       ],
@@ -292,10 +297,10 @@ defmodule DSEx.MixProject do
         "dsex.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.full": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

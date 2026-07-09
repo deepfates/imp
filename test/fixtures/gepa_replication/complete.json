@@ -1,0 +1,106 @@
+{
+  "rows": [
+    {
+      "family": "AIMEBench",
+      "program": "CoT",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 1839,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    },
+    {
+      "family": "HotpotQABench",
+      "program": "HotpotMultiHop",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 6871,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    },
+    {
+      "family": "hoverBench",
+      "program": "HoverMultiHop",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 7051,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    },
+    {
+      "family": "IFBench",
+      "program": "IFBenchCoT2StageProgram",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 3593,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    },
+    {
+      "family": "LiveBenchMathBench",
+      "program": "CoT",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 1839,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    },
+    {
+      "family": "Papillon",
+      "program": "PAPILLON",
+      "model": "openai/gpt-4.1-mini-2025-04-14",
+      "metric_calls": 2426,
+      "token_cost": {"usd": 1.25, "input_tokens": 10000, "output_tokens": 2000},
+      "wall_clock_ms": 12345,
+      "seed_variance": {"seeds": [0, 1, 2], "stddev": 0.01},
+      "train_dev_test_gap": {"train": 0.8, "dev": 0.75, "test": 0.73},
+      "results": {
+        "baseline": {"score": 0.5},
+        "dspy_gepa": {"score": 0.6},
+        "dsex_gepa": {"score": 0.61},
+        "mipro_v2": {"score": 0.55},
+        "simba": {"score": 0.56}
+      }
+    }
+  ]
+}

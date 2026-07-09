@@ -252,6 +252,19 @@ retrieval/KNN few-shot, and instruction following. Each natural lane reports
 baseline score, optimized score, lift, LM calls, estimated fixture cost, and
 selected demos or instructions.
 
+Research-scale GEPA claims use a separate lane:
+
+```sh
+mix benchmark.gepa_replication.check
+```
+
+That lane validates GEPA paper-family artifacts rather than generic optimizer
+lift. Full evidence requires rows for AIME, HotpotQA, HoVer, IFBench,
+LiveBench-Math, and Papillon/privacy delegation, with baseline, DSPy GEPA,
+DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock, seed variance,
+and train/dev/test gap. SIMBA is optional extra comparator evidence, not a
+required optimizer in the upstream GEPA artifact.
+
 Pass condition:
 
 - DSEx achieves non-regression versus baseline on every optimizer lane

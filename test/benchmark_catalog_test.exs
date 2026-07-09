@@ -21,6 +21,7 @@ defmodule BenchmarkCatalogTest do
     assert by_id["operations_persistence_observability"].status == "provider_free_implemented"
     assert by_id["multimodal_primitives"].status == "deterministic_implemented"
     assert by_id["optimizer_lift"].status == "provider_free_implemented"
+    assert by_id["gepa_paper_replication"].status == "artifact_contract_implemented"
     assert by_id["factuality_classification"].status == "missing"
     assert by_id["mipro_tabular"].status == "missing"
     assert by_id["mipro_scone"].status == "missing"
@@ -32,6 +33,7 @@ defmodule BenchmarkCatalogTest do
 
     assert "mix benchmark.parity.full" in by_id["math_gsm8k"].commands
     assert "mix benchmark.truth.check" in by_id["classification_colors"].commands
+    assert "mix benchmark.gepa_replication.check" in by_id["gepa_paper_replication"].commands
     assert by_id["factuality_classification"].next_step =~ "generic classification/QA sampler"
     assert by_id["rag_retrieval"].next_step =~ "larger retrieval corpora"
     assert by_id["rlm_recursive_control"].metric =~ "budget"

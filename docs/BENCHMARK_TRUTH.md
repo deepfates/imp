@@ -181,6 +181,21 @@ classification, QA, retrieval/KNN few-shot, and instruction following, with
 baseline score, optimized score, lift, call counts, cost estimate, and selected
 demos or instructions.
 
+## Run GEPA Paper Replication
+
+```sh
+mix benchmark.gepa_replication.check
+```
+
+This source-checkout lane validates GEPA paper-family replication artifacts. It
+does not turn provider-free optimizer lift into a paper claim. A full artifact
+must cover `AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
+`LiveBenchMathBench`, and `Papillon`; for each row it must report baseline,
+DSPy GEPA, DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock,
+seed variance, and train/dev/test gap. SIMBA can appear as an extra comparator
+when a campaign includes it, but it is not part of the upstream GEPA artifact's
+required optimizer list.
+
 ## Run RAG, Tool, And Agent Parity
 
 ```sh

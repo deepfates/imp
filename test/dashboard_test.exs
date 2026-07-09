@@ -8,6 +8,7 @@ defmodule DashboardTest do
     trace_dir = Path.join(root, "trace")
     overhead_dir = Path.join(root, "overhead")
     optimizer_dir = Path.join(root, "optimizer")
+    gepa_dir = Path.join(root, "gepa")
     rag_tool_agent_dir = Path.join(root, "rag-tool-agent")
     rlm_dir = Path.join(root, "rlm-benchmark")
     live_matrix_dir = Path.join(root, "live-matrix")
@@ -20,6 +21,7 @@ defmodule DashboardTest do
         trace_dir,
         overhead_dir,
         optimizer_dir,
+        gepa_dir,
         rag_tool_agent_dir,
         rlm_dir,
         live_matrix_dir,
@@ -93,6 +95,14 @@ defmodule DashboardTest do
           "passing" => true
         }
       ]
+    })
+
+    write_json!(Path.join(gepa_dir, "gepa-replication-20260707T000000Z.json"), %{
+      "schema_version" => 1,
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "git_sha" => "abc",
+      "summary" => %{"all_passing" => true},
+      "rows" => gepa_rows()
     })
 
     write_json!(Path.join(rag_tool_agent_dir, "rag-tool-agent-parity-20260707T000000Z.json"), %{
@@ -287,6 +297,8 @@ defmodule DashboardTest do
         overhead_dir,
         "--optimizer-dir",
         optimizer_dir,
+        "--gepa-dir",
+        gepa_dir,
         "--rag-tool-agent-dir",
         rag_tool_agent_dir,
         "--rlm-dir",
@@ -317,10 +329,10 @@ defmodule DashboardTest do
              "public_claims"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 11
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 12
     assert dashboard["claims"]["status"] == "failing"
-    assert dashboard["claims"]["summary"]["total"] == 9
-    assert dashboard["claims"]["summary"]["proven"] == 7
+    assert dashboard["claims"]["summary"]["total"] == 10
+    assert dashboard["claims"]["summary"]["proven"] == 8
     assert dashboard["claims"]["summary"]["blocked"] == 2
 
     proven_claim_ids =
@@ -331,6 +343,7 @@ defmodule DashboardTest do
 
     assert proven_claim_ids == [
              "claim.dspy_semantics.golden_trace",
+             "claim.gepa_replication.full",
              "claim.optimizer_lift.full",
              "claim.performance.provider_free",
              "claim.product.public_api_installable",
@@ -484,6 +497,11 @@ defmodule DashboardTest do
              "InstructionSearch"
            ]
 
+    assert dashboard["lanes"]["gepa_replication"]["status"] == "full"
+    assert dashboard["lanes"]["gepa_replication"]["summary"]["full_gepa_replication"]
+    assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_families"] == []
+    assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_fields"] == []
+
     assert dashboard["lanes"]["rag_tool_agent"]["status"] == "full"
 
     error =
@@ -496,6 +514,8 @@ defmodule DashboardTest do
             overhead_dir,
             "--optimizer-dir",
             optimizer_dir,
+            "--gepa-dir",
+            gepa_dir,
             "--rag-tool-agent-dir",
             rag_tool_agent_dir,
             "--live-matrix-dir",
@@ -807,6 +827,38 @@ defmodule DashboardTest do
         "run_id" => run_id
       }
     }
+  end
+
+  defp gepa_rows do
+    Enum.map(
+      [
+        {"AIMEBench", "CoT"},
+        {"HotpotQABench", "HotpotMultiHop"},
+        {"hoverBench", "HoverMultiHop"},
+        {"IFBench", "IFBenchCoT2StageProgram"},
+        {"LiveBenchMathBench", "CoT"},
+        {"Papillon", "PAPILLON"}
+      ],
+      fn {family, program} ->
+        %{
+          "family" => family,
+          "program" => program,
+          "model" => "gpt-4.1-mini-2025-04-14",
+          "metric_calls" => 150,
+          "token_cost" => %{"usd" => 1.25, "input_tokens" => 10_000, "output_tokens" => 2_000},
+          "wall_clock_ms" => 12_345,
+          "seed_variance" => %{"seeds" => [0, 1, 2], "stddev" => 0.01},
+          "train_dev_test_gap" => %{"train" => 0.8, "dev" => 0.75, "test" => 0.73},
+          "results" => %{
+            "baseline" => %{"score" => 0.5},
+            "dspy_gepa" => %{"score" => 0.6},
+            "dsex_gepa" => %{"score" => 0.61},
+            "mipro_v2" => %{"score" => 0.55},
+            "simba" => %{"score" => 0.56}
+          }
+        }
+      end
+    )
   end
 
   defp tmp_dir(name) do

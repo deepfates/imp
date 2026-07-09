@@ -28,6 +28,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           trace_dir: :string,
           overhead_dir: :string,
           optimizer_dir: :string,
+          gepa_dir: :string,
           rag_tool_agent_dir: :string,
           rlm_dir: :string,
           live_matrix_dir: :string,
@@ -103,6 +104,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           Keyword.get(opts, :optimizer_dir, "tmp/optimizer-lift"),
           max_age_hours
         ),
+      "gepa_replication" =>
+        gepa_replication_lane(
+          Keyword.get(opts, :gepa_dir, "tmp/gepa-replication"),
+          max_age_hours
+        ),
       "rag_tool_agent" =>
         rag_tool_agent_lane(
           Keyword.get(opts, :rag_tool_agent_dir, "tmp/rag-tool-agent"),
@@ -125,6 +131,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "golden_trace",
       "live_matched_model",
       "optimizer_lift",
+      "gepa_replication",
       "rag_tool_agent",
       "rlm_benchmark",
       "provider_free_overhead"
@@ -470,6 +477,107 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     else
       _ -> missing_lane("optimizer_lift", "no optimizer-lift-parity artifact found in #{dir}")
     end
+  end
+
+  defp gepa_replication_lane(dir, max_age_hours) do
+    required_families = [
+      "AIMEBench",
+      "HotpotQABench",
+      "hoverBench",
+      "IFBench",
+      "LiveBenchMathBench",
+      "Papillon"
+    ]
+
+    required_fields = [
+      "baseline",
+      "dspy_gepa",
+      "dsex_gepa",
+      "mipro_v2",
+      "metric_calls",
+      "token_cost",
+      "wall_clock_ms",
+      "seed_variance",
+      "train_dev_test_gap"
+    ]
+
+    with {:ok, path} <- latest(Path.join(dir, "gepa-replication-*.json")),
+         {:ok, artifact} <- read_artifact(path) do
+      rows = Map.get(artifact, "rows", [])
+      present_families = rows |> Enum.map(& &1["family"]) |> Enum.uniq()
+      missing_families = required_families -- present_families
+      missing_fields = gepa_missing_fields(rows, required_fields)
+
+      passing = get_in(artifact, ["summary", "all_passing"]) == true
+      full = missing_families == [] and missing_fields == []
+
+      artifact_lane("gepa_replication", path, artifact, max_age_hours,
+        passing: passing and full,
+        full_evidence: passing and full,
+        scale: if(full, do: "full", else: "sample"),
+        summary: %{
+          "total" => length(rows),
+          "families" => present_families,
+          "required_families" => required_families,
+          "missing_families" => missing_families,
+          "missing_fields" => missing_fields,
+          "models" => rows |> Enum.map(& &1["model"]) |> Enum.reject(&is_nil/1) |> Enum.uniq(),
+          "optimizers" =>
+            required_fields --
+              [
+                "metric_calls",
+                "token_cost",
+                "wall_clock_ms",
+                "seed_variance",
+                "train_dev_test_gap"
+              ],
+          "all_passing" => passing,
+          "full_gepa_replication" => full
+        },
+        blocking_requirements:
+          gepa_blocking_requirements(missing_families, missing_fields, passing),
+        limitation:
+          if(passing and full,
+            do: nil,
+            else:
+              "GEPA paper-replication claims require fresh rows for every required family with optimizer, budget, cost, seed, and split-gap fields."
+          )
+      )
+    else
+      _ -> missing_lane("gepa_replication", "no gepa-replication artifact found in #{dir}")
+    end
+  end
+
+  defp gepa_missing_fields(rows, required_fields) do
+    rows
+    |> Enum.flat_map(fn row ->
+      required_fields
+      |> Enum.reject(fn field -> present_gepa_field?(row, field) end)
+      |> Enum.map(&%{"family" => row["family"], "field" => &1})
+    end)
+  end
+
+  defp present_gepa_field?(row, field)
+       when field in ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"] do
+    row
+    |> Map.get("results", %{})
+    |> Map.get(field)
+    |> is_map()
+  end
+
+  defp present_gepa_field?(row, field), do: Map.has_key?(row, field)
+
+  defp gepa_blocking_requirements([], [], true), do: []
+
+  defp gepa_blocking_requirements(missing_families, missing_fields, passing) do
+    Enum.reject(
+      [
+        if(passing, do: nil, else: "artifact summary.all_passing must be true"),
+        if(missing_families == [], do: nil, else: %{"missing_families" => missing_families}),
+        if(missing_fields == [], do: nil, else: %{"missing_fields" => missing_fields})
+      ],
+      &is_nil/1
+    )
   end
 
   defp rag_tool_agent_lane(dir, max_age_hours) do
