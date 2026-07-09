@@ -164,7 +164,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         "checksums" => split_checksums(paths),
         "retrieval" => spec["retrieval"]
       },
-      "wall_clock_ms" => System.convert_time_unit(wall_us, :microsecond, :millisecond),
+      "wall_clock_ms" => max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond)),
       "seed_variance" => seed_variance(seed_results),
       "train_dev_test_gap" => %{
         "train" => best.train,

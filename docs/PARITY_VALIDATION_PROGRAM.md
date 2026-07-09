@@ -296,7 +296,11 @@ paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
 HoVer rows must carry `dataset.retrieval` provenance for the upstream
 `wiki.abstracts.2017` BM25 corpus/index checksums; generic `retrieved_docs`
 predictions without that provenance are rejected for research campaign rows, and
-DSEx uses its native HoVer BM25 corpus retriever for those rows.
+DSEx uses its native HoVer BM25 corpus retriever for those rows. Validate exact
+ranking parity in a GEPA source checkout with
+`DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs` after
+installing upstream HoVer retrieval dependencies (`bm25s`, PyStemmer,
+`diskcache`, and `ujson`).
 IFBench imports the larger AllenAI extended registry; DSEx ports those registry
 checks in Elixir and keeps unknown ids fail-closed. Four IFBench NLP-dependent
 checks have native deterministic fallbacks plus a source-exact Python bridge for
