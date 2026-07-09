@@ -204,8 +204,12 @@ When upstream GEPA artifact experiments have been run, convert their
 `experiment_runs_data` output into DSEx dashboard rows with:
 
 ```sh
+mix dsex.benchmark.gepa_dataset \
+  --gepa-root path/to/gepa-artifact \
+  --out benchmarks/data/gepa-campaign
+
 mix dsex.benchmark.gepa_campaign \
-  --dataset-root path/to/dsex-gepa-family-splits \
+  --dataset-root benchmarks/data/gepa-campaign \
   --campaign-id gepa-full-YYYYMMDD \
   --model openai:gpt-4.1-mini-2025-04-14 \
   --reflection-model openai:gpt-5 \
@@ -227,11 +231,20 @@ mix dsex.benchmark.gepa_replication \
 The DSEx campaign producer expects a `families.json` file plus one directory
 per GEPA family, each with `train.jsonl`, `dev.jsonl`, and `test.jsonl`.
 `families.json` declares each family’s signature, instructions, input keys,
-output key, program name, and metric-call budget. The converter then reads
-upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy` `evaluation_result.txt` files
-and merges them with DSEx-produced `dsex_gepa` rows. It refuses missing
-families, missing comparator outputs, ambiguous artifact models, and rows that
-do not satisfy the full-evidence contract after merge.
+output key, program name, metric-call budget, upstream metric name, source
+commit, split counts, and split checksums. The dataset exporter imports the
+upstream GEPA artifact benchmark classes and preserves their split construction.
+The converter then reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
+`evaluation_result.txt` files and merges them with DSEx-produced `dsex_gepa`
+rows. It refuses missing families, missing comparator outputs, ambiguous
+artifact models, and rows that do not satisfy the full-evidence contract after
+merge.
+
+The exported `families.json` records upstream metric names. DSEx's current GEPA
+campaign runner scores the configured output key by exact normalized match; do
+not claim metric-identical GEPA-family quality for Papillon, HoVer, IFBench, or
+LiveBench until dedicated DSEx metric adapters are implemented for those
+upstream metrics.
 
 ## Run RAG, Tool, And Agent Parity
 
