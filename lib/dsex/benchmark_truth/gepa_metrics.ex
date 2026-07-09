@@ -261,6 +261,67 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     end)
   end
 
+  defp ifbench_following?("count:person_names", args, _prompt, value) do
+    person_names()
+    |> Enum.count(&String.contains?(value, &1))
+    |> Kernel.>=(Map.get(args, "N", 0))
+  end
+
+  defp ifbench_following?("count:words_japanese", args, _prompt, value) do
+    position = Map.get(args, "N", 1)
+
+    value
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.with_index(1)
+    |> Enum.all?(fn {word, index} ->
+      word = trim_punctuation(word)
+
+      rem(index, position) != 0 or word == "" or Regex.match?(~r/^\d+$/, word) or
+        Regex.match?(~r/[\x{3040}-\x{30ff}\x{4e00}-\x{9fff}]/u, word)
+    end)
+  end
+
+  defp ifbench_following?("ratio:sentence_type", _args, _prompt, value) do
+    sentences = split_sentences(value)
+    declarative_count = Enum.count(sentences, &String.ends_with?(&1, "."))
+    interrogative_count = Enum.count(sentences, &String.ends_with?(&1, "?"))
+    declarative_count == 2 * interrogative_count
+  end
+
+  defp ifbench_following?("ratio:sentence_balance", _args, _prompt, value) do
+    sentences = split_sentences(value)
+    declarative_count = Enum.count(sentences, &String.ends_with?(&1, "."))
+    interrogative_count = Enum.count(sentences, &String.ends_with?(&1, "?"))
+    exclamatory_count = Enum.count(sentences, &String.ends_with?(&1, "!"))
+    declarative_count == interrogative_count and interrogative_count == exclamatory_count
+  end
+
+  defp ifbench_following?("ratio:overlap", args, _prompt, value) do
+    reference_text = Map.get(args, "reference_text", "")
+    percentage = Map.get(args, "percentage", 0)
+    ngrams = char_ngrams(value, 3)
+    reference_ngrams = char_ngrams(reference_text, 3)
+
+    if MapSet.size(ngrams) == 0 do
+      false
+    else
+      overlap = MapSet.intersection(ngrams, reference_ngrams) |> MapSet.size()
+      score = overlap / MapSet.size(ngrams) * 100
+      percentage - 2 <= score and score <= percentage + 2
+    end
+  end
+
+  defp ifbench_following?("ratio:sentence_words", _args, _prompt, value) do
+    sentences = split_sentences(value)
+
+    length(sentences) == 3 and
+      sentences
+      |> Enum.map(&(String.trim(&1) |> String.length()))
+      |> Enum.uniq()
+      |> length()
+      |> Kernel.==(1)
+  end
+
   defp ifbench_following?("length_constraints:number_sentences", args, _prompt, value) do
     count = sentence_count(value)
     compare_count(count, Map.get(args, "num_sentences", 0), Map.get(args, "relation"))
@@ -740,6 +801,32 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     end
   end
 
+  defp ifbench_following?("sentence:alliteration_increment", _args, _prompt, value) do
+    value
+    |> split_sentences()
+    |> Enum.map(&alliteration_run_score/1)
+    |> strictly_increasing?()
+  end
+
+  defp ifbench_following?("words:keywords_specific_position", args, _prompt, value) do
+    keyword = args |> Map.get("keyword", "") |> to_string()
+    sentence_index = Map.get(args, "n", 0) - 1
+    word_index = Map.get(args, "m", 0) - 1
+
+    value
+    |> split_sentences()
+    |> Enum.at(sentence_index, "")
+    |> word_tokens()
+    |> Enum.at(word_index)
+    |> Kernel.==(keyword)
+  end
+
+  defp ifbench_following?("words:words_position", args, _prompt, value) do
+    keyword = args |> Map.get("keyword", "") |> to_string()
+    words = word_tokens(value)
+    length(words) >= 2 and Enum.at(words, 1) == keyword and Enum.at(words, -2) == keyword
+  end
+
   defp ifbench_following?("repeat:repeat_change", args, prompt, value) do
     prompt_to_repeat = Map.get(args, "prompt_to_repeat", prompt)
 
@@ -1099,6 +1186,92 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
       month in [4, 6, 9, 11] -> day >= 1 and day <= 30
       month == 2 -> day >= 1 and day <= 29
     end
+  end
+
+  defp person_names do
+    [
+      "Emma",
+      "Liam",
+      "Sophia",
+      "Jackson",
+      "Olivia",
+      "Noah",
+      "Ava",
+      "Lucas",
+      "Isabella",
+      "Mason",
+      "Mia",
+      "Ethan",
+      "Charlotte",
+      "Alexander",
+      "Amelia",
+      "Benjamin",
+      "Harper",
+      "Leo",
+      "Zoe",
+      "Daniel",
+      "Chloe",
+      "Samuel",
+      "Lily",
+      "Matthew",
+      "Grace",
+      "Owen",
+      "Abigail",
+      "Gabriel",
+      "Ella",
+      "Jacob",
+      "Scarlett",
+      "Nathan",
+      "Victoria",
+      "Elijah",
+      "Layla",
+      "Nicholas",
+      "Audrey",
+      "David",
+      "Hannah",
+      "Christopher",
+      "Penelope",
+      "Thomas",
+      "Nora",
+      "Andrew",
+      "Aria",
+      "Joseph",
+      "Claire",
+      "Ryan",
+      "Stella",
+      "Jonathan"
+    ]
+  end
+
+  defp char_ngrams(value, n) do
+    value
+    |> String.graphemes()
+    |> Enum.chunk_every(n, 1, :discard)
+    |> Enum.map(&Enum.join/1)
+    |> MapSet.new()
+  end
+
+  defp alliteration_run_score(sentence) do
+    sentence
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.map(&String.trim_leading(&1, ~s|!"#$%&'()*+,-./:;<=>?@[\\]^_`{}~|))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.reduce({0, false}, fn [left, right], {score, previous?} ->
+      if String.first(left) == String.first(right) do
+        {score + if(previous?, do: 1, else: 2), true}
+      else
+        {score, false}
+      end
+    end)
+    |> elem(0)
+  end
+
+  defp word_tokens(value) do
+    ~r/[[:alnum:]_]+/
+    |> Regex.scan(value)
+    |> Enum.map(fn [word] -> word end)
   end
 
   defp first_italics_tag(value) do
