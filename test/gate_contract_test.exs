@@ -72,7 +72,7 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.gepa_replication.check") == [
-             "dsex.benchmark.gepa_replication --input test/fixtures/gepa_replication/complete.json --out tmp/gepa-replication"
+             "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.rag_tool_agent.check") == [

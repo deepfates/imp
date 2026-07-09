@@ -47,6 +47,32 @@ defmodule GepaReplicationArtifactTest do
            end)
   end
 
+  test "GEPA replication smoke runner exercises DSEx GEPA without authorizing research claims" do
+    out_dir = tmp_dir("gepa-replication-smoke")
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+
+      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        "--smoke",
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "gepa-replication-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    assert artifact["summary"]["all_passing"]
+    refute artifact["summary"]["full_gepa_replication"]
+    assert artifact["summary"]["evidence_level"] == "smoke"
+
+    assert Enum.all?(
+             artifact["rows"],
+             &(get_in(&1, ["results", "dsex_gepa", "source"]) == "DSEx.Optimize.GEPA")
+           )
+  end
+
   defp tmp_dir(name) do
     path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)

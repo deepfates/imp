@@ -101,7 +101,11 @@ defmodule DashboardTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
-      "summary" => %{"all_passing" => true},
+      "summary" => %{
+        "all_passing" => true,
+        "full_gepa_replication" => true,
+        "evidence_level" => "research_campaign"
+      },
       "rows" => gepa_rows()
     })
 

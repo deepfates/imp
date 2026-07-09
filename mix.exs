@@ -282,7 +282,7 @@ defmodule DSEx.MixProject do
         "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"
       ],
       "benchmark.gepa_replication.check": [
-        "dsex.benchmark.gepa_replication --input test/fixtures/gepa_replication/complete.json --out tmp/gepa-replication"
+        "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
       ],
       "benchmark.rag_tool_agent.check": [
         "dsex.benchmark.rag_tool_agent --out tmp/rag-tool-agent"

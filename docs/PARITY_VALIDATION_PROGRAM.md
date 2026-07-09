@@ -258,8 +258,9 @@ Research-scale GEPA claims use a separate lane:
 mix benchmark.gepa_replication.check
 ```
 
-That lane validates GEPA paper-family artifacts rather than generic optimizer
-lift. Full evidence requires rows for AIME, HotpotQA, HoVer, IFBench,
+That lane runs deterministic smoke rows and validates GEPA paper-family
+artifact shape rather than generic optimizer lift. Full evidence requires
+non-smoke campaign rows for AIME, HotpotQA, HoVer, IFBench,
 LiveBench-Math, and Papillon/privacy delegation, with baseline, DSPy GEPA,
 DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock, seed variance,
 and train/dev/test gap. SIMBA is optional extra comparator evidence, not a

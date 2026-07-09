@@ -187,9 +187,10 @@ demos or instructions.
 mix benchmark.gepa_replication.check
 ```
 
-This source-checkout lane validates GEPA paper-family replication artifacts. It
-does not turn provider-free optimizer lift into a paper claim. A full artifact
-must cover `AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
+This source-checkout lane runs a deterministic smoke campaign by default and
+validates GEPA paper-family artifact shape. It does not turn provider-free
+optimizer lift or smoke rows into a paper claim. A full artifact must cover
+`AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
 `LiveBenchMathBench`, and `Papillon`; for each row it must report baseline,
 DSPy GEPA, DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock,
 seed variance, and train/dev/test gap. SIMBA can appear as an extra comparator

@@ -509,7 +509,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       missing_fields = gepa_missing_fields(rows, required_fields)
 
       passing = get_in(artifact, ["summary", "all_passing"]) == true
-      full = missing_families == [] and missing_fields == []
+
+      full =
+        missing_families == [] and missing_fields == [] and
+          get_in(artifact, ["summary", "full_gepa_replication"]) == true
 
       artifact_lane("gepa_replication", path, artifact, max_age_hours,
         passing: passing and full,
@@ -522,6 +525,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "missing_families" => missing_families,
           "missing_fields" => missing_fields,
           "models" => rows |> Enum.map(& &1["model"]) |> Enum.reject(&is_nil/1) |> Enum.uniq(),
+          "evidence_level" => get_in(artifact, ["summary", "evidence_level"]),
           "optimizers" =>
             required_fields --
               [
