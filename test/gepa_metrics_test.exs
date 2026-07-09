@@ -421,6 +421,20 @@ defmodule GepaMetricsTest do
     assert metric.(example, DSEx.prediction(response: "bridge-ok")) == 1.0
   end
 
+  test "IFBench registry parity fixtures cover every active upstream instruction id" do
+    fixture_path = "test/fixtures/ifbench_registry_parity.jsonl"
+    fixtures = load_ifbench_parity_fixtures(fixture_path)
+    fixture_ids = fixtures |> Enum.map(& &1["instruction_id"]) |> MapSet.new()
+    registry_ids = upstream_ifbench_registry_ids()
+
+    assert MapSet.difference(registry_ids, fixture_ids) == MapSet.new()
+    assert MapSet.difference(fixture_ids, registry_ids) == MapSet.new()
+
+    if System.get_env("DSEX_IFBENCH_UPSTREAM_PARITY") == "1" do
+      run_ifbench_upstream_parity!(fixture_path, fixtures)
+    end
+  end
+
   test "LiveBenchMath metric ports AMC answer parsing cases" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{
@@ -662,5 +676,95 @@ defmodule GepaMetricsTest do
     example = DSEx.example(prompt: "p", response: "Hello, world!") |> DSEx.with_inputs(:prompt)
 
     assert metric.(example, DSEx.prediction(response: "hello world"))
+  end
+
+  defp load_ifbench_parity_fixtures(path) do
+    path
+    |> File.read!()
+    |> String.split("\n", trim: true)
+    |> Enum.map(&Jason.decode!/1)
+  end
+
+  defp upstream_ifbench_registry_ids do
+    [
+      "tmp/gepa-artifact/gepa_artifact/benchmarks/IFBench/utils_ifbench/instructions_registry.py",
+      "tmp/gepa-artifact/gepa_artifact/benchmarks/IFBench/utils_ifbench/instructions_registry_ifeval.py"
+    ]
+    |> Enum.flat_map(fn path ->
+      assert File.exists?(path), "missing upstream IFBench registry source: #{path}"
+
+      source =
+        path
+        |> File.read!()
+        |> String.split("\n")
+        |> Enum.reject(&(String.trim_leading(&1) |> String.starts_with?("#")))
+        |> Enum.join("\n")
+
+      literal_ids =
+        source
+        |> then(&Regex.scan(~r/"([^"]+:[^"]+)"\s*:/, &1))
+        |> Enum.map(fn [_, instruction_id] -> instruction_id end)
+
+      prefix_constants =
+        source
+        |> then(&Regex.scan(~r/(_[A-Z_]+)\s*=\s*"([^"]+)"/, &1))
+        |> Map.new(fn [_, name, prefix] -> {name, prefix} end)
+
+      prefixed_ids =
+        source
+        |> then(&Regex.scan(~r/(_[A-Z_]+)\s*\+\s*"([^"]+)"\s*:/, &1))
+        |> Enum.map(fn [_, name, suffix] -> Map.fetch!(prefix_constants, name) <> suffix end)
+
+      literal_ids ++ prefixed_ids
+    end)
+    |> MapSet.new()
+  end
+
+  defp run_ifbench_upstream_parity!(fixture_path, fixtures) do
+    python = System.get_env("DSEX_IFBENCH_UPSTREAM_PYTHON") || "python3"
+
+    {output, status} =
+      System.cmd(
+        python,
+        [
+          "scripts/ifbench_upstream_eval.py",
+          "--artifact-root",
+          "tmp/gepa-artifact",
+          "--fixtures",
+          fixture_path
+        ],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+
+    report = Jason.decode!(output)
+    assert report["missing_fixture_ids"] == []
+    assert report["extra_fixture_ids"] == []
+
+    by_id = Map.new(fixtures, &{&1["instruction_id"], &1})
+
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric"
+      })
+
+    Enum.each(report["results"], fn result ->
+      refute Map.has_key?(result, "error"), inspect(result)
+      assert result["upstream_following"], inspect(result)
+
+      fixture = Map.fetch!(by_id, result["instruction_id"])
+
+      example =
+        DSEx.example(
+          prompt: fixture["prompt"],
+          instruction_id_list: [fixture["instruction_id"]],
+          kwargs: [fixture["kwargs"]]
+        )
+        |> DSEx.with_inputs(:prompt)
+
+      assert metric.(example, DSEx.prediction(response: fixture["response"])) == 1.0,
+             "DSEx disagreed with upstream for #{fixture["instruction_id"]}"
+    end)
   end
 end

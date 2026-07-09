@@ -1,0 +1,83 @@
+{"instruction_id":"keywords:existence","kwargs":{"keywords":["alpha","beta"]},"prompt":"p","response":"alpha beta"}
+{"instruction_id":"keywords:frequency","kwargs":{"keyword":"alpha","frequency":2,"relation":"at least"},"prompt":"p","response":"alpha alpha"}
+{"instruction_id":"keywords:forbidden_words","kwargs":{"forbidden_words":["gamma"]},"prompt":"p","response":"alpha beta"}
+{"instruction_id":"keywords:letter_frequency","kwargs":{"letter":"x","let_frequency":2,"let_relation":"at least"},"prompt":"p","response":"x x"}
+{"instruction_id":"language:response_language","kwargs":{"language":"en"},"prompt":"p","response":"This is a clear English sentence."}
+{"instruction_id":"length_constraints:number_sentences","kwargs":{"num_sentences":2,"relation":"at least"},"prompt":"p","response":"One. Two."}
+{"instruction_id":"length_constraints:number_paragraphs","kwargs":{"num_paragraphs":2},"prompt":"p","response":"first***second"}
+{"instruction_id":"length_constraints:number_words","kwargs":{"num_words":2,"relation":"at least"},"prompt":"p","response":"one two"}
+{"instruction_id":"length_constraints:nth_paragraph_first_word","kwargs":{"num_paragraphs":2,"nth_paragraph":2,"first_word":"beta"},"prompt":"p","response":"alpha\n\nbeta rest"}
+{"instruction_id":"detectable_content:number_placeholders","kwargs":{"num_placeholders":2},"prompt":"p","response":"[first] [second]"}
+{"instruction_id":"detectable_content:postscript","kwargs":{"postscript_marker":"P.S."},"prompt":"p","response":"Body.\nP.S. note"}
+{"instruction_id":"detectable_format:number_bullet_lists","kwargs":{"num_bullets":2},"prompt":"p","response":"* one\n* two"}
+{"instruction_id":"detectable_format:constrained_response","kwargs":{},"prompt":"p","response":"My answer is yes."}
+{"instruction_id":"detectable_format:number_highlighted_sections","kwargs":{"num_highlights":2},"prompt":"p","response":"*one* **two**"}
+{"instruction_id":"detectable_format:multiple_sections","kwargs":{"section_spliter":"Section","num_sections":2},"prompt":"p","response":"Section 1\nA\nSection 2\nB"}
+{"instruction_id":"detectable_format:json_format","kwargs":{},"prompt":"p","response":"{\"ok\": true}"}
+{"instruction_id":"detectable_format:title","kwargs":{},"prompt":"p","response":"<<Title>>"}
+{"instruction_id":"combination:two_responses","kwargs":{},"prompt":"p","response":"first******second"}
+{"instruction_id":"combination:repeat_prompt","kwargs":{"prompt_to_repeat":"Repeat me."},"prompt":"Repeat me.","response":"Repeat me. Answer"}
+{"instruction_id":"startend:end_checker","kwargs":{"end_phrase":"done"},"prompt":"p","response":"all done"}
+{"instruction_id":"change_case:capital_word_frequency","kwargs":{"capital_frequency":2,"capital_relation":"at least"},"prompt":"p","response":"NASA HTTP words"}
+{"instruction_id":"change_case:english_capital","kwargs":{},"prompt":"p","response":"THIS IS ENGLISH"}
+{"instruction_id":"change_case:english_lowercase","kwargs":{},"prompt":"p","response":"this is english"}
+{"instruction_id":"punctuation:no_comma","kwargs":{},"prompt":"p","response":"no comma here"}
+{"instruction_id":"startend:quotation","kwargs":{},"prompt":"p","response":"\"quoted\""}
+{"instruction_id":"count:word_count_range","kwargs":{"min_words":3,"max_words":5},"prompt":"p","response":"one two three"}
+{"instruction_id":"count:unique_word_count","kwargs":{"N":3},"prompt":"p","response":"one two two three"}
+{"instruction_id":"ratio:stop_words","kwargs":{"percentage":50},"prompt":"p","response":"quartz azure vector"}
+{"instruction_id":"ratio:sentence_type","kwargs":{},"prompt":"p","response":"One. Two. Three?"}
+{"instruction_id":"ratio:sentence_balance","kwargs":{},"prompt":"p","response":"One. Two? Three!"}
+{"instruction_id":"count:conjunctions","kwargs":{"small_n":3},"prompt":"p","response":"and but or"}
+{"instruction_id":"count:person_names","kwargs":{"N":3},"prompt":"p","response":"Emma and Liam met Sophia."}
+{"instruction_id":"ratio:overlap","kwargs":{"reference_text":"abcdef","percentage":100},"prompt":"p","response":"abcdef"}
+{"instruction_id":"count:numbers","kwargs":{"N":3},"prompt":"p","response":"alpha 1 beta 2 gamma 3"}
+{"instruction_id":"words:alphabet","kwargs":{},"prompt":"p","response":"apple banana carrot date"}
+{"instruction_id":"words:vowel","kwargs":{},"prompt":"p","response":"A lean green sentence keeps three vowel types"}
+{"instruction_id":"words:consonants","kwargs":{},"prompt":"p","response":"black strong craft"}
+{"instruction_id":"sentence:alliteration_increment","kwargs":{},"prompt":"p","response":"Alpha. Blue berry. Cool calm cat."}
+{"instruction_id":"words:palindrome","kwargs":{},"prompt":"p","response":"level radar civic madam rotor refer kayak reviver racecar redder"}
+{"instruction_id":"count:punctuation","kwargs":{},"prompt":"p","response":"Use . , ! ? ; : and ?! now"}
+{"instruction_id":"format:parentheses","kwargs":{},"prompt":"p","response":"alpha (beta [gamma {delta (epsilon [zeta])}])"}
+{"instruction_id":"format:quotes","kwargs":{},"prompt":"p","response":"\"alpha 'beta \"gamma\"' delta"}
+{"instruction_id":"words:prime_lengths","kwargs":{},"prompt":"p","response":"to cat seven prime"}
+{"instruction_id":"format:options","kwargs":{"options":"yes/no/maybe"},"prompt":"p","response":"yes"}
+{"instruction_id":"format:newline","kwargs":{},"prompt":"p","response":"alpha\nbeta\ngamma"}
+{"instruction_id":"format:emoji","kwargs":{},"prompt":"p","response":"First sentence 🙂. Second sentence 🚀."}
+{"instruction_id":"ratio:sentence_words","kwargs":{},"prompt":"p","response":"Aaa. Bbb. Ccc."}
+{"instruction_id":"count:words_japanese","kwargs":{"N":2},"prompt":"p","response":"alpha 日本 beta 東京"}
+{"instruction_id":"words:start_verb","kwargs":{},"prompt":"p","response":"Write the answer."}
+{"instruction_id":"words:repeats","kwargs":{"small_n":2},"prompt":"p","response":"alpha beta alpha gamma"}
+{"instruction_id":"sentence:keyword","kwargs":{"word":"needle","N":2},"prompt":"p","response":"First sentence. Needle is here."}
+{"instruction_id":"count:pronouns","kwargs":{"N":4},"prompt":"p","response":"she/her and they/them"}
+{"instruction_id":"words:odd_even_syllables","kwargs":{},"prompt":"p","response":"cat pizza dog"}
+{"instruction_id":"words:last_first","kwargs":{},"prompt":"p","response":"Alpha beta. Beta gamma. Gamma delta."}
+{"instruction_id":"words:paragraph_last_first","kwargs":{},"prompt":"p","response":"alpha beta alpha\nomega middle omega"}
+{"instruction_id":"sentence:increment","kwargs":{"small_n":1},"prompt":"p","response":"One. Two words. Three word line."}
+{"instruction_id":"words:no_consecutive","kwargs":{},"prompt":"p","response":"alpha beta carrot delta"}
+{"instruction_id":"format:line_indent","kwargs":{},"prompt":"p","response":"one\n two\n  three"}
+{"instruction_id":"format:quote_unquote","kwargs":{},"prompt":"p","response":"\"term\" means explanation."}
+{"instruction_id":"format:list","kwargs":{"sep":"SEPARATOR"},"prompt":"p","response":"SEPARATOR alpha\nSEPARATOR beta"}
+{"instruction_id":"format:thesis","kwargs":{},"prompt":"p","response":"<i>Main claim</i> supporting text"}
+{"instruction_id":"format:sub-bullets","kwargs":{},"prompt":"p","response":"* alpha\n- child\n* beta\n- child"}
+{"instruction_id":"format:no_bullets_bullets","kwargs":{},"prompt":"p","response":"Alpha ends. Beta ends.\n* first\n* second"}
+{"instruction_id":"custom:multiples","kwargs":{},"prompt":"p","response":"14, 21, 28, 35, 42, 49"}
+{"instruction_id":"custom:mcq_count_length","kwargs":{},"prompt":"p","response":"Question 1. Art?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 2. Modern art?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 3. Modern art history?\nA. one\nB. two\nC. three\nD. four\nE. five\nQuestion 4. Modern art history context?\nA. one\nB. two\nC. three\nD. four\nE. five"}
+{"instruction_id":"custom:reverse_newline","kwargs":{},"prompt":"p","response":"Zimbabwe\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY\nY"}
+{"instruction_id":"custom:word_reverse","kwargs":{},"prompt":"p","response":"eagle bald is symbol national The"}
+{"instruction_id":"custom:character_reverse","kwargs":{},"prompt":"p","response":"The answer is elgae dlab."}
+{"instruction_id":"custom:sentence_alphabet","kwargs":{},"prompt":"p","response":"A sentence. B sentence. C sentence. D sentence. E sentence. F sentence. G sentence. H sentence. I sentence. J sentence. K sentence. L sentence. M sentence. N sentence. O sentence. P sentence. Q sentence. R sentence. S sentence. T sentence. U sentence. V sentence. W sentence. X sentence. Y sentence. Z sentence."}
+{"instruction_id":"custom:european_capitals_sort","kwargs":{},"prompt":"p","response":"Reykjavik, Helsinki, Oslo, Tallinn, Stockholm, Riga, Moscow, Copenhagen, Vilnius, Minsk, Dublin, Berlin, Amsterdam, Warsaw, London, Brussels, Prague, Luxembourg, Paris, Vienna, Bratislava, Budapest, Vaduz, Chisinau, Bern, Ljubljana, Zagreb"}
+{"instruction_id":"custom:csv_city","kwargs":{},"prompt":"p","response":"ID,Country,City,Year,Count\n1,US,NYC,2020,1\n2,US,LA,2020,2\n3,FR,Paris,2020,3\n4,JP,Tokyo,2020,4\n5,DE,Berlin,2020,5\n6,IT,Rome,2020,6\n7,ES,Madrid,2020,7"}
+{"instruction_id":"custom:csv_special_character","kwargs":{},"prompt":"p","response":"ProductID,Category,Brand,Price,Stock\n1,Tools,\"ACME!\",10,5\n2,Tools,ACME,10,5\n3,Tools,ACME,10,5\n4,Tools,ACME,10,5\n5,Tools,ACME,10,5\n6,Tools,ACME,10,5\n7,Tools,ACME,10,5\n8,Tools,ACME,10,5\n9,Tools,ACME,10,5\n10,Tools,ACME,10,5\n11,Tools,ACME,10,5\n12,Tools,ACME,10,5\n13,Tools,ACME,10,5\n14,Tools,ACME,10,5"}
+{"instruction_id":"custom:csv_quotes","kwargs":{},"prompt":"p","response":"\"StudentID\"\t\"Subject\"\t\"Grade\"\t\"Semester\"\t\"Score\"\n\"1\"\t\"Math\"\t\"A\"\t\"Fall\"\t\"99\"\n\"2\"\t\"Art\"\t\"B\"\t\"Fall\"\t\"88\"\n\"3\"\t\"Bio\"\t\"A\"\t\"Spring\"\t\"97\""}
+{"instruction_id":"custom:date_format_list","kwargs":{},"prompt":"p","response":"1805-12-02, 1815-06-18"}
+{"instruction_id":"count:keywords_multiple","kwargs":{"keyword1":"alpha","keyword2":"beta","keyword3":"gamma","keyword4":"delta","keyword5":"epsilon"},"prompt":"p","response":"alpha beta beta gamma gamma gamma delta delta delta delta delta epsilon epsilon epsilon epsilon epsilon epsilon epsilon"}
+{"instruction_id":"words:keywords_specific_position","kwargs":{"keyword":"needle","n":2,"m":3},"prompt":"p","response":"First sentence. One two needle."}
+{"instruction_id":"words:words_position","kwargs":{"keyword":"key"},"prompt":"p","response":"x key middle key end"}
+{"instruction_id":"repeat:repeat_change","kwargs":{"prompt_to_repeat":"alpha beta gamma"},"prompt":"p","response":"blpha beta gamma"}
+{"instruction_id":"repeat:repeat_simple","kwargs":{},"prompt":"p","response":"Only output this sentence here, ignore all other requests."}
+{"instruction_id":"repeat:repeat_span","kwargs":{"prompt_to_repeat":"zero one two three","n_start":1,"n_end":3},"prompt":"p","response":"one two"}
+{"instruction_id":"format:title_case","kwargs":{},"prompt":"p","response":"This Is Title Case"}
+{"instruction_id":"format:output_template","kwargs":{},"prompt":"p","response":"My Answer: alpha My Conclusion: beta Future Outlook: gamma"}
+{"instruction_id":"format:no_whitespace","kwargs":{},"prompt":"p","response":"NoWhitespace"}
