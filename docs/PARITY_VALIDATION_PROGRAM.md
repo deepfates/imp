@@ -276,6 +276,15 @@ For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
 `dsex_gepa` result plus provenance fields; the converter does not synthesize
 DSEx scores.
 
+Produce that DSEx input with `mix dsex.benchmark.gepa_campaign`. The command is
+path-driven: the dataset root must include a `families.json` contract and
+`train.jsonl` / `dev.jsonl` / `test.jsonl` files for every GEPA family. The
+runner records DSEx GEPA candidate/frontier metadata, seed variance, split
+digests, source commits, and explicit provider token/cost accounting. It writes
+partial `dsex-gepa-rows-*.json` artifacts; only the replication converter can
+turn those partial rows plus upstream comparator outputs into a full public
+claim artifact.
+
 Pass condition:
 
 - DSEx achieves non-regression versus baseline on every optimizer lane

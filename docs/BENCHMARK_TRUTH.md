@@ -204,18 +204,34 @@ When upstream GEPA artifact experiments have been run, convert their
 `experiment_runs_data` output into DSEx dashboard rows with:
 
 ```sh
+mix dsex.benchmark.gepa_campaign \
+  --dataset-root path/to/dsex-gepa-family-splits \
+  --campaign-id gepa-full-YYYYMMDD \
+  --model openai:gpt-4.1-mini-2025-04-14 \
+  --reflection-model openai:gpt-5 \
+  --pricing-source "provider usage export 2026-07-09" \
+  --input-tokens 123456 \
+  --output-tokens 23456 \
+  --usd 1.23 \
+  --dspy-source stanfordnlp/dspy@<sha> \
+  --gepa-artifact-source gepa-ai/gepa-artifact@<sha> \
+  --out benchmarks/results
+
 mix dsex.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
-  --dsex-input path/to/dsex-gepa-rows.json \
+  --dsex-input benchmarks/results/dsex-gepa-rows-*.json \
   --campaign-id gepa-full-YYYYMMDD \
   --artifact-model gpt-41-mini
 ```
 
-The converter reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
-`evaluation_result.txt` files and merges them with DSEx-produced `dsex_gepa`
-rows. It refuses missing families, missing comparator outputs, ambiguous
-artifact models, and DSEx rows that do not satisfy the same full-evidence
-contract.
+The DSEx campaign producer expects a `families.json` file plus one directory
+per GEPA family, each with `train.jsonl`, `dev.jsonl`, and `test.jsonl`.
+`families.json` declares each family’s signature, instructions, input keys,
+output key, program name, and metric-call budget. The converter then reads
+upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy` `evaluation_result.txt` files
+and merges them with DSEx-produced `dsex_gepa` rows. It refuses missing
+families, missing comparator outputs, ambiguous artifact models, and rows that
+do not satisfy the full-evidence contract after merge.
 
 ## Run RAG, Tool, And Agent Parity
 
