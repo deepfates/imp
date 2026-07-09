@@ -74,7 +74,9 @@ defmodule GepaCampaignTest do
             prompt =~ "num_pii_leaked" -> %{reasoning: "No PII leaked.", num_pii_leaked: 0}
             prompt =~ "judgment" -> %{reasoning: "Response A is good enough.", judgment: true}
             prompt =~ "llm_request" -> %{llm_request: "redacted request", response: "gold"}
-            true -> %{answer: "gold"}
+            prompt =~ "retrieved_docs" -> %{retrieved_docs: ["gold | supporting document"]}
+            prompt =~ "response" -> %{response: "gold"}
+            true -> %{answer: "42"}
           end
         end
       ]
@@ -112,21 +114,24 @@ defmodule GepaCampaignTest do
               "upstream_metric" => "papillon_utils.compute_overall_score"
             }
           else
+            contract = campaign_contract(family)
+
             Enum.each(["train", "dev", "test"], fn split ->
               File.write!(
                 Path.join(family_dir, "#{split}.jsonl"),
-                Jason.encode!(%{question: "#{family} #{split} question", answer: "gold"}) <> "\n"
+                campaign_record(family, split) <> "\n"
               )
             end)
 
             %{
               "family" => family,
               "program" => program,
-              "signature" => "question -> answer",
+              "signature" => contract.signature,
               "instructions" => "Answer the question.",
-              "input_keys" => ["question"],
-              "output_key" => "answer",
-              "metric_calls" => budget
+              "input_keys" => contract.input_keys,
+              "output_key" => contract.output_key,
+              "metric_calls" => budget,
+              "upstream_metric" => contract.upstream_metric
             }
           end
 
@@ -134,6 +139,93 @@ defmodule GepaCampaignTest do
       end)
 
     File.write!(Path.join(root, "families.json"), Jason.encode!(%{"families" => families}))
+  end
+
+  defp campaign_record("hoverBench", split) do
+    Jason.encode!(%{
+      claim: "hoverBench #{split} claim",
+      supporting_facts: [%{key: "gold"}],
+      label: "SUPPORTED"
+    })
+  end
+
+  defp campaign_record("AIMEBench", split) do
+    Jason.encode!(%{problem: "AIMEBench #{split} problem", answer: "42"})
+  end
+
+  defp campaign_record("HotpotQABench", split) do
+    Jason.encode!(%{question: "HotpotQABench #{split} question", answer: "42"})
+  end
+
+  defp campaign_record("IFBench", split) do
+    Jason.encode!(%{
+      prompt: "IFBench #{split} prompt",
+      instruction_id_list: ["keywords:existence"],
+      kwargs: [%{keywords: ["gold"]}]
+    })
+  end
+
+  defp campaign_record("LiveBenchMathBench", split) do
+    Jason.encode!(%{
+      question: "LiveBenchMathBench #{split} question",
+      answer: "42",
+      question_d: %{
+        task: "aime",
+        subtask: "aime_2024",
+        turns: ["LiveBenchMathBench #{split} question"],
+        ground_truth: "42",
+        question_id: "livebench-#{split}"
+      }
+    })
+  end
+
+  defp campaign_record(family, split) do
+    raise ArgumentError, "unknown campaign fixture #{inspect({family, split})}"
+  end
+
+  defp campaign_contract("AIMEBench") do
+    %{
+      signature: "problem -> answer",
+      input_keys: ["problem"],
+      output_key: "answer",
+      upstream_metric: "AIME.metric integer exact match"
+    }
+  end
+
+  defp campaign_contract("HotpotQABench") do
+    %{
+      signature: "question -> answer",
+      input_keys: ["question"],
+      output_key: "answer",
+      upstream_metric: "dspy.evaluate.answer_exact_match"
+    }
+  end
+
+  defp campaign_contract("hoverBench") do
+    %{
+      signature: "claim -> retrieved_docs",
+      input_keys: ["claim"],
+      output_key: "retrieved_docs",
+      upstream_metric: "hover_utils.discrete_retrieval_eval"
+    }
+  end
+
+  defp campaign_contract("IFBench") do
+    %{
+      signature: "prompt -> response",
+      input_keys: ["prompt"],
+      output_key: "response",
+      upstream_metric: "IFBench.ifbench_metric.metric"
+    }
+  end
+
+  defp campaign_contract("LiveBenchMathBench") do
+    %{
+      signature: "question -> answer",
+      input_keys: ["question"],
+      output_key: "answer",
+      upstream_metric: "livebench_math.calculate_livebench_score"
+    }
   end
 
   defp write_upstream_gepa_results!(artifact_dir, model) do

@@ -37,10 +37,10 @@ FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "hoverBench": {
         "module": "gepa_artifact.benchmarks.hover",
         "program": "HoverMultiHop",
-        "signature": "claim -> label",
+        "signature": "claim -> retrieved_docs",
         "instructions": "Verify the claim using retrieved supporting evidence.",
         "input_keys": ["claim"],
-        "output_key": "label",
+        "output_key": "retrieved_docs",
         "metric_calls": 7051,
         "upstream_metric": "hover_utils.discrete_retrieval_eval",
     },
@@ -121,8 +121,8 @@ def main() -> int:
                 "split_checksums": split_checksums,
                 "metric_fidelity": (
                     "upstream_metric_named_for_adapter; DSEx campaign runner ports "
-                    "deterministic adapters and falls back to output_key exact match "
-                    "for unsupported judge/symbolic branches"
+                    "deterministic adapters, Papillon judge scoring, IFBench registry "
+                    "checks, and guarded LiveBenchMath symbolic bridge branches"
                 ),
             }
         )

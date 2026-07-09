@@ -23,9 +23,9 @@ defmodule BenchmarkCatalogTest do
     assert by_id["optimizer_lift"].status == "provider_free_implemented"
     assert by_id["gepa_paper_replication"].status == "artifact_contract_implemented"
     assert by_id["factuality_classification"].status == "missing"
-    assert by_id["mipro_tabular"].status == "missing"
+    assert by_id["mipro_tabular"].status == "samplers_implemented_optimizer_scale_missing"
     assert by_id["mipro_scone"].status == "missing"
-    assert by_id["hover_verification"].status == "missing"
+    assert by_id["hover_verification"].status == "gepa_adapter_partial_retrieval_corpus_missing"
     assert by_id["ifbench_instruction_following"].status == "provider_free_implemented"
     assert by_id["hard_math"].status == "provider_free_implemented"
     assert by_id["privacy_delegation"].status == "missing"
@@ -50,6 +50,8 @@ defmodule BenchmarkCatalogTest do
     assert "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
+    assert "mix dsex.benchmark.gepa_campaign" in by_id["hover_verification"].commands
+    assert by_id["hover_verification"].next_step =~ "BM25"
     assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands
     assert "mix benchmark.truth.check" in by_id["hard_math"].commands
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"

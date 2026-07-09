@@ -232,9 +232,13 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "tabular features -> class label",
       metric: "accuracy",
       tiers: ["smoke", "research", "full_tiny"],
-      status: "missing",
-      commands: [],
-      next_step: "Add tiny tabular sampler for Iris, Iris-Typo, and Heart Disease optimizer lift."
+      status: "samplers_implemented_optimizer_scale_missing",
+      commands: [
+        "mix dsex.benchmark.fetch --tasks iris,iris_typo,heart_disease --full --out benchmarks/data",
+        "mix dsex.benchmark.run --iris benchmarks/data/iris-test-0-6.jsonl --iris-typo benchmarks/data/iris_typo-test-0-3.jsonl --heart-disease benchmarks/data/heart_disease-test-0-4.jsonl"
+      ],
+      next_step:
+        "Add optimizer-lift runs and larger pinned Iris, Iris-Typo, and Heart Disease slices when making MIPRO tabular claims."
     },
     %{
       id: "mipro_scone",
@@ -254,9 +258,10 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "claim + corpus/evidence -> supported/refuted label",
       metric: "label accuracy plus retrieval recall where available",
       tiers: ["smoke", "research", "full"],
-      status: "missing",
-      commands: [],
-      next_step: "Add HoVer sampler and retrieval-aware metric after source/license check."
+      status: "gepa_adapter_partial_retrieval_corpus_missing",
+      commands: ["mix dsex.benchmark.gepa_dataset", "mix dsex.benchmark.gepa_campaign"],
+      next_step:
+        "Pin or reproduce the upstream wiki.abstracts.2017 BM25 retriever before claiming source-exact HoVer campaign parity."
     },
     %{
       id: "ifbench_instruction_following",

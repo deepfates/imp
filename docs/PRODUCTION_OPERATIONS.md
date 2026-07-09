@@ -171,6 +171,9 @@ Source-checkout maintainer aliases:
 - GEPA paper-family artifact validation through
   `mix benchmark.gepa_replication.check`
 - RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
+- operations stress checks through `mix benchmark.operations_stress.check`
+- RLM recursive-controller benchmark checks through `mix benchmark.rlm.check`
+- upstream surface mapping through `mix upstream_fidelity.check`
 
 The live provider tests prove a real provider can execute:
 

@@ -36,6 +36,11 @@ defmodule GepaDatasetExportTest do
     papillon = Enum.find(families["families"], &(&1["family"] == "Papillon"))
     assert papillon["signature"] == "user_query -> llm_request, response"
     assert papillon["output_key"] == "response"
+
+    hover = Enum.find(families["families"], &(&1["family"] == "hoverBench"))
+    assert hover["signature"] == "claim -> retrieved_docs"
+    assert hover["output_key"] == "retrieved_docs"
+    assert hover["upstream_metric"] == "hover_utils.discrete_retrieval_eval"
   end
 
   defp write_fake_gepa_package!(root) do

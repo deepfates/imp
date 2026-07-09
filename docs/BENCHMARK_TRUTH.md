@@ -246,6 +246,11 @@ answer exact match, HoVer supporting-title retrieval, IFBench
 IFEval-style instruction constraints, Papillon LLM-judge quality/leakage
 scoring, the deterministic LiveBenchMath AMC/AIME parser paths, and
 LiveBenchMath `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
+HoVer uses the upstream `HoverMultiHop` output contract (`claim ->
+retrieved_docs`); the metric scores retrieved document titles against
+`supporting_facts`, not the entailment label. Source-exact HoVer campaign
+claims must still pin the BM25/wiki corpus provenance used for retrieval.
+GEPA
 IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages

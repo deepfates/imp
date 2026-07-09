@@ -293,12 +293,15 @@ DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
 supporting-title retrieval, IFBench IFEval-style constraints, Papillon LLM-judge
 quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME parser
 paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
-IFBench imports the larger AllenAI extended registry; unsupported extended ids
-fail closed until that ticket is complete. Papillon campaigns must pass a judge
-LM and include `metric_judge` provenance in research rows. Dedicated upstream
-fixture comparisons are still required before claiming full IFBench registry
-parity. LiveBenchMath `amps_hard` remains guarded until the SymPy/Lark symbolic
-bridge is installed and validated.
+IFBench imports the larger AllenAI extended registry; DSEx ports those registry
+checks in Elixir and keeps unknown ids fail-closed. Four IFBench NLP-dependent
+checks have native deterministic fallbacks plus a source-exact Python bridge for
+research campaigns. Papillon campaigns must pass a judge LM and include
+`metric_judge` provenance in research rows. Dedicated upstream fixture
+comparisons are still required before claiming full IFBench registry parity.
+LiveBenchMath `amps_hard` is guarded by the SymPy/Lark symbolic bridge and must
+be validated in the research campaign Python environment before claiming
+AMPS_Hard parity.
 
 Pass condition:
 

@@ -221,7 +221,7 @@ defmodule DSEx.UpstreamFidelity do
     surfaces =
       Enum.map(@surfaces, fn surface ->
         matches = Enum.filter(surface.tokens, &contains_token?(corpus, &1))
-        status = if matches == [], do: :unmapped, else: :mapped
+        status = surface_status(surface, matches)
 
         surface
         |> Map.put(:status, status)
@@ -235,12 +235,33 @@ defmodule DSEx.UpstreamFidelity do
       source_anchors: @source_anchors,
       summary: %{
         total: length(surfaces),
+        implemented: Enum.count(surfaces, &(&1.status == :implemented)),
+        needs_work: Enum.count(surfaces, &(&1.status == :needs_work)),
+        intentional_omission: Enum.count(surfaces, &(&1.status == :intentional_omission)),
         mapped: length(surfaces) - length(unmapped),
         unmapped: length(unmapped),
         passing: unmapped == []
       },
       surfaces: surfaces
     }
+  end
+
+  defp surface_status(_surface, []), do: :unmapped
+
+  defp surface_status(%{name: name}, _matches) do
+    case name do
+      name when name in ["ReActV2", "InferRules", "StatusMessage", "StatusMessageProvider"] ->
+        :needs_work
+
+      "inspect_history" ->
+        :needs_work
+
+      "ColBERTv2" ->
+        :intentional_omission
+
+      _other ->
+        :implemented
+    end
   end
 
   defp read_corpus(root) do

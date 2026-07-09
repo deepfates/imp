@@ -225,9 +225,6 @@ case live_lm.(max_completion_tokens: 100) do
 end
 ```
 
-Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs
-explicit tools, external catalogs, or bounded recursive exploration.
-
 ## GEPA-Style Reflection
 
 GEPA-style optimization keeps per-example diagnostics, reflects on misses, and
@@ -262,3 +259,6 @@ report =
 
 report.best
 ```
+
+Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs
+explicit tools, external catalogs, or bounded recursive exploration.

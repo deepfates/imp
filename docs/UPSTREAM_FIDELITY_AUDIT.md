@@ -47,30 +47,29 @@ mix dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --
 The current generated maintainer-readable map is
 [Upstream Surface Map](UPSTREAM_SURFACE_MAP.md).
 
-## Current High-Risk Gaps
+## Current Open Blockers
 
 | Area | Current finding | Ticket |
 | --- | --- | --- |
-| Upstream diffing | DSEx now has a generated 120-surface upstream-fidelity artifact and a local gate; future work should automate manifest refresh from upstream docs/source. | `de-0mhi` |
-| No-blind-spots audit | The previous audit missed RLM depth until prompted. Every dspy.ai and DeepWiki category needs explicit mapping. | `de-9mcw` |
-| RLM semantics | DSEx now covers the upstream RLM semantic checklist: persistent variable-space loop, explicit lazy loading, `llm_query_batched`, sub-LM call budgets, invalid-submit retry, extract fallback, and optimizer-visible internal predictors. | `de-ciht` |
-| RLM benchmarks | DSEx now has a provider-free HotPotQA-shaped RLM benchmark lane comparing DSEx RLM, Python DSPy RLM, direct prompting, and simple RAG. Live model-quality RLM campaigns remain a separate scale-up question. | `de-m7aa` |
 | GEPA research evidence | DSEx now has a strict GEPA paper-replication artifact lane and dashboard claim gate for AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon rows with optimizer, budget, cost, seed, and split-gap fields. Fresh paid/source-checkout campaign rows are still required before making GEPA dominance claims. | `de-izej` |
+| GEPA canonical data and adapters | The GEPA dataset exporter and metric adapters exist, but source-exact closure waits on IFBench upstream parity and HoVer BM25/wiki retrieval-corpus parity. | `de-4k3l`, `de-m5o2`, `de-izg6`, `de-7f6h` |
+| GEPA campaign runner | DSEx can produce strict `dsex_gepa` rows from a dataset root, but the ticket requires a fresh six-family provider campaign artifact, not fixture/static-LM evidence. | `de-8nbo`, `de-b10z` |
 | optimize_anything evidence | DSEx has arbitrary artifact optimization APIs, but not replication across non-prompt artifact classes. | `de-16fo` |
-| Assertions | DSEx now exposes named Elixir assertions plus assertion-guided self-refinement over ordinary programs, with feedback hints, strict mode, best-attempt metadata, streaming composition, and docs/tests. Current installed DSPy exposes `Refine`, not the older public `Assert`/`Suggest` surface, so DSEx intentionally implements the current refinement behavior rather than stale compatibility names. | `de-b79l` |
-| History | DSEx now has signature-shaped `DSEx.History` matching DSPy's task-turn primitive, Chat adapter rendering, JSON-safe dump/load, redaction, streaming composition, and an explicit boundary from provider-native role-message history. | `de-vm37` |
-| Native reasoning/BaseLM | DSEx now keeps ReqLLM as the typed provider boundary and preserves provider-native reasoning as prediction metadata, reasoning details, outbound thinking content parts, and reasoning stream chunks while keeping manual reasoning fields as ordinary signature outputs. | `de-erg0` |
-| ToolCalls | DSEx now has primitive-level tool-call constructors, OpenAI-style nested function-call normalization, formatting, tool results, ReqLLM assistant/tool message serialization, stream chunk normalization, malformed-call errors, and composition outside ReAct. | `de-e84o` |
 | Multimodal | DSEx has encoding primitives and operations stress, but not live multimodal quality benchmarks. | `de-ezg9` |
 | Optimizer completeness | InferRules and exact semantics for less-emphasized optimizer variants need explicit mapping. | `de-9x31` |
 | ReAct/CodeAct/PoT | Existing implementations need a current-source fidelity audit, including ReActV2 behavior. | `de-3uxx` |
-| Adapters | Chat/JSON/XML/TwoStep behavior is now audited against current DSPy docs, including delimiter formatting, JSON fallback, demos/history, provider-native tool-call ownership, and intentional DSEx deviations. | `de-t3uh` |
-| Evaluation/metrics | DSEx now maps evaluation and metric parity explicitly: bounded concurrent `Evaluate`, trace-aware metrics, feedback-rich metric results, evaluator error budgeting, SemanticF1/CompleteAndGrounded helper modules, extractive QA EM/F1, classification reports, passage match, retrieval recall, and dataset-backed QA/classification/retrieval evidence. | `de-bova` |
-| Retrieval/vector DBs | DSEx now maps retrieval/vector concepts explicitly: memory retrieval, one-shot and multi-hop RAG, KNN prediction, KNNFewShot, deterministic embeddings, generic HTTP retrievers, Weaviate-compatible payloads, Databricks-compatible vector-search payloads, and an intentional ColBERTv2 delegation to external retriever services through `DSEx.Retrieve`/HTTP protocols. | `de-c2we` |
 | Runtime | Settings, cache, async, streaming, and performance semantics need a current DSPy comparison. | `de-tt5j` |
 | Persistence/deployment | Save/load, compiled artifacts, credential rebinding, package usage, and deployment semantics need source-level parity mapping. | `de-g3wa` |
 | Observability | `inspect_history`, status messages, optimizer tracking, logging controls, and DSEx telemetry/dashboard need a user-facing equivalence audit. | `de-xt9k` |
 | Tutorials/examples | The dspy.ai tutorial and real-world-example surface needs mapping to DSEx docs, Livebooks, examples, benchmarks, or omissions. | `de-lof6` |
+
+## Closed Evidence
+
+Recent closed tickets established the generated upstream surface gate, RLM
+semantic and benchmark coverage, assertions/refinement behavior, history
+serialization, native reasoning metadata, tool-call primitives, adapter parity,
+evaluation/metric helpers, and retrieval/vector protocol mappings. Those rows
+remain important evidence, but they are no longer listed as open blockers here.
 
 ## Execution Order
 
@@ -84,6 +83,6 @@ The current generated maintainer-readable map is
 
 ## Claim Discipline
 
-Until the tickets above are closed, DSEx can claim broad product-quality parity
-for the already-gated surface, but it should not claim complete modern DSPy,
-GEPA, RLM, or optimize_anything research dominance.
+Until the open blockers above are closed, DSEx can claim broad product-quality
+parity for the already-gated surface, but it should not claim complete modern
+DSPy, GEPA, RLM, or optimize_anything research dominance.

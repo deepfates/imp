@@ -61,7 +61,9 @@ defmodule Mix.Tasks.Dsex.UpstreamFidelity do
     # DSEx Upstream Fidelity
 
     Total: #{report.summary.total}
-    Mapped: #{report.summary.mapped}
+    Implemented: #{report.summary.implemented}
+    Needs work: #{report.summary.needs_work}
+    Intentional omissions: #{report.summary.intentional_omission}
     Unmapped: #{report.summary.unmapped}
     Passing: #{report.summary.passing}
 

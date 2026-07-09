@@ -6,9 +6,15 @@ defmodule DSEx.UpstreamFidelityTest do
 
     assert report.summary.total > 100
     assert report.summary.unmapped == 0
+    assert report.summary.needs_work > 0
     assert report.summary.passing
 
     names = MapSet.new(report.surfaces, & &1.name)
+    by_name = Map.new(report.surfaces, &{&1.name, &1})
+
+    assert by_name["ReActV2"].status == :needs_work
+    assert by_name["InferRules"].status == :needs_work
+    assert by_name["ColBERTv2"].status == :intentional_omission
 
     for required <- [
           "RLM",

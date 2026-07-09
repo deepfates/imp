@@ -184,9 +184,6 @@ case live_lm.(max_completion_tokens: 120) do
 end
 ```
 
-Next: open `livebooks/03_evaluate_and_optimize.livemd` to turn examples into a
-metric, evaluate the baseline, and compile a better program.
-
 ## Save And Load
 
 Program state can be saved without serializing provider secrets. That makes it
@@ -201,3 +198,6 @@ File.rm(path)
 
 loaded.signature |> DSEx.Signature.to_spec()
 ```
+
+Next: open `livebooks/03_evaluate_and_optimize.livemd` to turn examples into a
+metric, evaluate the baseline, and compile a better program.

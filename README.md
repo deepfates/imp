@@ -85,8 +85,9 @@ runtime dependency.
 
 For the canonical real-LM walkthrough, open
 `livebooks/01_real_lm_front_door.livemd`. It walks through structured extraction,
-changing modules, ReAct tools, evaluation, optimization, and save/load using
-`OPENAI_API_KEY` and `OPENAI_MODEL`.
+changing modules, ReAct tools, and save/load using `OPENAI_API_KEY` and
+`OPENAI_MODEL`. Livebook 03 covers evaluation and optimization, including the
+live-provider proof path for those workflows.
 
 You can also build the same program without the pipe:
 
