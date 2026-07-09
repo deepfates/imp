@@ -1,5 +1,5 @@
 defmodule GepaMetricsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   test "AIME metric parses integer answers exactly" do
     metric =
@@ -195,7 +195,7 @@ defmodule GepaMetricsTest do
     assert metric.(usamo, DSEx.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
   end
 
-  test "LiveBenchMath AMPS_Hard branch is guarded until the symbolic bridge is installed" do
+  test "LiveBenchMath AMPS_Hard branch uses the symbolic bridge contract" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
@@ -215,7 +215,66 @@ defmodule GepaMetricsTest do
       )
       |> DSEx.with_inputs(:question)
 
-    assert_raise ArgumentError, ~r/AMPS_Hard scoring requires/, fn ->
+    bridge =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-livebench-bridge-#{System.unique_integer([:positive])}.py"
+      )
+
+    File.write!(bridge, """
+    import json, sys
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["task"] == "amps_hard"
+    assert payload["ground_truth"] == "\\\\frac{1}{2}"
+    assert payload["answer"] == "\\\\boxed{1/2}"
+    print(json.dumps({"score": 1, "parsed_answer": "1/2"}))
+    """)
+
+    previous_bridge = System.get_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+    System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", bridge)
+
+    on_exit(fn ->
+      if previous_bridge,
+        do: System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", previous_bridge),
+        else: System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+
+      File.rm(bridge)
+    end)
+
+    assert metric.(example, DSEx.prediction(answer: "\\boxed{1/2}")) == 1.0
+  end
+
+  test "LiveBenchMath AMPS_Hard default bridge fails clearly without symbolic dependencies" do
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "livebench_math.calculate_livebench_score",
+        "output_key" => "answer"
+      })
+
+    example =
+      DSEx.example(
+        question: "Solve.",
+        answer: "\\frac{1}{2}",
+        question_d: %{
+          "task" => "amps_hard",
+          "subtask" => "amps_hard_algebra",
+          "turns" => ["Solve."],
+          "ground_truth" => "\\frac{1}{2}"
+        }
+      )
+      |> DSEx.with_inputs(:question)
+
+    previous_bridge = System.get_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+    System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+
+    on_exit(fn ->
+      if previous_bridge,
+        do: System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", previous_bridge),
+        else: System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+    end)
+
+    assert_raise ArgumentError, ~r/AMPS_Hard scoring bridge failed/, fn ->
       metric.(example, DSEx.prediction(answer: "\\boxed{1/2}"))
     end
   end

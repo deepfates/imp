@@ -350,8 +350,7 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
         livebench_proof_rearrangement_score(to_string(ground_truth), answer)
 
       String.contains?(to_string(task), "amps_hard") ->
-        raise ArgumentError,
-              "LiveBenchMath AMPS_Hard scoring requires the upstream SymPy/Lark symbolic bridge; install the Python math dependencies before claiming AMPS_Hard parity"
+        livebench_amps_hard_score(ground_truth, answer)
 
       true ->
         raise ArgumentError,
@@ -489,6 +488,42 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     else
       1.0 - distance / denominator
     end
+  end
+
+  defp livebench_amps_hard_score(ground_truth, answer) do
+    bridge = System.get_env("DSEX_LIVEBENCH_MATH_BRIDGE") || default_livebench_bridge()
+    python = System.get_env("DSEX_LIVEBENCH_MATH_PYTHON") || "python3"
+
+    payload_path =
+      Path.join(System.tmp_dir!(), "dsex-livebench-#{System.unique_integer([:positive])}.json")
+
+    File.write!(
+      payload_path,
+      Jason.encode!(%{"task" => "amps_hard", "ground_truth" => ground_truth, "answer" => answer})
+    )
+
+    try do
+      case System.cmd(python, [bridge, payload_path], stderr_to_stdout: true) do
+        {output, 0} ->
+          output
+          |> Jason.decode!()
+          |> Map.fetch!("score")
+          |> numeric_score!()
+
+        {output, status} ->
+          raise ArgumentError,
+                "LiveBenchMath AMPS_Hard scoring bridge failed with status #{status}: #{String.trim(output)}"
+      end
+    after
+      File.rm(payload_path)
+    end
+  end
+
+  defp default_livebench_bridge do
+    __ENV__.file
+    |> Path.dirname()
+    |> Path.join("../../../scripts/livebench_math_score.py")
+    |> Path.expand()
   end
 
   defp extract_expression_completions(generation) do
@@ -778,6 +813,23 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
   end
 
   defp parse_number(_value), do: nil
+
+  defp numeric_score!(value) when is_integer(value), do: value * 1.0
+  defp numeric_score!(value) when is_float(value), do: value
+
+  defp numeric_score!(value) when is_binary(value) do
+    case Float.parse(value) do
+      {score, _rest} ->
+        score
+
+      :error ->
+        raise ArgumentError, "LiveBenchMath bridge returned non-numeric score: #{inspect(value)}"
+    end
+  end
+
+  defp numeric_score!(value) do
+    raise ArgumentError, "LiveBenchMath bridge returned non-numeric score: #{inspect(value)}"
+  end
 
   defp exact_output(output_key) do
     fn example, prediction ->

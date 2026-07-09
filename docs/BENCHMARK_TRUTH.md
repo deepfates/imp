@@ -251,7 +251,10 @@ naming the judge model plus quality/leakage judge semantics; the full GEPA
 replication contract rejects Papillon rows without that provenance. Unknown
 LiveBenchMath task branches now fail closed. LiveBenchMath `amps_hard` remains
 guarded because upstream uses SymPy/Lark symbolic equivalence; install and
-validate the symbolic Python bridge before claiming AMPS_Hard parity.
+validate the symbolic Python bridge before claiming AMPS_Hard parity. The
+default bridge is `scripts/livebench_math_score.py`; pin
+`DSEX_LIVEBENCH_MATH_PYTHON` and, when needed, `DSEX_LIVEBENCH_MATH_BRIDGE` for
+research campaigns.
 
 ## Run RAG, Tool, And Agent Parity
 
