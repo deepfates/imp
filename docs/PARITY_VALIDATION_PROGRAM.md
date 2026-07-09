@@ -269,6 +269,13 @@ non-placeholder comparator sources, distinct train/dev/test split digests, and
 positive live token/cost accounting. SIMBA is optional extra comparator
 evidence, not a required optimizer in the upstream GEPA artifact.
 
+For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
+--from-gepa-artifact ... --dsex-input ...` to convert upstream GEPA artifact
+`Baseline`, `GEPA`, and `MIPROv2-Heavy` outputs into dashboard rows. The
+`--dsex-input` file must come from DSEx's own GEPA run and provide the
+`dsex_gepa` result plus provenance fields; the converter does not synthesize
+DSEx scores.
+
 Pass condition:
 
 - DSEx achieves non-regression versus baseline on every optimizer lane

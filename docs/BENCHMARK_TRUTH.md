@@ -200,6 +200,23 @@ split digests, and positive live token/cost accounting. SIMBA can appear as an
 extra comparator when a campaign includes it, but it is not part of the upstream
 GEPA artifact's required optimizer list.
 
+When upstream GEPA artifact experiments have been run, convert their
+`experiment_runs_data` output into DSEx dashboard rows with:
+
+```sh
+mix dsex.benchmark.gepa_replication \
+  --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
+  --dsex-input path/to/dsex-gepa-rows.json \
+  --campaign-id gepa-full-YYYYMMDD \
+  --artifact-model gpt-41-mini
+```
+
+The converter reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
+`evaluation_result.txt` files and merges them with DSEx-produced `dsex_gepa`
+rows. It refuses missing families, missing comparator outputs, ambiguous
+artifact models, and DSEx rows that do not satisfy the same full-evidence
+contract.
+
 ## Run RAG, Tool, And Agent Parity
 
 ```sh

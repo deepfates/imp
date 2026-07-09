@@ -86,6 +86,44 @@ defmodule GepaReplicationArtifactTest do
            ]
   end
 
+  test "GEPA replication task converts upstream GEPA artifact outputs plus DSEx rows" do
+    artifact_dir = tmp_dir("gepa-artifact-output")
+    out_dir = tmp_dir("gepa-artifact-converted")
+    write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
+    dsex_input = write_rows!("dsex-gepa-rows", full_rows())
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+
+      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        "--from-gepa-artifact",
+        artifact_dir,
+        "--dsex-input",
+        dsex_input,
+        "--campaign-id",
+        "gepa-conversion-test",
+        "--artifact-model",
+        "gpt-41-mini",
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "gepa-replication-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    assert artifact["summary"]["full_gepa_replication"]
+    assert artifact["source"]["input"] == artifact_dir
+
+    assert Enum.all?(artifact["rows"], fn row ->
+             get_in(row, ["results", "baseline", "source"]) =~ "gepa-artifact Baseline" and
+               get_in(row, ["results", "dspy_gepa", "source"]) =~ "gepa-artifact GEPA" and
+               get_in(row, ["results", "mipro_v2", "source"]) =~
+                 "gepa-artifact MIPROv2-Heavy" and
+               get_in(row, ["results", "dsex_gepa", "source"]) == "DSEx GEPA runner artifact"
+           end)
+  end
+
   test "GEPA replication smoke runner exercises DSEx GEPA without authorizing research claims" do
     out_dir = tmp_dir("gepa-replication-smoke")
 
@@ -136,6 +174,39 @@ defmodule GepaReplicationArtifactTest do
     ]
     |> Enum.map(fn {family, program, budget} ->
       full_row(family, program, budget)
+    end)
+  end
+
+  defp write_upstream_gepa_results!(artifact_dir, model) do
+    Enum.each(full_rows(), fn row ->
+      family = row["family"]
+      program = row["program"]
+
+      [
+        {"Baseline", 0.5},
+        {"GEPA", 0.6},
+        {"MIPROv2-Heavy", 0.55}
+      ]
+      |> Enum.each(fn {optimizer, score} ->
+        run_dir =
+          Path.join([
+            artifact_dir,
+            "experiment_runs",
+            "seed_0",
+            "#{family}_#{program}_#{optimizer}_#{model}",
+            "evaluation_results"
+          ])
+
+        File.mkdir_p!(run_dir)
+
+        File.write!(
+          Path.join(run_dir, "evaluation_result.txt"),
+          """
+          score,cost,input_tokens,output_tokens
+          #{score},0.25,1000,200
+          """
+        )
+      end)
     end)
   end
 
