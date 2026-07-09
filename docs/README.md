@@ -81,3 +81,5 @@ catalog is the maintainer starting point for outside-view validation work.
   against DSPy, DeepWiki, GEPA, optimize_anything, and the associated papers.
 - [Upstream Surface Map](UPSTREAM_SURFACE_MAP.md): generated maintainer map of
   tracked upstream surfaces and their current DSEx mapping.
+- [Adapter Fidelity](ADAPTER_FIDELITY.md): Chat, JSON, XML, TwoStep, tool,
+  history, and provider-native adapter semantics.

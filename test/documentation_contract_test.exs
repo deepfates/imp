@@ -83,6 +83,19 @@ defmodule DocumentationContractTest do
     refute body =~ "regressions have tickets"
   end
 
+  test "adapter fidelity audit names upstream semantics and DSEx evidence" do
+    body = File.read!("docs/ADAPTER_FIDELITY.md")
+    readme = File.read!("docs/README.md")
+
+    assert readme =~ "ADAPTER_FIDELITY.md"
+    assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
+    assert body =~ "JSON fallback"
+    assert body =~ "DSEx.Adapter.JSON.lm_opts/2"
+    assert body =~ "DSEx.Clients.ReqLLM"
+    assert body =~ "Intentional Deviations"
+    assert body =~ "semantic: field names, delimiter structure, demo/history turn shape"
+  end
+
   test "user-facing docs name the executable Livebook proof" do
     assert File.read!("README.md") =~ "mix livebook.execute.check"
     assert File.read!("docs/README.md") =~ "mix livebook.execute.check"

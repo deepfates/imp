@@ -64,7 +64,7 @@ The current generated maintainer-readable map is
 | Multimodal | DSEx has encoding primitives and operations stress, but not live multimodal quality benchmarks. | `de-ezg9` |
 | Optimizer completeness | InferRules and exact semantics for less-emphasized optimizer variants need explicit mapping. | `de-9x31` |
 | ReAct/CodeAct/PoT | Existing implementations need a current-source fidelity audit, including ReActV2 behavior. | `de-3uxx` |
-| Adapters | Chat/JSON/XML/TwoStep behavior needs current-source comparison, including native tool formatting and failure modes. | `de-t3uh` |
+| Adapters | Chat/JSON/XML/TwoStep behavior is now audited against current DSPy docs, including delimiter formatting, JSON fallback, demos/history, provider-native tool-call ownership, and intentional DSEx deviations. | `de-t3uh` |
 | Evaluation/metrics | Evaluate, SemanticF1, CompleteAndGrounded, feedback-rich metrics, and aggregate behavior need source-level parity mapping. | `de-bova` |
 | Retrieval/vector DBs | ColBERTv2, embeddings, KNN, KNNFewShot, external stores, and multi-hop RAG need explicit mapping and evidence. | `de-c2we` |
 | Runtime | Settings, cache, async, streaming, and performance semantics need a current DSPy comparison. | `de-tt5j` |
