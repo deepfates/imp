@@ -31,11 +31,24 @@ Every upstream surface must land in exactly one state:
 
 Unmapped upstream surfaces are release blockers for comparative claims.
 
+The source checkout enforces this with:
+
+```sh
+mix upstream_fidelity.check
+```
+
+The underlying task writes a JSON artifact and fails when any tracked upstream
+surface is unmapped:
+
+```sh
+mix dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped
+```
+
 ## Current High-Risk Gaps
 
 | Area | Current finding | Ticket |
 | --- | --- | --- |
-| Upstream diffing | DSEx has a hand-maintained coverage matrix, but no generated gate that compares against current DSPy docs/API/source categories. | `de-0mhi` |
+| Upstream diffing | DSEx now has a generated 74-surface upstream-fidelity artifact and a local gate; future work should automate manifest refresh from upstream docs/source. | `de-0mhi` |
 | No-blind-spots audit | The previous audit missed RLM depth until prompted. Every dspy.ai and DeepWiki category needs explicit mapping. | `de-9mcw` |
 | RLM semantics | DSEx has a JSON-action RLM controller, but DSPy RLM includes persistent REPL semantics, `llm_query_batched`, extract fallback, `SandboxSerializable`, and optimizer-visible action/extract predictors. | `de-ciht` |
 | RLM benchmarks | Existing live RLM proof is an immediate-submit smoke, not a long-context RLM benchmark or DSPy comparison. | `de-m7aa` |

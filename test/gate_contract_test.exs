@@ -23,7 +23,12 @@ defmodule GateContractTest do
              "benchmark.operations_stress.check",
              "benchmark.overhead.check",
              "benchmark.optimizer_lift.check",
-             "benchmark.rag_tool_agent.check"
+             "benchmark.rag_tool_agent.check",
+             "upstream_fidelity.check"
+           ]
+
+    assert Keyword.fetch!(aliases, :"upstream_fidelity.check") == [
+             "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped"
            ]
 
     retired_gate = String.to_atom("v2" <> ".check")

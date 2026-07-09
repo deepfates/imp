@@ -75,7 +75,8 @@ defmodule DSEx.MixProject do
           "benchmark.overhead.check": :test,
           "benchmark.rag_tool_agent.check": :test,
           "benchmark.parity.check": :test,
-          "benchmark.parity.full": :test
+          "benchmark.parity.full": :test,
+          "upstream_fidelity.check": :test
         ]
     else
       base_preferred_envs
@@ -249,7 +250,11 @@ defmodule DSEx.MixProject do
         "benchmark.operations_stress.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
-        "benchmark.rag_tool_agent.check"
+        "benchmark.rag_tool_agent.check",
+        "upstream_fidelity.check"
+      ],
+      "upstream_fidelity.check": [
+        "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
