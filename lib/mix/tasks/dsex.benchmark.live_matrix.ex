@@ -30,6 +30,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
           max_age_hours: :integer,
           campaign_id: :string,
           campaign_ids: :string,
+          availability_file: :string,
           historical_unavailable_note: :string
         ]
       )
@@ -127,13 +128,46 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
     do: Enum.filter(artifacts, &(&1["campaign_id"] in campaign_ids))
 
   defp unavailable_notes(opts) do
+    file_notes =
+      opts
+      |> Keyword.get(:availability_file, "benchmarks/model_availability.json")
+      |> unavailable_notes_from_file()
+
     note =
       Keyword.get(opts, :historical_unavailable_note) ||
         System.get_env("DSEX_HISTORICAL_UNAVAILABLE_NOTE")
 
-    case blank?(note) do
-      true -> %{}
-      false -> %{"historical_research" => String.trim(note)}
+    explicit_notes =
+      case blank?(note) do
+        true -> %{}
+        false -> %{"historical_research" => String.trim(note)}
+      end
+
+    Map.merge(file_notes, explicit_notes)
+  end
+
+  defp unavailable_notes_from_file(nil), do: %{}
+
+  defp unavailable_notes_from_file(path) do
+    if File.exists?(path) do
+      path
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.get("unavailable_lanes", %{})
+      |> Enum.reduce(%{}, fn
+        {lane, %{"note" => note}}, acc when is_binary(note) ->
+          Map.put(acc, lane, String.trim(note))
+
+        {lane, note}, acc when is_binary(note) ->
+          Map.put(acc, lane, String.trim(note))
+
+        _other, acc ->
+          acc
+      end)
+      |> Enum.reject(fn {_lane, note} -> blank?(note) end)
+      |> Map.new()
+    else
+      %{}
     end
   end
 
@@ -879,10 +913,35 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
       "models" => Enum.map(candidates, & &1["model"]),
       "best_model" => best && best["model"],
       "best_status" => best_status(candidates),
+      "best_parity" => best && parity_summary(best["parity"]),
+      "best_proof" =>
+        best &&
+          Map.take(best["proof"] || %{}, [
+            "fresh",
+            "evidence_policy_current",
+            "prompt_contract_current",
+            "effective_generation_complete",
+            "effective_generation_matched",
+            "wire_api_matched",
+            "max_concurrency_consistent"
+          ]),
       "coverage" => lane_coverage_progress(candidates, best),
       "cost" => lane_cost_progress(candidates, best)
     }
   end
+
+  defp parity_summary(%{} = parity) do
+    Map.take(parity, [
+      "aggregate_gap",
+      "max_task_score_gap",
+      "strict_aggregate_gap",
+      "strict_task_gap",
+      "latency_parity",
+      "max_latency_ratio_dsex_over_dspy"
+    ])
+  end
+
+  defp parity_summary(_parity), do: nil
 
   defp unavailable_note_allowed?("historical_research", note) when is_binary(note), do: true
   defp unavailable_note_allowed?(_tag, _note), do: false

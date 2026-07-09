@@ -40,7 +40,7 @@ defmodule Mix.Tasks.Dsex.GateEvidence do
       :timer.tc(fn ->
         System.cmd(mix_executable!(), [mix_task],
           cd: File.cwd!(),
-          env: env_file_values(env_files) ++ env,
+          env: DSEx.BenchmarkEnv.values_from_files!(env_files) ++ env,
           stderr_to_stdout: true
         )
       end)
@@ -80,56 +80,6 @@ defmodule Mix.Tasks.Dsex.GateEvidence do
       },
       "output_tail" => output_tail(output)
     }
-  end
-
-  defp env_file_values(paths) do
-    paths
-    |> Enum.flat_map(fn path ->
-      if File.exists?(path) do
-        path
-        |> File.read!()
-        |> String.split("\n")
-        |> Enum.flat_map(&parse_env_line/1)
-      else
-        Mix.raise("env file not found: #{path}")
-      end
-    end)
-  end
-
-  defp parse_env_line(line) do
-    line = String.trim(line)
-
-    cond do
-      line == "" or String.starts_with?(line, "#") ->
-        []
-
-      true ->
-        line
-        |> String.trim_leading("export ")
-        |> String.split("=", parts: 2)
-        |> case do
-          [key, value] when key != "" ->
-            [{key, unquote_env_value(value)}]
-
-          _ ->
-            []
-        end
-    end
-  end
-
-  defp unquote_env_value(value) do
-    value = String.trim(value)
-
-    cond do
-      String.starts_with?(value, "\"") and String.ends_with?(value, "\"") ->
-        value |> String.trim_leading("\"") |> String.trim_trailing("\"")
-
-      String.starts_with?(value, "'") and String.ends_with?(value, "'") ->
-        value |> String.trim_leading("'") |> String.trim_trailing("'")
-
-      true ->
-        value
-    end
   end
 
   defp env(opts) do

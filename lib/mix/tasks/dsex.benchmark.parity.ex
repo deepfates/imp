@@ -29,6 +29,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
+    DSEx.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
     configure_req_llm_pool!(opts)
     Mix.Task.run("app.start")
 
@@ -233,6 +234,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         dsex_model: :string,
         dspy_model: :string,
         api_key_env: :string,
+        env_file: :string,
         campaign_id: :string,
         temperature: :float,
         max_tokens: :integer,

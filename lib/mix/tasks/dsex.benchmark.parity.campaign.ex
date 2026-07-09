@@ -38,6 +38,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
           model: :string,
           dspy_model: :string,
           api_key_env: :string,
+          env_file: :string,
           gsm8k: :string,
           hotpotqa: :string,
           chunk_size: :integer,
@@ -58,6 +59,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       )
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
+    DSEx.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
 
     model = Keyword.get(opts, :model) || Mix.raise("--model is required")
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
@@ -278,6 +280,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       generation_args(opts) ++
       dspy_model_args(opts) ++
       api_key_env_args(opts) ++
+      env_file_args(opts) ++
       req_llm_pool_args(opts) ++
       dataset_args(chunk_plan) ++
       python_args(opts)
@@ -315,6 +318,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
   defp api_key_env_args(opts) do
     []
     |> maybe_arg("--api-key-env", Keyword.get(opts, :api_key_env))
+  end
+
+  defp env_file_args(opts) do
+    opts
+    |> Keyword.get_values(:env_file)
+    |> Enum.flat_map(&["--env-file", &1])
   end
 
   defp req_llm_pool_args(opts) do

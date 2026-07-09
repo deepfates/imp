@@ -62,6 +62,11 @@ consumes those artifacts as the `product_package`, `livebook_execute`,
 loads `.env` and sets `LIVE_PROVIDER=1`; it still requires provider credentials
 in the ignored local `.env` file.
 
+Live matched-model evidence also consumes `benchmarks/model_availability.json`
+for documented external model unavailability. That file can unblock a historical
+lane only when the historical endpoint itself is no longer a stable provider
+baseline; it cannot replace current-model coverage.
+
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
 work queue: either produce the missing evidence, narrow or remove the claim, or

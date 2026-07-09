@@ -222,7 +222,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     lane = req["lane"] || parent_lane
     status = req["status"] || "present"
     model = req["best_model"] || req["models"] || "unknown model"
-    suffix = coverage_suffix(req["coverage"]) <> cost_suffix(req["cost"])
+
+    suffix =
+      coverage_suffix(req["coverage"]) <> parity_suffix(req["parity"]) <> cost_suffix(req["cost"])
 
     "#{lane}: #{model} is #{status}, not full live evidence#{suffix}"
   end
@@ -783,6 +785,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
                 "models" => status["models"] || [],
                 "best_model" => status["best_model"],
                 "policy" => status["policy"],
+                "parity" => status["best_parity"],
+                "proof" => status["best_proof"],
                 "coverage" => status["coverage"],
                 "cost" => status["cost"],
                 "message" =>

@@ -1876,6 +1876,7 @@ defmodule BenchmarkTruthTest do
           temperature: 0.0,
           max_tokens: 700,
           reasoning_effort: "low",
+          env_file: ".env",
           req_llm_pool_protocols: "http2",
           req_llm_pool_count: 16
         ],
@@ -1896,12 +1897,15 @@ defmodule BenchmarkTruthTest do
 
     assert Enum.at(args, dspy_model_index + 1) == "responses/gpt-5.4-mini"
     reasoning_effort_index = Enum.find_index(args, &(&1 == "--reasoning-effort"))
+    env_file_index = Enum.find_index(args, &(&1 == "--env-file"))
 
     assert Enum.at(args, reasoning_effort_index + 1) == "low"
+    assert Enum.at(args, env_file_index + 1) == ".env"
     assert "--model" in args
     assert "--runner-order" in args
     assert "--gsm8k" in args
     assert "--api-key-env" in args
+    assert "--env-file" in args
     assert "--req-llm-pool-protocols" in args
     assert "--req-llm-pool-count" in args
   end
@@ -2253,6 +2257,69 @@ defmodule BenchmarkTruthTest do
     assert required["frontier_sanity"]["policy"]["required_scale"] == "research_sample"
     assert required["historical_research"]["satisfied"]
     assert required["historical_research"]["policy"]["required_scale"] == "research_sample"
+  end
+
+  test "live matrix consumes model availability evidence for historical lane" do
+    out_dir = tmp_dir("live-matrix-availability")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    availability_path = Path.join(out_dir, "model_availability.json")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "current-full.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-haiku-4-5",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
+      "parity" => %{"full_parity" => true, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_campaign_artifact(in_dir, "frontier-sample.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    write_json!(availability_path, %{
+      "schema_version" => 1,
+      "unavailable_lanes" => %{
+        "historical_research" => %{
+          "note" => "Historical GPT-3.5 snapshots are unavailable."
+        }
+      }
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir,
+        "--availability-file",
+        availability_path
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+    matrix = matrix_path |> File.read!() |> Jason.decode!()
+    required = matrix["summary"]["required_lanes"]
+
+    assert matrix["summary"]["matrix_complete"]
+    assert required["historical_research"]["satisfied"]
+    assert required["historical_research"]["satisfaction"] == "explicit_unavailable"
+
+    assert required["historical_research"]["availability"] == %{
+             "status" => "explicit_unavailable",
+             "note" => "Historical GPT-3.5 snapshots are unavailable."
+           }
   end
 
   test "live matrix refuses research-sample release proof without consistent concurrency" do
@@ -3691,6 +3758,8 @@ defmodule BenchmarkTruthTest do
 
     File.write!(Path.join(out_dir, name), Jason.encode!(artifact, pretty: true) <> "\n")
   end
+
+  defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true) <> "\n")
 
   defp write_legacy_campaign_artifact(out_dir, name, artifact) do
     artifact = Map.put_new(artifact, "evidence_policy", current_evidence_policy())

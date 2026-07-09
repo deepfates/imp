@@ -364,6 +364,7 @@ mix dsex.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
+  --env-file .env \
   --offset 0 \
   --max-examples 100 \
   --max-concurrency 8 \
@@ -383,6 +384,7 @@ mix dsex.benchmark.parity.campaign \
   --model "$CURRENT_LOW_COST_MODEL" \
   --dspy-model "$CURRENT_LOW_COST_DSPY_MODEL" \
   --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
+  --env-file .env \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --chunk-size 100 \
@@ -408,6 +410,7 @@ mix dsex.benchmark.parity.campaign \
   --model "$DSEX_PROVIDER_MODEL" \
   --dspy-model "$DSEX_DSPY_MODEL" \
   --api-key-env PROVIDER_API_KEY \
+  --env-file .env \
   --req-llm-pool-protocols http1 \
   --req-llm-pool-count 16 \
   --chunk-size 100 \
@@ -453,6 +456,14 @@ contracts so latency evidence cannot be mixed accidentally.
 
 If `--campaign-id` is omitted, the campaign task creates a unique id for that
 invocation. Reuse an explicit id when resuming a long full campaign later.
+
+`mix benchmark.live_matrix` also reads `benchmarks/model_availability.json` by
+default. Use that file for documented external model unavailability, not for
+convenience skips. For example, historical GPT-3.5 snapshots that are no longer
+stable API baselines can satisfy the `historical_research` lane only when the
+file names the unavailable lane, explains the limitation, and links to provider
+deprecation evidence. Current-model full coverage remains required for the
+`current_low_cost` lane.
 
 Concurrency improves wall-clock time by issuing independent row calls in
 parallel on both the DSEx and Python DSPy sides. It does not reduce the number
