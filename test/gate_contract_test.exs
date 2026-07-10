@@ -30,7 +30,7 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"upstream_fidelity.check") == [
-             "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped"
+             "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
            ]
 
     retired_gate = String.to_atom("v2" <> ".check")

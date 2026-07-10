@@ -173,7 +173,7 @@ Source-checkout maintainer aliases:
 - RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
 - operations stress checks through `mix benchmark.operations_stress.check`
 - RLM recursive-controller benchmark checks through `mix benchmark.rlm.check`
-- upstream surface mapping through `mix upstream_fidelity.check`
+- pinned executable upstream conformance through `mix upstream_fidelity.check`
 
 The live provider tests prove a real provider can execute:
 

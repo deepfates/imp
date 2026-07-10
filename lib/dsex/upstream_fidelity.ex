@@ -1,10 +1,30 @@
 defmodule DSEx.UpstreamFidelity do
   @moduledoc false
 
+  @stable_baseline %{
+    project: "stanfordnlp/dspy",
+    version: "3.2.1",
+    git_ref: "refs/tags/3.2.1",
+    tag_object_sha: "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376",
+    git_sha: "29448ae12756abdd14bd8796c819247ebb83673c",
+    released_on: "2026-05-05",
+    api_index: "https://dspy.ai/api/",
+    api_manifest_sha256: "3e6243532fba8a8412850cb6b3f5c277c044c3f021c5626869db74665b1e933d"
+  }
+
+  @prerelease_tracking %{
+    project: "stanfordnlp/dspy",
+    version: "3.3.0b1",
+    git_ref: "refs/tags/3.3.0b1",
+    tag_object_sha: "ee3687c36e832010a38c4091fcb8cf1d4c9fb841",
+    git_sha: "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+    release_blocking: false,
+    tracked_surfaces: ["BaseLM normalized runtime", "ReActV2", "GEPA 0.1.1 result contract"]
+  }
+
   @source_anchors %{
+    dspy: "https://github.com/stanfordnlp/dspy",
     dspy_docs: "https://dspy.ai/",
-    dspy_rlm: "https://dspy.ai/diving-deeper/rlm/",
-    deepwiki: "https://deepwiki.com/stanfordnlp/dspy",
     dspy_paper: "arXiv:2310.03714",
     dsp_paper: "arXiv:2212.14024",
     assertions_paper: "arXiv:2312.13382",
@@ -15,275 +35,770 @@ defmodule DSEx.UpstreamFidelity do
     gepa_repo: "https://github.com/gepa-ai/gepa"
   }
 
-  @surfaces [
-    %{category: :deepwiki, name: "Overview", tokens: ["Overview"]},
+  @stable_api_manifest """
+                       Adapter
+                       Audio
+                       BestOfN
+                       BetterTogether
+                       BootstrapFewShot
+                       BootstrapFewShotWithRandomSearch
+                       BootstrapFinetune
+                       BootstrapRS
+                       COPRO
+                       ChainOfThought
+                       ChatAdapter
+                       Citations
+                       Code
+                       CodeAct
+                       ColBERTv2
+                       CompleteAndGrounded
+                       Document
+                       Embedder
+                       Embeddings
+                       Ensemble
+                       Evaluate
+                       EvaluationResult
+                       Example
+                       GEPA
+                       GEPA advanced
+                       History
+                       Image
+                       InferRules
+                       InputField
+                       JSONAdapter
+                       KNN
+                       KNNFewShot
+                       LM
+                       LabeledFewShot
+                       MIPROv2
+                       Module
+                       MultiChainComparison
+                       OutputField
+                       Parallel
+                       Predict
+                       Prediction
+                       ProgramOfThought
+                       PythonInterpreter
+                       RLM
+                       ReAct
+                       Refine
+                       SIMBA
+                       SemanticF1
+                       Signature
+                       StatusMessage
+                       StatusMessageProvider
+                       StreamListener
+                       Tool
+                       ToolCalls
+                       TwoStepAdapter
+                       XMLAdapter
+                       answer_exact_match
+                       answer_passage_match
+                       asyncify
+                       configure
+                       configure_cache
+                       context
+                       disable_litellm_logging
+                       disable_logging
+                       enable_litellm_logging
+                       enable_logging
+                       inspect_history
+                       load
+                       streamify
+                       """
+                       |> String.split("\n", trim: true)
+
+  @ledger [
     %{
-      category: :deepwiki,
-      name: "Introduction & Core Concepts",
-      tokens: ["Core Programming Model"]
+      id: "programming.contracts",
+      category: :programming_model,
+      upstream: ["Signature", "InputField", "OutputField", "Example", "Prediction", "History"],
+      source: "dspy/signatures; dspy/primitives",
+      disposition: :conformant,
+      dsex: [DSEx.Signature, DSEx.Example, DSEx.Prediction, DSEx.History],
+      invariants: [
+        "signatures declare named typed inputs and outputs",
+        "examples distinguish inputs from labels",
+        "predictions retain structured fields and metadata",
+        "history is signature-shaped and serializable"
+      ],
+      evidence: %{
+        tests: ["test/dsex_test.exs", "test/schema_constraints_test.exs", "test/history_test.exs"],
+        docs: ["docs/API_GUIDE.md", "livebooks/02_programming_not_prompting.livemd"]
+      }
     },
     %{
-      category: :deepwiki,
-      name: "Use Cases & Applications",
-      tokens: ["Tutorial and real-world example parity"]
+      id: "programming.modules",
+      category: :programming_model,
+      upstream: ["Module", "Predict", "ChainOfThought", "MultiChainComparison", "Parallel"],
+      source: "dspy/primitives/module.py; dspy/predict",
+      disposition: :conformant,
+      dsex: [
+        DSEx.Module,
+        DSEx.Predict.Predict,
+        DSEx.Predict.ChainOfThought,
+        DSEx.Predict.MultiChainComparison,
+        DSEx.Predict.Parallel
+      ],
+      invariants: [
+        "programs are composable callable values",
+        "Predict binds a signature to an LM and adapter",
+        "ChainOfThought extends the output contract with reasoning",
+        "parallel execution preserves input order and failures"
+      ],
+      evidence: %{
+        tests: [
+          "test/public_surface_test.exs",
+          "test/property_invariants_test.exs",
+          "test/live_provider_e2e_test.exs"
+        ],
+        docs: ["README.md", "docs/API_GUIDE.md"]
+      }
     },
     %{
-      category: :deepwiki,
-      name: "Installation & Quick Start",
-      tokens: ["Getting Started", "Learning Path"]
-    },
-    %{category: :deepwiki, name: "Community & Resources", tokens: ["Prior Art"]},
-    %{category: :deepwiki, name: "Core Architecture", tokens: ["Architecture"]},
-    %{category: :deepwiki, name: "Package Structure & Public API", tokens: ["Public facade"]},
-    %{category: :deepwiki, name: "Language Model Integration", tokens: ["ReqLLM", "DSEx.LM"]},
-    %{category: :deepwiki, name: "Signatures & Task Definition", tokens: ["DSEx.Signature"]},
-    %{category: :deepwiki, name: "Adapter System", tokens: ["Adapter fidelity audit"]},
-    %{category: :deepwiki, name: "Module System & Base Classes", tokens: ["DSEx.Module"]},
-    %{category: :deepwiki, name: "Example & Data Primitives", tokens: ["DSEx.Example"]},
-    %{category: :deepwiki, name: "Building DSPy Programs", tokens: ["Build With DSEx"]},
-    %{category: :deepwiki, name: "Predict Module", tokens: ["Predict"]},
-    %{
-      category: :deepwiki,
-      name: "Reasoning Strategies",
-      tokens: ["ChainOfThought", "ProgramOfThought"]
-    },
-    %{
-      category: :deepwiki,
-      name: "Tool Integration & Function Calling",
-      tokens: ["ToolCalls", "ReAct"]
-    },
-    %{
-      category: :deepwiki,
-      name: "Custom Types & Multimodal Support",
-      tokens: ["Multimodal primitives"]
+      id: "models.runtime",
+      category: :model_runtime,
+      upstream: ["BaseLM", "LM", "Embedder", "configure", "context", "Errors"],
+      source: "dspy/clients; dspy/dsp/utils/settings.py; dspy/utils/exceptions.py",
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "ReqLLM owns provider transport while DSEx owns program semantics; process-local context replaces Python context variables.",
+      dsex: [DSEx.LM, DSEx.Clients.ReqLLM, DSEx.Embeddings, DSEx.Settings],
+      invariants: [
+        "provider transport is injectable and normalized",
+        "request context is isolated across BEAM processes",
+        "credentials never enter portable program state",
+        "provider errors retain actionable categories"
+      ],
+      evidence: %{
+        tests: [
+          "test/req_llm_client_test.exs",
+          "test/otp_state_semantics_test.exs",
+          "test/live_provider_test.exs"
+        ],
+        docs: ["docs/ARCHITECTURE.md", "docs/PRODUCTION_OPERATIONS.md"]
+      }
     },
     %{
-      category: :deepwiki,
-      name: "Module Composition & Refinement",
-      tokens: ["Refine", "BestOfN"]
-    },
-    %{category: :deepwiki, name: "History & Conversation Management", tokens: ["History"]},
-    %{category: :deepwiki, name: "Program Optimization", tokens: ["Optimization"]},
-    %{category: :deepwiki, name: "Optimization Overview", tokens: ["Optimizers"]},
-    %{category: :deepwiki, name: "Evaluation Framework", tokens: ["Evaluation"]},
-    %{category: :deepwiki, name: "Few-Shot Optimizers", tokens: ["FewShot"]},
-    %{
-      category: :deepwiki,
-      name: "MIPROv2: Instruction & Parameter Optimization",
-      tokens: ["MIPROv2"]
-    },
-    %{
-      category: :deepwiki,
-      name: "GEPA & SIMBA: Reflective and Stochastic Optimization",
-      tokens: ["GEPA", "SIMBA"]
-    },
-    %{
-      category: :deepwiki,
-      name: "Fine-tuning & Weight Optimization",
-      tokens: ["BootstrapFinetune", "GRPO"]
-    },
-    %{category: :deepwiki, name: "Advanced Features", tokens: ["Advanced DSEx"]},
-    %{
-      category: :deepwiki,
-      name: "Caching & Performance Optimization",
-      tokens: ["Cache", "performance"]
-    },
-    %{category: :deepwiki, name: "Parallel & Async Execution", tokens: ["Parallel", "async"]},
-    %{category: :deepwiki, name: "Streaming Output", tokens: ["Streaming"]},
-    %{
-      category: :deepwiki,
-      name: "State Management & Serialization",
-      tokens: ["save/load", "serialization"]
-    },
-    %{category: :deepwiki, name: "Assertions & Output Validation", tokens: ["Assertions"]},
-    %{category: :deepwiki, name: "Code Execution & Sandboxing", tokens: ["DSEx.Sandbox"]},
-    %{
-      category: :deepwiki,
-      name: "Configuration & Integration",
-      tokens: ["configure", "integration"]
+      id: "models.normalized_runtime_prerelease",
+      category: :model_runtime,
+      upstream: [
+        "3.3 BaseLM normalized requests/responses",
+        "LMRequest",
+        "LMResponse",
+        "LMStream"
+      ],
+      source: "dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.0b1",
+      disposition: :tracking,
+      release_blocking: false,
+      ticket: "de-tt5j",
+      dsex: [DSEx.Core.LMRequest, DSEx.Core.LMResponse],
+      invariants: ["stable DSPy remains the release baseline until 3.3 is final"],
+      evidence: %{
+        tests: ["test/req_llm_client_test.exs"],
+        docs: ["docs/UPSTREAM_FIDELITY_AUDIT.md"]
+      }
     },
     %{
-      category: :deepwiki,
-      name: "Settings & Configuration Management",
-      tokens: ["DSEx.Settings"]
+      id: "adapters.structured_io",
+      category: :adapters,
+      upstream: ["Adapter", "ChatAdapter", "JSONAdapter", "XMLAdapter", "TwoStepAdapter"],
+      source: "dspy/adapters",
+      disposition: :conformant,
+      dsex: [
+        DSEx.Adapter,
+        DSEx.Adapter.Chat,
+        DSEx.Adapter.JSON,
+        DSEx.Adapter.XML,
+        DSEx.Adapter.TwoStep
+      ],
+      invariants: [
+        "adapters format signature fields and demonstrations",
+        "structured parsers validate output contracts and return retry feedback",
+        "tool and history messages survive provider normalization"
+      ],
+      evidence: %{
+        tests: ["test/production_adapter_persistence_test.exs", "test/golden_trace_test.exs"],
+        docs: ["docs/ADAPTER_FIDELITY.md", "docs/API_GUIDE.md"]
+      }
     },
-    %{category: :deepwiki, name: "Model Providers & LiteLLM Integration", tokens: ["ReqLLM"]},
     %{
-      category: :deepwiki,
-      name: "Vector Databases & Retrieval",
-      tokens: ["Retrieval and vector database parity"]
+      id: "primitives.multimodal",
+      category: :primitives,
+      upstream: ["Image", "Audio", "File", "Code", "Document", "Citations", "Reasoning"],
+      source: "dspy/adapters/types; dspy/experimental",
+      disposition: :gap,
+      ticket: "de-ezg9",
+      dsex: [DSEx.Adapters.Types],
+      invariants: ["encoding support is not evidence of model reasoning quality"],
+      evidence: %{
+        tests: ["test/multimodal_adapter_test.exs"],
+        docs: ["docs/API_GUIDE.md"],
+        missing: ["live image task", "live document task", "quality and failure artifact"]
+      }
     },
-    %{category: :deepwiki, name: "Observability & Monitoring", tokens: ["observability"]},
-    %{category: :deepwiki, name: "External Framework Integration", tokens: ["MCP", "ReqLLM"]},
-    %{category: :deepwiki, name: "Model Context Protocol (MCP)", tokens: ["MCP"]},
-    %{category: :deepwiki, name: "Development & Contributing", tokens: ["release gates"]},
-    %{category: :deepwiki, name: "Build System & CI/CD", tokens: ["production.check"]},
-    %{category: :deepwiki, name: "Testing Framework", tokens: ["test/"]},
-    %{category: :deepwiki, name: "Documentation System", tokens: ["docs", "Livebooks"]},
-    %{category: :deepwiki, name: "Package Metadata & Release Process", tokens: ["package.check"]},
-    %{category: :deepwiki, name: "Glossary", tokens: ["Glossary"]},
-    %{category: :adapters, name: "Adapter", tokens: ["DSEx.Adapter"]},
-    %{category: :adapters, name: "ChatAdapter", tokens: ["DSEx.Adapter.Chat"]},
-    %{category: :adapters, name: "JSONAdapter", tokens: ["DSEx.Adapter.JSON"]},
-    %{category: :adapters, name: "XMLAdapter", tokens: ["DSEx.Adapter.XML"]},
-    %{category: :adapters, name: "TwoStepAdapter", tokens: ["DSEx.Adapter.TwoStep"]},
-    %{category: :evaluation, name: "CompleteAndGrounded", tokens: ["CompleteAndGrounded"]},
-    %{category: :evaluation, name: "Evaluate", tokens: ["DSEx.Evaluate"]},
-    %{category: :evaluation, name: "EvaluationResult", tokens: ["EvaluationResult", "Report"]},
-    %{category: :evaluation, name: "SemanticF1", tokens: ["SemanticF1"]},
-    %{category: :evaluation, name: "answer_exact_match", tokens: ["exact_match"]},
-    %{category: :evaluation, name: "answer_passage_match", tokens: ["extractive_qa"]},
-    %{category: :experimental, name: "Citations", tokens: ["Citation"]},
-    %{category: :experimental, name: "Document", tokens: ["Document"]},
-    %{category: :models, name: "BaseLM", tokens: ["BaseLM", "typed LM"]},
-    %{category: :models, name: "Embedder", tokens: ["Embeddings", "Embedder"]},
-    %{category: :models, name: "LM", tokens: ["DSEx.LM", "ReqLLM"]},
-    %{category: :modules, name: "BestOfN", tokens: ["BestOfN"]},
-    %{category: :modules, name: "ChainOfThought", tokens: ["ChainOfThought"]},
-    %{category: :modules, name: "CodeAct", tokens: ["CodeAct"]},
-    %{category: :modules, name: "Module", tokens: ["DSEx.Module"]},
-    %{category: :modules, name: "MultiChainComparison", tokens: ["MultiChainComparison"]},
-    %{category: :modules, name: "Parallel", tokens: ["Parallel"]},
-    %{category: :modules, name: "Predict", tokens: ["Predict"]},
-    %{category: :modules, name: "ProgramOfThought", tokens: ["ProgramOfThought"]},
-    %{category: :modules, name: "ReAct", tokens: ["ReAct"]},
-    %{category: :modules, name: "ReActV2", tokens: ["ReActV2", "de-3uxx"]},
-    %{category: :modules, name: "Refine", tokens: ["Refine"]},
-    %{category: :modules, name: "RLM", tokens: ["RLM"]},
-    %{category: :optimizers, name: "BetterTogether", tokens: ["BetterTogether"]},
-    %{category: :optimizers, name: "BootstrapFewShot", tokens: ["BootstrapFewShot"]},
     %{
-      category: :optimizers,
-      name: "BootstrapFewShotWithRandomSearch",
-      tokens: ["BootstrapFewShotWithRandomSearch", "RandomSearch"]
+      id: "tools.typed_calls",
+      category: :tools_agents,
+      upstream: ["Tool", "ToolCalls", "ToolCallResults", "MCP"],
+      source: "dspy/adapters/types/tool.py; dspy/utils/mcp.py",
+      disposition: :conformant,
+      dsex: [DSEx.Tool, DSEx.MCP],
+      invariants: [
+        "tool schemas are validated before execution",
+        "provider tool-call ids and results are retained",
+        "MCP discovery creates ordinary DSEx tools"
+      ],
+      evidence: %{
+        tests: [
+          "test/react_contract_test.exs",
+          "test/mcp_import_test.exs",
+          "test/protocol_mcp/provider_mcp_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md", "livebooks/04_tools_agents_mcp_rlm.livemd"]
+      }
     },
-    %{category: :optimizers, name: "BootstrapFinetune", tokens: ["BootstrapFinetune"]},
-    %{category: :optimizers, name: "BootstrapRS", tokens: ["BootstrapRS", "RandomSearch"]},
-    %{category: :optimizers, name: "COPRO", tokens: ["COPRO"]},
-    %{category: :optimizers, name: "Ensemble", tokens: ["Ensemble"]},
-    %{category: :optimizers, name: "GEPA", tokens: ["GEPA"]},
-    %{category: :optimizers, name: "InferRules", tokens: ["InferRules", "de-9x31"]},
-    %{category: :optimizers, name: "KNN", tokens: ["KNN"]},
-    %{category: :optimizers, name: "KNNFewShot", tokens: ["KNNFewShot"]},
-    %{category: :optimizers, name: "LabeledFewShot", tokens: ["LabeledFewShot"]},
-    %{category: :optimizers, name: "MIPROv2", tokens: ["MIPROv2"]},
-    %{category: :optimizers, name: "SIMBA", tokens: ["SIMBA"]},
-    %{category: :primitives, name: "Audio", tokens: ["Audio"]},
-    %{category: :primitives, name: "Code", tokens: ["Code"]},
-    %{category: :primitives, name: "Example", tokens: ["DSEx.Example"]},
-    %{category: :primitives, name: "History", tokens: ["History"]},
-    %{category: :primitives, name: "Image", tokens: ["Image"]},
-    %{category: :primitives, name: "Prediction", tokens: ["DSEx.Prediction"]},
-    %{category: :primitives, name: "Tool", tokens: ["DSEx.Tool"]},
-    %{category: :primitives, name: "ToolCalls", tokens: ["ToolCalls"]},
-    %{category: :signatures, name: "InputField", tokens: ["InputField", "Signature.Field"]},
-    %{category: :signatures, name: "OutputField", tokens: ["OutputField", "Signature.Field"]},
-    %{category: :signatures, name: "Signature", tokens: ["DSEx.Signature"]},
-    %{category: :tools, name: "ColBERTv2", tokens: ["ColBERTv2", "de-c2we"]},
-    %{category: :tools, name: "Embeddings", tokens: ["Embeddings"]},
-    %{category: :tools, name: "PythonInterpreter", tokens: ["PythonInterpreter", "DSEx.Sandbox"]},
-    %{category: :utils, name: "Errors", tokens: ["Errors", "Exceptions"]},
-    %{category: :utils, name: "configure", tokens: ["configure"]},
-    %{category: :utils, name: "context", tokens: ["context"]},
-    %{category: :utils, name: "StatusMessage", tokens: ["StatusMessage", "de-xt9k"]},
     %{
-      category: :utils,
-      name: "StatusMessageProvider",
-      tokens: ["StatusMessageProvider", "de-xt9k"]
+      id: "agents.react_family",
+      category: :tools_agents,
+      upstream: ["ReAct", "ReActV2", "CodeAct", "ProgramOfThought", "PythonInterpreter"],
+      source: "dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py",
+      disposition: :gap,
+      ticket: "de-3uxx",
+      dsex: [
+        DSEx.Predict.ReAct,
+        DSEx.Predict.CodeAct,
+        DSEx.Predict.ProgramOfThought,
+        DSEx.Sandbox
+      ],
+      invariants: [
+        "each module preserves upstream control-loop and termination semantics",
+        "ReActV2 native history/tool-call semantics are either implemented or explicitly excluded",
+        "code execution uses a documented Elixir security boundary"
+      ],
+      evidence: %{
+        tests: [
+          "test/react_contract_test.exs",
+          "test/completion_surface_test.exs",
+          "test/live_provider_e2e_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md"],
+        missing: ["ReActV2", "source-fidelity audit", "live CodeAct user story"]
+      }
     },
-    %{category: :utils, name: "StreamListener", tokens: ["StreamListener", "Streaming"]},
-    %{category: :utils, name: "asyncify", tokens: ["async", "Parallel"]},
-    %{category: :utils, name: "configure_cache", tokens: ["Cache"]},
-    %{category: :utils, name: "inspect_history", tokens: ["inspect_history", "de-xt9k"]},
-    %{category: :utils, name: "load", tokens: ["load"]},
-    %{category: :utils, name: "streamify", tokens: ["stream", "Streaming"]},
-    %{category: :advanced, name: "Assertions", tokens: ["Assertions", "de-b79l"]},
-    %{category: :advanced, name: "MCP", tokens: ["MCP"]},
-    %{category: :advanced, name: "Saving and loading", tokens: ["save/load", "Saving"]},
-    %{category: :advanced, name: "Deployment", tokens: ["Deployment"]},
-    %{category: :advanced, name: "Debugging and observability", tokens: ["observability"]},
-    %{category: :advanced, name: "optimize_anything", tokens: ["optimize_anything"]},
     %{
-      category: :advanced,
-      name: "Recursive Language Models paper",
-      tokens: ["RLM paper", "de-m7aa"]
+      id: "agents.rlm",
+      category: :tools_agents,
+      upstream: ["RLM", "SandboxSerializable", "Recursive Language Models paper"],
+      source: "dspy/predict/rlm.py; arXiv:2512.24601",
+      disposition: :gap,
+      ticket: "de-c7ui",
+      dsex: [DSEx.Predict.RLM, DSEx.Predict.RLM.SandboxSerializable],
+      invariants: [
+        "large inputs remain external to the controller prompt",
+        "the controller can inspect, compute, subquery, batch, recurse, and submit",
+        "resource budgets are enforced and observable",
+        "paper-scale effectiveness is compared with upstream"
+      ],
+      evidence: %{
+        tests: ["test/rlm_test.exs"],
+        docs: ["livebooks/04_tools_agents_mcp_rlm.livemd"],
+        missing: [
+          "live RLM user story",
+          "current upstream matched benchmark",
+          "paper-scale reproduction"
+        ]
+      }
+    },
+    %{
+      id: "composition.refinement",
+      category: :programming_model,
+      upstream: ["BestOfN", "Refine", "Assertions"],
+      source: "dspy/predict/best_of_n.py; refine.py; assertions paper",
+      disposition: :conformant,
+      dsex: [DSEx.Predict.BestOfN, DSEx.Predict.Refine, DSEx.Predict.Assertions],
+      invariants: [
+        "metrics select or refine predictions",
+        "feedback is retained and fed into retries",
+        "strict assertions fail explicitly"
+      ],
+      evidence: %{
+        tests: [
+          "test/refine_feedback_test.exs",
+          "test/assertions_test.exs",
+          "test/live_provider_e2e_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md"]
+      }
+    },
+    %{
+      id: "evaluation.metrics",
+      category: :evaluation,
+      upstream: [
+        "Evaluate",
+        "EvaluationResult",
+        "answer_exact_match",
+        "answer_passage_match",
+        "SemanticF1",
+        "CompleteAndGrounded"
+      ],
+      source: "dspy/evaluate",
+      disposition: :conformant,
+      dsex: [
+        DSEx.Evaluate,
+        DSEx.Metrics,
+        DSEx.Evaluate.SemanticF1,
+        DSEx.Evaluate.CompleteAndGrounded
+      ],
+      invariants: [
+        "boolean, numeric, and feedback-bearing metrics normalize consistently",
+        "evaluation retains per-row outputs, failures, scores, and traces",
+        "concurrency does not reorder rows or lose process context"
+      ],
+      evidence: %{
+        tests: [
+          "test/metric_contract_test.exs",
+          "test/dsex_test.exs",
+          "test/property_invariants_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md", "livebooks/03_evaluate_and_optimize.livemd"]
+      }
+    },
+    %{
+      id: "optimization.few_shot",
+      category: :optimization,
+      upstream: [
+        "LabeledFewShot",
+        "BootstrapFewShot",
+        "BootstrapFewShotWithRandomSearch",
+        "BootstrapRS",
+        "KNN",
+        "KNNFewShot"
+      ],
+      source: "dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py",
+      disposition: :gap,
+      ticket: "de-9x31",
+      dsex: [
+        DSEx.Optimizer.LabeledFewShot,
+        DSEx.Optimizer.BootstrapFewShot,
+        DSEx.Optimizer.RandomSearch,
+        DSEx.Optimizer.KNNFewShot
+      ],
+      invariants: [
+        "successful traces become module-specific demonstrations",
+        "teacher and student programs remain distinct",
+        "candidate selection uses held-out evaluation"
+      ],
+      evidence: %{
+        tests: ["test/optimizer_behavioral_corpus_test.exs"],
+        docs: ["docs/API_GUIDE.md"],
+        missing: ["source-level algorithm audit", "matched optimizer-lift campaign"]
+      }
+    },
+    %{
+      id: "optimization.instructions",
+      category: :optimization,
+      upstream: ["COPRO", "MIPROv2", "SIMBA", "InferRules", "SignatureOptimizer"],
+      source:
+        "dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py",
+      disposition: :gap,
+      ticket: "de-9x31",
+      dsex: [
+        DSEx.Optimizer.COPRO,
+        DSEx.Optimizer.MIPROv2,
+        DSEx.Optimizer.SIMBA,
+        DSEx.Optimizer.SignatureOptimizer
+      ],
+      invariants: [
+        "public names preserve the upstream optimization mechanism",
+        "proposal, bootstrapping, search, and selection stages are independently observable",
+        "optimization demonstrates held-out lift under matched budgets"
+      ],
+      evidence: %{
+        tests: ["test/optimizer_behavioral_corpus_test.exs"],
+        docs: ["docs/API_GUIDE.md"],
+        missing: ["InferRules", "faithful MIPROv2", "faithful SIMBA", "paper-scale lift evidence"]
+      }
+    },
+    %{
+      id: "optimization.gepa",
+      category: :optimization,
+      upstream: ["GEPA", "GEPA advanced", "GEPA 0.1.1 result contract"],
+      source: "dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457",
+      disposition: :gap,
+      ticket: "de-izej",
+      dsex: [DSEx.Optimizer.GEPA, DSEx.Optimize.GEPA],
+      invariants: [
+        "reflective mutation uses per-example feedback and trajectories",
+        "candidate lineage and Pareto state are retained",
+        "result shape is source-versioned",
+        "paper families reproduce under matched budgets"
+      ],
+      evidence: %{
+        tests: ["test/optimize_gepa_test.exs", "test/gepa_replication_artifact_test.exs"],
+        docs: ["docs/ADVANCED.md"],
+        missing: [
+          "faithful program-level GEPA",
+          "GEPA 0.1.1 result parity",
+          "non-smoke paper-family campaigns"
+        ]
+      }
+    },
+    %{
+      id: "optimization.weights",
+      category: :optimization,
+      upstream: ["BootstrapFinetune", "GRPO", "BetterTogether", "Ensemble"],
+      source: "dspy/teleprompt/bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py",
+      disposition: :gap,
+      ticket: "de-9x31",
+      dsex: [
+        DSEx.Optimizer.BootstrapFinetune,
+        DSEx.Optimizer.GRPO,
+        DSEx.Optimizer.BetterTogether,
+        DSEx.Optimizer.Ensemble
+      ],
+      invariants: [
+        "training jobs execute through a real provider lifecycle",
+        "BetterTogether composes arbitrary named optimizers by strategy",
+        "compiled programs bind trained model state portably"
+      ],
+      evidence: %{
+        tests: [
+          "test/provider_training_lifecycle_test.exs",
+          "test/protocol_training/provider_training_lifecycle_test.exs"
+        ],
+        docs: ["docs/ADVANCED.md"],
+        missing: [
+          "real training lifecycle",
+          "trained model rebinding",
+          "matched BetterTogether effectiveness"
+        ]
+      }
+    },
+    %{
+      id: "optimization.anything",
+      category: :optimization,
+      upstream: ["optimize_anything", "arbitrary text artifacts"],
+      source: "arXiv:2605.19633; gepa-ai optimize-anything",
+      disposition: :gap,
+      ticket: "de-16fo",
+      dsex: [DSEx.Optimize.Anything],
+      invariants: [
+        "artifacts are not limited to prompts",
+        "feedback is per-task and per-metric",
+        "search retains lineage and Pareto trade-offs",
+        "paper tasks reproduce at meaningful scale"
+      ],
+      evidence: %{
+        tests: ["test/optimize_anything_test.exs"],
+        docs: ["docs/ADVANCED.md"],
+        missing: ["non-prompt replication suite", "paper-scale comparison"]
+      }
+    },
+    %{
+      id: "retrieval.data",
+      category: :retrieval,
+      upstream: [
+        "Retrieve",
+        "Embeddings",
+        "ColBERTv2",
+        "WeaviateRM",
+        "DatabricksRM",
+        "built-in datasets",
+        "DataLoader"
+      ],
+      source: "dspy/retrievers; dspy/datasets",
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "DSEx owns retrieval protocols and composition while production indexes remain replaceable services; embedded ColBERT is intentionally omitted.",
+      dsex: [DSEx.Retrieve, DSEx.Embeddings, DSEx.Retrievers.HTTP, DSEx.Datasets],
+      invariants: [
+        "retrievers return ranked normalized documents",
+        "external protocols are contract tested",
+        "dataset splits and provenance are explicit"
+      ],
+      evidence: %{
+        tests: [
+          "test/external_retriever_test.exs",
+          "test/datasets_contract_test.exs",
+          "test/integration/local_service_e2e_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md", "docs/ARCHITECTURE.md"]
+      }
+    },
+    %{
+      id: "runtime.async_stream_cache",
+      category: :runtime,
+      upstream: [
+        "asyncify",
+        "syncify",
+        "ParallelExecutor",
+        "streamify",
+        "StreamListener",
+        "configure_cache",
+        "track_usage"
+      ],
+      source: "dspy/utils; dspy/streaming; dspy/clients/cache.py",
+      disposition: :gap,
+      ticket: "de-tt5j",
+      dsex: [DSEx.Tasks, DSEx.Streaming, DSEx.Cache],
+      invariants: [
+        "work is supervised and cancellable",
+        "stream events preserve final results and errors",
+        "cache policy and usage accounting are configurable",
+        "provider-free overhead is measured against upstream"
+      ],
+      evidence: %{
+        tests: ["test/task_supervision_test.exs", "test/production_hardening_test.exs"],
+        docs: ["docs/ARCHITECTURE.md"],
+        missing: [
+          "cancellation parity",
+          "stream listener parity",
+          "cache policy parity",
+          "current overhead comparison"
+        ]
+      }
+    },
+    %{
+      id: "runtime.observability",
+      category: :runtime,
+      upstream: [
+        "inspect_history",
+        "StatusMessage",
+        "StatusMessageProvider",
+        "disable_litellm_logging",
+        "disable_logging",
+        "enable_litellm_logging",
+        "enable_logging",
+        "optimizer tracking"
+      ],
+      source: "dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs",
+      disposition: :gap,
+      ticket: "de-xt9k",
+      dsex: [DSEx.Telemetry, DSEx.Streaming.Messages],
+      invariants: [
+        "developers can inspect model, tool, optimizer, and RLM traces",
+        "progress is observable without parsing internal structs",
+        "all emitted data is redacted"
+      ],
+      evidence: %{
+        tests: ["test/support/telemetry_helpers.ex", "test/history_test.exs"],
+        docs: ["docs/PRODUCTION_OPERATIONS.md"],
+        missing: [
+          "public trace inspector",
+          "optimizer progress provider",
+          "logging control user story"
+        ]
+      }
+    },
+    %{
+      id: "state.persistence_deployment",
+      category: :operations,
+      upstream: ["Module.save", "Module.load", "load", "dump_state", "load_state", "deployment"],
+      source: "dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs",
+      disposition: :gap,
+      ticket: "de-g3wa",
+      dsex: [DSEx.Saving],
+      invariants: [
+        "portable state round-trips transactionally",
+        "credentials are excluded",
+        "compiled optimizer state remains executable",
+        "deployment from a clean package is documented and tested"
+      ],
+      evidence: %{
+        tests: ["test/production_adapter_persistence_test.exs", "test/package_contract_test.exs"],
+        docs: ["docs/PRODUCTION_OPERATIONS.md"],
+        missing: [
+          "all public program types",
+          "transactional load",
+          "deployment reference application"
+        ]
+      }
+    },
+    %{
+      id: "product.learning_path",
+      category: :product,
+      upstream: [
+        "getting started",
+        "tutorials",
+        "real-world examples",
+        "API reference",
+        "production guide"
+      ],
+      source: "dspy/docs/docs",
+      disposition: :gap,
+      ticket: "de-2ia5",
+      dsex: [DSEx],
+      invariants: [
+        "one progressive path teaches the complete product",
+        "examples use canonical public APIs",
+        "credential-gated cells prove provider-relevant behavior",
+        "documentation never outruns evidence"
+      ],
+      evidence: %{
+        tests: ["test/livebook_contract_test.exs", "test/documentation_contract_test.exs"],
+        docs: ["README.md", "docs/README.md", "livebooks/01_real_lm_front_door.livemd"],
+        missing: [
+          "complete upstream tutorial mapping",
+          "faithful optimizer curriculum",
+          "paper reproduction curriculum"
+        ]
+      }
+    },
+    %{
+      id: "product.release",
+      category: :product,
+      upstream: [
+        "installable package",
+        "versioned release",
+        "security policy",
+        "CI",
+        "clean-room consumer"
+      ],
+      source: "Hex package and canonical GitHub repository",
+      disposition: :gap,
+      ticket: "de-p29x",
+      dsex: [DSEx],
+      invariants: [
+        "documented installation resolves",
+        "license and release metadata ship",
+        "security and quality gates pass",
+        "a clean project consumes the exact artifact"
+      ],
+      evidence: %{
+        tests: ["test/package_contract_test.exs"],
+        docs: ["README.md", "docs/RELEASE_CRITERIA.md"],
+        missing: [
+          "GitHub remote",
+          "Hex release",
+          "LICENSE",
+          "green security audit",
+          "release stewardship"
+        ]
+      }
     }
   ]
 
   @doc false
-  def surfaces, do: @surfaces
+  def baseline, do: @stable_baseline
+
+  @doc false
+  def prerelease_tracking, do: @prerelease_tracking
+
+  @doc false
+  def stable_api_manifest, do: @stable_api_manifest
+
+  @doc false
+  def surfaces, do: @ledger
 
   @doc false
   def report(opts \\ []) do
     root = Keyword.get(opts, :root, File.cwd!())
-    corpus = read_corpus(root)
+    rows = Enum.map(@ledger, &evaluate_row(&1, root))
+    blocking = Enum.filter(rows, &release_blocking_gap?/1)
+    {manifest_missing, manifest_duplicates} = manifest_errors(rows)
 
-    surfaces =
-      Enum.map(@surfaces, fn surface ->
-        matches = Enum.filter(surface.tokens, &contains_token?(corpus, &1))
-        status = surface_status(surface, matches)
-
-        surface
-        |> Map.put(:status, status)
-        |> Map.put(:matches, matches)
-      end)
-
-    unmapped = Enum.filter(surfaces, &(&1.status == :unmapped))
+    manifest_blockers =
+      Enum.map(manifest_missing, &"upstream.manifest.missing:#{&1}") ++
+        Enum.map(manifest_duplicates, &"upstream.manifest.duplicate:#{&1}")
 
     %{
+      schema_version: 2,
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+      baseline: @stable_baseline,
+      prerelease_tracking: @prerelease_tracking,
       source_anchors: @source_anchors,
       summary: %{
-        total: length(surfaces),
-        implemented: Enum.count(surfaces, &(&1.status == :implemented)),
-        needs_work: Enum.count(surfaces, &(&1.status == :needs_work)),
-        intentional_omission: Enum.count(surfaces, &(&1.status == :intentional_omission)),
-        mapped: length(surfaces) - length(unmapped),
-        unmapped: length(unmapped),
-        passing: unmapped == []
+        total: length(rows),
+        conformant: Enum.count(rows, &(&1.status == :conformant)),
+        elixir_native_equivalent: Enum.count(rows, &(&1.status == :elixir_native_equivalent)),
+        tracking: Enum.count(rows, &(&1.status == :tracking)),
+        gaps: Enum.count(rows, &(&1.status == :gap)),
+        invalid_evidence: Enum.count(rows, &(&1.status == :invalid_evidence)),
+        manifest_missing: length(manifest_missing),
+        manifest_duplicates: length(manifest_duplicates),
+        release_blockers: length(blocking) + length(manifest_blockers),
+        passing: blocking == [] and manifest_blockers == []
       },
-      surfaces: surfaces
+      manifest: %{
+        expected: @stable_api_manifest,
+        missing: manifest_missing,
+        duplicates: manifest_duplicates
+      },
+      blocking_ids: Enum.map(blocking, & &1.id) ++ manifest_blockers,
+      surfaces: rows
     }
   end
 
-  defp surface_status(_surface, []), do: :unmapped
+  defp manifest_errors(rows) do
+    ownership_counts =
+      rows
+      |> Enum.reject(&(&1.disposition == :tracking))
+      |> Enum.flat_map(& &1.upstream)
+      |> Enum.frequencies()
 
-  defp surface_status(%{name: name}, _matches) do
-    case name do
-      name when name in ["ReActV2", "InferRules", "StatusMessage", "StatusMessageProvider"] ->
-        :needs_work
-
-      "inspect_history" ->
-        :needs_work
-
-      "ColBERTv2" ->
-        :intentional_omission
-
-      _other ->
-        :implemented
-    end
+    missing = Enum.reject(@stable_api_manifest, &Map.has_key?(ownership_counts, &1))
+    duplicates = Enum.filter(@stable_api_manifest, &(Map.get(ownership_counts, &1, 0) > 1))
+    {missing, duplicates}
   end
 
-  defp read_corpus(root) do
-    patterns = [
-      "README.md",
-      "docs/**/*.md",
-      "lib/**/*.ex",
-      "test/**/*.exs",
-      "livebooks/**/*.livemd",
-      ".tickets/*.md"
-    ]
+  defp evaluate_row(row, root) do
+    evidence = Map.fetch!(row, :evidence)
+    missing_files = missing_files(evidence, root)
+    missing_modules = Enum.reject(Map.get(row, :dsex, []), &module_available?/1)
+    contract_errors = contract_errors(row)
 
-    patterns
-    |> Enum.flat_map(&Path.wildcard(Path.join(root, &1)))
-    |> Enum.uniq()
-    |> Enum.map_join("\n", fn path ->
-      case File.read(path) do
-        {:ok, text} -> text
-        {:error, _reason} -> ""
+    evidence_errors =
+      file_errors(missing_files) ++ module_errors(missing_modules) ++ contract_errors
+
+    status =
+      cond do
+        evidence_errors != [] -> :invalid_evidence
+        row.disposition == :gap -> :gap
+        true -> row.disposition
       end
-    end)
+
+    row
+    |> Map.put(:release_blocking, Map.get(row, :release_blocking, true))
+    |> Map.put(:status, status)
+    |> Map.put(:evidence_errors, evidence_errors)
   end
 
-  defp contains_token?(corpus, token), do: String.contains?(corpus, token)
+  defp missing_files(evidence, root) do
+    [:tests, :docs]
+    |> Enum.flat_map(&Map.get(evidence, &1, []))
+    |> Enum.reject(&File.exists?(Path.join(root, &1)))
+  end
+
+  defp module_available?(module) when is_atom(module), do: Code.ensure_loaded?(module)
+
+  defp contract_errors(%{disposition: :gap} = row) do
+    if present?(Map.get(row, :ticket)), do: [], else: ["gap rows require an owner ticket"]
+  end
+
+  defp contract_errors(%{disposition: :elixir_native_equivalent} = row) do
+    if present?(Map.get(row, :rationale)),
+      do: [],
+      else: ["Elixir-native equivalents require a rationale"]
+  end
+
+  defp contract_errors(row) do
+    []
+    |> require_nonempty(row, :upstream)
+    |> require_nonempty(row, :invariants)
+    |> require_nonempty(Map.fetch!(row, :evidence), :tests)
+    |> require_nonempty(Map.fetch!(row, :evidence), :docs)
+  end
+
+  defp require_nonempty(errors, map, key) do
+    if Map.get(map, key, []) == [], do: errors ++ ["#{key} must not be empty"], else: errors
+  end
+
+  defp file_errors([]), do: []
+  defp file_errors(paths), do: Enum.map(paths, &"missing evidence file: #{&1}")
+  defp module_errors(modules), do: Enum.map(modules, &"missing DSEx module: #{inspect(&1)}")
+  defp present?(value), do: is_binary(value) and String.trim(value) != ""
+
+  defp release_blocking_gap?(row),
+    do: row.release_blocking and row.status in [:gap, :invalid_evidence]
 end

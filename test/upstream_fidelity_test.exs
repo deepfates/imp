@@ -1,52 +1,109 @@
 defmodule DSEx.UpstreamFidelityTest do
   use ExUnit.Case, async: true
 
-  test "upstream fidelity report maps every tracked upstream surface" do
+  test "ledger is pinned to an immutable stable DSPy baseline" do
     report = DSEx.UpstreamFidelity.report()
 
-    assert report.summary.total > 100
-    assert report.summary.unmapped == 0
-    assert report.summary.needs_work > 0
-    assert report.summary.passing
+    assert report.schema_version == 2
+    assert report.baseline.version == "3.2.1"
+    assert report.baseline.git_ref == "refs/tags/3.2.1"
+    assert report.baseline.tag_object_sha == "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376"
+    assert report.baseline.git_sha == "29448ae12756abdd14bd8796c819247ebb83673c"
 
-    names = MapSet.new(report.surfaces, & &1.name)
-    by_name = Map.new(report.surfaces, &{&1.name, &1})
+    assert report.baseline.api_manifest_sha256 ==
+             "3e6243532fba8a8412850cb6b3f5c277c044c3f021c5626869db74665b1e933d"
 
-    assert by_name["ReActV2"].status == :needs_work
-    assert by_name["InferRules"].status == :needs_work
-    assert by_name["ColBERTv2"].status == :intentional_omission
+    assert report.prerelease_tracking.version == "3.3.0b1"
+    assert report.prerelease_tracking.git_sha == "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+    refute report.prerelease_tracking.release_blocking
+  end
 
-    for required <- [
-          "RLM",
-          "ReActV2",
-          "InferRules",
-          "Assertions",
-          "ToolCalls",
-          "History",
-          "ColBERTv2",
-          "optimize_anything",
-          "Recursive Language Models paper"
-        ] do
-      assert MapSet.member?(names, required)
-    end
+  test "status is derived from explicit contracts and executable evidence" do
+    report = DSEx.UpstreamFidelity.report()
+    by_id = Map.new(report.surfaces, &{&1.id, &1})
 
-    for deepwiki_category <- [
-          "History & Conversation Management",
-          "Assertions & Output Validation",
-          "Vector Databases & Retrieval",
-          "Build System & CI/CD",
-          "Package Metadata & Release Process"
-        ] do
-      assert MapSet.member?(names, deepwiki_category)
+    assert by_id["programming.contracts"].status == :conformant
+    assert by_id["models.runtime"].status == :elixir_native_equivalent
+    assert by_id["models.normalized_runtime_prerelease"].status == :tracking
+    assert by_id["agents.react_family"].status == :gap
+    assert by_id["optimization.instructions"].status == :gap
+    assert by_id["product.release"].status == :gap
+
+    assert report.summary.invalid_evidence == 0
+    assert report.summary.manifest_missing == 0
+    assert report.summary.manifest_duplicates == 0
+    assert report.summary.gaps > 0
+    assert report.summary.release_blockers == report.summary.gaps
+    refute report.summary.passing
+    assert "optimization.instructions" in report.blocking_ids
+  end
+
+  test "every stable surface has exactly one owning ledger row" do
+    stable_rows = Enum.reject(DSEx.UpstreamFidelity.surfaces(), &(&1.disposition == :tracking))
+
+    surfaces = Enum.flat_map(stable_rows, & &1.upstream)
+    duplicates = surfaces -- Enum.uniq(surfaces)
+
+    assert duplicates == []
+    assert length(surfaces) >= 75
+    assert length(DSEx.UpstreamFidelity.stable_api_manifest()) == 69
+  end
+
+  test "gap and native-equivalent rows carry accountable decisions" do
+    for row <- DSEx.UpstreamFidelity.surfaces() do
+      assert row.invariants != []
+      assert row.evidence.tests != []
+      assert row.evidence.docs != []
+
+      case row.disposition do
+        :gap -> assert is_binary(row.ticket) and row.ticket != ""
+        :elixir_native_equivalent -> assert is_binary(row.rationale) and row.rationale != ""
+        _other -> :ok
+      end
     end
   end
 
-  test "upstream fidelity source anchors include papers and source indexes" do
-    report = DSEx.UpstreamFidelity.report()
+  test "missing executable evidence cannot remain conformant" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-missing-conformance-#{System.unique_integer([:positive])}"
+      )
 
-    assert report.source_anchors.dspy_docs == "https://dspy.ai/"
-    assert report.source_anchors.deepwiki == "https://deepwiki.com/stanfordnlp/dspy"
-    assert report.source_anchors.rlm_paper == "arXiv:2512.24601"
-    assert report.source_anchors.optimize_anything_paper == "arXiv:2605.19633"
+    File.mkdir_p!(root)
+
+    report = DSEx.UpstreamFidelity.report(root: root)
+
+    assert report.summary.invalid_evidence > 0
+    refute report.summary.passing
+    assert Enum.all?(report.surfaces, &(&1.status == :invalid_evidence))
+
+    assert Enum.any?(
+             hd(report.surfaces).evidence_errors,
+             &String.starts_with?(&1, "missing evidence file:")
+           )
+  end
+
+  test "source anchors include every research lineage named by the product" do
+    anchors = DSEx.UpstreamFidelity.report().source_anchors
+
+    assert anchors.dspy_paper == "arXiv:2310.03714"
+    assert anchors.dsp_paper == "arXiv:2212.14024"
+    assert anchors.mipro_v2_paper == "arXiv:2406.11695"
+    assert anchors.gepa_paper == "arXiv:2507.19457"
+    assert anchors.rlm_paper == "arXiv:2512.24601"
+    assert anchors.optimize_anything_paper == "arXiv:2605.19633"
+  end
+
+  test "checked-in readable projection reflects every executable ledger verdict" do
+    report = DSEx.UpstreamFidelity.report()
+    body = File.read!("docs/UPSTREAM_SURFACE_MAP.md")
+
+    assert body =~ report.baseline.git_sha
+
+    for row <- report.surfaces do
+      assert body =~ "| #{row.id} | #{row.category} | #{row.status} |"
+      assert body =~ "### `#{row.id}`"
+    end
   end
 end

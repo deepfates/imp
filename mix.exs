@@ -258,7 +258,7 @@ defmodule DSEx.MixProject do
         "upstream_fidelity.check"
       ],
       "upstream_fidelity.check": [
-        "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-mapped"
+        "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
