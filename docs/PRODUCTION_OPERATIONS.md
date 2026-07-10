@@ -158,6 +158,12 @@ installable package contains product modules, docs, and Livebooks while
 excluding local benchmark evidence tasks, Mix-only proof harnesses, and
 test-only support.
 
+The deterministic source-checkout suite also executes the pinned Python DSPy
+reference sidecars and reads the pinned GEPA artifact source registry. CI uses
+DSPy `3.2.1` and `gepa-ai/gepa-artifact` commit
+`cbefbc1aa0f43dd39874ec4bf42211365dbda42e`; changing either pin requires an
+upstream-conformance review rather than an incidental dependency update.
+
 In a source checkout, `mix evidence.check` runs deterministic maintainer
 evidence. These commands are not shipped as package APIs:
 

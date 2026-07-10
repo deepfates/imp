@@ -46,7 +46,7 @@ fi
 
 "$PYTHON" -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install -U pip setuptools wheel
-"$VENV_DIR/bin/python" -m pip install -U "dspy[optuna]>=3.2.1,<3.3" openai
+"$VENV_DIR/bin/python" -m pip install -U "dspy[optuna]==3.2.1" openai
 "$VENV_DIR/bin/python" - <<'PY'
 import dspy
 import importlib.metadata
