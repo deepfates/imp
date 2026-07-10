@@ -12,7 +12,7 @@ defmodule DSEx.MixProject do
       package: package(),
       docs: [
         main: "DSEx",
-        extras: ["README.md"] ++ product_docs() ++ livebooks(),
+        extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
         filter_modules: &public_doc_module?/2
       ],
       start_permanent: Mix.env() == :prod,
@@ -126,6 +126,8 @@ defmodule DSEx.MixProject do
       livebooks() ++
       [
         ".formatter.exs",
+        "CHANGELOG.md",
+        "LICENSE",
         "README.md",
         "mix.exs"
       ]
@@ -221,7 +223,7 @@ defmodule DSEx.MixProject do
       ],
       "quality.check": [
         "credo --only warning",
-        "hex.audit"
+        "cmd mix hex.audit"
       ],
       "gate.package.evidence": [
         "dsex.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"

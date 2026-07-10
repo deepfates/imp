@@ -2055,7 +2055,7 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
 
         true ->
           next = acc ++ [parse_int!(number)]
-          if length(acc) > 0 and removed > 0, do: {:halt, next}, else: {:cont, next}
+          if acc != [] and removed > 0, do: {:halt, next}, else: {:cont, next}
       end
     end)
   end

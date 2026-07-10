@@ -129,7 +129,7 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"quality.check") == [
              "credo --only warning",
-             "hex.audit"
+             "cmd mix hex.audit"
            ]
 
     assert Keyword.fetch!(aliases, :"gate.package.evidence") == [

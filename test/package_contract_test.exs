@@ -7,10 +7,22 @@ defmodule PackageContractTest do
     "lib/dsex.ex",
     "lib/dsex/clients/req_llm.ex",
     "lib/dsex/lm/static.ex",
+    "CHANGELOG.md",
+    "LICENSE",
     "README.md",
     "docs/API_GUIDE.md",
     "livebooks/01_real_lm_front_door.livemd",
     "livebooks/02_programming_not_prompting.livemd"
+  ]
+
+  @repository_files [
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "SECURITY.md",
+    ".github/dependabot.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/ci.yml"
   ]
 
   @excluded_prefixes [
@@ -52,6 +64,12 @@ defmodule PackageContractTest do
 
   test "package exclusion list names current repository files" do
     assert Enum.all?(@excluded_files, &File.regular?/1)
+  end
+
+  test "repository includes release and security stewardship files" do
+    assert Enum.all?(@repository_files, &File.regular?/1)
+    assert File.read!("LICENSE") =~ "MIT License"
+    assert File.read!("SECURITY.md") =~ "Reporting a Vulnerability"
   end
 
   test "unpacked Hex artifact preserves the release boundary" do
