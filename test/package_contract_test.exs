@@ -157,10 +157,10 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README starts with a package install path and labels source-checkout path installs" do
+  test "README starts with a resolvable Git install path and labels source-checkout installs" do
     readme = File.read!("README.md")
 
-    assert readme =~ ~s({:dsex, "~> 0.1.0"})
+    assert readme =~ ~s({:dsex, github: "deepfates/dsex", branch: "main"})
     assert readme =~ "source checkout"
     assert readme =~ ~s({:dsex, path: "."})
   end

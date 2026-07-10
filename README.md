@@ -27,12 +27,12 @@ The manual teaches one path all the way through:
 
 ```elixir
 Mix.install([
-  {:dsex, "~> 0.1.0"}
+  {:dsex, github: "deepfates/dsex", branch: "main"}
 ])
 ```
 
-When running this snippet from a source checkout before DSEx is published, use
-the local path dependency instead:
+When running this snippet from a source checkout, use the local path dependency
+instead:
 
 ```elixir
 Mix.install([
@@ -129,13 +129,12 @@ mix deps.get
 mix test
 ```
 
-In another project, use the Hex package once published, or a Git dependency
-while working directly from this repository:
+In another project, use the current Git dependency:
 
 ```elixir
 def deps do
   [
-    {:dsex, github: "deepfates/dsex"}
+    {:dsex, github: "deepfates/dsex", branch: "main"}
   ]
 end
 ```
