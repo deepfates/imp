@@ -649,6 +649,31 @@ These lifecycle APIs do not imply that an account-specific paid training job
 has run. From a source checkout, `mix protocol.training.check` exercises the
 provider wire contracts locally.
 
+Fast-Slow Training has a separate provider-neutral orchestration surface. Build
+immutable configuration and state with `DSEx.Training.FastSlow.Config` and
+`State`, then execute paper-ordered cycles through
+`DSEx.Training.FastSlow.Runner` and a module implementing
+`DSEx.Training.FastSlow.Backend`. Each cycle prefetches exactly `T` minibatches,
+runs the GEPA fast phase once, allocates exactly `G / K` rollouts to each of the
+`K` retained prompts per question, and keeps that population fixed through the
+`T` slow updates.
+
+The checkpoint callback receives `%{state: state, runner_context: context}`.
+Persist `state` with `DSEx.Training.FastSlow.Checkpoint` and persist the supplied
+context map alongside it; `Runner.load_context!/2` verifies the actual
+minibatch content digests against the state's lookahead. Backend context must be
+credential-free, JSON-safe data. A backend must return `true` from
+`replay_safe?/2` only after proving the provider effect is idempotent under the
+operation intent or that the earlier attempt was not applied. Otherwise resume
+fails with `:ambiguous_external_outcome` instead of duplicating a rollout or
+weight update.
+
+The shared `DSEx.Clients.Trainer` reinforcement boundary accepts the resulting
+token-aligned trajectories, including behavior-policy token log probabilities,
+response token IDs and masks, reward, and normalized advantage. The runner is a
+paper-faithful BEAM orchestration adaptation; it is not a bundled weight trainer
+and does not by itself establish paid-provider CISPO effectiveness.
+
 ## Optimize Arbitrary Artifacts
 
 The primary surface accepts a string, a named map of text components, or `nil`

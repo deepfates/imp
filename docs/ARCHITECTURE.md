@@ -289,6 +289,12 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
   artifact identity, support idempotent bounded-retry submit/refresh/cancel,
   persist credential-free checkpoints, and rebind a successful model artifact
   onto the compiled program.
+- `DSEx.Training.FastSlow` state modules and `Runner` preserve the paper's
+  prefetch, GEPA fast update, cross-prompt rollout grouping, and exactly `T`
+  slow-update cycle. Provider effects cross an explicit backend behaviour with
+  durable operation intents, content-bound state/context checkpoints, and
+  fail-closed replay certification. Token-aligned CISPO groups flow through the
+  shared trainer contract; no local weight-training fallback is implied.
 
 Arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 
