@@ -27,6 +27,8 @@ One word does not have to perform all four jobs.
 
 - `atlas.json` defines the product boundary, semantic territories, audiences,
   lexical strategies, brand architectures, assessment axes, and coverage rules.
+- `workflow.json` declares planned generation waves and downstream coverage
+  requirements. It is the denominator for progress, not a ranking surface.
 - `schema/portfolio.schema.json` is the locked contract for independent
   generation runs.
 - `inbox/*.json` preserves each raw generation portfolio exactly as accepted.
@@ -42,6 +44,20 @@ One word does not have to perform all four jobs.
 
 Accepted inbox files are not edited. Corrections and reinterpretations are new
 events that reference the earlier record. Generated reports may be rebuilt.
+
+## Live Progress
+
+Run `mix dsex.identity.progress` for the accepted frontier, valid work awaiting
+acceptance, assigned or planned portfolios, wave completion, and downstream
+registry, enrichment, assessment, and collision coverage. Use `--json` for
+automation or `--out identity/reports/progress.json` for a dated snapshot.
+
+The acceptance boundary is mechanical: a portfolio counts as accepted only
+when `workflow.json` declares it, its candidate count exactly matches that
+declaration, it is schema-valid, it is tracked by Git, and its contents are
+unchanged from `HEAD`. Valid uncommitted work remains visible as pending, while
+partial, undeclared, and assigned files remain visible without entering
+accepted totals.
 
 ## Process
 

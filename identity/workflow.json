@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "checkpoint_id": "step-8-identity-space-census",
+  "selection_made": false,
+  "required_assessment_replicates": 3,
+  "collision_sources": ["hex", "npm", "pypi", "crates"],
+  "waves": [
+    {
+      "id": "baseline",
+      "label": "Baseline census",
+      "portfolios": [
+        {"path": "identity/inbox/01-formal-systems.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/01b-formal-systems-independent.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/02-empirical-practice.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/03-adaptive-dynamics.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/04-beam-runtime.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/05-performance-making.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/06-built-navigation.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/07-ecology-purpose-transformation.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/08-civic-play-learning.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/09-boundaries-limits-care.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/10-time-plurality-abstract.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/11-cross-cultural-semiotics.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/12-code-namespace-protocol.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/13-plain-language-newcomer.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/14-research-epistemic.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/15-performance-brand-architecture.json", "target_candidate_count": 100},
+        {"path": "identity/inbox/16-negative-space-futures.json", "target_candidate_count": 100}
+      ]
+    },
+    {
+      "id": "form-saturation-a",
+      "label": "Form challenge wave A",
+      "portfolios": [
+        {"path": "identity/inbox/17a-form-derivation-grammar-systems.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/17b-form-blends-compact-language.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/17c-form-sound-code.json", "target_candidate_count": 20},
+        {"path": "identity/inbox/17d-form-counterclaim-citation.json", "target_candidate_count": 20}
+      ]
+    },
+    {
+      "id": "semantic-saturation-a",
+      "label": "Semantic and power challenge wave A",
+      "portfolios": [
+        {"path": "identity/inbox/18-semantic-power-a.json", "target_candidate_count": 100}
+      ]
+    },
+    {
+      "id": "form-saturation-b",
+      "label": "Form challenge wave B",
+      "portfolios": [
+        {"path": "identity/inbox/19a-form-derivation-grammar-systems.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/19b-form-blends-compact-language.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/19c-form-sound-code.json", "target_candidate_count": 20},
+        {"path": "identity/inbox/19d-form-counterclaim-citation.json", "target_candidate_count": 20}
+      ]
+    },
+    {
+      "id": "semantic-saturation-b",
+      "label": "Semantic and power challenge wave B",
+      "portfolios": [
+        {"path": "identity/inbox/20-semantic-power-b.json", "target_candidate_count": 100, "missing_state": "assigned"}
+      ]
+    },
+    {
+      "id": "form-saturation-c",
+      "label": "Corrective form challenge wave C",
+      "portfolios": [
+        {"path": "identity/inbox/21a-form-derivation-compact-counterclaim.json", "target_candidate_count": 30, "missing_state": "assigned"},
+        {"path": "identity/inbox/21b-form-blend-code-citation.json", "target_candidate_count": 30, "missing_state": "assigned"},
+        {"path": "identity/inbox/21c-form-sound-identity-grammar.json", "target_candidate_count": 20, "missing_state": "assigned"},
+        {"path": "identity/inbox/21d-form-conversion-language.json", "target_candidate_count": 20, "missing_state": "assigned"}
+      ]
+    },
+    {
+      "id": "form-saturation-d",
+      "label": "Independent corrective form challenge wave D",
+      "portfolios": [
+        {"path": "identity/inbox/22a-form-derivation-compact-counterclaim.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/22b-form-blend-code-citation.json", "target_candidate_count": 30},
+        {"path": "identity/inbox/22c-form-sound-identity-grammar.json", "target_candidate_count": 20},
+        {"path": "identity/inbox/22d-form-conversion-language.json", "target_candidate_count": 20}
+      ]
+    }
+  ]
+}
