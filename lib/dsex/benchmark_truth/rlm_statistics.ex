@@ -30,11 +30,22 @@ defmodule DSEx.BenchmarkTruth.RLMStatistics do
       "completed" => length(completed),
       "mean_score" => mean(Enum.map(completed, & &1["score"])),
       "mean_latency_ms" => mean(Enum.map(completed, & &1["latency_ms"])),
-      "calls" => Enum.sum(Enum.map(completed, &get_in(&1, ["usage", "requests"]))),
-      "input_tokens" => Enum.sum(Enum.map(completed, &get_in(&1, ["usage", "input_tokens"]))),
-      "output_tokens" => Enum.sum(Enum.map(completed, &get_in(&1, ["usage", "output_tokens"]))),
-      "usd" => Enum.sum(Enum.map(completed, &get_in(&1, ["usage", "usd"])))
+      "calls" => Enum.sum(Enum.map(rows, &usage_number(&1, "requests"))),
+      "input_tokens" => Enum.sum(Enum.map(rows, &usage_number(&1, "input_tokens"))),
+      "output_tokens" => Enum.sum(Enum.map(rows, &usage_number(&1, "output_tokens"))),
+      "usd" => Enum.sum(Enum.map(rows, &usage_number(&1, "usd"))),
+      "cost_authorities" =>
+        rows
+        |> Enum.map(&(get_in(&1, ["usage", "cost_authority"]) || "unavailable"))
+        |> Enum.frequencies()
     }
+  end
+
+  defp usage_number(row, key) do
+    case get_in(row, ["usage", key]) do
+      value when is_number(value) and value >= 0 -> value
+      _ -> 0
+    end
   end
 
   defp paired_comparisons(rows, manifest) do

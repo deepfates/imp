@@ -1,10 +1,106 @@
 defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.{RLMCampaign, RLMCheckpoint, RLMProtocol, RLMStatistics}
+  alias DSEx.BenchmarkTruth.{
+    CampaignBudget,
+    RLMCampaign,
+    RLMCheckpoint,
+    RLMProtocol,
+    RLMRuntime,
+    RLMStatistics
+  }
+
+  defmodule UsageFixture do
+    @rates %{"input_per_million" => 1.0, "output_per_million" => 1.0}
+
+    def provider_reported(requests, input_per_call, output_per_call, usd_per_call) do
+      audits =
+        for request <- 1..requests do
+          %{
+            "request" => request,
+            "role" => "root",
+            "authority" => "provider_reported",
+            "input_tokens" => input_per_call,
+            "output_tokens" => output_per_call,
+            "usd" => usd_per_call,
+            "provider_reported_usd" => usd_per_call,
+            "rates" => @rates
+          }
+        end
+
+      usage(requests, input_per_call, output_per_call, usd_per_call, "provider_reported", audits)
+    end
+
+    def pricing_derived(input_tokens, output_tokens) do
+      usd = (input_tokens + output_tokens) / 1_000_000
+
+      audits = [
+        %{
+          "request" => 1,
+          "role" => "root",
+          "authority" => "pricing_derived",
+          "input_tokens" => input_tokens,
+          "output_tokens" => output_tokens,
+          "usd" => usd,
+          "provider_reported_usd" => nil,
+          "rates" => @rates
+        }
+      ]
+
+      usage(1, input_tokens, output_tokens, usd, "pricing_derived", audits)
+    end
+
+    def free do
+      audits = [
+        %{
+          "request" => 1,
+          "role" => "root",
+          "authority" => "free",
+          "input_tokens" => 1,
+          "output_tokens" => 1,
+          "usd" => 0.0,
+          "provider_reported_usd" => 0.0,
+          "rates" => @rates
+        }
+      ]
+
+      usage(1, 1, 1, 0.0, "free", audits)
+    end
+
+    def empty(rates \\ @rates),
+      do: %{
+        "requests" => 0,
+        "root_calls" => 0,
+        "sub_calls" => 0,
+        "input_tokens" => 0,
+        "output_tokens" => 0,
+        "usd" => 0.0,
+        "cost_authority" => "unavailable",
+        "cost_rates" => rates,
+        "cost_audit" => []
+      }
+
+    def rates, do: @rates
+
+    defp usage(requests, input_per_call, output_per_call, usd_per_call, authority, audits) do
+      %{
+        "requests" => requests,
+        "root_calls" => requests,
+        "sub_calls" => 0,
+        "input_tokens" => requests * input_per_call,
+        "output_tokens" => requests * output_per_call,
+        "usd" => requests * usd_per_call,
+        "cost_authority" => authority,
+        "cost_rates" => @rates,
+        "cost_audit" => audits
+      }
+    end
+  end
 
   defmodule GoodRuntime do
     @behaviour DSEx.BenchmarkTruth.RLMRuntime
+    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+
     def execute(row, approach, _context) do
       if Map.has_key?(row, "gold") or Map.has_key?(row, "evidence_document_ids"),
         do: raise("gold leaked into runtime payload")
@@ -13,14 +109,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
        %{
          "answer" => "yes",
          "latency_ms" => 1.0,
-         "usage" => %{
-           "requests" => 1,
-           "root_calls" => 1,
-           "sub_calls" => 0,
-           "input_tokens" => 1,
-           "output_tokens" => 1,
-           "usd" => 0.0
-         },
+         "usage" => UsageFixture.provider_reported(1, 1, 1, 0.25),
          "trace_shape" => [approach],
          "trace" => [],
          "call_semantics" => %{
@@ -56,20 +145,15 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
 
   defmodule OverBudgetRuntime do
     @behaviour DSEx.BenchmarkTruth.RLMRuntime
+    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+
     def execute(_row, approach, _context),
       do:
         {:ok,
          %{
            "answer" => "yes",
            "latency_ms" => 1.0,
-           "usage" => %{
-             "requests" => 2,
-             "root_calls" => 2,
-             "sub_calls" => 0,
-             "input_tokens" => 1,
-             "output_tokens" => 1,
-             "usd" => 0.0
-           },
+           "usage" => UsageFixture.provider_reported(2, 1, 1, 0.25),
            "trace_shape" => [approach],
            "trace" => [],
            "call_semantics" => %{
@@ -83,6 +167,30 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
          }}
   end
 
+  defmodule ChargedErrorRuntime do
+    @behaviour DSEx.BenchmarkTruth.RLMRuntime
+    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+
+    def execute(_row, approach, _context) do
+      usage = UsageFixture.pricing_derived(7, 0)
+
+      {:error,
+       %{
+         "reason" => "provider rejected request after charging input",
+         "usage" => usage,
+         "call_semantics" => %{
+           "provider_calls" => 1,
+           "root_calls" => 1,
+           "sub_calls" => 0,
+           "max_llm_calls_scope" =>
+             if(approach == "rlm", do: "total_provider_calls", else: "not_applicable"),
+           "configured_max_depth" => if(approach == "rlm", do: 1, else: 0),
+           "max_observed_depth" => 0
+         }
+       }}
+    end
+  end
+
   test "five adapters run without exposing gold and committed rows resume without replay" do
     fixture = fixture!()
     result = run!(fixture, GoodRuntime)
@@ -90,6 +198,17 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert result.artifact["summary"]["total"] == 20
     assert result.artifact["summary"]["all_passing"]
     refute result.artifact["summary"]["paper_protocol_complete"]
+
+    assert Enum.all?(result.artifact["rows"], fn row ->
+             row["usage"]["cost_authority"] == "provider_reported" and
+               row["usage"]["cost_rates"] == UsageFixture.rates()
+           end)
+
+    gate = RLMProtocol.evaluate(result.artifact)
+    assert Enum.find(gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
+
+    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) ==
+             1.25
 
     resumed = run!(fixture, CrashRuntime)
     assert resumed.artifact["summary"]["total"] == 20
@@ -134,12 +253,83 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
            )
 
     assert Enum.all?(result.artifact["rows"], fn row ->
-             row["usage"]["requests"] == 2 and row["usage"]["input_tokens"] == 1 and
-               row["usage"]["output_tokens"] == 1
+             row["usage"]["requests"] == 2 and row["usage"]["input_tokens"] == 2 and
+               row["usage"]["output_tokens"] == 2 and
+               row["usage"]["cost_authority"] == "provider_reported"
            end)
+
+    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "calls"]) == 10
+    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) == 2.5
 
     resumed = run!(fixture, CrashRuntime)
     assert Enum.all?(resumed.artifact["rows"], &(&1["usage"]["requests"] == 2))
+    assert Enum.all?(resumed.artifact["rows"], &(length(&1["usage"]["cost_audit"]) == 2))
+  end
+
+  test "external input-only provider errors retain charged usage in rows, aggregates, and resume" do
+    fixture = fixture!()
+    result = run!(fixture, ChargedErrorRuntime)
+
+    assert Enum.all?(result.artifact["rows"], fn row ->
+             row["status"] == "error" and row["usage"]["requests"] == 1 and
+               row["usage"]["input_tokens"] == 7 and row["usage"]["output_tokens"] == 0 and
+               row["usage"]["cost_authority"] == "pricing_derived"
+           end)
+
+    direct = get_in(result.artifact, ["aggregate", "approaches", "dsex:direct"])
+    assert direct["completed"] == 0
+    assert direct["calls"] == 5
+    assert direct["input_tokens"] == 35
+    assert direct["output_tokens"] == 0
+    assert direct["cost_authorities"] == %{"pricing_derived" => 5}
+
+    resumed = run!(fixture, CrashRuntime)
+    assert Enum.all?(resumed.artifact["rows"], &(&1["usage"]["input_tokens"] == 7))
+  end
+
+  test "metered LM records input-only provider error usage and derives missing cost" do
+    rates = UsageFixture.rates()
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{
+          "requests" => 2,
+          "input_tokens" => 10_000,
+          "output_tokens" => 100,
+          "usd" => 1.0
+        },
+        pricing: rates,
+        default_max_output_tokens: 10
+      )
+
+    {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
+
+    inner = fn _messages, _opts ->
+      {:error, %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}, reason: :rejected}}
+    end
+
+    lm = %RLMRuntime.MeteredLM{
+      inner: inner,
+      budget: budget,
+      usage: usage_agent,
+      max_tokens: 10,
+      role: "root",
+      pricing: rates
+    }
+
+    assert {:error, {:provider_error_with_usage, _reason}} =
+             RLMRuntime.MeteredLM.generate(lm, [%{role: :user, content: "charged"}], [])
+
+    usage = Agent.get(usage_agent, & &1)
+    assert usage["requests"] == 1
+    assert usage["input_tokens"] == 9
+    assert usage["output_tokens"] == 0
+    assert usage["cost_authority"] == "pricing_derived"
+    assert_in_delta usage["usd"], 0.000009, 1.0e-12
+
+    snapshot = CampaignBudget.snapshot(budget)
+    assert snapshot["usage"]["input_tokens"] == 9
+    assert_in_delta snapshot["usage"]["usd"], 0.000009, 1.0e-12
   end
 
   test "checkpoint payload tamper is rejected" do
@@ -208,6 +398,57 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
 
     gate = RLMProtocol.evaluate(%{"manifest" => %{"paper_protocol" => protocol}})
     refute Enum.find(gate["checks"], &(&1["id"] == "exact_paper_manifest"))["passing"]
+  end
+
+  test "operator dataset reconstructions cannot satisfy paper-exact authority" do
+    manifest = %{
+      "paper_protocol" => %{
+        "dataset_selection" => %{
+          "s_niah" => "operator_generated_ruler",
+          "browsecomp_plus" => "operator_sample_paper_ids_unpublished",
+          "oolong_pairs" => "operator_gold_with_unpublished_paper_scorer"
+        }
+      },
+      "datasets" => %{
+        "browsecomp_plus" => %{"split" => "operator_hash_150_not_paper_selection"}
+      }
+    }
+
+    datasets = %{
+      "s_niah" => %{"selection_authority" => "operator_generated"},
+      "browsecomp_plus" => %{
+        "split" => "operator_hash_150_not_paper_selection",
+        "selection_authority" => "operator_generated"
+      },
+      "oolong_pairs" => %{"scorer_authority" => "operator_defined"}
+    }
+
+    gate = RLMProtocol.evaluate(%{"manifest" => manifest, "datasets" => datasets})
+    refute Enum.find(gate["checks"], &(&1["id"] == "dataset_authority"))["passing"]
+    refute gate["paper_protocol_complete"]
+  end
+
+  test "cost gate permits explicit free authority and rejects zero or inconsistent unaudited cost" do
+    free_row = %{"status" => "ok", "usage" => UsageFixture.free()}
+    free_gate = RLMProtocol.evaluate(%{"rows" => [free_row]})
+    assert Enum.find(free_gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
+
+    unaudited =
+      free_row
+      |> put_in(["usage", "cost_authority"], "pricing_derived")
+      |> put_in(["usage", "cost_audit", Access.at(0), "authority"], "pricing_derived")
+      |> put_in(["usage", "cost_audit", Access.at(0), "provider_reported_usd"], nil)
+
+    unaudited_gate = RLMProtocol.evaluate(%{"rows" => [unaudited]})
+    refute Enum.find(unaudited_gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
+
+    inconsistent = put_in(free_row, ["usage", "cost_audit", Access.at(0), "usd"], 0.1)
+    inconsistent_gate = RLMProtocol.evaluate(%{"rows" => [inconsistent]})
+    refute Enum.find(inconsistent_gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
+
+    malformed = put_in(free_row, ["usage", "cost_audit"], ["not-an-audit"])
+    malformed_gate = RLMProtocol.evaluate(%{"rows" => [malformed]})
+    refute Enum.find(malformed_gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
   end
 
   test "paired bootstrap aggregation is deterministic" do
@@ -357,6 +598,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     refute Enum.find(gate["checks"], &(&1["id"] == "row_outcomes"))["passing"]
     refute Enum.find(gate["checks"], &(&1["id"] == "official_scorers"))["passing"]
     refute Enum.find(gate["checks"], &(&1["id"] == "dataset_authority"))["passing"]
+    refute Enum.find(gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
   end
 
   defp run!(fixture, runtime) do

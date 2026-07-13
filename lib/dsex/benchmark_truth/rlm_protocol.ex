@@ -41,6 +41,7 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
       check("approaches", approach_coverage?(rows, datasets)),
       check("runtime_comparison", runtime_coverage?(rows, datasets)),
       check("call_semantics_equivalent", call_semantics_equivalent?(rows)),
+      check("cost_accounting", rows != [] and Enum.all?(rows, &valid_cost_row?/1)),
       check("row_outcomes", rows != [] and Enum.all?(rows, &valid_row?/1)),
       check("evidence", evidence_complete?(rows, datasets)),
       check("deviations", is_list(manifest["deviations"]))
@@ -56,7 +57,9 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
       protocol["reference_commit"] == "72d6940142ddfb84ee6be573dc999a37e633e671" and
       protocol["model_method_matrix"] == @paper_model_method_matrix and
       protocol["dataset_selection"] == %{
-        "browsecomp_plus" => "operator_sample_paper_ids_unpublished"
+        "s_niah" => "published_paper_frozen_instances",
+        "browsecomp_plus" => "published_paper_frozen_ids_and_document_lists",
+        "oolong_pairs" => "published_paper_gold_and_scorer"
       } and
       protocol["compaction"] == "iterative_threshold_agent" and
       protocol["max_llm_calls_scope"] == "subcalls_only" and
@@ -105,12 +108,16 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
   end
 
   defp dataset_authority?(manifest, datasets) do
-    manifest_split = get_in(manifest, ["datasets", "browsecomp_plus", "split"])
-    artifact_split = get_in(datasets, ["browsecomp_plus", "split"])
+    selections = get_in(manifest, ["paper_protocol", "dataset_selection"]) || %{}
 
-    manifest_split != "paper_random_150" and artifact_split == manifest_split and
-      get_in(manifest, ["paper_protocol", "dataset_selection", "browsecomp_plus"]) ==
-        "operator_sample_paper_ids_unpublished"
+    selections == %{
+      "s_niah" => "published_paper_frozen_instances",
+      "browsecomp_plus" => "published_paper_frozen_ids_and_document_lists",
+      "oolong_pairs" => "published_paper_gold_and_scorer"
+    } and
+      get_in(datasets, ["s_niah", "selection_authority"]) == "paper_published" and
+      get_in(datasets, ["browsecomp_plus", "selection_authority"]) == "paper_published" and
+      get_in(datasets, ["oolong_pairs", "scorer_authority"]) == "paper_published"
   end
 
   defp official_scorers?(artifact, rows) do
@@ -125,6 +132,8 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
       Regex.match?(@sha256, browse["prompt_sha256"]) and
       oolong["contract"] == "numeric_0.75_abs_error_else_exact" and
       pairs["contract"] == "normalized_unordered_pair_set_f1" and
+      pairs["authority"] == "paper_published_run_all.py" and
+      is_binary(pairs["source_sha256"]) and Regex.match?(@sha256, pairs["source_sha256"]) and
       rows
       |> Enum.filter(&(&1["family"] == "browsecomp_plus"))
       |> then(&(&1 != [] and Enum.all?(&1, fn row -> valid_browse_scorer?(row, browse) end)))
@@ -232,8 +241,86 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
       is_integer(usage["input_tokens"]) and usage["input_tokens"] > 0 and
       is_integer(usage["output_tokens"]) and usage["output_tokens"] > 0 and
       is_number(usage["usd"]) and usage["usd"] >= 0 and
-      valid_call_semantics?(semantics, usage)
+      valid_call_semantics?(semantics, usage) and valid_cost_usage?(usage)
   end
+
+  defp valid_cost_row?(row), do: row["status"] == "ok" and valid_cost_usage?(row["usage"])
+
+  defp valid_cost_usage?(usage) when is_map(usage) do
+    rates = usage["cost_rates"]
+    audits = usage["cost_audit"]
+    requests = usage["requests"]
+
+    valid_rates?(rates) and is_list(audits) and Enum.all?(audits, &is_map/1) and
+      is_integer(requests) and requests > 0 and
+      length(audits) == requests and
+      Enum.map(audits, & &1["request"]) |> Enum.sort() == Enum.to_list(1..requests) and
+      Enum.all?(audits, &valid_cost_audit?(&1, rates)) and
+      Enum.sum(Enum.map(audits, & &1["input_tokens"])) == usage["input_tokens"] and
+      Enum.sum(Enum.map(audits, & &1["output_tokens"])) == usage["output_tokens"] and
+      Enum.count(audits, &(&1["role"] == "root")) == usage["root_calls"] and
+      Enum.count(audits, &(&1["role"] == "sub")) == usage["sub_calls"] and
+      close?(Enum.sum(Enum.map(audits, & &1["usd"])), usage["usd"]) and
+      aggregate_cost_authority(audits) == usage["cost_authority"]
+  end
+
+  defp valid_cost_usage?(_usage), do: false
+
+  defp valid_rates?(
+         %{
+           "input_per_million" => input,
+           "output_per_million" => output
+         } = rates
+       ),
+       do:
+         Map.keys(rates) |> Enum.sort() == ~w(input_per_million output_per_million) and
+           is_number(input) and input >= 0 and is_number(output) and output >= 0
+
+  defp valid_rates?(_rates), do: false
+
+  defp valid_cost_audit?(audit, rates) when is_map(audit) do
+    input = audit["input_tokens"]
+    output = audit["output_tokens"]
+    usd = audit["usd"]
+    reported = audit["provider_reported_usd"]
+
+    is_integer(input) and input >= 0 and is_integer(output) and output >= 0 and
+      is_number(usd) and usd >= 0 and audit["role"] in ~w(root sub) and
+      audit["rates"] == rates and
+      case audit["authority"] do
+        "provider_reported" ->
+          is_number(reported) and reported > 0 and close?(reported, usd)
+
+        "pricing_derived" ->
+          is_nil(reported) and usd > 0 and close?(derived_cost(input, output, rates), usd)
+
+        "free" ->
+          reported == 0.0 and usd == 0.0
+
+        _ ->
+          false
+      end
+  end
+
+  defp valid_cost_audit?(_audit, _rates), do: false
+
+  defp derived_cost(input, output, rates),
+    do:
+      input / 1_000_000 * rates["input_per_million"] +
+        output / 1_000_000 * rates["output_per_million"]
+
+  defp aggregate_cost_authority(audits) do
+    case audits |> Enum.map(& &1["authority"]) |> Enum.uniq() do
+      [authority] -> authority
+      [_first | _rest] -> "mixed"
+      [] -> "unavailable"
+    end
+  end
+
+  defp close?(left, right) when is_number(left) and is_number(right),
+    do: abs(left - right) <= max(1.0e-12, max(abs(left), abs(right)) * 1.0e-9)
+
+  defp close?(_left, _right), do: false
 
   defp valid_call_semantics?(semantics, usage) do
     Enum.all?(

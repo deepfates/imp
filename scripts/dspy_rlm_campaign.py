@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import threading
 import time
@@ -25,7 +26,7 @@ class BudgetLM:
     def __init__(
         self,
         inner: Any,
-        ledger: dict[str, float],
+        ledger: dict[str, Any],
         limits: dict[str, float],
         pricing: dict[str, float],
         configured_max_tokens: int,
@@ -35,13 +36,16 @@ class BudgetLM:
         self.inner = inner
         self.ledger = ledger
         self.limits = limits
-        self.pricing = pricing
+        self.pricing = validated_rates(pricing)
         self.configured_max_tokens = int(configured_max_tokens)
         self.role = role
         self.lock = lock
+        self.dispatch_lock = threading.Lock()
 
         for key, value in (("_reserved_input", 0), ("_reserved_output", 0), ("_reserved_usd", 0.0)):
             self.ledger.setdefault(key, value)
+        self.ledger.setdefault("_cost_audit", list(self.ledger.get("cost_audit", [])))
+        self.ledger.setdefault("_cost_rates", dict(self.pricing))
 
         if self.configured_max_tokens <= 0:
             raise CampaignError("configured provider output limit must be positive")
@@ -51,68 +55,204 @@ class BudgetLM:
 
     def __call__(self, prompt: Any = None, **kwargs: Any) -> Any:
         conservative_input = len(str(prompt).encode("utf-8")) + 256
-        with self.lock:
-            if self.ledger["requests"] + 1 > self.limits["requests"]:
-                raise CampaignError("request ceiling exhausted before dispatch", auditable_usage(self.ledger))
-            if self.ledger["input_tokens"] + self.ledger["_reserved_input"] + conservative_input > self.limits["input_tokens"]:
-                raise CampaignError("input-token ceiling exhausted before dispatch", auditable_usage(self.ledger))
-            output_remaining = int(
-                self.limits["output_tokens"]
-                - self.ledger["output_tokens"]
-                - self.ledger["_reserved_output"]
+        with self.dispatch_lock:
+            with self.lock:
+                if self.ledger["requests"] + 1 > self.limits["requests"]:
+                    raise CampaignError(
+                        "request ceiling exhausted before dispatch", auditable_usage(self.ledger)
+                    )
+                if (
+                    self.ledger["input_tokens"]
+                    + self.ledger["_reserved_input"]
+                    + conservative_input
+                    > self.limits["input_tokens"]
+                ):
+                    raise CampaignError(
+                        "input-token ceiling exhausted before dispatch",
+                        auditable_usage(self.ledger),
+                    )
+                output_remaining = int(
+                    self.limits["output_tokens"]
+                    - self.ledger["output_tokens"]
+                    - self.ledger["_reserved_output"]
+                )
+                if output_remaining <= 0:
+                    raise CampaignError(
+                        "output-token ceiling exhausted before dispatch",
+                        auditable_usage(self.ledger),
+                    )
+                dispatch_max = min(self.configured_max_tokens, output_remaining)
+                reserved_usd = (
+                    conservative_input / 1_000_000 * self.pricing["input_per_million"]
+                    + dispatch_max / 1_000_000 * self.pricing["output_per_million"]
+                )
+                if (
+                    self.ledger["usd"] + self.ledger["_reserved_usd"] + reserved_usd
+                    > self.limits["usd"]
+                ):
+                    raise CampaignError(
+                        "USD ceiling exhausted before dispatch", auditable_usage(self.ledger)
+                    )
+                self.ledger["requests"] += 1
+                self.ledger[f"{self.role}_calls"] += 1
+                request_index = self.ledger["requests"]
+                self.ledger["_reserved_input"] += conservative_input
+                self.ledger["_reserved_output"] += dispatch_max
+                self.ledger["_reserved_usd"] += reserved_usd
+
+            provider_key = (
+                "max_completion_tokens"
+                if "max_completion_tokens" in getattr(self.inner, "kwargs", {})
+                else "max_tokens"
             )
-            if output_remaining <= 0:
-                raise CampaignError("output-token ceiling exhausted before dispatch", auditable_usage(self.ledger))
-            dispatch_max = min(self.configured_max_tokens, output_remaining)
-            reserved_usd = (
-                conservative_input / 1_000_000 * float(self.pricing["input_per_million"])
-                + dispatch_max / 1_000_000 * float(self.pricing["output_per_million"])
+            dispatch_kwargs = {**kwargs, provider_key: dispatch_max, "cache": False}
+            history_cursor = history_length(self.inner)
+            result: Any = None
+            provider_error: BaseException | None = None
+            try:
+                result = self.inner(prompt, **dispatch_kwargs)
+            except BaseException as error:
+                provider_error = error
+
+            usage = new_history_usage(self.inner, history_cursor)
+            if not usage and isinstance(getattr(provider_error, "usage", None), dict):
+                usage = provider_error.usage
+            input_tokens, input_error = token_count(usage, "input_tokens", "prompt_tokens")
+            output_tokens, output_error = token_count(
+                usage, "output_tokens", "completion_tokens"
             )
-            if self.ledger["usd"] + self.ledger["_reserved_usd"] + reserved_usd > self.limits["usd"]:
-                raise CampaignError("USD ceiling exhausted before dispatch", auditable_usage(self.ledger))
-            self.ledger["requests"] += 1
-            self.ledger[f"{self.role}_calls"] += 1
-            self.ledger["_reserved_input"] += conservative_input
-            self.ledger["_reserved_output"] += dispatch_max
-            self.ledger["_reserved_usd"] += reserved_usd
+            audit, cost_error = cost_audit(
+                usage,
+                input_tokens,
+                output_tokens,
+                self.pricing,
+                request_index,
+                self.role,
+            )
 
-        provider_key = (
-            "max_completion_tokens"
-            if "max_completion_tokens" in getattr(self.inner, "kwargs", {})
-            else "max_tokens"
-        )
-        dispatch_kwargs = {**kwargs, provider_key: dispatch_max, "cache": False}
-        result: Any = None
-        provider_error: BaseException | None = None
-        try:
-            result = self.inner(prompt, **dispatch_kwargs)
-        except BaseException as error:
-            provider_error = error
-
-        history = getattr(self.inner, "history", [])
-        usage = (history[-1].get("usage") if history else None) or {}
-        input_tokens = int(usage.get("input_tokens", usage.get("prompt_tokens", 0)))
-        output_tokens = int(usage.get("output_tokens", usage.get("completion_tokens", 0)))
-        usd = float(usage.get("total_cost", usage.get("cost", 0.0)))
-
-        with self.lock:
-            self.ledger["_reserved_input"] -= conservative_input
-            self.ledger["_reserved_output"] -= dispatch_max
-            self.ledger["_reserved_usd"] -= reserved_usd
-            if input_tokens > 0 and output_tokens > 0:
+            with self.lock:
+                self.ledger["_reserved_input"] -= conservative_input
+                self.ledger["_reserved_output"] -= dispatch_max
+                self.ledger["_reserved_usd"] -= reserved_usd
                 self.ledger["input_tokens"] += input_tokens
                 self.ledger["output_tokens"] += output_tokens
-                self.ledger["usd"] += usd
-            snapshot = auditable_usage(self.ledger)
+                self.ledger["usd"] += audit["usd"]
+                self.ledger["_cost_audit"].append(audit)
+                snapshot = auditable_usage(self.ledger)
 
-        if input_tokens <= 0 or output_tokens <= 0:
-            raise CampaignError("provider usage missing; outcome is not auditable", snapshot) from provider_error
         for key in ("input_tokens", "output_tokens", "usd"):
             if snapshot[key] > self.limits[key]:
                 raise CampaignError(f"observed {key} ceiling exceeded", snapshot)
+        observation_errors = [error for error in (input_error, output_error, cost_error) if error]
+        if observation_errors:
+            raise CampaignError("; ".join(observation_errors), snapshot) from provider_error
         if provider_error is not None:
             raise CampaignError(f"provider call failed after charging usage: {provider_error}", snapshot) from provider_error
+        if input_tokens <= 0 or output_tokens <= 0:
+            raise CampaignError("provider usage missing; outcome is not auditable", snapshot)
         return result
+
+
+def validated_rates(pricing: dict[str, float]) -> dict[str, float]:
+    rates = {}
+    for key in ("input_per_million", "output_per_million"):
+        value = pricing.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise CampaignError(f"invalid reservation pricing for {key}")
+        value = float(value)
+        if not math.isfinite(value) or value < 0:
+            raise CampaignError(f"invalid reservation pricing for {key}")
+        rates[key] = value
+    return rates
+
+
+def history_length(inner: Any) -> int:
+    history = getattr(inner, "history", [])
+    try:
+        return len(history)
+    except TypeError:
+        return 0
+
+
+def new_history_usage(inner: Any, cursor: int) -> dict[str, Any]:
+    history = getattr(inner, "history", [])
+    try:
+        if len(history) <= cursor:
+            return {}
+        entry = history[-1]
+    except (IndexError, TypeError):
+        return {}
+    if not isinstance(entry, dict) or not isinstance(entry.get("usage"), dict):
+        return {}
+    return entry["usage"]
+
+
+def token_count(usage: dict[str, Any], primary: str, fallback: str) -> tuple[int, str | None]:
+    value = usage.get(primary, usage.get(fallback, 0))
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0, f"invalid provider {primary}"
+    if not math.isfinite(float(value)) or value < 0 or int(value) != value:
+        return 0, f"invalid provider {primary}"
+    return int(value), None
+
+
+def provider_cost(usage: dict[str, Any]) -> tuple[float | None, str | None]:
+    observed = []
+    for key in ("total_cost", "cost"):
+        if key not in usage or usage[key] is None:
+            continue
+        value = usage[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None, f"invalid provider {key}"
+        value = float(value)
+        if not math.isfinite(value) or value < 0:
+            return None, f"invalid provider {key}"
+        if value > 0:
+            observed.append(value)
+    if observed and not all(math.isclose(observed[0], value) for value in observed[1:]):
+        return None, "inconsistent provider cost fields"
+    return (observed[0] if observed else None), None
+
+
+def cost_audit(
+    usage: dict[str, Any],
+    input_tokens: int,
+    output_tokens: int,
+    rates: dict[str, float],
+    request_index: int,
+    role: str,
+) -> tuple[dict[str, Any], str | None]:
+    reported, error = provider_cost(usage)
+    derived = (
+        input_tokens / 1_000_000 * rates["input_per_million"]
+        + output_tokens / 1_000_000 * rates["output_per_million"]
+    )
+
+    if error:
+        authority, usd, reported_usd, error = "unavailable", 0.0, None, error
+    elif reported is not None:
+        authority, usd, reported_usd = "provider_reported", reported, reported
+    elif usage.get("cost_authority") == "free":
+        authority, usd, reported_usd = "free", 0.0, 0.0
+    elif derived > 0:
+        authority, usd, reported_usd = "pricing_derived", derived, None
+    else:
+        authority, usd, reported_usd = "unavailable", 0.0, None
+        error = "zero cost lacks explicit free authority"
+
+    return (
+        {
+            "request": request_index,
+            "role": role,
+            "authority": authority,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "usd": usd,
+            "provider_reported_usd": reported_usd,
+            "rates": dict(rates),
+        },
+        error,
+    )
 
 
 def remaining(snapshot: dict[str, Any]) -> dict[str, float]:
@@ -126,8 +266,28 @@ def remaining(snapshot: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def auditable_usage(ledger: dict[str, float]) -> dict[str, float]:
-    return {key: ledger[key] for key in ("requests", "root_calls", "sub_calls", "input_tokens", "output_tokens", "usd")}
+def auditable_usage(ledger: dict[str, Any]) -> dict[str, Any]:
+    audits = [dict(audit) for audit in ledger.get("_cost_audit", ledger.get("cost_audit", []))]
+    audits.sort(key=lambda audit: audit["request"])
+    authorities = {audit["authority"] for audit in audits}
+    if not audits or "unavailable" in authorities:
+        authority = "unavailable"
+    elif len(authorities) == 1:
+        authority = next(iter(authorities))
+    else:
+        authority = "mixed"
+    result = {
+        key: ledger[key]
+        for key in ("requests", "root_calls", "sub_calls", "input_tokens", "output_tokens", "usd")
+    }
+    result.update(
+        {
+            "cost_authority": authority,
+            "cost_rates": dict(ledger.get("_cost_rates", ledger.get("cost_rates", {}))),
+            "cost_audit": audits,
+        }
+    )
+    return result
 
 
 def context_text(row: dict[str, Any]) -> str:

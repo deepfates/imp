@@ -87,6 +87,9 @@ T3 has not been completed. The checked-in manifest and current runner are not
 eligible for T3: they do not represent the standalone paper runtime, the exact
 Base/CodeAct/iterative-compaction/coding-agent matrix, or separate RLM depths
 0--3 across the paper's model blocks.
+In addition, the paper's frozen S-NIAH instances, BrowseComp+ query/document
+selection, and promised OOLONG-Pairs scorer are not public. Operator-generated
+substitutes are useful T2 protocols but cannot satisfy the paper-exact T3 gate.
 The upstream-fidelity ledger and dashboard therefore keep RLM red even when T0,
 T1, deterministic tests, and live provider workflows pass.
 
@@ -117,17 +120,28 @@ has an ambiguous external outcome, so resume fails closed instead of replaying
 the row. Committed rows are checksum and identity bound and are never replayed.
 
 Budgets are independent for every runtime/approach pair. Reservations happen
-before every DSEx provider call, observed provider token/cost usage is required,
-and the DSPy sidecar snapshots its remaining ceiling inside the serialized
-budget section. The sidecar keeps active input/output/USD reservations under a
-lock and sends the explicit manifest output limit through either
-`max_tokens` or DSPy's GPT-5 `max_completion_tokens` provider boundary. Cache is
-disabled and manifest reasoning settings are passed explicitly. Usage-bearing
-provider errors remain charged terminal rows, and resume reconstructs spend
-from successful and failed charged rows. Missing usage or malformed output is
-terminal row evidence. Campaign concurrency and row timeouts are manifest
-bounded; timeout or task failure leaves the intent for an explicit operator
-audit.
+before every DSEx provider call, and the DSPy sidecar snapshots its remaining
+ceiling inside the serialized budget section. Each wrapped DSPy LM permits one
+in-flight dispatch through history capture, so a concurrent caller cannot read
+another request's shared `history[-1]`. Root and submodel wrappers still share
+active input/output/USD reservations. The sidecar sends the explicit manifest
+output limit through either `max_tokens` or DSPy's GPT-5
+`max_completion_tokens` provider boundary. Cache is disabled and manifest
+reasoning settings are passed explicitly.
+
+Every dispatched request records its role, observed input and output dimensions,
+USD, cost authority, and the exact pinned input/output rates. A positive,
+finite provider cost is `provider_reported`; an absent or zero provider cost is
+`pricing_derived` from observed dimensions. Zero USD is accepted only with an
+explicit `free` authority. Invalid, inconsistent, or otherwise unprovable cost
+is `unavailable` and cannot pass row validation or the mechanical gate. The row
+audit must reconcile request/root/sub counts, tokens, and USD exactly to its
+totals. Usage-bearing provider errors remain charged terminal rows even when
+only one token dimension is reported, and resume reconstructs spend from
+successful and failed charged rows. Aggregate spend includes those terminal
+rows. Missing usage or malformed output is terminal row evidence. Campaign
+concurrency and row timeouts are manifest bounded; timeout or task failure
+leaves the intent for an explicit operator audit.
 
 Each successful row records answer score, wall latency, total provider calls,
 root calls, subcalls, configured/observed depth, input and output tokens, USD
@@ -158,8 +172,8 @@ gate recomputes all of these conditions from artifact content:
 - pinned paper/RLM/DSPy authorities and root, submodel, and compaction roles;
 - exact unique dataset-key sets in every lane, pinned BrowseComp+ judge and
   `trec_eval` provenance, official OOLONG decay/exact scoring, OOLONG-Pairs
-  pair-set F1, positive provider usage, valid bounded traces, and
-  manifest/dataset provenance;
+  pair-set F1, positive provider usage, reconciled per-request cost authority,
+  valid bounded traces, and manifest/dataset provenance;
 - explicit root/subcall/total-call/depth semantics with matched
   `max_llm_calls` scope, plus cache, reasoning, model-tree, and output-limit
   pins; and
@@ -174,9 +188,12 @@ evidence.
 BrowseComp+ scorer metadata is insufficient by itself. Every row must bind the
 pinned judge model and prompt hash to a judge-input digest and raw verdict, and
 must carry qrels/run digests plus `trec_eval` version, evidence recall, gold
-recall, and nDCG. The gate also rejects a `paper_random_150` split label: the
-paper's 150 IDs are unpublished, so an operator sample must be disclosed as
-such in the split and `paper_protocol.dataset_selection` authority.
+recall, and nDCG. Paper-exact authority additionally requires published frozen
+S-NIAH instances, published BrowseComp+ IDs and document lists, and the
+published OOLONG-Pairs `run_all.py` scorer with a pinned source hash. Those
+sources are unavailable. Operator-generated RULER instances, BrowseComp+
+samples, gold reconstructions, or scorer reimplementations must be disclosed as
+T2 evidence and cannot satisfy T3.
 
 ## Recorded Deviations
 

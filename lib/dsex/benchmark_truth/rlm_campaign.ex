@@ -187,25 +187,51 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
   defp account_external_usage(budget, usage) when is_map(usage) do
     requests = usage["requests"]
 
-    with true <- is_integer(requests) and requests >= 0,
-         {:ok, reservations} <- reserve_requests(budget, requests, []),
-         :ok <- CampaignBudget.record_usage(budget, usage) do
-      Enum.each(reservations, &CampaignBudget.release(budget, &1))
+    reservation_result =
+      if is_integer(requests) and requests >= 0,
+        do: reserve_requests(budget, requests, []),
+        else: {:error, :malformed_runtime_usage, []}
 
-      case CampaignBudget.snapshot(budget)["exhausted"] do
-        nil -> :ok
-        dimension -> {:error, {:campaign_budget_exhausted, dimension}}
-      end
-    else
-      false ->
+    reservations = elem(reservation_result, tuple_size(reservation_result) - 1)
+    :ok = CampaignBudget.record_usage(budget, observed_budget_usage(usage))
+    Enum.each(reservations, &CampaignBudget.release(budget, &1))
+
+    case reservation_result do
+      {:error, :malformed_runtime_usage, _reservations} ->
         {:error, :malformed_runtime_usage}
 
-      {:error, dimension, reservations} ->
-        :ok = CampaignBudget.record_usage(budget, usage)
-        Enum.each(reservations, &CampaignBudget.release(budget, &1))
+      {:error, dimension, _reservations} ->
         {:error, {:campaign_budget_exhausted, dimension}}
+
+      {:ok, _reservations} ->
+        cond do
+          not valid_usage_dimensions?(usage) ->
+            {:error, :malformed_runtime_usage}
+
+          not valid_cost_usage?(usage) ->
+            {:error, :unaudited_runtime_cost}
+
+          dimension = CampaignBudget.snapshot(budget)["exhausted"] ->
+            {:error, {:campaign_budget_exhausted, dimension}}
+
+          true ->
+            :ok
+        end
     end
   end
+
+  defp observed_budget_usage(usage) do
+    %{
+      "input_tokens" => observed_token_count(usage["input_tokens"]),
+      "output_tokens" => observed_token_count(usage["output_tokens"]),
+      "usd" => observed_usd(usage["usd"])
+    }
+  end
+
+  defp observed_token_count(value) when is_integer(value) and value >= 0, do: value
+  defp observed_token_count(_value), do: 0
+  defp observed_usd(value) when is_number(value) and value >= 0, do: value
+  defp observed_usd(_value), do: 0.0
 
   defp charged_error(reason, usage, source),
     do:
@@ -319,10 +345,13 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
               is_map(usage) and is_list(shape) and shape != [] and is_list(trace) and
               is_map(semantics) do
     unless Enum.all?(
-             ~w(requests input_tokens output_tokens),
+             ~w(requests root_calls sub_calls input_tokens output_tokens),
              &(is_integer(usage[&1]) and usage[&1] >= 0)
            ) and is_number(usage["usd"]) and usage["usd"] >= 0,
            do: raise(ArgumentError, "malformed RLM runtime usage")
+
+    unless valid_cost_usage?(usage),
+      do: raise(ArgumentError, "unaudited or inconsistent RLM runtime cost")
 
     unless semantics["provider_calls"] == usage["requests"] and
              Enum.all?(
@@ -336,6 +365,89 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
 
   defp validate_outcome!(other),
     do: raise(ArgumentError, "malformed RLM runtime output: #{inspect(other)}")
+
+  defp valid_usage_dimensions?(usage) do
+    Enum.all?(~w(requests root_calls sub_calls input_tokens output_tokens), fn key ->
+      is_integer(usage[key]) and usage[key] >= 0
+    end) and is_number(usage["usd"]) and usage["usd"] >= 0 and
+      usage["requests"] == usage["root_calls"] + usage["sub_calls"]
+  end
+
+  defp valid_cost_usage?(usage) when is_map(usage) do
+    rates = usage["cost_rates"]
+    audits = usage["cost_audit"]
+    requests = usage["requests"]
+
+    valid_rates?(rates) and is_list(audits) and Enum.all?(audits, &is_map/1) and
+      is_integer(requests) and requests > 0 and
+      length(audits) == requests and
+      Enum.map(audits, & &1["request"]) |> Enum.sort() == Enum.to_list(1..requests) and
+      Enum.all?(audits, &valid_cost_audit?(&1, rates)) and
+      Enum.sum(Enum.map(audits, & &1["input_tokens"])) == usage["input_tokens"] and
+      Enum.sum(Enum.map(audits, & &1["output_tokens"])) == usage["output_tokens"] and
+      Enum.count(audits, &(&1["role"] == "root")) == usage["root_calls"] and
+      Enum.count(audits, &(&1["role"] == "sub")) == usage["sub_calls"] and
+      close?(Enum.sum(Enum.map(audits, & &1["usd"])), usage["usd"]) and
+      aggregate_cost_authority(audits) == usage["cost_authority"]
+  end
+
+  defp valid_cost_usage?(_usage), do: false
+
+  defp valid_rates?(
+         %{
+           "input_per_million" => input,
+           "output_per_million" => output
+         } = rates
+       ),
+       do:
+         Map.keys(rates) |> Enum.sort() == ~w(input_per_million output_per_million) and
+           is_number(input) and input >= 0 and is_number(output) and output >= 0
+
+  defp valid_rates?(_rates), do: false
+
+  defp valid_cost_audit?(audit, rates) when is_map(audit) do
+    input = audit["input_tokens"]
+    output = audit["output_tokens"]
+    usd = audit["usd"]
+    reported = audit["provider_reported_usd"]
+
+    is_integer(input) and input >= 0 and is_integer(output) and output >= 0 and
+      is_number(usd) and usd >= 0 and audit["role"] in ~w(root sub) and
+      audit["rates"] == rates and
+      case audit["authority"] do
+        "provider_reported" ->
+          is_number(reported) and reported > 0 and close?(reported, usd)
+
+        "pricing_derived" ->
+          is_nil(reported) and usd > 0 and close?(derived_cost(input, output, rates), usd)
+
+        "free" ->
+          reported == 0.0 and usd == 0.0
+
+        _ ->
+          false
+      end
+  end
+
+  defp valid_cost_audit?(_audit, _rates), do: false
+
+  defp derived_cost(input, output, rates),
+    do:
+      input / 1_000_000 * rates["input_per_million"] +
+        output / 1_000_000 * rates["output_per_million"]
+
+  defp aggregate_cost_authority(audits) do
+    case audits |> Enum.map(& &1["authority"]) |> Enum.uniq() do
+      [authority] -> authority
+      [_first | _rest] -> "mixed"
+      [] -> "unavailable"
+    end
+  end
+
+  defp close?(left, right) when is_number(left) and is_number(right),
+    do: abs(left - right) <= max(1.0e-12, max(abs(left), abs(right)) * 1.0e-9)
+
+  defp close?(_left, _right), do: false
 
   defp jobs(manifest, datasets, runtimes) do
     for runtime <- runtimes,
@@ -627,7 +739,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
       "sub_calls" => usage["sub_calls"] || 0,
       "input_tokens" => usage["input_tokens"] || 0,
       "output_tokens" => usage["output_tokens"] || 0,
-      "usd" => usage["usd"] || 0.0
+      "usd" => usage["usd"] || 0.0,
+      "cost_authority" => usage["cost_authority"] || "unavailable",
+      "cost_rates" => usage["cost_rates"] || %{},
+      "cost_audit" => usage["cost_audit"] || []
     }
 
   defp normalize_row_usage(_), do: empty_usage()
@@ -639,7 +754,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
       "sub_calls" => 0,
       "input_tokens" => 0,
       "output_tokens" => 0,
-      "usd" => 0.0
+      "usd" => 0.0,
+      "cost_authority" => "unavailable",
+      "cost_rates" => %{},
+      "cost_audit" => []
     }
 
   defp empty_call_semantics,

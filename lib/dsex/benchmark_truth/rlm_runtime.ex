@@ -9,7 +9,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
 
   defmodule MeteredLM do
     @moduledoc false
-    defstruct [:inner, :budget, :usage, :max_tokens, :role]
+    defstruct [:inner, :budget, :usage, :max_tokens, :role, :pricing]
 
     def generate(%__MODULE__{} = lm, messages, opts) do
       opts = Keyword.put_new(opts, :max_tokens, lm.max_tokens)
@@ -26,11 +26,14 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
     end
 
     defp record_result(lm, {:ok, value} = result) do
-      case usage(value) do
+      case usage(value, lm.pricing) do
         %{} = usage ->
           DSEx.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
           Agent.update(lm.usage, &sum(&1, usage, lm.role))
-          result
+
+          if usage.cost_authority == "unavailable",
+            do: {:error, :provider_cost_unauditable},
+            else: result
 
         nil ->
           {:error, :provider_usage_missing}
@@ -38,7 +41,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
     end
 
     defp record_result(lm, {:error, reason}) do
-      case usage(reason) do
+      case usage(reason, lm.pricing) do
         %{} = usage ->
           DSEx.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
           Agent.update(lm.usage, &sum(&1, usage, lm.role))
@@ -50,40 +53,146 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       end
     end
 
-    defp usage(%{__dsex_lm_metadata__: metadata}),
-      do: normalize(get_in(metadata, [:req_llm, :usage]))
+    defp usage(%{__dsex_lm_metadata__: metadata}, pricing),
+      do: normalize(get_in(metadata, [:req_llm, :usage]), pricing)
 
-    defp usage(%{"__dsex_lm_metadata__" => metadata}),
-      do: normalize(get_in(metadata, ["req_llm", "usage"]))
+    defp usage(%{"__dsex_lm_metadata__" => metadata}, pricing),
+      do: normalize(get_in(metadata, ["req_llm", "usage"]), pricing)
 
-    defp usage(%{usage: usage}), do: normalize(usage)
-    defp usage(%{"usage" => usage}), do: normalize(usage)
-    defp usage({_, value}), do: usage(value)
+    defp usage(%{usage: usage}, pricing), do: normalize(usage, pricing)
+    defp usage(%{"usage" => usage}, pricing), do: normalize(usage, pricing)
+    defp usage({_, value}, pricing), do: usage(value, pricing)
 
-    defp usage(_), do: nil
+    defp usage(_, _pricing), do: nil
 
-    defp normalize(usage) when is_map(usage) do
-      %{
-        input_tokens: number(usage, :input_tokens),
-        output_tokens: number(usage, :output_tokens),
-        usd: number(usage, :total_cost, number(usage, :cost, 0.0))
-      }
+    defp normalize(usage, pricing) when is_map(usage) and is_map(pricing) do
+      with {:ok, input_tokens} <- token_count(usage, :input_tokens),
+           {:ok, output_tokens} <- token_count(usage, :output_tokens) do
+        cost = cost(usage, input_tokens, output_tokens, pricing)
+
+        %{
+          input_tokens: input_tokens,
+          output_tokens: output_tokens,
+          usd: cost.usd,
+          cost_authority: cost.authority,
+          cost_rates: pricing,
+          provider_reported_usd: cost.provider_reported_usd
+        }
+      else
+        _ -> nil
+      end
     end
 
-    defp normalize(_), do: nil
+    defp normalize(_, _pricing), do: nil
 
-    defp number(map, key, default \\ 0),
-      do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+    defp token_count(map, key) do
+      case Map.get(map, key, Map.get(map, Atom.to_string(key), 0)) do
+        value when is_integer(value) and value >= 0 -> {:ok, value}
+        _ -> :error
+      end
+    end
 
-    defp sum(left, right, role),
-      do: %{
+    defp cost(usage, input_tokens, output_tokens, pricing) do
+      derived =
+        input_tokens / 1_000_000 * pricing["input_per_million"] +
+          output_tokens / 1_000_000 * pricing["output_per_million"]
+
+      case provider_cost(usage) do
+        {:ok, reported} when reported > 0 ->
+          %{authority: "provider_reported", usd: reported, provider_reported_usd: reported}
+
+        :absent ->
+          if usage_authority(usage) == "free" do
+            %{authority: "free", usd: 0.0, provider_reported_usd: 0.0}
+          else
+            if derived > 0,
+              do: %{authority: "pricing_derived", usd: derived, provider_reported_usd: nil},
+              else: %{authority: "unavailable", usd: 0.0, provider_reported_usd: nil}
+          end
+
+        _ ->
+          %{authority: "unavailable", usd: 0.0, provider_reported_usd: nil}
+      end
+    end
+
+    defp provider_cost(usage) do
+      values =
+        [:total_cost, :cost]
+        |> Enum.flat_map(fn key ->
+          case fetch(usage, key) do
+            value when value in [:missing, nil] -> []
+            value -> [value]
+          end
+        end)
+
+      cond do
+        Enum.any?(values, &(not is_number(&1) or &1 < 0)) ->
+          :invalid
+
+        reported = Enum.filter(values, &(&1 > 0)) ->
+          case reported do
+            [] ->
+              :absent
+
+            [first | rest] ->
+              if(Enum.all?(rest, &close?(&1, first)), do: {:ok, first}, else: :invalid)
+          end
+      end
+    end
+
+    defp fetch(map, key) do
+      cond do
+        Map.has_key?(map, key) -> map[key]
+        Map.has_key?(map, Atom.to_string(key)) -> map[Atom.to_string(key)]
+        true -> :missing
+      end
+    end
+
+    defp usage_authority(usage),
+      do: Map.get(usage, :cost_authority, Map.get(usage, "cost_authority"))
+
+    defp close?(left, right),
+      do: abs(left - right) <= max(1.0e-12, max(abs(left), abs(right)) * 1.0e-9)
+
+    defp sum(left, right, role) do
+      request = left["requests"] + 1
+      audit_role = if(role == "root", do: "root", else: "sub")
+
+      audit = %{
+        "request" => request,
+        "role" => audit_role,
+        "authority" => right.cost_authority,
+        "input_tokens" => right.input_tokens,
+        "output_tokens" => right.output_tokens,
+        "usd" => right.usd,
+        "provider_reported_usd" => right.provider_reported_usd,
+        "rates" => right.cost_rates
+      }
+
+      audits = left["cost_audit"] ++ [audit]
+
+      %{
         "requests" => left["requests"] + 1,
         "root_calls" => left["root_calls"] + if(role == "root", do: 1, else: 0),
         "sub_calls" => left["sub_calls"] + if(role == "root", do: 0, else: 1),
         "input_tokens" => left["input_tokens"] + right.input_tokens,
         "output_tokens" => left["output_tokens"] + right.output_tokens,
-        "usd" => left["usd"] + right.usd
+        "usd" => left["usd"] + right.usd,
+        "cost_authority" => aggregate_authority(audits),
+        "cost_rates" => right.cost_rates,
+        "cost_audit" => audits
       }
+    end
+
+    defp aggregate_authority(audits) do
+      authorities = audits |> Enum.map(& &1["authority"]) |> Enum.uniq()
+
+      cond do
+        "unavailable" in authorities -> "unavailable"
+        length(authorities) == 1 -> hd(authorities)
+        true -> "mixed"
+      end
+    end
   end
 
   defmodule Dsex do
@@ -92,7 +201,8 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
 
     @impl true
     def execute(row, approach, context) do
-      {:ok, usage} = Agent.start_link(fn -> empty_usage() end)
+      pricing = get_in(context, ["approach", "settings", "reservation_pricing"])
+      {:ok, usage} = Agent.start_link(fn -> empty_usage(pricing) end)
       root = metered_lm(context, "root", usage)
 
       sub =
@@ -242,7 +352,8 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         budget: context["budget"],
         usage: usage,
         max_tokens: model["max_output_tokens"],
-        role: role
+        role: role,
+        pricing: get_in(context, ["approach", "settings", "reservation_pricing"])
       }
     end
 
@@ -331,14 +442,17 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       }
     end
 
-    defp empty_usage,
+    defp empty_usage(pricing),
       do: %{
         "requests" => 0,
         "root_calls" => 0,
         "sub_calls" => 0,
         "input_tokens" => 0,
         "output_tokens" => 0,
-        "usd" => 0.0
+        "usd" => 0.0,
+        "cost_authority" => "unavailable",
+        "cost_rates" => pricing,
+        "cost_audit" => []
       }
   end
 
