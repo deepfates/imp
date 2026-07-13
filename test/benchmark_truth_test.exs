@@ -813,7 +813,7 @@ defmodule BenchmarkTruthTest do
     spec.loader.exec_module(runner)
 
     assert runner.dspy_lm_name("gpt-5.4-mini") == "openai/gpt-5.4-mini"
-    assert runner.dspy_lm_name("responses/gpt-5.4-mini") == "responses/gpt-5.4-mini"
+    assert runner.dspy_lm_name("responses/gpt-5.4-mini") == "openai/responses/gpt-5.4-mini"
     assert runner.dspy_lm_name("anthropic/claude-haiku-4-5") == "anthropic/claude-haiku-4-5"
     assert runner.wire_api("anthropic/claude-haiku-4-5") == "litellm_anthropic_messages"
     assert runner.wire_api("gemini/gemini-3-flash-preview") == "litellm_google_generate_content"

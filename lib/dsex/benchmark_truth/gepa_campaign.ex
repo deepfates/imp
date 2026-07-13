@@ -15,8 +15,9 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     token_cost = Keyword.get(opts, :token_cost)
     source_commits = Keyword.fetch!(opts, :source_commits)
     lm = Keyword.fetch!(opts, :lm)
-    judge_lm = Keyword.get(opts, :judge_lm, lm)
-    judge_model = Keyword.get(opts, :judge_model, reflection_model)
+    reflection_lm = Keyword.get(opts, :reflection_lm)
+    {judge_lm, judge_model} = judge_config!(opts, lm, model)
+    optimizer_callbacks = Keyword.get(opts, :optimizer_callbacks, [])
     families = Keyword.get(opts, :families, @required_families)
     partial? = families != @required_families
     reporter = Keyword.get(opts, :reporter, fn _event -> :ok end)
@@ -29,29 +30,30 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     specs = load_specs!(dataset_root)
     validate_requested_families!(families, specs)
 
+    context = %{
+      dataset_root: dataset_root,
+      campaign_id: campaign_id,
+      model: model,
+      reflection_model: reflection_model,
+      seeds: seeds,
+      generations: generations,
+      lm: lm,
+      reflection_lm: reflection_lm,
+      judge_lm: judge_lm,
+      judge_model: judge_model,
+      pricing_source: pricing_source,
+      reporter: reporter,
+      max_concurrency: max_concurrency,
+      checkpoint_dir: checkpoint_dir,
+      source_commits: source_commits,
+      execution: execution,
+      optimizer_callbacks: optimizer_callbacks
+    }
+
     rows =
       Enum.map(families, fn family ->
         spec = Map.fetch!(specs, family)
-
-        row(
-          spec,
-          dataset_root,
-          campaign_id,
-          model,
-          reflection_model,
-          seeds,
-          generations,
-          lm,
-          judge_lm,
-          judge_model,
-          pricing_source,
-          explicit_token_cost!(token_cost, family, seeds, families),
-          reporter,
-          max_concurrency,
-          checkpoint_dir,
-          source_commits,
-          execution
-        )
+        row(spec, context, explicit_token_cost!(token_cost, family, seeds, families))
       end)
       |> Enum.map(&Map.put(&1, "source_commits", source_commits))
 
@@ -166,25 +168,27 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     :ok
   end
 
-  defp row(
-         spec,
-         dataset_root,
-         campaign_id,
-         model,
-         reflection_model,
-         seeds,
-         generations,
-         lm,
-         judge_lm,
-         judge_model,
-         pricing_source,
-         token_cost,
-         reporter,
-         max_concurrency,
-         checkpoint_dir,
-         source_commits,
-         execution
-       ) do
+  defp row(spec, context, token_cost) do
+    %{
+      dataset_root: dataset_root,
+      campaign_id: campaign_id,
+      model: model,
+      reflection_model: reflection_model,
+      seeds: seeds,
+      generations: generations,
+      lm: lm,
+      reflection_lm: reflection_lm,
+      judge_lm: judge_lm,
+      judge_model: judge_model,
+      pricing_source: pricing_source,
+      reporter: reporter,
+      max_concurrency: max_concurrency,
+      checkpoint_dir: checkpoint_dir,
+      source_commits: source_commits,
+      execution: execution,
+      optimizer_callbacks: optimizer_callbacks
+    } = context
+
     family = spec["family"]
     program = spec["program"]
     signature = spec["signature"]
@@ -196,6 +200,21 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     devset = DSEx.Datasets.jsonl(paths.dev, input_keys)
     testset = DSEx.Datasets.jsonl(paths.test, input_keys)
     validate_family_spec!(spec)
+
+    seed_context = %{
+      spec: spec,
+      trainset: trainset,
+      devset: devset,
+      testset: testset,
+      lm: lm,
+      reflection_lm: reflection_lm,
+      judge_lm: judge_lm,
+      budget: budget,
+      generations: generations,
+      max_concurrency: max_concurrency,
+      execution: execution,
+      optimizer_callbacks: optimizer_callbacks
+    }
 
     report_progress(reporter, %{
       event: :family_start,
@@ -274,16 +293,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
                 fn usage_fn ->
                   :timer.tc(fn ->
                     run_seed(
-                      spec,
-                      trainset,
-                      devset,
-                      testset,
-                      lm,
-                      judge_lm,
-                      generations,
+                      seed_context,
                       seed,
-                      max_concurrency,
-                      execution,
                       progress,
                       fn seed_progress ->
                         seed_progress
@@ -332,12 +343,14 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     wall_us = Enum.sum(Enum.map(entries, & &1["wall_us"]))
     usage = Enum.reduce(entries, empty_usage(), &sum_usage(&2, &1["usage"]))
 
-    best = Enum.max_by(seed_results, & &1.test)
+    best = Enum.max_by(seed_results, &{&1.dev, -&1.seed})
 
     report_progress(reporter, %{
       event: :family_done,
       family: family,
-      best_test: best.test,
+      selected_seed: best.seed,
+      best_dev: best.dev,
+      selected_test: best.test,
       wall_clock_ms: max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond))
     })
 
@@ -357,6 +370,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         "dsex_gepa" => budget,
         "mipro_v2" => budget
       },
+      "metric_call_evidence" => metric_call_evidence(best, seed_results),
       "dataset" => %{
         "source" => "DSEx GEPA dataset root #{Path.expand(dataset_root)}",
         "split" => "train_dev_test",
@@ -368,6 +382,16 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       },
       "wall_clock_ms" => max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond)),
       "seed_variance" => seed_variance(seed_results),
+      "seed_selection" => %{
+        "dsex_gepa" => %{
+          "method" => "best_dev",
+          "seeds" => Enum.map(seed_results, & &1.seed),
+          "selected_seed" => best.seed,
+          "selection_split" => "dev",
+          "test_scores_used" => false,
+          "source" => "DSEx GEPA campaign completed-seed dev score comparison"
+        }
+      },
       "train_dev_test_gap" => %{
         "train" => best.train,
         "dev" => best.dev,
@@ -439,20 +463,22 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     })
   end
 
-  defp run_seed(
-         spec,
-         trainset,
-         devset,
-         testset,
-         lm,
-         judge_lm,
-         generations,
-         seed,
-         max_concurrency,
-         execution,
-         progress,
-         progress_fn
-       ) do
+  defp run_seed(context, seed, progress, progress_fn) do
+    %{
+      spec: spec,
+      trainset: trainset,
+      devset: devset,
+      testset: testset,
+      lm: lm,
+      reflection_lm: reflection_lm,
+      judge_lm: judge_lm,
+      budget: budget,
+      generations: generations,
+      max_concurrency: max_concurrency,
+      execution: execution,
+      optimizer_callbacks: optimizer_callbacks
+    } = context
+
     metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)
     program = program_for(spec, lm, execution)
 
@@ -479,26 +505,35 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       |> progress_fn.()
     end
 
-    compiled =
+    {compiled, report} =
       DSEx.Optimizer.GEPA.new(metric,
+        seed: seed,
         generations: generations,
         max_concurrency: max_concurrency,
+        reflection_lm: reflection_lm,
+        max_metric_calls: budget,
+        callbacks: optimizer_callbacks,
         feedback_fn: fn _trainset ->
           "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
         end
       )
-      |> DSEx.Optimizer.GEPA.compile(program, trainset, devset,
+      |> DSEx.Optimizer.GEPA.compile_with_report(program, trainset, devset,
         resume_state: progress["optimizer_state"],
         checkpoint_fn: optimizer_checkpoint_fn
       )
 
-    report =
-      DSEx.Optimizer.Report.fetch(compiled) ||
-        DSEx.Optimizer.Report.new(%{
-          optimizer: :gepa,
-          candidate_count: 0,
-          metadata: %{frontier_size: 0, status: :not_attached}
-        })
+    metric_calls = Map.get(report.metadata, :metric_calls)
+    metric_call_limit = Map.get(report.metadata, :max_metric_calls)
+    stop_reason = Map.get(report.metadata, :stop_reason)
+
+    unless non_negative_integer?(metric_calls) do
+      raise ArgumentError, "GEPA optimizer did not export observed metric calls"
+    end
+
+    unless metric_call_limit == budget do
+      raise ArgumentError,
+            "GEPA optimizer budget state did not enforce the family metric-call limit"
+    end
 
     %{
       seed: seed,
@@ -509,9 +544,41 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       baseline_dev: baseline.dev,
       baseline_test: baseline.test,
       candidate_count: report.candidate_count,
-      frontier_size: Map.get(report.metadata, :frontier_size, 0)
+      frontier_size: Map.get(report.metadata, :frontier_size, 0),
+      optimizer_metric_calls: metric_calls,
+      optimizer_metric_call_limit: metric_call_limit,
+      optimizer_stop_reason: normalize_stop_reason(stop_reason)
     }
   end
+
+  defp judge_config!(opts, lm, model) do
+    case Keyword.fetch(opts, :judge_lm) do
+      {:ok, judge_lm} -> {judge_lm, Keyword.fetch!(opts, :judge_model)}
+      :error -> {lm, model}
+    end
+  end
+
+  defp metric_call_evidence(best, seed_results) do
+    %{
+      "basis" => "observed_and_enforced",
+      "source" => "DSEx.Optimizer.GEPA report metadata backed by DSEx.Optimizer.GEPA.Budget",
+      "observed" => %{"dsex_gepa" => best.optimizer_metric_calls},
+      "enforced_limits" => %{"dsex_gepa" => true},
+      "per_seed" =>
+        Enum.map(seed_results, fn result ->
+          %{
+            "seed" => result.seed,
+            "observed" => result.optimizer_metric_calls,
+            "limit" => result.optimizer_metric_call_limit,
+            "stop_reason" => result.optimizer_stop_reason
+          }
+        end)
+    }
+  end
+
+  defp normalize_stop_reason(nil), do: nil
+  defp normalize_stop_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp normalize_stop_reason(reason), do: inspect(reason)
 
   defp program_for(
          %{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec,
@@ -667,7 +734,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       ["train", "dev", "test", "baseline_train", "baseline_dev", "baseline_test"],
       &(numeric?(result[&1]) and result[&1] >= 0 and result[&1] <= 1)
     ) and non_negative_integer?(result["candidate_count"]) and
-      non_negative_integer?(result["frontier_size"])
+      non_negative_integer?(result["frontier_size"]) and
+      non_negative_integer?(result["optimizer_metric_calls"]) and
+      positive_integer?(result["optimizer_metric_call_limit"]) and
+      result["optimizer_metric_calls"] <= result["optimizer_metric_call_limit"]
   end
 
   defp valid_usage?(usage) when is_map(usage) do
@@ -706,7 +776,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       frontier_size: Map.fetch!(result, "frontier_size"),
       baseline_train: Map.fetch!(result, "baseline_train"),
       baseline_dev: Map.fetch!(result, "baseline_dev"),
-      baseline_test: Map.fetch!(result, "baseline_test")
+      baseline_test: Map.fetch!(result, "baseline_test"),
+      optimizer_metric_calls: Map.fetch!(result, "optimizer_metric_calls"),
+      optimizer_metric_call_limit: Map.fetch!(result, "optimizer_metric_call_limit"),
+      optimizer_stop_reason: Map.get(result, "optimizer_stop_reason")
     }
   end
 

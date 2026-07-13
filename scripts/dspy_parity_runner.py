@@ -145,6 +145,8 @@ def configure_dspy(
 
 
 def dspy_lm_name(model: str) -> str:
+    if model.lower().strip("/").startswith("responses/"):
+        return f"openai/{model.strip('/')}"
     if "/" in model:
         return model
     return f"openai/{model}"

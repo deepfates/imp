@@ -119,6 +119,8 @@ defmodule OptimizerBehavioralCorpusTest do
     optimizer =
       DSEx.Optimizer.GEPA.new(metric(),
         generations: 2,
+        max_metric_calls: 20,
+        max_full_evaluations: 5,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
 
@@ -130,6 +132,8 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.best_score == evaluator(compiled).score
     assert report.metadata.feedback =~ "Always answer Paris"
     assert report.metadata.implementation == DSEx.Optimize.GEPA
+    assert report.metadata.max_metric_calls == 20
+    assert report.metadata.max_full_evaluations == 5
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
   end
 

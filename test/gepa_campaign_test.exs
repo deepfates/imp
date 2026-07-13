@@ -1,6 +1,17 @@
 defmodule GepaCampaignTest do
   use ExUnit.Case, async: false
 
+  alias DSEx.BenchmarkTruth.{GepaCampaign, GepaReplicationContract}
+
+  defmodule OptimizerConfigCallback do
+    @behaviour DSEx.Optimizer.GEPA.Callback
+
+    @impl true
+    def on_optimization_start(event, owner) do
+      send(owner, {:optimizer_config, event.config})
+    end
+  end
+
   test "DSEx GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
     dataset_root = tmp_dir("gepa-campaign-data")
     upstream_dir = tmp_dir("gepa-campaign-upstream")
@@ -389,6 +400,155 @@ defmodule GepaCampaignTest do
     end
   end
 
+  test "requested seeds and the family metric budget reach distinct optimizer configs" do
+    dataset_root = tmp_dir("gepa-campaign-optimizer-config-data")
+    rows_dir = tmp_dir("gepa-campaign-optimizer-config-rows")
+    write_dataset_root!(dataset_root)
+    set_family_budget!(dataset_root, "AIMEBench", 4)
+
+    result =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-optimizer-config",
+        seeds: [17, 29],
+        token_cost: explicit_costs(["AIMEBench"], [17, 29]),
+        optimizer_callbacks: [{OptimizerConfigCallback, self()}]
+      )
+      |> GepaCampaign.run()
+
+    assert_receive {:optimizer_config, %{seed: 17, max_metric_calls: 4}}
+    assert_receive {:optimizer_config, %{seed: 29, max_metric_calls: 4}}
+
+    [row] = result.report["rows"]
+    evidence = row["metric_call_evidence"]
+
+    assert evidence["basis"] == "observed_and_enforced"
+    assert evidence["enforced_limits"] == %{"dsex_gepa" => true}
+
+    assert Enum.map(evidence["per_seed"], &{&1["seed"], &1["observed"], &1["limit"]}) ==
+             [{17, 4, 4}, {29, 4, 4}]
+  end
+
+  test "reflection LM is used for optimizer proposals and Papillon names its actual judge" do
+    dataset_root = tmp_dir("gepa-campaign-reflection-data")
+    rows_dir = tmp_dir("gepa-campaign-reflection-rows")
+    write_dataset_root!(dataset_root)
+    receiver = self()
+
+    reflection_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(receiver, {:reflection_call, messages})
+          %{"instruction" => "Use the reflected instruction."}
+        end
+      ]
+    }
+
+    result =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-reflection",
+        families: ["Papillon"],
+        reflection_lm: reflection_lm
+      )
+      |> GepaCampaign.run()
+
+    assert_receive {:reflection_call, messages}
+    assert Enum.any?(messages, &(Map.get(&1, :content, "") =~ "Improve exactly one"))
+
+    [row] = result.report["rows"]
+    assert row["metric_judge"]["model"] == "openai:gpt-4.1-mini-2025-04-14"
+    refute row["metric_judge"]["model"] == row["reflection_model"]
+  end
+
+  test "resumed seed selection uses dev even when another seed has the higher test score" do
+    dataset_root = tmp_dir("gepa-campaign-dev-selection-data")
+    rows_dir = tmp_dir("gepa-campaign-dev-selection-rows")
+    write_dataset_root!(dataset_root)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-dev-selection",
+        seeds: [10, 20],
+        token_cost: explicit_costs(["AIMEBench"], [10, 20])
+      )
+
+    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+
+    completed =
+      Enum.map(checkpoint["completed"], fn entry ->
+        scores =
+          case entry["seed"] do
+            10 -> %{"dev" => 0.9, "test" => 0.1}
+            20 -> %{"dev" => 0.2, "test" => 1.0}
+          end
+
+        update_in(entry, ["result"], &Map.merge(&1, scores))
+      end)
+
+    File.write!(checkpoint_path, Jason.encode!(%{checkpoint | "completed" => completed}))
+
+    [row] = DSEx.BenchmarkTruth.GepaCampaign.run(opts).report["rows"]
+
+    assert get_in(row, ["results", "dsex_gepa", "seed"]) == 10
+    assert get_in(row, ["results", "dsex_gepa", "score"]) == 0.1
+    assert get_in(row, ["seed_selection", "dsex_gepa", "selection_split"]) == "dev"
+    assert get_in(row, ["seed_selection", "dsex_gepa", "test_scores_used"]) == false
+  end
+
+  test "DSEx evidence satisfies the strict contract once converter comparators are supplied" do
+    dataset_root = tmp_dir("gepa-campaign-contract-data")
+    rows_dir = tmp_dir("gepa-campaign-contract-rows")
+    write_dataset_root!(dataset_root)
+
+    [dsex_row] =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-contract",
+        seeds: [3, 5],
+        token_cost: explicit_costs(["AIMEBench"], [3, 5])
+      )
+      |> GepaCampaign.run()
+      |> get_in([:report, "rows"])
+
+    selection = get_in(dsex_row, ["seed_selection", "dsex_gepa"])
+    observed_dsex = get_in(dsex_row, ["metric_call_evidence", "observed", "dsex_gepa"])
+
+    rows =
+      Enum.map(GepaReplicationContract.required_families(), fn family ->
+        dataset =
+          if family == "hoverBench" do
+            put_in(dsex_row["dataset"], ["retrieval"], %{
+              "verified" => true,
+              "implementation" => "upstream_python_bm25s",
+              "corpus_checksum" => "sha256:" <> String.duplicate("a", 64),
+              "index_checksum" => "sha256:" <> String.duplicate("b", 64)
+            })
+          else
+            dsex_row["dataset"]
+          end
+
+        dsex_row
+        |> Map.put("family", family)
+        |> Map.put("dataset", dataset)
+        |> Map.put("results", contract_results(dsex_row))
+        |> Map.put("seed_selection", Map.new(contract_optimizers(), &{&1, selection}))
+        |> Map.put("metric_call_evidence", %{
+          "basis" => "observed_and_enforced",
+          "source" => "optimizer runtime exports and enforced campaign limits",
+          "observed" =>
+            Map.merge(Map.new(contract_optimizers(), &{&1, 1}), %{
+              "dsex_gepa" => observed_dsex
+            }),
+          "enforced_limits" => Map.new(contract_optimizers(), &{&1, true})
+        })
+        |> maybe_put_contract_judge(family)
+      end)
+
+    assert GepaReplicationContract.validate_rows(rows).passing
+  end
+
   defp static_gold_lm do
     %{
       module: DSEx.LM.Static,
@@ -432,6 +592,39 @@ defmodule GepaCampaignTest do
       overrides
     )
   end
+
+  defp set_family_budget!(dataset_root, family, budget) do
+    path = Path.join(dataset_root, "families.json")
+    document = path |> File.read!() |> Jason.decode!()
+
+    families =
+      Enum.map(document["families"], fn
+        %{"family" => ^family} = spec -> Map.put(spec, "metric_calls", budget)
+        spec -> spec
+      end)
+
+    File.write!(path, Jason.encode!(%{document | "families" => families}))
+  end
+
+  defp contract_optimizers, do: ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"]
+
+  defp contract_results(dsex_row) do
+    Map.new(contract_optimizers(), fn
+      "dsex_gepa" -> {"dsex_gepa", get_in(dsex_row, ["results", "dsex_gepa"])}
+      optimizer -> {optimizer, %{"score" => 0.5, "source" => "upstream runtime #{optimizer}"}}
+    end)
+  end
+
+  defp maybe_put_contract_judge(row, "Papillon") do
+    Map.put(row, "metric_judge", %{
+      "kind" => "papillon_quality_leakage",
+      "model" => "openai:gpt-4.1-mini-2025-04-14",
+      "quality_judge" => "pairwise quality judge export",
+      "leakage_judge" => "pii leakage judge export"
+    })
+  end
+
+  defp maybe_put_contract_judge(row, _family), do: row
 
   defp explicit_costs(families, seeds) do
     Map.new(families, fn family ->

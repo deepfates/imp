@@ -68,6 +68,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
     model = fetch!(opts, :model)
+    reflection_model = fetch!(opts, :reflection_model)
+    req_llm_opts = Keyword.merge([api_key: api_key, temperature: 0], generation_opts(opts))
 
     families = parse_families(Keyword.get(opts, :families))
     require_upstream_hover!(families)
@@ -77,7 +79,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         dataset_root: fetch!(opts, :dataset_root),
         campaign_id: fetch!(opts, :campaign_id),
         model: model,
-        reflection_model: fetch!(opts, :reflection_model),
+        reflection_model: reflection_model,
         out_dir: Keyword.get(opts, :out, "benchmarks/results"),
         families: families,
         max_concurrency: Keyword.get(opts, :max_concurrency, 1),
@@ -88,11 +90,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         source_commits: source_commits(opts),
         execution: execution_identity(opts),
         reporter: &report_progress/1,
-        lm:
-          DSEx.req_llm(
-            model,
-            Keyword.merge([api_key: api_key, temperature: 0], generation_opts(opts))
-          )
+        lm: DSEx.req_llm(model, req_llm_opts),
+        reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts)
       )
 
     Mix.shell().info("DSEx GEPA rows: #{result.out_path}")
@@ -203,7 +202,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
 
   defp report_progress(%{event: :family_done} = event) do
     Mix.shell().info(
-      "[GEPA] #{event.family} done best_test=#{format_score(event.best_test)} wall_clock_ms=#{event.wall_clock_ms}"
+      "[GEPA] #{event.family} done selected_seed=#{event.selected_seed} best_dev=#{format_score(event.best_dev)} selected_test=#{format_score(event.selected_test)} wall_clock_ms=#{event.wall_clock_ms}"
     )
   end
 

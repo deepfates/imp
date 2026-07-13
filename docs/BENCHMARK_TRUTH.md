@@ -281,6 +281,11 @@ methods are a predeclared seed, dev-only best-seed selection, or an aggregate
 over declared seeds, all with concrete provenance and `test_scores_used: false`.
 Choosing the reported best seed from test scores is test-set leakage and cannot
 support parity or source-fidelity claims, even when seed variance is reported.
+The DSEx campaign passes every `--seeds` value and each family’s declared
+`metric_calls` limit into `DSEx.Optimizer.GEPA`, selects the reported seed by
+dev score, and exports the optimizer report’s observed metric calls plus the
+enforced limit for each seed. Comparator-side evidence must be added by the
+upstream artifact converter before strict full-artifact validation.
 
 When upstream GEPA artifact experiments have been run, convert their
 `experiment_runs_data` output into DSEx dashboard rows with:
@@ -309,6 +314,10 @@ mix dsex.benchmark.gepa_replication \
   --campaign-id gepa-full-YYYYMMDD \
   --artifact-model gpt-41-mini
 ```
+
+`--model` constructs the task LM and the Papillon judge LM. The separately
+constructed `--reflection-model` client is passed to GEPA for reflective
+proposals; it is not recorded as Papillon judge provenance.
 
 For long full-scope runs, execute one or more families at a time with
 `--families AIMEBench,HotpotQABench`. These partial campaign artifacts are
@@ -691,9 +700,11 @@ quota/credentials or switch to a matched provider/model lane, then rerun the
 same campaign id to continue from the earliest missing accepted row.
 
 Use `--dspy-model responses/<model>` when the matching Python DSPy/LiteLLM path
-must force OpenAI Responses endpoint semantics for the selected model. DSEx
-reaches the provider through ReqLLM; the explicit DSPy model route prevents
-comparing Responses semantics against Chat Completions semantics by accident.
+must force OpenAI Responses endpoint semantics for the selected model. The
+runner normalizes that shorthand to LiteLLM's provider-qualified
+`openai/responses/<model>` identity. DSEx reaches the provider through ReqLLM;
+the explicit DSPy model route prevents comparing Responses semantics against
+Chat Completions semantics by accident.
 
 For reasoning models, add `--reasoning-effort low` when the parity question is
 throughput and answer-quality parity under a bounded reasoning budget. The

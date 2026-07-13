@@ -13,6 +13,7 @@ defmodule DSEx.Optimizer.GEPA do
   """
 
   alias DSEx.Optimizer.GEPA.{Callback, Candidate, Engine, ProgramAdapter}
+  alias DSEx.Optimizer.Report
 
   defstruct [
     :metric,
@@ -93,6 +94,12 @@ defmodule DSEx.Optimizer.GEPA do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
+    {compiled, _report} = compile_with_report(optimizer, program, trainset, devset, opts)
+    compiled
+  end
+
+  @doc "Compiles a program and returns the optimizer report independently of program metadata support."
+  def compile_with_report(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @compile_option_schema, "DSEx.Optimizer.GEPA.compile/5")
     trainset = Enum.to_list(trainset)
     devset = Enum.to_list(devset)
@@ -137,9 +144,8 @@ defmodule DSEx.Optimizer.GEPA do
     candidates = report_candidates(state)
     errors = feedback_errors ++ evaluation_errors(state)
 
-    DSEx.Optimizer.Report.attach(
-      compiled,
-      DSEx.Optimizer.Report.new(%{
+    report =
+      Report.new(%{
         optimizer: :gepa,
         best_score: best.validation.aggregate_score,
         candidate_count: length(candidates),
@@ -159,14 +165,17 @@ defmodule DSEx.Optimizer.GEPA do
           merge_candidates: Enum.count(state.history, &(&1[:operation] == :merge)),
           merges_accepted: state.total_merges_tested,
           metric_calls: state.budget.metric_calls,
+          max_metric_calls: state.budget.max_metric_calls,
           reflection_calls: state.budget.reflection_calls,
           full_evaluations: state.budget.full_evaluations,
+          max_full_evaluations: state.budget.max_full_evaluations,
           rejected_candidates: length(state.rejected),
           stop_reason: state.stop_reason,
           status: if(errors == [], do: :ok, else: :with_errors)
         }
       })
-    )
+
+    {Report.attach(compiled, report), report}
   end
 
   defp proposer(reflection_lm, feedback) do
