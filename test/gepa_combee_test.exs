@@ -102,6 +102,135 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     assert elem(final, 6) |> Enum.map(& &1["ComBeeGroupIndex"]) == [0, 1, 2, 3]
   end
 
+  test "production fallback retains every first-level and final aggregation input" do
+    records = Enum.map(0..19, &%{"Feedback" => "source-#{&1}"})
+
+    first =
+      DSEx.Optimizer.GEPA.fallback_proposal(
+        %{main: "current"},
+        :main,
+        records,
+        1,
+        "",
+        %{phase: :first_level}
+      )
+
+    final_records =
+      Enum.map(0..19, &%{"ComBeeIntermediateUpdate" => "intermediate-#{&1}"})
+
+    final =
+      DSEx.Optimizer.GEPA.fallback_proposal(
+        %{main: "current"},
+        :main,
+        final_records,
+        1,
+        "",
+        %{phase: :final}
+      )
+
+    assert Enum.all?(0..19, &String.contains?(first, "source-#{&1}"))
+    assert Enum.all?(0..19, &String.contains?(final, "intermediate-#{&1}"))
+  end
+
+  test "one deadline covers queued first-level work and the final level" do
+    owner = self()
+    records = Enum.map(0..15, &%{id: &1})
+    policy = policy(16, max_concurrency: 1, timeout: 25)
+
+    proposer = fn _candidate, _component, _records, _iteration, metadata ->
+      send(owner, {:deadline_call, metadata.phase, metadata[:group_index]})
+      Process.sleep(15)
+      "update-#{metadata[:group_index]}"
+    end
+
+    started = System.monotonic_time(:millisecond)
+
+    assert {:error, {:combee_first_level_failed, 1, :timeout}, report} =
+             ComBee.aggregate(proposer, %{main: "current"}, :main, records, 1, policy)
+
+    elapsed = System.monotonic_time(:millisecond) - started
+    assert elapsed < 60
+    assert report.first_level_calls == 2
+    assert report.final_calls == 0
+    assert report.reflection_calls == 2
+    assert receive_deadline_calls([]) == [{:first_level, 0}, {:first_level, 1}]
+  end
+
+  test "one proposal deadline is inherited across sequential components" do
+    owner = self()
+    policy = policy(1, max_concurrency: 1, timeout: :infinity)
+
+    proposer = fn _candidate, component, _records, _iteration, metadata ->
+      send(owner, {:proposal_deadline_call, component, metadata.phase})
+      delay = if component == :alpha, do: 6, else: if(metadata.phase == :final, do: 20, else: 1)
+      Process.sleep(delay)
+      "update-#{metadata.phase}"
+    end
+
+    parent = %{candidate: %{alpha: "a", beta: "b"}}
+
+    context = %{
+      components: [:alpha, :beta],
+      dataset: %{alpha: [%{id: 1}], beta: [%{id: 2}]},
+      iteration: 1
+    }
+
+    started = System.monotonic_time(:millisecond)
+
+    assert [{:error, :timeout}] =
+             DSEx.Optimizer.GEPA.Coordinator.run([:proposal], 25, fn :proposal ->
+               DSEx.Optimizer.GEPA.Reflection.execute(proposer, parent, context, policy)
+             end)
+
+    assert System.monotonic_time(:millisecond) - started < 60
+
+    assert receive_proposal_deadline_calls([]) == [
+             {:alpha, :first_level},
+             {:alpha, :final},
+             {:beta, :first_level},
+             {:beta, :final}
+           ]
+  end
+
+  test "terminal failure stops queued dispatch and cancels active siblings" do
+    owner = self()
+    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    records = Enum.map(0..24, &%{id: &1})
+    policy = policy(25, max_concurrency: 2, timeout: 1_000)
+
+    proposer = fn _candidate, _component, _records, _iteration, metadata ->
+      send(owner, {:fail_fast_call, metadata.group_index, self()})
+
+      case metadata.group_index do
+        0 ->
+          Process.sleep(15)
+          Process.exit(self(), :kill)
+
+        1 ->
+          Process.sleep(:infinity)
+
+        index ->
+          "must-not-dispatch-#{index}"
+      end
+    end
+
+    assert {:error, {:combee_first_level_failed, 0, {:worker_exit, :killed}}, report} =
+             ComBee.aggregate(proposer, %{main: "current"}, :main, records, 1, policy)
+
+    assert report.first_level_calls == 2
+    assert report.reflection_calls == 2
+    assert_receive {:fail_fast_call, 0, _worker_zero}
+    assert_receive {:fail_fast_call, 1, worker_one}
+    refute_receive {:fail_fast_call, 2, _worker}
+    refute_receive {:fail_fast_call, 3, _worker}
+    refute_receive {:fail_fast_call, 4, _worker}
+
+    assert eventually(fn ->
+             not Process.alive?(worker_one) and
+               MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+           end)
+  end
+
   test "fatal exits and timeouts fail deterministically without task leaks" do
     baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
     records = Enum.map(0..8, &%{id: &1})
@@ -233,6 +362,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       )
 
     assert report.status == :ok
+    assert report.measurement_source == :caller_supplied
     assert_in_delta report.a, 1000.0, 1.0e-8
     assert_in_delta report.alpha, 0.5, 1.0e-8
     assert_in_delta report.tau, report.peak_slope * 0.016, 1.0e-8
@@ -252,6 +382,14 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     assert_raise ArgumentError, ~r/max_batch_size/, fn ->
       BatchController.options!(max_batch_size: 201)
+    end
+
+    assert_raise ArgumentError, ~r/runtime batch profiling is unavailable/, fn ->
+      BatchController.select([], 100)
+    end
+
+    assert_raise ArgumentError, ~r/runtime trial profiling is not implemented/, fn ->
+      ComBee.Options.new!(batch_controller: true)
     end
   end
 
@@ -416,6 +554,23 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       {:model_call, _, _} = call -> receive_model_calls(count - 1, [call | calls])
     after
       1_000 -> flunk("expected #{count} more model calls")
+    end
+  end
+
+  defp receive_deadline_calls(calls) do
+    receive do
+      {:deadline_call, phase, index} -> receive_deadline_calls([{phase, index} | calls])
+    after
+      25 -> Enum.reverse(calls)
+    end
+  end
+
+  defp receive_proposal_deadline_calls(calls) do
+    receive do
+      {:proposal_deadline_call, component, phase} ->
+        receive_proposal_deadline_calls([{component, phase} | calls])
+    after
+      25 -> Enum.reverse(calls)
     end
   end
 

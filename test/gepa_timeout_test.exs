@@ -8,6 +8,34 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
     def on_error(event, owner), do: send(owner, {:gepa_error, event.exception})
   end
 
+  defmodule FixtureAdapter do
+    @behaviour DSEx.Optimizer.GEPA.Adapter
+    defstruct []
+
+    @impl true
+    def evaluate(_adapter, batch, candidate, opts) do
+      score = if candidate.main == "base", do: 0.0, else: 1.0
+
+      traces =
+        if Keyword.get(opts, :capture_traces, false),
+          do: %{main: List.duplicate(nil, length(batch))},
+          else: %{}
+
+      DSEx.Optimizer.GEPA.Result.new(batch, List.duplicate(score, length(batch)),
+        trajectories: traces,
+        side_information: %{main: batch},
+        metadata: %{metric_calls: length(batch)}
+      )
+    end
+
+    @impl true
+    def make_reflective_dataset(_adapter, _candidate, result, components) do
+      Map.new(components, fn component ->
+        {component, Enum.map(result.outputs, &%{id: &1})}
+      end)
+    end
+  end
+
   defp example do
     DSEx.example(question: "q", answer: "ok") |> DSEx.with_inputs(:question)
   end
@@ -98,6 +126,74 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
              not Process.alive?(worker) and
                MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
            end)
+  end
+
+  test "sequential proposals checkpoint prepared and started reservations" do
+    owner = self()
+
+    prepared =
+      interrupt_sequential_checkpoint!(owner, "prepared", "reflection")
+
+    assert [%{"reflection_calls" => 3}] =
+             Enum.filter(prepared["budget_ledger"], &String.starts_with?(&1["id"], "reflection:"))
+
+    assert prepared["budget"]["reflection_calls"] == 0
+
+    started =
+      interrupt_sequential_checkpoint!(owner, "started", "reflection")
+
+    assert [%{"reflection_calls" => 3}] =
+             Enum.filter(started["budget_ledger"], &String.starts_with?(&1["id"], "reflection:"))
+
+    assert_raise ArgumentError, ~r/ambiguous external effects/, fn ->
+      run_sequential_engine(resume_state: started)
+    end
+  end
+
+  defp interrupt_sequential_checkpoint!(owner, status, phase) do
+    assert_raise RuntimeError, "interrupt", fn ->
+      run_sequential_engine(
+        checkpoint_fn: fn checkpoint ->
+          case checkpoint["pending_proposal_batch"] do
+            %{"status" => ^status, "phase" => ^phase} ->
+              send(owner, {:sequential_checkpoint, checkpoint})
+              raise "interrupt"
+
+            _other ->
+              :ok
+          end
+        end
+      )
+    end
+
+    assert_receive {:sequential_checkpoint, checkpoint}
+    checkpoint
+  end
+
+  defp run_sequential_engine(overrides) do
+    opts =
+      Keyword.merge(
+        [
+          max_iterations: 1,
+          minibatch_size: 4,
+          proposal_concurrency: 1,
+          candidate_selection_strategy: :current_best,
+          acceptance_policy: :equal_or_better,
+          combee: [max_concurrency: 2]
+        ],
+        overrides
+      )
+
+    DSEx.Optimizer.GEPA.Engine.run(
+      %FixtureAdapter{},
+      %{main: "base"},
+      Enum.to_list(0..3),
+      [:validation],
+      fn _candidate, _component, _records, _iteration, metadata ->
+        if metadata.phase == :final, do: "proposal", else: "local"
+      end,
+      opts
+    )
   end
 
   defp eventually(fun, attempts \\ 100)

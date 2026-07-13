@@ -73,6 +73,8 @@ output = %{
   combee: %{
     wall_time_ms: combee_ms,
     reducer_calls: report.reflection_calls,
+    dispatched_first_level_calls: report.first_level_calls,
+    dispatched_final_calls: report.final_calls,
     retained_unique_records: length(combee_retained),
     retention_ratio: length(combee_retained) / record_count,
     status: report.status

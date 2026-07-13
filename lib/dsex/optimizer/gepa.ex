@@ -260,14 +260,18 @@ defmodule DSEx.Optimizer.GEPA do
     end
   end
 
-  defp fallback_proposal(candidate, component, records, generation, feedback, aggregation) do
+  @doc false
+  def fallback_proposal(candidate, component, records, generation, feedback, aggregation) do
     record_feedback =
       records
-      |> Enum.map(
-        &(Map.get(&1, "ComBeeIntermediateUpdate") || Map.get(&1, "Feedback") || inspect(&1))
-      )
-      |> Enum.take(8)
-      |> Enum.join("; ")
+      |> Enum.with_index()
+      |> Enum.map_join("\n", fn {record, index} ->
+        value =
+          Map.get(record, "ComBeeIntermediateUpdate") || Map.get(record, "Feedback") ||
+            inspect(record)
+
+        "[#{index}] #{value}"
+      end)
 
     phase = Map.get(aggregation, :phase, :single)
 
@@ -330,11 +334,11 @@ defmodule DSEx.Optimizer.GEPA do
       {:ok, instruction} when is_binary(instruction) ->
         instruction
 
-      {:error, _reason} ->
-        fallback_proposal(candidate, component, records, generation, feedback, aggregation)
+      {:error, reason} ->
+        {:error, {:reflection_lm_failed, reason}}
 
-      {:ok, _other} ->
-        fallback_proposal(candidate, component, records, generation, feedback, aggregation)
+      {:ok, other} ->
+        {:error, {:invalid_reflection_lm_response, other}}
     end
   end
 

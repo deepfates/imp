@@ -1,8 +1,10 @@
 defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
   @moduledoc """
-  Fits ComBee's positive power-law epoch-delay model from measured batches.
+  Fits ComBee's power-law epoch-delay model from caller-supplied measurements.
 
-  Every measurement is `{batch_size, observed_delay}`. The controller converts
+  This is an offline fit, not the paper's runtime batch controller. DSEx does
+  not run synchronized trial iterations through this module. Every supplied
+  measurement is `{batch_size, observed_delay}`. The fitter converts
   delay to estimated epoch time with `delay * trainset_size / batch_size`, fits
   `T = A * batch_size^-alpha` in log space, and applies the paper's plateau
   formula. Invalid or non-decreasing fits fail closed to the smallest safe batch
@@ -13,7 +15,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
   @default_slope_threshold_ratio 0.016
 
   defmodule Options do
-    @moduledoc "Options for measured ComBee batch-size selection."
+    @moduledoc "Options for an offline ComBee delay-curve fit."
 
     defstruct measurements: [],
               min_batch_size: 1,
@@ -35,6 +37,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
     defstruct [
       :status,
       :reason,
+      :measurement_source,
       :trainset_size,
       :measurements,
       :epoch_times,
@@ -52,6 +55,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
     @type t :: %__MODULE__{
             status: status(),
             reason: atom() | nil,
+            measurement_source: :caller_supplied,
             trainset_size: pos_integer(),
             measurements: [{pos_integer(), float()}],
             epoch_times: [{pos_integer(), float()}],
@@ -112,6 +116,13 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
   @spec select(Options.t() | keyword(), pos_integer()) :: Report.t()
   def select(options, trainset_size) when is_integer(trainset_size) and trainset_size > 0 do
     options = options!(options)
+
+    if options.measurements == [] do
+      raise ArgumentError,
+            "ComBee runtime batch profiling is unavailable; " <>
+              "provide caller-supplied :measurements for the offline delay fit"
+    end
+
     {safe_min, safe_max} = effective_safety_range(options, trainset_size)
     measurements = Enum.map(options.measurements, fn {size, delay} -> {size, delay * 1.0} end)
 
@@ -121,6 +132,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
       end)
 
     base = %Report{
+      measurement_source: :caller_supplied,
       trainset_size: trainset_size,
       measurements: measurements,
       epoch_times: epoch_times,
@@ -253,6 +265,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee.BatchController do
     %Report{
       status: :degenerate,
       reason: reason,
+      measurement_source: :caller_supplied,
       trainset_size: trainset_size,
       measurements: measurements,
       epoch_times: [],

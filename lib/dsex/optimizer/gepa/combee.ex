@@ -220,37 +220,48 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
       reason = {:combee_degenerate, :empty_reflective_dataset}
       {:error, reason, %{report | status: :error, failure: reason}}
     else
-      first_level =
-        Coordinator.run(plan.groups, policy.timeout, policy.max_concurrency, fn group ->
-          metadata = local_metadata(plan, group)
+      deadline = Coordinator.deadline(policy.timeout)
 
-          invoke(
-            proposer,
-            candidate,
-            component,
-            Enum.map(group.entries, & &1.record),
-            iteration,
-            metadata
-          )
-        end)
-        |> Enum.map(&unwrap_coordinator_result/1)
+      first_level_run =
+        Coordinator.run_with_report(
+          plan.groups,
+          {:deadline, deadline},
+          policy.max_concurrency,
+          fn group ->
+            metadata = local_metadata(plan, group)
+
+            invoke(
+              proposer,
+              candidate,
+              component,
+              Enum.map(group.entries, & &1.record),
+              iteration,
+              metadata
+            )
+          end
+        )
+
+      first_level = Enum.map(first_level_run.results, &unwrap_coordinator_result/1)
 
       report = %{
         report
-        | first_level_calls: plan.group_count,
-          reflection_calls: plan.group_count
+        | first_level_calls: first_level_run.dispatched,
+          reflection_calls: first_level_run.dispatched
       }
 
-      case first_failure(first_level) do
+      case first_failure(first_level, first_level_run.terminal_index) do
         nil ->
           updates = Enum.map(first_level, fn {:ok, update} -> update end)
           final_records = final_records(updates)
           metadata = final_metadata(plan)
 
-          final =
-            Coordinator.run([:final], policy.timeout, 1, fn :final ->
+          final_run =
+            Coordinator.run_with_report([:final], {:deadline, deadline}, 1, fn :final ->
               invoke(proposer, candidate, component, final_records, iteration, metadata)
             end)
+
+          final =
+            final_run.results
             |> hd()
             |> unwrap_coordinator_result()
 
@@ -260,8 +271,8 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
                %{
                  report
                  | status: :ok,
-                   final_calls: 1,
-                   reflection_calls: plan.group_count + 1
+                   final_calls: final_run.dispatched,
+                   reflection_calls: report.reflection_calls + final_run.dispatched
                }}
 
             {:error, reason} ->
@@ -272,8 +283,8 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
                  report
                  | status: :error,
                    failure: failure,
-                   final_calls: 1,
-                   reflection_calls: plan.group_count + 1
+                   final_calls: final_run.dispatched,
+                   reflection_calls: report.reflection_calls + final_run.dispatched
                }}
           end
 
@@ -538,13 +549,13 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   defp unwrap_coordinator_result({:ok, result}), do: result
   defp unwrap_coordinator_result({:error, reason}), do: {:error, reason}
 
-  defp first_failure(results) do
-    results
-    |> Enum.with_index()
-    |> Enum.find_value(fn
-      {{:error, reason}, index} -> {index, reason}
-      _success -> nil
-    end)
+  defp first_failure(_results, nil), do: nil
+
+  defp first_failure(results, index) do
+    case Enum.fetch!(results, index) do
+      {:error, reason} -> {index, reason}
+      other -> {index, {:terminal_scheduler_result, other}}
+    end
   end
 
   defp floor_sqrt(number), do: number |> :math.sqrt() |> floor() |> max(1)

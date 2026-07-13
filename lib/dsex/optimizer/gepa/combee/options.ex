@@ -71,6 +71,12 @@ defmodule DSEx.Optimizer.GEPA.ComBee.Options do
   end
 
   defp batch_controller_options(value) when value in [nil, false], do: nil
-  defp batch_controller_options(true), do: BatchController.options!([])
+
+  defp batch_controller_options(true) do
+    raise ArgumentError,
+          "ComBee :batch_controller requires caller-supplied :measurements; " <>
+            "source-faithful runtime trial profiling is not implemented"
+  end
+
   defp batch_controller_options(value), do: BatchController.options!(value)
 end

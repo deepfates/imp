@@ -125,7 +125,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     max_iterations = Keyword.get(opts, :max_iterations, 10)
 
     state =
-      if proposal_policy.resolved == 1 do
+      if proposal_policy.resolved == 1 and not combee_policy.enabled do
         run_sequential_loop(
           adapter,
           trainset,

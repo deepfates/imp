@@ -40,13 +40,26 @@ Arity-five proposers also receive metadata with `phase: :first_level` or
 `ComBeeGroupIndex` and `ComBeeIntermediateUpdate` fields.
 
 The reflection-call reservation for one component is exactly `k + 1`. The
-duplication factor changes reducer input sizes, not the number of reducer calls.
-An empty reflective dataset fails without a model call.
+duplication factor changes reducer input sizes, not the reservation. Reports
+record actual dispatched calls: a terminal first-level failure can consume less
+than the reservation because queued groups are never launched. An empty
+reflective dataset fails without a model call.
 
-## Batch controller
+The built-in no-LM fallback is phase-aware and exhaustive. It includes every
+record in a first-level group and every ordered intermediate update at the final
+level. It does not apply a record-count truncation. When a configured reflection
+LM returns an error or an invalid response, proposal generation fails closed;
+DSEx does not silently substitute the fallback.
 
-`DSEx.Optimizer.GEPA.ComBee.BatchController` consumes measured
-`{batch_size, delay}` pairs. For trainset size `N`, it computes:
+## Offline delay-curve fit
+
+The paper's dynamic controller runs synchronized trial iterations at several
+candidate batch sizes, measures their end-to-end delays, and accounts for those
+iterations as real work. DSEx does not currently implement that trial pipeline.
+`DSEx.Optimizer.GEPA.ComBee.BatchController` is therefore only an offline fitter
+for caller-supplied `{batch_size, delay}` pairs. It must not be described as
+source-faithful runtime profiling. Enabling it without explicit measurements
+fails closed. For trainset size `N`, the offline fit computes:
 
 ```text
 T_epoch(batch_size) = delay * N / batch_size
@@ -69,7 +82,7 @@ batch. It never guesses a larger batch after a degenerate fit.
 
 ## Runtime policy
 
-Example:
+Example using externally collected measurements:
 
 ```elixir
 DSEx.Optimizer.GEPA.new(metric,
@@ -94,8 +107,14 @@ DSEx.Optimizer.GEPA.new(metric,
   is omitted, it inherits `timeout` so existing callers receive bounded
   reflection calls.
 - Legacy single-call reflection and both ComBee levels run under
-  `DSEx.UnlinkedTaskSupervisor`. A finite ComBee timeout is capped by
-  `proposal_timeout`.
+  `DSEx.UnlinkedTaskSupervisor`. Each proposal receives one absolute monotonic
+  deadline. Nested component aggregation, queued first-level groups, and the
+  final level consume the same remaining time. A finite ComBee timeout is an
+  additional cap on that inherited proposal deadline.
+- The bounded scheduler launches at most the resolved concurrency. On terminal
+  failure or deadline it stops launching queued calls, brutally cancels active
+  siblings, and marks undispatched work as cancelled. Aggregation reports count
+  dispatched provider calls only.
 - Timeout, crash, or fatal exit after dispatch consumes the preauthorized call.
   When the inner aggregation returns, a final call is charged only if it was
   dispatched. If an enclosing speculative proposal is killed first, effects
@@ -105,13 +124,14 @@ DSEx.Optimizer.GEPA.new(metric,
   that worker allowance are rejected before optimization.
 - Callback effects and aggregation reports are applied in proposal-slot and
   component order, regardless of worker completion order.
-- Checkpoint schema 4 stores a ComBee policy identity, batch-controller report,
+- Checkpoint schema 4 stores a ComBee policy identity, offline-fit report,
   pending aggregation reports, and budget reservations. Resume rejects drift in
   seed, duplication, timeout, concurrency, effective batch, or controller
   measurements. A checkpoint marked `started` remains non-resumable because
   provider effects are ambiguous.
 
-`on_combee_batch_selected` exposes the controller report.
+`on_combee_batch_selected` exposes the offline-fit report, whose
+`measurement_source` is `:caller_supplied`.
 `on_combee_aggregation` exposes `DSEx.Optimizer.GEPA.ComBee.Report`, including
 group sizes, source-copy assignments, call counts, status, and deterministic
 failure identity. The optimizer report includes resolved policy and ordered
@@ -123,9 +143,11 @@ A process already blocked in the old direct `DSEx.LM.generate/3` reflection
 path cannot acquire the new task boundary through code reload. Stop that process
 and resume from the last completed checkpoint. If the checkpoint predates the
 hung reflection, that provider call is an ambiguous external spend and may be
-replayed; account for it outside the checkpoint ledger. Parallel-proposal runs
-checkpoint prepared/started proposal phases and fail closed on ambiguous
-started work; sequential runs checkpoint after the bounded proposal returns.
+replayed; account for it outside the checkpoint ledger. Both sequential and
+parallel-proposal runs checkpoint prepared and started proposal phases with
+budget reservations. Resume rejects started work because provider effects are
+ambiguous. If an enclosing proposal is interrupted after the started
+checkpoint, the full reservation is the conservative spend bound.
 
 ## Provider-free harness
 
