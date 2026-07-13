@@ -7,9 +7,12 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceAdapter do
   adapter's reflection model. It requests OpenAI Chat token logprobs through
   ReqLLM, but accepts capability only when the returned response proves support.
 
+  Raw confidence remains diagnostic metadata. The maximized
+  `:confidence_quality` objective is the configured correctness-aware score,
+  so an incorrect prediction always receives zero regardless of confidence.
   Missing or unsupported logprobs fail evaluation by default. Set
-  `fallback: :accuracy` explicitly to omit `:raw_confidence`, retain only the
-  `:accuracy` objective, and record why confidence was unavailable.
+  `fallback: :accuracy` explicitly to omit `:confidence_quality`, retain only
+  the `:accuracy` objective, and record why confidence was unavailable.
   """
 
   @behaviour DSEx.Optimizer.GEPA.Adapter

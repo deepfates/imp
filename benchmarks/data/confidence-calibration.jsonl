@@ -1,24 +1,24 @@
-{"id":"cal-01","split":"calibration","text":"I was charged twice for the same invoice.","label":"billing"}
-{"id":"cal-02","split":"calibration","text":"The app crashes whenever I upload a PDF.","label":"technical"}
-{"id":"cal-03","split":"calibration","text":"I cannot reset the password on my profile.","label":"account"}
-{"id":"cal-04","split":"calibration","text":"Please stop my subscription before the next renewal.","label":"cancellation"}
-{"id":"cal-05","split":"calibration","text":"Why is tax listed twice on this receipt?","label":"billing"}
-{"id":"cal-06","split":"calibration","text":"The sync spinner has been running for an hour.","label":"technical"}
-{"id":"cal-07","split":"calibration","text":"My email address changed and I am locked out.","label":"account"}
-{"id":"cal-08","split":"calibration","text":"I no longer need the plan and want it ended.","label":"cancellation"}
-{"id":"cal-09","split":"calibration","text":"The refund amount does not match what I paid.","label":"billing"}
-{"id":"cal-10","split":"calibration","text":"Notifications disappeared after the update.","label":"technical"}
-{"id":"cal-11","split":"calibration","text":"How do I transfer ownership of my workspace?","label":"account"}
-{"id":"cal-12","split":"calibration","text":"Turn off auto-renew and close the service.","label":"cancellation"}
-{"id":"held-01","split":"heldout","text":"The total looks wrong, and I also cannot open the invoice screen.","label":"billing"}
-{"id":"held-02","split":"heldout","text":"I can sign in, but every project page is blank.","label":"technical"}
-{"id":"held-03","split":"heldout","text":"Remove the former employee as owner; the product itself works.","label":"account"}
-{"id":"held-04","split":"heldout","text":"The cancellation button errors, but my main request is to end the plan.","label":"cancellation"}
-{"id":"held-05","split":"heldout","text":"My card was declined after you already posted the payment.","label":"billing"}
-{"id":"held-06","split":"heldout","text":"Password reset succeeds, then the browser returns to an empty page.","label":"technical"}
-{"id":"held-07","split":"heldout","text":"Billing is fine; I need to merge two user profiles.","label":"account"}
-{"id":"held-08","split":"heldout","text":"I cannot log in to disable renewal, so please terminate it.","label":"cancellation"}
-{"id":"held-09","split":"heldout","text":"The export works now. Explain the unexpected overage fee.","label":"billing"}
-{"id":"held-10","split":"heldout","text":"Changing my email fixed login, but mobile search still freezes.","label":"technical"}
-{"id":"held-11","split":"heldout","text":"Do not cancel anything; just restore administrator access.","label":"account"}
-{"id":"held-12","split":"heldout","text":"I disputed a charge earlier, but today I only want the membership closed.","label":"cancellation"}
+{"id":"cal:minimal:01","source_id":"support-cal-01","group_id":"cal-thread-01","split":"calibration","prompt":"minimal","text":"I was charged twice for the same invoice.","label":"billing"}
+{"id":"cal:minimal:02","source_id":"support-cal-02","group_id":"cal-thread-01","split":"calibration","prompt":"minimal","text":"The app crashes whenever I upload a PDF.","label":"technical"}
+{"id":"cal:minimal:03","source_id":"support-cal-03","group_id":"cal-thread-02","split":"calibration","prompt":"minimal","text":"I cannot reset the password on my profile.","label":"account"}
+{"id":"cal:minimal:04","source_id":"support-cal-04","group_id":"cal-thread-02","split":"calibration","prompt":"minimal","text":"Please stop my subscription before the next renewal.","label":"cancellation"}
+{"id":"cal:minimal:05","source_id":"support-cal-05","group_id":"cal-thread-03","split":"calibration","prompt":"minimal","text":"Why is tax listed twice on this receipt?","label":"billing"}
+{"id":"cal:minimal:06","source_id":"support-cal-06","group_id":"cal-thread-03","split":"calibration","prompt":"minimal","text":"The sync spinner has been running for an hour.","label":"technical"}
+{"id":"cal:minimal:07","source_id":"support-cal-07","group_id":"cal-thread-04","split":"calibration","prompt":"minimal","text":"My email address changed and I am locked out.","label":"account"}
+{"id":"cal:minimal:08","source_id":"support-cal-08","group_id":"cal-thread-04","split":"calibration","prompt":"minimal","text":"I no longer need the plan and want it ended.","label":"cancellation"}
+{"id":"cal:minimal:09","source_id":"support-cal-09","group_id":"cal-thread-05","split":"calibration","prompt":"minimal","text":"The refund amount does not match what I paid.","label":"billing"}
+{"id":"cal:minimal:10","source_id":"support-cal-10","group_id":"cal-thread-05","split":"calibration","prompt":"minimal","text":"Notifications disappeared after the update.","label":"technical"}
+{"id":"cal:minimal:11","source_id":"support-cal-11","group_id":"cal-thread-06","split":"calibration","prompt":"minimal","text":"How do I transfer ownership of my workspace?","label":"account"}
+{"id":"cal:minimal:12","source_id":"support-cal-12","group_id":"cal-thread-06","split":"calibration","prompt":"minimal","text":"Turn off auto-renew and close the service.","label":"cancellation"}
+{"id":"held:minimal:01","source_id":"support-held-01","group_id":"held-thread-01","split":"heldout","prompt":"minimal","text":"The total looks wrong, and I also cannot open the invoice screen.","label":"billing"}
+{"id":"held:minimal:02","source_id":"support-held-02","group_id":"held-thread-01","split":"heldout","prompt":"minimal","text":"I can sign in, but every project page is blank.","label":"technical"}
+{"id":"held:minimal:03","source_id":"support-held-03","group_id":"held-thread-02","split":"heldout","prompt":"minimal","text":"Remove the former employee as owner; the product itself works.","label":"account"}
+{"id":"held:minimal:04","source_id":"support-held-04","group_id":"held-thread-02","split":"heldout","prompt":"minimal","text":"The cancellation button errors, but my main request is to end the plan.","label":"cancellation"}
+{"id":"held:minimal:05","source_id":"support-held-05","group_id":"held-thread-03","split":"heldout","prompt":"minimal","text":"My card was declined after you already posted the payment.","label":"billing"}
+{"id":"held:minimal:06","source_id":"support-held-06","group_id":"held-thread-03","split":"heldout","prompt":"minimal","text":"Password reset succeeds, then the browser returns to an empty page.","label":"technical"}
+{"id":"held:policy:07","source_id":"support-held-07","group_id":"held-thread-04","split":"heldout","prompt":"policy","text":"Billing is fine; I need to merge two user profiles.","label":"account"}
+{"id":"held:policy:08","source_id":"support-held-08","group_id":"held-thread-04","split":"heldout","prompt":"policy","text":"I cannot log in to disable renewal, so please terminate it.","label":"cancellation"}
+{"id":"held:policy:09","source_id":"support-held-09","group_id":"held-thread-05","split":"heldout","prompt":"policy","text":"The export works now. Explain the unexpected overage fee.","label":"billing"}
+{"id":"held:policy:10","source_id":"support-held-10","group_id":"held-thread-05","split":"heldout","prompt":"policy","text":"Changing my email fixed login, but mobile search still freezes.","label":"technical"}
+{"id":"held:policy:11","source_id":"support-held-11","group_id":"held-thread-06","split":"heldout","prompt":"policy","text":"Do not cancel anything; just restore administrator access.","label":"account"}
+{"id":"held:policy:12","source_id":"support-held-12","group_id":"held-thread-06","split":"heldout","prompt":"policy","text":"I disputed a charge earlier, but today I only want the membership closed.","label":"cancellation"}

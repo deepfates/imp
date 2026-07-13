@@ -4,16 +4,16 @@ defmodule DSEx.Confidence do
 
   The implementation follows GEPA commit
   `65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe` for joint token logprob,
-  scoring formulas, feedback buckets, and alternative formatting. The exposed
-  confidence objective is named `:raw_confidence`; it is not a calibrated
-  probability.
+  scoring formulas, feedback buckets, and alternative formatting. Raw
+  confidence is diagnostic metadata, not a maximized objective. The exposed
+  `:confidence_quality` objective is the configured correctness-aware scoring
+  strategy's value in `[0, 1]`; incorrect predictions always receive `0.0`.
 
   Missing logprobs fail closed by default. `fallback: :accuracy` must be
   selected explicitly to continue with accuracy only. In that mode the
-  `:raw_confidence` objective is omitted and unavailability is recorded in
-  metric metadata. This intentionally improves the upstream adapter's numeric
-  `0.0` confidence objective for missing logprobs, which can be mistaken for a
-  measured value.
+  `:confidence_quality` objective is omitted and unavailability is recorded in
+  metric metadata. This intentionally avoids treating either missing evidence
+  or confidence in an incorrect prediction as optimization quality.
   """
 
   alias DSEx.Confidence.Scoring
@@ -107,7 +107,7 @@ defmodule DSEx.Confidence do
           metadata: %{
             objective_scores: %{
               accuracy: accuracy(correct?),
-              raw_confidence: extraction.raw_confidence
+              confidence_quality: score
             },
             confidence: %{
               available?: true,

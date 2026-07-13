@@ -55,7 +55,7 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
     end
   end
 
-  test "confidence objectives flow through ProgramAdapter into the GEPA frontier" do
+  test "confidently wrong predictions cannot survive the confidence frontier" do
     lm =
       DSEx.Clients.ReqLLM.new(%{provider: :openai, id: "gpt-fixture"},
         req_module: OpenAIChatFixture,
@@ -84,19 +84,32 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
     correct = Evaluation.evaluate(adapter, batch, correct_candidate, capture_traces: true)
     wrong = Evaluation.evaluate(adapter, batch, wrong_candidate, capture_traces: true)
 
-    assert [%{accuracy: 1.0, raw_confidence: correct_confidence}] = correct.objective_scores
-    assert_in_delta correct_confidence, 0.40, 1.0e-12
+    assert [%{accuracy: 1.0, confidence_quality: correct_quality}] =
+             correct.objective_scores
 
-    assert [%{accuracy: wrong_accuracy, raw_confidence: wrong_confidence}] =
+    assert_in_delta correct_quality, 0.3 + 0.7 * (0.40 / 0.99), 1.0e-12
+
+    assert [%{accuracy: wrong_accuracy, confidence_quality: wrong_quality}] =
              wrong.objective_scores
 
     assert wrong_accuracy == 0.0
-    assert_in_delta wrong_confidence, 0.95, 1.0e-12
+    assert wrong_quality == 0.0
 
     assert Frontier.mapping([correct: correct, wrong: wrong], :objective) == %{
              {:objective, :accuracy} => MapSet.new([:correct]),
-             {:objective, :raw_confidence} => MapSet.new([:wrong])
+             {:objective, :confidence_quality} => MapSet.new([:correct])
            }
+
+    assert Frontier.candidate_ids([correct: correct, wrong: wrong], :objective) == [:correct]
+
+    [correct_trajectory] = correct.trajectories.main
+    [wrong_trajectory] = wrong.trajectories.main
+
+    assert_in_delta correct_trajectory.metric_metadata.confidence.raw_confidence, 0.40, 1.0e-12
+    assert_in_delta wrong_trajectory.metric_metadata.confidence.raw_confidence, 0.95, 1.0e-12
+
+    refute Map.has_key?(hd(correct.objective_scores), :raw_confidence)
+    refute Map.has_key?(hd(wrong.objective_scores), :raw_confidence)
 
     assert_receive {:confidence_request, opts}
     provider_options = Keyword.fetch!(opts, :provider_options)

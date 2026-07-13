@@ -100,6 +100,7 @@ defmodule DSEx.ConfidenceTest do
     assert fallback.score == 1.0
     assert fallback.metadata.objective_scores == %{accuracy: 1.0}
     refute Map.has_key?(fallback.metadata.objective_scores, :raw_confidence)
+    refute Map.has_key?(fallback.metadata.objective_scores, :confidence_quality)
 
     assert fallback.metadata.confidence == %{
              available?: false,
@@ -141,6 +142,7 @@ defmodule DSEx.ConfidenceTest do
 
     assert fallback.metadata.objective_scores == %{accuracy: 1.0}
     refute Map.has_key?(fallback.metadata.objective_scores, :raw_confidence)
+    refute Map.has_key?(fallback.metadata.objective_scores, :confidence_quality)
 
     assert fallback.metadata.confidence.reason ==
              {:logprob_extraction_failed, :no_overlapping_logprob_tokens}
