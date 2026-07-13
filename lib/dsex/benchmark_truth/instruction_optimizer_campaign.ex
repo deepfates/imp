@@ -243,7 +243,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
       |> Keyword.merge(seed: context.seed, prompt_lm: lm, max_concurrency: 1)
 
     SIMBA.new(metric, opts)
-    |> SIMBA.compile(program, context.trainset, context.devset,
+    |> SIMBA.compile(program, context.trainset, context.trainset,
       resume_state: resume,
       checkpoint_fn: checkpoint
     )
@@ -292,7 +292,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
   defp program(spec, lm) do
     spec["signature"]
     |> DSEx.signature(spec["instructions"])
-    |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.Chat, config: [cache: true])
+    |> DSEx.chain_of_thought(lm: lm, adapter: DSEx.Adapter.Chat, config: [cache: false])
   end
 
   defp unwrap_budgeted_lm(program) do

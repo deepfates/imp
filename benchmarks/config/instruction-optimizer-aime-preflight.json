@@ -18,7 +18,7 @@
       "minibatch": false,
       "max_bootstrapped_demos": 4,
       "max_labeled_demos": 4,
-      "startup_trials": 2,
+      "startup_trials": 10,
       "max_errors": 1,
       "timeout": 300000
     },

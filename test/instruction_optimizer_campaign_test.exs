@@ -27,6 +27,9 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     assert get_in(first.artifact, ["results", "baseline", "dev"]) == 1.0
     assert get_in(first.artifact, ["results", "baseline", "test"]) == 1.0
     assert get_in(first.artifact, ["results", "baseline", "frozen_test_evaluations"]) == 2
+
+    assert ["cache", false] in get_in(first.artifact, ["results", "baseline", "program", "config"])
+
     assert Agent.get(calls, & &1) == 4
 
     second = InstructionOptimizerCampaign.run(opts)
@@ -57,6 +60,24 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     assert_raise ArgumentError, ~r/checkpoint identity mismatch/, fn ->
       opts |> Keyword.put(:model, "openai:different") |> InstructionOptimizerCampaign.run()
     end
+  end
+
+  test "SIMBA finalist validation uses the trainset like pinned DSPy" do
+    root = tmp_dir("simba-final-set")
+    dataset = write_aime_dataset!(root)
+
+    result =
+      root
+      |> campaign_opts(dataset, static_lm(), arms: [:simba])
+      |> InstructionOptimizerCampaign.run()
+
+    assert get_in(result.artifact, [
+             "results",
+             "simba",
+             "optimizer_report",
+             "metadata",
+             "final_evaluation_calls"
+           ]) == 1
   end
 
   test "checkpoint tampering and dataset drift fail closed" do
