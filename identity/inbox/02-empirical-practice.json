@@ -1,0 +1,2389 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-02-empirical-practice",
+    "generated_at": "2026-07-13T18:19:59Z",
+    "generator": {
+      "kind": "agent",
+      "name": "empirical instrument and publication safari",
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "reasoning_effort": "high",
+      "agent_id": null
+    },
+    "method": "empirical instrument and publication safari",
+    "brief": "You own exactly /Users/deepfates/Hacking/github/deepfates/dspy_elixir/identity/inbox/02-empirical-practice.json. You are not alone in the codebase: do not edit, revert, stage, or reformat any other path, and accommodate concurrent work. Read identity/README.md, identity/atlas.json, identity/schema/portfolio.schema.json, README.md, and docs/DSEX_PHILOSOPHY.md. Create one valid portfolio JSON object at your owned path. Run id must be \"run-02-empirical-practice\", schema_version 1, atlas_version 1. generator must be {\"kind\":\"agent\",\"name\":\"empirical instrument and publication safari\",\"provider\":\"openai\",\"model\":\"gpt-5.5\",\"reasoning_effort\":\"high\",\"agent_id\":null}. Use an ISO-8601 UTC generated_at. method must be \"empirical instrument and publication safari\". Preserve the complete brief in run.brief. Set intended_territories to [\"science-experiment\",\"measurement-evidence\",\"writing-editing-publishing\",\"uncertainty-probability\"], intended_strategies to [\"ordinary-object\",\"ordinary-verb\",\"technical-borrowing\",\"compound-portmanteau\",\"descriptive-category\"], intended_audiences to [\"dspy-gepa-researchers\",\"ml-researchers\",\"eval-research-ops\",\"educators-writers\"]. Generate exactly 100 candidate observations with contiguous ordinals 1..100. Exactly 20 should have wildcard true; the others false. Do not rank, filter, deduplicate, check availability, browse, or suppress strange/bad/colliding ideas. Repetition is allowed but seek real morphological and conceptual variety. Every candidate must have surface, rationale, territories, strategies, audience_lenses, architecture_lenses, wildcard; add pronunciation, grammar, etymology, parent_surfaces, known_concerns, and notes only when useful and only with schema-allowed fields. All referenced IDs must exist in atlas.json. Do not use a favorite from conversation or infer a winner. Explore experiments, observatories, instruments, editions, revision, calibration, evidence, uncertainty, and publication. Include both sober scientific and unexpectedly humane registers; mark implications of objective metrics or guaranteed discovery. Validate with jq and report the changed path and candidate count.",
+    "atlas_version": 1,
+    "intended_territories": [
+      "science-experiment",
+      "measurement-evidence",
+      "writing-editing-publishing",
+      "uncertainty-probability"
+    ],
+    "intended_strategies": [
+      "ordinary-object",
+      "ordinary-verb",
+      "technical-borrowing",
+      "compound-portmanteau",
+      "descriptive-category"
+    ],
+    "intended_audiences": [
+      "dspy-gepa-researchers",
+      "ml-researchers",
+      "eval-research-ops",
+      "educators-writers"
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Trialbook",
+      "rationale": "Frames LM programs as recorded trials whose examples, metrics, and revisions can be opened like a lab notebook.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 2,
+      "surface": "Metric Press",
+      "rationale": "Combines evaluation with publication, suggesting programs become publishable artifacts through measured revisions.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "company-product-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Could overemphasize metrics as objective truth rather than situated evidence."
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Calibra",
+      "pronunciation": "kuh-LEE-bruh",
+      "rationale": "A compact calibration-derived name for adjusting language-model programs against observed behavior.",
+      "territories": [
+        "measurement-evidence",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "beam-master"
+      ],
+      "wildcard": false,
+      "etymology": "From calibration and a Latinate brand ending."
+    },
+    {
+      "ordinal": 4,
+      "surface": "Revision Field",
+      "rationale": "Presents the system as a field site where program variants are revised and compared under observable conditions.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 5,
+      "surface": "Kindling Lab",
+      "rationale": "A humane register: programs are carefully started, tended, and tested without promising automatic discovery.",
+      "territories": [
+        "science-experiment",
+        "care-stewardship-repair",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "single-branded-house"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 6,
+      "surface": "Evidence Loom",
+      "rationale": "Weaves examples, scores, traces, and revisions into inspectable program artifacts.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "craft-material"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "umbrella-named-subsystems",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 7,
+      "surface": "Benchletter",
+      "rationale": "Merges benchmark and letter, giving evaluation a publication texture rather than a scoreboard-only mood.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Bench may imply benchmark reductionism if not paired with qualitative evidence."
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Probe Edition",
+      "rationale": "Suggests a product family where experiments, optimizers, and runtime variants are published as explicit editions.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "lifecycle-planes"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 9,
+      "surface": "Weather Glass",
+      "rationale": "Uses an old instrument metaphor for probabilistic conditions: useful readings, not certainty.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Weather imagery may understate software structure and evaluation rigor."
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Empiric",
+      "rationale": "A sober one-word signal that programs are improved by observation and measured practice.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 11,
+      "surface": "Draftbench",
+      "rationale": "Puts writing revision and evaluation bench work in one practical compound for optimizer workflows.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 12,
+      "surface": "Observation Works",
+      "rationale": "Emphasizes the work of observing program behavior and preserving evidence in ordinary operational terms.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "labor-coordination"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "community-commercial-steward"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 13,
+      "surface": "Signal Revision",
+      "rationale": "Names the loop where traces and metric feedback become changed instructions, demos, and program values.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "feedback-control"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 14,
+      "surface": "Footnote Engine",
+      "rationale": "A strange scholarly object: every optimized artifact carries provenance, caveats, and readable evidence.",
+      "territories": [
+        "writing-editing-publishing",
+        "persistence-provenance",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "umbrella-named-subsystems",
+        "research-stable-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Engine may imply automation scope beyond current product boundaries."
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Measurecraft",
+      "rationale": "Makes measurement feel skilled and constructed, guarding against the idea that metrics alone decide truth.",
+      "territories": [
+        "measurement-evidence",
+        "craft-material",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "edition-architecture"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 16,
+      "surface": "Quire",
+      "rationale": "A publishing object that can hold program sheets, examples, and revisions as a bound working set.",
+      "territories": [
+        "writing-editing-publishing",
+        "composition-modularity"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "shared-prefix-family",
+        "single-branded-house"
+      ],
+      "wildcard": false,
+      "etymology": "A quire is a set of paper leaves prepared for binding."
+    },
+    {
+      "ordinal": 17,
+      "surface": "Posterior Press",
+      "rationale": "Signals updating beliefs and publishing results, leaning into uncertainty without promising proof.",
+      "territories": [
+        "uncertainty-probability",
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "company-product-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Posterior has statistical precision but awkward everyday connotations."
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Protocol Notebook",
+      "rationale": "Treats LM program design as a recorded protocol: explicit inputs, outputs, examples, metrics, and revision notes.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "declaration-contract"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 19,
+      "surface": "Small Findings",
+      "rationale": "A gentle publication register for incremental empirical gains rather than grand claims of autonomous improvement.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 20,
+      "surface": "Evalis",
+      "pronunciation": "ee-VAL-iss",
+      "rationale": "A compact coined form around evaluation that can stretch from library to research framework.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "endorsed-family"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 21,
+      "surface": "Experiment Press",
+      "rationale": "Names a place where experimental program variants are not just run but turned into inspectable published artifacts.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 22,
+      "surface": "Calibrate",
+      "rationale": "An ordinary verb suitable for command grammar: calibrate a program against examples and metrics.",
+      "territories": [
+        "measurement-evidence",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 23,
+      "surface": "Benchproof",
+      "rationale": "A collision-prone but semantically sharp compound for evidence from tests and benchmarks.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "pl-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "single-branded-house"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Proof implies formal or guaranteed truth; this would need careful correction in descriptors."
+      ]
+    },
+    {
+      "ordinal": 24,
+      "surface": "The Margins",
+      "rationale": "A humane editing metaphor for feedback, doubts, evaluator comments, and repair notes around model behavior.",
+      "territories": [
+        "writing-editing-publishing",
+        "uncertainty-probability",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 25,
+      "surface": "Assay",
+      "rationale": "Borrows from experimental testing to name a library that characterizes program behavior through controlled examples.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 26,
+      "surface": "Uncertain Press",
+      "rationale": "A publication identity that foregrounds probabilistic judgment and caveated results.",
+      "territories": [
+        "uncertainty-probability",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 27,
+      "surface": "Control Group",
+      "rationale": "Links evaluation practice to comparative baselines and reproducible optimizer campaigns.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "research-stable-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "May sound like a consultancy or management phrase outside research contexts."
+      ]
+    },
+    {
+      "ordinal": 28,
+      "surface": "Tracefolio",
+      "rationale": "A portfolio of traces, examples, and revisions, suited to artifact lineage and evaluation records.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "umbrella-named-subsystems",
+        "edition-architecture"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 29,
+      "surface": "Almost Surely",
+      "rationale": "A playful probability phrase that admits uncertainty while sounding memorable in talks and docs.",
+      "territories": [
+        "uncertainty-probability",
+        "abstract-sound-symbolic"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "company-product-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Mathematical phrase could imply stronger probability claims than the product can support."
+      ]
+    },
+    {
+      "ordinal": 30,
+      "surface": "Labscript",
+      "rationale": "Joins lab protocol and executable text for declared LM programs that can be run, evaluated, and revised.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "program-compilation"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "beam-developers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 31,
+      "surface": "Findings Kit",
+      "rationale": "A practical kit identity for assembling examples, metrics, traces, and optimized program variants.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment",
+        "composition-modularity"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "applied-lm-engineers"
+      ],
+      "architecture_lenses": [
+        "endorsed-family",
+        "umbrella-named-subsystems"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 32,
+      "surface": "Blind Review",
+      "rationale": "Carries the publishing practice of separating evidence from preference into optimizer evaluation.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "civic-governance"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Could imply peer-review infrastructure rather than LM program tooling."
+      ]
+    },
+    {
+      "ordinal": 33,
+      "surface": "Criterion",
+      "rationale": "A formal measurement word for metrics, gates, and evaluation criteria without naming a specific optimizer.",
+      "territories": [
+        "measurement-evidence",
+        "declaration-contract"
+      ],
+      "strategies": [
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "pl-researchers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 34,
+      "surface": "Warm Baseline",
+      "rationale": "A strangely humane benchmark phrase: baselines are necessary, but they are treated as context rather than destiny.",
+      "territories": [
+        "measurement-evidence",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "single-branded-house"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Warm may reduce perceived technical seriousness for some research audiences."
+      ]
+    },
+    {
+      "ordinal": 35,
+      "surface": "Observe",
+      "rationale": "A direct verb for inspecting LM program behavior before changing it.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 36,
+      "surface": "Artifact Review",
+      "rationale": "Grounds optimization in reviewable artifacts rather than hidden prompt magic.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "spec-implementations"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 37,
+      "surface": "Confidence Ledger",
+      "rationale": "Records estimates, scores, and provenance for decisions made under model uncertainty.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "company-product-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Ledger can imply financial finality or tamper-proof claims."
+      ]
+    },
+    {
+      "ordinal": 38,
+      "surface": "Field Note",
+      "rationale": "A compact identity for observations gathered during real program runs and evaluation campaigns.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "community-commercial-steward"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 39,
+      "surface": "Soft Instrument",
+      "rationale": "Names a tool that measures language behavior while admitting that the instrument itself handles soft, uncertain material.",
+      "territories": [
+        "measurement-evidence",
+        "uncertainty-probability",
+        "craft-material"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 40,
+      "surface": "Revisory",
+      "pronunciation": "rih-VIZE-uh-ree",
+      "rationale": "A coined place for revision: part repository, part advisory surface for better program variants.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "umbrella-named-subsystems",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 41,
+      "surface": "Ablation House",
+      "rationale": "Borrows the ML ablation concept and gives it a house identity for organized variant comparison.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 42,
+      "surface": "Working Paper",
+      "rationale": "Presents optimized LM programs as living, versioned artifacts with evidence attached.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 43,
+      "surface": "Scorekeeper",
+      "rationale": "An ordinary role metaphor for capturing evaluation results and making optimizer lineage visible.",
+      "territories": [
+        "measurement-evidence",
+        "play-games",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "applied-lm-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Scorekeeping can reduce quality to a single number if framed carelessly."
+      ]
+    },
+    {
+      "ordinal": 44,
+      "surface": "Dear Metric",
+      "rationale": "An intentionally tender publication address that treats metrics as correspondents to question, not masters to obey.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "May be too literary or whimsical for a core developer library."
+      ]
+    },
+    {
+      "ordinal": 45,
+      "surface": "Variant Press",
+      "rationale": "Focuses on publishing and comparing program variants produced by optimizers.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 46,
+      "surface": "Posterior",
+      "rationale": "A concise Bayesian-flavored identity for learning from evidence while retaining uncertainty.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "beam-master"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Everyday connotation is awkward; statistical meaning may be too narrow."
+      ]
+    },
+    {
+      "ordinal": 47,
+      "surface": "Trialsmith",
+      "rationale": "Makes experiments feel crafted: building trials, metrics, and program variants with visible skill.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "craft-material"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "endorsed-family"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 48,
+      "surface": "Result Room",
+      "rationale": "A plain place metaphor for collecting predictions, scores, traces, and reviewable evaluation results.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 49,
+      "surface": "Maybe Works",
+      "rationale": "A humane, uncertain, and possibly too blunt identity for systems that test claims instead of guaranteeing success.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "community-commercial-steward"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Could undermine trust by sounding unserious or unreliable."
+      ]
+    },
+    {
+      "ordinal": 50,
+      "surface": "Evidence Edition",
+      "rationale": "Treats releases or program variants as editions backed by explicit evidence.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 51,
+      "surface": "Labmark",
+      "rationale": "A compact mark for experimental evidence and measurable program behavior.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "buyers-founders"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 52,
+      "surface": "Measure Twice",
+      "rationale": "An ordinary craft phrase that asks users to evaluate before deploying or optimizing further.",
+      "territories": [
+        "measurement-evidence",
+        "craft-material",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "sre-platform"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 53,
+      "surface": "Confidence Interval",
+      "rationale": "A statistical phrase that foregrounds bounded uncertainty around evaluated behavior.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "spec-implementations"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Could imply formal statistical estimates even when metrics are task-specific heuristics."
+      ]
+    },
+    {
+      "ordinal": 54,
+      "surface": "Scratchpad Press",
+      "rationale": "Keeps experimental drafts, notes, and revisions visible rather than hiding the messy path to a better program.",
+      "territories": [
+        "writing-editing-publishing",
+        "science-experiment",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 55,
+      "surface": "Caliper",
+      "rationale": "An instrument metaphor for measuring and adjusting textual program artifacts.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment",
+        "craft-material"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 56,
+      "surface": "Program Evidence",
+      "rationale": "A sober descriptive category for LM programs with examples, metrics, traces, and optimizer lineage.",
+      "territories": [
+        "measurement-evidence",
+        "program-compilation",
+        "science-experiment"
+      ],
+      "strategies": [
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 57,
+      "surface": "Revise",
+      "rationale": "A direct verb that maps to the central loop of changing instructions, demos, and artifacts after feedback.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "applied-lm-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 58,
+      "surface": "Finding Machine",
+      "rationale": "A strong publication and discovery metaphor for producing inspectable findings from optimizer experiments.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "single-branded-house"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "May imply guaranteed discovery or objective findings beyond available evidence."
+      ]
+    },
+    {
+      "ordinal": 59,
+      "surface": "Mended Prompt",
+      "rationale": "A deliberately imperfect transitional name that acknowledges repair work while moving beyond prompt-only framing.",
+      "territories": [
+        "writing-editing-publishing",
+        "care-stewardship-repair",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Prompt narrows the product and conflicts with the project philosophy."
+      ]
+    },
+    {
+      "ordinal": 60,
+      "surface": "Testprint",
+      "rationale": "A proofing and publication compound for running variants, seeing outputs, and adjusting before release.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 61,
+      "surface": "Optimizer's Notebook",
+      "rationale": "Directly names the research artifact where optimizer inputs, outputs, and changes are recorded.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 62,
+      "surface": "Measurefield",
+      "rationale": "A field-site compound for running program behavior through situated measures rather than abstract claims.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 63,
+      "surface": "Sigma Press",
+      "rationale": "Uses the statistical symbol register with publication language to suggest measured uncertainty in artifacts.",
+      "territories": [
+        "uncertainty-probability",
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "research-stable-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Greek-symbol branding can feel generic and may imply narrow statistical scope."
+      ]
+    },
+    {
+      "ordinal": 64,
+      "surface": "Reply Garden",
+      "rationale": "A gentle metaphor for cultivating predictions, examples, and feedback without hiding evaluation work.",
+      "territories": [
+        "writing-editing-publishing",
+        "ecology-cultivation",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "single-branded-house"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 65,
+      "surface": "Observable Program",
+      "rationale": "A plain category phrase that highlights traces, metrics, and runtime boundaries in executable LM programs.",
+      "territories": [
+        "measurement-evidence",
+        "program-compilation",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "sre-platform"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 66,
+      "surface": "Evidence Run",
+      "rationale": "Frames each evaluation or optimization pass as a run that produces evidence-bearing artifacts.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 67,
+      "surface": "Peer Draft",
+      "rationale": "Suggests program revisions that can be read, challenged, and improved by collaborators or automated evaluators.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "civic-governance"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 68,
+      "surface": "Likelihood Works",
+      "rationale": "A probabilistic and institutional phrase for systems that operate amid plausible alternatives.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Likelihood may be read as formal probabilistic modeling when the product may use ordinary metrics."
+      ]
+    },
+    {
+      "ordinal": 69,
+      "surface": "Tender Baselines",
+      "rationale": "A humane wildcard that asks baseline comparisons to be visible, contextual, and revisable.",
+      "territories": [
+        "measurement-evidence",
+        "care-stewardship-repair",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Tender may feel too soft for infrastructure and research tooling."
+      ]
+    },
+    {
+      "ordinal": 70,
+      "surface": "Observed Lift",
+      "rationale": "A compact results phrase for optimizer improvements that are measured rather than assumed.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Lift can imply marketing growth or guaranteed improvement if detached from evidence."
+      ]
+    },
+    {
+      "ordinal": 71,
+      "surface": "Notebook Runtime",
+      "rationale": "Connects executable program boundaries to the notebook tradition of reproducible experimental records.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 72,
+      "surface": "Draft Metric",
+      "rationale": "Keeps metric design provisional and revisable, matching early empirical practice.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Could reduce the system to metric authoring rather than executable programs."
+      ]
+    },
+    {
+      "ordinal": 73,
+      "surface": "Instrumental",
+      "rationale": "Signals instruments, measured action, and practical utility while staying broad enough for future artifact optimization.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment",
+        "purpose-praxis"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "buyers-founders"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 74,
+      "surface": "The Honest Error",
+      "rationale": "A surprisingly humane identity around error visibility, failed trials, and learning from bad predictions.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Error-forward identity may feel negative for a library name."
+      ]
+    },
+    {
+      "ordinal": 75,
+      "surface": "Comparison Press",
+      "rationale": "Names the act of publishing comparisons among program variants, metrics, examples, and traces.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "science-experiment"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 76,
+      "surface": "P Value",
+      "rationale": "A stark statistical borrowing for uncertainty and evidence thresholds.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "single-branded-house"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Could imply classical hypothesis testing and objective significance where task metrics are broader and messier."
+      ]
+    },
+    {
+      "ordinal": 77,
+      "surface": "Workshop Findings",
+      "rationale": "Combines craft, evaluation, and publication: findings are made, checked, and revised.",
+      "territories": [
+        "craft-material",
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "company-product-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 78,
+      "surface": "Revision Engine",
+      "rationale": "A broad product-style name for automated and human-guided program revision loops.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "applied-lm-engineers",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "lifecycle-planes"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Engine may inflate autonomous capability if not bounded."
+      ]
+    },
+    {
+      "ordinal": 79,
+      "surface": "Rain Gauge",
+      "rationale": "A low-drama measuring instrument for stochastic conditions: not control, just observed accumulation.",
+      "territories": [
+        "measurement-evidence",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 80,
+      "surface": "Runbook Science",
+      "rationale": "Connects operational runbooks with empirical iteration for LM programs in production contexts.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "sre-platform"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 81,
+      "surface": "Evaluate",
+      "rationale": "A direct verb aligned with the product's metric and optimizer path.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 82,
+      "surface": "Edition Lab",
+      "rationale": "A place for making, testing, and publishing named editions of programs or optimized artifacts.",
+      "territories": [
+        "writing-editing-publishing",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 83,
+      "surface": "Evidence Beam",
+      "rationale": "An Elixir-resonant phrase that joins BEAM runtime identity with evidence-bearing program behavior.",
+      "territories": [
+        "measurement-evidence",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "beam-developers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "endorsed-family"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "BEAM tie may narrow future runtime-neutral architecture."
+      ]
+    },
+    {
+      "ordinal": 84,
+      "surface": "Careful Guess",
+      "rationale": "A warm uncertainty name: model behavior is probabilistic, but the surrounding program can be explicit and careful.",
+      "territories": [
+        "uncertainty-probability",
+        "care-stewardship-repair",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "single-branded-house"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Guess may undersell the engineering discipline of the system."
+      ]
+    },
+    {
+      "ordinal": 85,
+      "surface": "Resultsmith",
+      "rationale": "A craft compound for shaping better outputs through examples, feedback, and optimizer trials.",
+      "territories": [
+        "measurement-evidence",
+        "craft-material",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "applied-lm-engineers"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "endorsed-family"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 86,
+      "surface": "Publication Gate",
+      "rationale": "Maps evaluation and production checks to a publishing threshold for program artifacts.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence",
+        "declaration-contract"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 87,
+      "surface": "Empirical Programs",
+      "rationale": "A sober category descriptor for callable LM programs developed through examples, metrics, and optimization.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "program-compilation"
+      ],
+      "strategies": [
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 88,
+      "surface": "Trace Review",
+      "rationale": "Focuses on looking at traces and evidence as a first-class review practice.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "beam-master"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 89,
+      "surface": "Quiet Result",
+      "rationale": "A restrained humane register for results that are useful but not inflated into certainty or spectacle.",
+      "territories": [
+        "measurement-evidence",
+        "limits-refusal-silence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 90,
+      "surface": "Measuremark",
+      "rationale": "A compact brandable compound around measurements attached to program artifacts.",
+      "territories": [
+        "measurement-evidence",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "buyers-founders"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 91,
+      "surface": "Method Sheet",
+      "rationale": "A simple publishing object for a declared method, examples, metrics, and run settings.",
+      "territories": [
+        "science-experiment",
+        "writing-editing-publishing",
+        "declaration-contract"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "research-stable-split"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 92,
+      "surface": "Trialwise",
+      "rationale": "Suggests empirical wisdom accumulated from many trials without claiming a universal optimizer.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "ml-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "single-branded-house"
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 93,
+      "surface": "Proofsheet",
+      "rationale": "Borrows print proofing and mathematical proof language to imply review before release.",
+      "territories": [
+        "writing-editing-publishing",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "pl-researchers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "beam-master"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Proof may imply formal verification or guaranteed correctness."
+      ]
+    },
+    {
+      "ordinal": 94,
+      "surface": "Little Observatory",
+      "rationale": "A small, humane observatory for watching program behavior and preserving what was seen.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "single-branded-house"
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 95,
+      "surface": "Score Draft",
+      "rationale": "Keeps scoring and drafting together, implying metric feedback can revise text-like program artifacts.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "edition-architecture"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Score may overemphasize single-number success."
+      ]
+    },
+    {
+      "ordinal": 96,
+      "surface": "Evidence Kernel",
+      "rationale": "A technical nucleus metaphor for the evidence-bearing core around metrics, examples, and traces.",
+      "territories": [
+        "measurement-evidence",
+        "program-compilation",
+        "science-experiment"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "pl-researchers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "spec-implementations"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Kernel may imply OS-level scope or formal core semantics."
+      ]
+    },
+    {
+      "ordinal": 97,
+      "surface": "Open Trial",
+      "rationale": "A transparent empirical identity for runs whose inputs, outputs, metrics, and lineage are available for review.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "civic-governance"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Open may imply governance or licensing commitments beyond the name."
+      ]
+    },
+    {
+      "ordinal": 98,
+      "surface": "Comparata",
+      "pronunciation": "kom-puh-RAH-tuh",
+      "rationale": "A coined comparative-data name for optimizer campaigns and program variant evidence.",
+      "territories": [
+        "measurement-evidence",
+        "science-experiment"
+      ],
+      "strategies": [
+        "compound-portmanteau",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "neutral-master-beam-implementation"
+      ],
+      "wildcard": false,
+      "etymology": "From compare and data with a Latinate ending."
+    },
+    {
+      "ordinal": 99,
+      "surface": "Doubt Press",
+      "rationale": "A publication identity that gives doubt an explicit place in program improvement and evaluation reports.",
+      "territories": [
+        "uncertainty-probability",
+        "writing-editing-publishing",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "research-stable-split"
+      ],
+      "wildcard": true,
+      "known_concerns": [
+        "Doubt may project hesitation rather than disciplined uncertainty."
+      ]
+    },
+    {
+      "ordinal": 100,
+      "surface": "Published Measure",
+      "rationale": "A sober descriptor for measurements that travel with the program artifact and can be inspected by future readers.",
+      "territories": [
+        "measurement-evidence",
+        "writing-editing-publishing",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "edition-architecture",
+        "research-stable-split"
+      ],
+      "wildcard": false,
+      "known_concerns": [
+        "Published metrics may be mistaken for objective ground truth unless caveated."
+      ]
+    }
+  ]
+}

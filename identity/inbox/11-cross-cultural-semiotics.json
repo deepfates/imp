@@ -1,0 +1,2251 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-11-cross-cultural-semiotics",
+    "generated_at": "2026-07-13T18:36:11Z",
+    "generator": {
+      "kind": "agent",
+      "name": "cross-cultural semiotic translation relay",
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "reasoning_effort": "xhigh",
+      "agent_id": null
+    },
+    "method": "cross-cultural semiotic translation relay",
+    "brief": "You own exactly /Users/deepfates/Hacking/github/deepfates/dspy_elixir/identity/inbox/11-cross-cultural-semiotics.json. You are not alone in the codebase: edit only that path; do not revert, stage, or format anything else. Read identity/README.md, identity/atlas.json, identity/schema/portfolio.schema.json, README.md, and docs/DSEX_PHILOSOPHY.md. Create one valid schema_version 1 portfolio with run id run-11-cross-cultural-semiotics, atlas_version 1, ISO UTC generated_at, method and generator name \"cross-cultural semiotic translation relay\", generator kind agent/provider openai/model gpt-5.5/reasoning_effort xhigh/agent_id null. Store the full brief. intended_territories: language-semantics, ecology-cultivation, ritual-transformation, civic-governance, learning-adaptation. intended_strategies: archaic-cross-language, coined-category-noun, institutional-community, ordinary-object, abstract-sound-brand. intended_audiences: international-users, affected-publics, educators-writers, oss-contributors, pl-researchers. Generate exactly 100 observations numbered 1..100, exactly 20 wildcard true. Do not rank, filter, dedupe, browse, availability-check, or suppress odd/bad/colliding ideas. Use only valid atlas IDs. Deliberately escape a Latin/Greek/English-only lexicon. Explore conceptual resources and sound patterns from multiple language families and writing traditions, but keep candidate surfaces ASCII-compatible for now. Do not claim universality or correctness; for every borrowing state source-language/meaning uncertainty and cultural or appropriation concern in etymology/known_concerns. Include translation-relay coinages and abstract forms, not only dictionary words. Retain uncertain forms for later verification rather than inventing certainty. Validate with jq and report.",
+    "prompt_path": null,
+    "prompt_sha256": null,
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "language-semantics",
+      "ecology-cultivation",
+      "ritual-transformation",
+      "civic-governance",
+      "learning-adaptation"
+    ],
+    "intended_strategies": [
+      "archaic-cross-language",
+      "coined-category-noun",
+      "institutional-community",
+      "ordinary-object",
+      "abstract-sound-brand"
+    ],
+    "intended_audiences": [
+      "international-users",
+      "affected-publics",
+      "educators-writers",
+      "oss-contributors",
+      "pl-researchers"
+    ],
+    "notes": [
+      "Raw divergence portfolio; no ranking, filtering, deduplication, browsing, availability checks, or suppression of awkward, bad, or colliding ideas was performed.",
+      "Candidate surfaces are ASCII-compatible transliterations or coinages for later verification, not claims of linguistic correctness."
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Qalamet",
+      "rationale": "Frames programs as meaning-bearing writing tools and executable declarations.",
+      "etymology": "Source: Arabic qalam, often glossed as pen; relay adds coined -et. Meaning and pronunciation are uncertain pending Arabic-speaker review.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Arabic scholarly and script associations may be flattened or exoticized; appropriation and transliteration review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 2,
+      "surface": "Misraq",
+      "rationale": "Suggests orientation from a different semantic horizon without implying a single correct path.",
+      "etymology": "Source: Arabic mashriq/misraq regionally associated with east or sunrise; spelling and meaning are uncertain in this relay form.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May mis-handle Arabic morphology and regional meanings; orientalist or geographic appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 3,
+      "surface": "Bayanu",
+      "rationale": "Points at explanation, disclosure, and legible program behavior.",
+      "etymology": "Source: Arabic bayan, commonly glossed as explanation or clarity; final -u is coined and meaning certainty is low.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Religious, rhetorical, and language-specific uses of bayan may carry context not captured here; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 4,
+      "surface": "Sederu",
+      "rationale": "Connects program contracts to ordered steps, rituals, and repeatable public procedure.",
+      "etymology": "Source: Hebrew seder, often glossed as order or ritual order; -u is a relay ending and the semantic fit is uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Jewish ritual associations may be inappropriately secularized; transliteration and appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 5,
+      "surface": "Safraqa",
+      "rationale": "Keeps a travel-and-transformation idea in play as an odd relay form.",
+      "etymology": "Source: Arabic safar, often glossed as journey, blended with abstract q/a sounds; meaning is deliberately uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Could sound like faux-Arabic rather than respectful borrowing; cultural and phonetic review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 6,
+      "surface": "Mizanu",
+      "rationale": "Evokes weighing evidence and balancing program variants without promising objective truth.",
+      "etymology": "Source: Arabic mizan, often glossed as scale or balance; relay spelling adds -u and meaning certainty is partial.",
+      "territories": [
+        "civic-governance",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Mizan has religious and legal resonances that may be mishandled; appropriation and overclaiming concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 7,
+      "surface": "Kitabu",
+      "rationale": "Treats the system as a living book of executable examples and contracts.",
+      "etymology": "Source: Arabic kitab and Swahili kitabu, commonly glossed as book; source path and final brand meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Crossing Arabic and Swahili may blur distinct histories; cultural and colonial-language context review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 8,
+      "surface": "Amaniq",
+      "rationale": "A quiet trust-and-safety sound for bounded runtime behavior.",
+      "etymology": "Source: Arabic aman, often glossed as safety or trust, plus coined -iq; meaning and connotation are uncertain.",
+      "territories": [
+        "civic-governance",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May imply safety guarantees DSEx does not make; Arabic borrowing and trust-language appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 9,
+      "surface": "Naharil",
+      "rationale": "Uses river imagery for traceable flow through adaptive program versions.",
+      "etymology": "Source: Hebrew/Arabic nahar, often glossed as river or day in related forms; relay ending is coined and meaning is uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Semitic roots differ across languages and contexts; appropriation and false-cognate concerns require review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 10,
+      "surface": "Ruachiq",
+      "rationale": "An intentionally risky breath-and-process metaphor for invisible runtime activity.",
+      "etymology": "Source: Hebrew ruach, often glossed as breath, wind, or spirit; -iq is coined and the source meaning is culturally loaded.",
+      "territories": [
+        "ritual-transformation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Religious and sacred associations make appropriation risk high; retained only as a wildcard for later rejection or repair."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 11,
+      "surface": "Sutrava",
+      "rationale": "Makes programs feel like threaded instructions that can be revised and followed.",
+      "etymology": "Source: Sanskrit sutra, often glossed as thread or aphoristic rule; relay -va is coined and meaning accuracy is uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Sutra has religious and philosophical contexts beyond software metaphor; cultural appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 12,
+      "surface": "Anuvaka",
+      "rationale": "Suggests sections of recitation or reusable program passages without claiming textual authority.",
+      "etymology": "Source: Sanskrit anuvaka, a recitation section in Vedic contexts; application to software is uncertain and culturally sensitive.",
+      "territories": [
+        "ritual-transformation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Vedic textual borrowing may be inappropriate for a software project; sacred-context and appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 13,
+      "surface": "Layaqa",
+      "rationale": "Holds rhythm, fit, and adaptive timing as a brandable sound.",
+      "etymology": "Source relay: Sanskrit/Hindi laya, often glossed as rhythm or absorption, with possible Arabic false-friend echoes; meaning uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Cross-language ambiguity may confuse or offend; musical and spiritual meanings need native-speaker review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 14,
+      "surface": "Arivu",
+      "rationale": "Short knowledge-oriented form for evaluated learning without claiming intelligence.",
+      "etymology": "Source: Tamil arivu, commonly glossed as knowledge or understanding; romanization and software meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "Using a living-language knowledge term may appropriate cultural meaning; Tamil-speaker review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 15,
+      "surface": "Mozhika",
+      "rationale": "Names language-handling as a mutable artifact rather than a universal language system.",
+      "etymology": "Source: Tamil mozhi, commonly glossed as language or speech, plus coined -ka; meaning and pronunciation are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Tamil borrowing may be ornamental if not grounded; transliteration and appropriation concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 16,
+      "surface": "Noolam",
+      "rationale": "Links threads, books, and program lineage in a compact object metaphor.",
+      "etymology": "Source: Tamil nool, often glossed as thread or book; -am relay ending is uncertain in grammar and meaning.",
+      "territories": [
+        "language-semantics",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "May misrepresent Tamil morphology and literary tradition; cultural-context review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 17,
+      "surface": "Bhashiq",
+      "rationale": "Keeps speech and language as explicit program material while sounding distinct from English AI terms.",
+      "etymology": "Source: Sanskrit/Hindi bhasha, commonly glossed as language; -iq is coined and exact source-language scope is uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May collapse several Indic languages into one decorative root; appropriation and pronunciation concerns."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 18,
+      "surface": "Bodharo",
+      "rationale": "Points to understood outcomes and observed learning, not sentience or proof.",
+      "etymology": "Source: Sanskrit bodha, commonly glossed as awakening or understanding; -ro is coined and meaning certainty is limited.",
+      "territories": [
+        "learning-adaptation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Buddhist and Indic philosophical associations may be appropriated; spiritual overclaiming concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 19,
+      "surface": "Karmeli",
+      "rationale": "Brings action, consequence, and iterative repair into the candidate pool.",
+      "etymology": "Source relay: Sanskrit karma, often glossed as action, blended with a soft coined ending; meaning and religious connotation are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Karma is heavily appropriated and often misunderstood in English; high cultural and semantic risk."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 20,
+      "surface": "Jigyasa",
+      "rationale": "Curiosity-driven evaluation wave for programs that improve through questions.",
+      "etymology": "Source: Sanskrit/Hindi jigyasa, often glossed as inquiry or curiosity; pronunciation and cultural range are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "May be hard to spell for many users and may appropriate Indic educational vocabulary; review needed."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 21,
+      "surface": "Wenqiao",
+      "rationale": "Bridge-like name for translation between language contracts and runtime execution.",
+      "etymology": "Source: Mandarin wen, text/pattern, and qiao, bridge, in pinyin-like ASCII; tone and compound meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "Tone-stripped Mandarin can create wrong words; cultural and pronunciation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 22,
+      "surface": "Yixu",
+      "rationale": "Compact form for intent plus sequence, useful for program structure.",
+      "etymology": "Source relay: Mandarin yi, meaning or intent, and xu, order or sequence; tones and actual compound semantics are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Pinyin without tones may be ambiguous or misleading; appropriation and false-word concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 23,
+      "surface": "Fayan",
+      "rationale": "Pairs method, rule, and speech as a civic-programming signal.",
+      "etymology": "Source relay: Mandarin fa, method/law, and yan, speech/words; tone and meaning uncertainty are high.",
+      "territories": [
+        "civic-governance",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Could imply law or authority beyond the project; Mandarin borrowing and political connotation review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 24,
+      "surface": "Daozuo",
+      "rationale": "Suggests making a path through uncertain model behavior.",
+      "etymology": "Source relay: Mandarin dao, way/path, and zuo, to make/do, in tone-less ASCII; meaning is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Dao has deep philosophical and religious associations; appropriation and over-metaphor concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 25,
+      "surface": "Mingluo",
+      "rationale": "Works as a bright-network image for traces, examples, and program lineage.",
+      "etymology": "Source relay: Mandarin ming, bright/name/clear, and luo, net/network; tones and compound correctness are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May sound like an accidental Chinese word with unintended meaning; native-speaker review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 26,
+      "surface": "Jiexu",
+      "rationale": "Boundary plus sequence maps to explicit runtime contracts and evaluations.",
+      "etymology": "Source relay: Mandarin jie, boundary/joint/explain, and xu, order; tones and intended sense are uncertain.",
+      "territories": [
+        "civic-governance",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Tone loss and multiple homophones can create unintended meanings; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 27,
+      "surface": "Ziranic",
+      "rationale": "An odd naturalness term for systems cultivated over time, with risk left visible.",
+      "etymology": "Source: Mandarin ziran, often glossed as natural or self-so, plus coined -ic; philosophical meaning is uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May imply natural inevitability or misuse Daoist concepts; appropriation and biological-determinism concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 28,
+      "surface": "Wenmu",
+      "rationale": "Text plus wood suggests inscriptions, tools, and cultivated artifacts.",
+      "etymology": "Source relay: Mandarin wen, text/pattern, and mu, wood; tone and compound meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Could be meaningless or an unintended Mandarin compound; cultural and transliteration review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 29,
+      "surface": "Xunshu",
+      "rationale": "Search-and-document energy for optimizer campaigns and evidence records.",
+      "etymology": "Source relay: Mandarin xun, seek/train in possible readings, and shu, book/document; tone and meaning uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Pinyin ambiguity may produce wrong or awkward associations; native-speaker review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 30,
+      "surface": "Hesheng",
+      "rationale": "A sound-and-coordination candidate for programs tuned by feedback.",
+      "etymology": "Source relay: Mandarin he, harmony/combine, and sheng, sound/voice/life in homophones; exact meaning is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Harmony language can sound politically loaded or over-smooth conflict; cultural and governance concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 31,
+      "surface": "Kotono",
+      "rationale": "A clipped word-leaf feeling for modular pieces of language work.",
+      "etymology": "Source relay: Japanese koto no or kotonoha associations around words; romanized form and meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May distort Japanese grammar or literary associations; cultural and transliteration review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 32,
+      "surface": "Kotoba",
+      "rationale": "Directly centers words as program material while keeping the candidate untranslated.",
+      "etymology": "Source: Japanese kotoba, commonly glossed as word or language; software-brand meaning and context are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Very literal Japanese borrowing may feel ornamental or already heavily used; appropriation and collision concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 33,
+      "surface": "Shirabe",
+      "rationale": "Holds investigation and tune as a dual image for evaluation loops.",
+      "etymology": "Source: Japanese shirabe, associated with investigation or melody depending context; intended meaning is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Multiple Japanese senses may mislead; cultural review and pronunciation testing required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 34,
+      "surface": "Musubi",
+      "rationale": "Binding metaphor for composing signatures, examples, and tools.",
+      "etymology": "Source: Japanese musubi, often glossed as knot, binding, or connection; cultural and ritual meanings are uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May invoke Shinto or food associations unintentionally; appropriation and collision risk need review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 35,
+      "surface": "Keiroku",
+      "rationale": "Record-keeping sound for traces and optimizer lineage, left deliberately uncertain.",
+      "etymology": "Source relay: Japanese kiroku, record, blended with kei readings around pattern/measure; exact form is uncertain.",
+      "territories": [
+        "civic-governance",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May be a malformed Japanese-like word; cultural and phonetic review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 36,
+      "surface": "Hanmae",
+      "rationale": "Abstract community sound that can carry shared examples and maintenance.",
+      "etymology": "Source relay: Korean han and mae sound patterns, with no claimed stable lexical meaning; meaning uncertainty is high.",
+      "territories": [
+        "civic-governance",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Korean han can carry complex cultural meanings if perceived that way; faux-Korean appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 37,
+      "surface": "Gyeolmun",
+      "rationale": "Decision plus writing resonance for typed declarations and adjudicated outputs.",
+      "etymology": "Source relay: Korean gyeol, decision/knot in possible readings, and mun, writing/text in Sino-Korean; meaning uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Romanization may be difficult and source meanings may be wrong; Korean-speaker review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 38,
+      "surface": "Baramun",
+      "rationale": "Wind-and-text feeling for visible traces of otherwise stochastic behavior.",
+      "etymology": "Source relay: Korean baram, wind, and mun, text/gate in possible readings; exact semantics are uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May accidentally resemble unrelated Korean or South Asian terms; cultural and collision review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 39,
+      "surface": "Madang",
+      "rationale": "Courtyard metaphor for shared community evaluation and public examples.",
+      "etymology": "Source: Korean madang, often glossed as yard/courtyard or performance space; software meaning is uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Community and performance meanings are culturally specific; appropriation and collision risk require review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 40,
+      "surface": "Soriwa",
+      "rationale": "A cross-relay sound for voice, harmony, and translation, retained despite awkwardness.",
+      "etymology": "Source relay: Korean sori, sound/voice, with Japanese wa-like harmony echo; exact meaning is uncertain and hybridized.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Hybrid Korean/Japanese sound may be culturally careless; appropriation and historical-context concerns are high."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 41,
+      "surface": "Habiqa",
+      "rationale": "Weaving metaphor for assembling signatures, examples, and optimizers.",
+      "etymology": "Source: Tagalog habi, commonly glossed as weave, plus coined -qa; meaning and pronunciation are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "May ornamentalize Filipino craft vocabulary; cultural-context and transliteration review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 42,
+      "surface": "Diwaqa",
+      "rationale": "Purpose-and-meaning signal for programs judged by intended outcomes.",
+      "etymology": "Source: Tagalog diwa, often glossed as thought, spirit, or essence, plus coined -qa; meaning is culturally uncertain.",
+      "territories": [
+        "language-semantics",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Spirit/essence associations may overclaim or appropriate Filipino concepts; review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 43,
+      "surface": "Baybayu",
+      "rationale": "Signals writing tradition and layered transcription while staying ASCII for now.",
+      "etymology": "Source: Tagalog baybay and Baybayin associations around spelling or script; -u is coined and source meaning is uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Baybayin carries cultural revival and identity significance; appropriation and script-context concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 44,
+      "surface": "Tuklasu",
+      "rationale": "Discovery-oriented name for evaluation campaigns that reveal program behavior.",
+      "etymology": "Source: Tagalog tuklas, commonly glossed as discover, plus coined -u; meaning and grammatical fit are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May be hard for non-Tagalog users to pronounce and may appropriate everyday vocabulary; review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 45,
+      "surface": "Ugnayan",
+      "rationale": "Community and relation term for OSS collaboration and program composition.",
+      "etymology": "Source: Tagalog ugnayan, commonly glossed as relation or connection; exact social connotation is uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Living-language community term may be appropriated and may present spelling burden; Filipino review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 46,
+      "surface": "Anyaman",
+      "rationale": "Woven artifact image for composing examples, traces, and instructions.",
+      "etymology": "Source: Malay/Indonesian anyaman, often glossed as weaving or plaiting; regional meanings are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May flatten Malay and Indonesian differences and craft contexts; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 47,
+      "surface": "Rukunet",
+      "rationale": "Civic harmony and rule resonance for explicit collaboration boundaries.",
+      "etymology": "Source: Malay/Indonesian rukun, often glossed as harmony or principle, plus coined -et; meaning is context-dependent and uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Harmony vocabulary may erase conflict and carries local civic/religious associations; appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 48,
+      "surface": "Akaru",
+      "rationale": "Root metaphor for durable program values and lineage.",
+      "etymology": "Source: Malay/Indonesian akar, often glossed as root, plus coined -u; meaning and neighboring-language associations are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May collide with Japanese akarui associations or other words; cultural and false-friend review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 49,
+      "surface": "Jelajah",
+      "rationale": "Search-through-space feeling for optimizer exploration and evaluation.",
+      "etymology": "Source: Malay/Indonesian jelajah, often glossed as explore or roam; exact connotation is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Exploration terms can echo colonial movement metaphors; cultural and political review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 50,
+      "surface": "Bunyian",
+      "rationale": "Abstract sound-source term for model outputs made inspectable.",
+      "etymology": "Source: Malay/Indonesian bunyi, sound, with relay -an; grammatical correctness and meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May be malformed or childish in source languages; appropriation and phonetic review needed."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 51,
+      "surface": "Ayniqa",
+      "rationale": "Reciprocity-oriented candidate for human-visible feedback and responsibility loops.",
+      "etymology": "Source: Quechua ayni, often glossed as reciprocity or mutual aid, plus coined -qa; meaning is culturally specific and uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Andean reciprocity concepts are not generic collaboration metaphors; high appropriation and decontextualization concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 52,
+      "surface": "Khipura",
+      "rationale": "Knot-record metaphor for examples, traces, and optimizer lineage.",
+      "etymology": "Source: Quechua khipu/quipu, knotted record system; -ra is coined and meaning certainty is limited.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Khipu traditions are culturally and historically specific; appropriation and colonial-archive concerns require review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 53,
+      "surface": "Yachay",
+      "rationale": "Learning-oriented term for evaluated improvement without claiming universal knowledge.",
+      "etymology": "Source: Quechua yachay, often glossed as knowledge, learning, or wisdom; exact range is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Indigenous knowledge term may be appropriated or politicized; Quechua-speaker and community review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 54,
+      "surface": "Sumaqa",
+      "rationale": "Quality-oriented sound that avoids direct English evaluation vocabulary.",
+      "etymology": "Source: Quechua sumaq, often glossed as good, beautiful, or excellent, plus coined -a; meaning and value connotation are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Could imply quality guarantees and appropriate Indigenous value language; review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 55,
+      "surface": "Tinkuy",
+      "rationale": "Encounter metaphor for comparing programs, examples, and outcomes.",
+      "etymology": "Source: Quechua tinkuy, often glossed as encounter, meeting, or convergence; ritual/social range is uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "May flatten Andean ritual or political meanings; appropriation and collision concerns are high."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 56,
+      "surface": "Tlamatiq",
+      "rationale": "Knowledge-and-method resonance for technical users while staying visibly uncertain.",
+      "etymology": "Source: Nahuatl tlamati, often glossed as to know, plus coined -q; exact morphology and meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Nahuatl borrowing by software can be extractive; orthography, community, and appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 57,
+      "surface": "Nepantla",
+      "rationale": "In-between name for translation across model behavior, Elixir contracts, and human review.",
+      "etymology": "Source: Nahuatl nepantla, often glossed as in-between or middle space; contemporary cultural meanings are uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Term has Indigenous and Chicanx theoretical significance; appropriation and political-context concerns are high."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 58,
+      "surface": "Tlacuilo",
+      "rationale": "Scribe-like candidate for maintained program artifacts and traces.",
+      "etymology": "Source: Nahuatl tlacuilo, often glossed as painter-scribe; exact role and historical meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Colonial history and Indigenous roles make this sensitive; pronunciation burden and appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 59,
+      "surface": "Milpaqa",
+      "rationale": "Cultivation metaphor for examples and programs tended together over time.",
+      "etymology": "Source: Nahuatl-derived milpa, a cultivated field system, plus coined -qa; meaning and source pathway are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Agricultural and Indigenous land practices should not become generic tech metaphor; appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 60,
+      "surface": "Ollinra",
+      "rationale": "Movement-oriented wildcard for adaptive systems changing through evaluated steps.",
+      "etymology": "Source: Nahuatl ollin, often glossed as movement, with coined -ra; cosmological meanings and correctness are uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Ollin has calendar/cosmological significance; high appropriation and spiritual-context concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 61,
+      "surface": "Niafora",
+      "rationale": "Intent-and-form relay for declared purposes becoming runnable artifacts.",
+      "etymology": "Source relay: Swahili nia, purpose/intention, with a coined -fora ending not claimed as Greek; meaning is uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May sound like a fabricated Swahili/European hybrid; cultural appropriation and false-etymology concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 62,
+      "surface": "Ujamaa",
+      "rationale": "Community-organization candidate for OSS stewardship and shared responsibility.",
+      "etymology": "Source: Swahili ujamaa, associated with familyhood and Tanzanian political philosophy; software meaning is uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Politically and historically loaded term; appropriation, ideology, and collision concerns are high."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 63,
+      "surface": "Kijiji",
+      "rationale": "Village metaphor for local examples, maintainers, and shared norms.",
+      "etymology": "Source: Swahili kijiji, commonly glossed as village; exact cultural range and brand fit are uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Village metaphor can romanticize community or collide with existing brands; appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 64,
+      "surface": "Shamba",
+      "rationale": "Field image for cultivating datasets, examples, and program variants.",
+      "etymology": "Source: Swahili shamba, often glossed as field or farm; colonial and regional meanings are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Agrarian metaphor may naturalize optimization or exploit East African vocabulary; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 65,
+      "surface": "Hakika",
+      "rationale": "A deliberately risky truth-certainty candidate for evidence-heavy workflows.",
+      "etymology": "Source: Swahili hakika, often glossed as certainly or truth-related, from Arabic roots; exact force is uncertain.",
+      "territories": [
+        "civic-governance",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "May overclaim truth or certainty and blur Arabic/Swahili histories; appropriation concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 66,
+      "surface": "Ubuntu",
+      "rationale": "Community-and-mutuality candidate retained despite extreme collision and cultural load.",
+      "etymology": "Source: Nguni/Bantu ubuntu, often glossed as humanness or relational personhood; meaning is culturally rich and uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Major existing software collision and high risk of appropriating Southern African philosophy; retained per no-suppression rule."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 67,
+      "surface": "Itumelo",
+      "rationale": "Warm community sound for trust in shared development practices.",
+      "etymology": "Source: Sotho/Tswana itumelo, often associated with faith, belief, or joy depending language; meaning uncertain.",
+      "territories": [
+        "civic-governance",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "May appropriate personal names or faith vocabulary; Southern African language review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 68,
+      "surface": "Thuto",
+      "rationale": "Learning-oriented compact form for examples and optimizer practice.",
+      "etymology": "Source: Sesotho/Setswana thuto, often glossed as education or lesson; pronunciation and context are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May flatten related Southern African languages and educational contexts; appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 69,
+      "surface": "Korafo",
+      "rationale": "Abstract Akan-adjacent sound for cooperative maintenance and repair.",
+      "etymology": "Source relay: Akan sound patterns around kora/fo, with no claimed stable dictionary meaning; uncertainty is high.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Faux-Akan form could be disrespectful or accidentally meaningful; native-speaker review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 70,
+      "surface": "Sankofa",
+      "rationale": "Learning from prior examples and lineage is semantically apt, but the risk is left visible.",
+      "etymology": "Source: Akan sankofa, often glossed as return and get it or learn from the past; exact cultural meaning is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Widely used Akan symbol with cultural and diasporic significance; appropriation and collision risk are high."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 71,
+      "surface": "Ortaq",
+      "rationale": "Partnership sound for human-machine and contributor coordination.",
+      "etymology": "Source: Turkic ortak/ortaq, often glossed as partner or shared; specific language source and meaning are uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Pan-Turkic borrowing may flatten distinct languages and politics; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 72,
+      "surface": "Bilgeli",
+      "rationale": "Knowledge-like candidate for evidence and examples without direct English roots.",
+      "etymology": "Source: Turkish bilgi, knowledge, and bilge, wise, with coined -li; meaning and morphology are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May sound malformed or overclaim wisdom; Turkish-speaker and cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 73,
+      "surface": "Yordam",
+      "rationale": "Method-oriented name for procedural patterns and teachable program paths.",
+      "etymology": "Source: Turkish yordam, often glossed as method or procedure; exact technical connotation is uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May appropriate ordinary Turkish vocabulary and collide with existing technical usage; review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 74,
+      "surface": "Kutluq",
+      "rationale": "Fortune-blessing sound for transformed programs, intentionally odd and risky.",
+      "etymology": "Source: Old Turkic/Turkic kut and kutlu, associated with fortune, blessing, or sacred vitality; meaning is uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Sacral and historical Turkic concepts may be misused; appropriation and spelling concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 75,
+      "surface": "Toyun",
+      "rationale": "Assembly-feast-council ambiguity keeps a civic wildcard in the set.",
+      "etymology": "Source relay: Turkic toy/toyun associations with gathering, feast, or title in some histories; meaning uncertainty is high.",
+      "territories": [
+        "civic-governance",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May be historically inaccurate or politically loaded; retained as uncertain form for verification."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 76,
+      "surface": "Sisuva",
+      "rationale": "Resilience-oriented sound for supervised retries and durable maintenance.",
+      "etymology": "Source: Finnish sisu, culturally associated with grit or perseverance, plus coined -va; meaning is culturally specific and uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Sisu is culturally marked and often commercialized; appropriation and stereotype concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 77,
+      "surface": "Sanasto",
+      "rationale": "Vocabulary-centered candidate for signatures, fields, and teachable program language.",
+      "etymology": "Source: Finnish sanasto, commonly glossed as vocabulary or glossary; software meaning and cultural context are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Ordinary Finnish word may be too literal or already used; living-language appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 78,
+      "surface": "Tietava",
+      "rationale": "Knowing-capable sound for adaptive programs while avoiding direct intelligence claims.",
+      "etymology": "Source relay: Finnish tietaa/tietava around knowing, stripped to ASCII; grammar and meaning are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "ASCII loss of Finnish diacritics may change meaning; may overclaim knowledge; review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 79,
+      "surface": "Siltaq",
+      "rationale": "Bridge object for translation across model output and Elixir contracts.",
+      "etymology": "Source: Finnish silta, bridge, plus coined -q; meaning and pronounceability are uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "Could read as fake-Finnish due to q ending; cultural and spelling concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 80,
+      "surface": "Metsamu",
+      "rationale": "Forest-and-humus image for many interdependent program artifacts.",
+      "etymology": "Source: Finnish metsa, forest, with coined -mu; ASCII stripping and intended meaning are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Nature metaphor may naturalize optimization and misuse Finnish vocabulary; review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 81,
+      "surface": "Bidea",
+      "rationale": "Path-oriented candidate for repeatable learning workflows and examples.",
+      "etymology": "Source: Basque bide, often glossed as way/path, with -a article-like ending; grammar and meaning are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Basque morphology may be mishandled and ordinary vocabulary appropriated; review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 82,
+      "surface": "Hizki",
+      "rationale": "Letter-and-symbol identity for signatures and field names.",
+      "etymology": "Source: Basque hizki, often glossed as letter or character; exact usage and connotation are uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "May appropriate a minority language and be hard to pronounce for some users; Basque-speaker review needed."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 83,
+      "surface": "Auzolan",
+      "rationale": "Community-work candidate for open-source stewardship and collective maintenance.",
+      "etymology": "Source: Basque auzolan, commonly associated with neighborhood or communal work; exact cultural meaning is uncertain.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Community labor term may be decontextualized or politicized; appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 84,
+      "surface": "Ikasiq",
+      "rationale": "Learning verb root made into a compact abstract project name.",
+      "etymology": "Source: Basque ikasi, often glossed as learn, plus coined -q; grammatical correctness is uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May be fake-looking and flatten Basque language context; cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 85,
+      "surface": "Erroqa",
+      "rationale": "Root metaphor for stable declarations beneath changing optimizer outputs.",
+      "etymology": "Source: Basque erro, often glossed as root, with coined -qa; source meaning and pronunciation are uncertain.",
+      "territories": [
+        "ecology-cultivation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May be malformed or accidentally meaningful; minority-language appropriation concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 86,
+      "surface": "Dabarun",
+      "rationale": "Word-and-thing ambiguity maps to programs as language-bearing artifacts.",
+      "etymology": "Source: Hebrew davar/dabar, often glossed as word, thing, or matter; -un relay ending is coined and meaning uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Hebrew religious and philosophical context may be mishandled; appropriation and transliteration review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 87,
+      "surface": "Kavanah",
+      "rationale": "Intent-focused candidate for declared task boundaries and evaluation goals.",
+      "etymology": "Source: Hebrew kavanah, often glossed as intention or directed devotion; exact cultural meaning is uncertain.",
+      "territories": [
+        "ritual-transformation",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Jewish prayer and intention concept may be secularized inappropriately; high appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 88,
+      "surface": "Hevruta",
+      "rationale": "Paired study metaphor for examples, review, and feedback.",
+      "etymology": "Source: Aramaic/Hebrew havruta/hevruta, a paired learning practice; spelling and meaning are uncertain.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Jewish study practice is culturally specific; appropriation and transliteration concern are high."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 89,
+      "surface": "Midrashu",
+      "rationale": "Interpretive-corpus candidate for evolving examples and documented reasoning.",
+      "etymology": "Source: Hebrew midrash, interpretive tradition/commentary, plus coined -u; meaning and context are uncertain.",
+      "territories": [
+        "language-semantics",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "Religious textual tradition should not be reduced to software interpretation; appropriation concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 90,
+      "surface": "Mishpatu",
+      "rationale": "Rule-and-judgment resonance for explicit outputs, metrics, and accountability.",
+      "etymology": "Source: Hebrew mishpat, often glossed as judgment/law, plus coined -u; legal and religious meaning is uncertain.",
+      "territories": [
+        "civic-governance",
+        "language-semantics"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "May imply law or authority the project lacks and appropriate Hebrew legal vocabulary; review required."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 91,
+      "surface": "Tifinu",
+      "rationale": "Script-adjacent sound for declarations, marks, and visible program signs.",
+      "etymology": "Source: Tifinagh, an Amazigh writing tradition, shortened and coined as Tifinu; source meaning is uncertain.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "abstract-sound-brand"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Amazigh script identity is culturally and politically significant; appropriation and script-context review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 92,
+      "surface": "Amazrar",
+      "rationale": "Abstract Amazigh-adjacent sound for plural community governance.",
+      "etymology": "Source relay: Amazigh/Tamazight sound patterns around amaz- and -rar; no stable lexical meaning is claimed and uncertainty is high.",
+      "territories": [
+        "civic-governance",
+        "ecology-cultivation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Could be fake-Amazigh or accidentally meaningful; cultural and political identity review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 93,
+      "surface": "Tamusni",
+      "rationale": "Knowledge-oriented term that keeps North African language resources in the exploration.",
+      "etymology": "Source: Tamazight tamusni, often glossed as knowledge in some references; exact dialect and meaning are uncertain.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "Dialect variation and cultural identity stakes are high; appropriation and verification concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 94,
+      "surface": "Assaru",
+      "rationale": "Path-trace sound for reproducible program lineage.",
+      "etymology": "Source relay: Amazigh/Tuareg-like asaru/asar path associations reported in uncertain sources; meaning is unverified.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "pl-researchers"
+      ],
+      "known_concerns": [
+        "Unverified borrowing from marginalized language contexts may be irresponsible; retain only for later expert review."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 95,
+      "surface": "Zrigan",
+      "rationale": "A rough consonant-heavy abstract form to break smooth SaaS sound patterns.",
+      "etymology": "Source relay: abstract form shaped by Semitic and Caucasian consonant clusters; no lexical meaning is claimed and uncertainty is high.",
+      "territories": [
+        "language-semantics",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "May read as faux-ethnic or harshly unpronounceable; cultural pattern appropriation and accessibility concern."
+      ],
+      "wildcard": true
+    },
+    {
+      "ordinal": 96,
+      "surface": "Naliqo",
+      "rationale": "Soft abstract relay form for language, learning, and civic review.",
+      "etymology": "Source relay: abstract sound drawn from Bantu, Austronesian, and Turkic open-syllable patterns; no stable source meaning claimed.",
+      "territories": [
+        "language-semantics",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "educators-writers"
+      ],
+      "known_concerns": [
+        "Pattern borrowing without lexical source can still exoticize languages; pronunciation and cultural review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 97,
+      "surface": "Ravuqi",
+      "rationale": "Abstract candidate with enough edge for code names and enough rhythm for speech.",
+      "etymology": "Source relay: invented from Dravidian, Quechua, and Semitic-adjacent phonotactic impressions; no source meaning is claimed.",
+      "territories": [
+        "learning-adaptation",
+        "ritual-transformation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May accidentally collide with real words or sound like imitation; appropriation and verification concern."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 98,
+      "surface": "Pelumo",
+      "rationale": "Gentler abstract name for cultivated program families and examples.",
+      "etymology": "Source relay: abstract form using open syllables inspired by Austronesian and Niger-Congo sound patterns; meaning uncertain and unclaimed.",
+      "territories": [
+        "ecology-cultivation",
+        "learning-adaptation"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "oss-contributors"
+      ],
+      "known_concerns": [
+        "Could be too generic or accidentally meaningful in a living language; cultural and collision review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 99,
+      "surface": "Xorani",
+      "rationale": "Unsettled x-initial sound for boundary-crossing language systems.",
+      "etymology": "Source relay: abstract form with possible Kurdish, Iranian, or invented echoes; no source meaning is asserted and uncertainty is high.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "archaic-cross-language"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics"
+      ],
+      "known_concerns": [
+        "May accidentally evoke real ethnic, political, or language names; verification and appropriation review required."
+      ],
+      "wildcard": false
+    },
+    {
+      "ordinal": 100,
+      "surface": "Veykatu",
+      "rationale": "Final relay coinage for making and teaching program artifacts across communities.",
+      "etymology": "Source relay: abstract blend from Armenian/Georgian/Turkic-adjacent sound impressions plus -tu; no lexical meaning is claimed.",
+      "territories": [
+        "learning-adaptation",
+        "civic-governance"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "coined-category-noun"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "international-users"
+      ],
+      "known_concerns": [
+        "May be faux-regional or accidentally meaningful; Caucasus and Turkic cultural pattern review required."
+      ],
+      "wildcard": true
+    }
+  ]
+}
