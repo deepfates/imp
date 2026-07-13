@@ -1,0 +1,270 @@
+defmodule DSEx.BenchmarkTruth.MultimodalManifest do
+  @moduledoc false
+
+  @payload_keys ~w(assets campaign_id claim_policy created_at limitations provider samples schema_version scoring signature)
+  @provider_keys ~w(api capabilities credential_env generation model name pricing req_llm_model)
+  @generation_keys ~w(max_tokens seed temperature timeout_ms top_p)
+  @pricing_keys ~w(as_of currency input_nano_usd_per_token input_usd_per_1m output_nano_usd_per_token output_usd_per_1m source)
+  @signature_keys ~w(input output output_schema prompt_contract)
+  @scoring_keys ~w(family_thresholds normalization scorer)
+  @claim_keys ~w(document_family image_family required_families)
+  @asset_keys ~w(bytes mime_type path sha256)
+  @sample_keys ~w(asset_ids delivery expected_capability family gold id prompt)
+  @deliveries ~w(typed_image_data_uri typed_native_file)
+
+  def load!(path, opts \\ []) do
+    root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
+
+    envelope = path |> File.read!() |> Jason.decode!()
+    exact_keys!(envelope, ~w(payload payload_sha256), "manifest envelope")
+
+    payload = Map.fetch!(envelope, "payload")
+    expected = Map.fetch!(envelope, "payload_sha256")
+    actual = sha256(Jason.encode!(payload))
+
+    unless secure_equal?(expected, actual) do
+      raise ArgumentError, "multimodal manifest checksum mismatch"
+    end
+
+    validate!(payload, root: root)
+    %{payload: payload, sha256: actual, path: Path.expand(path)}
+  end
+
+  def validate!(payload, opts \\ []) when is_map(payload) do
+    root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
+    exact_keys!(payload, @payload_keys, "manifest payload")
+
+    require_equal!(payload["schema_version"], 1, "schema_version")
+    require_string!(payload["campaign_id"], "campaign_id")
+    require_string!(payload["created_at"], "created_at")
+
+    validate_provider!(payload["provider"])
+    validate_signature!(payload["signature"])
+    validate_scoring!(payload["scoring"])
+    validate_claim_policy!(payload["claim_policy"], payload["scoring"])
+    assets = validate_assets!(payload["assets"], root)
+    validate_samples!(payload["samples"], assets, payload["provider"])
+
+    unless is_list(payload["limitations"]) and
+             Enum.all?(payload["limitations"], &is_binary/1) do
+      raise ArgumentError, "limitations must be a list of strings"
+    end
+
+    payload
+  end
+
+  def payload_sha256(payload), do: sha256(Jason.encode!(payload))
+
+  defp validate_provider!(provider) do
+    exact_keys!(provider, @provider_keys, "provider")
+    require_equal!(provider["name"], "google", "provider.name")
+    require_equal!(provider["api"], "generateContent", "provider.api")
+    require_equal!(provider["req_llm_model"], "google:" <> provider["model"], "req_llm_model")
+    require_equal!(provider["credential_env"], "GEMINI_API_KEY", "credential_env")
+
+    capabilities = provider["capabilities"]
+    exact_keys!(capabilities, ~w(audio image_input native_pdf), "provider.capabilities")
+    require_equal!(capabilities["image_input"], true, "capabilities.image_input")
+    require_equal!(capabilities["native_pdf"], true, "capabilities.native_pdf")
+    require_equal!(capabilities["audio"], false, "capabilities.audio")
+
+    exact_keys!(provider["generation"], @generation_keys, "provider.generation")
+    generation = provider["generation"]
+    require_number!(generation["temperature"], "generation.temperature")
+    require_number!(generation["top_p"], "generation.top_p")
+    require_integer!(generation["seed"], "generation.seed")
+    require_positive_integer!(generation["max_tokens"], "generation.max_tokens")
+    require_positive_integer!(generation["timeout_ms"], "generation.timeout_ms")
+
+    exact_keys!(provider["pricing"], @pricing_keys, "provider.pricing")
+    pricing = provider["pricing"]
+    require_equal!(pricing["currency"], "USD", "pricing.currency")
+    require_positive_integer!(pricing["input_nano_usd_per_token"], "input token price")
+    require_positive_integer!(pricing["output_nano_usd_per_token"], "output token price")
+
+    Enum.each(~w(input_usd_per_1m output_usd_per_1m source as_of), fn key ->
+      require_string!(pricing[key], "pricing.#{key}")
+    end)
+  end
+
+  defp validate_signature!(signature) do
+    exact_keys!(signature, @signature_keys, "signature")
+
+    Enum.each(
+      ~w(input output prompt_contract),
+      &require_string!(signature[&1], "signature.#{&1}")
+    )
+
+    require_equal!(
+      signature["output_schema"],
+      %{"answer" => "string_or_integer"},
+      "output_schema"
+    )
+  end
+
+  defp validate_scoring!(scoring) do
+    exact_keys!(scoring, @scoring_keys, "scoring")
+    require_equal!(scoring["scorer"], "exact_match", "scoring.scorer")
+    require_equal!(scoring["normalization"], ["trim", "unicode_lowercase"], "normalization")
+
+    thresholds = scoring["family_thresholds"]
+    exact_keys!(thresholds, ~w(image native_document), "family_thresholds")
+
+    Enum.each(thresholds, fn {family, threshold} ->
+      unless is_number(threshold) and threshold >= 0 and threshold <= 1 do
+        raise ArgumentError, "threshold for #{family} must be between 0 and 1"
+      end
+    end)
+  end
+
+  defp validate_claim_policy!(policy, scoring) do
+    exact_keys!(policy, @claim_keys, "claim_policy")
+    require_equal!(policy["image_family"], "image", "claim_policy.image_family")
+    require_equal!(policy["document_family"], "native_document", "claim_policy.document_family")
+    require_equal!(policy["required_families"], ["image", "native_document"], "required_families")
+
+    unless Map.keys(scoring["family_thresholds"]) |> Enum.sort() ==
+             Enum.sort(policy["required_families"]) do
+      raise ArgumentError, "family thresholds must exactly match required claim families"
+    end
+  end
+
+  defp validate_assets!(assets, root) when is_map(assets) and map_size(assets) > 0 do
+    Map.new(assets, fn {id, asset} ->
+      require_string!(id, "asset id")
+      exact_keys!(asset, @asset_keys, "asset #{id}")
+      Enum.each(~w(path mime_type sha256), &require_string!(asset[&1], "asset #{id}.#{&1}"))
+      require_positive_integer!(asset["bytes"], "asset #{id}.bytes")
+
+      path = confined_path!(root, asset["path"])
+      bytes = File.read!(path)
+
+      unless byte_size(bytes) == asset["bytes"] and sha256(bytes) == asset["sha256"] do
+        raise ArgumentError, "multimodal asset drift detected for #{id}"
+      end
+
+      {id, Map.put(asset, "absolute_path", path)}
+    end)
+  end
+
+  defp validate_assets!(_assets, _root),
+    do: raise(ArgumentError, "assets must be a non-empty map")
+
+  defp validate_samples!(samples, assets, provider) when is_list(samples) and samples != [] do
+    ids = Enum.map(samples, & &1["id"])
+    if Enum.uniq(ids) != ids, do: raise(ArgumentError, "sample ids must be unique")
+
+    Enum.each(samples, fn sample ->
+      exact_keys!(sample, @sample_keys, "sample")
+
+      Enum.each(~w(id family prompt delivery expected_capability), fn key ->
+        require_string!(sample[key], "sample.#{key}")
+      end)
+
+      unless sample["family"] in ~w(image native_document),
+        do: raise(ArgumentError, "unsupported sample family #{inspect(sample["family"])}")
+
+      unless sample["delivery"] in @deliveries,
+        do: raise(ArgumentError, "unsupported delivery #{inspect(sample["delivery"])}")
+
+      unless is_list(sample["asset_ids"]) and sample["asset_ids"] != [] and
+               Enum.all?(sample["asset_ids"], &Map.has_key?(assets, &1)) do
+        raise ArgumentError, "sample #{sample["id"]} references unknown assets"
+      end
+
+      capability = sample["expected_capability"]
+
+      unless provider["capabilities"][capability] == true do
+        raise ArgumentError,
+              "sample #{sample["id"]} requires unsupported capability #{capability}"
+      end
+
+      validate_family_delivery!(sample)
+
+      unless is_binary(sample["gold"]) or is_integer(sample["gold"]),
+        do: raise(ArgumentError, "sample #{sample["id"]} gold must be a string or integer")
+    end)
+  end
+
+  defp validate_samples!(_samples, _assets, _provider),
+    do: raise(ArgumentError, "samples must be a non-empty list")
+
+  defp validate_family_delivery!(%{
+         "family" => "image",
+         "delivery" => "typed_image_data_uri",
+         "expected_capability" => "image_input",
+         "asset_ids" => [_]
+       }),
+       do: :ok
+
+  defp validate_family_delivery!(%{
+         "family" => "native_document",
+         "delivery" => "typed_native_file",
+         "expected_capability" => "native_pdf",
+         "asset_ids" => [_]
+       }),
+       do: :ok
+
+  defp validate_family_delivery!(sample) do
+    raise ArgumentError,
+          "sample #{sample["id"]} has an ambiguous family/delivery/capability combination"
+  end
+
+  defp confined_path!(root, relative) do
+    unless is_binary(relative) and Path.type(relative) == :relative do
+      raise ArgumentError, "asset path must be repository-relative"
+    end
+
+    path = Path.expand(relative, root)
+
+    unless String.starts_with?(path, root <> "/") do
+      raise ArgumentError, "asset path escapes repository root"
+    end
+
+    path
+  end
+
+  defp exact_keys!(map, expected, context) when is_map(map) do
+    actual = Map.keys(map) |> Enum.sort()
+    expected = Enum.sort(expected)
+
+    unless actual == expected,
+      do: raise(ArgumentError, "#{context} keys must be exactly #{inspect(expected)}")
+  end
+
+  defp exact_keys!(_map, _expected, context), do: raise(ArgumentError, "#{context} must be a map")
+
+  defp require_equal!(actual, expected, field) do
+    unless actual == expected,
+      do:
+        raise(ArgumentError, "#{field} must equal #{inspect(expected)}, got: #{inspect(actual)}")
+  end
+
+  defp require_string!(value, _field) when is_binary(value) and value != "", do: value
+
+  defp require_string!(value, field),
+    do: raise(ArgumentError, "#{field} must be a non-empty string, got: #{inspect(value)}")
+
+  defp require_number!(value, _field) when is_number(value), do: value
+
+  defp require_number!(value, field),
+    do: raise(ArgumentError, "#{field} must be numeric, got: #{inspect(value)}")
+
+  defp require_integer!(value, _field) when is_integer(value), do: value
+
+  defp require_integer!(value, field),
+    do: raise(ArgumentError, "#{field} must be an integer, got: #{inspect(value)}")
+
+  defp require_positive_integer!(value, _field) when is_integer(value) and value > 0, do: value
+
+  defp require_positive_integer!(value, field),
+    do: raise(ArgumentError, "#{field} must be a positive integer, got: #{inspect(value)}")
+
+  defp secure_equal?(left, right)
+       when is_binary(left) and is_binary(right) and byte_size(left) == byte_size(right),
+       do: :crypto.hash_equals(left, right)
+
+  defp secure_equal?(_left, _right), do: false
+
+  defp sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
+end

@@ -1,0 +1,102 @@
+defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
+  @moduledoc """
+  Plan or run the provider-backed multimodal quality campaign.
+
+      mix dsex.benchmark.multimodal_quality --plan
+      GEMINI_API_KEY=... mix dsex.benchmark.multimodal_quality --live
+
+  Plan and dry-run modes validate the signed manifest and every asset without
+  reading credentials or dispatching provider requests. Live mode uses only the
+  credential environment variable pinned by the manifest.
+  """
+
+  use Mix.Task
+
+  alias DSEx.BenchmarkTruth.ArtifactFile
+  alias DSEx.BenchmarkTruth.MultimodalRunner
+
+  @shortdoc "Plan or run the live multimodal quality campaign"
+
+  @impl true
+  def run(args) do
+    Mix.Task.run("app.start")
+
+    {opts, argv, invalid} =
+      OptionParser.parse(args,
+        strict: [
+          checkpoint: :string,
+          dry_run: :boolean,
+          live: :boolean,
+          manifest: :string,
+          max_concurrency: :integer,
+          out: :string,
+          plan: :boolean
+        ]
+      )
+
+    if invalid != [] or argv != [],
+      do: Mix.raise("invalid arguments: #{inspect(invalid ++ argv)}")
+
+    mode = mode!(opts)
+    manifest = Keyword.get(opts, :manifest, "benchmarks/data/multimodal/manifest.json")
+    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+
+    runner_opts =
+      [
+        manifest: manifest,
+        max_concurrency: Keyword.get(opts, :max_concurrency, 2),
+        mode: mode
+      ]
+      |> maybe_put(:checkpoint, Keyword.get(opts, :checkpoint))
+      |> maybe_put_live_credential(mode, manifest)
+
+    artifact = MultimodalRunner.run(runner_opts)
+    File.mkdir_p!(out_dir)
+
+    path =
+      ArtifactFile.write_json!(
+        Path.join(out_dir, "multimodal-quality-#{mode}-#{timestamp_slug()}.json"),
+        artifact
+      )
+
+    Mix.shell().info("multimodal quality report: #{path}")
+
+    Mix.shell().info(
+      "provider calls: #{if(mode == :live, do: artifact["summary"]["total"], else: 0)}"
+    )
+
+    Mix.shell().info("quality claim: #{artifact["claims"]["multimodal_quality"]}")
+
+    if mode == :live and not artifact["claims"]["multimodal_quality"] do
+      Mix.raise("multimodal quality thresholds did not pass")
+    end
+  end
+
+  defp mode!(opts) do
+    plan? = Keyword.get(opts, :plan, false) or Keyword.get(opts, :dry_run, false)
+    live? = Keyword.get(opts, :live, false)
+
+    case {plan?, live?} do
+      {true, false} -> :plan
+      {false, true} -> :live
+      _ -> Mix.raise("choose exactly one of --plan/--dry-run or --live")
+    end
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp maybe_put_live_credential(opts, :plan, _manifest), do: opts
+
+  defp maybe_put_live_credential(opts, :live, manifest_path) do
+    manifest = DSEx.BenchmarkTruth.MultimodalManifest.load!(manifest_path)
+    env = manifest.payload["provider"]["credential_env"]
+
+    case System.fetch_env(env) do
+      {:ok, api_key} when api_key != "" -> Keyword.put(opts, :api_key, api_key)
+      _ -> Mix.raise("#{env} is required for --live and is read only from the task process")
+    end
+  end
+
+  defp timestamp_slug, do: Calendar.strftime(DateTime.utc_now(), "%Y%m%dT%H%M%SZ")
+end

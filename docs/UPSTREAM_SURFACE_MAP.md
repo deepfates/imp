@@ -166,7 +166,7 @@ Missing evidence or behavior:
 
 ### `primitives.multimodal`
 
-Status: `gap`
+Status: `implemented; live evidence pending`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -178,13 +178,14 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/multimodal_adapter_test.exs`
-- docs: `docs/API_GUIDE.md`
+- test: `test/multimodal_quality_benchmark_test.exs`
+- task: `mix dsex.benchmark.multimodal_quality --plan|--live`
+- manifest: `benchmarks/data/multimodal/manifest.json`
+- docs: `docs/MULTIMODAL_FIDELITY.md`
 
 Missing evidence or behavior:
 
-- live image task
-- live document task
-- quality and failure artifact
+- execute the pinned live campaign and retain its quality/failure artifact
 
 ### `tools.typed_calls`
 
