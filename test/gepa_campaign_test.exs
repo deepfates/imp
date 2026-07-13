@@ -45,12 +45,16 @@ defmodule GepaCampaignTest do
       )
 
     assert File.exists?(result.out_path)
-    assert %{"rows" => rows} = File.read!(result.out_path) |> Jason.decode!()
+
+    assert %{"git_sha" => "abcdef2", "rows" => rows} =
+             File.read!(result.out_path) |> Jason.decode!()
+
     assert length(rows) == 6
 
     assert Enum.all?(rows, fn row ->
              is_map(get_in(row, ["results", "dsex_gepa"])) and
                get_in(row, ["results", "dsex_gepa", "source"]) =~ "DSEx GEPA campaign runner" and
+               get_in(row, ["results", "dsex_gepa", "source"]) =~ "abcdef2" and
                is_map(row["dataset"]) and
                row["dataset"]["scope"] == "full" and
                row["dataset"]["split_counts"] == %{"train" => 2, "dev" => 2, "test" => 2} and

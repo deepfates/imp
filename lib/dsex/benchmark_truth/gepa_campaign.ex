@@ -4,13 +4,15 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   alias DSEx.Adapter.Chat
 
   alias DSEx.BenchmarkTruth.{
+    ArtifactFile,
     GepaComponentFeedback,
     GepaMetrics,
     HotpotMultiHop,
     HoverBM25,
     HoverMultiHop,
     IFBenchTwoStage,
-    Papillon
+    Papillon,
+    RunContext
   }
 
   alias DSEx.Optimizer.GEPA
@@ -29,6 +31,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     token_cost = Keyword.get(opts, :token_cost)
     source_commits = Keyword.fetch!(opts, :source_commits)
     validate_source_commits!(source_commits)
+    run_context = RunContext.new!(source_commits: source_commits)
     lm = Keyword.fetch!(opts, :lm)
     reflection_lm = Keyword.get(opts, :reflection_lm)
     {judge_lm, judge_model} = judge_config!(opts, lm, model)
@@ -61,6 +64,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       max_concurrency: max_concurrency,
       checkpoint_dir: checkpoint_dir,
       source_commits: source_commits,
+      source_git_sha: run_context.code_revision,
       execution: execution,
       optimizer_callbacks: optimizer_callbacks
     }
@@ -92,8 +96,6 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     report = %{
       "schema_version" => 1,
       "runner" => "dsex-gepa-campaign",
-      "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-      "git_sha" => git_sha(),
       "summary" => %{
         "total" => length(rows),
         "families" => Enum.map(rows, & &1["family"]),
@@ -111,7 +113,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     }
 
     out_path = Path.join(out_dir, "dsex-gepa-rows-#{timestamp_slug()}.json")
-    out_path = DSEx.BenchmarkTruth.ArtifactFile.write_json!(out_path, report)
+
+    %{artifact: report, path: out_path} =
+      ArtifactFile.write_run_json!(out_path, report, run_context)
+
     %{report: report, out_path: out_path}
   end
 
@@ -428,7 +433,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "results" => %{
         "dsex_gepa" => %{
           "score" => best.test,
-          "source" => "DSEx GEPA campaign runner #{git_sha()} #{family}/#{program}",
+          "source" => "DSEx GEPA campaign runner #{context.source_git_sha} #{family}/#{program}",
           "candidate_count" => best.candidate_count,
           "frontier_size" => best.frontier_size,
           "seed" => best.seed
@@ -1128,12 +1133,5 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     |> DateTime.truncate(:second)
     |> DateTime.to_iso8601(:basic)
     |> String.replace("Z", "Z")
-  end
-
-  defp git_sha do
-    case System.cmd("git", ["rev-parse", "--short", "HEAD"], stderr_to_stdout: true) do
-      {sha, 0} -> String.trim(sha)
-      _ -> "unknown"
-    end
   end
 end

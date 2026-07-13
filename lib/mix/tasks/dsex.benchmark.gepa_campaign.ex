@@ -66,6 +66,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
     Mix.Task.run("app.start")
+    ensure_clean_checkout!()
 
     api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
@@ -250,9 +251,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   defp format_score(score), do: to_string(score)
 
   defp git_sha do
-    case System.cmd("git", ["rev-parse", "--short", "HEAD"], stderr_to_stdout: true) do
+    case System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true) do
       {sha, 0} -> String.trim(sha)
-      _ -> "unknown"
+      _ -> Mix.raise("GEPA research campaigns require a Git checkout with a concrete HEAD")
+    end
+  end
+
+  defp ensure_clean_checkout! do
+    case System.cmd("git", ["status", "--porcelain=v1", "--untracked-files=all"],
+           stderr_to_stdout: true
+         ) do
+      {"", 0} -> :ok
+      {_changes, 0} -> Mix.raise("GEPA research campaigns require a clean Git checkout")
+      {_error, _status} -> Mix.raise("unable to verify a clean Git checkout")
     end
   end
 
