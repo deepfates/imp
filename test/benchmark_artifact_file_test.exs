@@ -44,7 +44,35 @@ defmodule BenchmarkArtifactFileTest do
     assert get_in(artifact, ["run_context", "code", "identity"]) ==
              "deepfates/dsex@abc1234"
 
+    assert get_in(artifact, ["run_context", "workspace"]) == %{
+             "state" => "synthetic",
+             "reproducible" => false
+           }
+
+    assert get_in(artifact, ["run_context", "payload_sha256"]) =~ "sha256:"
+
     assert File.read!(path) |> Jason.decode!() == artifact
+    assert DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path) == artifact
+  end
+
+  test "verified reads reject payload tampering" do
+    root =
+      Path.join(System.tmp_dir!(), "dsex-tampered-artifact-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    path = Path.join(root, "artifact.json")
+
+    context =
+      DSEx.BenchmarkTruth.RunContext.new!(source_commits: %{"dsex" => "deepfates/dsex@abc1234"})
+
+    %{artifact: artifact} =
+      DSEx.BenchmarkTruth.ArtifactFile.write_run_json!(path, %{"value" => 1}, context)
+
+    File.write!(path, Jason.encode!(Map.put(artifact, "value", 2)))
+
+    assert_raise ArgumentError, ~r/invalid or tampered/, fn ->
+      DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path)
+    end
   end
 
   test "run context rejects source identities without immutable revisions" do

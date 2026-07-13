@@ -29,9 +29,14 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     generations = Keyword.get(opts, :generations, 1)
     pricing_source = Keyword.fetch!(opts, :pricing_source)
     token_cost = Keyword.get(opts, :token_cost)
-    source_commits = Keyword.fetch!(opts, :source_commits)
+
+    run_context =
+      Keyword.get_lazy(opts, :run_context, fn ->
+        RunContext.new!(source_commits: Keyword.fetch!(opts, :source_commits))
+      end)
+
+    source_commits = run_context.source_commits
     validate_source_commits!(source_commits)
-    run_context = RunContext.new!(source_commits: source_commits)
     lm = Keyword.fetch!(opts, :lm)
     reflection_lm = Keyword.get(opts, :reflection_lm)
     {judge_lm, judge_model} = judge_config!(opts, lm, model)

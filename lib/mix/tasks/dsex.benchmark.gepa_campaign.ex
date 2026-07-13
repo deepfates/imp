@@ -66,7 +66,6 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
     Mix.Task.run("app.start")
-    ensure_clean_checkout!()
 
     api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
@@ -83,6 +82,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     require_upstream_bm25!(families)
     require_upstream_ifbench_descriptions!(families)
 
+    run_context =
+      DSEx.BenchmarkTruth.RunContext.capture_git!(
+        source_commits: upstream_source_commits(opts),
+        require_clean: true
+      )
+
     result =
       DSEx.BenchmarkTruth.GepaCampaign.run(
         dataset_root: fetch!(opts, :dataset_root),
@@ -96,7 +101,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         generations: Keyword.get(opts, :generations, 1),
         pricing_source: fetch!(opts, :pricing_source),
         token_cost: token_cost(opts),
-        source_commits: source_commits(opts),
+        run_context: run_context,
         execution: execution_identity(opts),
         reporter: &report_progress/1,
         lm: DSEx.req_llm(model, req_llm_opts),
@@ -203,10 +208,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     end
   end
 
-  defp source_commits(opts) do
+  defp upstream_source_commits(opts) do
     %{
       "dspy" => fetch!(opts, :dspy_source),
-      "dsex" => "deepfates/dsex@#{git_sha()}",
       "gepa_artifact" => fetch!(opts, :gepa_artifact_source)
     }
   end
@@ -249,23 +253,6 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
 
   defp format_score(score) when is_float(score), do: :erlang.float_to_binary(score, decimals: 4)
   defp format_score(score), do: to_string(score)
-
-  defp git_sha do
-    case System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true) do
-      {sha, 0} -> String.trim(sha)
-      _ -> Mix.raise("GEPA research campaigns require a Git checkout with a concrete HEAD")
-    end
-  end
-
-  defp ensure_clean_checkout! do
-    case System.cmd("git", ["status", "--porcelain=v1", "--untracked-files=all"],
-           stderr_to_stdout: true
-         ) do
-      {"", 0} -> :ok
-      {_changes, 0} -> Mix.raise("GEPA research campaigns require a clean Git checkout")
-      {_error, _status} -> Mix.raise("unable to verify a clean Git checkout")
-    end
-  end
 
   defp dash(key), do: key |> Atom.to_string() |> String.replace("_", "-")
 end

@@ -19,6 +19,13 @@ defmodule DSEx.BenchmarkTruth.ArtifactFile do
     %{artifact: artifact, path: write_json!(path, artifact)}
   end
 
+  def read_run_json!(path) do
+    path
+    |> File.read!()
+    |> Jason.decode!()
+    |> DSEx.BenchmarkTruth.RunContext.verify!()
+  end
+
   defp available_path(path) do
     if File.exists?(path) do
       extension = Path.extname(path)
