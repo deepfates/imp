@@ -81,6 +81,13 @@
         {"path": "identity/inbox/22c-form-sound-identity-grammar.json", "target_candidate_count": 20},
         {"path": "identity/inbox/22d-form-conversion-language.json", "target_candidate_count": 20}
       ]
+    },
+    {
+      "id": "form-saturation-e",
+      "label": "Provider-diverse rare form mechanism closure",
+      "portfolios": [
+        {"path": "identity/inbox/23-form-rare-mechanism-closure.json", "target_candidate_count": 10}
+      ]
     }
   ]
 }
