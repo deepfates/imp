@@ -902,10 +902,32 @@ defmodule DSEx.Clients.Trainer do
     response = Map.get(completion, :completion, Map.get(completion, "completion"))
     reward = Map.get(completion, :reward, Map.get(completion, "reward"))
 
-    is_list(messages) and is_map(response) and is_number(reward)
+    (is_list(messages) and is_map(response) and finite_number?(reward)) or
+      valid_token_trajectory?(completion, reward)
   end
 
   defp valid_completion?(_completion), do: false
+
+  defp valid_token_trajectory?(trajectory, reward) do
+    token_ids = field(trajectory, :response_token_ids)
+    mask = field(trajectory, :response_mask)
+    logprobs = field(trajectory, :behavior_logprobs)
+    advantage = field(trajectory, :advantage)
+    policy_id = field(trajectory, :behavior_policy_id)
+
+    finite_number?(reward) and finite_number?(advantage) and is_binary(policy_id) and
+      policy_id != "" and is_list(token_ids) and token_ids != [] and
+      Enum.all?(token_ids, &(is_integer(&1) and &1 >= 0)) and is_list(mask) and
+      length(mask) == length(token_ids) and Enum.all?(mask, &(&1 in [0, 1])) and
+      is_list(logprobs) and length(logprobs) == length(token_ids) and
+      Enum.all?(logprobs, &finite_number?/1)
+  end
+
+  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
+
+  defp finite_number?(value) when is_integer(value), do: true
+  defp finite_number?(value) when is_float(value), do: value == value and abs(value) < 1.0e308
+  defp finite_number?(_value), do: false
 
   defp validate_opts!(opts) when is_list(opts) do
     if Keyword.keyword?(opts) do

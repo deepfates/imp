@@ -1118,6 +1118,46 @@ defmodule ProviderTrainingLifecycleTest do
     refute_received {:grpo_started, _, _}
   end
 
+  test "trainer accepts token-aligned Fast-Slow trajectories without discarding provenance" do
+    trainer = %GRPOTrainingFixture{}
+
+    session =
+      DSEx.Clients.ReinforcementSession.new(%{
+        id: "fast-slow-session",
+        provider: :test,
+        model: "model-v0",
+        pending_batch_ids: ["question-group-1"]
+      })
+
+    trajectory = %{
+      "rollout_id" => "rollout-1",
+      "reward" => 1.0,
+      "advantage" => 0.75,
+      "behavior_policy_id" => "model-v0",
+      "behavior_logprobs" => [-0.2, -0.1],
+      "response_token_ids" => [101, 102],
+      "response_mask" => [1, 1],
+      "source" => "gepa_cache"
+    }
+
+    groups = [%{"batch_id" => "question-group-1", "group" => [trajectory]}]
+
+    assert {:ok, updated} =
+             DSEx.Clients.Trainer.reinforcement_step(trainer, session, groups, objective: :cispo)
+
+    assert updated.fulfilled_batch_ids == ["question-group-1"]
+    assert_received {:grpo_step, ^groups}
+
+    invalid = put_in(trajectory, ["response_mask"], [1])
+
+    assert {:error, :invalid_reinforcement_groups} =
+             DSEx.Clients.Trainer.reinforcement_step(
+               trainer,
+               session,
+               [%{"batch_id" => "question-group-1", "group" => [invalid]}]
+             )
+  end
+
   test "GRPO rejects OpenAI before reward evaluation or network submission" do
     trainer =
       DSEx.Clients.OpenAITrainer.new(
