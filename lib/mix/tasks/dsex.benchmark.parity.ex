@@ -20,6 +20,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
 
   use Mix.Task
 
+  alias DSEx.BenchmarkTruth.ParitySidecar
+
   @shortdoc "Run DSEx-vs-DSPy live parity comparison"
   @full_lengths %{"gsm8k" => 1319, "hotpotqa" => 7405}
 
@@ -116,7 +118,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               dspy_model,
               api_key_env,
               campaign_id,
-              out_dir
+              out_dir,
+              dspy_timeout(opts)
             )
 
           {dsex, dspy_path}
@@ -133,7 +136,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               dspy_model,
               api_key_env,
               campaign_id,
-              out_dir
+              out_dir,
+              dspy_timeout(opts)
             )
 
           dspy_report = dspy_path |> File.read!() |> Jason.decode!()
@@ -271,7 +275,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         req_llm_pool_protocols: :string,
         req_llm_pool_size: :integer,
         req_llm_pool_count: :integer,
-        python: :string
+        python: :string,
+        dspy_timeout_ms: :integer
       ]
     )
   end
@@ -485,7 +490,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
          dspy_model,
          api_key_env,
          campaign_id,
-         out_dir
+         out_dir,
+         timeout
        ) do
     args =
       [
@@ -513,15 +519,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         campaign_args(campaign_id) ++
         Enum.flat_map(tasks, fn {task, path} -> ["--#{task}", path] end)
 
-    case System.cmd(python, args, stderr_to_stdout: true) do
-      {output, 0} ->
+    case ParitySidecar.run(python, args, timeout: timeout) do
+      {:ok, output, 0} ->
         case parse_dspy_report_path(output) do
           {:ok, path} -> path
           :error -> Mix.raise("DSPy runner did not print DSPY_REPORT_PATH sentinel:\n#{output}")
         end
 
-      {output, status} ->
+      {:ok, output, status} ->
         Mix.raise("DSPy runner failed with status #{status}:\n#{output}")
+
+      {:error, :timeout, output} ->
+        Mix.raise("DSPy runner timed out after #{timeout}ms:\n#{output}")
+    end
+  end
+
+  defp dspy_timeout(opts) do
+    case Keyword.get(opts, :dspy_timeout_ms) do
+      nil ->
+        :infinity
+
+      timeout when is_integer(timeout) and timeout > 0 ->
+        timeout
+
+      timeout ->
+        Mix.raise("--dspy-timeout-ms must be a positive integer, got: #{inspect(timeout)}")
     end
   end
 

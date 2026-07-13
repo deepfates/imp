@@ -54,7 +54,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
           req_llm_pool_protocols: :string,
           req_llm_pool_size: :integer,
           req_llm_pool_count: :integer,
-          python: :string
+          python: :string,
+          dspy_timeout_ms: :integer
         ]
       )
 
@@ -283,7 +284,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       env_file_args(opts) ++
       req_llm_pool_args(opts) ++
       dataset_args(chunk_plan) ++
-      python_args(opts)
+      python_args(opts) ++
+      dspy_timeout_args(opts)
   end
 
   defp dataset_paths(opts) do
@@ -371,6 +373,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Campaign do
       nil -> []
       python -> ["--python", python]
     end
+  end
+
+  defp dspy_timeout_args(opts) do
+    []
+    |> maybe_arg("--dspy-timeout-ms", Keyword.get(opts, :dspy_timeout_ms))
   end
 
   defp campaign_reports(model, out_dir, campaign_id) do

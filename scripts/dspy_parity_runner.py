@@ -21,6 +21,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+
+def isolate_from_beam_process_group() -> None:
+    if os.name == "posix" and os.environ.get("DSEX_BEAM_PORT_OWNER") == "1":
+        if os.getpgrp() != os.getpid():
+            os.setsid()
+
+
+isolate_from_beam_process_group()
+
 import dspy
 
 HOTPOTQA_INSTRUCTION = (
@@ -111,10 +120,19 @@ def main() -> int:
     }
 
     out_path = Path(args.out) / f"dspy-parity-live-{timestamp_slug()}.json"
-    out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    write_report_atomically(out_path, report)
     print(f"DSPY_REPORT_PATH={out_path}")
     print(f"aggregate score: {report['aggregate_score']}")
     return 0
+
+
+def write_report_atomically(out_path: Path, report: Dict[str, Any]) -> None:
+    partial_path = out_path.with_suffix(out_path.suffix + ".partial")
+    try:
+        partial_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        os.replace(partial_path, out_path)
+    finally:
+        partial_path.unlink(missing_ok=True)
 
 
 def configure_dspy(

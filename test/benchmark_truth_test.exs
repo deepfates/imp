@@ -1960,7 +1960,8 @@ defmodule BenchmarkTruthTest do
           reasoning_effort: "low",
           env_file: ".env",
           req_llm_pool_protocols: "http2",
-          req_llm_pool_count: 16
+          req_llm_pool_count: 16,
+          dspy_timeout_ms: 120_000
         ],
         "gpt-5.4-mini",
         "responses-route-full",
@@ -1980,9 +1981,11 @@ defmodule BenchmarkTruthTest do
     assert Enum.at(args, dspy_model_index + 1) == "responses/gpt-5.4-mini"
     reasoning_effort_index = Enum.find_index(args, &(&1 == "--reasoning-effort"))
     env_file_index = Enum.find_index(args, &(&1 == "--env-file"))
+    timeout_index = Enum.find_index(args, &(&1 == "--dspy-timeout-ms"))
 
     assert Enum.at(args, reasoning_effort_index + 1) == "low"
     assert Enum.at(args, env_file_index + 1) == ".env"
+    assert Enum.at(args, timeout_index + 1) == "120000"
     assert "--model" in args
     assert "--runner-order" in args
     assert "--gsm8k" in args
