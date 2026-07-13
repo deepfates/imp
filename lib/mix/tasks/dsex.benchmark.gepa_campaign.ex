@@ -10,6 +10,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         --api-key-env OPENAI_API_KEY \\
         --families AIMEBench,HotpotQABench \\
         --max-concurrency 8 \\
+        --temperature 1.0 \\
         --max-tokens 256 \\
         --pricing-source "ReqLLM usage telemetry with provider pricing metadata" \\
         --token-cost-file path/to/fallback-costs.json \\
@@ -54,6 +55,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
           input_tokens: :integer,
           output_tokens: :integer,
           usd: :float,
+          temperature: :float,
           max_concurrency: :integer,
           max_tokens: :integer,
           dspy_source: :string,
@@ -69,7 +71,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
     model = fetch!(opts, :model)
     reflection_model = fetch!(opts, :reflection_model)
-    req_llm_opts = Keyword.merge([api_key: api_key, temperature: 0], generation_opts(opts))
+
+    req_llm_opts =
+      Keyword.merge(
+        [api_key: api_key, temperature: Keyword.get(opts, :temperature, 1.0)],
+        generation_opts(opts)
+      )
 
     families = parse_families(Keyword.get(opts, :families))
     require_upstream_hover!(families)
@@ -149,7 +156,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     %{
       "lm" => %{
         "provider" => "req_llm",
-        "temperature" => 0,
+        "temperature" => Keyword.get(opts, :temperature, 1.0),
         "max_tokens" => Keyword.get(opts, :max_tokens)
       },
       "retrieval" => %{

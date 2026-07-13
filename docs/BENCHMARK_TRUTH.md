@@ -300,6 +300,7 @@ mix dsex.benchmark.gepa_campaign \
   --campaign-id gepa-full-YYYYMMDD \
   --model openai:gpt-4.1-mini-2025-04-14 \
   --reflection-model openai:gpt-5 \
+  --temperature 1.0 \
   --pricing-source "provider usage export 2026-07-09" \
   --input-tokens 123456 \
   --output-tokens 23456 \
@@ -317,7 +318,9 @@ mix dsex.benchmark.gepa_replication \
 
 `--model` constructs the task LM and the Papillon judge LM. The separately
 constructed `--reflection-model` client is passed to GEPA for reflective
-proposals; it is not recorded as Papillon judge provenance.
+proposals; it is not recorded as Papillon judge provenance. The campaign
+defaults to the pinned upstream artifact's `temperature: 1.0`; any override is
+recorded in the execution identity and creates a distinct campaign contract.
 
 For long full-scope runs, execute one or more families at a time with
 `--families AIMEBench,HotpotQABench`. These partial campaign artifacts are
