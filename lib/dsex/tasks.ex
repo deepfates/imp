@@ -243,7 +243,7 @@ defmodule DSEx.Tasks do
     end
 
     ensure_runtime!()
-    Task.Supervisor.async_stream_nolink(@supervisor, enumerable, wrapped, opts)
+    Task.Supervisor.async_stream(@supervisor, enumerable, wrapped, opts)
   end
 
   def async_stream(_enumerable, fun, _opts) do
