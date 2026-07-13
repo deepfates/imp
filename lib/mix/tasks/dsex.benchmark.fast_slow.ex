@@ -41,6 +41,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
   @doc false
   def build_artifact do
     rows = Enum.map(@modes, &run_mode/1)
+    cancellation = cancellation_probe()
 
     artifact = %{
       "schema_version" => 1,
@@ -77,7 +78,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
         "external_provider_calls" => 0
       },
       "rows" => rows,
-      "summary" => summarize(rows)
+      "recovery" => %{"cancelled_rollout" => cancellation},
+      "summary" => summarize(rows, cancellation)
     }
 
     Map.put(artifact, "artifact_sha256", Codec.digest(artifact))
@@ -163,6 +165,32 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
       "resume" => resume,
       "claims" => claims,
       "all_claims_verified" => Enum.all?(claims, fn {_claim, verified} -> verified end)
+    }
+  end
+
+  defp cancellation_probe do
+    config = config("combined")
+    initial = State.new!(config, %{"bias" => -2, "artifact" => "theta-0"}, ["seed"])
+    context = Map.put(Backend.context("combined"), "cancel_first_rollout", true)
+
+    {:error, :cancelled, cancelled, runtime} = Runner.run(initial, Backend, context)
+    [intent] = Map.values(cancelled.pending_operations)
+    event_count = length(runtime.backend["events"])
+
+    {:error, {:ambiguous_external_outcome, intent_id}, same, replayed} =
+      Runner.run(cancelled, Backend, runtime)
+
+    %{
+      "operation_id" => intent.id,
+      "operation_kind" => intent.kind,
+      "retryable" => intent.reconciliation == :retryable,
+      "resume_error" => "ambiguous_external_outcome",
+      "resume_operation_id" => intent_id,
+      "state_unchanged" => same == cancelled,
+      "effect_events_before_resume" => event_count,
+      "effect_events_after_resume" => length(replayed.backend["events"]),
+      "replay_blocked" =>
+        intent_id == intent.id and length(replayed.backend["events"]) == event_count
     }
   end
 
@@ -313,13 +341,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
     }
   end
 
-  defp summarize(rows) do
+  defp summarize(rows, cancellation) do
     quality = Map.new(rows, &{&1["mode"], get_in(&1, ["quality", "value"])})
 
     %{
       "rows" => length(rows),
       "matched_modes" => Enum.map(rows, & &1["mode"]),
-      "all_protocol_claims_verified" => Enum.all?(rows, & &1["all_claims_verified"]),
+      "all_protocol_claims_verified" =>
+        Enum.all?(rows, & &1["all_claims_verified"]) and cancellation["replay_blocked"],
       "research_effectiveness_claimed" => false,
       "provider_effectiveness_claimed" => false,
       "quality_label" => "synthetic_protocol_behavior",
@@ -500,7 +529,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
         "theta_id" => state.current_theta_id
       }
 
-      {:ok, result, record(context, event)}
+      context = record(context, event)
+
+      if context["cancel_first_rollout"] == true and slot.slow_step == 0 and
+           slot.member_index == 0 do
+        {:error, :cancelled, context}
+      else
+        {:ok, result, context}
+      end
     end
 
     @impl true

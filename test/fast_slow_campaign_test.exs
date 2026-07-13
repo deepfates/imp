@@ -20,6 +20,13 @@ defmodule DSEx.FastSlowCampaignTest do
     assert artifact["dataset"]["optimizer_callback_access"] == ["train"]
     assert artifact["dataset"]["split_overlap"] == []
     assert artifact["summary"]["all_protocol_claims_verified"]
+    assert artifact["recovery"]["cancelled_rollout"]["retryable"]
+    assert artifact["recovery"]["cancelled_rollout"]["state_unchanged"]
+    assert artifact["recovery"]["cancelled_rollout"]["replay_blocked"]
+
+    assert artifact["recovery"]["cancelled_rollout"]["effect_events_before_resume"] ==
+             artifact["recovery"]["cancelled_rollout"]["effect_events_after_resume"]
+
     assert artifact["summary"]["quality_comparison"]["combined_gt_prompt_only"]
     assert artifact["summary"]["quality_comparison"]["combined_gt_slow_only"]
 
