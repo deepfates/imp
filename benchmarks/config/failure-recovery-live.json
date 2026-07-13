@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "campaign": "dsex-failure-campaign",
+  "deterministic_iterations": 10,
+  "live_iterations": 2,
+  "max_concurrency": 2,
+  "iteration_timeout_ms": 15000,
+  "live_timeout_ms": 30000,
+  "provider": "openai",
+  "provider_model": "gpt-4.1-mini",
+  "agent_model": "gpt-5.4",
+  "api_key_env": "OPENAI_API_KEY",
+  "base_url_env": "OPENAI_BASE_URL",
+  "live_networks": [
+    "api.openai.com",
+    "httpbin.org"
+  ],
+  "authority": {
+    "require_clean_git": true,
+    "minimum_live_iterations": 2,
+    "maximum_flake_rate": 0.0,
+    "require_zero_runtime_leaks": true,
+    "require_balanced_telemetry": true,
+    "require_secret_scan": true
+  }
+}

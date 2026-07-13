@@ -28,12 +28,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     async_concurrency_is_bounded
     partial_stream_failure_is_terminal
     training_retry_and_idempotency_are_bounded
+    http_retrieval_retry_timeout_and_idempotency
+    mcp_retry_timeout_and_idempotency
     mipro_v2_durable_resume_and_tamper
     simba_durable_resume_and_tamper
   )
   @failure_live_ids ~w(
     provider_retry_timeout_idempotency_live
-    training_retrieval_tool_agent_recovery_live
+    retrieval_and_tool_agent_recovery_live
   )
   @instruction_optimizer_tier "t1_instruction_optimizer_differential_contract"
   @instruction_optimizer_dspy_version "3.3.0b1"
@@ -578,11 +580,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     runtime_complete = valid_failure_runtime?(artifact["runtime"])
 
     envelope_current =
-      artifact["schema_version"] == 2 and artifact["runner"] == "dsex-failure-campaign" and
+      artifact["schema_version"] == 3 and artifact["runner"] == "dsex-failure-campaign" and
         artifact["evidence_tier"] == "t0_deterministic_failure_recovery"
 
     deterministic_complete =
       envelope_current and valid_case_ids == expected_case_ids and runtime_complete and
+        valid_failure_telemetry?(artifact["telemetry"]) and
+        valid_failure_secret_scan?(artifact["secret_scan"]) and
         length(deterministic_cases) == length(expected_case_ids) and
         Enum.sort(artifact["scope"] || []) == expected_case_ids
 
@@ -621,24 +625,79 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       Enum.sort(Enum.map(outcomes, & &1["iteration"])) == Enum.to_list(1..iterations) and
       Enum.all?(outcomes, fn outcome ->
         outcome["passing"] == true and is_number(outcome["duration_ms"]) and
-          outcome["duration_ms"] >= 0 and is_map(outcome["evidence"])
+          outcome["duration_ms"] >= 0 and is_map(outcome["evidence"]) and
+          valid_failure_case_evidence?(case_row["id"], outcome["evidence"])
       end)
+  end
+
+  defp valid_failure_case_evidence?("task_cancellation_releases_admission", evidence),
+    do: evidence["task_alive"] == false and evidence["cancellation"] == "terminal"
+
+  defp valid_failure_case_evidence?("task_timeout_is_explicit_and_terminal", evidence),
+    do: evidence["outcome"] == "timeout" and evidence["worker_terminated"] == true
+
+  defp valid_failure_case_evidence?("async_concurrency_is_bounded", evidence),
+    do: evidence["ordered"] == true and evidence["peak"] <= evidence["limit"]
+
+  defp valid_failure_case_evidence?("partial_stream_failure_is_terminal", evidence),
+    do: evidence["terminal_errors"] == 1 and evidence["statuses"] == ["started", "error"]
+
+  defp valid_failure_case_evidence?("training_retry_and_idempotency_are_bounded", evidence),
+    do: bounded_retry_evidence?(evidence, 3)
+
+  defp valid_failure_case_evidence?("http_retrieval_retry_timeout_and_idempotency", evidence),
+    do: bounded_retry_evidence?(evidence, 3) and evidence["terminal_status"] == 200
+
+  defp valid_failure_case_evidence?("mcp_retry_timeout_and_idempotency", evidence),
+    do:
+      evidence["initialize_attempts"] == 2 and evidence["list_attempts"] == 2 and
+        evidence["max_attempts"] == 3 and evidence["idempotency_header_present"] == true and
+        evidence["terminal_tool_count"] == 1
+
+  defp valid_failure_case_evidence?(id, evidence)
+       when id in ["mipro_v2_durable_resume_and_tamper", "simba_durable_resume_and_tamper"],
+       do:
+         evidence["exact_resume"] == true and evidence["tamper_rejected"] == true and
+           evidence["checkpoint_payload_included"] == false
+
+  defp valid_failure_case_evidence?(_id, _evidence), do: false
+
+  defp bounded_retry_evidence?(evidence, attempts) do
+    evidence["attempts"] == attempts and evidence["max_attempts"] == attempts and
+      evidence["idempotency_header_stable"] == true
   end
 
   defp valid_failure_runtime?(%{"leaks" => leaks, "after" => after_snapshot})
        when is_map(leaks) and is_map(after_snapshot) do
     expected_leaks =
-      ~w(admission_active admission_queued added_linked_tasks added_unlinked_tasks)
+      ~w(admission_active admission_queued added_linked_tasks added_unlinked_tasks added_processes added_ports added_telemetry_handlers)
 
     MapSet.new(Map.keys(leaks)) == MapSet.new(expected_leaks) and
       Enum.all?(Map.values(leaks), &(&1 == 0)) and
       get_in(after_snapshot, ["admission", "active"]) == 0 and
       get_in(after_snapshot, ["admission", "queued"]) == 0 and
       non_negative_integer?(after_snapshot["linked_tasks"]) and
-      non_negative_integer?(after_snapshot["unlinked_tasks"])
+      non_negative_integer?(after_snapshot["unlinked_tasks"]) and
+      non_negative_integer?(after_snapshot["processes"]) and
+      non_negative_integer?(after_snapshot["ports"]) and
+      non_negative_integer?(after_snapshot["telemetry_handlers"])
   end
 
   defp valid_failure_runtime?(_runtime), do: false
+
+  defp valid_failure_telemetry?(telemetry) when is_map(telemetry) do
+    telemetry["handler_detached"] == true and telemetry["balanced_spans"] == true and
+      telemetry["metadata_secret_free"] == true and is_map(telemetry["event_counts"])
+  end
+
+  defp valid_failure_telemetry?(_telemetry), do: false
+
+  defp valid_failure_secret_scan?(scan) when is_map(scan) do
+    scan["passing"] == true and scan["configured_secret_hits"] == 0 and
+      scan["credential_pattern_hits"] == 0 and is_binary(scan["payload_sha256"])
+  end
+
+  defp valid_failure_secret_scan?(_scan), do: false
 
   defp failure_live_rows(artifact) do
     explicit = artifact["live_cases"] || []
@@ -659,10 +718,65 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       row["evidence_kind"] == "live" and row["status"] == "complete" and
       row["passing"] == true and valid_time_window?(row["started_at"], row["completed_at"]) and
       is_list(checks) and checks != [] and
-      Enum.all?(checks, &(is_binary(&1["id"]) and &1["passing"] == true)) and
+      valid_failure_live_checks?(row["id"], checks) and valid_failure_live_outcomes?(row) and
       get_in(row, ["runtime", "leak_free"]) == true and
       zero_leaks?(get_in(row, ["runtime", "leaks"]))
   end
+
+  defp valid_failure_live_checks?(id, checks) when is_list(checks) do
+    ids = checks |> Enum.filter(&(&1["passing"] == true)) |> Enum.map(& &1["id"]) |> MapSet.new()
+    common = MapSet.new(~w(repeated_zero_flakes runtime_leak_free))
+
+    required =
+      case id do
+        "provider_retry_timeout_idempotency_live" ->
+          MapSet.new(
+            ~w(real_provider_terminal_success bounded_retry_after_injected_429 stable_idempotency_key positive_provider_usage)
+          )
+
+        "retrieval_and_tool_agent_recovery_live" ->
+          MapSet.new(~w(live_retrieval_recovered provider_backed_tool_agent_completed))
+
+        _ ->
+          MapSet.new()
+      end
+
+    MapSet.subset?(MapSet.union(common, required), ids)
+  end
+
+  defp valid_failure_live_checks?(_id, _checks), do: false
+
+  defp valid_failure_live_outcomes?(row) do
+    iterations = row["iterations"]
+    outcomes = row["outcomes"]
+
+    is_integer(iterations) and iterations >= 2 and row["passing_iterations"] == iterations and
+      row["failing_iterations"] == 0 and row["flake_rate"] == 0 and is_list(outcomes) and
+      length(outcomes) == iterations and
+      Enum.all?(outcomes, fn outcome ->
+        outcome["passing"] == true and
+          valid_failure_live_evidence?(row["id"], outcome["evidence"])
+      end)
+  end
+
+  defp valid_failure_live_evidence?("provider_retry_timeout_idempotency_live", evidence) do
+    evidence["provider"] == "openai" and is_binary(evidence["model"]) and
+      evidence["attempts"] == 2 and evidence["max_attempts"] == 2 and
+      evidence["injected_status"] == 429 and evidence["terminal_status"] in 200..299 and
+      evidence["idempotency_header_stable"] == true and
+      positive_integer?(get_in(evidence, ["usage", "input_tokens"])) and
+      positive_integer?(get_in(evidence, ["usage", "output_tokens"])) and
+      is_map(evidence["cost"])
+  end
+
+  defp valid_failure_live_evidence?("retrieval_and_tool_agent_recovery_live", evidence) do
+    evidence["provider"] == "openai" and is_binary(evidence["model"]) and
+      evidence["retrieval_attempts"] == 2 and evidence["retrieval_injected_error"] == "closed" and
+      evidence["retrieval_terminal_network"] == "httpbin.org" and evidence["tool_calls"] == 1 and
+      evidence["submit_calls"] == 1
+  end
+
+  defp valid_failure_live_evidence?(_id, _evidence), do: false
 
   defp valid_time_window?(started_at, completed_at)
        when is_binary(started_at) and is_binary(completed_at) do
@@ -683,6 +797,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp ids(rows), do: rows |> Enum.map(& &1["id"]) |> Enum.uniq() |> Enum.sort()
   defp non_negative_integer?(value), do: is_integer(value) and value >= 0
+  defp positive_integer?(value), do: is_integer(value) and value > 0
 
   defp unverifiable_failure_lane(path, reason) do
     %{

@@ -1088,11 +1088,13 @@ defmodule DashboardTest do
     root = tmp_dir("dashboard-failure-authority")
     deterministic_dir = Path.join(root, "deterministic")
     live_dir = Path.join(root, "live")
+    forged_dir = Path.join(root, "forged")
     legacy_dir = Path.join(root, "legacy")
-    Enum.each([deterministic_dir, live_dir, legacy_dir], &File.mkdir_p!/1)
+    Enum.each([deterministic_dir, live_dir, forged_dir, legacy_dir], &File.mkdir_p!/1)
 
     write_failure_campaign!(deterministic_dir, reported_release_complete: true)
     write_failure_campaign!(live_dir, live: true)
+    write_failure_campaign!(forged_dir, live: true, forge_live_summary: true)
 
     write_json!(Path.join(legacy_dir, "failure-campaign-legacy.json"), %{
       "schema_version" => 2,
@@ -1110,6 +1112,13 @@ defmodule DashboardTest do
     live = run_failure_dashboard!(root, "live-out", live_dir)
     assert live["lanes"]["failure_recovery"]["status"] == "full"
     assert live["lanes"]["failure_recovery"]["full_evidence"]
+
+    forged = run_failure_dashboard!(root, "forged-out", forged_dir)
+    refute forged["lanes"]["failure_recovery"]["full_evidence"]
+
+    assert forged["lanes"]["failure_recovery"]["summary"]["authority"][
+             "missing_live_rows"
+           ] == ["provider_retry_timeout_idempotency_live"]
 
     legacy = run_failure_dashboard!(root, "legacy-out", legacy_dir)
     assert legacy["lanes"]["failure_recovery"]["status"] == "unverifiable"
@@ -1154,6 +1163,8 @@ defmodule DashboardTest do
           async_concurrency_is_bounded
           partial_stream_failure_is_terminal
           training_retry_and_idempotency_are_bounded
+          http_retrieval_retry_timeout_and_idempotency
+          mcp_retry_timeout_and_idempotency
           mipro_v2_durable_resume_and_tamper
           simba_durable_resume_and_tamper
         ),
@@ -1172,7 +1183,7 @@ defmodule DashboardTest do
                   "iteration" => iteration,
                   "passing" => true,
                   "duration_ms" => 1,
-                  "evidence" => %{"verified" => true}
+                  "evidence" => failure_case_evidence(id)
                 }
               end)
           }
@@ -1184,7 +1195,7 @@ defmodule DashboardTest do
         Enum.map(
           ~w(
             provider_retry_timeout_idempotency_live
-            training_retrieval_tool_agent_recovery_live
+            retrieval_and_tool_agent_recovery_live
           ),
           fn id ->
             %{
@@ -1195,8 +1206,38 @@ defmodule DashboardTest do
               "passing" => true,
               "started_at" => "2026-07-07T00:00:00Z",
               "completed_at" => "2026-07-07T00:01:00Z",
-              "checks" => [%{"id" => "recovery_completed", "passing" => true}],
-              "runtime" => %{"leak_free" => true, "leaks" => %{"active_tasks" => 0}}
+              "iterations" => 2,
+              "passing_iterations" => 2,
+              "failing_iterations" => 0,
+              "flake_rate" => 0.0,
+              "outcomes" =>
+                Enum.map(1..2, fn iteration ->
+                  %{
+                    "iteration" => iteration,
+                    "passing" => true,
+                    "duration_ms" => 1,
+                    "evidence" =>
+                      if Keyword.get(opts, :forge_live_summary, false) and
+                           id == "provider_retry_timeout_idempotency_live" do
+                        Map.put(failure_live_evidence(id), "attempts", 1)
+                      else
+                        failure_live_evidence(id)
+                      end
+                  }
+                end),
+              "checks" => failure_live_checks(id),
+              "runtime" => %{
+                "leak_free" => true,
+                "leaks" => %{
+                  "admission_active" => 0,
+                  "admission_queued" => 0,
+                  "added_linked_tasks" => 0,
+                  "added_unlinked_tasks" => 0,
+                  "added_processes" => 0,
+                  "added_ports" => 0,
+                  "added_telemetry_handlers" => 0
+                }
+              }
             }
           end
         )
@@ -1205,7 +1246,7 @@ defmodule DashboardTest do
       end
 
     artifact = %{
-      "schema_version" => 2,
+      "schema_version" => 3,
       "runner" => "dsex-failure-campaign",
       "evidence_tier" => "t0_deterministic_failure_recovery",
       "configuration" => %{"iterations" => 10, "required_flake_iterations" => 10},
@@ -1218,20 +1259,41 @@ defmodule DashboardTest do
         "before" => %{
           "admission" => %{"active" => 0, "queued" => 0},
           "linked_tasks" => 0,
-          "unlinked_tasks" => 0
+          "unlinked_tasks" => 0,
+          "processes" => 1,
+          "ports" => 0,
+          "telemetry_handlers" => 0
         },
         "after" => %{
           "admission" => %{"active" => 0, "queued" => 0},
           "linked_tasks" => 0,
-          "unlinked_tasks" => 0
+          "unlinked_tasks" => 0,
+          "processes" => 1,
+          "ports" => 0,
+          "telemetry_handlers" => 0
         },
         "leaks" => %{
           "admission_active" => 0,
           "admission_queued" => 0,
           "added_linked_tasks" => 0,
-          "added_unlinked_tasks" => 0
+          "added_unlinked_tasks" => 0,
+          "added_processes" => 0,
+          "added_ports" => 0,
+          "added_telemetry_handlers" => 0
         },
         "leak_free" => true
+      },
+      "telemetry" => %{
+        "handler_detached" => true,
+        "balanced_spans" => true,
+        "metadata_secret_free" => true,
+        "event_counts" => %{}
+      },
+      "secret_scan" => %{
+        "passing" => true,
+        "configured_secret_hits" => 0,
+        "credential_pattern_hits" => 0,
+        "payload_sha256" => "sha256:test"
       },
       "cases" => cases,
       "live_cases" => live_cases,
@@ -1254,6 +1316,83 @@ defmodule DashboardTest do
       DSEx.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, context)
 
     written_path
+  end
+
+  defp failure_case_evidence("task_cancellation_releases_admission"),
+    do: %{"task_alive" => false, "cancellation" => "terminal"}
+
+  defp failure_case_evidence("task_timeout_is_explicit_and_terminal"),
+    do: %{"outcome" => "timeout", "worker_terminated" => true}
+
+  defp failure_case_evidence("async_concurrency_is_bounded"),
+    do: %{"ordered" => true, "peak" => 2, "limit" => 2}
+
+  defp failure_case_evidence("partial_stream_failure_is_terminal"),
+    do: %{"terminal_errors" => 1, "statuses" => ["started", "error"]}
+
+  defp failure_case_evidence("training_retry_and_idempotency_are_bounded"),
+    do: %{"attempts" => 3, "max_attempts" => 3, "idempotency_header_stable" => true}
+
+  defp failure_case_evidence("http_retrieval_retry_timeout_and_idempotency"),
+    do: %{
+      "attempts" => 3,
+      "max_attempts" => 3,
+      "idempotency_header_stable" => true,
+      "terminal_status" => 200
+    }
+
+  defp failure_case_evidence("mcp_retry_timeout_and_idempotency"),
+    do: %{
+      "initialize_attempts" => 2,
+      "list_attempts" => 2,
+      "max_attempts" => 3,
+      "idempotency_header_present" => true,
+      "terminal_tool_count" => 1
+    }
+
+  defp failure_case_evidence(_optimizer),
+    do: %{
+      "exact_resume" => true,
+      "tamper_rejected" => true,
+      "checkpoint_payload_included" => false
+    }
+
+  defp failure_live_evidence("provider_retry_timeout_idempotency_live"),
+    do: %{
+      "provider" => "openai",
+      "model" => "gpt-test",
+      "attempts" => 2,
+      "max_attempts" => 2,
+      "injected_status" => 429,
+      "terminal_status" => 200,
+      "idempotency_header_stable" => true,
+      "usage" => %{"input_tokens" => 1, "output_tokens" => 1},
+      "cost" => %{}
+    }
+
+  defp failure_live_evidence("retrieval_and_tool_agent_recovery_live"),
+    do: %{
+      "provider" => "openai",
+      "model" => "gpt-test",
+      "retrieval_attempts" => 2,
+      "retrieval_injected_error" => "closed",
+      "retrieval_terminal_network" => "httpbin.org",
+      "tool_calls" => 1,
+      "submit_calls" => 1
+    }
+
+  defp failure_live_checks("provider_retry_timeout_idempotency_live") do
+    Enum.map(
+      ~w(repeated_zero_flakes runtime_leak_free real_provider_terminal_success bounded_retry_after_injected_429 stable_idempotency_key positive_provider_usage),
+      &%{"id" => &1, "passing" => true}
+    )
+  end
+
+  defp failure_live_checks("retrieval_and_tool_agent_recovery_live") do
+    Enum.map(
+      ~w(repeated_zero_flakes runtime_leak_free live_retrieval_recovered provider_backed_tool_agent_completed),
+      &%{"id" => &1, "passing" => true}
+    )
   end
 
   defp write_instruction_optimizer_contract!(dir, opts \\ []) do

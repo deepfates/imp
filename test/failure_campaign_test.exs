@@ -12,18 +12,18 @@ defmodule DSEx.FailureCampaignTest do
         max_concurrency: 2
       )
 
-    assert artifact["schema_version"] == 2
+    assert artifact["schema_version"] == 3
     assert artifact["runner"] == "dsex-failure-campaign"
     refute Map.has_key?(artifact, "generated_at")
 
     assert artifact["summary"] == %{
-             "deterministic_lanes" => 7,
-             "deterministic_passing" => 7,
+             "deterministic_lanes" => 9,
+             "deterministic_passing" => 9,
              "all_requested_iterations_pass" => true,
              "flake_sample_complete" => true,
              "deterministic_complete" => true,
-             "local_cases" => 7,
-             "local_passing" => 7,
+             "local_cases" => 9,
+             "local_passing" => 9,
              "local_complete" => true,
              "live_complete" => false,
              "release_complete" => false,
@@ -36,8 +36,16 @@ defmodule DSEx.FailureCampaignTest do
              "admission_active" => 0,
              "admission_queued" => 0,
              "added_linked_tasks" => 0,
-             "added_unlinked_tasks" => 0
+             "added_unlinked_tasks" => 0,
+             "added_processes" => 0,
+             "added_ports" => 0,
+             "added_telemetry_handlers" => 0
            }
+
+    assert artifact["telemetry"]["handler_detached"]
+    assert artifact["telemetry"]["balanced_spans"]
+    assert artifact["telemetry"]["metadata_secret_free"]
+    assert artifact["secret_scan"]["passing"]
 
     assert artifact["evidence_policy"]["payloads_included"] == false
     assert Enum.all?(artifact["cases"], &(&1["flake_rate"] == 0.0))

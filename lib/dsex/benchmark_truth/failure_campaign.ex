@@ -13,6 +13,8 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     {"async_concurrency_is_bounded", :concurrency},
     {"partial_stream_failure_is_terminal", :partial_stream},
     {"training_retry_and_idempotency_are_bounded", :training_retry},
+    {"http_retrieval_retry_timeout_and_idempotency", :retrieval},
+    {"mcp_retry_timeout_and_idempotency", :mcp},
     {"mipro_v2_durable_resume_and_tamper", :mipro_v2},
     {"simba_durable_resume_and_tamper", :simba}
   ]
@@ -25,10 +27,10 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
       "deterministic_coverage" => "training_http_and_task_runtime_only"
     },
     %{
-      "id" => "training_retrieval_tool_agent_recovery_live",
-      "status" => "requires_live_integration_evidence",
+      "id" => "retrieval_and_tool_agent_recovery_live",
+      "status" => "requires_live_retrieval_and_agent_evidence",
       "required" => true,
-      "deterministic_coverage" => "not_claimed"
+      "deterministic_coverage" => "retrieval_and_mcp_transport_only"
     }
   ]
 
@@ -39,7 +41,9 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     validate_positive!(:iterations, iterations)
     validate_positive!(:max_concurrency, max_concurrency)
     validate_positive!(:iteration_timeout_ms, iteration_timeout_ms)
+    warmup = prepare_runtime(opts)
     baseline = runtime_snapshot()
+    telemetry = start_telemetry_capture()
 
     cases =
       Enum.map(@deterministic_lanes, fn
@@ -52,6 +56,8 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
           repeat(id, iterations, iteration_timeout_ms, fn -> run_lane(handler) end)
       end)
 
+    live_cases = run_live_cases(opts)
+    telemetry_summary = stop_telemetry_capture(telemetry)
     settle_runtime(baseline)
     final = runtime_snapshot()
     leak_accounting = leak_accounting(baseline, final)
@@ -61,17 +67,22 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     deterministic_complete? =
       all_iterations_pass? and flake_sample_complete? and leak_accounting["leak_free"]
 
-    live_complete? = Enum.all?(@live_requirements, &(&1["status"] == "complete"))
+    live_complete? = live_cases_complete?(live_cases)
+    remaining = remaining_requirements(live_cases)
+
+    secret_scan = secret_scan(%{"cases" => cases, "live_cases" => live_cases}, opts)
+    deterministic_complete? = deterministic_complete? and secret_scan["passing"]
 
     %{
-      "schema_version" => 2,
+      "schema_version" => 3,
       "runner" => "dsex-failure-campaign",
       "evidence_tier" => "t0_deterministic_failure_recovery",
       "configuration" => %{
         "iterations" => iterations,
         "required_flake_iterations" => @required_flake_iterations,
         "max_concurrency" => max_concurrency,
-        "iteration_timeout_ms" => iteration_timeout_ms
+        "iteration_timeout_ms" => iteration_timeout_ms,
+        "runtime_warmup" => warmup
       },
       "summary" => %{
         "deterministic_lanes" => length(cases),
@@ -84,7 +95,7 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
         "local_complete" => all_iterations_pass?,
         "live_complete" => live_complete?,
         "release_complete" => deterministic_complete? and live_complete?,
-        "remaining_live_lanes" => Enum.count(@live_requirements, &(&1["status"] != "complete"))
+        "remaining_live_lanes" => Enum.count(remaining, &(&1["status"] != "complete"))
       },
       "runtime" => %{
         "before" => public_runtime_snapshot(baseline),
@@ -92,14 +103,22 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
         "leaks" => leak_accounting["leaks"],
         "leak_free" => leak_accounting["leak_free"]
       },
+      "telemetry" => telemetry_summary,
+      "secret_scan" => secret_scan,
       "evidence_policy" => %{
         "payloads_included" => false,
         "flake_rate" => "failing_iterations / iterations",
         "completion_requires_zero_flakes" => true
       },
       "cases" => cases,
-      "remaining" => @live_requirements,
-      "scope" => Enum.map(@deterministic_lanes, &elem(&1, 0))
+      "live_cases" => live_cases,
+      "remaining" => remaining,
+      "scope" => Enum.map(@deterministic_lanes, &elem(&1, 0)),
+      "limitations" => [
+        "No live provider training job was created or cancelled.",
+        "Live authority is limited to the exact provider, retrieval, and tool-agent probes recorded in live_cases.",
+        "Deterministic MCP evidence uses an injected transport; no public MCP endpoint is claimed."
+      ]
     }
   end
 
@@ -107,6 +126,8 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
   defp run_lane(:timeout), do: timeout_iteration()
   defp run_lane(:partial_stream), do: partial_stream_iteration()
   defp run_lane(:training_retry), do: training_retry_iteration()
+  defp run_lane(:retrieval), do: retrieval_iteration()
+  defp run_lane(:mcp), do: mcp_iteration()
   defp run_lane(:mipro_v2), do: mipro_v2_iteration()
   defp run_lane(:simba), do: simba_iteration()
 
@@ -133,9 +154,18 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
       Task.async(fn ->
         try do
           case fun.() do
-            {:ok, evidence} -> {true, evidence}
-            {:error, reason} -> {false, %{reason_category: failure_category(reason)}}
-            _other -> {false, %{reason_category: "invalid_campaign_result"}}
+            {:ok, evidence} ->
+              {true, evidence}
+
+            {:error, reason} ->
+              {false,
+               %{
+                 reason_category: failure_category(reason),
+                 reason_detail: inspect(reason, limit: 20, printable_limit: 1_000)
+               }}
+
+            _other ->
+              {false, %{reason_category: "invalid_campaign_result"}}
           end
         rescue
           error -> {false, %{exception_type: error.__struct__}}
@@ -334,6 +364,136 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
       {:error,
        %{attempts: length(seen), stable_key: key == repeated_key, stable_header: stable_header?}}
     end
+  end
+
+  defp retrieval_iteration do
+    {:ok, state} = Agent.start_link(fn -> [] end)
+
+    transport = fn _url, headers, _body, _opts ->
+      attempt = Agent.get_and_update(state, fn seen -> {length(seen) + 1, [headers | seen]} end)
+
+      case attempt do
+        1 -> {:error, :closed}
+        2 -> {:ok, %{status: 503, headers: [{"retry-after", "0"}], body: "fault"}}
+        3 -> {:ok, %{status: 200, headers: [], body: ~s({"documents":[{"text":"recovered"}]})}}
+      end
+    end
+
+    retriever =
+      DSEx.Retrievers.HTTP.new("https://deterministic.invalid/retrieve",
+        transport: transport,
+        max_attempts: 3,
+        attempt_timeout: 100,
+        total_timeout: 300,
+        retry_backoff_ms: 0,
+        max_retry_delay_ms: 0
+      )
+
+    result = DSEx.Retrievers.HTTP.retrieve(retriever, "beam")
+    seen = Agent.get(state, &Enum.reverse/1)
+    Agent.stop(state)
+    keys = Enum.map(seen, &header_value(&1, "idempotency-key"))
+
+    if match?({:ok, [%{text: "recovered"}]}, result) and length(seen) == 3 and
+         length(Enum.uniq(keys)) == 1 and Enum.all?(keys, &is_binary/1) do
+      {:ok,
+       %{
+         attempts: 3,
+         max_attempts: 3,
+         terminal_status: 200,
+         idempotency_header_stable: true,
+         inherited_total_timeout_ms: 300
+       }}
+    else
+      {:error, %{attempts: length(seen), result: inspect(result), stable_keys: Enum.uniq(keys)}}
+    end
+  end
+
+  defp mcp_iteration do
+    {:ok, state} = Agent.start_link(fn -> %{} end)
+
+    transport = fn _url, headers, body, _opts ->
+      request = Jason.decode!(body)
+      method = request["method"]
+
+      attempt =
+        Agent.get_and_update(state, fn seen ->
+          next = Map.get(seen, method, 0) + 1
+          {next, Map.put(seen, method, next)}
+        end)
+
+      cond do
+        method == "initialize" and attempt == 1 ->
+          {:ok, %{status: 503, headers: [{"retry-after", "0"}], body: "fault"}}
+
+        method == "tools/list" and attempt == 1 ->
+          {:error, :closed}
+
+        method == "notifications/initialized" ->
+          {:ok, %{status: 204, headers: [], body: ""}}
+
+        method == "tools/list" ->
+          mcp_response(request, %{
+            "tools" => [
+              %{"name" => "recoverable", "description" => "fixture", "input_schema" => %{}}
+            ]
+          })
+
+        true ->
+          mcp_response(request, %{})
+      end
+      |> tap(fn _ ->
+        if method == "initialize" do
+          Agent.update(
+            state,
+            &Map.put(&1, "idempotency-key-present", !!header_value(headers, "idempotency-key"))
+          )
+        end
+      end)
+    end
+
+    client =
+      DSEx.MCP.StreamableHTTPClient.new("https://deterministic.invalid/mcp",
+        transport: transport,
+        max_attempts: 3,
+        timeout: 100,
+        retry_delay: 0,
+        max_retry_after: 0,
+        idempotency_key: fn method, _params -> "failure-campaign:#{method}" end
+      )
+
+    result = DSEx.MCP.import_tools(client)
+    counts = Agent.get(state, & &1)
+    Agent.stop(state)
+
+    if match?([%DSEx.Tool{name: :recoverable}], result) and counts["initialize"] == 2 and
+         counts["tools/list"] == 2 and counts["idempotency-key-present"] do
+      {:ok,
+       %{
+         initialize_attempts: 2,
+         list_attempts: 2,
+         max_attempts: 3,
+         idempotency_header_present: true,
+         terminal_tool_count: 1
+       }}
+    else
+      {:error, %{counts: counts, result: inspect(result)}}
+    end
+  end
+
+  defp mcp_response(request, result) do
+    {:ok,
+     %{
+       status: 200,
+       headers: [{"content-type", "application/json"}],
+       body: Jason.encode!(%{"jsonrpc" => "2.0", "id" => request["id"], "result" => result})
+     }}
+  end
+
+  defp header_value(headers, expected) do
+    Enum.find_value(headers, fn {name, value} ->
+      if String.downcase(to_string(name)) == expected, do: to_string(value)
+    end)
   end
 
   defp mipro_v2_iteration do
@@ -611,11 +771,566 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     end
   end
 
+  defp run_live_cases(opts) do
+    if Keyword.get(opts, :live, false) do
+      api_key = Keyword.fetch!(opts, :api_key)
+      model = Keyword.get(opts, :model, "gpt-4.1-mini")
+      agent_model = Keyword.get(opts, :agent_model, model)
+      base_url = Keyword.get(opts, :base_url, "https://api.openai.com/v1")
+      iterations = Keyword.get(opts, :live_iterations, 2)
+      timeout_ms = Keyword.get(opts, :live_timeout_ms, 30_000)
+      validate_positive!(:live_iterations, iterations)
+      validate_positive!(:live_timeout_ms, timeout_ms)
+
+      live_opts = [
+        api_key: api_key,
+        model: model,
+        agent_model: agent_model,
+        base_url: base_url,
+        iterations: iterations,
+        timeout_ms: timeout_ms
+      ]
+
+      [
+        repeat_live(
+          "provider_retry_timeout_idempotency_live",
+          iterations,
+          timeout_ms,
+          fn -> provider_live_iteration(live_opts) end
+        ),
+        repeat_live(
+          "retrieval_and_tool_agent_recovery_live",
+          iterations,
+          timeout_ms,
+          fn -> retrieval_agent_live_iteration(live_opts) end
+        )
+      ]
+    else
+      []
+    end
+  end
+
+  defp prepare_runtime(opts) do
+    if Keyword.get(opts, :live, false) do
+      api_key = Keyword.fetch!(opts, :api_key)
+      base_url = String.trim_trailing(Keyword.fetch!(opts, :base_url), "/")
+      model = Keyword.fetch!(opts, :model)
+      agent_model = Keyword.get(opts, :agent_model, model)
+      {:ok, _model} = ReqLLM.model("openai:#{model}")
+      {:ok, _agent_model} = ReqLLM.model("openai:#{agent_model}")
+
+      probes = [
+        Req.get(base_url <> "/models",
+          headers: [{"authorization", "Bearer #{api_key}"}],
+          receive_timeout: 15_000,
+          retry: false,
+          pool_max_idle_time: 0
+        ),
+        Req.get("https://httpbin.org/status/204",
+          receive_timeout: 15_000,
+          retry: false,
+          pool_max_idle_time: 0
+        )
+      ]
+
+      provider_warmup =
+        warmup_provider(model, api_key, base_url)
+
+      integration_preflight =
+        retrieval_agent_live_iteration(
+          api_key: api_key,
+          model: model,
+          agent_model: agent_model,
+          base_url: base_url,
+          timeout_ms: Keyword.get(opts, :live_timeout_ms, 30_000)
+        )
+
+      %{
+        "performed" => true,
+        "network_hosts" => [URI.parse(base_url).host, "httpbin.org"],
+        "statuses" => Enum.map(probes, &warmup_status/1),
+        "provider_adapter" => warmup_provider_result(provider_warmup, model),
+        "integration_preflight" => warmup_integration_result(integration_preflight),
+        "billable_generation" => true
+      }
+    else
+      %{"performed" => false}
+    end
+  end
+
+  defp warmup_status({:ok, %Req.Response{status: status}}), do: status
+  defp warmup_status({:error, reason}), do: "error:#{failure_category(reason)}"
+
+  defp warmup_provider(model, api_key, base_url) do
+    with_finch(fn finch ->
+      ReqLLM.generate_text("openai:#{model}", "Reply with exactly pong.",
+        api_key: api_key,
+        base_url: base_url,
+        temperature: 0.0,
+        max_tokens: 16,
+        req_http_options: [finch: finch]
+      )
+    end)
+  end
+
+  defp warmup_provider_result({:ok, response}, model) do
+    usage = ReqLLM.Response.usage(response) || %{}
+    input = Map.get(usage, :input_tokens, Map.get(usage, "input_tokens", 0))
+    output = Map.get(usage, :output_tokens, Map.get(usage, "output_tokens", 0))
+
+    %{
+      "status" => "complete",
+      "usage" => %{"input_tokens" => input, "output_tokens" => output},
+      "cost" => openai_cost(model, input, output),
+      "payload_included" => false
+    }
+  end
+
+  defp warmup_provider_result({:error, reason}, _model),
+    do: %{
+      "status" => "failed",
+      "reason_category" => failure_category(reason),
+      "reason_detail" => inspect(reason, limit: 10, printable_limit: 500)
+    }
+
+  defp warmup_integration_result({:ok, evidence}),
+    do: %{"status" => "complete", "evidence" => json_safe(evidence)}
+
+  defp warmup_integration_result({:error, reason}),
+    do: %{
+      "status" => "failed",
+      "reason_category" => failure_category(reason),
+      "reason_detail" => inspect(reason, limit: 10, printable_limit: 500)
+    }
+
+  defp repeat_live(id, iterations, timeout_ms, fun) do
+    started_at = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    baseline = runtime_snapshot()
+    outcomes = Enum.map(1..iterations, &normalize(fun, &1, timeout_ms))
+    settle_runtime(baseline)
+    final = runtime_snapshot()
+    runtime = leak_accounting(baseline, final)
+    passing = Enum.count(outcomes, & &1["passing"])
+
+    %{
+      "id" => id,
+      "required" => true,
+      "evidence_kind" => "live",
+      "status" =>
+        if(passing == iterations and runtime["leak_free"], do: "complete", else: "failed"),
+      "passing" => passing == iterations and runtime["leak_free"],
+      "started_at" => started_at,
+      "completed_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+      "iterations" => iterations,
+      "passing_iterations" => passing,
+      "failing_iterations" => iterations - passing,
+      "flake_rate" => (iterations - passing) / iterations,
+      "outcomes" => outcomes,
+      "runtime" => runtime,
+      "checks" => live_checks(id, outcomes, runtime)
+    }
+  end
+
+  defp provider_live_iteration(opts),
+    do: with_finch(fn finch -> provider_live_iteration(opts, finch) end)
+
+  defp provider_live_iteration(opts, finch) do
+    api_key = Keyword.fetch!(opts, :api_key)
+    model = Keyword.fetch!(opts, :model)
+    url = String.trim_trailing(Keyword.fetch!(opts, :base_url), "/") <> "/responses"
+    timeout = Keyword.fetch!(opts, :timeout_ms)
+    key = "dsex-failure-#{Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)}"
+
+    body =
+      Jason.encode!(%{model: model, input: "Reply with exactly pong.", max_output_tokens: 24})
+
+    {:ok, attempts} = Agent.start_link(fn -> [] end)
+
+    transport = fn request_url, headers, request_body, request_opts ->
+      attempt =
+        Agent.get_and_update(attempts, fn seen -> {length(seen) + 1, [headers | seen]} end)
+
+      if attempt == 1 do
+        {:ok, %{status: 429, headers: [{"retry-after", "0"}], body: ~s({"error":"injected"})}}
+      else
+        req_opts = [
+          method: :post,
+          url: request_url,
+          headers: headers,
+          body: request_body,
+          receive_timeout: Keyword.get(request_opts, :timeout, timeout),
+          retry: false,
+          finch: finch
+        ]
+
+        case Req.request(req_opts) do
+          {:ok, response} ->
+            {:ok,
+             %{
+               status: response.status,
+               headers: response.headers,
+               body: encode_body(response.body)
+             }}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+    end
+
+    headers = [
+      {"authorization", "Bearer #{api_key}"},
+      {"content-type", "application/json"},
+      {"idempotency-key", key}
+    ]
+
+    result =
+      DSEx.Clients.TrainingHTTP.request(transport, url, headers, body, [timeout: timeout], 2, 0)
+
+    seen = Agent.get(attempts, &Enum.reverse/1)
+    Agent.stop(attempts)
+    keys = Enum.map(seen, &header_value(&1, "idempotency-key"))
+
+    with {:ok, %{status: status, body: response_body}} when status in 200..299 <- result,
+         {:ok, decoded} <- Jason.decode(response_body),
+         true <- response_text(decoded) |> String.downcase() |> String.contains?("pong"),
+         %{"input_tokens" => input, "output_tokens" => output} when input > 0 and output > 0 <-
+           decoded["usage"],
+         true <- length(seen) == 2 and Enum.uniq(keys) == [key] do
+      {:ok,
+       %{
+         provider: "openai",
+         model: model,
+         attempts: 2,
+         max_attempts: 2,
+         injected_status: 429,
+         terminal_status: status,
+         idempotency_header_stable: true,
+         timeout_ms: timeout,
+         usage: %{input_tokens: input, output_tokens: output},
+         cost: openai_cost(model, input, output),
+         response_payload_included: false
+       }}
+    else
+      reason -> {:error, {:live_provider_probe_failed, inspect(reason)}}
+    end
+  end
+
+  defp retrieval_agent_live_iteration(opts),
+    do: with_finch(fn finch -> retrieval_agent_live_iteration(opts, finch) end)
+
+  defp retrieval_agent_live_iteration(opts, finch) do
+    timeout = Keyword.fetch!(opts, :timeout_ms)
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    transport = fn url, headers, body, request_opts ->
+      attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
+
+      if attempt == 1 do
+        {:error, :closed}
+      else
+        DSEx.HTTP.Hackneyless.post(url, headers, body, request_opts)
+      end
+    end
+
+    retriever =
+      DSEx.Retrievers.HTTP.new("https://httpbin.org/anything",
+        transport: transport,
+        max_attempts: 2,
+        attempt_timeout: timeout,
+        total_timeout: timeout,
+        retry_backoff_ms: 0,
+        max_retry_delay_ms: 0,
+        response_mapper: fn decoded ->
+          if get_in(decoded, ["json", "query"]) == "beam-recovery", do: ["retrieval-ok"], else: []
+        end
+      )
+
+    retrieval_result =
+      DSEx.Retrievers.HTTP.retrieve(retriever, "beam-recovery", k: 1, finch: finch)
+
+    retrieval_attempts = Agent.get(attempts, & &1)
+    Agent.stop(attempts)
+
+    tool =
+      DSEx.Tool.new(
+        :lookup,
+        "Lookup a fact by query.",
+        fn
+          %{query: "failure-recovery"} -> "pong"
+          %{"query" => "failure-recovery"} -> "pong"
+          other -> {:error, {:unexpected_query, other}}
+        end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{
+            "query" => %{"type" => "string", "enum" => ["failure-recovery"]}
+          },
+          "required" => ["query"]
+        }
+      )
+
+    lm =
+      DSEx.req_llm("openai:#{Keyword.fetch!(opts, :agent_model)}",
+        api_key: Keyword.fetch!(opts, :api_key),
+        base_url: Keyword.fetch!(opts, :base_url),
+        temperature: 0,
+        max_tokens: 120,
+        req_http_options: [finch: finch]
+      )
+
+    agent =
+      DSEx.react(
+        DSEx.Signature.new(
+          "question -> answer",
+          "Use lookup first with query failure-recovery. If history contains lookup result pong, stop calling lookup and call submit with answer pong. Do not answer directly."
+        ),
+        [tool],
+        lm: lm,
+        tool_policy: [:lookup, :submit],
+        max_iters: 4
+      )
+
+    agent_result = DSEx.call(agent, %{question: "Recover the fixed fact using the lookup tool."})
+
+    with {:ok, ["retrieval-ok"]} <- retrieval_result,
+         2 <- retrieval_attempts,
+         {:ok, prediction} <- agent_result,
+         "pong" <-
+           prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase(),
+         history when is_list(history) <- DSEx.Prediction.get(prediction, :history),
+         true <- Enum.any?(history, &(&1.tool == :lookup and &1.result == "pong")),
+         true <- Enum.any?(history, &(&1.tool == :submit)) do
+      {:ok,
+       %{
+         provider: "openai",
+         model: Keyword.fetch!(opts, :agent_model),
+         retrieval_attempts: 2,
+         retrieval_injected_error: "closed",
+         retrieval_terminal_network: "httpbin.org",
+         tool_calls: 1,
+         submit_calls: 1,
+         timeout_ms: timeout,
+         agent_usage_available: false,
+         agent_cost: %{"authority" => "not_exposed_by_prediction", "usd" => nil},
+         payloads_included: false
+       }}
+    else
+      reason -> {:error, {:live_retrieval_agent_probe_failed, inspect(reason)}}
+    end
+  end
+
+  defp response_text(%{"output" => output}) when is_list(output) do
+    output
+    |> Enum.flat_map(&(&1["content"] || []))
+    |> Enum.map_join("", &(&1["text"] || ""))
+  end
+
+  defp response_text(_), do: ""
+
+  defp encode_body(body) when is_binary(body), do: body
+  defp encode_body(body), do: Jason.encode!(body)
+
+  defp openai_cost("gpt-4.1-mini", input, output) do
+    %{
+      "authority" => "pinned_public_list_price",
+      "input_usd_per_million" => 0.4,
+      "output_usd_per_million" => 1.6,
+      "usd" => Float.round(input * 0.4 / 1_000_000 + output * 1.6 / 1_000_000, 9)
+    }
+  end
+
+  defp openai_cost(_model, _input, _output),
+    do: %{"authority" => "unpriced_model", "usd" => nil}
+
+  defp live_checks(id, outcomes, runtime) do
+    evidence = Enum.map(outcomes, & &1["evidence"])
+
+    common = [
+      %{"id" => "repeated_zero_flakes", "passing" => Enum.all?(outcomes, & &1["passing"])},
+      %{"id" => "runtime_leak_free", "passing" => runtime["leak_free"]}
+    ]
+
+    specific =
+      case id do
+        "provider_retry_timeout_idempotency_live" ->
+          [
+            %{
+              "id" => "real_provider_terminal_success",
+              "passing" => Enum.all?(evidence, &(&1["terminal_status"] in 200..299))
+            },
+            %{
+              "id" => "bounded_retry_after_injected_429",
+              "passing" => Enum.all?(evidence, &(&1["attempts"] == 2 and &1["max_attempts"] == 2))
+            },
+            %{
+              "id" => "stable_idempotency_key",
+              "passing" => Enum.all?(evidence, & &1["idempotency_header_stable"])
+            },
+            %{
+              "id" => "positive_provider_usage",
+              "passing" =>
+                Enum.all?(
+                  evidence,
+                  &(get_in(&1, ["usage", "input_tokens"]) > 0 and
+                      get_in(&1, ["usage", "output_tokens"]) > 0)
+                )
+            }
+          ]
+
+        "retrieval_and_tool_agent_recovery_live" ->
+          [
+            %{
+              "id" => "live_retrieval_recovered",
+              "passing" => Enum.all?(evidence, &(&1["retrieval_attempts"] == 2))
+            },
+            %{
+              "id" => "provider_backed_tool_agent_completed",
+              "passing" =>
+                Enum.all?(evidence, &(&1["tool_calls"] == 1 and &1["submit_calls"] == 1))
+            }
+          ]
+      end
+
+    common ++ specific
+  end
+
+  defp with_finch(fun) do
+    name = DSEx.BenchmarkTruth.FailureCampaign.Finch
+
+    {:ok, finch} =
+      Finch.start_link(
+        name: name,
+        pools: %{default: [size: 1, count: 1, pool_max_idle_time: 60_000]}
+      )
+
+    try do
+      fun.(name)
+    after
+      if Process.alive?(finch), do: GenServer.stop(finch, :normal, 5_000)
+    end
+  end
+
+  defp live_cases_complete?(rows) do
+    ids = rows |> Enum.filter(& &1["passing"]) |> Enum.map(& &1["id"]) |> Enum.sort()
+    ids == Enum.sort(Enum.map(@live_requirements, & &1["id"]))
+  end
+
+  defp remaining_requirements(live_cases) do
+    completed = live_cases |> Enum.filter(& &1["passing"]) |> Map.new(&{&1["id"], &1})
+
+    Enum.map(@live_requirements, fn requirement ->
+      case completed[requirement["id"]] do
+        nil -> requirement
+        row -> Map.merge(requirement, %{"status" => "complete", "artifact_row" => row["id"]})
+      end
+    end)
+  end
+
+  defp start_telemetry_capture do
+    id = "dsex-failure-campaign-#{System.unique_integer([:positive, :monotonic])}"
+    {:ok, state} = Agent.start_link(fn -> %{} end)
+
+    events = [
+      [:dsex, :retriever, :start],
+      [:dsex, :retriever, :stop],
+      [:dsex, :retriever, :exception],
+      [:dsex, :retriever, :http, :attempt],
+      [:dsex, :mcp, :http, :start],
+      [:dsex, :mcp, :http, :stop],
+      [:dsex, :mcp, :http, :exception],
+      [:dsex, :mcp, :http, :attempt],
+      [:dsex, :lm, :start],
+      [:dsex, :lm, :stop]
+    ]
+
+    :ok =
+      :telemetry.attach_many(
+        id,
+        events,
+        &__MODULE__.handle_telemetry_event/4,
+        state
+      )
+
+    %{id: id, state: state}
+  end
+
+  @doc false
+  def handle_telemetry_event(event, measurements, metadata, agent) do
+    key = Enum.join(event, ".")
+
+    Agent.update(agent, fn counts ->
+      Map.update(counts, key, telemetry_entry(measurements, metadata), fn entry ->
+        %{entry | count: entry.count + 1}
+      end)
+    end)
+  end
+
+  defp stop_telemetry_capture(%{id: id, state: state}) do
+    :ok = :telemetry.detach(id)
+    entries = Agent.get(state, & &1)
+    Agent.stop(state)
+
+    counts = Map.new(entries, fn {event, entry} -> {event, entry.count} end)
+
+    %{
+      "handler_detached" => true,
+      "event_counts" => counts,
+      "metadata_secret_free" => Enum.all?(entries, fn {_event, entry} -> entry.safe end),
+      "balanced_spans" =>
+        balanced_span?(counts, "dsex.retriever") and balanced_span?(counts, "dsex.mcp.http") and
+          Map.get(counts, "dsex.lm.start", 0) == Map.get(counts, "dsex.lm.stop", 0)
+    }
+  end
+
+  defp telemetry_entry(measurements, metadata) do
+    encoded = inspect({measurements, metadata}, limit: 50, printable_limit: 2_000)
+    %{count: 1, safe: not secret_pattern?(encoded)}
+  end
+
+  defp balanced_span?(counts, prefix) do
+    Map.get(counts, prefix <> ".start", 0) ==
+      Map.get(counts, prefix <> ".stop", 0) + Map.get(counts, prefix <> ".exception", 0)
+  end
+
+  defp secret_scan(value, opts) do
+    encoded = Jason.encode!(json_safe(value))
+
+    configured =
+      opts
+      |> Keyword.get(:secrets, [])
+      |> Enum.filter(&(is_binary(&1) and byte_size(&1) >= 8))
+
+    configured_hits = Enum.count(configured, &String.contains?(encoded, &1))
+    pattern_hits = if secret_pattern?(encoded), do: 1, else: 0
+
+    %{
+      "passing" => configured_hits == 0 and pattern_hits == 0,
+      "configured_secret_count" => length(configured),
+      "configured_secret_hits" => configured_hits,
+      "credential_pattern_hits" => pattern_hits,
+      "payload_sha256" => sha256(encoded)
+    }
+  end
+
+  defp secret_pattern?(value) do
+    Regex.match?(
+      ~r/(?:sk-[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._-]{16,}|api[_-]?key["']?\s*[:=]\s*["'][^"']{8,})/i,
+      value
+    )
+  end
+
+  defp sha256(value),
+    do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower) |> then(&("sha256:" <> &1))
+
   defp runtime_snapshot do
     %{
       admission: DSEx.Tasks.admission_status(),
       linked_tasks: active_children(DSEx.Tasks.supervisor()),
-      unlinked_tasks: active_children(DSEx.Tasks.unlinked_supervisor())
+      unlinked_tasks: active_children(DSEx.Tasks.unlinked_supervisor()),
+      processes: Process.list() |> MapSet.new(),
+      ports: Port.list() |> MapSet.new(),
+      telemetry_handlers: telemetry_handler_ids()
     }
   end
 
@@ -630,7 +1345,10 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     %{
       "admission" => json_safe(snapshot.admission),
       "linked_tasks" => MapSet.size(snapshot.linked_tasks),
-      "unlinked_tasks" => MapSet.size(snapshot.unlinked_tasks)
+      "unlinked_tasks" => MapSet.size(snapshot.unlinked_tasks),
+      "processes" => MapSet.size(snapshot.processes),
+      "ports" => MapSet.size(snapshot.ports),
+      "telemetry_handlers" => MapSet.size(snapshot.telemetry_handlers)
     }
   end
 
@@ -646,15 +1364,17 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
   end
 
   defp settle_runtime(baseline) do
-    Enum.reduce_while(1..100, :timeout, fn _, _ ->
+    Enum.reduce_while(1..500, :timeout, fn _, _ ->
       snapshot = runtime_snapshot()
 
       if snapshot.admission == %{active: 0, queued: 0} and
            MapSet.subset?(snapshot.linked_tasks, baseline.linked_tasks) and
-           MapSet.subset?(snapshot.unlinked_tasks, baseline.unlinked_tasks) do
+           MapSet.subset?(snapshot.unlinked_tasks, baseline.unlinked_tasks) and
+           MapSet.subset?(snapshot.ports, baseline.ports) and
+           MapSet.subset?(snapshot.telemetry_handlers, baseline.telemetry_handlers) do
         {:halt, :ok}
       else
-        Process.sleep(2)
+        Process.sleep(4)
         {:cont, :timeout}
       end
     end)
@@ -663,18 +1383,32 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
   defp leak_accounting(before, after_snapshot) do
     added_linked = MapSet.difference(after_snapshot.linked_tasks, before.linked_tasks)
     added_unlinked = MapSet.difference(after_snapshot.unlinked_tasks, before.unlinked_tasks)
+    added_processes = MapSet.difference(after_snapshot.processes, before.processes)
+    added_ports = MapSet.difference(after_snapshot.ports, before.ports)
+
+    added_handlers =
+      MapSet.difference(after_snapshot.telemetry_handlers, before.telemetry_handlers)
 
     leaks = %{
       "admission_active" => after_snapshot.admission.active,
       "admission_queued" => after_snapshot.admission.queued,
       "added_linked_tasks" => MapSet.size(added_linked),
-      "added_unlinked_tasks" => MapSet.size(added_unlinked)
+      "added_unlinked_tasks" => MapSet.size(added_unlinked),
+      "added_processes" => MapSet.size(added_processes),
+      "added_ports" => MapSet.size(added_ports),
+      "added_telemetry_handlers" => MapSet.size(added_handlers)
     }
 
     %{
       "leaks" => leaks,
       "leak_free" => Enum.all?(Map.values(leaks), &(&1 == 0))
     }
+  end
+
+  defp telemetry_handler_ids do
+    :telemetry.list_handlers([])
+    |> Enum.map(&Map.fetch!(&1, :id))
+    |> MapSet.new()
   end
 
   defp validate_positive!(_name, value) when is_integer(value) and value > 0, do: :ok
