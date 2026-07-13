@@ -20,14 +20,16 @@ defmodule DSEx.Optimizer.GRPO do
   def compile(%__MODULE__{trainer: nil}, _program, _trainset), do: {:error, :trainer_required}
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
-    enriched =
-      Enum.map(trainset, fn example ->
-        reward = optimizer.reward_fn.(example)
-        DSEx.Example.put(example, :reward, reward)
-      end)
+    with :ok <- DSEx.Clients.Trainer.supports_method(optimizer.trainer, :grpo) do
+      enriched =
+        Enum.map(trainset, fn example ->
+          reward = optimizer.reward_fn.(example)
+          DSEx.Example.put(example, :reward, reward)
+        end)
 
-    lm = DSEx.ProgramAccess.lm(program) || %{}
+      lm = DSEx.ProgramAccess.lm(program) || %{}
 
-    DSEx.Clients.Trainer.finetune(optimizer.trainer, lm, enriched, method: :grpo)
+      DSEx.Clients.Trainer.finetune(optimizer.trainer, lm, enriched, method: :grpo)
+    end
   end
 end

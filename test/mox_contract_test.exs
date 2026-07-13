@@ -83,6 +83,8 @@ defmodule MoxContractTest do
     lm = DSEx.req_llm("openai:gpt-test")
     examples = [DSEx.example(question: "q", answer: "a")]
 
+    expect(DSEx.Test.TrainerMock, :supported_methods, fn -> [:sft] end)
+
     expect(DSEx.Test.TrainerMock, :finetune, fn ^lm, ^examples, opts ->
       assert Keyword.fetch!(opts, :suffix) == "contract"
 

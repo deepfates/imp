@@ -121,14 +121,23 @@ defmodule DSEx.HTTP.Hackneyless do
     :inets.start()
     :ssl.start()
 
-    headers =
-      headers
-      |> Enum.reject(fn {key, _value} -> String.downcase(to_string(key)) == "content-type" end)
-      |> Enum.map(fn {key, value} ->
-        {String.to_charlist(to_string(key)), String.to_charlist(to_string(value))}
+    {content_type, headers} =
+      Enum.reduce(headers, {"application/json", []}, fn {key, value}, {content_type, rest} ->
+        if String.downcase(to_string(key)) == "content-type" do
+          {to_string(value), rest}
+        else
+          {content_type,
+           [{String.to_charlist(to_string(key)), String.to_charlist(to_string(value))} | rest]}
+        end
       end)
 
-    request = {String.to_charlist(url), headers, ~c"application/json", IO.iodata_to_binary(body)}
+    request = {
+      String.to_charlist(url),
+      Enum.reverse(headers),
+      String.to_charlist(content_type),
+      IO.iodata_to_binary(body)
+    }
+
     http_opts = http_opts(opts)
     request_opts = Keyword.get(opts, :request_opts, [])
 

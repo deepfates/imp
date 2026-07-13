@@ -548,6 +548,9 @@ end
 defmodule DSEx.Clients.Trainer do
   @moduledoc "Behaviour for provider-specific training backends."
 
+  @callback supported_methods() :: [atom()]
+  @callback supported_methods(term()) :: [atom()]
+
   @callback finetune(
               term(),
               list(DSEx.Example.t()),
@@ -561,7 +564,7 @@ defmodule DSEx.Clients.Trainer do
               keyword()
             ) ::
               {:ok, DSEx.Clients.TrainingJob.t()} | {:error, term()}
-  @optional_callbacks finetune: 3, finetune: 4
+  @optional_callbacks finetune: 3, finetune: 4, supported_methods: 0, supported_methods: 1
 
   def finetune(provider, lm, examples, opts \\ [])
 
@@ -569,8 +572,21 @@ defmodule DSEx.Clients.Trainer do
     opts = validate_opts!(opts)
     examples = validate_examples!(examples)
 
-    do_finetune(provider, lm, examples, opts)
+    with :ok <- supports_method(provider, Keyword.get(opts, :method, :sft)) do
+      do_finetune(provider, lm, examples, opts)
+    end
   end
+
+  @doc "Checks whether a trainer explicitly supports a training method."
+  def supports_method(provider, method) when is_atom(method) do
+    if method in supported_methods(provider) do
+      :ok
+    else
+      {:error, {:unsupported_training_method, method}}
+    end
+  end
+
+  def supports_method(_provider, method), do: {:error, {:unsupported_training_method, method}}
 
   def validate_provider(nil), do: {:ok, nil}
   def validate_provider(provider) when is_atom(provider), do: {:ok, provider}
@@ -580,6 +596,27 @@ defmodule DSEx.Clients.Trainer do
   def validate_provider(_provider) do
     {:error, "expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback"}
   end
+
+  defp supported_methods(%module{} = trainer) do
+    cond do
+      Code.ensure_loaded?(module) and function_exported?(module, :supported_methods, 1) ->
+        module.supported_methods(trainer)
+
+      true ->
+        [:sft]
+    end
+  end
+
+  defp supported_methods(module) when is_atom(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :supported_methods, 0) do
+      module.supported_methods()
+    else
+      [:sft]
+    end
+  end
+
+  defp supported_methods(fun) when is_function(fun, 3), do: [:sft]
+  defp supported_methods(_provider), do: []
 
   defp do_finetune(module, lm, examples, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :finetune, 3) do
@@ -677,7 +714,9 @@ defmodule DSEx.Clients.HTTPTrainer do
     :cancel_url,
     :api_key,
     transport: DSEx.HTTP.Hackneyless,
+    supported_methods: [:sft],
     headers: [],
+    submission_preparer: nil,
     payload_builder: nil,
     response_mapper: nil,
     max_attempts: 3,
@@ -689,7 +728,9 @@ defmodule DSEx.Clients.HTTPTrainer do
     cancel_url: [type: {:or, [:string, nil]}],
     api_key: [type: {:or, [:string, nil]}],
     transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
+    supported_methods: [type: {:list, :atom}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
+    submission_preparer: [type: {:fun, 4}],
     payload_builder: [type: {:fun, 3}],
     response_mapper: [type: {:fun, 4}],
     max_attempts: [type: :pos_integer, default: 3],
@@ -706,7 +747,9 @@ defmodule DSEx.Clients.HTTPTrainer do
       cancel_url: Keyword.get(opts, :cancel_url),
       api_key: Keyword.get(opts, :api_key),
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
+      supported_methods: Keyword.get(opts, :supported_methods, [:sft]),
       headers: Keyword.get(opts, :headers, []),
+      submission_preparer: Keyword.get(opts, :submission_preparer),
       payload_builder: Keyword.get(opts, :payload_builder, &default_payload/3),
       response_mapper: Keyword.get(opts, :response_mapper, &default_response/4),
       max_attempts: opts[:max_attempts],
@@ -714,17 +757,24 @@ defmodule DSEx.Clients.HTTPTrainer do
     }
   end
 
+  @impl true
+  def supported_methods(%__MODULE__{supported_methods: methods}), do: methods
+
+  @impl true
   def finetune(%__MODULE__{} = trainer, lm, examples, opts) do
     opts = validate_call_opts!(opts)
     examples = validate_examples!(examples)
 
-    DSEx.Telemetry.span(
-      [:dsex, :training, :submit],
-      %{provider: trainer.provider, model: Map.get(lm, :model)},
-      fn ->
-        submit(trainer, lm, examples, opts)
-      end
-    )
+    with :ok <-
+           DSEx.Clients.Trainer.supports_method(trainer, Keyword.get(opts, :method, :sft)) do
+      DSEx.Telemetry.span(
+        [:dsex, :training, :submit],
+        %{provider: trainer.provider, model: Map.get(lm, :model)},
+        fn ->
+          submit(trainer, lm, examples, opts)
+        end
+      )
+    end
   end
 
   def finetune(trainer, lm, examples, opts) when is_map(trainer) do
@@ -783,7 +833,8 @@ defmodule DSEx.Clients.HTTPTrainer do
   end
 
   defp submit(%__MODULE__{} = trainer, lm, examples, opts) do
-    with {:ok, payload} <- build_payload(trainer, lm, examples, opts),
+    with {:ok, opts} <- prepare_submission(trainer, lm, examples, opts),
+         {:ok, payload} <- build_payload(trainer, lm, examples, opts),
          {:ok, body} <- encode_payload(payload),
          {:ok, request_policy} <- request_policy(trainer, lm, body, opts),
          headers <-
@@ -805,6 +856,21 @@ defmodule DSEx.Clients.HTTPTrainer do
            ) do
       {:ok, job}
     end
+  end
+
+  defp prepare_submission(%__MODULE__{submission_preparer: nil}, _lm, _examples, opts),
+    do: {:ok, opts}
+
+  defp prepare_submission(%__MODULE__{} = trainer, lm, examples, opts) do
+    case trainer.submission_preparer.(trainer, lm, examples, opts) do
+      {:ok, prepared_opts} when is_list(prepared_opts) -> {:ok, prepared_opts}
+      {:error, reason} -> {:error, reason}
+      other -> {:error, {:invalid_training_preparation, other}}
+    end
+  rescue
+    error -> {:error, {:invalid_training_preparation, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:invalid_training_preparation, inspect({kind, reason})}}
   end
 
   defp encode_payload(payload) do
@@ -940,7 +1006,7 @@ defmodule DSEx.Clients.HTTPTrainer do
   end
 
   defp request_opts(opts) do
-    Keyword.drop(opts, [:idempotency_key, :max_attempts, :retry_backoff_ms])
+    Keyword.drop(opts, [:example_encoder, :idempotency_key, :max_attempts, :retry_backoff_ms])
   end
 
   defp status_url(%__MODULE__{status_url: nil}, _decoded), do: nil
@@ -985,15 +1051,17 @@ defmodule DSEx.Clients.OpenAITrainer do
   @moduledoc """
   OpenAI fine-tuning job client.
 
-  This client submits an OpenAI fine-tuning job for an existing uploaded
-  training file. It does not upload examples itself; callers must provide
-  `:training_file` either to `new/1` or to `Trainer.finetune/4`.
+  Existing `:training_file` IDs are submitted directly. Otherwise examples are
+  encoded as deterministic JSONL, uploaded to the OpenAI Files API, and the
+  returned file ID is used for the fine-tuning job.
   """
 
   @option_schema [
     base_url: [type: :string],
     api_key: [type: {:or, [:string, nil]}],
     transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
+    upload_transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
+    example_encoder: [type: {:fun, 1}],
     training_file: [type: :string],
     validation_file: [type: :string],
     suffix: [type: :string],
@@ -1010,22 +1078,233 @@ defmodule DSEx.Clients.OpenAITrainer do
         "https://api.openai.com/v1"
 
     api_key = provider_api_key(opts, "OPENAI_API_KEY")
+    transport = Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless)
 
-    defaults = Keyword.take(opts, [:training_file, :validation_file, :suffix, :metadata])
+    upload_transport = Keyword.get(opts, :upload_transport, transport)
+
+    defaults =
+      Keyword.take(opts, [
+        :example_encoder,
+        :training_file,
+        :validation_file,
+        :suffix,
+        :metadata
+      ])
 
     DSEx.Clients.HTTPTrainer.new(
       :openai,
       String.trim_trailing(base, "/") <> "/fine_tuning/jobs",
       api_key: api_key,
-      transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
+      transport: transport,
       max_attempts: opts[:max_attempts],
       retry_backoff_ms: opts[:retry_backoff_ms],
       status_url: String.trim_trailing(base, "/") <> "/fine_tuning/jobs/{id}",
       cancel_url: String.trim_trailing(base, "/") <> "/fine_tuning/jobs/{id}/cancel",
+      supported_methods: [:sft],
+      submission_preparer: fn trainer, lm, examples, call_opts ->
+        prepare_training_file(
+          %{trainer | transport: upload_transport},
+          lm,
+          examples,
+          Keyword.merge(defaults, call_opts),
+          String.trim_trailing(base, "/") <> "/files"
+        )
+      end,
       payload_builder: fn lm, examples, call_opts ->
         payload(lm, examples, Keyword.merge(defaults, call_opts))
       end
     )
+  end
+
+  defp prepare_training_file(trainer, lm, examples, opts, files_url) do
+    cond do
+      is_binary(Keyword.get(opts, :training_file)) ->
+        {:ok, opts}
+
+      examples == [] ->
+        {:error, :openai_training_file_required}
+
+      true ->
+        with {:ok, jsonl} <- encode_jsonl(examples, Keyword.get(opts, :example_encoder)),
+             digest <- :crypto.hash(:sha256, jsonl) |> Base.encode16(case: :lower),
+             boundary <- "dsex-" <> binary_part(digest, 0, 32),
+             filename <- "dsex-training-" <> binary_part(digest, 0, 16) <> ".jsonl",
+             body <- multipart_body(boundary, filename, jsonl),
+             headers <-
+               [{"content-type", "multipart/form-data; boundary=#{boundary}"}] ++
+                 auth_headers(trainer.api_key),
+             {:ok, response} <-
+               upload_file(
+                 trainer,
+                 lm,
+                 files_url,
+                 headers,
+                 body,
+                 opts
+               ),
+             {:ok, training_file} <- decode_file_id(response) do
+          {:ok, Keyword.put(opts, :training_file, training_file)}
+        end
+    end
+  end
+
+  defp encode_jsonl(examples, encoder) do
+    examples
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {example, index}, {:ok, rows} ->
+      with {:ok, row} <- encode_example(example, encoder),
+           {:ok, row} <- normalize_provider_row(row),
+           :ok <- validate_provider_row(row) do
+        {:cont, {:ok, [canonical_json(row) | rows]}}
+      else
+        {:error, reason} ->
+          {:halt, {:error, {:invalid_openai_training_example, index, reason}}}
+      end
+    end)
+    |> case do
+      {:ok, rows} -> {:ok, rows |> Enum.reverse() |> Enum.join("\n") |> Kernel.<>("\n")}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp encode_example(example, nil), do: {:ok, DSEx.Example.to_map(example)}
+
+  defp encode_example(example, encoder) do
+    case encoder.(example) do
+      {:ok, row} -> {:ok, row}
+      {:error, reason} -> {:error, {:example_encoder_failed, reason}}
+      row when is_map(row) -> {:ok, row}
+      other -> {:error, {:invalid_example_encoder_result, other}}
+    end
+  rescue
+    error -> {:error, {:example_encoder_failed, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:example_encoder_failed, inspect({kind, reason})}}
+  end
+
+  defp normalize_provider_row(row) do
+    {:ok, row |> Jason.encode!() |> Jason.decode!()}
+  rescue
+    error -> {:error, {:invalid_json, Exception.message(error)}}
+  end
+
+  defp validate_provider_row(%{"messages" => messages})
+       when is_list(messages) and messages != [] do
+    with :ok <- validate_messages(messages),
+         true <- Enum.any?(messages, &(&1["role"] == "assistant")) do
+      :ok
+    else
+      false -> {:error, :assistant_message_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_provider_row(%{"messages" => _messages}),
+    do: {:error, :messages_must_be_a_non_empty_list}
+
+  defp validate_provider_row(_row), do: {:error, :messages_required}
+
+  defp validate_messages(messages) do
+    messages
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn
+      {%{"role" => role, "content" => content}, _index}, :ok
+      when role in ["system", "user", "assistant"] and is_binary(content) and content != "" ->
+        {:cont, :ok}
+
+      {%{"role" => role}, index}, :ok
+      when role not in ["system", "user", "assistant"] ->
+        {:halt, {:error, {:invalid_message_role, index, role}}}
+
+      {%{"content" => content}, index}, :ok when not is_binary(content) or content == "" ->
+        {:halt, {:error, {:invalid_message_content, index, content}}}
+
+      {_message, index}, :ok ->
+        {:halt, {:error, {:invalid_message, index}}}
+    end)
+  end
+
+  defp canonical_json(value) when is_map(value) do
+    value
+    |> Enum.sort_by(fn {key, _value} -> key end)
+    |> Enum.map_join(",", fn {key, nested} ->
+      Jason.encode!(key) <> ":" <> canonical_json(nested)
+    end)
+    |> then(&("{" <> &1 <> "}"))
+  end
+
+  defp canonical_json(value) when is_list(value),
+    do: "[" <> Enum.map_join(value, ",", &canonical_json/1) <> "]"
+
+  defp canonical_json(value), do: Jason.encode!(value)
+
+  defp multipart_body(boundary, filename, jsonl) do
+    [
+      "--",
+      boundary,
+      "\r\n",
+      "content-disposition: form-data; name=\"purpose\"\r\n\r\n",
+      "fine-tune\r\n",
+      "--",
+      boundary,
+      "\r\n",
+      "content-disposition: form-data; name=\"file\"; filename=\"",
+      filename,
+      "\"\r\n",
+      "content-type: application/jsonl\r\n\r\n",
+      jsonl,
+      "\r\n--",
+      boundary,
+      "--\r\n"
+    ]
+  end
+
+  defp upload_file(trainer, lm, files_url, headers, body, opts) do
+    body = IO.iodata_to_binary(body)
+
+    with {:ok, idempotency_key} <-
+           DSEx.Clients.TrainingHTTP.idempotency_key(
+             :openai_file,
+             Map.get(lm, :model),
+             body,
+             nil
+           ) do
+      headers =
+        DSEx.Clients.TrainingHTTP.put_header(headers, "idempotency-key", idempotency_key)
+
+      case DSEx.Clients.TrainingHTTP.request(
+             trainer.transport,
+             files_url,
+             headers,
+             body,
+             request_opts(opts),
+             Keyword.get(opts, :max_attempts, trainer.max_attempts),
+             Keyword.get(opts, :retry_backoff_ms, trainer.retry_backoff_ms)
+           ) do
+        {:ok, %{status: status, body: response}} when status in 200..299 ->
+          {:ok, response}
+
+        {:ok, %{status: status, body: response}} ->
+          {:error, {:http_error, status, DSEx.Clients.TrainingHTTP.redact_response(response)}}
+
+        {:error, {:http_transport_failed, _transport, reason}} ->
+          {:error, {:training_transport_failed, DSEx.Redaction.redact(reason)}}
+
+        {:error, reason} ->
+          {:error, DSEx.Redaction.redact(reason)}
+
+        other ->
+          {:error, {:invalid_training_transport_response, other}}
+      end
+    end
+  end
+
+  defp decode_file_id(response) do
+    case Jason.decode(response) do
+      {:ok, %{"id" => id}} when is_binary(id) and id != "" -> {:ok, id}
+      {:ok, decoded} -> {:error, {:invalid_openai_file_response, decoded}}
+      {:error, reason} -> {:error, {:invalid_openai_file_response, Exception.message(reason)}}
+    end
   end
 
   defp payload(lm, _examples, opts) do
@@ -1050,6 +1329,19 @@ defmodule DSEx.Clients.OpenAITrainer do
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
   defp map_or_nil(nil), do: nil
   defp map_or_nil(values), do: Map.new(values)
+
+  defp request_opts(opts),
+    do:
+      Keyword.drop(opts, [
+        :example_encoder,
+        :idempotency_key,
+        :max_attempts,
+        :retry_backoff_ms,
+        :training_file
+      ])
+
+  defp auth_headers(nil), do: []
+  defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
 
   defp provider_api_key(opts, env_key) do
     cond do
@@ -1089,6 +1381,7 @@ defmodule DSEx.Clients.DatabricksTrainer do
       retry_backoff_ms: opts[:retry_backoff_ms],
       status_url: String.trim_trailing(base, "/") <> "/api/2.0/dsex/finetune/{id}",
       cancel_url: String.trim_trailing(base, "/") <> "/api/2.0/dsex/finetune/{id}/cancel",
+      supported_methods: [:sft, :grpo],
       payload_builder: &payload/3
     )
   end

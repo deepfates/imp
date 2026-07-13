@@ -6,9 +6,24 @@ defmodule ProviderTrainingLifecycleTest do
 
     @impl true
     def post(url, headers, body, _opts) do
-      decoded = Jason.decode!(body)
-      send(self(), {:openai_training_request, url, headers, decoded})
+      if String.ends_with?(url, "/files") do
+        send(self(), {:openai_file_upload, url, headers, IO.iodata_to_binary(body)})
 
+        {:ok,
+         %{
+           status: 200,
+           headers: [],
+           body: Jason.encode!(%{id: "file-uploaded-demos", purpose: "fine-tune"})
+         }}
+      else
+        decoded = Jason.decode!(body)
+        send(self(), {:openai_training_request, url, headers, decoded})
+
+        response(url, decoded)
+      end
+    end
+
+    defp response(url, decoded) do
       cond do
         String.ends_with?(url, "/chat/completions") ->
           {:ok,
@@ -47,6 +62,21 @@ defmodule ProviderTrainingLifecycleTest do
                })
            }}
       end
+    end
+  end
+
+  defmodule GRPOTrainingFixture do
+    @behaviour DSEx.Clients.Trainer
+
+    defstruct []
+
+    @impl true
+    def supported_methods(%__MODULE__{}), do: [:grpo]
+
+    @impl true
+    def finetune(%__MODULE__{}, trainer_lm, enriched, opts) do
+      send(self(), {:grpo_finetune, trainer_lm, enriched, opts})
+      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_grpo", provider: :test})}
     end
   end
 
@@ -532,7 +562,7 @@ defmodule ProviderTrainingLifecycleTest do
     refute body =~ "sk-provider-error-secret"
   end
 
-  test "OpenAI trainer requires an uploaded training file id" do
+  test "OpenAI trainer requires a file id when there are no examples to upload" do
     lm = DSEx.req_llm("gpt-test")
 
     trainer =
@@ -543,7 +573,96 @@ defmodule ProviderTrainingLifecycleTest do
       )
 
     assert {:error, :openai_training_file_required} =
-             DSEx.Clients.Trainer.finetune(trainer, lm, examples(), [])
+             DSEx.Clients.Trainer.finetune(trainer, lm, [], [])
+
+    refute_received {:openai_file_upload, _, _, _}
+  end
+
+  test "OpenAI trainer deterministically uploads examples before submitting their file id" do
+    encoder = fn example ->
+      %{
+        messages: [
+          %{role: "system", content: "Solve the example."},
+          %{role: "user", content: "Question: #{DSEx.Example.get(example, :question)}"},
+          %{role: "assistant", content: "Answer: #{DSEx.Example.get(example, :answer)}"}
+        ]
+      }
+    end
+
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport,
+        example_encoder: encoder
+      )
+
+    assert {:ok, %DSEx.Clients.TrainingJob{id: "ftjob_123"}} =
+             DSEx.Clients.Trainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               examples(),
+               method: :sft
+             )
+
+    assert_received {:openai_file_upload, "https://api.example/v1/files", upload_headers,
+                     multipart}
+
+    assert {"authorization", "Bearer sk-test"} in upload_headers
+
+    assert {"content-type", "multipart/form-data; boundary=" <> boundary} =
+             List.keyfind(upload_headers, "content-type", 0)
+
+    jsonl =
+      ~s({"messages":[{"content":"Solve the example.","role":"system"},{"content":"Question: 2+2?","role":"user"},{"content":"Answer: 4","role":"assistant"}]}\n)
+
+    digest = :crypto.hash(:sha256, jsonl) |> Base.encode16(case: :lower)
+
+    assert boundary == "dsex-" <> binary_part(digest, 0, 32)
+    assert multipart =~ "name=\"purpose\"\r\n\r\nfine-tune"
+    assert multipart =~ "filename=\"dsex-training-#{binary_part(digest, 0, 16)}.jsonl\""
+    assert multipart =~ "content-type: application/jsonl\r\n\r\n"
+    assert multipart =~ jsonl
+    assert multipart =~ "\r\n--#{boundary}--\r\n"
+
+    assert_received {:openai_training_request, "https://api.example/v1/fine_tuning/jobs",
+                     _headers, %{"model" => "gpt-test", "training_file" => "file-uploaded-demos"}}
+  end
+
+  test "OpenAI trainer rejects unshaped example rows before upload" do
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport
+      )
+
+    assert {:error, {:invalid_openai_training_example, 0, :messages_required}} =
+             DSEx.Clients.Trainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               examples(),
+               method: :sft
+             )
+
+    invalid_messages =
+      DSEx.example(
+        messages: [
+          %{role: "user", content: "Question: 2+2?"},
+          %{role: "assistant", content: nil}
+        ]
+      )
+
+    assert {:error, {:invalid_openai_training_example, 0, {:invalid_message_content, 1, nil}}} =
+             DSEx.Clients.Trainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               [invalid_messages],
+               method: :sft
+             )
+
+    refute_received {:openai_file_upload, _, _, _}
+    refute_received {:openai_training_request, _, _, _}
   end
 
   test "trainer dispatch reports callback crashes and invalid callback results" do
@@ -760,7 +879,11 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "BootstrapFinetune accepts provider trainer structs" do
-    lm = DSEx.req_llm("gpt-test")
+    lm = %{
+      module: DSEx.LM.Static,
+      model: "gpt-test",
+      opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
+    }
 
     program = DSEx.predict("question -> answer", lm: lm)
     metric = DSEx.Metrics.exact_match(:answer)
@@ -769,8 +892,7 @@ defmodule ProviderTrainingLifecycleTest do
       DSEx.Clients.OpenAITrainer.new(
         base_url: "https://api.example/v1",
         api_key: "sk-test",
-        transport: OpenAITrainingTransport,
-        training_file: "file-abc"
+        transport: OpenAITrainingTransport
       )
 
     result =
@@ -783,6 +905,34 @@ defmodule ProviderTrainingLifecycleTest do
              job: %DSEx.Clients.TrainingJob{provider: :openai}
            } =
              result
+
+    assert_received {:openai_file_upload, "https://api.example/v1/files", headers, multipart}
+
+    assert {"content-type", "multipart/form-data; boundary=" <> boundary} =
+             List.keyfind(headers, "content-type", 0)
+
+    [_, file_part] =
+      String.split(multipart, "content-type: application/jsonl\r\n\r\n", parts: 2)
+
+    [jsonl, _closing_boundary] =
+      String.split(file_part, "\r\n--#{boundary}--\r\n", parts: 2)
+
+    assert [row] = jsonl |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+
+    assert row == %{
+             "messages" => [
+               %{
+                 "role" => "system",
+                 "content" =>
+                   "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+               },
+               %{"role" => "user", "content" => "[[ ## question ## ]]\n2+2?"},
+               %{"role" => "assistant", "content" => "[[ ## answer ## ]]\n4"}
+             ]
+           }
+
+    assert_received {:openai_training_request, "https://api.example/v1/fine_tuning/jobs",
+                     _headers, %{"training_file" => "file-uploaded-demos"}}
   end
 
   test "training optimizer constructors reject invalid boundary contracts" do
@@ -902,7 +1052,7 @@ defmodule ProviderTrainingLifecycleTest do
            } = result
 
     assert DSEx.Example.get(demo, :doubled) == 42
-    assert_received {:bootstrap_finetune, ^lm, [^demo], []}
+    assert_received {:bootstrap_finetune, ^lm, [^demo], [method: :sft]}
   end
 
   test "GRPO extracts the provider LM through CodeAct and ProgramOfThought wrappers" do
@@ -914,10 +1064,7 @@ defmodule ProviderTrainingLifecycleTest do
     program = DSEx.code_act("question -> answer", [], lm: lm)
     trainset = [DSEx.example(question: "life?", answer: "42") |> DSEx.with_inputs(:question)]
 
-    trainer = fn trainer_lm, enriched, opts ->
-      send(self(), {:grpo_finetune, trainer_lm, enriched, opts})
-      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_grpo", provider: :test})}
-    end
+    trainer = %GRPOTrainingFixture{}
 
     assert {:ok, %DSEx.Clients.TrainingJob{id: "job_grpo"}} =
              DSEx.Optimizer.GRPO.new(fn _example -> 0.75 end, trainer: trainer)
@@ -925,5 +1072,52 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert_received {:grpo_finetune, ^lm, [enriched], [method: :grpo]}
     assert DSEx.Example.get(enriched, :reward) == 0.75
+  end
+
+  test "an explicit GRPO-only trainer rejects SFT before trainer dispatch" do
+    trainer = %GRPOTrainingFixture{}
+
+    assert {:error, {:unsupported_training_method, :sft}} =
+             DSEx.Clients.Trainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               examples(),
+               method: :sft
+             )
+
+    refute_received {:grpo_finetune, _, _, _}
+  end
+
+  test "GRPO rejects OpenAI before reward evaluation or network submission" do
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport
+      )
+
+    reward_fn = fn _example ->
+      send(self(), :grpo_reward_evaluated)
+      1.0
+    end
+
+    assert {:error, {:unsupported_training_method, :grpo}} =
+             DSEx.Optimizer.GRPO.new(reward_fn, trainer: trainer)
+             |> DSEx.Optimizer.GRPO.compile(
+               DSEx.predict("question -> answer", lm: DSEx.req_llm("gpt-test")),
+               examples()
+             )
+
+    assert {:error, {:unsupported_training_method, :grpo}} =
+             DSEx.Clients.HTTPTrainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               examples(),
+               method: :grpo
+             )
+
+    refute_received :grpo_reward_evaluated
+    refute_received {:openai_file_upload, _, _, _}
+    refute_received {:openai_training_request, _, _, _}
   end
 end

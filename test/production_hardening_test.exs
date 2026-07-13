@@ -345,6 +345,27 @@ defmodule ProductionHardeningTest do
                  fn -> DSEx.HTTP.Hackneyless.http_opts(http_opts: %{timeout: 1}) end
   end
 
+  test "default HTTP transport honors an explicit multipart content type" do
+    boundary = "dsex-test-boundary"
+    content_type = "multipart/form-data; boundary=#{boundary}"
+    body = "--#{boundary}\r\ncontent\r\n--#{boundary}--\r\n"
+
+    base_url =
+      DSEx.Test.LocalHTTP.start(fn request ->
+        assert request.headers["content-type"] == content_type
+        assert request.body == body
+        {200, %{ok: true}}
+      end)
+
+    assert {:ok, %{status: 200}} =
+             DSEx.HTTP.Hackneyless.post(
+               base_url <> "/upload",
+               [{"Content-Type", content_type}],
+               body,
+               []
+             )
+  end
+
   test "LM facade rejects malformed options and unknown providers explicitly" do
     assert_raise ArgumentError, ~r/DSEx.LM.generate\/3 expects keyword options/, fn ->
       DSEx.LM.generate(DSEx.LM.Static, [%{role: :user, content: "hello"}], %{handler: nil})
