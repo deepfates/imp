@@ -10,13 +10,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   Public claims are evaluated from `benchmarks/claims.json` by default. Pass
   `--claims-file path/to/claims.json` to evaluate a different inventory.
+
+  Select `--profile v0.1`, `--profile telos`, or `--profile research` to choose
+  the release claim scope. The default is the conservative `telos` profile.
   """
 
   use Mix.Task
 
+  alias DSEx.BenchmarkTruth.ReleaseProfile
+
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
   @default_results_dir "benchmarks/results"
+  @failure_case_ids ~w(
+    task_cancellation_releases_admission
+    task_timeout_is_explicit_and_terminal
+    async_concurrency_is_bounded
+    partial_stream_failure_is_terminal
+    training_retry_and_idempotency_are_bounded
+    mipro_v2_durable_resume_and_tamper
+    simba_durable_resume_and_tamper
+  )
+  @failure_live_ids ~w(
+    provider_retry_timeout_idempotency_live
+    training_retrieval_tool_agent_recovery_live
+  )
   @instruction_optimizer_tier "t1_instruction_optimizer_differential_contract"
   @instruction_optimizer_dspy_version "3.3.0b1"
   @instruction_optimizer_dspy_commit "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
@@ -51,11 +69,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           rag_tool_agent_dir: :string,
           rlm_dir: :string,
           live_matrix_dir: :string,
+          failure_campaign_dir: :string,
           results_dir: :string,
           gate_dir: :string,
           claims_file: :string,
           out: :string,
           max_age_hours: :integer,
+          profile: :string,
           require_full: :boolean
         ]
       )
@@ -65,11 +85,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     out_dir = Keyword.get(opts, :out, @default_results_dir)
     File.mkdir_p!(out_dir)
 
-    dashboard = dashboard(opts)
+    profile_name = Keyword.get(opts, :profile, ReleaseProfile.default())
+
+    try do
+      ReleaseProfile.fetch!(profile_name)
+    rescue
+      error in ArgumentError -> Mix.raise(Exception.message(error))
+    end
+
+    dashboard = dashboard(Keyword.put(opts, :profile, profile_name))
     out_path = Path.join(out_dir, "parity-dashboard-#{timestamp_slug()}.json")
     File.write!(out_path, Jason.encode!(dashboard, pretty: true) <> "\n")
 
     Mix.shell().info("parity dashboard: #{out_path}")
+    Mix.shell().info("release profile: #{dashboard["profile"]["id"]}")
     Mix.shell().info("full parity: #{dashboard["full_parity"]}")
     Mix.shell().info("performance claim supported: #{dashboard["performance_claim_supported"]}")
 
@@ -80,6 +109,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp dashboard(opts) do
     max_age_hours = Keyword.get(opts, :max_age_hours, 24)
+    profile = opts |> Keyword.fetch!(:profile) |> ReleaseProfile.fetch!()
+    claims_path = Keyword.get(opts, :claims_file, "benchmarks/claims.json")
 
     instruction_optimizer_contract =
       instruction_optimizer_contract_lane(
@@ -123,6 +154,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           max_age_hours,
           "protocol.check"
         ),
+      "failure_recovery" =>
+        failure_recovery_lane(
+          Keyword.get(opts, :failure_campaign_dir, "tmp/failure-campaign"),
+          max_age_hours
+        ),
       "golden_trace" =>
         golden_trace_lane(Keyword.get(opts, :trace_dir, "tmp/golden-trace"), max_age_hours),
       "live_matched_model" =>
@@ -157,23 +193,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         overhead_lane(Keyword.get(opts, :overhead_dir, "tmp/overhead"), max_age_hours)
     }
 
-    required = [
-      "product_package",
-      "livebook_execute",
-      "live_provider_smoke",
-      "protocol_gates",
-      "golden_trace",
-      "live_matched_model",
-      "instruction_optimizer_contract",
-      "optimizer_lift",
-      "gepa_replication",
-      "optimize_anything",
-      "rag_tool_agent",
-      "rlm_benchmark",
-      "provider_free_overhead"
-    ]
-
-    claims = claims_gate(Keyword.get(opts, :claims_file, "benchmarks/claims.json"), lanes)
+    required = profile_lane_requirements(claims_path, profile)
+    claims = claims_gate(claims_path, lanes, profile)
     gate_checks = release_gate_checks(required, lanes, claims)
     full_parity = Enum.all?(gate_checks, &(&1["passing"] == true))
     performance_supported = get_in(lanes, ["provider_free_overhead", "passing"]) == true
@@ -183,7 +204,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
       "max_age_hours" => max_age_hours,
-      "required_lanes" => required,
+      "profile" => profile,
+      "required_lanes" => Enum.map(required, & &1["lane"]),
+      "required_lane_requirements" => required,
       "full_parity" => full_parity,
       "performance_claim_supported" => performance_supported,
       "release_gate" => %{
@@ -211,17 +234,33 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp results_dir(opts), do: Keyword.get(opts, :results_dir, @default_results_dir)
 
+  defp profile_lane_requirements(path, profile) do
+    case read_claims(path) do
+      {:ok, claims} -> ReleaseProfile.lane_requirements(claims, profile)
+      {:error, _reason} -> []
+    end
+  end
+
   defp release_gate_checks(required, lanes, claims) do
     lane_checks =
-      Enum.map(required, fn lane_id ->
+      Enum.map(required, fn requirement ->
+        lane_id = requirement["lane"]
         lane = Map.fetch!(lanes, lane_id)
+        evidence = requirement["evidence"]
+
+        passing =
+          lane["passing"] == true and lane["fresh"] == true and
+            (evidence == "passing" or lane["full_evidence"] == true)
 
         %{
           "lane" => lane_id,
           "status" => lane["status"],
-          "passing" => lane["passing"] == true and lane["full_evidence"] == true,
+          "passing" => passing,
           "fresh" => lane["fresh"],
           "full_evidence" => lane["full_evidence"],
+          "required_evidence" => evidence,
+          "claim_ids" => requirement["claim_ids"],
+          "requirement_ids" => requirement["requirement_ids"],
           "limitation" => lane["limitation"],
           "blocking_requirements" => lane["blocking_requirements"] || []
         }
@@ -459,6 +498,208 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "no #{id} source-checkout gate evidence artifact found in #{dir}; run mix dsex.gate_evidence --gate #{id} --mix-task #{expected_mix_task}"
         )
     end
+  end
+
+  defp failure_recovery_lane(dir, max_age_hours) do
+    with {:ok, path} <- latest(Path.join(dir, "failure-campaign-*.json")),
+         {:ok, artifact} <- read_verified_failure_artifact(path) do
+      authority = failure_recovery_authority(artifact)
+      deterministic = authority["deterministic_complete"]
+      live = authority["live_complete"]
+
+      blockers =
+        []
+        |> maybe_add_requirement(not deterministic, %{
+          "kind" => "failure_recovery_t0_unverified",
+          "message" =>
+            "Deterministic failure recovery cases or runtime leak accounting are incomplete."
+        })
+        |> maybe_add_requirement(deterministic and not live, %{
+          "kind" => "failure_recovery_live_incomplete",
+          "missing_live_rows" => authority["missing_live_rows"],
+          "message" =>
+            "Verified T0 evidence is present, but completed live recovery rows are still required."
+        })
+
+      artifact_lane("failure_recovery", path, artifact, max_age_hours,
+        passing: deterministic,
+        full_evidence: deterministic and live,
+        scale: if(live, do: "full", else: "t0"),
+        summary: %{
+          "evidence_tier" => artifact["evidence_tier"],
+          "authority" => authority,
+          "reported_summary" => artifact["summary"]
+        },
+        limitation:
+          cond do
+            not deterministic ->
+              "The verified artifact does not independently establish deterministic T0 failure recovery."
+
+            not live ->
+              "Deterministic T0 failure recovery passes, but it cannot authorize live release recovery claims."
+
+            true ->
+              nil
+          end,
+        blocking_requirements: blockers
+      )
+    else
+      {:error, :missing} ->
+        missing_lane(
+          "failure_recovery",
+          "no failure-campaign artifact found in #{dir}; run mix benchmark.failure_campaign.check"
+        )
+
+      {:error, {:unverifiable, path, reason}} ->
+        unverifiable_failure_lane(path, reason)
+    end
+  end
+
+  defp read_verified_failure_artifact(path) do
+    {:ok, DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path)}
+  rescue
+    error -> {:error, {:unverifiable, path, Exception.message(error)}}
+  end
+
+  defp failure_recovery_authority(artifact) do
+    cases = artifact["cases"] || []
+    deterministic_cases = Enum.filter(cases, &(&1["evidence_kind"] == "deterministic"))
+    configured_iterations = get_in(artifact, ["configuration", "iterations"])
+    required_iterations = get_in(artifact, ["configuration", "required_flake_iterations"])
+
+    valid_case_ids =
+      deterministic_cases
+      |> Enum.filter(&valid_failure_case?(&1, configured_iterations, required_iterations))
+      |> ids()
+
+    expected_case_ids = Enum.sort(@failure_case_ids)
+    runtime_complete = valid_failure_runtime?(artifact["runtime"])
+
+    envelope_current =
+      artifact["schema_version"] == 2 and artifact["runner"] == "dsex-failure-campaign" and
+        artifact["evidence_tier"] == "t0_deterministic_failure_recovery"
+
+    deterministic_complete =
+      envelope_current and valid_case_ids == expected_case_ids and runtime_complete and
+        length(deterministic_cases) == length(expected_case_ids) and
+        Enum.sort(artifact["scope"] || []) == expected_case_ids
+
+    live_rows = failure_live_rows(artifact)
+    valid_live_ids = live_rows |> Enum.filter(&valid_failure_live_row?/1) |> ids()
+    expected_live_ids = Enum.sort(@failure_live_ids)
+
+    live_complete =
+      deterministic_complete and valid_live_ids == expected_live_ids and
+        length(live_rows) == length(expected_live_ids)
+
+    %{
+      "run_envelope_verified" => true,
+      "current_schema" => envelope_current,
+      "deterministic_complete" => deterministic_complete,
+      "runtime_complete" => runtime_complete,
+      "expected_deterministic_cases" => expected_case_ids,
+      "valid_deterministic_cases" => valid_case_ids,
+      "live_complete" => live_complete,
+      "expected_live_rows" => expected_live_ids,
+      "valid_live_rows" => valid_live_ids,
+      "missing_live_rows" => expected_live_ids -- valid_live_ids
+    }
+  end
+
+  defp valid_failure_case?(case_row, configured_iterations, required_iterations) do
+    iterations = case_row["iterations"]
+    outcomes = case_row["outcomes"]
+
+    case_row["id"] in @failure_case_ids and is_integer(required_iterations) and
+      required_iterations >= 10 and is_integer(configured_iterations) and
+      configured_iterations >= required_iterations and iterations == configured_iterations and
+      case_row["passing"] == true and case_row["passing_iterations"] == iterations and
+      case_row["failing_iterations"] == 0 and case_row["flake_rate"] == 0 and
+      is_list(outcomes) and length(outcomes) == iterations and
+      Enum.sort(Enum.map(outcomes, & &1["iteration"])) == Enum.to_list(1..iterations) and
+      Enum.all?(outcomes, fn outcome ->
+        outcome["passing"] == true and is_number(outcome["duration_ms"]) and
+          outcome["duration_ms"] >= 0 and is_map(outcome["evidence"])
+      end)
+  end
+
+  defp valid_failure_runtime?(%{"leaks" => leaks, "after" => after_snapshot})
+       when is_map(leaks) and is_map(after_snapshot) do
+    expected_leaks =
+      ~w(admission_active admission_queued added_linked_tasks added_unlinked_tasks)
+
+    MapSet.new(Map.keys(leaks)) == MapSet.new(expected_leaks) and
+      Enum.all?(Map.values(leaks), &(&1 == 0)) and
+      get_in(after_snapshot, ["admission", "active"]) == 0 and
+      get_in(after_snapshot, ["admission", "queued"]) == 0 and
+      non_negative_integer?(after_snapshot["linked_tasks"]) and
+      non_negative_integer?(after_snapshot["unlinked_tasks"])
+  end
+
+  defp valid_failure_runtime?(_runtime), do: false
+
+  defp failure_live_rows(artifact) do
+    explicit = artifact["live_cases"] || []
+    completed_remaining = Enum.filter(artifact["remaining"] || [], &(&1["status"] == "complete"))
+    live_cases = Enum.filter(artifact["cases"] || [], &(&1["evidence_kind"] == "live"))
+
+    cond do
+      explicit != [] -> explicit
+      completed_remaining != [] -> completed_remaining
+      true -> live_cases
+    end
+  end
+
+  defp valid_failure_live_row?(row) do
+    checks = row["checks"]
+
+    row["id"] in @failure_live_ids and row["required"] == true and
+      row["evidence_kind"] == "live" and row["status"] == "complete" and
+      row["passing"] == true and valid_time_window?(row["started_at"], row["completed_at"]) and
+      is_list(checks) and checks != [] and
+      Enum.all?(checks, &(is_binary(&1["id"]) and &1["passing"] == true)) and
+      get_in(row, ["runtime", "leak_free"]) == true and
+      zero_leaks?(get_in(row, ["runtime", "leaks"]))
+  end
+
+  defp valid_time_window?(started_at, completed_at)
+       when is_binary(started_at) and is_binary(completed_at) do
+    with {:ok, started, _offset} <- DateTime.from_iso8601(started_at),
+         {:ok, completed, _offset} <- DateTime.from_iso8601(completed_at) do
+      DateTime.compare(completed, started) in [:eq, :gt]
+    else
+      _error -> false
+    end
+  end
+
+  defp valid_time_window?(_started_at, _completed_at), do: false
+
+  defp zero_leaks?(leaks) when is_map(leaks) and map_size(leaks) > 0,
+    do: Enum.all?(Map.values(leaks), &(&1 == 0))
+
+  defp zero_leaks?(_leaks), do: false
+
+  defp ids(rows), do: rows |> Enum.map(& &1["id"]) |> Enum.uniq() |> Enum.sort()
+  defp non_negative_integer?(value), do: is_integer(value) and value >= 0
+
+  defp unverifiable_failure_lane(path, reason) do
+    %{
+      "id" => "failure_recovery",
+      "status" => "unverifiable",
+      "passing" => false,
+      "fresh" => false,
+      "full_evidence" => false,
+      "scale" => "unverifiable",
+      "artifact" => %{"path" => path, "sha256" => file_sha256(path)},
+      "summary" => %{"authority" => %{"run_envelope_verified" => false}},
+      "limitation" => "Failure campaign artifact is legacy, tampered, or unverifiable: #{reason}",
+      "blocking_requirements" => [
+        %{
+          "kind" => "failure_recovery_artifact_unverifiable",
+          "message" => "Failure recovery authority requires a verified benchmark run envelope."
+        }
+      ]
+    }
   end
 
   defp overhead_lane(dir, max_age_hours) do
@@ -805,10 +1046,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp claims_gate(path, lanes) do
+  defp claims_gate(path, lanes, profile) do
     case read_claims(path) do
       {:ok, claims} ->
-        evaluated = Enum.map(claims, &evaluate_claim(&1, lanes))
+        selected_claims = ReleaseProfile.select_claims(claims, profile)
+        evaluated = Enum.map(selected_claims, &evaluate_claim(&1, lanes))
 
         blocking =
           Enum.filter(evaluated, &(&1["release_blocking"] == true and &1["status"] != "proven"))
@@ -817,6 +1059,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "status" => if(blocking == [], do: "full", else: "failing"),
           "passing" => blocking == [],
           "artifact" => %{"path" => path, "sha256" => file_sha256(path)},
+          "profile" => profile,
           "summary" => %{
             "total" => length(evaluated),
             "proven" => Enum.count(evaluated, &(&1["status"] == "proven")),
@@ -919,7 +1162,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     satisfied? =
       case {lane, evidence} do
         {%{"full_evidence" => true}, "full"} -> true
-        {%{"passing" => true}, "passing"} -> true
+        {%{"passing" => true, "fresh" => true}, "passing"} -> true
         _other -> false
       end
 

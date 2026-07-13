@@ -257,6 +257,70 @@
           "threshold": "mix protocol.check passes"
         }
       ]
+    },
+    {
+      "id": "claim.failure_recovery.deterministic_t0",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Provider-free repeated failure and recovery behavior with verified runtime leak accounting.",
+      "statement": "DSEx deterministic cancellation, timeout, bounded concurrency, partial-stream failure, retry/idempotency, and optimizer resume recovery paths pass the canonical T0 campaign without runtime leaks.",
+      "category": "operations",
+      "surface": [
+        "concurrency",
+        "streaming",
+        "training_protocol",
+        "optimizer_scheduling"
+      ],
+      "claim_type": "failure_recovery",
+      "comparison": "dsex_native",
+      "release_blocking": true,
+      "sources": [
+        "lib/dsex/benchmark_truth/failure_campaign.ex",
+        "test/failure_campaign_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "failure_recovery.t0",
+          "kind": "failure_recovery",
+          "lane": "failure_recovery",
+          "evidence": "passing",
+          "threshold": "verified current-schema artifact independently recomputes all deterministic cases and zero runtime leaks"
+        }
+      ]
+    },
+    {
+      "id": "claim.failure_recovery.live",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Completed live provider and integration recovery, beyond deterministic protocol simulation.",
+      "limitations": [
+        "The current deterministic campaign is T0 evidence and cannot establish live provider, training, retrieval, tool, or agent recovery."
+      ],
+      "statement": "DSEx failure recovery has verified completed live evidence for provider retry/timeout/idempotency and integrated training, retrieval, tool, and agent recovery.",
+      "category": "operations",
+      "surface": [
+        "ReqLLM",
+        "training_protocol",
+        "retriever_protocol",
+        "tools",
+        "agents"
+      ],
+      "claim_type": "live_provider_proof",
+      "comparison": "dsex_native",
+      "release_blocking": true,
+      "sources": [
+        "lib/dsex/benchmark_truth/failure_campaign.ex",
+        "test/failure_campaign_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "failure_recovery.live.full",
+          "kind": "failure_recovery",
+          "lane": "failure_recovery",
+          "evidence": "full",
+          "threshold": "verified deterministic T0 authority plus valid completed live rows for both required recovery campaigns"
+        }
+      ]
     }
   ]
 }

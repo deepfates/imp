@@ -6,6 +6,7 @@ defmodule DashboardTest do
   test "dashboard aggregates lane artifacts and require-full refuses missing lanes" do
     root = tmp_dir("dashboard")
     trace_dir = Path.join(root, "trace")
+    failure_campaign_dir = Path.join(root, "failure-campaign")
     overhead_dir = Path.join(root, "overhead")
     optimizer_dir = Path.join(root, "optimizer")
     instruction_optimizer_dir = Path.join(root, "instruction-optimizer")
@@ -21,6 +22,7 @@ defmodule DashboardTest do
     Enum.each(
       [
         trace_dir,
+        failure_campaign_dir,
         overhead_dir,
         optimizer_dir,
         instruction_optimizer_dir,
@@ -39,6 +41,7 @@ defmodule DashboardTest do
     write_gate_evidence!(gate_dir, "product_package", "package.check")
     write_gate_evidence!(gate_dir, "livebook_execute", "livebook.execute.check")
     write_gate_evidence!(gate_dir, "protocol_gates", "protocol.check")
+    write_failure_campaign!(failure_campaign_dir)
 
     write_json!(Path.join(trace_dir, "golden-trace-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -306,6 +309,8 @@ defmodule DashboardTest do
       Mix.Tasks.Dsex.Benchmark.Dashboard.run([
         "--trace-dir",
         trace_dir,
+        "--failure-campaign-dir",
+        failure_campaign_dir,
         "--overhead-dir",
         overhead_dir,
         "--optimizer-dir",
@@ -338,21 +343,23 @@ defmodule DashboardTest do
 
     refute dashboard["full_parity"]
     assert dashboard["performance_claim_supported"]
+    assert dashboard["profile"]["id"] == "telos"
     refute dashboard["release_gate"]["passing"]
 
     assert dashboard["release_gate"]["blocking_lanes"] == [
-             "live_provider_smoke",
-             "live_matched_model",
+             "failure_recovery",
              "gepa_replication",
+             "live_matched_model",
+             "live_provider_smoke",
              "optimize_anything",
              "public_claims"
            ]
 
     assert Enum.count(dashboard["release_gate"]["checks"]) == 14
     assert dashboard["claims"]["status"] == "failing"
-    assert dashboard["claims"]["summary"]["total"] == 11
-    assert dashboard["claims"]["summary"]["proven"] == 7
-    assert dashboard["claims"]["summary"]["blocked"] == 4
+    assert dashboard["claims"]["summary"]["total"] == 13
+    assert dashboard["claims"]["summary"]["proven"] == 8
+    assert dashboard["claims"]["summary"]["blocked"] == 5
     assert dashboard["claims"]["summary"]["non_blocking"] == 0
 
     proven_claim_ids =
@@ -363,6 +370,7 @@ defmodule DashboardTest do
 
     assert proven_claim_ids == [
              "claim.dspy_semantics.golden_trace",
+             "claim.failure_recovery.deterministic_t0",
              "claim.optimizer_lift.full",
              "claim.performance.provider_free",
              "claim.product.public_api_installable",
@@ -375,6 +383,17 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
     assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
     assert dashboard["lanes"]["live_provider_smoke"]["status"] == "missing"
+    assert dashboard["lanes"]["failure_recovery"]["status"] == "passing"
+    assert dashboard["lanes"]["failure_recovery"]["passing"]
+    refute dashboard["lanes"]["failure_recovery"]["full_evidence"]
+
+    assert get_in(dashboard, [
+             "lanes",
+             "failure_recovery",
+             "summary",
+             "authority",
+             "deterministic_complete"
+           ])
 
     assert Enum.map(
              dashboard["claims"]["blocking_requirements"],
@@ -384,7 +403,8 @@ defmodule DashboardTest do
              {"claim.live_matched_model.full_parity", ["live_matched_model.full"]},
              {"claim.gepa_replication.full", ["gepa_replication.full"]},
              {"claim.optimize_anything.non_prompt_effectiveness",
-              ["optimize_anything.non_prompt.full"]}
+              ["optimize_anything.non_prompt.full"]},
+             {"claim.failure_recovery.live", ["failure_recovery.live.full"]}
            ]
 
     active_live_claim =
@@ -543,6 +563,8 @@ defmodule DashboardTest do
           Mix.Tasks.Dsex.Benchmark.Dashboard.run([
             "--trace-dir",
             trace_dir,
+            "--failure-campaign-dir",
+            failure_campaign_dir,
             "--overhead-dir",
             overhead_dir,
             "--optimizer-dir",
@@ -973,7 +995,216 @@ defmodule DashboardTest do
     assert Enum.map(live_blockers, & &1["kind"]) == ["live_lane_full_evidence"]
   end
 
+  test "profiles select claim requirements and default keeps telos gaps visible" do
+    root = tmp_dir("dashboard-profile")
+    out_dir = Path.join(root, "out")
+    File.mkdir_p!(out_dir)
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--profile",
+        "v0.1",
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = path |> File.read!() |> Jason.decode!()
+
+    assert dashboard["profile"]["id"] == "v0.1"
+    assert dashboard["claims"]["summary"]["total"] == 6
+
+    assert dashboard["required_lanes"] == [
+             "failure_recovery",
+             "golden_trace",
+             "live_provider_smoke",
+             "livebook_execute",
+             "optimize_anything",
+             "product_package",
+             "protocol_gates"
+           ]
+
+    refute Enum.any?(dashboard["claims"]["claims"], &(&1["release"] == "telos"))
+
+    assert_raise Mix.Error, ~r/unknown release profile/, fn ->
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run(["--profile", "unknown", "--out", out_dir])
+    end
+  end
+
+  test "failure recovery authority rejects summaries and legacy files but accepts valid live rows" do
+    root = tmp_dir("dashboard-failure-authority")
+    deterministic_dir = Path.join(root, "deterministic")
+    live_dir = Path.join(root, "live")
+    legacy_dir = Path.join(root, "legacy")
+    Enum.each([deterministic_dir, live_dir, legacy_dir], &File.mkdir_p!/1)
+
+    write_failure_campaign!(deterministic_dir, reported_release_complete: true)
+    write_failure_campaign!(live_dir, live: true)
+
+    write_json!(Path.join(legacy_dir, "failure-campaign-legacy.json"), %{
+      "schema_version" => 2,
+      "runner" => "dsex-failure-campaign",
+      "summary" => %{"deterministic_complete" => true, "release_complete" => true}
+    })
+
+    deterministic = run_failure_dashboard!(root, "deterministic-out", deterministic_dir)
+    deterministic_lane = deterministic["lanes"]["failure_recovery"]
+    assert deterministic_lane["passing"]
+    refute deterministic_lane["full_evidence"]
+    assert deterministic_lane["summary"]["reported_summary"]["release_complete"]
+    refute deterministic_lane["summary"]["authority"]["live_complete"]
+
+    live = run_failure_dashboard!(root, "live-out", live_dir)
+    assert live["lanes"]["failure_recovery"]["status"] == "full"
+    assert live["lanes"]["failure_recovery"]["full_evidence"]
+
+    legacy = run_failure_dashboard!(root, "legacy-out", legacy_dir)
+    assert legacy["lanes"]["failure_recovery"]["status"] == "unverifiable"
+    refute legacy["lanes"]["failure_recovery"]["passing"]
+
+    refute legacy["lanes"]["failure_recovery"]["summary"]["authority"][
+             "run_envelope_verified"
+           ]
+  end
+
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp run_failure_dashboard!(root, out_name, failure_dir) do
+    out_dir = Path.join(root, out_name)
+    File.mkdir_p!(out_dir)
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--failure-campaign-dir",
+        failure_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    path |> File.read!() |> Jason.decode!()
+  end
+
+  defp write_failure_campaign!(dir, opts \\ []) do
+    File.mkdir_p!(dir)
+
+    cases =
+      Enum.map(
+        ~w(
+          task_cancellation_releases_admission
+          task_timeout_is_explicit_and_terminal
+          async_concurrency_is_bounded
+          partial_stream_failure_is_terminal
+          training_retry_and_idempotency_are_bounded
+          mipro_v2_durable_resume_and_tamper
+          simba_durable_resume_and_tamper
+        ),
+        fn id ->
+          %{
+            "id" => id,
+            "evidence_kind" => "deterministic",
+            "iterations" => 10,
+            "passing_iterations" => 10,
+            "failing_iterations" => 0,
+            "flake_rate" => 0.0,
+            "passing" => true,
+            "outcomes" =>
+              Enum.map(1..10, fn iteration ->
+                %{
+                  "iteration" => iteration,
+                  "passing" => true,
+                  "duration_ms" => 1,
+                  "evidence" => %{"verified" => true}
+                }
+              end)
+          }
+        end
+      )
+
+    live_cases =
+      if Keyword.get(opts, :live, false) do
+        Enum.map(
+          ~w(
+            provider_retry_timeout_idempotency_live
+            training_retrieval_tool_agent_recovery_live
+          ),
+          fn id ->
+            %{
+              "id" => id,
+              "required" => true,
+              "evidence_kind" => "live",
+              "status" => "complete",
+              "passing" => true,
+              "started_at" => "2026-07-07T00:00:00Z",
+              "completed_at" => "2026-07-07T00:01:00Z",
+              "checks" => [%{"id" => "recovery_completed", "passing" => true}],
+              "runtime" => %{"leak_free" => true, "leaks" => %{"active_tasks" => 0}}
+            }
+          end
+        )
+      else
+        []
+      end
+
+    artifact = %{
+      "schema_version" => 2,
+      "runner" => "dsex-failure-campaign",
+      "evidence_tier" => "t0_deterministic_failure_recovery",
+      "configuration" => %{"iterations" => 10, "required_flake_iterations" => 10},
+      "summary" => %{
+        "deterministic_complete" => true,
+        "live_complete" => Keyword.get(opts, :reported_release_complete, false),
+        "release_complete" => Keyword.get(opts, :reported_release_complete, false)
+      },
+      "runtime" => %{
+        "before" => %{
+          "admission" => %{"active" => 0, "queued" => 0},
+          "linked_tasks" => 0,
+          "unlinked_tasks" => 0
+        },
+        "after" => %{
+          "admission" => %{"active" => 0, "queued" => 0},
+          "linked_tasks" => 0,
+          "unlinked_tasks" => 0
+        },
+        "leaks" => %{
+          "admission_active" => 0,
+          "admission_queued" => 0,
+          "added_linked_tasks" => 0,
+          "added_unlinked_tasks" => 0
+        },
+        "leak_free" => true
+      },
+      "cases" => cases,
+      "live_cases" => live_cases,
+      "remaining" => [],
+      "scope" => Enum.map(cases, & &1["id"])
+    }
+
+    clock = fn -> ~U[2026-07-07 00:02:00Z] end
+
+    context =
+      DSEx.BenchmarkTruth.RunContext.new!(
+        source_commits: %{"dsex" => "deepfates/dsex@abc"},
+        workspace_state: "synthetic",
+        clock: clock
+      )
+
+    path = Path.join(dir, "failure-campaign-test.json")
+
+    %{path: written_path} =
+      DSEx.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, context)
+
+    written_path
+  end
 
   defp write_instruction_optimizer_contract!(dir, opts \\ []) do
     sources = [

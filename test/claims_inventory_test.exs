@@ -54,6 +54,18 @@ defmodule ClaimsInventoryTest do
     end)
   end
 
+  test "live failure recovery remains an explicit full-evidence telos gap" do
+    claim =
+      Enum.find(read_claims!(), &(&1["id"] == "claim.failure_recovery.live"))
+
+    assert claim["decision"] == "active_gap"
+    assert claim["release"] == "telos"
+    assert claim["release_blocking"]
+
+    assert [%{"lane" => "failure_recovery", "evidence" => "full"}] =
+             claim["requirements"]
+  end
+
   defp read_claims! do
     @claims_path
     |> File.read!()
