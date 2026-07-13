@@ -1030,10 +1030,22 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
       tier = artifact["evidence_tier"]
+      protocol = DSEx.BenchmarkTruth.RLMProtocol.evaluate(artifact)
 
       full =
         tier == "t3_paper_scale" and
-          get_in(artifact, ["summary", "paper_protocol_complete"]) == true
+          protocol["paper_protocol_complete"] == true
+
+      blocking =
+        protocol["checks"]
+        |> Enum.reject(& &1["passing"])
+        |> Enum.map(fn check ->
+          %{
+            "kind" => "rlm_t3_protocol_incomplete",
+            "check" => check["id"],
+            "message" => "RLM T3 mechanical check failed: #{check["id"]}"
+          }
+        end)
 
       artifact_lane("rlm_benchmark", path, artifact, max_age_hours,
         passing: passing,
@@ -1044,14 +1056,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "passing" => get_in(artifact, ["summary", "passing"]),
           "approaches" => get_in(artifact, ["summary", "approaches"]),
           "evidence_tier" => tier,
-          "paper_protocol_complete" => get_in(artifact, ["summary", "paper_protocol_complete"]),
+          "paper_protocol_complete" => protocol["paper_protocol_complete"],
+          "t3_gate_checks" => protocol["checks"],
           "full_rlm_benchmark_parity" => full
         },
+        blocking_requirements: blocking,
         limitation:
           if(full,
             do: nil,
             else:
-              "RLM evidence is below T3 paper scale; the deterministic mix benchmark.rlm.check replay cannot satisfy this release lane."
+              "RLM evidence does not mechanically satisfy every T3 family, count, context, baseline, runtime, row-shape, and evidence condition."
           )
       )
     else

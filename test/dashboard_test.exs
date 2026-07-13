@@ -352,14 +352,15 @@ defmodule DashboardTest do
              "live_matched_model",
              "live_provider_smoke",
              "optimize_anything",
+             "rlm_benchmark",
              "public_claims"
            ]
 
     assert Enum.count(dashboard["release_gate"]["checks"]) == 14
     assert dashboard["claims"]["status"] == "failing"
     assert dashboard["claims"]["summary"]["total"] == 13
-    assert dashboard["claims"]["summary"]["proven"] == 8
-    assert dashboard["claims"]["summary"]["blocked"] == 5
+    assert dashboard["claims"]["summary"]["proven"] == 7
+    assert dashboard["claims"]["summary"]["blocked"] == 6
     assert dashboard["claims"]["summary"]["non_blocking"] == 0
 
     proven_claim_ids =
@@ -375,8 +376,7 @@ defmodule DashboardTest do
              "claim.performance.provider_free",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
-             "claim.rag_tools_agents.full",
-             "claim.rlm.provider_free_benchmark"
+             "claim.rag_tools_agents.full"
            ]
 
     assert dashboard["lanes"]["product_package"]["status"] == "full"
@@ -404,6 +404,7 @@ defmodule DashboardTest do
              {"claim.gepa_replication.full", ["gepa_replication.full"]},
              {"claim.optimize_anything.non_prompt_effectiveness",
               ["optimize_anything.non_prompt.full"]},
+             {"claim.rlm.provider_free_benchmark", ["rlm_benchmark.full"]},
              {"claim.failure_recovery.live", ["failure_recovery.live.full"]}
            ]
 
@@ -418,7 +419,15 @@ defmodule DashboardTest do
     assert active_live_claim["release"] == "telos"
 
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
-    assert dashboard["lanes"]["rlm_benchmark"]["status"] == "full"
+    assert dashboard["lanes"]["rlm_benchmark"]["status"] == "passing"
+    refute dashboard["lanes"]["rlm_benchmark"]["full_evidence"]
+    refute dashboard["lanes"]["rlm_benchmark"]["summary"]["paper_protocol_complete"]
+
+    assert Enum.any?(
+             dashboard["lanes"]["rlm_benchmark"]["blocking_requirements"],
+             &(&1["check"] == "dataset_protocol")
+           )
+
     assert dashboard["lanes"]["provider_free_overhead"]["status"] == "full"
     assert dashboard["lanes"]["live_matched_model"]["status"] == "failing"
     assert dashboard["lanes"]["live_matched_model"]["summary"]["matrix_complete"] == false

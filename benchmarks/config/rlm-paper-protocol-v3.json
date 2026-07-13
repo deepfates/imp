@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "campaign_id": "de-m7aa-rlm-paper-protocol-v3",
+  "evidence_tier": "t3_paper_scale",
+  "authorities": {
+    "paper": {
+      "arxiv": "2512.24601v3"
+    },
+    "rlm": {
+      "repository": "https://github.com/alexzhang13/rlm",
+      "commit": "72d6940142ddfb84ee6be573dc999a37e633e671"
+    },
+    "dspy": {
+      "repository": "https://github.com/stanfordnlp/dspy",
+      "version": "3.3.0b1",
+      "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+    },
+    "sources": {
+      "paper_text": {
+        "path": "tmp/pdfs/rlm-2512.24601v3.txt",
+        "sha256": "4d3881423d60e0c0abdc77b5e08bd9e3d5835af49beb3833c000182ebdec4480"
+      },
+      "rlm_core": {
+        "path": "tmp/rlm-upstream/rlm/core/rlm.py",
+        "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
+      },
+      "rlm_prompts": {
+        "path": "tmp/rlm-upstream/rlm/utils/prompts.py",
+        "sha256": "579c8ef220739f691d3896257b8289eec7e7b634fe473f41dea4adb83560b47e"
+      },
+      "dspy_rlm": {
+        "path": "tmp/dspy-current-target/dspy/predict/rlm.py",
+        "sha256": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8"
+      },
+      "dspy_interpreter": {
+        "path": "tmp/dspy-current-target/dspy/primitives/python_interpreter.py",
+        "sha256": "fef9baa19cd979e8466ef19e364e5f7e67848c9738955a2d3e1f0d7dae2177d4"
+      }
+    }
+  },
+  "models": {
+    "root": {
+      "logical": "gpt-5",
+      "dsex": "openai:gpt-5",
+      "dspy": "openai/gpt-5",
+      "temperature": 1.0,
+      "reasoning": "medium",
+      "max_output_tokens": 32768
+    },
+    "submodel": {
+      "logical": "gpt-5-mini",
+      "dsex": "openai:gpt-5-mini",
+      "dspy": "openai/gpt-5-mini",
+      "temperature": 1.0,
+      "reasoning": "medium",
+      "max_output_tokens": 16384
+    },
+    "compaction": {
+      "logical": "gpt-5-nano",
+      "dsex": "openai:gpt-5-nano",
+      "dspy": "openai/gpt-5-nano",
+      "temperature": 1.0,
+      "reasoning": "medium",
+      "max_output_tokens": 8192
+    }
+  },
+  "approaches": {
+    "direct": {
+      "enabled": true,
+      "runtimes": ["dsex", "dspy"],
+      "budget": {"requests": 500, "input_tokens": 100000000, "output_tokens": 5000000, "usd": 5000.0},
+      "settings": {"reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
+    },
+    "simple_retrieval": {
+      "enabled": true,
+      "runtimes": ["dsex", "dspy"],
+      "budget": {"requests": 500, "input_tokens": 10000000, "output_tokens": 5000000, "usd": 2500.0},
+      "settings": {"k": 8, "retriever": "deterministic_lexical", "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
+    },
+    "compaction": {
+      "enabled": true,
+      "runtimes": ["dsex", "dspy"],
+      "budget": {"requests": 20000, "input_tokens": 200000000, "output_tokens": 20000000, "usd": 7500.0},
+      "settings": {"chunk_chars": 100000, "max_chunks": 32, "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
+    },
+    "rlm": {
+      "enabled": true,
+      "runtimes": ["dsex", "dspy"],
+      "budget": {"requests": 50000, "input_tokens": 200000000, "output_tokens": 50000000, "usd": 15000.0},
+      "settings": {"max_iterations": 20, "max_llm_calls": 500, "recursion_depth": 1, "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
+    }
+  },
+  "execution": {
+    "seed": 251224601,
+    "concurrency": 4,
+    "row_timeout_ms": 1800000,
+    "cancellation_grace_ms": 5000,
+    "bootstrap_samples": 10000,
+    "confidence": 0.95
+  },
+  "datasets": {
+    "s_niah": {
+      "path": "../data/rlm/s_niah.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "RULER-derived S-NIAH protocol packaged by the campaign operator",
+      "revision": "paper arXiv:2512.24601v3 protocol",
+      "split": "paper_eval",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "exact_match"
+    },
+    "browsecomp_plus": {
+      "path": "../data/rlm/browsecomp_plus_1k.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "BrowseComp-Plus official release",
+      "revision": "official release pinned during acquisition",
+      "split": "paper_random_150",
+      "sample_count": 150,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [],
+      "docs_per_instance": 1000,
+      "metric": "exact_match"
+    },
+    "oolong": {
+      "path": "../data/rlm/oolong_trec_coarse.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "OOLONG official release",
+      "revision": "official release pinned during acquisition",
+      "split": "trec_coarse",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "token_f1"
+    },
+    "oolong_pairs": {
+      "path": "../data/rlm/oolong_pairs_trec_coarse.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "RLM paper OOLONG-Pairs construction over OOLONG trec_coarse",
+      "revision": "arXiv:2512.24601v3 Appendix D.1",
+      "split": "trec_coarse",
+      "sample_count": 20,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576],
+      "docs_per_instance": null,
+      "metric": "token_f1"
+    },
+    "longbench_v2_codeqa": {
+      "path": "../data/rlm/longbench_v2_codeqa.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "LongBench-v2 official release",
+      "revision": "official release pinned during acquisition",
+      "split": "CodeQA",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "exact_match"
+    }
+  },
+  "deviations": [
+    {
+      "id": "dsex_repl_language",
+      "scope": "dsex:rlm",
+      "paper_behavior": "Python REPL over external context variables",
+      "implementation": "BEAM-native constrained Elixir-shaped interpreter with equivalent persistent variable and sub-LM effects",
+      "impact": "trajectory syntax is not byte-for-byte comparable; answer, budget, and effect shape remain comparable"
+    },
+    {
+      "id": "retrieval_codeact_equivalent",
+      "scope": "simple_retrieval",
+      "paper_behavior": "CodeAct with BM25 where retrieval is usable",
+      "implementation": "deterministic lexical top-k retrieval followed by the root predictor",
+      "impact": "reported as a simple retrieval/CodeAct-equivalent baseline, never as exact CodeAct parity"
+    },
+    {
+      "id": "blocking_vs_bounded_concurrency",
+      "scope": "campaign",
+      "paper_behavior": "paper implementation reports blocking/sequential LM calls",
+      "implementation": "rows run with manifest-bounded concurrency; each row records wall latency and exact provider usage",
+      "impact": "quality and cost are paired; campaign wall time is not a paper runtime reproduction"
+    },
+    {
+      "id": "dspy_rlm_release_semantics",
+      "scope": "dspy:rlm",
+      "paper_behavior": "alexzhang13/rlm reference runtime",
+      "implementation": "DSPy 3.3.0b1 dspy.RLM with pinned source files",
+      "impact": "cross-runtime comparison is supported for RLM answer/effect evidence, not identical prompts or interpreter trajectories"
+    }
+  ]
+}

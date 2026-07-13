@@ -73,7 +73,9 @@ The T1 artifact proves operational semantics only.
 
 This tier requires preregistered samples from the paper task families, matched
 root/submodel settings, no gold leakage, per-row trajectories, complete token
-and cost accounting, task metrics, and paired uncertainty.
+and cost accounting, task metrics, and paired uncertainty. The campaign runner
+supports a manifest whose five family counts may be smaller than T3, but the
+artifact remains labeled `t2_live_sample` and cannot pass the paper-scale gate.
 
 ### T3: Paper-Scale Reproduction
 
@@ -85,6 +87,73 @@ T3 has not been completed. The upstream-fidelity ledger and dashboard therefore
 keep RLM red even when T0, T1, deterministic tests, and live provider workflows
 pass.
 
+## T2/T3 Campaign Runner
+
+`benchmarks/config/rlm-paper-protocol-v3.json` is the preregistration authority
+for ticket `de-m7aa`. It pins arXiv:2512.24601v3,
+`alexzhang13/rlm@72d6940142ddfb84ee6be573dc999a37e633e671`, DSPy
+3.3.0b1, audited source hashes, model roles, approach settings, budgets, seeds,
+timeouts, and the paper context grid.
+
+The checked-in manifest intentionally contains `ACQUIRE_AND_PIN_SHA256` and
+`ACQUIRE_AND_FREEZE_IDS` for ignored/local datasets. Those values are accepted
+only by `--plan`. Dry-run and live execution reject them.
+
+```console
+mix dsex.benchmark.rlm_campaign --plan
+mix dsex.benchmark.rlm_campaign --dry-run
+mix dsex.benchmark.rlm_campaign --runtime dsex
+mix dsex.benchmark.rlm_campaign --runtime dspy
+mix dsex.benchmark.rlm_campaign --runtime both
+```
+
+There is no fixture/oracle execution mode. Before each external row dispatch,
+the runner atomically writes an intent. It atomically replaces that intent with
+the complete outcome only after validated output returns. A surviving intent
+has an ambiguous external outcome, so resume fails closed instead of replaying
+the row. Committed rows are checksum and identity bound and are never replayed.
+
+Budgets are independent for every runtime/approach pair. Reservations happen
+before every DSEx provider call, observed provider token/cost usage is required,
+and the DSPy sidecar independently applies the remaining ceiling. Missing usage
+or malformed output is terminal row evidence. Campaign concurrency and row
+timeouts are manifest bounded; timeout or task failure leaves the intent for an
+explicit operator audit.
+
+Each successful row records answer score, wall latency, request count, input and
+output tokens, USD cost, trace shape, and bounded trace data. Aggregation uses a
+deterministic paired nonparametric bootstrap over shared family/example keys.
+
+## Mechanical T3 Gate
+
+Neither the runner nor dashboard trusts `paper_protocol_complete`. The shared
+gate recomputes all of these conditions from artifact content:
+
+- 50 S-NIAH, 150 BrowseComp+ rows with exactly 1,000 documents and evidence,
+  50 OOLONG `trec_coarse`, 20 OOLONG-Pairs queries at all 11 context sizes, and
+  50 LongBench-v2 CodeQA rows;
+- direct, simple retrieval/CodeAct-equivalent, compaction, and RLM outcomes for
+  every selected runtime;
+- both DSEx and DSPy RLM coverage for a cross-runtime T3 claim;
+- pinned paper/RLM/DSPy authorities and root, submodel, and compaction roles;
+- complete row usage, latency, score, and trace shapes; and
+- explicit deviation records.
+
+The OOLONG-Pairs condition means 20 logical queries and 220 evaluated rows.
+Any partial family, missing context, malformed row, or false completion flag
+keeps the lane below full evidence.
+
+## Recorded Deviations
+
+- DSEx uses its constrained BEAM-native interpreter rather than Python syntax.
+- The simple retrieval lane is deterministic lexical top-k and is labeled a
+  CodeAct equivalent, not exact paper CodeAct parity.
+- Rows use bounded campaign concurrency although the paper reports blocking,
+  sequential calls; campaign wall time is therefore not paper-runtime parity.
+- Python comparison uses the pinned DSPy 3.3.0b1 `dspy.RLM`, not the standalone
+  reference package, so prompt and interpreter trajectories are not asserted to
+  be identical.
+
 ## Executable Evidence
 
 - `test/rlm_interpreter_test.exs`
@@ -93,4 +162,5 @@ pass.
 - `test/rlm_contract_artifact_test.exs`
 - `test/live_provider_e2e_test.exs`
 - Source checkout: `mix benchmark.rlm.contract.check`
+- Source checkout: `mix dsex.benchmark.rlm_campaign --plan`
 - Source checkout: `LIVE_PROVIDER=1 mix live.check`
