@@ -1,0 +1,793 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-22c-form-sound-identity-grammar",
+    "generated_at": "2026-07-13T15:00:00-07:00",
+    "generator": {
+      "kind": "agent",
+      "name": "Codex",
+      "provider": "OpenAI",
+      "model": "GPT-5",
+      "reasoning_effort": "high",
+      "agent_id": "codex"
+    },
+    "method": "independent naming form-saturation wave D; two isolated ten-observation matrix cells generated from product truth and the assigned form audit",
+    "brief": "Generate raw, unranked divergence for the Sound figures and Identity grammar cells. Preserve adverse and wildcard observations, and distinguish the named sound mechanisms and identity roles without implying selection or availability.",
+    "prompt_path": "identity/prompts/form-correction.md",
+    "prompt_sha256": "5f4216d1b7ad963055aa36d2e9cc41181e53ae1a3d8fc54b70d3f9590f640c9d",
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "abstract-sound-symbolic",
+      "play-games",
+      "plurality-ecosystem",
+      "infrastructure-logistics"
+    ],
+    "intended_strategies": [
+      "abstract-sound-brand",
+      "ordinary-object",
+      "namespace-led",
+      "institutional-community",
+      "descriptive-category"
+    ],
+    "intended_audiences": [
+      "international-users",
+      "elixir-newcomers",
+      "future-maintainers",
+      "buyers-founders",
+      "oss-contributors"
+    ],
+    "notes": [
+      "assigned_cells=Sound figures; Identity grammar",
+      "audit_path=identity/reports/saturation-form-audit.md",
+      "audit_sha256=06831eef17c05a5faffcc1cb0376a5da838bd3fb5a5db907b7fd398ce2814ef7",
+      "isolation=surfaces were generated and frozen before any candidate, registry, enrichment, score, or wave-C surface was read",
+      "quotas=each cell has 10 contiguous ordinals, 2 wildcards, stance 5 affirmative/3 ambivalent/2 adverse, and scope 4 current/4 horizon/2 both",
+      "provenance=independent wave D observation; no parent lineage, ranking, shortlist, availability check, or selection",
+      "registry_overlap=ordinal 15 Manyfold normalized manyfold matches occurrence occ-6119df22efb6ae0c from run-17a-form-derivation-grammar-systems; surface preserved",
+      "registry_overlap=ordinal 16 Stewardry normalized stewardry matches occurrence occ-b869e69ef80d3121 from run-09-boundaries-limits-care; surface preserved"
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Check Chime",
+      "pronunciation": "/tʃɛk tʃaɪm/; plain phonetic: chek chime",
+      "grammar": "Two-word noun phrase for a display identity or documentation heading, not a command. Alliteration is the repeated initial /tʃ/ onset; the final vowels and codas differ, so this is not rhyme.",
+      "rationale": "Sound figure=alliteration only: Check and Chime share the /tʃ/ onset, while /ɛk/ and /aɪm/ prevent a rhyme claim. Current embodiment=the candidate could truthfully label documentation for the existing pre-release Elixir library and OTP application that declares, calls, evaluates, optimizes, and operates LM programs; it cannot claim a shipped notification or audio feature. Horizon embodiment=it could conditionally label an artifact-optimization guide or playbook family, not autonomous improvement. Stance=affirmative; scope=current.",
+      "etymology": "coined/no source as a product name; ordinary English check and chime are juxtaposed for onset repetition, not borrowed as a cultural claim",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "single-branded-house"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: an international user dictating the name needs the README pronunciation /tʃɛk tʃaɪm/ and a text search path; the cost is one spelling repair when chime is heard as time; no speech-to-text guarantee is available",
+        "power and repair: a maintainer may correct a mistaken docs label through a versioned issue or pull request, but affected publics have no project council or redress institution; the unavailable mechanism is public governance, not implied by chime"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=alliteration; not full rhyme, slant rhyme, reduplication, consonance, assonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=check_chime; otp_app=check_chime; module_root=CheckChime; mix_task_prefix=check_chime; config_prefix=check_chime; telemetry_prefix=[:check_chime]; display phrase and runtime identifiers remain separate",
+        "limitations=not an official DSPy port, provider SDK, hosted service, formal proof system, or stable published package"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Trace Grace",
+      "pronunciation": "/treɪs ɡreɪs/; plain phonetic: trays grays",
+      "grammar": "Two-word noun phrase; Trace is a possible documentation verb or noun, while Grace is a proper-sounding noun. Full rhyme occurs at the stressed final syllable /eɪs/; unlike alliteration, the onsets /tr/ and /ɡr/ differ.",
+      "rationale": "Sound figure=full rhyme: Trace and Grace share the stressed rime /eɪs/ exactly after different onsets. Current embodiment=the candidate can describe existing trace and evidence-bearing evaluation paths in the pre-release Elixir library, but it cannot promise graceful recovery or durable rollback. Horizon embodiment=it could conditionally identify a research effort comparing artifact candidates across instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, and configuration. Stance=affirmative; scope=current.",
+      "etymology": "coined/no source as a product name; trace and grace are ordinary English words paired for a full phonological rhyme",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a newcomer can reach the support call through the README and IEx examples, but listeners may write Grace as graze; the spelling-repair cost is a second verbal confirmation; no listener study or screen-reader preference is available",
+        "power and repair: an evaluator can publish a falsifying score and issue against a trace claim, while a person affected by an optimized program has no direct appeal route; the unavailable mechanism is human redress governance"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=full rhyme; not alliteration, slant rhyme, reduplication, consonance, assonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=trace_grace; otp_app=trace_grace; module_root=TraceGrace; mix_task_prefix=trace_grace; config_prefix=trace_grace; telemetry_prefix=[:trace_grace]",
+        "limitations=grace is a semantic association, not evidence of reliability, safety, or successful optimization"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Mark Murk",
+      "pronunciation": "/mɑɹk mɝɹk/; plain phonetic: mark murk; accent-dependent first vowel",
+      "grammar": "Two-word noun phrase with a command-adjacent noun Mark and a negatively valenced noun Murk. Slant rhyme only: both words end in /ɹk/, but /ɑɹ/ and /ɝɹ/ differ; the shared /m/ onset is incidental, not the mechanism tested.",
+      "rationale": "Sound figure=slant rhyme: Mark and Murk share the coda /ɹk/ but not the stressed vowel, so they are not a full rhyme. Current embodiment=the candidate could label a bounded evidence or trace view in the current pre-release library, where uncertainty and failure remain visible; it cannot claim that the system removes murk or resolves ambiguity. Horizon embodiment=it could conditionally identify a refusal-aware artifact review playbook. Stance=affirmative; scope=current.",
+      "etymology": "coined/no source as a product name; ordinary English mark and murk are paired for a consonant-and-coda rhyme with vowel mismatch",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: an international user needs the plain phonetic note because rhotic and non-rhotic accents realize the /r/ differently; the access path is a pronunciation line in docs and the cost is extra dictation correction; no validated multilingual pronunciation is available",
+        "power and repair: a maintainer can expose uncertain evaluation evidence in an issue, but a buyer cannot obtain a contractual guarantee or independent appeal from this name; unavailable mechanism=legal assurance and public redress"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=slant rhyme; not full rhyme, alliteration, reduplication, consonance, assonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=mark_murk; otp_app=mark_murk; module_root=MarkMurk; mix_task_prefix=mark_murk; config_prefix=mark_murk; telemetry_prefix=[:mark_murk]",
+        "limitations=the negative word murk may overstate uncertainty and remains culturally ordinary English rather than globally neutral"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Echo Echo",
+      "pronunciation": "/ˈɛkoʊ ˈɛkoʊ/; plain phonetic: eh-koh eh-koh",
+      "grammar": "Exact reduplication of the complete lexical item Echo; a noun phrase that can serve as a documentation label, not an inflected command. The repeated word is the mechanism, not an alliterative onset or a claim that the form imitates a real echo.",
+      "rationale": "Sound figure=reduplication: the same two-syllable lexical item is repeated without stem change. It is not onomatopoeia merely because echo is sound-related; the surface does not imitate an acoustic waveform. Current embodiment=it can truthfully label repeated trace inspection or history display already supported by the library observability concepts, but not durable replay or rollback. Horizon embodiment=it could conditionally name a repeated-evaluation artifact workflow. Stance=affirmative; scope=current.",
+      "etymology": "coined/no source as a product name; English echo is repeated lexically rather than borrowed from a named language or culture",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a screen reader will repeat the word and may make the label sound like duplicated content; the documentation path must explain the single spoken phrase, with a small comprehension cost; no alternate non-reduplicated label is shipped",
+        "power and repair: an operator can stop a failing run through existing explicit runtime boundaries, but affected people cannot use Echo Echo to demand repair; unavailable mechanism=community adjudication and compensation"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=exact lexical reduplication; not rhyme, alliteration, consonance, assonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=echo_echo; otp_app=echo_echo; module_root=EchoEcho; mix_task_prefix=echo_echo; config_prefix=echo_echo; telemetry_prefix=[:echo_echo]",
+        "limitations=echo may imply replay, persistence, or audio behavior beyond the current product boundary"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Tap Tap",
+      "pronunciation": "/tæp tæp/; plain phonetic: tap tap",
+      "grammar": "Two identical monosyllabic nouns or an imperative-like reduplicated phrase. The exact repeated word creates reduplication; the semantic relation to a tapping sound does not by itself make the form onomatopoeia.",
+      "rationale": "Sound figure=reduplication with a repeated lexical item, deliberately kept separate from onomatopoeia: Tap is an ordinary word whose repetition can suggest cadence, not a transcription of an actual system sound. Current embodiment=the candidate can only be a raw label for a current documentation sequence such as declare, call, evaluate; no haptic or UI tap exists in the repository. Horizon embodiment=it could conditionally label a stepwise artifact-editing playbook or demonstration set. Stance=affirmative; scope=horizon.",
+      "etymology": "coined/no source as a product name; English tap is repeated as an ordinary word, with no external-language claim",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "shared-prefix-family",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a newcomer may infer a touch interface; the README access path must state that the current product is an Elixir/OTP library and the cost is correcting a UI expectation; no haptic implementation is available",
+        "power and repair: an optimizer maintainer can inspect an artifact diff and open a patch, but users affected by a future stepwise workflow have no consent or appeal mechanism; unavailable mechanism=participatory governance"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=exact lexical reduplication; not onomatopoeia, ideophone, rhyme, alliteration, consonance, or assonance",
+        "code projections=hex_package=tap_tap; otp_app=tap_tap; module_root=TapTap; mix_task_prefix=tap_tap; config_prefix=tap_tap; telemetry_prefix=[:tap_tap]",
+        "limitations=horizon embodiment is conditional and cannot be presented as a shipped editor, haptic surface, or autonomous loop"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "Metric Limit",
+      "pronunciation": "/ˈmɛtrɪk ˈlɪmɪt/; plain phonetic: met-rik lim-it",
+      "grammar": "Two-word noun phrase. Assonance is repeated short /ɪ/ in the unstressed syllables of Metric and the stressed/unstressed sequence in Limit; initial consonants /m/ and /l/ differ and the endings do not rhyme.",
+      "rationale": "Sound figure=assonance: repeated /ɪ/ vowels carry across Metric and Limit while consonants and final segments differ. This is not alliteration, consonance, or rhyme. Current embodiment=the name could describe the current metric-driven evaluation and explicit limit boundaries, but it cannot claim complete measurement or guaranteed safety. Horizon embodiment=it could conditionally name a research track for optimizing arbitrary text artifacts against held-out metrics. Stance=ambivalent; scope=horizon.",
+      "etymology": "coined/no source as a product name; ordinary English metric and limit are paired for internal vowel recurrence",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "neutral-master-beam-implementation"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: the short /ɪ/ contrast can be hard for international speakers and speech recognition; access is a pronunciation note plus written search, with dictation correction cost; no language-specific listener evidence is available",
+        "power and repair: a researcher can challenge a metric in a reproducible report, but affected publics cannot veto what gets optimized; unavailable mechanism=public governance over objective choice"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=assonance; not alliteration, full/slant rhyme, reduplication, consonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=metric_limit; otp_app=metric_limit; module_root=MetricLimit; mix_task_prefix=metric_limit; config_prefix=metric_limit; telemetry_prefix=[:metric_limit]",
+        "limitations=limit is a useful boundary cue but cannot guarantee formal verification, compile-time type safety, or human-centered outcomes"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Result Vault",
+      "pronunciation": "/rɪˈzʌlt vɔːlt/; plain phonetic: ri-zult vault",
+      "grammar": "Two-word noun phrase. Consonance is the repeated final /t/ in Result and Vault; their vowels and onsets differ, so this is not alliteration, assonance, or rhyme.",
+      "rationale": "Sound figure=consonance: the /t/ coda recurs across the two words while the vowel nuclei differ. Current embodiment=Result Vault is only ambivalent as a label for current evidence-bearing evaluation and persistence concepts: the repository has results and artifacts, but not a guaranteed vault, archival durability, or secret store. Horizon embodiment=it could conditionally name an artifact archive or configuration plane in the credible horizon. Stance=ambivalent; scope=horizon.",
+      "etymology": "coined/no source as a product name; ordinary English result and vault are paired for final-consonant recurrence",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a non-rhotic speaker can pronounce the pair clearly but may still hear vault as fault; the access path is typed documentation and the cost is one spelling repair; no speech recovery test is available",
+        "power and repair: an operator may inspect current persisted artifacts and file a maintainer issue, but a person affected by a stored decision cannot access a correction vault; unavailable mechanism=retention policy, consent, and redress"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=consonance at final /t/; not alliteration, full/slant rhyme, reduplication, assonance, ideophone, or onomatopoeia",
+        "code projections=hex_package=result_vault; otp_app=result_vault; module_root=ResultVault; mix_task_prefix=result_vault; config_prefix=result_vault; telemetry_prefix=[:result_vault]",
+        "limitations=vault language risks an unsupported durability or security promise; current persistence remains bounded implementation evidence"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Tukut",
+      "pronunciation": "/ˈtuː.kʊt/; plain phonetic: too-kut, with two abrupt stop consonants",
+      "grammar": "Coined count noun and event label. Ideophone=the compact vowel and stop sequence depicts discrete, clipped checking steps; it is not onomatopoeia because it does not imitate an identifiable external sound.",
+      "rationale": "Sound figure=ideophone only: Tukut evokes a bounded, stepwise texture through phonotactics and rhythm, rather than naming or imitating a real noise. Current embodiment=the candidate could describe a current explicit call/evaluate boundary only as a metaphor, not as a runtime event or haptic action. Horizon embodiment=it could conditionally name a demonstration mutation or playbook step in the artifact-optimization substrate. Stance=ambivalent; scope=both.",
+      "etymology": "coined/no source; no language borrowing is asserted and no external sound source is claimed; cultural review is not applicable to the invented form but international review remains open",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "shared-prefix-family"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: international users may omit the final /t/ or read the form as a language word; the access path is a plain phonetic guide and spelling in docs, with repeated dictation cost; no pronunciation authority or listener panel is available",
+        "power and repair: a maintainer can explain or retire a misleading metaphor through a changelog, but affected users have no naming vote or repair fund; unavailable mechanism=community stewardship and redress"
+      ],
+      "wildcard": false,
+      "notes": [
+        "mechanism=ideophone; explicitly not onomatopoeia, alliteration, rhyme, reduplication, consonance, or assonance",
+        "code projections=hex_package=tukut; otp_app=tukut; module_root=Tukut; mix_task_prefix=tukut; config_prefix=tukut; telemetry_prefix=[:tukut]",
+        "limitations=coined phonosemantics are unverified across languages and do not establish usability, authority, or product behavior"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Ping",
+      "pronunciation": "/pɪŋ/; plain phonetic: ping",
+      "grammar": "One-word noun or verb. Onomatopoeia is intentional imitation of a short alert-like sound; it is not merely an ideophone, and it does not establish that the product emits notifications.",
+      "rationale": "Sound figure=onomatopoeia: Ping imitates a recognizable short signal, unlike an ideophone that depicts manner or intensity without copying a source sound. Current embodiment=the candidate is adverse because the current library has telemetry and explicit runtime boundaries but no promised ping or notification product. Horizon embodiment=only conditional documentation for an event-stream example is possible; it must not be presented as hosted monitoring. Stance=adverse; scope=both.",
+      "etymology": "coined/no source as a product name; English ping is an onomatopoeic lexical item for a short signal, with no claim to a proprietary sound",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: screen-reader users may interpret Ping as an incoming alert and be denied the intended quiet context; the access path is a visible text descriptor and the cost is notification confusion; unavailable mechanism=no shipped accessibility preference or alert service",
+        "power and repair: an operator can inspect redacted telemetry and open an issue, but affected people cannot silence or contest a future alert policy; unavailable mechanism=consent, notification control, and public redress"
+      ],
+      "wildcard": true,
+      "notes": [
+        "mechanism=onomatopoeia; not ideophone, alliteration, rhyme, reduplication, consonance, or assonance",
+        "code projections=hex_package=ping; otp_app=ping; module_root=Ping; mix_task_prefix=ping; config_prefix=ping; telemetry_prefix=[:ping]; these projections are mechanically viable but do not make a notification claim",
+        "limitations=adverse wildcard preserved; likely generic and semantically overpromising for a pre-release programming library; no availability check performed"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Krrt",
+      "pronunciation": "intended /kɹt/ with no vowel; plain phonetic: krrt, a clipped scrape",
+      "grammar": "Coined consonant cluster used only as a written noise token. Onomatopoeia is the intended imitation of a scrape or abrupt interruption, but the absent vowel makes ordinary speech and inflection unavailable.",
+      "rationale": "Sound figure=deliberately non-speakable onomatopoeia: Krrt attempts to write a scrape, not an ideophone, and its failure is part of the observation. Current embodiment=adverse and non-code: the pre-release Elixir library has no verified sound channel and the form cannot truthfully name a callable program. Horizon embodiment=conditional only as a quoted documentation counterexample for inaccessible code-token naming, never as a shipped product or protocol. Stance=adverse; scope=horizon.",
+      "etymology": "coined/no source; consonant-only invented noise token with no language, morphology, or cultural borrowing claimed",
+      "territories": [
+        "abstract-sound-symbolic",
+        "play-games"
+      ],
+      "strategies": [
+        "abstract-sound-brand",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "elixir-newcomers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "beam-master"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a screen reader will spell or omit the cluster and a dictation user cannot recover it reliably; access path=explicit text transcription in the audit, cost=manual spelling every time; unavailable mechanism=spoken support and accessible code identity",
+        "power and repair: a maintainer can replace the token in documentation, but users with speech or motor access needs have no alternate interface or appeal route; unavailable mechanism=accessible governance and repair workflow"
+      ],
+      "wildcard": true,
+      "notes": [
+        "mechanism=failed onomatopoeia/code-token probe; not ideophone, alliteration, rhyme, reduplication, consonance, or assonance",
+        "code projections=precise non-code reason: no viable conventional projection because the surface has no vowel, cannot be reliably dictated, and would turn a display noise into an opaque package identity; any hex_package=krrt, otp_app=krrt, module_root=Krrt, mix_task_prefix=krrt, config_prefix=krrt, telemetry_prefix=[:krrt] is recorded only as a failure fixture, not a recommendation",
+        "limitations=adverse wildcard preserved; malformed and inaccessible by design; no availability check or repair after freezing"
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "Kintra",
+      "pronunciation": "/ˈkɪntrə/; plain phonetic: kin-truh",
+      "grammar": "Invented count noun and proper master label; singular Kintra can name the system, while Kintra Programs is a plural family descriptor. The grammar deliberately separates master, descriptor, and code root.",
+      "rationale": "Identity grammar system, not a lone label. Current embodiment=library/descriptor/research labels can describe verified DSEx behavior if adopted, not current adoption. Horizon embodiment=artifact-optimization substrate across instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, and configuration remains conditional. Stance=affirmative; scope=current. Roles=master=Kintra; descriptor=Kintra, declared and callable LM programs for Elixir; library=Kintra as a hypothetical package label for the existing pre-release library and OTP application; research=Kintra Research for repository-local optimizer and evidence work; community=Kintra Commons as a conditional future group; company/steward=unavailable as a current claim because no company or steward evidence exists; protocol=unavailable because DSEx is not a protocol; hosted=unavailable because no hosted service exists; product-family=Kintra Programs, conditional horizon only.",
+      "etymology": "coined/no source; invented form chosen for a speakable consonant-vowel rhythm, with no claimed language origin",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "shared-prefix-family",
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: a newcomer can reach the exact descriptor and pronunciation through README and ExDoc search, while an international speaker may confuse Kintra with kintra or contra; cost=one spelling correction; unavailable mechanism=listener-tested multilingual support",
+        "refusal and repair: a maintainer can refuse an unsupported company, hosted, or protocol claim in docs and accept a correction through a public issue; affected publics have no council, compensation, or redress path, all unavailable today",
+        "power: buyers may read Commons or Research as institutional authority; the access path to challenge that reading is a repository issue, with contributor time as the cost and no independent governance body available"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Kintra; descriptor=Kintra, declared and callable LM programs for Elixir; library=Kintra as a hypothetical package label for the existing pre-release library and OTP application; research=Kintra Research for repository-local optimizer and evidence work; community=Kintra Commons as a conditional future group; company/steward=unavailable as a current claim because no company or steward evidence exists; protocol=unavailable because DSEx is not a protocol; hosted=unavailable because no hosted service exists; product-family=Kintra Programs, conditional horizon only.",
+        "code projections=hex_package=kintra; otp_app=kintra; module_root=Kintra; mix_task_prefix=kintra; config_prefix=kintra; telemetry_prefix=[:kintra]",
+        "limitations=not selected, not an availability result, not a company or hosted product, and not evidence of a stable package"
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "Relaystead",
+      "pronunciation": "/ˈriːleɪstɛd/; plain phonetic: ree-lay-sted",
+      "grammar": "Invented compound noun used as a master identity; Relaystead Ledger is a descriptor and Relaystead is the code root. The compound suggests coordination but does not grammatically assert a network service.",
+      "rationale": "Identity grammar system. Current embodiment=the library, app, evaluation, optimizer, and telemetry roles map to existing repository behavior without claiming DSPy parity. Horizon embodiment=conditional artifact-optimization planes. Stance=affirmative; scope=current. Roles=master=Relaystead; descriptor=Relaystead, an Elixir library for declared, callable, measurable, and improvable LM programs; library=Relaystead package and OTP app as a proposed naming layer over the verified DSEx modules; research=Relaystead Studies for current repository-local evidence and optimizer experiments; community=Relaystead Commons, unavailable currently because no community institution is verified; company/steward=unavailable because no legal steward is established; protocol=unavailable because the product has explicit boundaries, not a published protocol; hosted=unavailable because there is no hosted deployment; product-family=Relaystead Ledger and Relaystead Programs, horizon-only conditional.",
+      "etymology": "coined/no source; transparent English compound relay plus stead, with no eponym or cross-language borrowing",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "shared-prefix-family",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: the README can expose /ˈriːleɪstɛd/ and the plain descriptor, but listeners may split Relaystead as relay state; correction requires written confirmation and maintainer time; unavailable mechanism=independent dictation testing",
+        "refusal and repair: maintainers can decline hosted or protocol wording in a pull request and document a correction, but affected publics cannot invoke an ombud or compensation path; those governance mechanisms are unavailable",
+        "power: Ledger and Stead language may imply custody and continuity; a buyer can challenge the claim through an issue or support request, but no procurement guarantee or public oversight exists"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Relaystead; descriptor=Relaystead, an Elixir library for declared, callable, measurable, and improvable LM programs; library=Relaystead package and OTP app as a proposed naming layer over the verified DSEx modules; research=Relaystead Studies for current repository-local evidence and optimizer experiments; community=Relaystead Commons, unavailable currently because no community institution is verified; company/steward=unavailable because no legal steward is established; protocol=unavailable because the product has explicit boundaries, not a published protocol; hosted=unavailable because there is no hosted deployment; product-family=Relaystead Ledger and Relaystead Programs, horizon-only conditional.",
+        "code projections=hex_package=relaystead; otp_app=relaystead; module_root=Relaystead; mix_task_prefix=relaystead; config_prefix=relaystead; telemetry_prefix=[:relaystead]",
+        "limitations=company-product-split and community roles are architecture hypotheses, not current institutions"
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "Scopeweave",
+      "pronunciation": "/ˈskoʊpwiːv/; plain phonetic: scope-weev",
+      "grammar": "Invented compound noun; Scopeweave is the singular master, Scopeweave Library is a descriptor, and Scopeweave Programs is a plural product-family form. It does not claim a compiler or formal type system.",
+      "rationale": "Identity grammar system. Current embodiment=signature, program, call, metric, optimizer, persistence, and telemetry terms are repository-grounded, while Scopeweave is not shipped. Horizon embodiment=artifact optimization across typed textual parameters remains conditional. Stance=affirmative; scope=current. Roles=master=Scopeweave; descriptor=Scopeweave, an Elixir/OTP system for explicit LM program boundaries and evidence; library=Scopeweave as a possible package name for the current DSEx library and application; research=Scopeweave Research for current repository-local benchmark and optimizer work; community=Scopeweave Commons, horizon-only because no community is operating; company/steward=unavailable because there is no verified company; protocol=unavailable because the current product is not a protocol; hosted=unavailable because no hosted service exists; product-family=Scopeweave Programs and Scopeweave Artifacts, conditional horizon.",
+      "etymology": "coined/no source; English scope plus weave compound, selected to hold boundary and composition meanings without claiming a named tradition",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "lifecycle-planes",
+        "endorsed-family"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: scope is familiar but weave may be heard as wave; the access path is a spelling-and-phonetic line in README, with dictation correction cost; unavailable mechanism=tested international pronunciation support",
+        "refusal and repair: a maintainer can reject compiler, proof, or hosted claims in documentation and accept a public correction, but there is no independent appeals process or repair fund for affected users",
+        "power: scope language may hide who sets the boundary; contributors can inspect repository decisions and open issues, but no council or affected-public veto is available"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Scopeweave; descriptor=Scopeweave, an Elixir/OTP system for explicit LM program boundaries and evidence; library=Scopeweave as a possible package name for the current DSEx library and application; research=Scopeweave Research for current repository-local benchmark and optimizer work; community=Scopeweave Commons, horizon-only because no community is operating; company/steward=unavailable because there is no verified company; protocol=unavailable because the current product is not a protocol; hosted=unavailable because no hosted service exists; product-family=Scopeweave Programs and Scopeweave Artifacts, conditional horizon.",
+        "code projections=hex_package=scopeweave; otp_app=scopeweave; module_root=Scopeweave; mix_task_prefix=scopeweave; config_prefix=scopeweave; telemetry_prefix=[:scopeweave]",
+        "limitations=the name cannot supply formal verification, universal sandboxing, autonomous improvement, or hosted operations"
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "Cairnledger",
+      "pronunciation": "/ˈkɛərnˌlɛdʒər/; plain phonetic: cairn-led-jer",
+      "grammar": "Invented closed compound noun; Cairnledger is a master label, Cairnledger Evidence is a descriptor, and Cairnledger Programs is a family form. The ledger metaphor is evidentiary, not a financial or immutable-record promise.",
+      "rationale": "Identity grammar system. Current embodiment=program values, traces, scores, and optimizer lineage are truthful repository concepts but the candidate is not adopted. Horizon embodiment=artifact planes are conditional. Stance=affirmative; scope=current. Roles=master=Cairnledger; descriptor=Cairnledger, evidence-bearing evaluation for declared Elixir LM programs; library=Cairnledger as a candidate package/application identity over current DSEx behavior; research=Cairnledger Lab for current repository-local optimizer and benchmark experiments; community=Cairnledger Commons, unavailable today because no community governance exists; company/steward=unavailable because no legal steward is verified; protocol=unavailable because no wire or governance protocol is shipped; hosted=unavailable because deployment is not a hosted product; product-family=Cairnledger Programs and Cairnledger Artifacts, conditional horizon.",
+      "etymology": "coined/no source as a product identity; cairn and ledger are English nouns combined, with a stewardship risk around memorial and accounting metaphors",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "research-stable-split",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: cairn is unfamiliar to some international users and cairnledger has a consonant boundary that may be lost in speech; README pronunciation and typed search are the access path, costing a clarification; no cultural or listener review exists",
+        "refusal and repair: maintainers can state that the ledger is not immutable or legal evidence and accept corrections through issues, but affected publics lack a records-access, deletion, or redress institution; unavailable mechanism=independent data governance",
+        "power: cairn and ledger may appropriate memorial or accounting authority; the actor who can challenge it is a contributor or affected user through repository issues, with volunteer labor as cost and no council available"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Cairnledger; descriptor=Cairnledger, evidence-bearing evaluation for declared Elixir LM programs; library=Cairnledger as a candidate package/application identity over current DSEx behavior; research=Cairnledger Lab for current repository-local optimizer and benchmark experiments; community=Cairnledger Commons, unavailable today because no community governance exists; company/steward=unavailable because no legal steward is verified; protocol=unavailable because no wire or governance protocol is shipped; hosted=unavailable because deployment is not a hosted product; product-family=Cairnledger Programs and Cairnledger Artifacts, conditional horizon.",
+        "code projections=hex_package=cairnledger; otp_app=cairnledger; module_root=Cairnledger; mix_task_prefix=cairnledger; config_prefix=cairnledger; telemetry_prefix=[:cairnledger]",
+        "limitations=ledger must not imply immutable storage, legal admissibility, audit certification, or deletion guarantees"
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Manyfold",
+      "pronunciation": "/ˈmɛniˌfoʊld/; plain phonetic: many-fold",
+      "grammar": "English compound adjective/noun; Manyfold can modify Programs or Artifacts, while Manyfold alone is the master label. The plural semantics support a family but do not claim a multi-agent operating system.",
+      "rationale": "Identity grammar system. Current embodiment=composition, immutable values, metrics, and optimizer lineage are supported concepts. Horizon embodiment=the wider artifact substrate is conditional. Stance=affirmative; scope=horizon. Roles=master=Manyfold; descriptor=Manyfold, an Elixir library for composing declared and measurable LM programs; library=Manyfold package/OTP application as a conditional adoption name for current DSEx code; research=Manyfold Research for current optimizer and artifact-lineage investigation; community=Manyfold Commons, horizon-only conditional; company/steward=unavailable because the repository gives no company identity; protocol=unavailable because composition is an API pattern, not a published protocol; hosted=unavailable because no hosted service exists; product-family=Manyfold Programs, Manyfold Evaluations, and Manyfold Artifacts, horizon-only conditional.",
+      "etymology": "coined/no source as a product identity; English many plus fold, a transparent compound with no cross-language or eponymic claim",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "endorsed-family",
+        "shared-prefix-family",
+        "neutral-master-beam-implementation"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: Manyfold is pronounceable but fold can be heard as fault; the access path is written package spelling plus a plain descriptor, costing a verbal repair; no speech-recovery measurement exists",
+        "refusal and repair: a maintainer can reject multi-agent or universal-platform interpretations in docs and accept a patch, while affected publics have no control over future product-family scope; unavailable mechanism=public roadmap governance",
+        "power: the family grammar may make one steward look like an ecosystem; contributors can inspect code and issues, but no independent community authority or affected-public veto exists"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Manyfold; descriptor=Manyfold, an Elixir library for composing declared and measurable LM programs; library=Manyfold package/OTP application as a conditional adoption name for current DSEx code; research=Manyfold Research for current optimizer and artifact-lineage investigation; community=Manyfold Commons, horizon-only conditional; company/steward=unavailable because the repository gives no company identity; protocol=unavailable because composition is an API pattern, not a published protocol; hosted=unavailable because no hosted service exists; product-family=Manyfold Programs, Manyfold Evaluations, and Manyfold Artifacts, horizon-only conditional.",
+        "code projections=hex_package=manyfold; otp_app=manyfold; module_root=Manyfold; mix_task_prefix=manyfold; config_prefix=manyfold; telemetry_prefix=[:manyfold]",
+        "limitations=horizon family names cannot be described as shipped products, superior optimizers, or autonomous improvement"
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "Stewardry",
+      "pronunciation": "/ˈstjuːərdri/; plain phonetic: stew-erd-ree",
+      "grammar": "Coined abstract noun built from steward plus a productive -ry ending; Stewardry is a master or research noun, Stewardry Commons is a community descriptor, and Stewardry Programs is a family form.",
+      "rationale": "Identity grammar system. Current embodiment=the code supports explicit boundaries and evidence, not councils or fiduciary governance. Horizon embodiment=artifact optimization is conditional. Stance=ambivalent; scope=horizon. Roles=master=Stewardry; descriptor=Stewardry, bounded program and artifact stewardship for Elixir; library=Stewardry as a proposed current package identity for DSEx explicit runtime, evaluation, and optimizer surfaces; research=Stewardry Research for current repository-local work on evidence and lineage; community=Stewardry Commons, conditional horizon because no community is constituted; company/steward=unavailable as a legal or fiduciary claim; protocol=unavailable because stewardship language does not create a protocol; hosted=unavailable because no hosted product exists; product-family=Stewardry Programs and Stewardry Artifacts, horizon-only conditional.",
+      "etymology": "coined/no source; English steward plus -ry is a deliberate derivation, not a claim to an established institution or language tradition",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "oss-commercial-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: the /stj/ cluster and derived ending are difficult for some international speakers; access is a written pronunciation and plain descriptor in docs, with dictation correction cost; no multilingual review is available",
+        "refusal and repair: maintainers can refuse fiduciary, council, or legal-steward readings in a governance note and accept corrections by issue, but affected publics have no actual council, fiduciary duty, or compensation route; unavailable mechanisms are explicit",
+        "power: Stewardry can launder unilateral control as care; contributors and affected users can raise an issue, but the project has no independent steward selection or public decision process"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Stewardry; descriptor=Stewardry, bounded program and artifact stewardship for Elixir; library=Stewardry as a proposed current package identity for DSEx explicit runtime, evaluation, and optimizer surfaces; research=Stewardry Research for current repository-local work on evidence and lineage; community=Stewardry Commons, conditional horizon because no community is constituted; company/steward=unavailable as a legal or fiduciary claim; protocol=unavailable because stewardship language does not create a protocol; hosted=unavailable because no hosted product exists; product-family=Stewardry Programs and Stewardry Artifacts, horizon-only conditional.",
+        "code projections=hex_package=stewardry; otp_app=stewardry; module_root=Stewardry; mix_task_prefix=stewardry; config_prefix=stewardry; telemetry_prefix=[:stewardry]",
+        "limitations=the -ry derivation may imply an institution that does not exist; no ranking or availability check was performed"
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "Traceward",
+      "pronunciation": "/ˈtreɪsˌwɔːrd/; plain phonetic: trace-ward",
+      "grammar": "Invented compound noun; Traceward is a master, Traceward Evidence is a descriptor, and Traceward Programs is a family. Ward is directional/guarding imagery, not a safety guarantee.",
+      "rationale": "Identity grammar system. Current embodiment=trace and redacted telemetry are real repository concepts, but ward does not mean protection. Horizon embodiment=artifact lineage and retrieval policies remain conditional. Stance=ambivalent; scope=both. Roles=master=Traceward; descriptor=Traceward, a bounded Elixir library for traceable LM program evaluation; library=Traceward package and OTP application as a candidate label for current DSEx trace, metric, and runtime surfaces; research=Traceward Studies for current evidence and optimizer experiments; community=Traceward Commons, conditional only because no community body exists; company/steward=unavailable because no company or formal steward is verified; protocol=unavailable because trace events are implementation surfaces, not a public protocol; hosted=unavailable because no hosted service exists; product-family=Traceward Programs and Traceward Artifacts, conditional horizon.",
+      "etymology": "coined/no source; trace plus ward is a transparent English compound, with a deliberate warning against security or guardianship overreading",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: ward has multiple senses and traceward may be heard as trace word; the access path is a written category descriptor and pronunciation, with search correction cost; no user research or dictation study is available",
+        "refusal and repair: maintainers can refuse security, safety, or guardian claims in README language and accept a reproducible bug report, but affected publics have no incident redress, independent audit, or compensation mechanism",
+        "power: the ward metaphor can imply surveillance and protective authority; users can inspect redacted telemetry documentation and file issues, but no affected-public governance or consent board exists"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Traceward; descriptor=Traceward, a bounded Elixir library for traceable LM program evaluation; library=Traceward package and OTP application as a candidate label for current DSEx trace, metric, and runtime surfaces; research=Traceward Studies for current evidence and optimizer experiments; community=Traceward Commons, conditional only because no community body exists; company/steward=unavailable because no company or formal steward is verified; protocol=unavailable because trace events are implementation surfaces, not a public protocol; hosted=unavailable because no hosted service exists; product-family=Traceward Programs and Traceward Artifacts, conditional horizon.",
+        "code projections=hex_package=traceward; otp_app=traceward; module_root=Traceward; mix_task_prefix=traceward; config_prefix=traceward; telemetry_prefix=[:traceward]",
+        "limitations=ward must not imply security guarantees, surveillance authority, durable rollback, or legal accountability"
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Commons Without Consent",
+      "pronunciation": "/ˈkɑmənz wɪˈðaʊt kənˈsɛnt/; plain phonetic: com-munz without con-sent",
+      "grammar": "Adversarial declarative phrase used as a counter-claim identity. It can name documentation or governance critique, but it is not a package command, company, or neutral master brand.",
+      "rationale": "Identity grammar system, intentionally ambivalent. Current embodiment=the repository can document limits, evidence, and explicit runtime boundaries; it cannot claim consent management. Horizon embodiment=conditional playbooks and schemas may test consent questions. Stance=ambivalent; scope=both. Roles=master=Commons Without Consent as a counter-claim/documentation identity only; descriptor=an inquiry into who bears costs when LM programs are optimized; library=unavailable because the phrase is not a concise current code identity; research=Commons Without Consent Research, current documentation/research critique only; community=unavailable because naming a commons does not create membership or governance; company/steward=unavailable; protocol=unavailable; hosted=unavailable; product-family=unavailable, with a conditional horizon link to an artifact-impact review guide but no shipped product.",
+      "etymology": "coined/no source as an adversarial phrase; ordinary English commons and consent are combined as a counter-claim, not a claim to an existing community",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "oss-commercial-split",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: the phrase is long, stress-sensitive, and difficult to dictate; access path=visible counter-claim heading and exact text search, cost=manual spelling and explanation; unavailable mechanism=screen-reader-tested governance language",
+        "refusal and repair: affected people can refuse a future artifact use through a documented issue or project discussion, but the current repository has no consent registry, removal workflow, council, or compensation; those mechanisms are unavailable",
+        "power: the phrase correctly exposes a power concern but can speak for affected publics without their authorization; a maintainer must name the actor, action, access route, and cost in docs, with no independent review body available"
+      ],
+      "wildcard": true,
+      "notes": [
+        "identity grammar=master=Commons Without Consent as a counter-claim/documentation identity only; descriptor=an inquiry into who bears costs when LM programs are optimized; library=unavailable because the phrase is not a concise current code identity; research=Commons Without Consent Research, current documentation/research critique only; community=unavailable because naming a commons does not create membership or governance; company/steward=unavailable; protocol=unavailable; hosted=unavailable; product-family=unavailable, with a conditional horizon link to an artifact-impact review guide but no shipped product.",
+        "code projections=precise non-code reason: the phrase is intentionally a documentation/governance identity and cannot be a conventional package, OTP app, module root, task, config, or telemetry family without erasing its critical scope; display-only projections are not proposed",
+        "limitations=adverse wildcard preserved; it does not establish consent, public governance, company accountability, hosted service, or product availability"
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "One House",
+      "pronunciation": "/wʌn haʊs/; plain phonetic: wun house",
+      "grammar": "Two-word noun phrase; One House can be a master-brand architecture label, while One House Programs is a family descriptor. The phrase intentionally tests a single-branded-house claim.",
+      "rationale": "Identity grammar system, adverse wildcard. Current embodiment=the actual product remains DSEx, a pre-release library and OTP application; Horizon embodiment=artifact optimization across additional text planes is conditional. Stance=adverse; scope=horizon. Roles=master=One House as a single-branded-house proposal only; descriptor=One House, declared and callable LM programs in Elixir; library=unavailable as a current product identity because the existing code is DSEx and no renaming has shipped; research=One House Research, unavailable as a distinct current effort; community=One House Commons, unavailable because no community exists; company/steward=unavailable because no company evidence exists; protocol=unavailable; hosted=unavailable; product-family=One House Programs, conditional horizon only.",
+      "etymology": "coined/no source as an identity-system test; ordinary English one and house form a phrase, with no claim to a real institution or company",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "company-product-split",
+        "endorsed-family"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: One House is short but homophonic variation and the article can disappear in dictation; access path=exact written heading and README descriptor, cost=search disambiguation; unavailable mechanism=listener-tested retrieval",
+        "refusal and repair: maintainers can reject a universal house or company reading in documentation and accept an issue, but contributors and affected publics have no naming vote, governance council, or redress channel outside the repository; unavailable mechanisms are explicit",
+        "power: single-house language centralizes authority and can conceal separate responsibilities; a buyer can request scope clarification, but there is no independent steward or accountability institution"
+      ],
+      "wildcard": true,
+      "notes": [
+        "identity grammar=master=One House as a single-branded-house proposal only; descriptor=One House, declared and callable LM programs in Elixir; library=unavailable as a current product identity because the existing code is DSEx and no renaming has shipped; research=One House Research, unavailable as a distinct current effort; community=One House Commons, unavailable because no community exists; company/steward=unavailable because no company evidence exists; protocol=unavailable; hosted=unavailable; product-family=One House Programs, conditional horizon only.",
+        "code projections=hex_package=one_house; otp_app=one_house; module_root=OneHouse; mix_task_prefix=one_house; config_prefix=one_house; telemetry_prefix=[:one_house]; phrase remains a display architecture surface, not evidence of a rename",
+        "limitations=adverse wildcard preserved; single-branded-house, company, hosted, protocol, and community claims are unavailable or hypothetical; no availability check performed"
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "Harbor Mesh",
+      "pronunciation": "/ˈhɑɹbər mɛʃ/; plain phonetic: har-ber mesh",
+      "grammar": "Two-word noun phrase; Harbor Mesh can serve as a master candidate, Harbor Mesh Programs as a family, and Harbor Mesh Research as a research descriptor. Mesh is metaphorical and does not assert a distributed service.",
+      "rationale": "Identity grammar system, intentionally adverse. Current embodiment=existing explicit runtime boundaries, metrics, optimizer lineage, and telemetry can support the descriptor, but not harboring, networking, or protection claims. Horizon embodiment=artifact-optimization planes are conditional. Stance=adverse; scope=horizon. Roles=master=Harbor Mesh as an unselected master candidate; descriptor=Harbor Mesh, a pre-release Elixir/OTP library for declared and operated LM programs; library=Harbor Mesh package and app as a proposed future naming layer only, because current code is DSEx; research=Harbor Mesh Research, conditional horizon and not a published lab; community=Harbor Mesh Commons, unavailable because no community body exists; company/steward=unavailable because no company is evidenced; protocol=unavailable because mesh is not a published interoperability protocol; hosted=unavailable because no hosted service exists; product-family=Harbor Mesh Programs and Harbor Mesh Artifacts, conditional horizon.",
+      "etymology": "coined/no source as a product identity; harbor and mesh are ordinary English metaphors combined, with no maritime or networking institution claimed",
+      "territories": [
+        "plurality-ecosystem",
+        "infrastructure-logistics"
+      ],
+      "strategies": [
+        "namespace-led",
+        "institutional-community",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "buyers-founders",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "spec-implementations",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "accessibility: harbor is rhoticity- and spelling-sensitive and mesh may be heard as mess; access path=phonetic README descriptor and exact code search, cost=spoken repair; unavailable mechanism=international listener validation",
+        "refusal and repair: maintainers can refuse networking, safety, or hosted interpretations in docs and accept a concrete issue, but affected publics have no harboring service, consent control, independent redress, or compensation; all are unavailable",
+        "power: the harbor metaphor can imply sanctuary and mesh can imply an ecosystem; buyers and contributors can ask for evidence through issues, but no public governance, company fiduciary, or protocol authority exists"
+      ],
+      "wildcard": false,
+      "notes": [
+        "identity grammar=master=Harbor Mesh as an unselected master candidate; descriptor=Harbor Mesh, a pre-release Elixir/OTP library for declared and operated LM programs; library=Harbor Mesh package and app as a proposed future naming layer only, because current code is DSEx; research=Harbor Mesh Research, conditional horizon and not a published lab; community=Harbor Mesh Commons, unavailable because no community body exists; company/steward=unavailable because no company is evidenced; protocol=unavailable because mesh is not a published interoperability protocol; hosted=unavailable because no hosted service exists; product-family=Harbor Mesh Programs and Harbor Mesh Artifacts, conditional horizon.",
+        "code projections=hex_package=harbor_mesh; otp_app=harbor_mesh; module_root=HarborMesh; mix_task_prefix=harbor_mesh; config_prefix=harbor_mesh; telemetry_prefix=[:harbor_mesh]",
+        "limitations=mesh and harbor cannot claim distributed operation, secure hosting, universal platform status, or proven optimizer superiority"
+      ]
+    }
+  ]
+}
