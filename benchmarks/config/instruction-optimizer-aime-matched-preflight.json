@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "campaign_id": "instruction-optimizer-aime-matched-preflight-20260713",
+  "family": "AIMEBench",
+  "model": {
+    "logical": "gpt-4.1-mini-2025-04-14",
+    "dsex": "openai:gpt-4.1-mini-2025-04-14",
+    "dspy": "openai/gpt-4.1-mini-2025-04-14"
+  },
+  "seed": 17,
+  "arms": [
+    "baseline",
+    "bootstrap_few_shot",
+    "mipro_v2",
+    "simba"
+  ],
+  "arm_configs": {
+    "bootstrap_few_shot": {
+      "max_bootstrapped_demos": 4
+    },
+    "mipro_v2": {
+      "auto": null,
+      "num_candidates": 3,
+      "num_trials": 3,
+      "minibatch": false,
+      "max_bootstrapped_demos": 4,
+      "max_labeled_demos": 4,
+      "startup_trials": 10,
+      "max_errors": 1,
+      "timeout": 300000
+    },
+    "simba": {
+      "bsize": 8,
+      "num_candidates": 2,
+      "max_steps": 2,
+      "max_demos": 4,
+      "demo_input_field_maxlen": 100000,
+      "sampling_temperature": 0.2,
+      "candidate_temperature": 0.2,
+      "timeout": 300000
+    }
+  },
+  "budget": {
+    "requests": 1200,
+    "input_tokens": 3000000,
+    "output_tokens": 3000000,
+    "usd": 25.0
+  },
+  "provider": {
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 1.0,
+    "max_output_tokens": 4096,
+    "input_tokens_per_byte": 1,
+    "pricing": {
+      "input_usd_per_million": 1.0,
+      "output_usd_per_million": 4.0
+    }
+  },
+  "dataset": {
+    "root": "../data/gepa-campaign-full",
+    "splits": {
+      "train": {
+        "sha256": "d2ac1967257a089b6930b0b06c55366763df0c0e370322291b78082736f31fba"
+      },
+      "dev": {
+        "sha256": "cd8a46d0d0210420fc5c6550e1a2a1cd647fddb464e1698318e3e734c63e4552"
+      },
+      "test": {
+        "sha256": "5d05d1d1cf45d139526c1c160e8e23ac13df7a3ce083e5473c3d7bcbb11ebe6d"
+      }
+    }
+  },
+  "dspy_authority": {
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.3.0b1",
+    "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+  },
+  "dependency_identity": {
+    "optuna": "4.9.0"
+  },
+  "source_commits": {
+    "dspy": "https://github.com/stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+    "dsex": "resolved from campaign git_sha"
+  }
+}
