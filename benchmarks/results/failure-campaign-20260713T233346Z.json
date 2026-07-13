@@ -1,0 +1,1644 @@
+{
+  "cases": [
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "task_cancellation_releases_admission",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "cancellation": "terminal",
+            "task_alive": false
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "task_timeout_is_explicit_and_terminal",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 29,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 23,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 23,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 26,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 21,
+          "evidence": {
+            "admission": {
+              "active": 0,
+              "queued": 0
+            },
+            "outcome": "timeout",
+            "worker_terminated": true
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "async_concurrency_is_bounded",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 13,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "limit": 2,
+            "ordered": true,
+            "peak": 2
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "partial_stream_failure_is_terminal",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "partial_payload_included": false,
+            "statuses": [
+              "started",
+              "error"
+            ],
+            "terminal_errors": 1
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "training_retry_and_idempotency_are_bounded",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "deterministic_key_stable": true,
+            "idempotency_header_stable": true,
+            "max_attempts": 3,
+            "request_payload_included": false,
+            "terminal_status": 200
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "http_retrieval_retry_timeout_and_idempotency",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 18,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "attempts": 3,
+            "idempotency_header_stable": true,
+            "inherited_total_timeout_ms": 300,
+            "max_attempts": 3,
+            "terminal_status": 200
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "mcp_retry_timeout_and_idempotency",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 37,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 2,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 0,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 1,
+          "evidence": {
+            "idempotency_header_present": true,
+            "initialize_attempts": 2,
+            "list_attempts": 2,
+            "max_attempts": 3,
+            "terminal_tool_count": 1
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "mipro_v2_durable_resume_and_tamper",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 220,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 8,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 8,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 7,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 8,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 9,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 8,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_mipro_v2_run",
+            "exact_resume": true,
+            "optimizer": "mipro_v2",
+            "paused_trials": 1,
+            "resumed_trials": 2,
+            "setup_replayed": false,
+            "tamper_rejected": true
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    },
+    {
+      "evidence_kind": "deterministic",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "simba_durable_resume_and_tamper",
+      "iterations": 10,
+      "outcomes": [
+        {
+          "duration_ms": 42,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 28,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 2,
+          "passing": true
+        },
+        {
+          "duration_ms": 30,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 3,
+          "passing": true
+        },
+        {
+          "duration_ms": 27,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 4,
+          "passing": true
+        },
+        {
+          "duration_ms": 26,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 5,
+          "passing": true
+        },
+        {
+          "duration_ms": 27,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 6,
+          "passing": true
+        },
+        {
+          "duration_ms": 29,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 7,
+          "passing": true
+        },
+        {
+          "duration_ms": 29,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 8,
+          "passing": true
+        },
+        {
+          "duration_ms": 31,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 9,
+          "passing": true
+        },
+        {
+          "duration_ms": 29,
+          "evidence": {
+            "checkpoint_payload_included": false,
+            "checkpoint_schema_version": 1,
+            "checkpoint_type": "dsex_simba_run",
+            "exact_resume": true,
+            "optimizer": "simba",
+            "paused_steps": 1,
+            "resumed_steps": 2,
+            "tamper_rejected": true
+          },
+          "iteration": 10,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 10
+    }
+  ],
+  "configuration": {
+    "iteration_timeout_ms": 15000,
+    "iterations": 10,
+    "max_concurrency": 2,
+    "required_flake_iterations": 10,
+    "runtime_warmup": {
+      "billable_generation": true,
+      "integration_preflight": {
+        "evidence": {
+          "agent_cost": {
+            "authority": "not_exposed_by_prediction",
+            "usd": null
+          },
+          "agent_usage_available": false,
+          "model": "gpt-5.4",
+          "payloads_included": false,
+          "provider": "openai",
+          "retrieval_attempts": 2,
+          "retrieval_injected_error": "closed",
+          "retrieval_terminal_network": "httpbin.org",
+          "submit_calls": 1,
+          "timeout_ms": 30000,
+          "tool_calls": 1
+        },
+        "status": "complete"
+      },
+      "network_hosts": [
+        "api.openai.com",
+        "httpbin.org"
+      ],
+      "performed": true,
+      "provider_adapter": {
+        "cost": {
+          "authority": "pinned_public_list_price",
+          "input_usd_per_million": 0.4,
+          "output_usd_per_million": 1.6,
+          "usd": 8.0e-6
+        },
+        "payload_included": false,
+        "status": "complete",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 2
+        }
+      },
+      "statuses": [
+        200,
+        204
+      ]
+    }
+  },
+  "evidence_policy": {
+    "completion_requires_zero_flakes": true,
+    "flake_rate": "failing_iterations / iterations",
+    "payloads_included": false
+  },
+  "evidence_tier": "t0_deterministic_failure_recovery",
+  "generated_at": "2026-07-13T23:33:46Z",
+  "git_sha": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+  "limitations": [
+    "No live provider training job was created or cancelled.",
+    "Live authority is limited to the exact provider, retrieval, and tool-agent probes recorded in live_cases.",
+    "Deterministic MCP evidence uses an injected transport; no public MCP endpoint is claimed."
+  ],
+  "live_cases": [
+    {
+      "checks": [
+        {
+          "id": "repeated_zero_flakes",
+          "passing": true
+        },
+        {
+          "id": "runtime_leak_free",
+          "passing": true
+        },
+        {
+          "id": "real_provider_terminal_success",
+          "passing": true
+        },
+        {
+          "id": "bounded_retry_after_injected_429",
+          "passing": true
+        },
+        {
+          "id": "stable_idempotency_key",
+          "passing": true
+        },
+        {
+          "id": "positive_provider_usage",
+          "passing": true
+        }
+      ],
+      "completed_at": "2026-07-13T23:33:42Z",
+      "evidence_kind": "live",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "provider_retry_timeout_idempotency_live",
+      "iterations": 2,
+      "outcomes": [
+        {
+          "duration_ms": 736,
+          "evidence": {
+            "attempts": 2,
+            "cost": {
+              "authority": "pinned_public_list_price",
+              "input_usd_per_million": 0.4,
+              "output_usd_per_million": 1.6,
+              "usd": 8.0e-6
+            },
+            "idempotency_header_stable": true,
+            "injected_status": 429,
+            "max_attempts": 2,
+            "model": "gpt-4.1-mini",
+            "provider": "openai",
+            "response_payload_included": false,
+            "terminal_status": 200,
+            "timeout_ms": 30000,
+            "usage": {
+              "input_tokens": 12,
+              "output_tokens": 2
+            }
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 1223,
+          "evidence": {
+            "attempts": 2,
+            "cost": {
+              "authority": "pinned_public_list_price",
+              "input_usd_per_million": 0.4,
+              "output_usd_per_million": 1.6,
+              "usd": 8.0e-6
+            },
+            "idempotency_header_stable": true,
+            "injected_status": 429,
+            "max_attempts": 2,
+            "model": "gpt-4.1-mini",
+            "provider": "openai",
+            "response_payload_included": false,
+            "terminal_status": 200,
+            "timeout_ms": 30000,
+            "usage": {
+              "input_tokens": 12,
+              "output_tokens": 2
+            }
+          },
+          "iteration": 2,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 2,
+      "required": true,
+      "runtime": {
+        "leak_free": true,
+        "leaks": {
+          "added_linked_tasks": 0,
+          "added_ports": 0,
+          "added_processes": 0,
+          "added_telemetry_handlers": 0,
+          "added_unlinked_tasks": 0,
+          "admission_active": 0,
+          "admission_queued": 0
+        }
+      },
+      "started_at": "2026-07-13T23:33:40Z",
+      "status": "complete"
+    },
+    {
+      "checks": [
+        {
+          "id": "repeated_zero_flakes",
+          "passing": true
+        },
+        {
+          "id": "runtime_leak_free",
+          "passing": true
+        },
+        {
+          "id": "live_retrieval_recovered",
+          "passing": true
+        },
+        {
+          "id": "provider_backed_tool_agent_completed",
+          "passing": true
+        }
+      ],
+      "completed_at": "2026-07-13T23:33:46Z",
+      "evidence_kind": "live",
+      "failing_iterations": 0,
+      "flake_rate": 0.0,
+      "id": "retrieval_and_tool_agent_recovery_live",
+      "iterations": 2,
+      "outcomes": [
+        {
+          "duration_ms": 2112,
+          "evidence": {
+            "agent_cost": {
+              "authority": "not_exposed_by_prediction",
+              "usd": null
+            },
+            "agent_usage_available": false,
+            "model": "gpt-5.4",
+            "payloads_included": false,
+            "provider": "openai",
+            "retrieval_attempts": 2,
+            "retrieval_injected_error": "closed",
+            "retrieval_terminal_network": "httpbin.org",
+            "submit_calls": 1,
+            "timeout_ms": 30000,
+            "tool_calls": 1
+          },
+          "iteration": 1,
+          "passing": true
+        },
+        {
+          "duration_ms": 2631,
+          "evidence": {
+            "agent_cost": {
+              "authority": "not_exposed_by_prediction",
+              "usd": null
+            },
+            "agent_usage_available": false,
+            "model": "gpt-5.4",
+            "payloads_included": false,
+            "provider": "openai",
+            "retrieval_attempts": 2,
+            "retrieval_injected_error": "closed",
+            "retrieval_terminal_network": "httpbin.org",
+            "submit_calls": 1,
+            "timeout_ms": 30000,
+            "tool_calls": 1
+          },
+          "iteration": 2,
+          "passing": true
+        }
+      ],
+      "passing": true,
+      "passing_iterations": 2,
+      "required": true,
+      "runtime": {
+        "leak_free": true,
+        "leaks": {
+          "added_linked_tasks": 0,
+          "added_ports": 0,
+          "added_processes": 0,
+          "added_telemetry_handlers": 0,
+          "added_unlinked_tasks": 0,
+          "admission_active": 0,
+          "admission_queued": 0
+        }
+      },
+      "started_at": "2026-07-13T23:33:42Z",
+      "status": "complete"
+    }
+  ],
+  "remaining": [
+    {
+      "artifact_row": "provider_retry_timeout_idempotency_live",
+      "deterministic_coverage": "training_http_and_task_runtime_only",
+      "id": "provider_retry_timeout_idempotency_live",
+      "required": true,
+      "status": "complete"
+    },
+    {
+      "artifact_row": "retrieval_and_tool_agent_recovery_live",
+      "deterministic_coverage": "retrieval_and_mcp_transport_only",
+      "id": "retrieval_and_tool_agent_recovery_live",
+      "required": true,
+      "status": "complete"
+    }
+  ],
+  "run_context": {
+    "code": {
+      "identity": "deepfates/dsex@cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+      "revision": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+      "source": "dsex"
+    },
+    "completed_at": "2026-07-13T23:33:46Z",
+    "payload_sha256": "sha256:df28e653bc51502c91eea5c8edeea4533db781e36e7977166d5b16fa7bc007b0",
+    "schema_version": 1,
+    "source_commits": {
+      "dsex": "deepfates/dsex@cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03"
+    },
+    "started_at": "2026-07-13T23:33:32Z",
+    "workspace": {
+      "reproducible": true,
+      "state": "clean"
+    }
+  },
+  "runner": "dsex-failure-campaign",
+  "runtime": {
+    "after": {
+      "admission": {
+        "active": 0,
+        "queued": 0
+      },
+      "linked_tasks": 0,
+      "ports": 6,
+      "processes": 164,
+      "telemetry_handlers": 0,
+      "unlinked_tasks": 0
+    },
+    "before": {
+      "admission": {
+        "active": 0,
+        "queued": 0
+      },
+      "linked_tasks": 0,
+      "ports": 6,
+      "processes": 164,
+      "telemetry_handlers": 0,
+      "unlinked_tasks": 0
+    },
+    "leak_free": true,
+    "leaks": {
+      "added_linked_tasks": 0,
+      "added_ports": 0,
+      "added_processes": 0,
+      "added_telemetry_handlers": 0,
+      "added_unlinked_tasks": 0,
+      "admission_active": 0,
+      "admission_queued": 0
+    }
+  },
+  "schema_version": 3,
+  "scope": [
+    "task_cancellation_releases_admission",
+    "task_timeout_is_explicit_and_terminal",
+    "async_concurrency_is_bounded",
+    "partial_stream_failure_is_terminal",
+    "training_retry_and_idempotency_are_bounded",
+    "http_retrieval_retry_timeout_and_idempotency",
+    "mcp_retry_timeout_and_idempotency",
+    "mipro_v2_durable_resume_and_tamper",
+    "simba_durable_resume_and_tamper"
+  ],
+  "secret_scan": {
+    "configured_secret_count": 1,
+    "configured_secret_hits": 0,
+    "credential_pattern_hits": 0,
+    "passing": true,
+    "payload_sha256": "sha256:114eb3ec822fc449f5aa336c7c1275dae1569fdd3d2185ab0df4ddcde0139c45"
+  },
+  "summary": {
+    "all_requested_iterations_pass": true,
+    "deterministic_complete": true,
+    "deterministic_lanes": 9,
+    "deterministic_passing": 9,
+    "flake_sample_complete": true,
+    "live_complete": true,
+    "local_cases": 9,
+    "local_complete": true,
+    "local_passing": 9,
+    "release_complete": true,
+    "remaining_live_lanes": 0
+  },
+  "telemetry": {
+    "balanced_spans": true,
+    "event_counts": {
+      "dsex.lm.start": 4,
+      "dsex.lm.stop": 4,
+      "dsex.retriever.http.attempt": 34,
+      "dsex.retriever.start": 12,
+      "dsex.retriever.stop": 12
+    },
+    "handler_detached": true,
+    "metadata_secret_free": true
+  }
+}

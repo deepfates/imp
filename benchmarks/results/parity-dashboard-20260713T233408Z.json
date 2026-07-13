@@ -1,0 +1,1498 @@
+{
+  "claims": {
+    "artifact": {
+      "path": "benchmarks/claims.json",
+      "sha256": "21824ddb574b70a0f67d2dfd398c12aecef484d4d9ce1ade9c949d8ce83fa7aa"
+    },
+    "blocking_requirements": [
+      {
+        "claim_id": "claim.product.public_api_installable",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "package.clean_room"
+        ],
+        "statement": "DSEx is installable as a clean Elixir package and its documented public API works outside the source checkout."
+      },
+      {
+        "claim_id": "claim.docs.livebooks_real_provider",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "livebooks.executable",
+          "live.provider.smoke"
+        ],
+        "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features."
+      },
+      {
+        "claim_id": "claim.dspy_semantics.golden_trace",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "golden_trace.full"
+        ],
+        "statement": "DSEx implements DSPy-shaped core semantics for signatures, Predict, ChainOfThought, typed adapters, ReAct tool traces, streaming, save/load redaction, and cache behavior."
+      },
+      {
+        "claim_id": "claim.live_matched_model.full_parity",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "live_matched_model.full"
+        ],
+        "statement": "DSEx matches Python DSPy on live matched-model benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings."
+      },
+      {
+        "claim_id": "claim.optimizer_lift.full",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "optimizer_lift.full"
+        ],
+        "statement": "DSEx optimizer behavior has direct or intentionally-deviating evidence against DSPy for the optimizer surfaces it claims."
+      },
+      {
+        "claim_id": "claim.gepa_replication.full",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "gepa_replication.full"
+        ],
+        "statement": "DSEx GEPA research claims are supported only by fresh GEPA paper-family replication artifacts that compare baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present."
+      },
+      {
+        "claim_id": "claim.rag_tools_agents.full",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "rag_tool_agent.full"
+        ],
+        "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence."
+      },
+      {
+        "claim_id": "claim.rlm.provider_free_benchmark",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "rlm_benchmark.full"
+        ],
+        "statement": "DSEx RLM effectiveness is supported by a complete paper-scale reproduction rather than scripted fixture replay."
+      },
+      {
+        "claim_id": "claim.performance.provider_free",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "provider_free_overhead.full"
+        ],
+        "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made."
+      },
+      {
+        "claim_id": "claim.protocols.production_boundaries",
+        "kind": "public_claim_blocked",
+        "missing_requirements": [
+          "protocols.local"
+        ],
+        "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface."
+      }
+    ],
+    "claims": [
+      {
+        "category": "package",
+        "claim_type": "feature_completeness",
+        "comparison": "dsex_native",
+        "decision": "proven_target",
+        "id": "claim.product.public_api_installable",
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no product_package source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate product_package --mix-task package.check"
+            ],
+            "evidence": "full",
+            "id": "package.clean_room",
+            "kind": "package",
+            "lane": "product_package",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "fresh clean-room package consumer proof passes"
+          }
+        ],
+        "scope": "Clean package consumption and documented public API behavior.",
+        "sources": [
+          "README.md",
+          "docs/RELEASE_CRITERIA.md",
+          "test/package_contract_test.exs"
+        ],
+        "statement": "DSEx is installable as a clean Elixir package and its documented public API works outside the source checkout.",
+        "status": "blocked",
+        "surface": [
+          "package",
+          "public_api",
+          "docs"
+        ]
+      },
+      {
+        "category": "docs",
+        "claim_type": "live_provider_proof",
+        "comparison": "dsex_native",
+        "decision": "proven_target",
+        "id": "claim.docs.livebooks_real_provider",
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no livebook_execute source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check"
+            ],
+            "evidence": "full",
+            "id": "livebooks.executable",
+            "kind": "docs",
+            "lane": "livebook_execute",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "all shipped Livebooks execute successfully"
+          },
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no live_provider_smoke source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate live_provider_smoke --mix-task live.check"
+            ],
+            "evidence": "full",
+            "id": "live.provider.smoke",
+            "kind": "live",
+            "lane": "live_provider_smoke",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "LIVE_PROVIDER=1 mix live.check passes"
+          }
+        ],
+        "scope": "Executable shipped documentation plus a current provider smoke.",
+        "sources": [
+          "docs/README.md",
+          "livebooks/*.livemd",
+          "test/livebook_contract_test.exs"
+        ],
+        "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
+        "status": "blocked",
+        "surface": [
+          "README",
+          "docs",
+          "livebooks",
+          "ReqLLM"
+        ]
+      },
+      {
+        "category": "dspy_parity",
+        "claim_type": "conformance",
+        "comparison": "dspy",
+        "decision": "proven_target",
+        "id": "claim.dspy_semantics.golden_trace",
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no golden-trace-parity artifact found in tmp/golden-trace"
+            ],
+            "evidence": "full",
+            "id": "golden_trace.full",
+            "kind": "parity",
+            "lane": "golden_trace",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "all golden trace parity cases and DSEx semantic checks pass"
+          }
+        ],
+        "scope": "Normalized semantic traces; excludes byte-identical Python prompt templates.",
+        "sources": [
+          "docs/COVERAGE_MATRIX.md",
+          "docs/PARITY_VALIDATION_PROGRAM.md",
+          "test/fixtures/golden_trace/cases.json"
+        ],
+        "statement": "DSEx implements DSPy-shaped core semantics for signatures, Predict, ChainOfThought, typed adapters, ReAct tool traces, streaming, save/load redaction, and cache behavior.",
+        "status": "blocked",
+        "surface": [
+          "signature",
+          "predict",
+          "chain_of_thought",
+          "adapters",
+          "react",
+          "streaming",
+          "save_load",
+          "cache"
+        ]
+      },
+      {
+        "category": "dspy_parity",
+        "claim_type": "functional_effectiveness",
+        "comparison": "dspy",
+        "decision": "active_gap",
+        "id": "claim.live_matched_model.full_parity",
+        "limitations": [
+          "Requires fresh complete matched-model campaigns."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no live-matched-model matrix or dsex-dspy-parity-campaign artifact found"
+            ],
+            "evidence": "full",
+            "id": "live_matched_model.full",
+            "kind": "live_parity",
+            "lane": "live_matched_model",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "required current_low_cost, frontier_sanity, and historical_research lanes satisfy their policies"
+          }
+        ],
+        "scope": "Comparative matched-model effectiveness, not the v0.1 provider runtime contract.",
+        "sources": [
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/PARITY_VALIDATION_PROGRAM.md",
+          "docs/RELEASE_CRITERIA.md"
+        ],
+        "statement": "DSEx matches Python DSPy on live matched-model benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings.",
+        "status": "blocked",
+        "surface": [
+          "gsm8k",
+          "hotpotqa",
+          "predict",
+          "chain_of_thought",
+          "rag"
+        ]
+      },
+      {
+        "category": "optimizer",
+        "claim_type": "functional_effectiveness",
+        "comparison": "dspy",
+        "decision": "active_gap",
+        "id": "claim.optimizer_lift.full",
+        "limitations": [
+          "v0.1 guarantees deterministic optimizer contracts, not DSPy-equivalent lift."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no optimizer-lift-parity artifact found in tmp/optimizer-lift"
+            ],
+            "evidence": "full",
+            "id": "optimizer_lift.full",
+            "kind": "optimizer_parity",
+            "lane": "optimizer_lift",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "optimizer-lift artifact reports full_optimizer_parity"
+          }
+        ],
+        "scope": "Comparative optimizer effectiveness for advanced optimizer families.",
+        "sources": [
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/COVERAGE_MATRIX.md"
+        ],
+        "statement": "DSEx optimizer behavior has direct or intentionally-deviating evidence against DSPy for the optimizer surfaces it claims.",
+        "status": "blocked",
+        "surface": [
+          "LabeledFewShot",
+          "BootstrapFewShot",
+          "RandomSearch",
+          "KNNFewShot",
+          "BootstrapRS",
+          "COPRO",
+          "MIPROv2",
+          "SIMBA",
+          "GEPA",
+          "InstructionSearch",
+          "InferRules",
+          "SignatureOptimizer",
+          "BetterTogether",
+          "Ensemble",
+          "BootstrapFinetune",
+          "GRPO",
+          "OptimizeAnything"
+        ]
+      },
+      {
+        "category": "optimizer",
+        "claim_type": "research_replication",
+        "comparison": "dspy_gepa",
+        "decision": "active_gap",
+        "id": "claim.gepa_replication.full",
+        "limitations": [
+          "Papillon and HoVer full-scope artifacts are incomplete."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no gepa-replication artifact found in tmp/gepa-replication"
+            ],
+            "evidence": "full",
+            "id": "gepa_replication.full",
+            "kind": "gepa_paper_replication",
+            "lane": "gepa_replication",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "gepa-replication artifact covers AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon with required optimizer, budget, cost, seed, and split-gap fields"
+          }
+        ],
+        "scope": "Full six-family GEPA research replication.",
+        "sources": [
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/COVERAGE_MATRIX.md",
+          "docs/PARITY_VALIDATION_PROGRAM.md"
+        ],
+        "statement": "DSEx GEPA research claims are supported only by fresh GEPA paper-family replication artifacts that compare baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
+        "status": "blocked",
+        "surface": [
+          "GEPA",
+          "MIPROv2",
+          "SIMBA",
+          "AIMEBench",
+          "HotpotQABench",
+          "hoverBench",
+          "IFBench",
+          "LiveBenchMathBench",
+          "Papillon"
+        ]
+      },
+      {
+        "category": "optimizer",
+        "claim_type": "functional_effectiveness",
+        "comparison": "dsex_baseline_and_authored_comparator",
+        "decision": "proven_target",
+        "id": "claim.optimize_anything.non_prompt_effectiveness",
+        "limitations": [
+          "Scoped to DSEx-native effectiveness; does not claim paper-scale or matched-internals parity with upstream Optimize Anything."
+        ],
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": {
+              "generated_at": "2026-07-13T09:28:40Z",
+              "git_sha": "fbd510ec3f5340c5ad30ffcd13f1eb1fa343f0d7",
+              "path": "benchmarks/results/optimize-anything-replication-20260713T092840Z.json",
+              "sha256": "080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653"
+            },
+            "blocking_requirements": [],
+            "evidence": "full",
+            "id": "optimize_anything.non_prompt.full",
+            "kind": "optimizer_effectiveness",
+            "lane": "optimize_anything",
+            "lane_status": "full",
+            "satisfied": true,
+            "threshold": "all three non-prompt classes show positive mean lift and a majority of improving runs across at least three live provider-backed seeds"
+          }
+        ],
+        "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
+        "sources": [
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/COVERAGE_MATRIX.md",
+          "test/optimize_anything_campaign_test.exs"
+        ],
+        "statement": "DSEx Optimize Anything improves measurable non-prompt artifacts across multiple seeds using executable held-out evaluators, with provider cost and checkpoint provenance.",
+        "status": "proven",
+        "surface": [
+          "OptimizeAnything",
+          "code_artifact",
+          "agent_config",
+          "scheduling_heuristic"
+        ]
+      },
+      {
+        "category": "tools_agents_rag",
+        "claim_type": "feature_completeness",
+        "comparison": "dspy_and_dsex_native",
+        "decision": "active_gap",
+        "id": "claim.rag_tools_agents.full",
+        "limitations": [
+          "v0.1 claims local contracts and selected live paths, not full upstream parity."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no rag-tool-agent-parity artifact found in tmp/rag-tool-agent"
+            ],
+            "evidence": "full",
+            "id": "rag_tool_agent.full",
+            "kind": "parity",
+            "lane": "rag_tool_agent",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "rag-tool-agent artifact reports full_rag_tool_agent_parity"
+          }
+        ],
+        "scope": "Cross-system parity for advanced RAG, tool, and agent workflows.",
+        "sources": [
+          "docs/COVERAGE_MATRIX.md",
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/PARITY_VALIDATION_PROGRAM.md"
+        ],
+        "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence.",
+        "status": "blocked",
+        "surface": [
+          "rag",
+          "tools",
+          "react",
+          "agents",
+          "mcp",
+          "code_act",
+          "program_of_thought",
+          "streaming",
+          "async",
+          "save_load"
+        ]
+      },
+      {
+        "category": "rlm",
+        "claim_type": "functional_effectiveness",
+        "comparison": "dspy",
+        "decision": "active_gap",
+        "id": "claim.rlm.provider_free_benchmark",
+        "limitations": [
+          "The deterministic RLM fixture lane is T0 contract replay and cannot prove effectiveness or long-context parity."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no rlm-benchmark-parity artifact found in tmp/rlm-benchmark"
+            ],
+            "evidence": "full",
+            "id": "rlm_benchmark.full",
+            "kind": "parity",
+            "lane": "rlm_benchmark",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "RLM artifact is T3 paper-scale evidence with a complete paper protocol"
+          }
+        ],
+        "scope": "Paper-scale RLM long-context effectiveness compared with upstream.",
+        "sources": [
+          "docs/COVERAGE_MATRIX.md",
+          "docs/BENCHMARK_CATALOG.md",
+          "test/fixtures/benchmarks/hotpotqa-small.jsonl"
+        ],
+        "statement": "DSEx RLM effectiveness is supported by a complete paper-scale reproduction rather than scripted fixture replay.",
+        "status": "blocked",
+        "surface": [
+          "rlm",
+          "long_context",
+          "recursive_control",
+          "dspy_rlm"
+        ]
+      },
+      {
+        "category": "performance",
+        "claim_type": "performance",
+        "comparison": "dspy",
+        "decision": "active_gap",
+        "id": "claim.performance.provider_free",
+        "limitations": [
+          "No v0.1 claim that DSEx is faster than DSPy."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no overhead-parity artifact found in tmp/overhead"
+            ],
+            "evidence": "full",
+            "id": "provider_free_overhead.full",
+            "kind": "performance",
+            "lane": "provider_free_overhead",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "all provider-free overhead cases pass within configured ratio"
+          }
+        ],
+        "scope": "Named-path comparative local overhead; excludes blanket speed claims.",
+        "sources": [
+          "docs/BENCHMARK_TRUTH.md",
+          "docs/RELEASE_CRITERIA.md"
+        ],
+        "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made.",
+        "status": "blocked",
+        "surface": [
+          "signature_parse",
+          "adapter_format_parse",
+          "schema_validation",
+          "evaluation",
+          "metrics",
+          "optimizer_scheduling",
+          "redaction",
+          "cache",
+          "concurrency"
+        ]
+      },
+      {
+        "category": "operations",
+        "claim_type": "feature_completeness",
+        "comparison": "dsex_native",
+        "decision": "proven_target",
+        "id": "claim.protocols.production_boundaries",
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": null,
+            "blocking_requirements": [
+              "no protocol_gates source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate protocol_gates --mix-task protocol.check"
+            ],
+            "evidence": "full",
+            "id": "protocols.local",
+            "kind": "protocol",
+            "lane": "protocol_gates",
+            "lane_status": "missing",
+            "satisfied": false,
+            "threshold": "mix protocol.check passes"
+          }
+        ],
+        "scope": "Provider-compatible local protocol boundaries; excludes paid training completion.",
+        "sources": [
+          "docs/PRODUCTION_OPERATIONS.md",
+          "docs/RELEASE_CRITERIA.md",
+          "test/protocol_training",
+          "test/protocol_retriever",
+          "test/protocol_mcp"
+        ],
+        "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
+        "status": "blocked",
+        "surface": [
+          "training_protocol",
+          "retriever_protocol",
+          "mcp_protocol"
+        ]
+      },
+      {
+        "category": "operations",
+        "claim_type": "failure_recovery",
+        "comparison": "dsex_native",
+        "decision": "proven_target",
+        "id": "claim.failure_recovery.deterministic_t0",
+        "release": "v0.1",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": {
+              "generated_at": "2026-07-13T23:33:46Z",
+              "git_sha": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+              "path": "benchmarks/results/failure-campaign-20260713T233346Z.json",
+              "sha256": "07c8fef06c0cc653010eb4de32e2efb9faf27cd995ac310961c16f027d1f521d"
+            },
+            "blocking_requirements": [],
+            "evidence": "passing",
+            "id": "failure_recovery.t0",
+            "kind": "failure_recovery",
+            "lane": "failure_recovery",
+            "lane_status": "full",
+            "satisfied": true,
+            "threshold": "verified current-schema artifact independently recomputes all deterministic cases and zero runtime leaks"
+          }
+        ],
+        "scope": "Provider-free repeated failure and recovery behavior with verified runtime leak accounting.",
+        "sources": [
+          "lib/dsex/benchmark_truth/failure_campaign.ex",
+          "test/failure_campaign_test.exs"
+        ],
+        "statement": "DSEx deterministic cancellation, timeout, bounded concurrency, partial-stream failure, retry/idempotency, and optimizer resume recovery paths pass the canonical T0 campaign without runtime leaks.",
+        "status": "proven",
+        "surface": [
+          "concurrency",
+          "streaming",
+          "training_protocol",
+          "optimizer_scheduling"
+        ]
+      },
+      {
+        "category": "operations",
+        "claim_type": "live_provider_proof",
+        "comparison": "dsex_native",
+        "decision": "active_gap",
+        "id": "claim.failure_recovery.live",
+        "limitations": [
+          "The current deterministic campaign is T0 evidence and cannot establish live provider, training, retrieval, tool, or agent recovery."
+        ],
+        "release": "telos",
+        "release_blocking": true,
+        "requirements": [
+          {
+            "artifact": {
+              "generated_at": "2026-07-13T23:33:46Z",
+              "git_sha": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+              "path": "benchmarks/results/failure-campaign-20260713T233346Z.json",
+              "sha256": "07c8fef06c0cc653010eb4de32e2efb9faf27cd995ac310961c16f027d1f521d"
+            },
+            "blocking_requirements": [],
+            "evidence": "full",
+            "id": "failure_recovery.live.full",
+            "kind": "failure_recovery",
+            "lane": "failure_recovery",
+            "lane_status": "full",
+            "satisfied": true,
+            "threshold": "verified deterministic T0 authority plus valid completed live rows for both required recovery campaigns"
+          }
+        ],
+        "scope": "Completed live provider and integration recovery, beyond deterministic protocol simulation.",
+        "sources": [
+          "lib/dsex/benchmark_truth/failure_campaign.ex",
+          "test/failure_campaign_test.exs"
+        ],
+        "statement": "DSEx failure recovery has verified completed live evidence for provider retry/timeout/idempotency and integrated training, retrieval, tool, and agent recovery.",
+        "status": "proven",
+        "surface": [
+          "ReqLLM",
+          "training_protocol",
+          "retriever_protocol",
+          "tools",
+          "agents"
+        ]
+      }
+    ],
+    "limitation": "One or more release-blocking public claims lack fresh passing evidence.",
+    "passing": false,
+    "profile": {
+      "claim_releases": [
+        "v0.1",
+        "telos"
+      ],
+      "id": "telos",
+      "schema_version": 1
+    },
+    "status": "failing",
+    "summary": {
+      "blocked": 10,
+      "non_blocking": 0,
+      "proven": 3,
+      "total": 13
+    }
+  },
+  "full_parity": false,
+  "generated_at": "2026-07-13T23:34:08Z",
+  "git_sha": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+  "lanes": {
+    "failure_recovery": {
+      "artifact": {
+        "generated_at": "2026-07-13T23:33:46Z",
+        "git_sha": "cf7eb1700cb1ca00fe1f95d2bb7c1d01c0990e03",
+        "path": "benchmarks/results/failure-campaign-20260713T233346Z.json",
+        "sha256": "07c8fef06c0cc653010eb4de32e2efb9faf27cd995ac310961c16f027d1f521d"
+      },
+      "blocking_requirements": [],
+      "fresh": true,
+      "full_evidence": true,
+      "id": "failure_recovery",
+      "limitation": null,
+      "passing": true,
+      "scale": "full",
+      "status": "full",
+      "summary": {
+        "authority": {
+          "current_schema": true,
+          "deterministic_complete": true,
+          "expected_deterministic_cases": [
+            "async_concurrency_is_bounded",
+            "http_retrieval_retry_timeout_and_idempotency",
+            "mcp_retry_timeout_and_idempotency",
+            "mipro_v2_durable_resume_and_tamper",
+            "partial_stream_failure_is_terminal",
+            "simba_durable_resume_and_tamper",
+            "task_cancellation_releases_admission",
+            "task_timeout_is_explicit_and_terminal",
+            "training_retry_and_idempotency_are_bounded"
+          ],
+          "expected_live_rows": [
+            "provider_retry_timeout_idempotency_live",
+            "retrieval_and_tool_agent_recovery_live"
+          ],
+          "live_complete": true,
+          "missing_live_rows": [],
+          "run_envelope_verified": true,
+          "runtime_complete": true,
+          "valid_deterministic_cases": [
+            "async_concurrency_is_bounded",
+            "http_retrieval_retry_timeout_and_idempotency",
+            "mcp_retry_timeout_and_idempotency",
+            "mipro_v2_durable_resume_and_tamper",
+            "partial_stream_failure_is_terminal",
+            "simba_durable_resume_and_tamper",
+            "task_cancellation_releases_admission",
+            "task_timeout_is_explicit_and_terminal",
+            "training_retry_and_idempotency_are_bounded"
+          ],
+          "valid_live_rows": [
+            "provider_retry_timeout_idempotency_live",
+            "retrieval_and_tool_agent_recovery_live"
+          ]
+        },
+        "evidence_tier": "t0_deterministic_failure_recovery",
+        "reported_summary": {
+          "all_requested_iterations_pass": true,
+          "deterministic_complete": true,
+          "deterministic_lanes": 9,
+          "deterministic_passing": 9,
+          "flake_sample_complete": true,
+          "live_complete": true,
+          "local_cases": 9,
+          "local_complete": true,
+          "local_passing": 9,
+          "release_complete": true,
+          "remaining_live_lanes": 0
+        }
+      }
+    },
+    "gepa_replication": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no gepa-replication artifact found in tmp/gepa-replication"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "gepa_replication",
+      "limitation": "no gepa-replication artifact found in tmp/gepa-replication",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "golden_trace": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no golden-trace-parity artifact found in tmp/golden-trace"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "golden_trace",
+      "limitation": "no golden-trace-parity artifact found in tmp/golden-trace",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "instruction_optimizer_contract": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no instruction-optimizer-contract artifact found in tmp/instruction-optimizer-contract"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "instruction_optimizer_contract",
+      "limitation": "no instruction-optimizer-contract artifact found in tmp/instruction-optimizer-contract",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "live_matched_model": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no live-matched-model matrix or dsex-dspy-parity-campaign artifact found"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "live_matched_model",
+      "limitation": "no live-matched-model matrix or dsex-dspy-parity-campaign artifact found",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "live_provider_smoke": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no live_provider_smoke source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate live_provider_smoke --mix-task live.check"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "live_provider_smoke",
+      "limitation": "no live_provider_smoke source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate live_provider_smoke --mix-task live.check",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "livebook_execute": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no livebook_execute source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "livebook_execute",
+      "limitation": "no livebook_execute source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "optimize_anything": {
+      "artifact": {
+        "generated_at": "2026-07-13T09:28:40Z",
+        "git_sha": "fbd510ec3f5340c5ad30ffcd13f1eb1fa343f0d7",
+        "path": "benchmarks/results/optimize-anything-replication-20260713T092840Z.json",
+        "sha256": "080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653"
+      },
+      "blocking_requirements": [],
+      "fresh": true,
+      "full_evidence": true,
+      "id": "optimize_anything",
+      "limitation": null,
+      "passing": true,
+      "scale": "full",
+      "status": "full",
+      "summary": {
+        "artifact_classes": [
+          "code_artifact",
+          "agent_config",
+          "scheduling_heuristic"
+        ],
+        "effectiveness_authorized": true,
+        "provider_models": [
+          {
+            "model": "gpt-5.4-2026-03-05",
+            "provider": "openai"
+          }
+        ],
+        "rows": [
+          {
+            "absolute_lift": 0.3441818347326483,
+            "artifact_class": "code_artifact",
+            "baseline_score": 0.3728989106089666,
+            "cost_usd": 0.0868,
+            "optimized_score": 0.7170807453416149,
+            "reproducibility_runs": 3,
+            "wall_time_ms": 42041
+          },
+          {
+            "absolute_lift": 0.11834279999999997,
+            "artifact_class": "agent_config",
+            "baseline_score": 0.562,
+            "cost_usd": 0.093696,
+            "optimized_score": 0.6803428,
+            "reproducibility_runs": 3,
+            "wall_time_ms": 29949
+          },
+          {
+            "absolute_lift": 0.09236600000000006,
+            "artifact_class": "scheduling_heuristic",
+            "baseline_score": 0.7454195,
+            "cost_usd": 0.036706,
+            "optimized_score": 0.8377855000000001,
+            "reproducibility_runs": 3,
+            "wall_time_ms": 19434
+          }
+        ]
+      }
+    },
+    "optimizer_lift": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no optimizer-lift-parity artifact found in tmp/optimizer-lift"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "optimizer_lift",
+      "limitation": "no optimizer-lift-parity artifact found in tmp/optimizer-lift",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "product_package": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no product_package source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate product_package --mix-task package.check"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "product_package",
+      "limitation": "no product_package source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate product_package --mix-task package.check",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "protocol_gates": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no protocol_gates source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate protocol_gates --mix-task protocol.check"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "protocol_gates",
+      "limitation": "no protocol_gates source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate protocol_gates --mix-task protocol.check",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "provider_free_overhead": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no overhead-parity artifact found in tmp/overhead"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "provider_free_overhead",
+      "limitation": "no overhead-parity artifact found in tmp/overhead",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "rag_tool_agent": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no rag-tool-agent-parity artifact found in tmp/rag-tool-agent"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "rag_tool_agent",
+      "limitation": "no rag-tool-agent-parity artifact found in tmp/rag-tool-agent",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    },
+    "rlm_benchmark": {
+      "artifact": null,
+      "blocking_requirements": [
+        "no rlm-benchmark-parity artifact found in tmp/rlm-benchmark"
+      ],
+      "fresh": false,
+      "full_evidence": false,
+      "id": "rlm_benchmark",
+      "limitation": "no rlm-benchmark-parity artifact found in tmp/rlm-benchmark",
+      "passing": false,
+      "scale": "missing",
+      "status": "missing",
+      "summary": {}
+    }
+  },
+  "max_age_hours": 24,
+  "performance_claim_supported": false,
+  "profile": {
+    "claim_releases": [
+      "v0.1",
+      "telos"
+    ],
+    "id": "telos",
+    "schema_version": 1
+  },
+  "release_gate": {
+    "blocking_lanes": [
+      "gepa_replication",
+      "golden_trace",
+      "live_matched_model",
+      "live_provider_smoke",
+      "livebook_execute",
+      "optimizer_lift",
+      "product_package",
+      "protocol_gates",
+      "provider_free_overhead",
+      "rag_tool_agent",
+      "rlm_benchmark",
+      "public_claims"
+    ],
+    "checks": [
+      {
+        "blocking_requirements": [],
+        "claim_ids": [
+          "claim.failure_recovery.deterministic_t0",
+          "claim.failure_recovery.live"
+        ],
+        "fresh": true,
+        "full_evidence": true,
+        "lane": "failure_recovery",
+        "limitation": null,
+        "passing": true,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "failure_recovery.t0",
+          "failure_recovery.live.full"
+        ],
+        "status": "full"
+      },
+      {
+        "blocking_requirements": [
+          "no gepa-replication artifact found in tmp/gepa-replication"
+        ],
+        "claim_ids": [
+          "claim.gepa_replication.full"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "gepa_replication",
+        "limitation": "no gepa-replication artifact found in tmp/gepa-replication",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "gepa_replication.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no golden-trace-parity artifact found in tmp/golden-trace"
+        ],
+        "claim_ids": [
+          "claim.dspy_semantics.golden_trace"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "golden_trace",
+        "limitation": "no golden-trace-parity artifact found in tmp/golden-trace",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "golden_trace.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no live-matched-model matrix or dsex-dspy-parity-campaign artifact found"
+        ],
+        "claim_ids": [
+          "claim.live_matched_model.full_parity"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "live_matched_model",
+        "limitation": "no live-matched-model matrix or dsex-dspy-parity-campaign artifact found",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "live_matched_model.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no live_provider_smoke source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate live_provider_smoke --mix-task live.check"
+        ],
+        "claim_ids": [
+          "claim.docs.livebooks_real_provider"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "live_provider_smoke",
+        "limitation": "no live_provider_smoke source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate live_provider_smoke --mix-task live.check",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "live.provider.smoke"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no livebook_execute source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check"
+        ],
+        "claim_ids": [
+          "claim.docs.livebooks_real_provider"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "livebook_execute",
+        "limitation": "no livebook_execute source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "livebooks.executable"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [],
+        "claim_ids": [
+          "claim.optimize_anything.non_prompt_effectiveness"
+        ],
+        "fresh": true,
+        "full_evidence": true,
+        "lane": "optimize_anything",
+        "limitation": null,
+        "passing": true,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "optimize_anything.non_prompt.full"
+        ],
+        "status": "full"
+      },
+      {
+        "blocking_requirements": [
+          "no optimizer-lift-parity artifact found in tmp/optimizer-lift"
+        ],
+        "claim_ids": [
+          "claim.optimizer_lift.full"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "optimizer_lift",
+        "limitation": "no optimizer-lift-parity artifact found in tmp/optimizer-lift",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "optimizer_lift.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no product_package source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate product_package --mix-task package.check"
+        ],
+        "claim_ids": [
+          "claim.product.public_api_installable"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "product_package",
+        "limitation": "no product_package source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate product_package --mix-task package.check",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "package.clean_room"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no protocol_gates source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate protocol_gates --mix-task protocol.check"
+        ],
+        "claim_ids": [
+          "claim.protocols.production_boundaries"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "protocol_gates",
+        "limitation": "no protocol_gates source-checkout gate evidence artifact found in tmp/gate-evidence; run mix dsex.gate_evidence --gate protocol_gates --mix-task protocol.check",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "protocols.local"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no overhead-parity artifact found in tmp/overhead"
+        ],
+        "claim_ids": [
+          "claim.performance.provider_free"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "provider_free_overhead",
+        "limitation": "no overhead-parity artifact found in tmp/overhead",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "provider_free_overhead.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no rag-tool-agent-parity artifact found in tmp/rag-tool-agent"
+        ],
+        "claim_ids": [
+          "claim.rag_tools_agents.full"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "rag_tool_agent",
+        "limitation": "no rag-tool-agent-parity artifact found in tmp/rag-tool-agent",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "rag_tool_agent.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          "no rlm-benchmark-parity artifact found in tmp/rlm-benchmark"
+        ],
+        "claim_ids": [
+          "claim.rlm.provider_free_benchmark"
+        ],
+        "fresh": false,
+        "full_evidence": false,
+        "lane": "rlm_benchmark",
+        "limitation": "no rlm-benchmark-parity artifact found in tmp/rlm-benchmark",
+        "passing": false,
+        "required_evidence": "full",
+        "requirement_ids": [
+          "rlm_benchmark.full"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_requirements": [
+          {
+            "claim_id": "claim.product.public_api_installable",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "package.clean_room"
+            ],
+            "statement": "DSEx is installable as a clean Elixir package and its documented public API works outside the source checkout."
+          },
+          {
+            "claim_id": "claim.docs.livebooks_real_provider",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "livebooks.executable",
+              "live.provider.smoke"
+            ],
+            "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features."
+          },
+          {
+            "claim_id": "claim.dspy_semantics.golden_trace",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "golden_trace.full"
+            ],
+            "statement": "DSEx implements DSPy-shaped core semantics for signatures, Predict, ChainOfThought, typed adapters, ReAct tool traces, streaming, save/load redaction, and cache behavior."
+          },
+          {
+            "claim_id": "claim.live_matched_model.full_parity",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "live_matched_model.full"
+            ],
+            "statement": "DSEx matches Python DSPy on live matched-model benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings."
+          },
+          {
+            "claim_id": "claim.optimizer_lift.full",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "optimizer_lift.full"
+            ],
+            "statement": "DSEx optimizer behavior has direct or intentionally-deviating evidence against DSPy for the optimizer surfaces it claims."
+          },
+          {
+            "claim_id": "claim.gepa_replication.full",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "gepa_replication.full"
+            ],
+            "statement": "DSEx GEPA research claims are supported only by fresh GEPA paper-family replication artifacts that compare baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present."
+          },
+          {
+            "claim_id": "claim.rag_tools_agents.full",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "rag_tool_agent.full"
+            ],
+            "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence."
+          },
+          {
+            "claim_id": "claim.rlm.provider_free_benchmark",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "rlm_benchmark.full"
+            ],
+            "statement": "DSEx RLM effectiveness is supported by a complete paper-scale reproduction rather than scripted fixture replay."
+          },
+          {
+            "claim_id": "claim.performance.provider_free",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "provider_free_overhead.full"
+            ],
+            "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made."
+          },
+          {
+            "claim_id": "claim.protocols.production_boundaries",
+            "kind": "public_claim_blocked",
+            "missing_requirements": [
+              "protocols.local"
+            ],
+            "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface."
+          }
+        ],
+        "fresh": true,
+        "full_evidence": false,
+        "lane": "public_claims",
+        "limitation": "One or more release-blocking public claims lack fresh passing evidence.",
+        "passing": false,
+        "status": "failing"
+      }
+    ],
+    "note": "Full parity requires every required lane to be fresh, passing, and backed by full-evidence artifacts.",
+    "passing": false
+  },
+  "required_lane_requirements": [
+    {
+      "claim_ids": [
+        "claim.failure_recovery.deterministic_t0",
+        "claim.failure_recovery.live"
+      ],
+      "evidence": "full",
+      "lane": "failure_recovery",
+      "requirement_ids": [
+        "failure_recovery.t0",
+        "failure_recovery.live.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.gepa_replication.full"
+      ],
+      "evidence": "full",
+      "lane": "gepa_replication",
+      "requirement_ids": [
+        "gepa_replication.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.dspy_semantics.golden_trace"
+      ],
+      "evidence": "full",
+      "lane": "golden_trace",
+      "requirement_ids": [
+        "golden_trace.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.live_matched_model.full_parity"
+      ],
+      "evidence": "full",
+      "lane": "live_matched_model",
+      "requirement_ids": [
+        "live_matched_model.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.docs.livebooks_real_provider"
+      ],
+      "evidence": "full",
+      "lane": "live_provider_smoke",
+      "requirement_ids": [
+        "live.provider.smoke"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.docs.livebooks_real_provider"
+      ],
+      "evidence": "full",
+      "lane": "livebook_execute",
+      "requirement_ids": [
+        "livebooks.executable"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.optimize_anything.non_prompt_effectiveness"
+      ],
+      "evidence": "full",
+      "lane": "optimize_anything",
+      "requirement_ids": [
+        "optimize_anything.non_prompt.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.optimizer_lift.full"
+      ],
+      "evidence": "full",
+      "lane": "optimizer_lift",
+      "requirement_ids": [
+        "optimizer_lift.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.product.public_api_installable"
+      ],
+      "evidence": "full",
+      "lane": "product_package",
+      "requirement_ids": [
+        "package.clean_room"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.protocols.production_boundaries"
+      ],
+      "evidence": "full",
+      "lane": "protocol_gates",
+      "requirement_ids": [
+        "protocols.local"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.performance.provider_free"
+      ],
+      "evidence": "full",
+      "lane": "provider_free_overhead",
+      "requirement_ids": [
+        "provider_free_overhead.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.rag_tools_agents.full"
+      ],
+      "evidence": "full",
+      "lane": "rag_tool_agent",
+      "requirement_ids": [
+        "rag_tool_agent.full"
+      ]
+    },
+    {
+      "claim_ids": [
+        "claim.rlm.provider_free_benchmark"
+      ],
+      "evidence": "full",
+      "lane": "rlm_benchmark",
+      "requirement_ids": [
+        "rlm_benchmark.full"
+      ]
+    }
+  ],
+  "required_lanes": [
+    "failure_recovery",
+    "gepa_replication",
+    "golden_trace",
+    "live_matched_model",
+    "live_provider_smoke",
+    "livebook_execute",
+    "optimize_anything",
+    "optimizer_lift",
+    "product_package",
+    "protocol_gates",
+    "provider_free_overhead",
+    "rag_tool_agent",
+    "rlm_benchmark"
+  ],
+  "schema_version": 1,
+  "summary": {
+    "full_evidence_lanes": 2,
+    "note": "Full parity is true only when all required lanes pass with full-evidence artifacts. Passing smoke or deterministic slices are preserved but cannot authorize full parity claims.",
+    "passing_lanes": 2,
+    "public_claims": {
+      "blocked": 10,
+      "non_blocking": 0,
+      "proven": 3,
+      "total": 13
+    },
+    "total_lanes": 14
+  }
+}
