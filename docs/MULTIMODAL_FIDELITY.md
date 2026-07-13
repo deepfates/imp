@@ -6,16 +6,15 @@ is authorized only by a complete live artifact from the provider-backed campaign
 
 ## Audited Lane
 
-The preregistered manifest is
-`benchmarks/data/multimodal/manifest.json`. Its checksum envelope and strict
-schema pin:
+The provider-profile manifests are
+`benchmarks/data/multimodal/manifest.json` for Google and
+`benchmarks/data/multimodal/openai-responses-manifest.json` for OpenAI. Their
+checksum envelopes and strict schema pin:
 
 - every sample ID, asset byte count, and SHA-256 hash;
 - the exact prompts, signature, gold answers, normalization, and thresholds;
-- Google `generateContent`, ReqLLM model `google:gemini-2.5-flash`, and the
-  process-scoped `GEMINI_API_KEY` credential name;
-- temperature, top-p, seed, output limit, timeout, concurrency limit, and USD
-  token prices;
+- provider, API, exact model, credential environment name, identity-evidence
+  policy, supported generation options, and USD token prices;
 - expected image and native PDF capabilities.
 
 All assets are synthetic and repository-owned. The image family covers shape
@@ -27,9 +26,19 @@ them as native file support.
 DSEx sends image bytes as a typed `DSEx.Adapters.Types.Image` data URI through a
 ReqLLM `image_url` content part. It sends the PDF path as a typed
 `DSEx.Adapters.Types.File`, which ReqLLM reads into a binary `file` content part
-and the audited Google adapter maps to inline PDF data. Reports retain only the
+and the selected ReqLLM adapter maps to inline PDF data. OpenAI Responses uses
+`input_file.file_data`; its image path uses `input_image.image_url`. Reports retain only the
 type, MIME type, byte count, hash, and transport label. They never retain the
 data URI, binary file, base64 payload, or API key.
+
+The retained live proof is
+`benchmarks/results/multimodal-quality-live-20260713T215119Z.json`, generated
+2026-07-13 with manifest SHA-256
+`45c632a0806d279a749cce9904b002ec243f16e5ee65fa0081e47b10eb1fd4a3`.
+It records 6/6 passing samples, exact effective model
+`gpt-4.1-mini-2025-04-14`, API `responses`, 5,716 input tokens, 47 output
+tokens, and calculated cost `$0.002361600`. Four image tasks and both native-PDF
+tasks passed. This authorizes only the narrow claims defined below.
 
 ## Commands
 
@@ -37,16 +46,16 @@ Validate the manifest, assets, dispatch plan, and report shape without loading a
 credential or contacting Google:
 
 ```sh
-mix dsex.benchmark.multimodal_quality --plan --out tmp/multimodal-plan
+mix dsex.benchmark.multimodal_quality --profile openai-responses \
+  --plan --out tmp/multimodal-plan
 ```
 
 `--dry-run` is an alias for `--plan`. Execute or resume the pinned live campaign:
 
 ```sh
-GEMINI_API_KEY="$GEMINI_API_KEY" mix dsex.benchmark.multimodal_quality \
-  --live \
+mix dsex.benchmark.multimodal_quality \
+  --profile openai-responses --live \
   --max-concurrency 2 \
-  --checkpoint benchmarks/results/multimodal-checkpoints/google-gemini-2.5-flash-v1.json \
   --out benchmarks/results
 ```
 
@@ -57,6 +66,13 @@ before dispatch and durable outcomes after completion. Completed rows resume
 without another provider call. An unresolved intent is ambiguous because the
 provider may have accepted the request, so resume fails closed instead of
 silently retrying and double-billing it.
+
+The repository's current `GEMINI_API_KEY` returned Google HTTP 400 invalid-key
+responses on 2026-07-13, so it provides no Google quality evidence. Provider
+failures are retained as bounded structured maps with category, exception,
+HTTP status, provider code, request ID, and redacted message when available.
+Exception structs are converted before redaction so malformed nested fields
+cannot turn a provider failure into a runner error.
 
 ## Claim Gate
 

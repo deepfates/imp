@@ -1,0 +1,344 @@
+{
+  "artifact_schema": "dsex.multimodal_quality.v1",
+  "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v2",
+  "checkpoint": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/benchmarks/results/multimodal-checkpoints/dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v2.json",
+  "claims": {
+    "audio": {
+      "claimed": false,
+      "status": "unsupported_unproven"
+    },
+    "document_quality": true,
+    "image_quality": true,
+    "multimodal_quality": true,
+    "native_file_support": true,
+    "rendered_document_images": {
+      "claimed_as_native_file_support": false,
+      "executed": false
+    }
+  },
+  "content_part_shapes": [
+    {
+      "asset_id": "shape_board",
+      "bytes": 26387,
+      "dsex_type": "DSEx.Adapters.Types.Image",
+      "mime_type": "image/png",
+      "req_llm_content_part": "image_url",
+      "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e",
+      "transport": "inline_data_uri_redacted"
+    },
+    {
+      "asset_id": "inspection_card",
+      "bytes": 25618,
+      "dsex_type": "DSEx.Adapters.Types.Image",
+      "mime_type": "image/png",
+      "req_llm_content_part": "image_url",
+      "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff",
+      "transport": "inline_data_uri_redacted"
+    },
+    {
+      "asset_id": "project_register_pdf",
+      "bytes": 3097,
+      "dsex_type": "DSEx.Adapters.Types.File",
+      "mime_type": "application/pdf",
+      "req_llm_content_part": "file",
+      "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d",
+      "transport": "inline_binary_redacted"
+    }
+  ],
+  "families": {
+    "image": {
+      "passed": 4,
+      "passing": true,
+      "score": 1.0,
+      "threshold": 0.75,
+      "total": 4
+    },
+    "native_document": {
+      "passed": 2,
+      "passing": true,
+      "score": 1.0,
+      "threshold": 1.0,
+      "total": 2
+    }
+  },
+  "generated_at": "2026-07-13T21:51:19.466608Z",
+  "limitations": [
+    "This small synthetic campaign measures six preregistered exact-answer tasks; it is not a broad multimodal leaderboard.",
+    "Native document quality means the PDF was sent as a typed DSEx File through ReqLLM's OpenAI Responses input_file.file_data path.",
+    "Rendered PDF page PNGs are included for inspection but are not executed and never count as native file support.",
+    "Audio is unsupported and unproven in this campaign.",
+    "A plan or dry run validates wiring and assets only and cannot authorize any quality claim."
+  ],
+  "manifest": {
+    "path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/benchmarks/data/multimodal/openai-responses-manifest.json",
+    "payload_sha256": "45c632a0806d279a749cce9904b002ec243f16e5ee65fa0081e47b10eb1fd4a3",
+    "signature": {
+      "input": "instruction: string, attachment: DSEx.Adapters.Types.Image | DSEx.Adapters.Types.File",
+      "output": "answer: string | integer",
+      "output_schema": {
+        "answer": "string_or_integer"
+      },
+      "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
+    }
+  },
+  "mode": "live",
+  "provider": {
+    "api": "responses",
+    "capabilities": {
+      "audio": false,
+      "image_input": true,
+      "native_pdf": true
+    },
+    "generation": {
+      "max_tokens": 128,
+      "temperature": 0,
+      "timeout_ms": 60000
+    },
+    "identity_evidence": "response_metadata_required",
+    "model": "gpt-4.1-mini-2025-04-14",
+    "name": "openai",
+    "pricing": {
+      "as_of": "2026-07-13",
+      "currency": "USD",
+      "input_nano_usd_per_token": 400,
+      "input_usd_per_1m": "0.40",
+      "output_nano_usd_per_token": 1600,
+      "output_usd_per_1m": "1.60",
+      "source": "https://openai.com/index/gpt-4-1/"
+    },
+    "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+    "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+  },
+  "rows": [
+    {
+      "answer": 3,
+      "content_part_shape": {
+        "asset_id": "shape_board",
+        "bytes": 26387,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e",
+        "transport": "inline_data_uri_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 631200,
+        "output_nano_usd": 11200,
+        "total_nano_usd": 642400,
+        "total_usd": "0.000642400"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "image_input",
+      "failure": null,
+      "family": "image",
+      "gold": 3,
+      "latency_us": 3692356,
+      "outcome": "passed",
+      "prompt_sha256": "e3440d4d6e7f17cf578dfdb464a05324e8d3a14a7cacf059e159a6179880762f",
+      "sample_id": "image_shape_count_blue_circles",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 1578,
+        "output_tokens": 7,
+        "total_tokens": 1585
+      }
+    },
+    {
+      "answer": "left",
+      "content_part_shape": {
+        "asset_id": "shape_board",
+        "bytes": 26387,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e",
+        "transport": "inline_data_uri_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 634000,
+        "output_nano_usd": 11200,
+        "total_nano_usd": 645200,
+        "total_usd": "0.000645200"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "image_input",
+      "failure": null,
+      "family": "image",
+      "gold": "left",
+      "latency_us": 1729664,
+      "outcome": "passed",
+      "prompt_sha256": "26e7f62882e02f7b04813a86fcf21d5a2981899fb8b18c967b3a993ff68a7f8a",
+      "sample_id": "image_shape_spatial_relation",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 1585,
+        "output_tokens": 7,
+        "total_tokens": 1592
+      }
+    },
+    {
+      "answer": "MINT-47",
+      "content_part_shape": {
+        "asset_id": "inspection_card",
+        "bytes": 25618,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff",
+        "transport": "inline_data_uri_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 405200,
+        "output_nano_usd": 16000,
+        "total_nano_usd": 421200,
+        "total_usd": "0.000421200"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "image_input",
+      "failure": null,
+      "family": "image",
+      "gold": "MINT-47",
+      "latency_us": 1862632,
+      "outcome": "passed",
+      "prompt_sha256": "a9b09a539f73d93d8e14edf63f6a5158ed772e05c791e525bb9d3c2ccb5ad937",
+      "sample_id": "image_ocr_batch_code",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 1013,
+        "output_tokens": 10,
+        "total_tokens": 1023
+      }
+    },
+    {
+      "answer": "C-12",
+      "content_part_shape": {
+        "asset_id": "inspection_card",
+        "bytes": 25618,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff",
+        "transport": "inline_data_uri_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 404800,
+        "output_nano_usd": 14400,
+        "total_nano_usd": 419200,
+        "total_usd": "0.000419200"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "image_input",
+      "failure": null,
+      "family": "image",
+      "gold": "C-12",
+      "latency_us": 1142598,
+      "outcome": "passed",
+      "prompt_sha256": "bc2ead65ca5915ffd8ed0cf91c9a49451ff5b3b73f478572235ff82c198ab668",
+      "sample_id": "image_ocr_bin",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 1012,
+        "output_tokens": 9,
+        "total_tokens": 1021
+      }
+    },
+    {
+      "answer": 35,
+      "content_part_shape": {
+        "asset_id": "project_register_pdf",
+        "bytes": 3097,
+        "dsex_type": "DSEx.Adapters.Types.File",
+        "mime_type": "application/pdf",
+        "req_llm_content_part": "file",
+        "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d",
+        "transport": "inline_binary_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 106800,
+        "output_nano_usd": 9600,
+        "total_nano_usd": 116400,
+        "total_usd": "0.000116400"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "native_pdf",
+      "failure": null,
+      "family": "native_document",
+      "gold": 35,
+      "latency_us": 3049184,
+      "outcome": "passed",
+      "prompt_sha256": "8f057bd6ad38cc0661766986cd4f388906549ff6a19d42b09437847fdf9f9796",
+      "sample_id": "native_pdf_september_subtotal",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 267,
+        "output_tokens": 6,
+        "total_tokens": 273
+      }
+    },
+    {
+      "answer": "Priya",
+      "content_part_shape": {
+        "asset_id": "project_register_pdf",
+        "bytes": 3097,
+        "dsex_type": "DSEx.Adapters.Types.File",
+        "mime_type": "application/pdf",
+        "req_llm_content_part": "file",
+        "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d",
+        "transport": "inline_binary_redacted"
+      },
+      "cost": {
+        "input_nano_usd": 104400,
+        "output_nano_usd": 12800,
+        "total_nano_usd": 117200,
+        "total_usd": "0.000117200"
+      },
+      "effective_api": "responses",
+      "effective_api_evidence": "provider_response_metadata",
+      "effective_model": "gpt-4.1-mini-2025-04-14",
+      "expected_capability": "native_pdf",
+      "failure": null,
+      "family": "native_document",
+      "gold": "Priya",
+      "latency_us": 3145512,
+      "outcome": "passed",
+      "prompt_sha256": "183eda0012a002412940126bf2a51c24aafd3a2047a2020770e065ba015ab69f",
+      "sample_id": "native_pdf_cross_page_join",
+      "score": 1.0,
+      "usage": {
+        "input_tokens": 261,
+        "output_tokens": 8,
+        "total_tokens": 269
+      }
+    }
+  ],
+  "runner": {
+    "dispatch": "DSEx.Clients.ReqLLM.generate/3",
+    "max_concurrency": 2,
+    "resumable": true
+  },
+  "summary": {
+    "complete": true,
+    "failed": 0,
+    "passed": 6,
+    "total": 6
+  },
+  "usage": {
+    "cost": {
+      "total_nano_usd": 2361600,
+      "total_usd": "0.002361600"
+    },
+    "input_tokens": 5716,
+    "output_tokens": 47,
+    "total_tokens": 5763
+  }
+}

@@ -90,8 +90,11 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
     )
     |> Enum.zip(samples)
     |> Enum.map(fn
-      {{:ok, row}, sample} -> {sample["id"], row}
-      {{:exit, reason}, sample} -> {sample["id"], execution_failure_row(sample, reason)}
+      {{:ok, row}, sample} ->
+        {sample["id"], row}
+
+      {{:exit, reason}, sample} ->
+        {sample["id"], execution_failure_row(sample, reason, nil, context.api_key)}
     end)
   end
 
@@ -212,9 +215,9 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
   end
 
   defp result_row(sample, shape, {:error, reason}, latency, _provider, api_key) do
-    text = scrub_failure(reason, api_key)
-    outcome = if capability_error?(text), do: "capability_error", else: "provider_error"
-    failed_row(sample, shape, latency, outcome, text)
+    failure = scrub_failure(reason, api_key)
+    outcome = if capability_error?(failure), do: "capability_error", else: "provider_error"
+    failed_row(sample, shape, latency, outcome, failure)
   end
 
   defp result_row(sample, shape, other, latency, _provider, api_key),
@@ -256,6 +259,9 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
         {:error,
          {:identity_mismatch,
           "effective model #{inspect(model)} did not match #{provider["model"]}"}}
+
+      provider["identity_evidence"] == "response_metadata_required" and is_nil(api) ->
+        {:error, {:identity_mismatch, "effective API response metadata was missing"}}
 
       api not in [nil, provider["api"]] ->
         {:error,
@@ -406,7 +412,7 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
     })
   end
 
-  defp execution_failure_row(sample, reason, started \\ nil) do
+  defp execution_failure_row(sample, reason, started, api_key \\ nil) do
     latency = if started, do: System.monotonic_time(:microsecond) - started, else: 0
 
     base_row(sample, %{"unavailable" => true}, latency)
@@ -416,7 +422,7 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
       "effective_api" => nil,
       "effective_api_evidence" => nil,
       "effective_model" => nil,
-      "failure" => inspect(reason),
+      "failure" => failure_envelope(reason, api_key),
       "outcome" => "runner_error",
       "score" => 0.0,
       "usage" => nil
@@ -424,13 +430,10 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
   end
 
   defp generation_opts(settings) do
-    [
-      temperature: settings["temperature"],
-      top_p: settings["top_p"],
-      seed: settings["seed"],
-      max_tokens: settings["max_tokens"],
-      timeout: settings["timeout_ms"]
-    ]
+    settings
+    |> Map.take(~w(max_tokens seed temperature top_p))
+    |> Enum.map(fn {key, value} -> {String.to_existing_atom(key), value} end)
+    |> Keyword.put(:timeout, settings["timeout_ms"])
   end
 
   defp checkpoint_identity(manifest) do
@@ -489,8 +492,8 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
   defp normalize(value) when is_binary(value), do: value |> String.trim() |> String.downcase()
   defp normalize(value), do: value
 
-  defp capability_error?(text) do
-    down = String.downcase(text)
+  defp capability_error?(failure) do
+    down = failure |> Map.fetch!("message") |> String.downcase()
 
     Enum.any?(
       ["unsupported", "capability", "modality", "mime type", "file input"],
@@ -499,11 +502,77 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
   end
 
   defp scrub_failure(value, api_key) do
-    value
-    |> DSEx.Redaction.redact()
-    |> inspect()
-    |> String.replace(api_key, "[REDACTED]")
+    failure_envelope(value, api_key)
   end
+
+  defp failure_envelope(value, api_key) do
+    %{
+      "category" => failure_category(value),
+      "exception" => exception_name(value),
+      "http_status" => safe_field(value, :status),
+      "message" =>
+        value |> safe_failure_message() |> redact_failure_text(api_key) |> bound_text(),
+      "provider_code" => nested_safe_field(value, :code),
+      "request_id" => nested_safe_field(value, :request_id)
+    }
+  end
+
+  defp failure_category({category, _}) when is_atom(category), do: Atom.to_string(category)
+  defp failure_category(%{class: class}) when is_atom(class), do: Atom.to_string(class)
+  defp failure_category(%{__struct__: module}), do: module |> Module.split() |> Enum.join(".")
+  defp failure_category(_), do: "provider_failure"
+
+  defp exception_name(%{__struct__: module}), do: module |> Module.split() |> Enum.join(".")
+  defp exception_name({_category, value}), do: exception_name(value)
+  defp exception_name(_), do: nil
+
+  defp safe_failure_message(value) do
+    failure_message(value)
+  rescue
+    _error -> "provider failure message unavailable"
+  catch
+    _kind, _reason -> "provider failure message unavailable"
+  end
+
+  defp failure_message(value) when is_exception(value), do: Exception.message(value)
+
+  defp failure_message({category, value}) when is_atom(category),
+    do: "#{category}: #{failure_message(value)}"
+
+  defp failure_message(value) when is_binary(value), do: value
+  defp failure_message(value), do: inspect(value, limit: 20, printable_limit: 2_000)
+
+  defp safe_field(%{__struct__: _} = value, key), do: primitive_field(Map.get(value, key))
+  defp safe_field(value, key) when is_map(value), do: primitive_field(map_value(value, key))
+  defp safe_field({_category, value}, key), do: safe_field(value, key)
+  defp safe_field(_value, _key), do: nil
+
+  defp nested_safe_field(value, key) do
+    safe_field(value, key) ||
+      case safe_field_container(value, :response_body) do
+        body when is_map(body) -> primitive_field(map_value(body, key))
+        _ -> nil
+      end
+  end
+
+  defp safe_field_container(%{__struct__: _} = value, key), do: Map.get(value, key)
+  defp safe_field_container(value, key) when is_map(value), do: map_value(value, key)
+  defp safe_field_container({_category, value}, key), do: safe_field_container(value, key)
+  defp safe_field_container(_value, _key), do: nil
+
+  defp primitive_field(value) when is_binary(value) or is_integer(value), do: value
+  defp primitive_field(value) when is_atom(value) and not is_nil(value), do: Atom.to_string(value)
+  defp primitive_field(_value), do: nil
+
+  defp redact_failure_text(text, nil), do: DSEx.Redaction.redact(text)
+
+  defp redact_failure_text(text, api_key) do
+    text
+    |> String.replace(api_key, "[REDACTED]")
+    |> DSEx.Redaction.redact()
+  end
+
+  defp bound_text(text), do: String.slice(text, 0, 2_000)
 
   defp map_value(map, key) when is_map(map),
     do: Map.get(map, key, Map.get(map, Atom.to_string(key)))

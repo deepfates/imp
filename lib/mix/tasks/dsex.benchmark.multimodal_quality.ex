@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
   Plan or run the provider-backed multimodal quality campaign.
 
       mix dsex.benchmark.multimodal_quality --plan
-      GEMINI_API_KEY=... mix dsex.benchmark.multimodal_quality --live
+      mix dsex.benchmark.multimodal_quality --profile openai-responses --live
 
   Plan and dry-run modes validate the signed manifest and every asset without
   reading credentials or dispatching provider requests. Live mode uses only the
@@ -16,6 +16,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
   alias DSEx.BenchmarkTruth.MultimodalRunner
 
   @shortdoc "Plan or run the live multimodal quality campaign"
+  @profiles %{
+    "google" => "benchmarks/data/multimodal/manifest.json",
+    "openai-responses" => "benchmarks/data/multimodal/openai-responses-manifest.json"
+  }
 
   @impl true
   def run(args) do
@@ -30,7 +34,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
           manifest: :string,
           max_concurrency: :integer,
           out: :string,
-          plan: :boolean
+          plan: :boolean,
+          profile: :string
         ]
       )
 
@@ -38,7 +43,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
       do: Mix.raise("invalid arguments: #{inspect(invalid ++ argv)}")
 
     mode = mode!(opts)
-    manifest = Keyword.get(opts, :manifest, "benchmarks/data/multimodal/manifest.json")
+    manifest = manifest_path!(opts)
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
 
     runner_opts =
@@ -95,6 +100,22 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
     case System.fetch_env(env) do
       {:ok, api_key} when api_key != "" -> Keyword.put(opts, :api_key, api_key)
       _ -> Mix.raise("#{env} is required for --live and is read only from the task process")
+    end
+  end
+
+  defp manifest_path!(opts) do
+    case {Keyword.get(opts, :manifest), Keyword.fetch(opts, :profile)} do
+      {manifest, :error} when is_binary(manifest) ->
+        manifest
+
+      {nil, :error} ->
+        Map.fetch!(@profiles, "google")
+
+      {nil, {:ok, profile}} ->
+        Map.get(@profiles, profile) || Mix.raise("unknown profile #{inspect(profile)}")
+
+      {_manifest, {:ok, _profile}} ->
+        Mix.raise("choose --manifest or --profile, not both")
     end
   end
 

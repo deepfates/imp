@@ -6,7 +6,12 @@ defmodule MultimodalQualityBenchmarkTest do
   alias DSEx.BenchmarkTruth.MultimodalRunner, as: Runner
 
   @manifest "benchmarks/data/multimodal/manifest.json"
+  @openai_manifest "benchmarks/data/multimodal/openai-responses-manifest.json"
   @secret "gemini-test-secret-that-must-never-persist"
+
+  defmodule UnsafeProviderError do
+    defexception [:message, :status, :response_body]
+  end
 
   defmodule ProviderFake do
     def generate_text(model, messages, opts) do
@@ -25,6 +30,14 @@ defmodule MultimodalQualityBenchmarkTest do
         mode == :capability_error ->
           {:error, {:unsupported_capability, "PDF file input is unsupported"}}
 
+        mode == :unsafe_exception ->
+          {:error,
+           %UnsafeProviderError{
+             message: "provider rejected credential #{Keyword.fetch!(opts, :api_key)}",
+             status: 400,
+             response_body: ["improper" | :tail]
+           }}
+
         true ->
           answer = answer(text, mode)
 
@@ -41,16 +54,21 @@ defmodule MultimodalQualityBenchmarkTest do
           {:ok,
            %ReqLLM.Response{
              id: "fake-multimodal-response",
-             model: "gemini-2.5-flash",
+             model: model_name(model),
              context: ReqLLM.Context.new(messages),
              message: ReqLLM.Context.assistant(body),
              object: nil,
              usage: usage,
              finish_reason: :stop,
-             provider_meta: %{api_type: "generateContent"}
+             provider_meta: %{api_type: api_type(model)}
            }}
       end
     end
+
+    defp model_name("openai:" <> model), do: model
+    defp model_name("google:" <> model), do: model
+    defp api_type("openai:" <> _model), do: "responses"
+    defp api_type("google:" <> _model), do: "generateContent"
 
     defp answer(text, mode) do
       answer =
@@ -59,7 +77,7 @@ defmodule MultimodalQualityBenchmarkTest do
           String.contains?(text, "left or right") -> "left"
           String.contains?(text, "BATCH CODE") -> "MINT-47"
           String.contains?(text, "BIN value") -> "C-12"
-          String.contains?(text, "Sum Units") -> 35
+          String.contains?(text, "sum their Units") -> 35
           String.contains?(text, "which owner") -> "Priya"
         end
 
@@ -146,6 +164,56 @@ defmodule MultimodalQualityBenchmarkTest do
     refute encoded =~ "data:image/png;base64"
     refute encoded =~ Base.encode64(File.read!("benchmarks/data/multimodal/project-register.pdf"))
     refute File.read!(checkpoint) =~ @secret
+  end
+
+  test "OpenAI Responses profile requires exact API identity and dispatches supported image and PDF parts" do
+    artifact =
+      live_run(tmp_path("openai-profile.json"),
+        manifest: @openai_manifest,
+        client_opts: [test_pid: self(), fake_mode: :pass]
+      )
+
+    assert artifact["provider"]["profile"] ==
+             "openai-gpt-4.1-mini-2025-04-14-responses"
+
+    assert artifact["claims"]["multimodal_quality"]
+
+    dispatches = collect_dispatches(6)
+
+    assert Enum.all?(dispatches, fn {model, _message, opts} ->
+             model == "openai:gpt-4.1-mini-2025-04-14" and
+               Keyword.fetch!(opts, :temperature) == 0 and
+               not Keyword.has_key?(opts, :seed) and
+               not Keyword.has_key?(opts, :top_p)
+           end)
+
+    assert Enum.all?(artifact["rows"], fn row ->
+             row["effective_model"] == "gpt-4.1-mini-2025-04-14" and
+               row["effective_api"] == "responses" and
+               row["effective_api_evidence"] == "provider_response_metadata"
+           end)
+  end
+
+  test "exception structs become redacted structured provider failures without crashing scrubber" do
+    artifact =
+      live_run(tmp_path("structured-provider-error.json"),
+        client_opts: [test_pid: self(), fake_mode: :unsafe_exception]
+      )
+
+    assert Enum.all?(artifact["rows"], &(&1["outcome"] == "provider_error"))
+
+    assert Enum.all?(artifact["rows"], fn row ->
+             row["failure"] == %{
+               "category" => "MultimodalQualityBenchmarkTest.UnsafeProviderError",
+               "exception" => "MultimodalQualityBenchmarkTest.UnsafeProviderError",
+               "http_status" => 400,
+               "message" => "provider rejected credential [REDACTED]",
+               "provider_code" => nil,
+               "request_id" => nil
+             }
+           end)
+
+    refute Jason.encode!(artifact) =~ @secret
   end
 
   test "asset drift and manifest tampering fail before dispatch" do
@@ -275,11 +343,13 @@ defmodule MultimodalQualityBenchmarkTest do
   end
 
   defp live_run(checkpoint, opts) do
+    {manifest, opts} = Keyword.pop(opts, :manifest, @manifest)
+
     Runner.run(
       [
         api_key: @secret,
         checkpoint: checkpoint,
-        manifest: @manifest,
+        manifest: manifest,
         mode: :live,
         req_module: ProviderFake
       ] ++ opts

@@ -166,7 +166,7 @@ Missing evidence or behavior:
 
 ### `primitives.multimodal`
 
-Status: `implemented; live evidence pending`
+Status: `conformant for pinned image and native-PDF quality scope`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -181,11 +181,14 @@ Executable evidence:
 - test: `test/multimodal_quality_benchmark_test.exs`
 - task: `mix dsex.benchmark.multimodal_quality --plan|--live`
 - manifest: `benchmarks/data/multimodal/manifest.json`
+- manifest: `benchmarks/data/multimodal/openai-responses-manifest.json`
+- live proof: `benchmarks/results/multimodal-quality-live-20260713T215119Z.json` (6/6)
 - docs: `docs/MULTIMODAL_FIDELITY.md`
 
 Missing evidence or behavior:
 
-- execute the pinned live campaign and retain its quality/failure artifact
+- audio quality remains unsupported and unproven
+- the Google profile has no quality evidence because the available credential returned HTTP 400
 
 ### `tools.typed_calls`
 

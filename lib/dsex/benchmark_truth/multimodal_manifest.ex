@@ -2,8 +2,9 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
   @moduledoc false
 
   @payload_keys ~w(assets campaign_id claim_policy created_at limitations provider samples schema_version scoring signature)
-  @provider_keys ~w(api capabilities credential_env generation model name pricing req_llm_model)
-  @generation_keys ~w(max_tokens seed temperature timeout_ms top_p)
+  @provider_keys ~w(api capabilities credential_env generation identity_evidence model name pricing profile req_llm_model)
+  @required_generation_keys ~w(max_tokens timeout_ms)
+  @optional_generation_keys ~w(seed temperature top_p)
   @pricing_keys ~w(as_of currency input_nano_usd_per_token input_usd_per_1m output_nano_usd_per_token output_usd_per_1m source)
   @signature_keys ~w(input output output_schema prompt_contract)
   @scoring_keys ~w(family_thresholds normalization scorer)
@@ -11,6 +12,26 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
   @asset_keys ~w(bytes mime_type path sha256)
   @sample_keys ~w(asset_ids delivery expected_capability family gold id prompt)
   @deliveries ~w(typed_image_data_uri typed_native_file)
+  @provider_profiles %{
+    "google-gemini-2.5-flash-generate-content" => %{
+      "api" => "generateContent",
+      "capabilities" => %{"audio" => false, "image_input" => true, "native_pdf" => true},
+      "credential_env" => "GEMINI_API_KEY",
+      "identity_evidence" => "adapter_audit_or_response_metadata",
+      "model" => "gemini-2.5-flash",
+      "name" => "google",
+      "req_llm_model" => "google:gemini-2.5-flash"
+    },
+    "openai-gpt-4.1-mini-2025-04-14-responses" => %{
+      "api" => "responses",
+      "capabilities" => %{"audio" => false, "image_input" => true, "native_pdf" => true},
+      "credential_env" => "OPENAI_API_KEY",
+      "identity_evidence" => "response_metadata_required",
+      "model" => "gpt-4.1-mini-2025-04-14",
+      "name" => "openai",
+      "req_llm_model" => "openai:gpt-4.1-mini-2025-04-14"
+    }
+  }
 
   def load!(path, opts \\ []) do
     root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
@@ -55,26 +76,47 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
 
   def payload_sha256(payload), do: sha256(Jason.encode!(payload))
 
+  def profiles, do: Map.keys(@provider_profiles) |> Enum.sort()
+
   defp validate_provider!(provider) do
     exact_keys!(provider, @provider_keys, "provider")
-    require_equal!(provider["name"], "google", "provider.name")
-    require_equal!(provider["api"], "generateContent", "provider.api")
-    require_equal!(provider["req_llm_model"], "google:" <> provider["model"], "req_llm_model")
-    require_equal!(provider["credential_env"], "GEMINI_API_KEY", "credential_env")
+    profile = Map.get(@provider_profiles, provider["profile"])
+
+    unless profile do
+      raise ArgumentError,
+            "unknown multimodal provider profile #{inspect(provider["profile"])}; expected one of #{inspect(profiles())}"
+    end
+
+    profile
+    |> Map.drop(["capabilities"])
+    |> Enum.each(fn {key, expected} ->
+      require_equal!(provider[key], expected, "provider.#{key}")
+    end)
 
     capabilities = provider["capabilities"]
     exact_keys!(capabilities, ~w(audio image_input native_pdf), "provider.capabilities")
-    require_equal!(capabilities["image_input"], true, "capabilities.image_input")
-    require_equal!(capabilities["native_pdf"], true, "capabilities.native_pdf")
-    require_equal!(capabilities["audio"], false, "capabilities.audio")
 
-    exact_keys!(provider["generation"], @generation_keys, "provider.generation")
+    Enum.each(profile["capabilities"], fn {key, expected} ->
+      require_equal!(capabilities[key], expected, "capabilities.#{key}")
+    end)
+
     generation = provider["generation"]
-    require_number!(generation["temperature"], "generation.temperature")
-    require_number!(generation["top_p"], "generation.top_p")
-    require_integer!(generation["seed"], "generation.seed")
+    generation_keys = Map.keys(generation)
+
+    unless Enum.all?(@required_generation_keys, &(&1 in generation_keys)) and
+             Enum.all?(
+               generation_keys,
+               &(&1 in (@required_generation_keys ++ @optional_generation_keys))
+             ) do
+      raise ArgumentError,
+            "provider.generation must contain #{inspect(@required_generation_keys)} and only supported optional keys #{inspect(@optional_generation_keys)}"
+    end
+
     require_positive_integer!(generation["max_tokens"], "generation.max_tokens")
     require_positive_integer!(generation["timeout_ms"], "generation.timeout_ms")
+    maybe_require_number!(generation, "temperature")
+    maybe_require_number!(generation, "top_p")
+    maybe_require_integer!(generation, "seed")
 
     exact_keys!(provider["pricing"], @pricing_keys, "provider.pricing")
     pricing = provider["pricing"]
@@ -254,6 +296,14 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
 
   defp require_integer!(value, field),
     do: raise(ArgumentError, "#{field} must be an integer, got: #{inspect(value)}")
+
+  defp maybe_require_number!(map, key) do
+    if Map.has_key?(map, key), do: require_number!(map[key], "generation.#{key}")
+  end
+
+  defp maybe_require_integer!(map, key) do
+    if Map.has_key?(map, key), do: require_integer!(map[key], "generation.#{key}")
+  end
 
   defp require_positive_integer!(value, _field) when is_integer(value) and value > 0, do: value
 
