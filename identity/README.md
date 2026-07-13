@@ -108,6 +108,12 @@ Collision, cultural, linguistic, legal, and ecosystem research records sources,
 dates, jurisdiction or registry, confidence, and whether the claim is observed
 or inferred. A search result is not trademark clearance.
 
+The baseline enrichment includes a deterministic BEAM screen for Unicode,
+script mixing, code-projection loss, speech ambiguity, and source-language or
+proper-name review signals. It reports `attention` and `unverified` evidence;
+it never counts as native-speaker, community, accessibility-user, or legal
+validation.
+
 ### 6. Evaluate Without Erasure
 
 Assessments are independent records with an assessor, audience or scenario,

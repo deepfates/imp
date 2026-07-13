@@ -1,7 +1,7 @@
 defmodule DSEx.IdentityProgressTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.{IdentityCheckpoint, IdentityProgress}
+  alias DSEx.{IdentityCheckpoint, IdentityEnrichment, IdentityProgress}
 
   @atlas_path Path.expand("../identity/atlas.json", __DIR__)
 
@@ -164,39 +164,8 @@ defmodule DSEx.IdentityProgressTest do
     assert {:ok, %{events: events}} = IdentityCheckpoint.compile(atlas, [canonical_entry])
     write_jsonl!(Path.join(root, "identity/registry.jsonl"), events)
 
-    candidate_id = IdentityCheckpoint.candidate_id("Form Lab")
-
-    enrichment = %{
-      "id" => "enrichment-test",
-      "candidate_id" => candidate_id,
-      "enriched_at" => "2026-07-13T21:00:00Z",
-      "assessor" => %{"kind" => "test", "name" => "progress contract"},
-      "spoken_forms" => %{
-        "pronunciation" => "form lab",
-        "recommendation" => "Try Form Lab.",
-        "support_call" => "Using Form Lab."
-      },
-      "code_forms" => %{
-        "hex_package" => "form_lab",
-        "otp_app" => "form_lab",
-        "module_root" => "FormLab",
-        "mix_task_prefix" => "form_lab",
-        "config_prefix" => "form_lab",
-        "telemetry_prefix" => "[:form_lab]"
-      },
-      "prose_forms" => %{
-        "readme_headline" => "Form Lab for Elixir.",
-        "paper_title" => "Form Lab: An Elixir Study",
-        "conference_sentence" => "We evaluated Form Lab.",
-        "error_sentence" => "Form Lab could not complete the call."
-      },
-      "architecture_forms" => [
-        %{"architecture_id" => "beam-master", "form" => "Form Lab", "notes" => "Test"}
-      ],
-      "international_notes" => [],
-      "future_scope_notes" => ["Test-only embodiment."],
-      "supersedes" => nil
-    }
+    [enrichment] =
+      IdentityEnrichment.baseline(events, atlas, generated_at: "2026-07-13T21:00:00Z")
 
     write_jsonl!(Path.join(root, "identity/enrichments.jsonl"), [enrichment])
 
@@ -215,7 +184,9 @@ defmodule DSEx.IdentityProgressTest do
     assert pipeline["spoken_forms"]["state"] == "complete"
     assert pipeline["code_forms"]["state"] == "complete"
     assert pipeline["architecture_forms"]["state"] == "complete"
-    assert pipeline["international_review"]["state"] == "not_started"
+    assert pipeline["international_review"]["state"] == "complete"
+    assert pipeline["international_review"]["human_validated_candidates"] == 0
+    assert pipeline["international_review"]["unverified_candidates"] == 1
     assert pipeline["assessments"]["target"] == 1
     assert pipeline["assessments"]["target_assessment_records"] == 3
     assert pipeline["collision_checks"]["target"] == 4

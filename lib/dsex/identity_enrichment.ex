@@ -1,9 +1,9 @@
 defmodule DSEx.IdentityEnrichment do
   @moduledoc false
 
-  alias DSEx.IdentityEvaluation
+  alias DSEx.{IdentityEvaluation, IdentityInternationalScreen}
 
-  @baseline_version 1
+  @baseline_version 2
 
   @spec baseline([map()], map(), keyword()) :: [map()]
   def baseline(registry, atlas, opts \\ []) do
@@ -17,16 +17,39 @@ defmodule DSEx.IdentityEnrichment do
       |> Enum.filter(&(&1["event_type"] == "candidate_observed"))
       |> Enum.group_by(& &1["candidate_id"])
 
-    registry
-    |> IdentityEvaluation.candidate_entities()
-    |> Enum.sort_by(fn {_candidate_id, entity} ->
-      {String.downcase(entity["display"]), entity["candidate_id"]}
-    end)
-    |> Enum.map(fn {candidate_id, entity} ->
+    entities =
+      registry
+      |> IdentityEvaluation.candidate_entities()
+      |> Enum.sort_by(fn {_candidate_id, entity} ->
+        {String.downcase(entity["display"]), entity["candidate_id"]}
+      end)
+
+    code_forms_by_id =
+      Map.new(entities, fn {candidate_id, entity} ->
+        {candidate_id, code_forms(entity["display"])}
+      end)
+
+    projection_groups =
+      Enum.reduce(code_forms_by_id, %{}, fn {candidate_id, forms}, groups ->
+        case forms["hex_package"] do
+          projection when is_binary(projection) ->
+            Map.update(groups, projection, [candidate_id], &[candidate_id | &1])
+
+          _projection ->
+            groups
+        end
+      end)
+
+    Enum.map(entities, fn {candidate_id, entity} ->
       candidate_observations = Map.fetch!(observations, candidate_id)
       first = hd(candidate_observations)
       candidate = first["candidate"] || %{}
-      code_forms = code_forms(entity["display"])
+      code_forms = Map.fetch!(code_forms_by_id, candidate_id)
+
+      projection_peers =
+        projection_groups
+        |> Map.get(code_forms["hex_package"], [])
+        |> Enum.reject(&(&1 == candidate_id))
 
       %{
         "id" => stable_id("enrichment", "baseline-v#{@baseline_version}:#{candidate_id}"),
@@ -55,8 +78,15 @@ defmodule DSEx.IdentityEnrichment do
         "architecture_forms" =>
           architecture_forms(candidate_observations, entity["display"], atlas),
         "international_notes" => [],
+        "international_screen" =>
+          IdentityInternationalScreen.build(
+            entity,
+            candidate_observations,
+            code_forms,
+            projection_peers
+          ),
         "future_scope_notes" => [
-          "Baseline embodiment only; it does not establish international, legal, or ecosystem fitness.",
+          "Deterministic screening records machine-visible signals; it does not establish international, cultural, accessibility, legal, or ecosystem fitness.",
           "Assess against both the current Elixir library and the credible artifact-optimization horizon."
         ],
         "evidence_refs" => Enum.map(candidate_observations, & &1["occurrence_id"]),

@@ -1,7 +1,7 @@
 defmodule DSEx.IdentityProgress.Artifacts do
   @moduledoc false
 
-  alias DSEx.IdentityCollision
+  alias DSEx.{IdentityCollision, IdentityInternationalScreen}
 
   @terminal_collision_statuses ~w(collision no-exact-record skipped)
   @collision_statuses @terminal_collision_statuses ++ ~w(rate-limited unverified)
@@ -38,7 +38,12 @@ defmodule DSEx.IdentityProgress.Artifacts do
       "architecture_forms" =>
         form_coverage(active_enrichments, accepted_ids, enrichments, &architecture_form?/1),
       "international_review" =>
-        form_coverage(active_enrichments, accepted_ids, enrichments, &international_review?/1),
+        international_evidence_coverage(
+          active_enrichments,
+          accepted_ids,
+          enrichments,
+          accepted_events
+        ),
       "assessments" =>
         assessment_coverage(
           assessments,
@@ -152,6 +157,60 @@ defmodule DSEx.IdentityProgress.Artifacts do
       "usable_candidates",
       MapSet.intersection(usable_ids, accepted_ids) |> MapSet.size()
     )
+  end
+
+  defp international_evidence_coverage(records, accepted_ids, artifact, accepted_events) do
+    observations_by_candidate =
+      accepted_events
+      |> Enum.filter(&(&1["event_type"] == "candidate_observed"))
+      |> Enum.group_by(& &1["candidate_id"])
+
+    matching = Enum.filter(records, &MapSet.member?(accepted_ids, &1["candidate_id"]))
+
+    current =
+      Enum.filter(matching, fn record ->
+        observations = Map.get(observations_by_candidate, record["candidate_id"], [])
+        IdentityInternationalScreen.current?(record["international_screen"], observations)
+      end)
+
+    current_by_candidate = Enum.group_by(current, & &1["candidate_id"])
+    matching_by_candidate = Enum.group_by(matching, & &1["candidate_id"])
+
+    attention_candidates =
+      Enum.count(current_by_candidate, fn {_candidate_id, candidate_records} ->
+        screen_status?(candidate_records, "attention")
+      end)
+
+    unverified_candidates =
+      Enum.count(current_by_candidate, fn {_candidate_id, candidate_records} ->
+        screen_status?(candidate_records, "unverified")
+      end)
+
+    extra_candidates =
+      records
+      |> Enum.map(& &1["candidate_id"])
+      |> MapSet.new()
+      |> MapSet.difference(accepted_ids)
+      |> MapSet.size()
+
+    stale_candidates =
+      matching_by_candidate
+      |> Map.keys()
+      |> MapSet.new()
+      |> MapSet.difference(MapSet.new(Map.keys(current_by_candidate)))
+      |> MapSet.size()
+
+    artifact
+    |> coverage(map_size(current_by_candidate), MapSet.size(accepted_ids), %{
+      "algorithmically_screened_candidates" => map_size(current_by_candidate),
+      "attention_candidates" => attention_candidates,
+      "unverified_candidates" => unverified_candidates,
+      "human_validated_candidates" => 0,
+      "stale_screen_candidates" => stale_candidates,
+      "extra_candidate_entities" => extra_candidates
+    })
+    |> mark_started(matching != [])
+    |> mark_out_of_sync(stale_candidates > 0 or extra_candidates > 0)
   end
 
   defp assessment_coverage(artifact, accepted_ids, axis_ids, required_replicates) do
@@ -404,6 +463,10 @@ defmodule DSEx.IdentityProgress.Artifacts do
       "international_notes must be valid review records"
     )
     |> maybe_error(
+      not international_screen_shape?(record["international_screen"]),
+      "international_screen must be a complete deterministic evidence record"
+    )
+    |> maybe_error(
       not string_list?(record["future_scope_notes"]),
       "future_scope_notes must be strings"
     )
@@ -519,11 +582,46 @@ defmodule DSEx.IdentityProgress.Artifacts do
 
   defp international_notes_shape?(_notes), do: false
 
+  defp international_screen_shape?(%{
+         "schema_version" => 1,
+         "method" => "beam-deterministic-v1",
+         "basis" => "algorithmic-screen",
+         "input_sha256" => input_sha256,
+         "evidence_refs" => evidence_refs,
+         "checks" => checks,
+         "limitations" => limitations
+       }) do
+    check_ids = IdentityInternationalScreen.check_ids()
+
+    is_binary(input_sha256) and String.match?(input_sha256, ~r/^[a-f0-9]{64}$/) and
+      unique_string_list?(evidence_refs) and nonempty_string_list?(limitations) and
+      is_list(checks) and length(checks) == length(check_ids) and
+      checks |> Enum.map(& &1["id"]) |> Enum.sort() == Enum.sort(check_ids) and
+      Enum.all?(checks, &international_check_shape?/1)
+  end
+
+  defp international_screen_shape?(_screen), do: false
+
+  defp international_check_shape?(%{
+         "id" => id,
+         "status" => status,
+         "signals" => signals
+       }) do
+    id in IdentityInternationalScreen.check_ids() and
+      status in IdentityInternationalScreen.statuses() and nonempty_string_list?(signals) and
+      length(signals) == length(Enum.uniq(signals))
+  end
+
+  defp international_check_shape?(_check), do: false
+
   defp architecture_form?(record),
     do: is_list(record["architecture_forms"]) and record["architecture_forms"] != []
 
-  defp international_review?(record),
-    do: is_list(record["international_notes"]) and record["international_notes"] != []
+  defp screen_status?(records, status) do
+    Enum.any?(records, fn record ->
+      Enum.any?(record["international_screen"]["checks"], &(&1["status"] == status))
+    end)
+  end
 
   defp valid_axis_score?(record, axis_id) do
     case record["scores"] do
@@ -554,6 +652,13 @@ defmodule DSEx.IdentityProgress.Artifacts do
   defp iso8601?(_value), do: false
   defp no_errors(_record), do: []
   defp string_list?(value), do: is_list(value) and Enum.all?(value, &is_binary/1)
+
+  defp unique_string_list?(value),
+    do: string_list?(value) and length(value) == length(Enum.uniq(value))
+
+  defp nonempty_string_list?(value),
+    do: is_list(value) and value != [] and Enum.all?(value, &nonempty?/1)
+
   defp nonempty?(value), do: is_binary(value) and value != ""
 
   defp inspect_jsonl(path) do

@@ -1,7 +1,7 @@
 defmodule DSEx.IdentityEnrichmentTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityEnrichment
+  alias DSEx.{IdentityEnrichment, IdentityInternationalScreen}
 
   test "derives conventional Elixir identity surfaces without interning atoms" do
     assert %{
@@ -56,6 +56,11 @@ defmodule DSEx.IdentityEnrichmentTest do
     form_lab = Enum.find(enrichments, &(&1["candidate_id"] == "cand-a"))
     assert form_lab["evidence_refs"] == ["occ-a", "occ-b"]
     assert form_lab["code_forms"]["module_root"] == "FormLab"
+
+    assert IdentityInternationalScreen.current?(
+             form_lab["international_screen"],
+             Enum.take(registry, 2)
+           )
 
     assert [
              %{"architecture_id" => "beam-master"},

@@ -144,7 +144,7 @@ defmodule DSEx.IdentityProgress do
       coverage_line("spoken forms", pipeline["spoken_forms"]),
       coverage_line("code forms", pipeline["code_forms"]),
       coverage_line("architecture forms", pipeline["architecture_forms"]),
-      coverage_line("international review", pipeline["international_review"]),
+      international_evidence_line(pipeline["international_review"]),
       coverage_line("fully assessed candidates", pipeline["assessments"]),
       coverage_line("collision checks", pipeline["collision_checks"])
     ]
@@ -711,5 +711,12 @@ defmodule DSEx.IdentityProgress do
 
   defp coverage_line(label, coverage) do
     "#{label}: #{coverage["completed"]}/#{coverage["target"]} (#{coverage["state"]})"
+  end
+
+  defp international_evidence_line(coverage) do
+    "international evidence: #{coverage["completed"]}/#{coverage["target"]} screened " <>
+      "(#{coverage["state"]}) | attention #{coverage["attention_candidates"] || 0} | " <>
+      "unverified #{coverage["unverified_candidates"] || 0} | " <>
+      "human-validated #{coverage["human_validated_candidates"] || 0}"
   end
 end
