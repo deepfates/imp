@@ -1,12 +1,13 @@
 defmodule DSEx.Optimizer.SIMBA.Population do
   @moduledoc false
 
-  alias DSEx.Optimizer.Sampling
+  alias DSEx.Optimizer.SearchPolicy
+  alias DSEx.Optimizer.SearchPolicy.Sampling, as: SamplingPolicy
 
   @baseline_id 0
 
-  @enforce_keys [:programs, :program_ids, :score_histories, :next_id, :rng]
-  defstruct [:programs, :program_ids, :score_histories, :next_id, :rng]
+  @enforce_keys [:programs, :program_ids, :score_histories, :next_id, :policy]
+  defstruct [:programs, :program_ids, :score_histories, :next_id, :policy]
 
   @type program_id :: non_neg_integer()
   @type t :: %__MODULE__{
@@ -14,7 +15,7 @@ defmodule DSEx.Optimizer.SIMBA.Population do
           program_ids: [program_id()],
           score_histories: %{required(program_id()) => [number()]},
           next_id: pos_integer(),
-          rng: Sampling.state()
+          policy: SearchPolicy.t()
         }
 
   @spec baseline_id() :: 0
@@ -27,7 +28,13 @@ defmodule DSEx.Optimizer.SIMBA.Population do
       program_ids: [@baseline_id],
       score_histories: %{@baseline_id => []},
       next_id: 1,
-      rng: Keyword.get_lazy(opts, :rng, fn -> Sampling.new(Keyword.get(opts, :seed, 0)) end)
+      policy:
+        Keyword.get_lazy(opts, :policy, fn ->
+          SearchPolicy.new(SamplingPolicy,
+            seed: Keyword.get(opts, :seed, 0),
+            rng: opts[:rng]
+          )
+        end)
     }
   end
 
@@ -128,8 +135,8 @@ defmodule DSEx.Optimizer.SIMBA.Population do
       |> top_k_plus_baseline(k)
       |> Enum.map(&{&1, average_score(population, &1)})
 
-    {id, rng} = Sampling.softmax_choose(scored, temperature, population.rng)
-    {id, %{population | rng: rng}}
+    {id, policy} = SearchPolicy.suggest(population.policy, {:softmax, scored, temperature})
+    {id, %{population | policy: policy}}
   end
 
   @spec select_source_program(t(), pos_integer(), number()) :: {term(), t()}

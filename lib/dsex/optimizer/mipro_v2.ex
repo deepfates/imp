@@ -9,8 +9,9 @@ defmodule DSEx.Optimizer.MIPROv2 do
   program.
   """
 
-  alias DSEx.Optimizer.{CategoricalTPE, DemoCandidates, InstructionProposer, Sampling}
+  alias DSEx.Optimizer.{DemoCandidates, InstructionProposer, Sampling, SearchPolicy}
   alias DSEx.Optimizer.MIPROv2.Config
+  alias DSEx.Optimizer.SearchPolicy.CategoricalTPE, as: CategoricalPolicy
 
   defstruct [
     :metric,
@@ -188,13 +189,17 @@ defmodule DSEx.Optimizer.MIPROv2 do
     default_params = Map.new(space, fn {key, _choices} -> {key, 0} end)
     baseline = evaluate(program, config.valset, optimizer)
 
-    tpe =
-      space
-      |> CategoricalTPE.new(seed: config.seed, startup_trials: optimizer.startup_trials)
-      |> CategoricalTPE.observe(default_params, baseline.score)
+    policy =
+      CategoricalPolicy
+      |> SearchPolicy.new(
+        space: space,
+        seed: config.seed,
+        startup_trials: optimizer.startup_trials
+      )
+      |> SearchPolicy.observe(%{params: default_params, score: baseline.score})
 
     state = %{
-      tpe: tpe,
+      policy: policy,
       rng: Sampling.new(config.seed),
       trials: [],
       combo_scores: %{},
@@ -241,6 +246,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
           proposals: proposal_metadata,
           predictor_names: Enum.map(predictors, & &1.name),
           search_space: Map.new(space, fn {key, choices} -> {key, length(choices)} end),
+          search_policy: SearchPolicy.dump(state.policy),
           full_evaluations: Enum.map(state.full_evaluations, &Map.drop(&1, [:program])),
           evaluation_calls: state.evaluation_calls,
           compatibility: optimizer.compatibility,
@@ -261,11 +267,11 @@ defmodule DSEx.Optimizer.MIPROv2 do
          demos
        ) do
     upstream_trial_num = state.next_study_number + 1
-    {params, tpe} = CategoricalTPE.suggest(state.tpe)
+    {params, policy} = SearchPolicy.suggest(state.policy, :candidate)
     candidate = apply_params(program, predictors, params, instructions, demos)
     {examples, rng} = trial_examples(config, state.rng)
     result = evaluate(candidate, examples, optimizer)
-    tpe = CategoricalTPE.observe(tpe, params, result.score)
+    policy = SearchPolicy.observe(policy, %{params: params, score: result.score})
     key = params_key(params)
     combo_scores = Map.update(state.combo_scores, key, [result.score], &[result.score | &1])
 
@@ -281,7 +287,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
     state = %{
       state
-      | tpe: tpe,
+      | policy: policy,
         rng: rng,
         trials: state.trials ++ [record],
         next_study_number: state.next_study_number + 1,
@@ -325,7 +331,12 @@ defmodule DSEx.Optimizer.MIPROv2 do
       {_key, records} ->
         representative = hd(records)
         result = evaluate(representative.program, config.valset, optimizer)
-        tpe = CategoricalTPE.observe(state.tpe, representative.params, result.score)
+
+        policy =
+          SearchPolicy.observe(state.policy, %{
+            params: representative.params,
+            score: result.score
+          })
 
         full =
           full_record(
@@ -338,7 +349,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
         %{
           state
-          | tpe: tpe,
+          | policy: policy,
             next_study_number: state.next_study_number + 1,
             full_evaluations: state.full_evaluations ++ [full],
             evaluation_calls: state.evaluation_calls + length(config.valset),

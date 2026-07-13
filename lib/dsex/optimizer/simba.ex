@@ -8,7 +8,7 @@ defmodule DSEx.Optimizer.SIMBA do
   population and performs final selection on the full validation dataset.
   """
 
-  alias DSEx.Optimizer.{Sampling, TrajectoryRunner}
+  alias DSEx.Optimizer.{Sampling, SearchPolicy, TrajectoryRunner}
   alias DSEx.Optimizer.SIMBA.{Buckets, Population}
 
   defstruct [
@@ -268,6 +268,7 @@ defmodule DSEx.Optimizer.SIMBA do
           population_size: length(state.population.program_ids),
           trajectory_calls: state.trajectory_calls,
           candidate_evaluation_calls: state.candidate_evaluation_calls,
+          search_policy: SearchPolicy.dump(state.population.policy),
           compatibility: optimizer.compatibility,
           status: if(errors == [], do: :ok, else: :with_errors)
         }
@@ -406,16 +407,16 @@ defmodule DSEx.Optimizer.SIMBA do
 
         source = Population.fetch_program!(population, source_id)
 
-        {source, normal_rng, poisson_rng} =
-          evict_demos(source, optimizer.max_demos, population.rng, state.poisson_rng)
+        {source, policy, poisson_rng} =
+          evict_demos(source, optimizer.max_demos, population.policy, state.poisson_rng)
 
-        population = %{population | rng: normal_rng}
+        population = %{population | policy: policy}
 
         strategies =
           if optimizer.max_demos > 0, do: [:append_demo, :append_rule], else: [:append_rule]
 
-        {strategy, normal_rng} = Sampling.choose(strategies, population.rng)
-        population = %{population | rng: normal_rng}
+        {strategy, policy} = SearchPolicy.suggest(population.policy, {:choose, strategies})
+        population = %{population | policy: policy}
 
         case apply_strategy(strategy, source, bucket, analysis, optimizer, prompt_lm) do
           {:ok, candidate} ->
@@ -712,7 +713,7 @@ defmodule DSEx.Optimizer.SIMBA do
   defp input_value_representation(value),
     do: inspect(value, limit: :infinity, printable_limit: :infinity)
 
-  defp evict_demos(program, max_demos, rng, poisson_rng) do
+  defp evict_demos(program, max_demos, policy, poisson_rng) do
     predictors = DSEx.ProgramParameters.predictors(program)
     demo_count = predictors |> Enum.map(&length(&1.predictor.demos)) |> Enum.max(fn -> 0 end)
     parameters = eviction_parameters(demo_count, max_demos)
@@ -722,9 +723,9 @@ defmodule DSEx.Optimizer.SIMBA do
       max(poisson, parameters.minimum_drop_count)
       |> min(demo_count)
 
-    {indices, rng} =
-      Enum.map_reduce(step_indices(drop_count), rng, fn _, rng ->
-        Sampling.integer(max(1, demo_count), rng)
+    {indices, policy} =
+      Enum.map_reduce(step_indices(drop_count), policy, fn _, policy ->
+        SearchPolicy.suggest(policy, {:integer, max(1, demo_count)})
       end)
 
     program =
@@ -738,7 +739,7 @@ defmodule DSEx.Optimizer.SIMBA do
         DSEx.ProgramParameters.put_demos(program, name, demos)
       end)
 
-    {program, rng, poisson_rng}
+    {program, policy, poisson_rng}
   end
 
   defp prepare_rollout_models(program, optimizer) do
@@ -791,8 +792,8 @@ defmodule DSEx.Optimizer.SIMBA do
 
   defp next_batch(state, trainset, bsize) do
     if state.cursor + bsize > length(state.order) do
-      {order, rng} = Sampling.shuffle(state.order, state.population.rng)
-      population = %{state.population | rng: rng}
+      {order, policy} = SearchPolicy.suggest(state.population.policy, {:shuffle, state.order})
+      population = %{state.population | policy: policy}
       next_batch(%{state | order: order, cursor: 0, population: population}, trainset, bsize)
     else
       indices = Enum.slice(state.order, state.cursor, bsize)

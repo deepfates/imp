@@ -8,6 +8,25 @@ defmodule DSEx.Optimizer.Sampling do
 
   @type state :: :rand.state()
 
+  @doc "Serializes an explicit optimizer RNG state into JSON-safe data."
+  @spec dump(state()) :: map()
+  def dump(state) do
+    case :rand.export_seed_s(state) do
+      {:exsss, [first | second]} -> %{"algorithm" => "exsss", "words" => [first, second]}
+      _other -> raise ArgumentError, "invalid optimizer RNG state"
+    end
+  end
+
+  @doc "Restores an optimizer RNG state serialized by `dump/1`."
+  @spec load!(map()) :: state()
+  def load!(%{"algorithm" => "exsss", "words" => [first, second]})
+      when is_integer(first) and is_integer(second) and first >= 0 and second >= 0 do
+    :rand.seed_s({:exsss, [first | second]})
+  end
+
+  def load!(value),
+    do: raise(ArgumentError, "invalid optimizer RNG checkpoint: #{inspect(value)}")
+
   @spec new(integer()) :: state()
   def new(seed) when is_integer(seed) do
     seed = abs(seed) + 1

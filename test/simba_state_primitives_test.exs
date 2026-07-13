@@ -90,7 +90,7 @@ defmodule DSEx.Optimizer.SIMBA.StatePrimitivesTest do
     {second_ids, second_population} = sample.(build_population.())
 
     assert first_ids == second_ids
-    assert first_population.rng == second_population.rng
+    assert first_population.policy == second_population.policy
     assert Enum.all?(first_ids, &(&1 in [0, 1]))
   end
 
