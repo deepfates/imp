@@ -92,6 +92,11 @@ resume-reconciliation events. Each update is written to a synced temporary file
 and atomically renamed. Resume uses the persisted request order, attempt counts,
 and retry limit:
 
+Checkpoints contain the JSON-safe request payloads, provider outputs, and failure
+details needed for audit and resume. Treat the checkpoint directory as
+application data: restrict access, apply the application's retention policy, and
+do not place credentials in request payloads.
+
 ```elixir
 {:ok, summary} =
   ReqLLMBatch.resume("var/question-batch.json", dispatch,
