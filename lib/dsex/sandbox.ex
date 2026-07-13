@@ -101,8 +101,10 @@ defmodule DSEx.Sandbox do
   defp eval_ast(other, _vars), do: {:error, {:unsafe_ast, other}}
 
   defp fetch_clause(clauses, key) do
-    case List.keyfind(clauses, key, 0) do
-      {^key, value} -> {:ok, value}
+    atom_key = if key == "do", do: :do, else: :else
+
+    case List.keyfind(clauses, key, 0) || List.keyfind(clauses, atom_key, 0) do
+      {_key, value} -> {:ok, value}
       nil -> {:error, {:missing_clause, key}}
     end
   end

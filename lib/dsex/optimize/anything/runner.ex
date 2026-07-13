@@ -271,6 +271,7 @@ defmodule DSEx.Optimize.Anything.Runner do
     #{context.background || "No additional context."}
 
     Parameter: #{context.component}
+    Iteration: #{context.iteration}
     Current value:
     ```
     #{context.current_parameter}

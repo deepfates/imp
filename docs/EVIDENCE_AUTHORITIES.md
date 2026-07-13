@@ -74,7 +74,7 @@ open.
 | SIMBA | optimizer | DSPy 3.3.0b1 + commit + file hashes | no primary authority | no dedicated tests | protocol defined | partial; task implemented, fresh artifact pending |
 | GEPA prompt and program optimization | optimizer | standalone v0.1.1 + commit + file hashes | paper v2 pinned | partial | protocol defined | partial; task implemented, fresh artifact pending |
 | Weight and ensemble optimizers | optimizer | DSPy 3.2.1 + commit | gap | not audited | partial | gap |
-| Optimize Anything | optimizer | GEPA v0.1.1 + commit | paper v1 pinned | runtime contract covered; non-prompt campaigns pending | protocol defined | partial; implementation landed, fresh effectiveness artifact pending |
+| Optimize Anything | optimizer | GEPA v0.1.1 + commit | paper v1 pinned | runtime contract and three non-prompt executable evaluator families covered | protocol defined | live multi-seed DSEx-native effectiveness lane implemented; paper-scale upstream comparison remains open |
 | Retrieval, RAG, embeddings, and dataset loading | algorithm | DSPy 3.2.1 + commit | no primary authority | not audited | partial | present |
 | Async, streaming, cache, observability, and overhead | runtime | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | present |
 | Persistence, deployment, and protocol boundaries | operations | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | partial |

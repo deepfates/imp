@@ -430,17 +430,21 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/optimize_anything_runner_test.exs`
+- test: `test/optimize_anything_campaign_test.exs`
+- test: `test/optimize_anything_code_artifact_test.exs`
+- test: `test/optimize_anything_agent_config_test.exs`
+- test: `test/optimize_anything_scheduling_heuristic_test.exs`
 - test: `test/optimize_anything_refiner_test.exs`
 - test: `test/optimize_anything_multimodal_test.exs`
 - test: `test/optimize_anything_tracking_test.exs`
 - test: `test/gepa_module_selector_test.exs`
 - test: `test/gepa_evaluation_cache_backend_test.exs`
 - docs: `docs/ADVANCED.md`
+- docs: `docs/BENCHMARK_TRUTH.md`
 
 Missing evidence or behavior:
 
-- non-prompt replication suite
-- paper-scale comparison
+- paper-scale upstream comparison
 
 ### `retrieval.data`
 

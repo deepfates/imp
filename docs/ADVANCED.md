@@ -92,6 +92,20 @@ or finish failures are warnings. DSEx reports accurate failed terminal status,
 while the isolated W&B client can reproduce GEPA v0.1.1's success-only finish
 behavior when explicitly configured for compatibility.
 
+The source-checkout effectiveness lane uses executable code, agent
+configuration, and scheduling artifacts:
+
+```sh
+mix benchmark.optimize_anything.check
+mix dsex.benchmark.optimize_anything --live --provider openai \
+  --model gpt-5.4-2026-03-05 --seeds 17,23,31 --max-proposals 5 \
+  --out benchmarks/results
+```
+
+The smoke command validates wiring only. The source-checkout benchmark guide
+defines the multi-seed, held-out evaluation, cost, and checkpoint requirements
+that authorize the scoped live effectiveness claim.
+
 The compatibility `Artifact`/`Report` API remains available and delegates to
 the same engine. New code should use binary or named-map candidates and the
 production `Result` contract above.

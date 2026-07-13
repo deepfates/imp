@@ -52,7 +52,7 @@ criteria; current commands, docs, tests, and artifacts are.
 | External workflows | MCP, retrievers, save/load/rebind, streaming, tools, and provider-compatible training are exercised through local integration or protocol gates before they appear as production surface. |
 | Evaluation and optimization | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal; optimizers emit executable compiled programs and reports. |
 | Documentation | README, ExDoc, docs, and Livebooks teach DSEx as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
-| Parity evidence | Release claims are backed by separate dashboard lanes for golden trace parity, live matched models, optimizer lift, pinned instruction-optimizer structure, production semantics, and provider-free performance. |
+| Parity evidence | Release claims are backed by separate dashboard lanes for golden trace parity, live matched models, optimizer lift, Optimize Anything non-prompt effectiveness, pinned instruction-optimizer structure, production semantics, and provider-free performance. |
 | Clean-room product proof | A fresh Mix project can consume the unpacked package and exercise the golden user journey through the public API: predict, optimize, save/load, ReAct tools, provider construction, and credential redaction. |
 
 ## Gate Model

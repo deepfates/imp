@@ -55,6 +55,9 @@ defmodule CompletionSurfaceTest do
     assert {:ok, true} = DSEx.Sandbox.eval("length([1, 2, 3]) == 3 and \"a\" in [\"a\", \"b\"]")
     assert {:ok, 5} = DSEx.Sandbox.eval("x + y", %{"x" => 2, y: 3})
 
+    assert {:ok, 7} =
+             DSEx.Sandbox.eval("if enabled do\n  7\nelse\n  0\nend", %{"enabled" => true})
+
     assert {:error, {:unsafe_ast, _}} =
              DSEx.Sandbox.eval("System.cmd(\"rm\", [\"-rf\", \"/\"])")
 

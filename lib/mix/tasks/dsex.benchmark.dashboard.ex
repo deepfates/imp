@@ -47,6 +47,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           optimizer_dir: :string,
           instruction_optimizer_dir: :string,
           gepa_dir: :string,
+          optimize_anything_dir: :string,
           rag_tool_agent_dir: :string,
           rlm_dir: :string,
           live_matrix_dir: :string,
@@ -137,6 +138,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           Keyword.get(opts, :gepa_dir, "tmp/gepa-replication"),
           max_age_hours
         ),
+      "optimize_anything" =>
+        optimize_anything_lane(
+          Keyword.get(opts, :optimize_anything_dir, "benchmarks/results"),
+          max_age_hours
+        ),
       "rag_tool_agent" =>
         rag_tool_agent_lane(
           Keyword.get(opts, :rag_tool_agent_dir, "tmp/rag-tool-agent"),
@@ -161,6 +167,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "instruction_optimizer_contract",
       "optimizer_lift",
       "gepa_replication",
+      "optimize_anything",
       "rag_tool_agent",
       "rlm_benchmark",
       "provider_free_overhead"
@@ -654,6 +661,66 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       )
     else
       _ -> missing_lane("gepa_replication", "no gepa-replication artifact found in #{dir}")
+    end
+  end
+
+  defp optimize_anything_lane(dir, max_age_hours) do
+    with {:ok, path} <- latest(Path.join(dir, "optimize-anything-replication-*.json")),
+         {:ok, artifact} <- read_artifact(path) do
+      full = DSEx.BenchmarkTruth.OptimizeAnything.Artifact.full_artifact?(artifact)
+      rows = if is_list(artifact["rows"]), do: artifact["rows"], else: []
+
+      artifact_lane("optimize_anything", path, artifact, max_age_hours,
+        passing: full,
+        full_evidence: full,
+        scale:
+          if(full, do: "full", else: get_in(artifact, ["summary", "evidence_level"]) || "sample"),
+        summary: %{
+          "artifact_classes" => Enum.map(rows, & &1["artifact_class"]),
+          "rows" =>
+            Enum.map(rows, fn row ->
+              %{
+                "artifact_class" => row["artifact_class"],
+                "baseline_score" => get_in(row, ["baseline", "score"]),
+                "optimized_score" => get_in(row, ["optimized", "score"]),
+                "absolute_lift" => row["absolute_lift"],
+                "cost_usd" => row["cost_usd"],
+                "wall_time_ms" => row["wall_time_ms"],
+                "reproducibility_runs" =>
+                  row |> get_in(["reproducibility", "runs"]) |> List.wrap() |> length()
+              }
+            end),
+          "effectiveness_authorized" => full,
+          "provider_models" =>
+            rows
+            |> Enum.map(&{&1["provider"], &1["model"]})
+            |> Enum.uniq()
+            |> Enum.map(fn {provider, model} -> %{"provider" => provider, "model" => model} end)
+        },
+        limitation:
+          if(full,
+            do: nil,
+            else:
+              "Optimize Anything effectiveness requires three live non-prompt artifact classes with positive aggregate lift, provider usage, checkpoints, and a majority of improving runs across at least three seeds."
+          ),
+        blocking_requirements:
+          if(full,
+            do: [],
+            else: [
+              %{
+                "kind" => "optimize_anything_effectiveness_incomplete",
+                "message" =>
+                  "The latest Optimize Anything artifact does not authorize non-prompt effectiveness."
+              }
+            ]
+          )
+      )
+    else
+      _ ->
+        missing_lane(
+          "optimize_anything",
+          "no optimize-anything-replication artifact found in #{dir}; run the live Optimize Anything campaign"
+        )
     end
   end
 

@@ -10,6 +10,7 @@ defmodule DashboardTest do
     optimizer_dir = Path.join(root, "optimizer")
     instruction_optimizer_dir = Path.join(root, "instruction-optimizer")
     gepa_dir = Path.join(root, "gepa")
+    optimize_anything_dir = Path.join(root, "optimize-anything")
     rag_tool_agent_dir = Path.join(root, "rag-tool-agent")
     rlm_dir = Path.join(root, "rlm-benchmark")
     live_matrix_dir = Path.join(root, "live-matrix")
@@ -24,6 +25,7 @@ defmodule DashboardTest do
         optimizer_dir,
         instruction_optimizer_dir,
         gepa_dir,
+        optimize_anything_dir,
         rag_tool_agent_dir,
         rlm_dir,
         live_matrix_dir,
@@ -312,6 +314,8 @@ defmodule DashboardTest do
         instruction_optimizer_dir,
         "--gepa-dir",
         gepa_dir,
+        "--optimize-anything-dir",
+        optimize_anything_dir,
         "--rag-tool-agent-dir",
         rag_tool_agent_dir,
         "--rlm-dir",
@@ -340,14 +344,15 @@ defmodule DashboardTest do
              "live_provider_smoke",
              "live_matched_model",
              "gepa_replication",
+             "optimize_anything",
              "public_claims"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 13
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 14
     assert dashboard["claims"]["status"] == "failing"
-    assert dashboard["claims"]["summary"]["total"] == 10
+    assert dashboard["claims"]["summary"]["total"] == 11
     assert dashboard["claims"]["summary"]["proven"] == 7
-    assert dashboard["claims"]["summary"]["blocked"] == 3
+    assert dashboard["claims"]["summary"]["blocked"] == 4
     assert dashboard["claims"]["summary"]["non_blocking"] == 0
 
     proven_claim_ids =
@@ -377,7 +382,9 @@ defmodule DashboardTest do
            ) == [
              {"claim.docs.livebooks_real_provider", ["live.provider.smoke"]},
              {"claim.live_matched_model.full_parity", ["live_matched_model.full"]},
-             {"claim.gepa_replication.full", ["gepa_replication.full"]}
+             {"claim.gepa_replication.full", ["gepa_replication.full"]},
+             {"claim.optimize_anything.non_prompt_effectiveness",
+              ["optimize_anything.non_prompt.full"]}
            ]
 
     active_live_claim =

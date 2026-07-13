@@ -145,6 +145,29 @@
       ]
     },
     {
+      "id": "claim.optimize_anything.non_prompt_effectiveness",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
+      "limitations": ["Requires fresh positive-lift evidence across code, agent configuration, and scheduling artifacts."],
+      "statement": "DSEx Optimize Anything improves measurable non-prompt artifacts across multiple seeds using executable held-out evaluators, with provider cost and checkpoint provenance.",
+      "category": "optimizer",
+      "surface": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dsex_baseline_and_authored_comparator",
+      "release_blocking": true,
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
+      "requirements": [
+        {
+          "id": "optimize_anything.non_prompt.full",
+          "kind": "optimizer_effectiveness",
+          "lane": "optimize_anything",
+          "evidence": "full",
+          "threshold": "all three non-prompt classes show positive mean lift and a majority of improving runs across at least three live provider-backed seeds"
+        }
+      ]
+    },
+    {
       "id": "claim.rag_tools_agents.full",
       "decision": "active_gap",
       "release": "telos",

@@ -176,6 +176,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
     assert %Result{} = result
     assert_receive {:reflection_content, [prompt, ^first, ^second]}
+    assert prompt =~ "Iteration: 1"
     assert prompt =~ "[IMAGE-1 - see visual content]"
     assert prompt =~ "[IMAGE-2 - see visual content]"
   end

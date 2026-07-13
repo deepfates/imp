@@ -90,6 +90,15 @@ accounting are required. Capped `--max-per-split` dataset roots are explicitly
 rejected for full GEPA claims. SIMBA may be reported as extra comparator
 evidence when present, but it is not required by the upstream GEPA artifact.
 
+Optimize Anything non-prompt effectiveness uses its own `optimize_anything`
+lane. Full evidence requires executable code, agent-configuration, and
+scheduling artifact families; at least three live provider-backed seeds per
+family; positive mean held-out lift; a strict majority of improving runs;
+positive usage and cost; and durable checkpoint provenance. Smoke artifacts
+and authored comparator scores cannot authorize the claim. This lane proves
+the scoped DSEx-native effectiveness statement, not paper-scale upstream
+parity.
+
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
 work queue: either produce the missing evidence, narrow or remove the claim, or

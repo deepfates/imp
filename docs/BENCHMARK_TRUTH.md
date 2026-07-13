@@ -204,6 +204,45 @@ replace held-out multi-seed T3 effectiveness evidence. DSEx-only rows and equal
 scores under unmatched internal decision paths cannot satisfy that stronger
 claim.
 
+## Run Optimize Anything Replication
+
+Run the deterministic campaign contract and evaluator smoke with:
+
+```sh
+mix benchmark.optimize_anything.check
+```
+
+Run the live non-prompt effectiveness campaign with a pinned provider model:
+
+```sh
+mix dsex.benchmark.optimize_anything \
+  --live \
+  --provider openai \
+  --model gpt-5.4-2026-03-05 \
+  --seeds 17,23,31 \
+  --max-proposals 5 \
+  --out benchmarks/results
+```
+
+The full lane optimizes three executable artifact classes: an Elixir retry
+controller, a support-routing agent configuration, and a scheduling heuristic.
+Each family has deterministic train and independently recomputed held-out
+evaluators, a baseline, and an authored reference comparator. The comparator
+is a positive control for evaluator headroom; it is not an upstream
+Optimize Anything parity result.
+
+Full evidence requires at least three distinct seeds, positive mean held-out
+lift, a strict majority of improving seeds for every family, positive live
+provider token and cost accounting, and durable per-run checkpoints. All seed
+outcomes remain in the artifact, including ties and regressions. `--smoke`
+proves campaign wiring and artifact validation only and never authorizes the
+effectiveness claim. The dashboard consumes full artifacts through its
+`optimize_anything` lane.
+
+This campaign establishes DSEx-native non-prompt optimization effectiveness at
+the declared scale. It does not establish full paper reproduction or equality
+with an upstream implementation under matched internals.
+
 ## Run GEPA Paper Replication
 
 ```sh

@@ -512,14 +512,18 @@ defmodule DSEx.UpstreamFidelity do
       evidence: %{
         tests: [
           "test/optimize_anything_runner_test.exs",
+          "test/optimize_anything_campaign_test.exs",
+          "test/optimize_anything_code_artifact_test.exs",
+          "test/optimize_anything_agent_config_test.exs",
+          "test/optimize_anything_scheduling_heuristic_test.exs",
           "test/optimize_anything_refiner_test.exs",
           "test/optimize_anything_multimodal_test.exs",
           "test/optimize_anything_tracking_test.exs",
           "test/gepa_module_selector_test.exs",
           "test/gepa_evaluation_cache_backend_test.exs"
         ],
-        docs: ["docs/ADVANCED.md"],
-        missing: ["non-prompt replication suite", "paper-scale comparison"]
+        docs: ["docs/ADVANCED.md", "docs/BENCHMARK_TRUTH.md"],
+        missing: ["paper-scale upstream comparison"]
       }
     },
     %{
