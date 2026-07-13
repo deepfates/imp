@@ -162,11 +162,11 @@ defmodule DSEx.Clients.ReqLLM do
 
     case safe_stream(lm, messages, opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} ->
-        response.stream
-        |> Stream.flat_map(&from_stream_chunk/1)
-        |> Stream.concat(stream_stop(lm))
+        normalize_stream(response, lm)
 
       {:error, reason} ->
+        emit_stream_stop(lm)
+
         [
           %DSEx.Streaming.Messages.StreamResponse{
             chunk: {:error, reason},
@@ -645,16 +645,93 @@ defmodule DSEx.Clients.ReqLLM do
 
   defp from_stream_chunk(_chunk), do: []
 
-  defp stream_stop(lm) do
+  defp normalize_stream(%ReqLLM.StreamResponse{} = response, lm) do
     Stream.resource(
-      fn -> :emit end,
-      fn
-        :emit ->
-          DSEx.Telemetry.execute([:dsex, :lm, :stream, :stop], %{count: 1}, %{lm: redact_lm(lm)})
-          {:halt, :done}
+      fn ->
+        %{
+          resume: fn -> suspend_stream(response.stream) end,
+          continuation: nil,
+          started?: false,
+          completed?: false,
+          failed?: false
+        }
       end,
-      fn _ -> :ok end
+      &next_stream_chunk/1,
+      &cleanup_stream(&1, response.cancel, lm)
     )
+  end
+
+  defp next_stream_chunk(%{completed?: true} = state), do: {:halt, state}
+
+  defp next_stream_chunk(state) do
+    case state.resume.() do
+      {:suspended, chunk, continuation} ->
+        chunks = from_stream_chunk(chunk)
+
+        {chunks,
+         %{
+           state
+           | resume: fn -> continuation.({:cont, nil}) end,
+             continuation: continuation,
+             started?: true
+         }}
+
+      {:done, _acc} ->
+        {:halt, %{state | continuation: nil, started?: true, completed?: true}}
+
+      {:halted, _acc} ->
+        {:halt, %{state | continuation: nil, started?: true, completed?: true}}
+    end
+  rescue
+    error -> stream_failure(state, error)
+  catch
+    kind, reason -> stream_failure(state, {kind, reason})
+  end
+
+  defp suspend_stream(stream) do
+    Enumerable.reduce(stream, {:cont, nil}, fn chunk, _acc -> {:suspend, chunk} end)
+  end
+
+  defp stream_failure(state, error) do
+    reason = {:req_llm_stream_failed, error_message(error)}
+
+    {[%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
+     %{state | completed?: true, failed?: true}}
+  end
+
+  defp cleanup_stream(state, cancel, lm) do
+    try do
+      halt_provider_stream(state)
+
+      if not state.completed? or state.failed? do
+        cancel_provider_stream(cancel)
+      end
+    after
+      emit_stream_stop(lm)
+    end
+  end
+
+  defp halt_provider_stream(%{started?: true, completed?: false, continuation: continuation})
+       when is_function(continuation, 1) do
+    safely(fn -> continuation.({:halt, nil}) end)
+  end
+
+  defp halt_provider_stream(_state), do: :ok
+
+  defp cancel_provider_stream(cancel) when is_function(cancel, 0), do: safely(cancel)
+  defp cancel_provider_stream(_cancel), do: :ok
+
+  defp safely(fun) do
+    fun.()
+    :ok
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp emit_stream_stop(lm) do
+    DSEx.Telemetry.execute([:dsex, :lm, :stream, :stop], %{count: 1}, %{lm: redact_lm(lm)})
   end
 
   defp emit_stream_chunk(chunk) do

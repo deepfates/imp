@@ -161,6 +161,36 @@ defmodule ReqLLMClientTest do
     def stream_text(_model, _messages, _opts), do: throw(:stream_exploded)
   end
 
+  defmodule AdversarialStreamStub do
+    def stream_text(model, messages, opts) do
+      test_pid = Keyword.fetch!(opts, :test_pid)
+
+      stream =
+        Stream.resource(
+          fn -> 0 end,
+          fn
+            0 ->
+              send(test_pid, {:provider_pull, 1})
+              {[ReqLLM.StreamChunk.text("partial")], 1}
+
+            1 ->
+              send(test_pid, {:provider_pull, 2})
+              raise "provider enumeration exploded"
+          end,
+          fn _state -> send(test_pid, :provider_cleanup) end
+        )
+
+      {:ok,
+       %ReqLLM.StreamResponse{
+         stream: stream,
+         metadata_handle: self(),
+         cancel: fn -> send(test_pid, :provider_cancelled) end,
+         model: model,
+         context: ReqLLM.Context.new(messages)
+       }}
+    end
+  end
+
   defmodule InvalidStub do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
@@ -555,6 +585,52 @@ defmodule ReqLLMClientTest do
                done: true
              }
            ] = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+  end
+
+  test "ReqLLM normalizes enumeration-time provider failures and always cleans up" do
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :stream, :start],
+        [:dsex, :lm, :stream, :stop]
+      ])
+
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    stream = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+
+    refute_received {:provider_pull, _count}
+
+    assert [
+             %DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
+             %DSEx.Streaming.Messages.StreamResponse{
+               chunk: {:error, {:req_llm_stream_failed, "provider enumeration exploded"}},
+               done: true
+             }
+           ] = Enum.to_list(stream)
+
+    assert_received {:provider_pull, 1}
+    assert_received {:provider_pull, 2}
+    assert_received :provider_cleanup
+    assert_received :provider_cancelled
+    assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+    assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+  end
+
+  test "ReqLLM cancels and cleans up a provider stream when consumption stops early" do
+    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :lm, :stream, :stop]])
+
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: "partial"}] =
+             lm
+             |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+             |> Enum.take(1)
+
+    assert_received {:provider_pull, 1}
+    refute_received {:provider_pull, 2}
+    assert_received :provider_cleanup
+    assert_received :provider_cancelled
+    assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
   end
 
   test "ReqLLM client reports invalid provider module return shapes" do
