@@ -647,6 +647,47 @@ defmodule DashboardTest do
     assert lane["summary"]["authority"]["complete"]
   end
 
+  test "instruction optimizer full evidence requires the dashboard code revision" do
+    root = tmp_dir("dashboard-instruction-optimizer-revision")
+    contract_dir = Path.join(root, "contracts")
+    out_dir = Path.join(root, "out")
+    Enum.each([contract_dir, out_dir], &File.mkdir_p!/1)
+
+    write_instruction_optimizer_contract!(contract_dir, git_sha: "recent-but-wrong-sha")
+    dashboard = run_instruction_optimizer_dashboard!(contract_dir, out_dir)
+    lane = dashboard["lanes"]["instruction_optimizer_contract"]
+
+    assert lane["fresh"]
+    assert lane["status"] == "failing"
+    refute lane["full_evidence"]
+    refute lane["summary"]["implementation_revision_matches"]
+
+    assert [blocker] =
+             Enum.filter(
+               lane["blocking_requirements"],
+               &(&1["kind"] == "instruction_optimizer_implementation_revision_mismatch")
+             )
+
+    assert blocker["artifact_git_sha"] == "recent-but-wrong-sha"
+    assert blocker["expected_git_sha"] == dashboard["git_sha"]
+    assert blocker["message"] =~ "Stale instruction-optimizer evidence"
+    assert blocker["message"] =~ "recent-but-wrong-sha"
+    assert blocker["message"] =~ dashboard["git_sha"]
+
+    write_instruction_optimizer_contract!(contract_dir, git_sha: dashboard["git_sha"])
+    dashboard = run_instruction_optimizer_dashboard!(contract_dir, out_dir)
+    lane = dashboard["lanes"]["instruction_optimizer_contract"]
+
+    assert lane["status"] == "full"
+    assert lane["full_evidence"]
+    assert lane["summary"]["implementation_revision_matches"]
+
+    refute Enum.any?(
+             lane["blocking_requirements"],
+             &(&1["kind"] == "instruction_optimizer_implementation_revision_mismatch")
+           )
+  end
+
   test "missing stale failed or unpinned structural evidence stays red and blocks optimizer parity" do
     scenarios = [
       {"missing", :missing, "missing"},
@@ -1230,7 +1271,7 @@ defmodule DashboardTest do
       "evidence_tier" => "t1_instruction_optimizer_differential_contract",
       "generated_at" =>
         Keyword.get(opts, :generated_at, DateTime.utc_now() |> DateTime.to_iso8601()),
-      "git_sha" => "abc",
+      "git_sha" => Keyword.get(opts, :git_sha, dashboard_git_sha()),
       "dspy" => %{
         "version" => Keyword.get(opts, :dspy_version, "3.3.0b1"),
         "commit" => "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
@@ -1252,6 +1293,33 @@ defmodule DashboardTest do
     })
 
     path
+  end
+
+  defp run_instruction_optimizer_dashboard!(contract_dir, out_dir) do
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--instruction-optimizer-dir",
+        contract_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "1"
+      ])
+    end)
+
+    out_dir
+    |> Path.join("parity-dashboard-*.json")
+    |> Path.wildcard()
+    |> Enum.max_by(&File.stat!(&1).mtime)
+    |> File.read!()
+    |> Jason.decode!()
+  end
+
+  defp dashboard_git_sha do
+    {sha, 0} = System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true)
+    String.trim(sha)
   end
 
   defp write_gate_evidence!(dir, gate, mix_task) do

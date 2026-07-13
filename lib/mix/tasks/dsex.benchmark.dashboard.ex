@@ -111,11 +111,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     max_age_hours = Keyword.get(opts, :max_age_hours, 24)
     profile = opts |> Keyword.fetch!(:profile) |> ReleaseProfile.fetch!()
     claims_path = Keyword.get(opts, :claims_file, "benchmarks/claims.json")
+    code_revision = git_sha()
 
     instruction_optimizer_contract =
       instruction_optimizer_contract_lane(
         Keyword.get(opts, :instruction_optimizer_dir, "tmp/instruction-optimizer-contract"),
-        max_age_hours
+        max_age_hours,
+        code_revision
       )
 
     optimizer_lift =
@@ -202,7 +204,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     %{
       "schema_version" => 1,
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-      "git_sha" => git_sha(),
+      "git_sha" => code_revision,
       "max_age_hours" => max_age_hours,
       "profile" => profile,
       "required_lanes" => Enum.map(required, & &1["lane"]),
@@ -725,10 +727,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp instruction_optimizer_contract_lane(dir, max_age_hours) do
+  defp instruction_optimizer_contract_lane(dir, max_age_hours, code_revision) do
     with {:ok, path} <- latest(Path.join(dir, "instruction-optimizer-contract-*.json")),
          {:ok, artifact} <- read_artifact(path) do
       authority = instruction_optimizer_authority(artifact)
+      artifact_revision = artifact["git_sha"]
+      implementation_matches = is_binary(code_revision) and artifact_revision == code_revision
       required_cases = get_in(artifact, ["summary", "required_cases"])
       required_passing = get_in(artifact, ["summary", "required_passing"])
 
@@ -736,7 +740,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         get_in(artifact, ["summary", "structural_contract_complete"]) == true and
           is_integer(required_cases) and required_cases > 0 and required_passing == required_cases
 
-      passing = structural_complete and authority["complete"]
+      passing = structural_complete and authority["complete"] and implementation_matches
 
       blockers =
         []
@@ -749,6 +753,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "authority" => authority,
           "message" => "The structural differential does not match the pinned DSPy authority."
         })
+        |> maybe_add_requirement(not implementation_matches, %{
+          "kind" => "instruction_optimizer_implementation_revision_mismatch",
+          "expected_git_sha" => code_revision,
+          "artifact_git_sha" => artifact_revision,
+          "message" =>
+            "Stale instruction-optimizer evidence: artifact git_sha #{inspect(artifact_revision)} does not match dashboard code revision #{inspect(code_revision)}."
+        })
 
       artifact_lane("instruction_optimizer_contract", path, artifact, max_age_hours,
         passing: passing,
@@ -759,6 +770,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "required_cases" => required_cases,
           "required_passing" => required_passing,
           "structural_contract_complete" => structural_complete,
+          "implementation_revision_matches" => implementation_matches,
+          "expected_git_sha" => code_revision,
           "authority" => authority,
           "declared_native_deviations" => artifact["declared_native_deviations"] || []
         },
