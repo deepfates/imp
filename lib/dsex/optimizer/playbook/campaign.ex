@@ -252,6 +252,40 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
               {:cont, {:ok, trajectories ++ [trajectory]}}
 
+            {:error, %{reason: {:error, %Jason.DecodeError{}}, trace: %{raw: raw}}} ->
+              trajectory =
+                Trajectory.project(
+                  :evaluation,
+                  %{
+                    index: index,
+                    example: %{
+                      "id" => row["id"],
+                      "source_id" => row["source_id"],
+                      "group_id" => row["group_id"]
+                    },
+                    prediction: %{"answer" => ""},
+                    trace: [],
+                    score: 0.0,
+                    feedback: %{
+                      "valid" => false,
+                      "reason" => "adapter_decode_failure",
+                      "reference" => row["expected"],
+                      "raw_sha256" => sha256(raw)
+                    },
+                    metric_metadata: %{
+                      "metric" => "operator_assignment_exact_arithmetic_v1",
+                      "stage" => Atom.to_string(context.stage),
+                      "scored_failure" => true
+                    },
+                    error: nil
+                  },
+                  timing: %Trajectory.Timing{
+                    duration_us: System.monotonic_time(:microsecond) - call_started
+                  }
+                )
+
+              {:cont, {:ok, trajectories ++ [trajectory]}}
+
             {:error, reason} ->
               {:halt, {:error, {:provider_call_failed, index, reason}}}
           end

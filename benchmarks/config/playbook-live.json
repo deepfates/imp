@@ -3,7 +3,7 @@
   "checkpoint": "benchmarks/results/playbook-checkpoint-live-v3.json",
   "data": "benchmarks/data/playbook/math-equation-balancer.jsonl",
   "max_input_tokens_per_call": 2500,
-  "max_output_tokens": 256,
+  "max_output_tokens": 512,
   "max_proposal_input_tokens": 12000,
   "max_proposal_output_tokens": 256,
   "min_lift": 0.01,
