@@ -98,9 +98,13 @@ defmodule PublicSurfaceTest do
     DSEx.Optimizer.GEPA.CandidateSelector,
     DSEx.Optimizer.GEPA.Evaluation,
     DSEx.Optimizer.GEPA.EvaluationCache,
+    DSEx.Optimizer.GEPA.EvaluationCache.Backend,
+    DSEx.Optimizer.GEPA.EvaluationCache.Disk,
+    DSEx.Optimizer.GEPA.EvaluationCache.Memory,
     DSEx.Optimizer.GEPA.EvaluationPolicy,
     DSEx.Optimizer.GEPA.Frontier,
     DSEx.Optimizer.GEPA.Merge,
+    DSEx.Optimizer.GEPA.ModuleSelector,
     DSEx.Optimizer.GEPA.Result,
     DSEx.Optimizer.GEPA.Stopper,
     DSEx.Optimizer.GRPO,
@@ -153,6 +157,14 @@ defmodule PublicSurfaceTest do
     DSEx.Streaming.Messages.StatusMessageProvider,
     DSEx.Tasks,
     DSEx.Telemetry,
+    DSEx.Tracking.Backend,
+    DSEx.Tracking.MLflow,
+    DSEx.Tracking.Session,
+    DSEx.Tracking.Transport,
+    DSEx.Tracking.Transport.Req,
+    DSEx.Tracking.WandB,
+    DSEx.Tracking.WandB.Backend,
+    DSEx.Tracking.WandB.Transport,
     DSEx.Tool
   ]
 

@@ -319,6 +319,85 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     assert Result.best_candidate(resumed) == "2"
   end
 
+  test "run directories receive seed validation output artifacts" do
+    run_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-best-outputs-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    on_exit(fn -> File.rm_rf!(run_dir) end)
+
+    result =
+      Anything.optimize(
+        "baseline",
+        fn _candidate -> {0.75, %{explanation: "seed evidence"}} end,
+        config:
+          Config.new(
+            engine: [
+              max_candidate_proposals: 0,
+              run_dir: run_dir,
+              track_best_outputs: false
+            ]
+          ),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component)
+        end
+      )
+
+    assert %Result{run_dir: ^run_dir} = result
+
+    [artifact] =
+      Path.wildcard(Path.join(run_dir, "generated_best_outputs_valset/task_0/iter_0_prog_0.json"))
+
+    decoded = artifact |> File.read!() |> Jason.decode!()
+    assert decoded["score"] == 0.75
+
+    assert decoded["output"] == %{
+             "__dsex_type__" => "tuple",
+             "items" => [
+               0.75,
+               %{"current_candidate" => "baseline"},
+               %{"explanation" => "seed evidence"}
+             ]
+           }
+  end
+
+  test "disk evaluation caches survive independent runs" do
+    run_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-disk-cache-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    on_exit(fn -> File.rm_rf!(run_dir) end)
+    receiver = self()
+
+    evaluator = fn candidate ->
+      send(receiver, {:evaluated, candidate})
+      0.9
+    end
+
+    options =
+      runner_options(0,
+        config:
+          Config.new(
+            engine: [run_dir: run_dir, cache_evaluation: true, max_candidate_proposals: 0]
+          )
+      )
+
+    first = Anything.optimize("cached", evaluator, options)
+    assert_receive {:evaluated, "cached"}
+    assert first.total_metric_calls == 1
+
+    File.rm!(Path.join(run_dir, "gepa_state.json"))
+
+    second = Anything.optimize("cached", evaluator, options)
+    refute_receive {:evaluated, "cached"}
+    assert second.total_metric_calls == 0
+    assert second.validation_scores == [0.9]
+  end
+
   defp runner_options(max_candidate_proposals, overrides \\ []) do
     defaults = [
       config: Config.new(engine: [max_candidate_proposals: max_candidate_proposals]),

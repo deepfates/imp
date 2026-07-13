@@ -23,25 +23,83 @@ and negative controls that must remain below threshold.
 ## Optimize Anything
 
 ```elixir
-artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
+alias DSEx.Optimize.Anything
+alias DSEx.Optimize.Anything.{Config, Result}
 
-report =
-  DSEx.Optimize.Anything.optimize(
-    artifact,
-    fn artifact, _examples ->
-      if artifact.text =~ "mode=fast", do: 1.0, else: 0.0
-    end,
-    trials: 1,
-    mutation_fn: fn _artifact, _trial, _seed -> "mode=fast" end
+config =
+  Config.new(
+    engine: [max_candidate_proposals: 2, run_dir: "tmp/anything-run"],
+    reflection: [module_selector: :all]
   )
 
-report.best.score
-#=> 1.0
+result =
+  Anything.optimize(
+    %{config: "mode=slow", policy: "prefer safe changes"},
+    fn candidate ->
+      if candidate.config == "mode=fast", do: 1.0, else: 0.0
+    end,
+    config: config,
+    fallback_proposer: fn candidate, component, _feedback, _iteration ->
+      case component do
+        :config -> "mode=fast"
+        :policy -> candidate.policy
+      end
+    end
+  )
+
+Result.best_candidate(result)
+#=> %{config: "mode=fast", policy: "prefer safe changes"}
 ```
 
-Reports preserve baseline candidates, lineage, diagnostics, evaluator errors,
-named artifact parameters, and JSON-safe save/load via
-`save_report!/2` and `load_report!/1`.
+The public frontend delegates to the production GEPA engine. With no dataset,
+an arity-one evaluator selects single-task mode. `dataset:` selects multi-task
+mode with an arity-two evaluator, and `dataset:` plus `valset:` evaluates held-
+out generalization. A `nil` seed requires `objective:` and a configured
+`reflection_lm`; a binary seed is exposed to the engine as one named component.
+
+Evaluators may return a numeric score or `{score, side_information}`. Side
+information can contain component-specific feedback, objective subscores, and
+typed images. Config controls candidate and module selection, refinement,
+perfect-score skipping, merge, stopping, metric/reflection budgets, bounded
+concurrency, and callbacks. Custom selectors implement the documented GEPA
+selector behaviours rather than being special-cased in the runner.
+
+When `run_dir` is set, DSEx writes atomic JSON checkpoints and seed/best
+validation outputs. Evaluation caching defaults to durable, content-addressed
+JSON storage for run directories and fails closed on corrupt or incompatible
+entries. Without a run directory, enabled caching is in-memory. Persisted
+config and results use tagged JSON codecs; W&B credentials are never written.
+
+External tracking is optional:
+
+```elixir
+Config.new(
+  engine: [max_candidate_proposals: 10, run_dir: "tmp/anything-run"],
+  tracking: [
+    use_wandb: true,
+    wandb_init_kwargs: %{project: "artifact-optimization"},
+    use_mlflow: true,
+    mlflow_tracking_uri: "http://127.0.0.1:5000",
+    mlflow_experiment_name: "artifact-optimization"
+  ]
+)
+```
+
+W&B reads `WANDB_API_KEY` unless `wandb_api_key` is supplied at runtime.
+MLflow supports `MLFLOW_TRACKING_TOKEN` or the standard username/password
+environment variables. Backend startup failures abort the run; later logging
+or finish failures are warnings. DSEx reports accurate failed terminal status,
+while the isolated W&B client can reproduce GEPA v0.1.1's success-only finish
+behavior when explicitly configured for compatibility.
+
+The compatibility `Artifact`/`Report` API remains available and delegates to
+the same engine. New code should use binary or named-map candidates and the
+production `Result` contract above.
+
+Release fidelity is pinned to GEPA v0.1.1. Adapter-owned resume, reflection
+budgets, attachable tracking runs, and other selected post-tag lifecycle fixes
+are DSEx production extensions, not a claim of parity with unreleased GEPA
+main. Real non-prompt effectiveness campaigns remain a separate release gate.
 
 ## Pareto/ASI GEPA-Style Reflection
 

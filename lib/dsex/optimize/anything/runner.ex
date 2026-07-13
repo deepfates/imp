@@ -1,7 +1,16 @@
 defmodule DSEx.Optimize.Anything.Runner do
   @moduledoc false
 
-  alias DSEx.Optimize.Anything.{Adapter, Config, Multimodal, Progress, Result}
+  alias DSEx.Optimize.Anything.{
+    Adapter,
+    BestOutputWriter,
+    Config,
+    Multimodal,
+    Progress,
+    Result,
+    Tracking
+  }
+
   alias DSEx.Optimizer.GEPA.{Candidate, Engine}
 
   @string_candidate_key :current_candidate
@@ -66,20 +75,21 @@ defmodule DSEx.Optimize.Anything.Runner do
       ]
       |> maybe_put(:optimization_state, Keyword.get(opts, :optimization_state))
 
-    adapter = Adapter.new(evaluator, mode, adapter_opts)
+    {runtime_callbacks, runtime_resources} = runtime_services(config)
+    adapter = open_adapter(evaluator, mode, adapter_opts, runtime_resources)
 
     engine_opts =
       config
       |> Config.to_engine_options()
-      |> Keyword.update!(:callbacks, &(runtime_callbacks(config) ++ &1))
+      |> Keyword.update!(:callbacks, &(runtime_callbacks ++ &1))
       |> Keyword.merge(
         resume_state: resume_state(config, Keyword.get(opts, :resume_state)),
         checkpoint_fn: checkpoint_callback(config, Keyword.get(opts, :checkpoint_fn))
       )
       |> normalize_iteration_limit(opts)
 
-    state =
-      try do
+    try do
+      state =
         Engine.run(
           adapter,
           Candidate.validate!(candidate),
@@ -88,16 +98,24 @@ defmodule DSEx.Optimize.Anything.Runner do
           proposer(config, opts),
           engine_opts
         )
-      after
-        Adapter.close(adapter)
-      end
 
-    Result.from_state(state,
-      mode: mode,
-      run_dir: config.engine.run_dir,
-      seed: config.engine.seed,
-      string_candidate_key: string_key
-    )
+      result =
+        Result.from_state(state,
+          mode: mode,
+          run_dir: config.engine.run_dir,
+          seed: config.engine.seed,
+          string_candidate_key: string_key
+        )
+
+      close_runtime_resources(runtime_resources, :finished)
+      result
+    catch
+      kind, reason ->
+        close_runtime_resources(runtime_resources, :failed)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    after
+      Adapter.close(adapter)
+    end
   end
 
   def run(_seed_candidate, evaluator, opts) do
@@ -308,14 +326,6 @@ defmodule DSEx.Optimize.Anything.Runner do
   end
 
   defp validate_runtime_support!(config, opts) do
-    unless config.reflection.module_selector == :round_robin do
-      raise ArgumentError,
-            "Optimize Anything module selector #{inspect(config.reflection.module_selector)} is not wired yet"
-    end
-
-    if config.tracking.use_wandb or config.tracking.use_mlflow,
-      do: raise(ArgumentError, "Optimize Anything external experiment tracking is not wired yet")
-
     unless stopping_condition?(config, opts) do
       raise ArgumentError,
             "Optimize Anything requires max_metric_calls, max_candidate_proposals, a stopper, or a run_dir"
@@ -420,11 +430,51 @@ defmodule DSEx.Optimize.Anything.Runner do
   defp max_concurrency(%{engine: %{max_workers: nil}}), do: System.schedulers_online()
   defp max_concurrency(%{engine: %{max_workers: workers}}), do: workers
 
-  defp runtime_callbacks(%{engine: %{display_progress_bar: false}}), do: []
+  defp runtime_services(config) do
+    {tracking_callbacks, tracking_resources} = tracking_service(config)
+    {progress_callbacks, progress_resources} = progress_service(config)
+    callbacks = tracking_callbacks ++ progress_callbacks
+    resources = progress_resources ++ tracking_resources
 
-  defp runtime_callbacks(%{engine: engine, stopper: stopper}) do
+    case config.engine.run_dir do
+      nil ->
+        {callbacks, resources}
+
+      run_dir ->
+        {callback, writer} =
+          BestOutputWriter.open(run_dir, config.engine.track_best_outputs)
+
+        {callbacks ++ [callback], [{:best_output_writer, writer} | resources]}
+    end
+  end
+
+  defp tracking_service(%{tracking: %{use_wandb: false, use_mlflow: false}}), do: {[], []}
+
+  defp tracking_service(%{tracking: tracking}) do
+    {callback, session} = Tracking.open(tracking)
+    {[callback], [{:tracking, session}]}
+  end
+
+  defp progress_service(%{engine: %{display_progress_bar: false}}), do: {[], []}
+
+  defp progress_service(%{engine: engine, stopper: stopper}) do
     total = minimum_limit(engine.max_metric_calls, stopper_metric_limit(stopper))
-    [Progress.callback(total: total)]
+    {[Progress.callback(total: total)], []}
+  end
+
+  defp open_adapter(evaluator, mode, adapter_opts, runtime_resources) do
+    Adapter.new(evaluator, mode, adapter_opts)
+  catch
+    kind, reason ->
+      close_runtime_resources(runtime_resources, :failed)
+      :erlang.raise(kind, reason, __STACKTRACE__)
+  end
+
+  defp close_runtime_resources(resources, status) do
+    Enum.each(resources, fn
+      {:best_output_writer, writer} -> BestOutputWriter.close(writer)
+      {:tracking, session} -> Tracking.close(session, status)
+    end)
   end
 
   defp stopper_metric_limit({:max_metric_calls, limit}), do: limit

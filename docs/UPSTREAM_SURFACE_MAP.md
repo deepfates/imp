@@ -1,18 +1,15 @@
 # DSEx Executable Upstream Conformance
 
-This generated maintainer ledger belongs to a DSEx source checkout. Repository
-paths and gate commands are not package-consumer APIs.
-
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 22
 Conformant: 11
 Elixir-native equivalents: 2
-Tracking: 1
-Gaps: 8
+Tracking: 2
+Gaps: 7
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 8
+Release blockers: 7
 Passing: false
 
 | ID | Category | Status | Upstream surfaces | Ticket |
@@ -32,9 +29,9 @@ Passing: false
 | optimization.instructions | optimization | gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
 | optimization.gepa | optimization | gap | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
 | optimization.weights | optimization | gap | BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
-| optimization.anything | optimization | gap | optimize_anything, arbitrary text artifacts | de-16fo |
+| optimization.anything | optimization | tracking | optimize_anything, arbitrary text artifacts | de-16fo |
 | retrieval.data | retrieval | elixir_native_equivalent | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
-| runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |  |
+| runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
 | runtime.observability | runtime | conformant | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |  |
 | state.persistence_deployment | operations | conformant | Module.save, Module.load, load, dump_state, load_state, deployment |  |
 | product.learning_path | product | gap | getting started, tutorials, real-world examples, API reference, production guide | de-2ia5 |
@@ -361,8 +358,8 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- faithful MIPROv2
-- faithful SIMBA
+- matched DSPy 3.3.0b1 MIPROv2 differential artifact
+- matched DSPy 3.3.0b1 SIMBA differential artifact
 - paper-scale lift evidence
 
 ### `optimization.gepa`
@@ -418,11 +415,11 @@ Missing evidence or behavior:
 
 ### `optimization.anything`
 
-Status: `gap`
+Status: `tracking`
 
 Upstream source: `arXiv:2605.19633; gepa-ai optimize-anything`
 
-DSEx modules: `DSEx.Optimize.Anything`
+DSEx modules: `DSEx.Optimize.Anything`, `DSEx.Optimize.Anything.Config`, `DSEx.Optimize.Anything.Result`
 Semantic invariants:
 
 - artifacts are not limited to prompts
@@ -432,7 +429,12 @@ Semantic invariants:
 
 Executable evidence:
 
-- test: `test/optimize_anything_test.exs`
+- test: `test/optimize_anything_runner_test.exs`
+- test: `test/optimize_anything_refiner_test.exs`
+- test: `test/optimize_anything_multimodal_test.exs`
+- test: `test/optimize_anything_tracking_test.exs`
+- test: `test/gepa_module_selector_test.exs`
+- test: `test/gepa_evaluation_cache_backend_test.exs`
 - docs: `docs/ADVANCED.md`
 
 Missing evidence or behavior:

@@ -8,7 +8,7 @@ defmodule DSEx.Optimize.Anything.Config do
   """
 
   alias DSEx.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
-  alias DSEx.Optimizer.GEPA.{Callback, CandidateSelector, Stopper}
+  alias DSEx.Optimizer.GEPA.{Callback, CandidateSelector, ModuleSelector, Stopper}
 
   defmodule Persistence do
     @moduledoc false
@@ -219,7 +219,7 @@ defmodule DSEx.Optimize.Anything.Config do
       config = struct!(__MODULE__, values)
       validate_perfect_score!(config.perfect_score)
       validate_selector!(config.batch_sampler, :batch_sampler, [:epoch_shuffled])
-      validate_selector!(config.module_selector, :module_selector, [:round_robin, :all])
+      ModuleSelector.validate!(config.module_selector)
       validate_proposer!(config.custom_candidate_proposer)
       config
     end
@@ -356,7 +356,11 @@ defmodule DSEx.Optimize.Anything.Config do
     end
 
     @spec to_map(t()) :: map()
-    def to_map(%__MODULE__{} = config), do: Persistence.encode(config)
+    def to_map(%__MODULE__{} = config) do
+      config
+      |> Map.put(:wandb_api_key, nil)
+      |> Persistence.encode()
+    end
 
     @spec from_map(map()) :: t()
     def from_map(map),
@@ -410,7 +414,7 @@ defmodule DSEx.Optimize.Anything.Config do
     config
   end
 
-  @doc "Returns keyword options accepted by `DSEx.Optimizer.GEPA.Engine.run/6`."
+  @doc "Returns keyword options consumed by the production optimizer engine."
   @spec to_engine_options(t()) :: keyword()
   def to_engine_options(%__MODULE__{} = config) do
     engine = config.engine
@@ -422,12 +426,15 @@ defmodule DSEx.Optimize.Anything.Config do
       max_full_evaluations: engine.max_full_evaluations || :infinity,
       frontier_type: engine.frontier_type,
       cache_evaluation: engine.cache_evaluation,
+      cache_evaluation_storage: cache_storage(engine),
       candidate_selection_strategy: engine.candidate_selection_strategy,
+      module_selector: reflection.module_selector,
       track_best_outputs: engine.track_best_outputs,
       evaluation_policy: evaluation_policy(engine.val_evaluation_policy),
       minibatch_size: reflection.reflection_minibatch_size,
       skip_perfect_score: reflection.skip_perfect_score,
       perfect_score: reflection.perfect_score,
+      max_reflection_calls: engine.max_candidate_proposals || :infinity,
       stopper: config.stopper,
       callbacks: config.callbacks
     ]
@@ -542,6 +549,13 @@ defmodule DSEx.Optimize.Anything.Config do
 
   defp evaluation_policy(:full_eval), do: :full
   defp evaluation_policy(policy), do: policy
+
+  defp cache_storage(engine) do
+    case Engine.cache_mode(engine) do
+      :disk -> {:disk, engine.run_dir}
+      _mode -> :memory
+    end
+  end
 
   defp maybe_add(opts, _key, nil), do: opts
   defp maybe_add(opts, key, value), do: Keyword.put(opts, key, value)

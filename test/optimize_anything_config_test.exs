@@ -79,7 +79,10 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
     assert opts[:max_iterations] == 12
     assert opts[:frontier_type] == :cartesian
     assert opts[:cache_evaluation] == false
+    assert opts[:cache_evaluation_storage] == :memory
     assert opts[:candidate_selection_strategy] == :pareto
+    assert opts[:module_selector] == :round_robin
+    assert opts[:max_reflection_calls] == 12
     assert opts[:track_best_outputs] == false
     assert opts[:skip_perfect_score] == false
     assert opts[:perfect_score] == nil
@@ -90,6 +93,18 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
     assert opts[:use_merge]
     assert opts[:max_merge_invocations] == 3
     assert opts[:merge_val_overlap_floor] == 2
+  end
+
+  test "engine bridge selects disk cache and multi-component reflection" do
+    config =
+      Config.new(
+        engine: [run_dir: "tmp/gepa", cache_evaluation: true],
+        reflection: [module_selector: :all]
+      )
+
+    opts = Config.to_engine_options(config)
+    assert opts[:cache_evaluation_storage] == {:disk, "tmp/gepa"}
+    assert opts[:module_selector] == :all
   end
 
   test "constructors reject invalid released settings and unknown options" do
@@ -136,6 +151,15 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
     assert persisted["type"] == "dsex_optimize_anything_config"
     assert persisted["schema_version"] == 1
     assert Config.from_map(persisted) == config
+  end
+
+  test "tracking persistence never stores W&B credentials" do
+    config = Config.new(tracking: [use_wandb: true, wandb_api_key: "secret-api-key"])
+    persisted = Config.to_map(config)
+
+    assert get_in(persisted, ["tracking", "wandb_api_key"]) == nil
+    refute inspect(persisted) =~ "secret-api-key"
+    assert Config.from_map(persisted).tracking.wandb_api_key == nil
   end
 
   test "persistence rejects runtime-only model, proposer, stopper, and callback values" do

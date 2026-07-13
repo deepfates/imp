@@ -13,9 +13,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     EvaluationPolicy,
     Frontier,
     Merge,
+    ModuleSelector,
     Result,
     Stopper
   }
+
+  alias DSEx.Optimizer.GEPA.EvaluationCache.Disk, as: DiskEvaluationCache
 
   defmodule Entry do
     @moduledoc false
@@ -163,6 +166,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
   defp initialize(adapter, seed_candidate, valset, opts) do
     state = %State{
+      cache: new_evaluation_cache(opts),
       budget:
         Budget.new(
           max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
@@ -224,7 +228,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       |> CandidateSelector.select(state)
 
     state = %{state | rng_state: rng_state}
-    {component, next_component} = select_component(parent)
 
     notify(opts, :on_candidate_selected, %{
       iteration: iteration,
@@ -247,42 +250,54 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              is_seed_candidate: parent.id == 0
            }),
          :ok <- maybe_skip_perfect(parent_result, parent, iteration, state, opts),
+         components <-
+           ModuleSelector.select(
+             Keyword.get(opts, :module_selector, :round_robin),
+             state,
+             parent_result.trajectories,
+             parent_result.scores,
+             parent.id,
+             parent.candidate
+           ),
+         next_component <- next_component(parent, opts),
+         state <- advance_component_cursor(state, parent.id, next_component, opts),
          reflective_dataset <-
            Adapter.make_reflective_dataset(
              adapter,
              parent.candidate,
              parent_result,
-             [component]
+             components
            ),
          :ok <-
            notify(opts, :on_reflective_dataset_built, %{
              iteration: iteration,
              candidate_idx: parent.id,
-             components: [component],
+             components: components,
              dataset: reflective_dataset
            }),
          :ok <-
            notify(opts, :on_proposal_start, %{
              iteration: iteration,
              parent_candidate: parent.candidate,
-             components: [component],
+             components: components,
              reflective_dataset: reflective_dataset
            }),
-         {:ok, text, state} <-
-           propose_with_budget(
+         {:ok, replacements, state} <-
+           propose_components_with_budget(
              proposer,
              parent.candidate,
-             component,
+             components,
              reflective_dataset,
              iteration,
-             state
+             state,
+             opts
            ),
          :ok <-
            notify(opts, :on_proposal_end, %{
              iteration: iteration,
-             new_instructions: %{component => text}
+             new_instructions: replacements
            }),
-         proposed_candidate = Map.put(parent.candidate, component, text),
+         proposed_candidate = Map.merge(parent.candidate, replacements),
          {:ok, proposed_result, state} <-
            evaluate(adapter, batch, proposed_candidate, false, :minibatch, state, opts, %{
              iteration: iteration,
@@ -296,7 +311,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              operation: :mutation,
              iteration: iteration,
              parent_id: parent.id,
-             component: component,
+             component: legacy_component(components),
+             components: components,
              candidate: proposed_candidate
            }) do
         {:accept, acceptance} ->
@@ -305,7 +321,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
             valset,
             proposed_candidate,
             parent,
-            component,
+            components,
             next_component,
             parent_result,
             proposed_result,
@@ -320,7 +336,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
             iteration: iteration,
             old_score: parent_result.aggregate_score,
             new_score: proposed_result.aggregate_score,
-            reason: reason
+            reason: reason,
+            components: components
           })
 
           {:ok,
@@ -328,7 +345,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              state,
              iteration,
              parent,
-             component,
+             components,
              reason,
              parent_result,
              proposed_result,
@@ -342,17 +359,21 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       {:error, {:budget_exhausted, _, _, _} = reason, state} ->
         {:stop, reason, state}
 
-      {:error, reason, state} ->
+      {:error, {:component_proposal_error, reason, components}, state} ->
         notify(opts, :on_error, %{iteration: iteration, exception: reason, will_continue: true})
 
         {:ok,
-         reject(state, iteration, parent, component, {:proposal_error, reason}, nil, nil, nil)}
+         reject(state, iteration, parent, components, {:proposal_error, reason}, nil, nil, nil)}
+
+      {:error, reason, state} ->
+        notify(opts, :on_error, %{iteration: iteration, exception: reason, will_continue: true})
+
+        {:ok, reject(state, iteration, parent, [], {:proposal_error, reason}, nil, nil, nil)}
 
       {:error, reason} ->
         notify(opts, :on_error, %{iteration: iteration, exception: reason, will_continue: true})
 
-        {:ok,
-         reject(state, iteration, parent, component, {:proposal_error, reason}, nil, nil, nil)}
+        {:ok, reject(state, iteration, parent, [], {:proposal_error, reason}, nil, nil, nil)}
     end
   end
 
@@ -604,7 +625,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          valset,
          candidate,
          parent,
-         component,
+         components,
          next_component,
          parent_result,
          proposed_result,
@@ -638,7 +659,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           status: :accepted,
           candidate_id: entry.id,
           parent_ids: [parent.id],
-          component: component,
+          component: legacy_component(components),
+          components: components,
           minibatch_parent_score: parent_result.aggregate_score,
           minibatch_candidate_score: proposed_result.aggregate_score,
           acceptance: acceptance,
@@ -662,7 +684,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           iteration: iteration,
           new_candidate_idx: entry.id,
           new_score: proposed_result.aggregate_score,
-          parent_ids: [parent.id]
+          parent_ids: [parent.id],
+          components: components
         })
 
         {:ok, state}
@@ -676,7 +699,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          state,
          iteration,
          parent,
-         component,
+         components,
          reason,
          parent_result,
          proposed_result,
@@ -686,7 +709,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       iteration: iteration,
       status: :rejected,
       parent_ids: [parent.id],
-      component: component,
+      component: legacy_component(components),
+      components: components,
       candidate: candidate,
       reason: reason,
       minibatch_parent_score: score(parent_result),
@@ -819,10 +843,11 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp evaluate_cached(adapter, batch, candidate, kind, state, opts, event) do
-    {hits, missing_indexes} = EvaluationCache.lookup(state.cache, candidate, batch)
+    backend = evaluation_cache_backend(state.cache)
+    {hits, missing_indexes} = backend.lookup(state.cache, candidate, batch)
 
     if missing_indexes == [] do
-      result = EvaluationCache.assemble(batch, hits, [], nil)
+      result = backend.assemble(batch, hits, [], nil)
 
       case Budget.record_evaluation(state.budget, 0, kind) do
         {:ok, budget} ->
@@ -849,12 +874,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         missing_result =
           Evaluation.evaluate(adapter, missing_batch, candidate, capture_traces: false)
 
-        result = EvaluationCache.assemble(batch, hits, missing_indexes, missing_result)
+        result = backend.assemble(batch, hits, missing_indexes, missing_result)
         actual_calls = metric_calls(missing_result, length(missing_batch))
 
         case Budget.record_evaluation(state.budget, actual_calls, kind) do
           {:ok, budget} ->
-            cache = EvaluationCache.put(state.cache, candidate, missing_batch, missing_result)
+            cache = backend.put(state.cache, candidate, missing_batch, missing_result)
             notify_budget_updated(opts, state, budget, actual_calls, event.iteration)
             notify_evaluation_end(opts, result, event)
             {:ok, result, %{state | budget: budget, cache: cache}}
@@ -891,7 +916,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp maybe_cache_result(cache, candidate, batch, result, true),
-    do: EvaluationCache.put(cache, candidate, batch, result)
+    do: evaluation_cache_backend(cache).put(cache, candidate, batch, result)
 
   defp maybe_cache_result(cache, _candidate, _batch, _result, false), do: cache
 
@@ -962,19 +987,95 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     kind, reason -> {:error, {:proposal_throw, kind, reason}}
   end
 
-  defp propose_with_budget(proposer, candidate, component, dataset, iteration, state) do
-    state = %{state | budget: Budget.record_reflection(state.budget)}
+  defp propose_components_with_budget(
+         proposer,
+         candidate,
+         components,
+         dataset,
+         iteration,
+         state,
+         opts
+       ) do
+    Enum.reduce_while(components, {:ok, %{}, state}, fn component, {:ok, replacements, state} ->
+      case propose_component_with_budget(
+             proposer,
+             candidate,
+             component,
+             dataset,
+             iteration,
+             state,
+             opts
+           ) do
+        {:ok, text, state} ->
+          {:cont, {:ok, Map.put(replacements, component, text), state}}
 
+        {:error, {:budget_exhausted, _, _, _} = reason, state} ->
+          {:halt, {:error, reason, state}}
+
+        {:error, reason, state} ->
+          {:halt, {:error, {:component_proposal_error, reason, components}, state}}
+      end
+    end)
+  end
+
+  defp propose_component_with_budget(
+         proposer,
+         candidate,
+         component,
+         dataset,
+         iteration,
+         state,
+         opts
+       ) do
+    case authorize_reflection(state, opts) do
+      :ok ->
+        state = %{state | budget: Budget.record_reflection(state.budget)}
+        propose_authorized(proposer, candidate, component, dataset, iteration, state)
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp propose_authorized(proposer, candidate, component, dataset, iteration, state) do
     case propose(proposer, candidate, component, dataset, iteration) do
       {:ok, text} -> {:ok, text, state}
       {:error, reason} -> {:error, reason, state}
     end
   end
 
-  defp select_component(%Entry{candidate: candidate, next_component: cursor}) do
-    components = candidate |> Map.keys() |> Enum.sort_by(&inspect/1)
-    {Enum.at(components, rem(cursor, length(components))), cursor + 1}
+  defp authorize_reflection(state, opts) do
+    case Keyword.get(opts, :max_reflection_calls, :infinity) do
+      :infinity ->
+        :ok
+
+      limit when state.budget.reflection_calls < limit ->
+        :ok
+
+      limit ->
+        {:error, {:budget_exhausted, :reflection_calls, state.budget.reflection_calls + 1, limit}}
+    end
   end
+
+  defp next_component(parent, opts) do
+    if Keyword.get(opts, :module_selector, :round_robin) == :round_robin,
+      do: parent.next_component + 1,
+      else: parent.next_component
+  end
+
+  defp advance_component_cursor(state, candidate_id, next_component, opts) do
+    if Keyword.get(opts, :module_selector, :round_robin) == :round_robin do
+      candidates =
+        List.update_at(state.candidates, candidate_id, &%{&1 | next_component: next_component})
+
+      %{state | candidates: candidates}
+    else
+      state
+    end
+  end
+
+  defp legacy_component([component]), do: component
+  defp legacy_component(components), do: components
 
   defp frontier_candidates(candidates),
     do: Enum.map(candidates, &{&1.id, &1.validation})
@@ -1167,12 +1268,15 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       use_merge: Keyword.get(opts, :use_merge, false),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
       candidate_selection_strategy: Keyword.get(opts, :candidate_selection_strategy, :pareto),
+      module_selector: Keyword.get(opts, :module_selector, :round_robin),
       skip_perfect_score: Keyword.get(opts, :skip_perfect_score, false),
       perfect_score: Keyword.get(opts, :perfect_score),
       track_best_outputs: Keyword.get(opts, :track_best_outputs, false),
       cache_evaluation: Keyword.get(opts, :cache_evaluation, true),
+      cache_evaluation_storage: Keyword.get(opts, :cache_evaluation_storage, :memory),
       max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
-      max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity)
+      max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
+      max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)
     })
   end
 
@@ -1186,7 +1290,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       candidates: Enum.map(Map.fetch!(dumped, "candidates"), &load_entry!/1),
       rejected: restore(Map.get(dumped, "rejected", [])),
       history: restore(Map.get(dumped, "history", [])),
-      cache: load_cache(Map.get(dumped, "cache", [])),
+      cache: load_evaluation_cache(Map.get(dumped, "cache", []), opts),
       budget: dumped |> Map.fetch!("budget") |> Budget.load!(),
       rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
       merge_due: Map.get(dumped, "merge_due", 0),
@@ -1285,7 +1389,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       candidates: entries,
       rejected: [],
       history: [%{status: :legacy_checkpoint_migrated, candidates: length(entries)}],
-      cache: %{},
+      cache: new_evaluation_cache(opts),
       budget: budget,
       rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
@@ -1398,6 +1502,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     raise ArgumentError, "invalid GEPA best validation outputs: #{inspect(value)}"
   end
 
+  defp dump_cache(%DiskEvaluationCache{}), do: []
+
   defp dump_cache(cache) do
     Enum.map(cache, fn {{candidate_digest, example_digest}, %EvaluationCache.Entry{} = entry} ->
       %{
@@ -1414,6 +1520,23 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   defp load_cache(entries) do
     Enum.reduce(entries, %{}, &load_cache_entry/2)
   end
+
+  defp new_evaluation_cache(opts) do
+    case Keyword.get(opts, :cache_evaluation_storage, :memory) do
+      :memory -> %{}
+      {:disk, run_dir} -> DiskEvaluationCache.new(run_dir)
+    end
+  end
+
+  defp load_evaluation_cache(entries, opts) do
+    case Keyword.get(opts, :cache_evaluation_storage, :memory) do
+      :memory -> load_cache(entries)
+      {:disk, run_dir} -> DiskEvaluationCache.new(run_dir)
+    end
+  end
+
+  defp evaluation_cache_backend(%DiskEvaluationCache{}), do: DiskEvaluationCache
+  defp evaluation_cache_backend(cache) when is_map(cache), do: EvaluationCache
 
   defp load_cache_entry(
          %{
@@ -1584,10 +1707,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     merge_subsample_size = Keyword.get(opts, :merge_subsample_size, 5)
     frontier_type = Keyword.get(opts, :frontier_type, :instance)
     cache_evaluation = Keyword.get(opts, :cache_evaluation, true)
+    cache_evaluation_storage = Keyword.get(opts, :cache_evaluation_storage, :memory)
     skip_perfect_score = Keyword.get(opts, :skip_perfect_score, false)
     perfect_score = Keyword.get(opts, :perfect_score)
     track_best_outputs = Keyword.get(opts, :track_best_outputs, false)
     acceptance_policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
+    max_reflection_calls = Keyword.get(opts, :max_reflection_calls, :infinity)
 
     merge_acceptance_policy =
       Keyword.get(opts, :merge_acceptance_policy, Acceptance.default(:merge))
@@ -1599,11 +1724,23 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
     EvaluationPolicy.resolve!(Keyword.get(opts, :evaluation_policy, :full))
     CandidateSelector.validate!(Keyword.get(opts, :candidate_selection_strategy, :pareto))
+    ModuleSelector.validate!(Keyword.get(opts, :module_selector, :round_robin))
+
+    unless max_reflection_calls == :infinity or
+             (is_integer(max_reflection_calls) and max_reflection_calls >= 0) do
+      raise ArgumentError,
+            ":max_reflection_calls must be a non-negative integer or :infinity"
+    end
 
     unless is_boolean(use_merge), do: raise(ArgumentError, ":use_merge must be a boolean")
 
     unless is_boolean(cache_evaluation),
       do: raise(ArgumentError, ":cache_evaluation must be a boolean")
+
+    unless valid_cache_storage?(cache_evaluation_storage) do
+      raise ArgumentError,
+            ":cache_evaluation_storage must be :memory or {:disk, run_dir}"
+    end
 
     validate_policy_options!(skip_perfect_score, perfect_score, track_best_outputs)
 
@@ -1626,6 +1763,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     validate_acceptance_policy!(acceptance_policy, :acceptance_policy)
     validate_acceptance_policy!(merge_acceptance_policy, :merge_acceptance_policy)
   end
+
+  defp valid_cache_storage?(:memory), do: true
+  defp valid_cache_storage?({:disk, run_dir}) when is_binary(run_dir), do: run_dir != ""
+  defp valid_cache_storage?(_storage), do: false
 
   defp validate_policy_options!(skip_perfect_score, perfect_score, track_best_outputs) do
     unless is_boolean(skip_perfect_score),

@@ -496,9 +496,13 @@ defmodule DSEx.UpstreamFidelity do
       category: :optimization,
       upstream: ["optimize_anything", "arbitrary text artifacts"],
       source: "arXiv:2605.19633; gepa-ai optimize-anything",
-      disposition: :gap,
+      disposition: :tracking,
       ticket: "de-16fo",
-      dsex: [DSEx.Optimize.Anything],
+      dsex: [
+        DSEx.Optimize.Anything,
+        DSEx.Optimize.Anything.Config,
+        DSEx.Optimize.Anything.Result
+      ],
       invariants: [
         "artifacts are not limited to prompts",
         "feedback is per-task and per-metric",
@@ -506,7 +510,14 @@ defmodule DSEx.UpstreamFidelity do
         "paper tasks reproduce at meaningful scale"
       ],
       evidence: %{
-        tests: ["test/optimize_anything_test.exs"],
+        tests: [
+          "test/optimize_anything_runner_test.exs",
+          "test/optimize_anything_refiner_test.exs",
+          "test/optimize_anything_multimodal_test.exs",
+          "test/optimize_anything_tracking_test.exs",
+          "test/gepa_module_selector_test.exs",
+          "test/gepa_evaluation_cache_backend_test.exs"
+        ],
         docs: ["docs/ADVANCED.md"],
         missing: ["non-prompt replication suite", "paper-scale comparison"]
       }
