@@ -703,6 +703,64 @@ defmodule BenchmarkTruthTest do
              """)
   end
 
+  test "DSPy parity runner persists bounded redacted provider exceptions" do
+    runner_path = Path.expand("../scripts/dspy_parity_runner.py", __DIR__)
+    out_path = Path.join(tmp_dir("dspy-error-redaction"), "report.json")
+    secret = "provider-secret-value-0123456789"
+    shaped_secret = "sk-test-python-runner-secret-1234567890"
+
+    python = """
+    import importlib.util
+    import json
+    import pathlib
+    import sys
+    import types
+
+    fake = types.ModuleType("dspy")
+    fake.__version__ = "fake"
+    fake.settings = types.SimpleNamespace(lm=None)
+    fake.Signature = type("Signature", (), {})
+    fake.Module = type("Module", (), {})
+    fake.ChainOfThought = lambda signature: None
+    fake.Predict = lambda signature: None
+    fake.InputField = lambda *args, **kwargs: None
+    fake.OutputField = lambda *args, **kwargs: None
+    fake.LM = lambda *args, **kwargs: None
+    fake.configure = lambda **kwargs: None
+    sys.modules["dspy"] = fake
+
+    spec = importlib.util.spec_from_file_location("dspy_parity_runner", #{Jason.encode!(runner_path)})
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    runner.DIAGNOSTIC_SECRETS = (#{Jason.encode!(secret)},)
+
+    error = RuntimeError(
+        "provider failed " + #{Jason.encode!(secret)} + " " +
+        #{Jason.encode!(shaped_secret)} + " " + ("x" * 5000)
+    )
+    diagnostic = runner.exception_diagnostic(7, error)
+    out_path = pathlib.Path(#{Jason.encode!(out_path)})
+    runner.write_report_atomically(out_path, {"errors": [diagnostic]})
+
+    persisted = out_path.read_text()
+    assert #{Jason.encode!(secret)} not in persisted
+    assert #{Jason.encode!(shaped_secret)} not in persisted
+    assert "repr" not in diagnostic
+    assert diagnostic["type"] == "RuntimeError"
+    assert diagnostic["reason_truncated"] is True
+    assert len(diagnostic["reason"]) == diagnostic["reason_limit_chars"]
+    assert diagnostic["reason_chars"] > diagnostic["reason_limit_chars"]
+    assert not out_path.with_suffix(out_path.suffix + ".partial").exists()
+    print(json.dumps(diagnostic))
+    """
+
+    {output, status} = System.cmd("python3", ["-c", python], stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ "[REDACTED]"
+    refute output =~ secret
+    refute output =~ shaped_secret
+  end
+
   test "DSPy parity runner attributes concurrent LM history by unambiguous row question" do
     runner_path = Path.expand("../scripts/dspy_parity_runner.py", __DIR__)
 

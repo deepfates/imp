@@ -614,6 +614,19 @@ The parity report records:
 This is the required lane for parity claims. DSEx-only benchmark truth proves
 DSEx behavior; parity requires the Python DSPy sidecar.
 
+The Python runner is a direct OTP Port executable in its own session and
+process group. If the campaign caller exits or `--dspy-timeout-ms` expires, the
+Port owner sends checked TERM to the complete group, probes group liveness
+through a bounded grace period even if the Python leader has already exited,
+and sends checked KILL to any surviving descendants. Combined stdout/stderr is
+kept as a 256 KiB tail with explicit byte-count and truncation metadata, which
+preserves the final `DSPY_REPORT_PATH` sentinel without allowing output floods
+to grow BEAM memory without bound. Diagnostics are redacted with the configured
+`--api-key-env` value before task errors are logged. Python provider exceptions
+are likewise persisted as bounded, redacted error records rather than raw
+exception representations. A completed report is atomically promoted from its
+`.partial` path; cancellation cannot promote a partial DSPy report.
+
 Two rows are a smoke test, not a leaderboard. They prove only that both sides
 can run against the same data and endpoint. Use research samples or the full
 lane before making quality/efficiency claims:

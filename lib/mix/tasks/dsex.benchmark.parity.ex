@@ -519,18 +519,30 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
         campaign_args(campaign_id) ++
         Enum.flat_map(tasks, fn {task, path} -> ["--#{task}", path] end)
 
-    case ParitySidecar.run(python, args, timeout: timeout) do
+    case ParitySidecar.run(python, args,
+           timeout: timeout,
+           secrets: [System.get_env(api_key_env)]
+         ) do
       {:ok, output, 0} ->
-        case parse_dspy_report_path(output) do
-          {:ok, path} -> path
-          :error -> Mix.raise("DSPy runner did not print DSPY_REPORT_PATH sentinel:\n#{output}")
+        case parse_dspy_report_path(output.text) do
+          {:ok, path} ->
+            path
+
+          :error ->
+            Mix.raise(
+              "DSPy runner did not print DSPY_REPORT_PATH sentinel:\n#{ParitySidecar.diagnostic(output)}"
+            )
         end
 
       {:ok, output, status} ->
-        Mix.raise("DSPy runner failed with status #{status}:\n#{output}")
+        Mix.raise(
+          "DSPy runner failed with status #{status}:\n#{ParitySidecar.diagnostic(output)}"
+        )
 
       {:error, :timeout, output} ->
-        Mix.raise("DSPy runner timed out after #{timeout}ms:\n#{output}")
+        Mix.raise(
+          "DSPy runner timed out after #{timeout}ms:\n#{ParitySidecar.diagnostic(output)}"
+        )
     end
   end
 

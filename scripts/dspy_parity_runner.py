@@ -22,6 +22,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 
+DIAGNOSTIC_LIMIT_CHARS = 2048
+DIAGNOSTIC_SECRETS: Tuple[str, ...] = ()
+
+
 def isolate_from_beam_process_group() -> None:
     if os.name == "posix" and os.environ.get("DSEX_BEAM_PORT_OWNER") == "1":
         if os.getpgrp() != os.getpid():
@@ -72,6 +76,8 @@ class HotPotQAProgram(dspy.Module):
 
 
 def main() -> int:
+    global DIAGNOSTIC_SECRETS
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--gsm8k")
     parser.add_argument("--hotpotqa")
@@ -91,6 +97,7 @@ def main() -> int:
     if not api_key:
         raise SystemExit(f"{args.api_key_env} is required")
 
+    DIAGNOSTIC_SECRETS = (api_key,)
     os.makedirs(args.out, exist_ok=True)
     configure_dspy(args.model, api_key, args.temperature, args.max_tokens, args.reasoning_effort)
 
@@ -308,7 +315,7 @@ def run_row(
     except Exception as exc:  # noqa: BLE001 - benchmark artifact should capture all failures.
         passed = False
         metric_result = {"score": 0.0, "passed": False, "metadata": {}}
-        error = {"index": index, "reason": repr(exc)}
+        error = exception_diagnostic(index, exc)
         pred = None
 
     duration_ms = round((time.perf_counter() - started) * 1000, 3)
@@ -323,6 +330,33 @@ def run_row(
         "duration_ms": duration_ms,
         "instrumentation": dspy_instrumentation(task, row, pred, duration_ms, before_history_len),
     }
+
+
+def exception_diagnostic(index: int, exc: Exception) -> Dict[str, Any]:
+    text = str(exc)
+    total_chars = len(text)
+    redacted = redact_diagnostic(text)
+
+    return {
+        "index": index,
+        "type": type(exc).__name__,
+        "reason": redacted[:DIAGNOSTIC_LIMIT_CHARS],
+        "reason_truncated": len(redacted) > DIAGNOSTIC_LIMIT_CHARS,
+        "reason_chars": total_chars,
+        "reason_limit_chars": DIAGNOSTIC_LIMIT_CHARS,
+    }
+
+
+def redact_diagnostic(text: str) -> str:
+    for secret in sorted((value for value in DIAGNOSTIC_SECRETS if value), key=len, reverse=True):
+        text = text.replace(secret, "[REDACTED]")
+    text = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}\b", "[REDACTED]", text)
+    return re.sub(
+        r"\bBearer\s+[A-Za-z0-9._~+/=\-]{12,}\b",
+        "Bearer [REDACTED]",
+        text,
+        flags=re.IGNORECASE,
+    )
 
 
 def dspy_history_len() -> int:
