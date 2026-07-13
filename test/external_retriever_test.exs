@@ -1,12 +1,22 @@
 defmodule ExternalRetrieverTest do
   use ExUnit.Case
 
+  setup do
+    Process.register(self(), __MODULE__.TransportOwner)
+    :ok
+  end
+
   defmodule WeaviateTransport do
     @behaviour DSEx.HTTP
 
     @impl true
     def post(url, headers, body, _opts) do
-      send(self(), {:weaviate_request, url, headers, Jason.decode!(body)})
+      send(ExternalRetrieverTest.TransportOwner, {
+        :weaviate_request,
+        url,
+        headers,
+        Jason.decode!(body)
+      })
 
       response = %{
         data: %{
@@ -27,7 +37,12 @@ defmodule ExternalRetrieverTest do
 
     @impl true
     def post(url, headers, body, _opts) do
-      send(self(), {:databricks_request, url, headers, Jason.decode!(body)})
+      send(ExternalRetrieverTest.TransportOwner, {
+        :databricks_request,
+        url,
+        headers,
+        Jason.decode!(body)
+      })
 
       response = %{
         manifest: %{columns: [%{name: "text"}, %{name: "score"}, %{name: "doc_id"}]},
@@ -126,7 +141,7 @@ defmodule ExternalRetrieverTest do
     assert {"authorization", "Bearer dbc-token"} in headers
     assert body["query_text"] == "capital France"
     assert body["num_results"] == 1
-    assert_received {^ref, [:dsex, :retriever, :start], _, %{query: "capital France"}}
+    assert_received {^ref, [:dsex, :retriever, :start], _, %{retriever: DSEx.Retrievers.HTTP}}
 
     assert_received {^ref, [:dsex, :retriever, :stop], %{duration: duration}, %{result: :ok}}
 
@@ -352,7 +367,7 @@ defmodule ExternalRetrieverTest do
     bad_transport =
       DSEx.Retrievers.HTTP.new("https://retriever.example/search", transport: RaisingTransport)
 
-    assert {:error, {:retriever_transport_failed, "retriever transport exploded"}} =
+    assert {:error, {:retriever_http_failed, {:transport, "retriever transport exploded"}, 1}} =
              DSEx.Retrieve.retrieve(bad_transport, "capital France")
 
     invalid_json =
@@ -370,7 +385,8 @@ defmodule ExternalRetrieverTest do
         transport: InvalidShapeTransport
       )
 
-    assert {:error, {:invalid_retriever_transport_response, :not_an_http_response}} =
+    assert {:error,
+            {:retriever_http_failed, {:invalid_transport_response, :not_an_http_response}, 1}} =
              DSEx.Retrieve.retrieve(invalid_shape, "capital France")
 
     bad_mapper =

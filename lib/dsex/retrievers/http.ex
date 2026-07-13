@@ -26,15 +26,31 @@ defmodule DSEx.Retrievers.HTTP do
     headers: [],
     body_builder: nil,
     response_mapper: nil,
-    method: :post
+    method: :post,
+    max_attempts: 3,
+    attempt_timeout: 15_000,
+    total_timeout: 45_000,
+    retry_statuses: [429, 500, 502, 503, 504],
+    retry_backoff_ms: 100,
+    max_retry_delay_ms: 5_000,
+    sleep_fun: nil
   ]
+
+  @default_retry_statuses [429, 500, 502, 503, 504]
 
   @option_schema [
     transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     headers: [type: {:list, {:tuple, [:any, :any]}}],
     body_builder: [type: {:fun, 2}],
     response_mapper: [type: {:fun, 1}],
-    method: [type: :atom]
+    method: [type: :atom],
+    max_attempts: [type: :pos_integer],
+    attempt_timeout: [type: :pos_integer],
+    total_timeout: [type: :pos_integer],
+    retry_statuses: [type: {:custom, __MODULE__, :validate_retry_statuses, []}],
+    retry_backoff_ms: [type: {:custom, __MODULE__, :validate_retry_backoff, []}],
+    max_retry_delay_ms: [type: :non_neg_integer],
+    sleep_fun: [type: {:fun, 1}]
   ]
 
   def new(url, opts \\ []) do
@@ -47,9 +63,33 @@ defmodule DSEx.Retrievers.HTTP do
       headers: Keyword.get(opts, :headers, []),
       body_builder: Keyword.get(opts, :body_builder, &default_body/2),
       response_mapper: Keyword.get(opts, :response_mapper, &default_mapper/1),
-      method: Keyword.get(opts, :method, :post)
+      method: Keyword.get(opts, :method, :post),
+      max_attempts: Keyword.get(opts, :max_attempts, 3),
+      attempt_timeout: Keyword.get(opts, :attempt_timeout, 15_000),
+      total_timeout: Keyword.get(opts, :total_timeout, 45_000),
+      retry_statuses: Keyword.get(opts, :retry_statuses, @default_retry_statuses),
+      retry_backoff_ms: Keyword.get(opts, :retry_backoff_ms, 100),
+      max_retry_delay_ms: Keyword.get(opts, :max_retry_delay_ms, 5_000),
+      sleep_fun: Keyword.get(opts, :sleep_fun, &Process.sleep/1)
     }
   end
+
+  def validate_retry_statuses(statuses) when is_list(statuses) do
+    if Enum.all?(statuses, &(&1 in [429, 500, 502, 503, 504])) do
+      {:ok, Enum.uniq(statuses)}
+    else
+      {:error, "expected a list containing only 429, 500, 502, 503, or 504"}
+    end
+  end
+
+  def validate_retry_statuses(_statuses),
+    do: {:error, "expected a list containing only 429, 500, 502, 503, or 504"}
+
+  def validate_retry_backoff(value) when is_integer(value) and value >= 0, do: {:ok, value}
+  def validate_retry_backoff(value) when is_function(value, 1), do: {:ok, value}
+
+  def validate_retry_backoff(_value),
+    do: {:error, "expected a non-negative integer or an arity-1 function"}
 
   @impl true
   def retrieve(retriever, query, opts \\ [])
@@ -59,18 +99,21 @@ defmodule DSEx.Retrievers.HTTP do
   end
 
   def retrieve(%__MODULE__{} = retriever, query, opts) do
-    DSEx.Telemetry.span([:dsex, :retriever], %{url: retriever.url, query: query}, fn ->
-      submit_retrieval(retriever, query, opts)
-    end)
+    DSEx.Telemetry.span(
+      [:dsex, :retriever],
+      %{retriever: __MODULE__, method: retriever.method},
+      fn ->
+        submit_retrieval(retriever, query, opts)
+      end
+    )
   end
 
   defp submit_retrieval(%__MODULE__{} = retriever, query, opts) do
     with {:ok, body} <- build_body(retriever, query, opts),
-         headers <- [{"content-type", "application/json"} | retriever.headers],
+         headers <- request_headers(retriever),
          {:ok, response} <- post_retrieval(retriever, headers, body, opts),
-         {:ok, decoded} <- decode_response(response),
-         {:ok, docs} <- map_response(retriever, decoded) do
-      {:ok, docs}
+         {:ok, decoded} <- decode_response(response) do
+      map_response(retriever, decoded)
     end
   end
 
@@ -84,27 +127,210 @@ defmodule DSEx.Retrievers.HTTP do
   end
 
   defp post_retrieval(retriever, headers, body, opts) do
-    case DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, opts) do
-      {:ok, %{status: status, body: response}} when status in 200..299 ->
-        {:ok, response}
-
-      {:ok, %{status: status, body: response}} ->
-        {:error, {:http_error, status, response}}
-
-      {:error, {:http_transport_failed, _transport, reason}} ->
-        {:error, {:retriever_transport_failed, reason}}
-
-      {:error, reason} ->
-        {:error, reason}
-
-      other ->
-        {:error, {:invalid_retriever_transport_response, other}}
-    end
-  rescue
-    error -> {:error, {:retriever_transport_failed, Exception.message(error)}}
-  catch
-    kind, reason -> {:error, {:retriever_transport_failed, inspect({kind, reason})}}
+    deadline = now_ms() + retriever.total_timeout
+    do_post_retrieval(retriever, headers, body, opts, deadline, 1)
   end
+
+  defp do_post_retrieval(retriever, headers, body, opts, deadline, attempt) do
+    remaining = deadline - now_ms()
+
+    if remaining <= 0 do
+      {:error, {:retriever_http_failed, :total_timeout, attempt - 1}}
+    else
+      timeout = min(effective_attempt_timeout(retriever, opts), remaining)
+      attempt_opts = Keyword.put(opts, :timeout, timeout)
+      started = System.monotonic_time()
+
+      result =
+        run_attempt(timeout, fn ->
+          DSEx.HTTP.post(retriever.transport, retriever.url, headers, body, attempt_opts)
+        end)
+
+      outcome = classify_attempt(result, retriever.retry_statuses)
+      emit_attempt(retriever, attempt, started, outcome)
+
+      case outcome do
+        {:ok, response} ->
+          {:ok, response.body}
+
+        {:error, reason, false, _headers} ->
+          {:error, {:retriever_http_failed, reason, attempt}}
+
+        {:error, _reason, true, response_headers} when attempt < retriever.max_attempts ->
+          delay = retry_delay(retriever, attempt, response_headers)
+          sleep = min(delay, max(deadline - now_ms(), 0))
+          retriever.sleep_fun.(sleep)
+          do_post_retrieval(retriever, headers, body, opts, deadline, attempt + 1)
+
+        {:error, reason, true, _headers} ->
+          {:error, {:retriever_http_failed, reason, attempt}}
+      end
+    end
+  end
+
+  defp run_attempt(timeout, fun) do
+    task = Task.async(fun)
+
+    case Task.yield(task, timeout) do
+      {:ok, result} ->
+        result
+
+      {:exit, reason} ->
+        {:error, {:attempt_exit, reason}}
+
+      nil ->
+        Task.shutdown(task, :brutal_kill)
+        {:error, :attempt_timeout}
+    end
+  end
+
+  defp classify_attempt({:ok, %{status: status, body: body} = response}, _retry_statuses)
+       when status in 200..299 and is_binary(body),
+       do: {:ok, response}
+
+  defp classify_attempt({:ok, %{status: status} = response}, retry_statuses)
+       when is_integer(status),
+       do: {:error, {:status, status}, status in retry_statuses, Map.get(response, :headers, [])}
+
+  defp classify_attempt({:error, :attempt_timeout}, _retry_statuses),
+    do: {:error, :attempt_timeout, true, []}
+
+  defp classify_attempt(
+         {:error, {:http_transport_failed, _transport, reason}},
+         _retry_statuses
+       ),
+       do: {:error, {:transport, reason}, retryable_transport?(reason), []}
+
+  defp classify_attempt({:error, reason}, _retry_statuses),
+    do: {:error, {:transport, reason}, retryable_transport?(reason), []}
+
+  defp classify_attempt(other, _retry_statuses),
+    do: {:error, {:invalid_transport_response, other}, false, []}
+
+  defp emit_attempt(retriever, attempt, started, outcome) do
+    {outcome_name, status} = telemetry_outcome(outcome)
+
+    metadata = %{
+      attempt: attempt,
+      max_attempts: retriever.max_attempts,
+      outcome: outcome_name
+    }
+
+    metadata = if status, do: Map.put(metadata, :status, status), else: metadata
+
+    DSEx.Telemetry.execute(
+      [:dsex, :retriever, :http, :attempt],
+      %{duration: System.monotonic_time() - started},
+      metadata
+    )
+  end
+
+  defp telemetry_outcome({:ok, _response}), do: {:ok, nil}
+  defp telemetry_outcome({:error, {:status, status}, true, _}), do: {:retryable_status, status}
+  defp telemetry_outcome({:error, {:status, status}, false, _}), do: {:status_error, status}
+  defp telemetry_outcome({:error, :attempt_timeout, _, _}), do: {:timeout, nil}
+  defp telemetry_outcome({:error, {:transport, _}, _, _}), do: {:transport_error, nil}
+  defp telemetry_outcome({:error, _, _, _}), do: {:invalid_response, nil}
+
+  defp retryable_transport?(reason)
+       when reason in [
+              :timeout,
+              :connect_timeout,
+              :closed,
+              :socket_closed_remotely,
+              :econnrefused,
+              :enetunreach,
+              :ehostunreach,
+              :nxdomain
+            ],
+       do: true
+
+  defp retryable_transport?({:failed_connect, _details}), do: true
+  defp retryable_transport?({:shutdown, _reason}), do: true
+  defp retryable_transport?(_reason), do: false
+
+  defp retry_delay(retriever, attempt, headers) do
+    backoff = retry_backoff(retriever.retry_backoff_ms, attempt)
+    retry_after = retry_after_ms(headers)
+
+    max(backoff, retry_after)
+    |> min(retriever.max_retry_delay_ms)
+  end
+
+  defp retry_backoff(backoff, attempt) when is_function(backoff, 1) do
+    case backoff.(attempt) do
+      value when is_integer(value) and value >= 0 ->
+        value
+
+      value ->
+        raise ArgumentError, "retry backoff function returned invalid delay: #{inspect(value)}"
+    end
+  end
+
+  defp retry_backoff(backoff, attempt), do: backoff * Integer.pow(2, attempt - 1)
+
+  defp retry_after_ms(headers) do
+    headers
+    |> Enum.find_value(fn
+      {key, value} ->
+        if String.downcase(to_string(key)) == "retry-after", do: to_string(value)
+
+      _other ->
+        nil
+    end)
+    |> parse_retry_after()
+  end
+
+  defp parse_retry_after(nil), do: 0
+
+  defp parse_retry_after(value) do
+    case Integer.parse(String.trim(value)) do
+      {seconds, ""} when seconds >= 0 -> seconds * 1_000
+      _other -> retry_after_date_ms(value)
+    end
+  end
+
+  defp retry_after_date_ms(value) do
+    target = value |> String.to_charlist() |> :httpd_util.convert_request_date()
+    target_seconds = :calendar.datetime_to_gregorian_seconds(target)
+    now_seconds = :calendar.datetime_to_gregorian_seconds(:calendar.universal_time())
+    max(target_seconds - now_seconds, 0) * 1_000
+  rescue
+    _error -> 0
+  catch
+    _kind, _reason -> 0
+  end
+
+  defp request_headers(retriever) do
+    headers = [{"content-type", "application/json"} | retriever.headers]
+
+    if retriever.max_attempts > 1 and not header?(headers, "idempotency-key") do
+      [{"idempotency-key", request_id()} | headers]
+    else
+      headers
+    end
+  end
+
+  defp header?(headers, expected) do
+    Enum.any?(headers, fn
+      {key, _value} -> String.downcase(to_string(key)) == expected
+      _other -> false
+    end)
+  end
+
+  defp request_id do
+    suffix = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+    "dsex-retrieval-#{suffix}"
+  end
+
+  defp effective_attempt_timeout(retriever, opts) do
+    case Keyword.get(opts, :timeout, retriever.attempt_timeout) do
+      timeout when is_integer(timeout) and timeout > 0 -> min(timeout, retriever.attempt_timeout)
+      _invalid -> retriever.attempt_timeout
+    end
+  end
+
+  defp now_ms, do: System.monotonic_time(:millisecond)
 
   defp decode_response(response) do
     case Jason.decode(response) do
