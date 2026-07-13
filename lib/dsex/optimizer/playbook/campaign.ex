@@ -287,7 +287,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       )
 
     signature
-    |> DSEx.predict(
+    |> DSEx.chain_of_thought(
       lm: lm,
       adapter: DSEx.Adapter.JSON,
       config: [native_json_schema: true]

@@ -1,0 +1,983 @@
+{
+  "authorities": {
+    "ace": {
+      "commit": "bcb7cea0504afad6f55fec4845dd4864c9f9eee7",
+      "curator_sha256": "863aa928b28538ded4b86ed330ce40c6012f6ca215f94618bef0615fb4de281b",
+      "paper": "arXiv:2510.04618",
+      "paper_pdf_sha256": "51050ced82df75c143b151262d5af8763916968ca50374bd8ff778f40552b0ad",
+      "reflector_sha256": "fe5ae8fb006fd16fdef7b8e7ad38dc746195a4bf0a366a82e69c473c9982b811",
+      "repository": "https://github.com/ace-agent/ace"
+    },
+    "dynamic_cheatsheet": {
+      "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+      "paper": "arXiv:2504.07952",
+      "paper_pdf_sha256": "660680ecc5cdb8f4d921e1284bf95df2dfa9020c5923330e406fff9b93bcfd00",
+      "repository": "https://github.com/suzgunmirac/dynamic-cheatsheet"
+    },
+    "model_pricing": {
+      "input_usd_per_million": 0.4,
+      "output_usd_per_million": 1.6,
+      "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+    }
+  },
+  "budget": {
+    "active_reservations": 0,
+    "exhausted": null,
+    "limits": {
+      "input_tokens": 152000,
+      "output_tokens": 5632,
+      "requests": 57,
+      "usd": 0.0698112
+    },
+    "pricing": {
+      "input_per_million": 0.4,
+      "output_per_million": 1.6
+    },
+    "requests": 57,
+    "reserved": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0
+    },
+    "usage": {
+      "input_tokens": 21069,
+      "output_tokens": 1022,
+      "usd": 0.010062000000000003
+    }
+  },
+  "checkpoint": {
+    "path": "benchmarks/results/playbook-checkpoint-live-v2.json",
+    "payload_sha256": "b620e07fafc6345f69c1bb999017de3758eaaa71e8cd2d673ea2583f582cf1ed"
+  },
+  "claims": {
+    "ace_exact_parity": false,
+    "bounded_no_context_growth": true,
+    "durable_natural_heldout_lift": false,
+    "dynamic_cheatsheet_exact_parity": false
+  },
+  "dataset": {
+    "builder": {
+      "path": "benchmarks/data/playbook/build_dataset.py",
+      "sha256": "e92fa3ef1ca8abf031a12787bc3ecae9e9c5a4d82c71b340b4131f88ad9430d2"
+    },
+    "materialized": {
+      "path": "benchmarks/data/playbook/math-equation-balancer.jsonl",
+      "rows": 250,
+      "sha256": "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+    },
+    "schema_version": 1,
+    "source": {
+      "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+      "path": "data/MathEquationBalancer/data-00000-of-00001.arrow",
+      "repository": "https://github.com/suzgunmirac/dynamic-cheatsheet",
+      "sha256": "4f7a605807efb3b2b5e739f39032d4e9bb5026e57ca3c8d45a3e99a861c3e5e2"
+    }
+  },
+  "evidence_tier": "live_source_group_disjoint_natural_playbook_campaign",
+  "generated_at": "2026-07-13T23:55:26Z",
+  "implementation": {
+    "campaign_module": "DSEx.Optimizer.Playbook.Campaign",
+    "git_commit": "1492b73b69c4e17aa3c350197ca5fe6ddd86c31b",
+    "optimizer_module": "DSEx.Optimizer.Playbook"
+  },
+  "limitations": [
+    "This is one bounded equation-balancing campaign, not a cross-domain effectiveness claim.",
+    "The same pinned model proposes and executes the strategy; the two held-out splits prevent example reuse but do not prove causal mechanism isolation.",
+    "DSEx adopts the incremental playbook idea while intentionally using typed atomic deltas and held-out promotion rather than reproducing upstream string rewriting."
+  ],
+  "model": "openai:gpt-4.1-mini-2025-04-14",
+  "outcome": {
+    "baseline_retained_bytes": 1098,
+    "candidate_retained_bytes": 718,
+    "context_growth_bytes": -380,
+    "growth_gate_passed": true,
+    "heldout_content_and_provenance_gate_passed": true,
+    "persistence_reloaded_for_audit": true,
+    "promoted": false,
+    "rejection_reasons": [
+      "{:promotion_lift_below_threshold, 0.0, 0.01}",
+      "{:audit_lift_below_threshold, 0.0, 0.01}"
+    ],
+    "scores": {
+      "baseline_audit": 0.25,
+      "baseline_promotion": 0.5,
+      "candidate_audit": 0.25,
+      "candidate_promotion": 0.5
+    }
+  },
+  "playbooks": {
+    "baseline": {
+      "entries": [
+        {
+          "content": "Complete each equation by replacing every question mark with one arithmetic operator. Keep the given numbers in their original order, use ordinary operator precedence, and return only one completed equation with the stated right-hand value. Work carefully and check that the expression is valid before answering. Do not add numbers, omit numbers, reorder numbers, or introduce parentheses.\n\nTreat the right-hand side as a hard arithmetic constraint. Every placeholder must become exactly one operator from addition, subtraction, multiplication, or division. Preserve every printed integer and the equality sign exactly. Before returning, independently recompute the complete left-hand expression under standard precedence and compare it with the requested value. If the check fails, reconsider the operator choices rather than changing the numbers or output format. The final response must contain the equation alone, without explanation, markdown, alternatives, or intermediate work.",
+          "harmful": 0,
+          "hash": "36df3bfc4096f4a0e56446ed2c42550feabeb4e7ebe43e01b087c8566e785030",
+          "helpful": 0,
+          "id": "equation-strategy",
+          "parent_hash": null,
+          "provenance": {
+            "digests": [
+              "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+            ],
+            "source_ids": [
+              "dynamic-cheatsheet:task-contract"
+            ]
+          },
+          "revision": 1,
+          "section": "Equation balancing",
+          "status": "active"
+        }
+      ],
+      "hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "id": "dynamic-cheatsheet-equation-balancer",
+      "parent_hash": "b538adbda5bf8c35c37a16bdfd9bed441b7c9a644873fbff41fca83b06dfd521",
+      "policy": {
+        "max_counter": 1000000,
+        "max_entries": 8,
+        "max_entry_bytes": 1024,
+        "max_operations": 4,
+        "max_playbook_bytes": 8192,
+        "max_provenance_items": 64,
+        "max_section_bytes": 128,
+        "max_source_id_bytes": 128,
+        "max_tombstones": 16,
+        "reject_secrets": true
+      },
+      "revision": 1,
+      "schema_version": 2,
+      "tombstones": []
+    },
+    "candidate": {
+      "entries": [
+        {
+          "content": "Enumerate every possible combination of operators (+, -, *, /) for each question mark exhaustively. Evaluate each generated expression strictly according to standard operator precedence without adding parentheses. Return only the equation whose evaluated left side exactly matches the target right side, ensuring all numbers remain in original order and no numbers are added or reordered.",
+          "harmful": 0,
+          "hash": "f6f4bd22fa1a1acaa924efc1cbbf4edec311bd11a48aa1b3da6549d8f9e08147",
+          "helpful": 0,
+          "id": "equation-strategy",
+          "parent_hash": "36df3bfc4096f4a0e56446ed2c42550feabeb4e7ebe43e01b087c8566e785030",
+          "provenance": {
+            "digests": [
+              "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+            ],
+            "source_ids": [
+              "dynamic-cheatsheet:equation:017",
+              "dynamic-cheatsheet:equation:041",
+              "dynamic-cheatsheet:equation:062",
+              "dynamic-cheatsheet:equation:083",
+              "dynamic-cheatsheet:equation:084",
+              "dynamic-cheatsheet:equation:105",
+              "dynamic-cheatsheet:equation:108",
+              "dynamic-cheatsheet:equation:136"
+            ]
+          },
+          "revision": 2,
+          "section": "Equation balancing",
+          "status": "active"
+        }
+      ],
+      "hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "id": "dynamic-cheatsheet-equation-balancer",
+      "parent_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "policy": {
+        "max_counter": 1000000,
+        "max_entries": 8,
+        "max_entry_bytes": 1024,
+        "max_operations": 4,
+        "max_playbook_bytes": 8192,
+        "max_provenance_items": 64,
+        "max_section_bytes": 128,
+        "max_source_id_bytes": 128,
+        "max_tombstones": 16,
+        "reject_secrets": true
+      },
+      "revision": 2,
+      "schema_version": 2,
+      "tombstones": []
+    },
+    "selected_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee"
+  },
+  "rows": [
+    {
+      "answer": "3 - 4 * 25 = -13",
+      "duration_us": 1034904,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "3 * 4 - 25 = -13",
+        "valid": false
+      },
+      "id": "dc-equation-179",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "19 - 23 * 13 - 11 = -291",
+      "duration_us": 1052249,
+      "feedback": {
+        "reason": null,
+        "reference": "19 - 23 * 13 - 11 = -291",
+        "valid": true
+      },
+      "id": "dc-equation-029",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "6 + 2 * 9 = 24",
+      "duration_us": 880318,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "6 - 2 + 9 = 13",
+        "valid": false
+      },
+      "id": "dc-equation-034",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "4 - 22 / 13 * 12 = 1",
+      "duration_us": 3082438,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "4 + 22 - 13 - 12 = 1",
+        "valid": false
+      },
+      "id": "dc-equation-189",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "13 + 3 * 6 = 26",
+      "duration_us": 1081996,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "13 / 3 * 6 = 26",
+        "valid": false
+      },
+      "id": "dc-equation-150",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "14 + 24 / 1 - 7 * 28 = 58",
+      "duration_us": 987624,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "14 + 24 - 1 - 7 + 28 = 58",
+        "valid": false
+      },
+      "id": "dc-equation-120",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "1 + 5 - 8 * 3 / 7 = -8",
+      "duration_us": 1197450,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "1 * 5 + 8 - 3 * 7 = -8",
+        "valid": false
+      },
+      "id": "dc-equation-052",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "3 - 21 * 1 = -18",
+      "duration_us": 881670,
+      "feedback": {
+        "reason": null,
+        "reference": "3 - 21 / 1 = -18",
+        "valid": true
+      },
+      "id": "dc-equation-019",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "8 + 26 / 4 - 6 = -20",
+      "duration_us": 910243,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "8 - 26 + 4 - 6 = -20",
+        "valid": false
+      },
+      "id": "dc-equation-234",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "6 * 5 * 2 = 60",
+      "duration_us": 940605,
+      "feedback": {
+        "reason": null,
+        "reference": "6 * 5 * 2 = 60",
+        "valid": true
+      },
+      "id": "dc-equation-191",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "3 + 15 * 22 * 27 + 14 = 124743",
+      "duration_us": 769497,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "3 + 15 * 22 * 27 * 14 = 124743",
+        "valid": false
+      },
+      "id": "dc-equation-098",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "27 * 17 - 11 * 4 + 24 = 498",
+      "duration_us": 1507673,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "27 * 17 + 11 + 4 + 24 = 498",
+        "valid": false
+      },
+      "id": "dc-equation-081",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_audit"
+    },
+    {
+      "answer": "17 - 23 + 24 = 18",
+      "duration_us": 838587,
+      "feedback": {
+        "reason": null,
+        "reference": "17 - 23 + 24 = 18",
+        "valid": true
+      },
+      "id": "dc-equation-232",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "13 - 16 + 9 / 19 = 1",
+      "duration_us": 1042512,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "13 + 16 - 9 - 19 = 1",
+        "valid": false
+      },
+      "id": "dc-equation-046",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "19 - 8 * 28 = -205",
+      "duration_us": 2212211,
+      "feedback": {
+        "reason": null,
+        "reference": "19 - 8 * 28 = -205",
+        "valid": true
+      },
+      "id": "dc-equation-093",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "7 * 24 * 4 = 672",
+      "duration_us": 1045217,
+      "feedback": {
+        "reason": null,
+        "reference": "7 * 24 * 4 = 672",
+        "valid": true
+      },
+      "id": "dc-equation-004",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "15 - 18 / 2 * 24 = 81",
+      "duration_us": 1171235,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "15 + 18 + 2 * 24 = 81",
+        "valid": false
+      },
+      "id": "dc-equation-218",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "17 + 10 * 26 = 144",
+      "duration_us": 951342,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "17 * 10 - 26 = 144",
+        "valid": false
+      },
+      "id": "dc-equation-223",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "20 * 4 + 10 * 1 = 89",
+      "duration_us": 1056729,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "20 * 4 + 10 - 1 = 89",
+        "valid": false
+      },
+      "id": "dc-equation-087",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "18 * 11 - 19 = 179",
+      "duration_us": 1025351,
+      "feedback": {
+        "reason": null,
+        "reference": "18 * 11 - 19 = 179",
+        "valid": true
+      },
+      "id": "dc-equation-040",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "12 / 2 - 22 = 2",
+      "duration_us": 935810,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "12 * 2 - 22 = 2",
+        "valid": false
+      },
+      "id": "dc-equation-155",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "21 * 11 + 3 = 234",
+      "duration_us": 941341,
+      "feedback": {
+        "reason": null,
+        "reference": "21 * 11 + 3 = 234",
+        "valid": true
+      },
+      "id": "dc-equation-092",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "26 - 28 * 24 = -646",
+      "duration_us": 962595,
+      "feedback": {
+        "reason": null,
+        "reference": "26 - 28 * 24 = -646",
+        "valid": true
+      },
+      "id": "dc-equation-031",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "1 + 23 - 16 - 25 * 20 = -38",
+      "duration_us": 1094857,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "1 * 23 - 16 - 25 - 20 = -38",
+        "valid": false
+      },
+      "id": "dc-equation-115",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "baseline_promotion"
+    },
+    {
+      "answer": "3 + 4 - 25 = -13",
+      "duration_us": 958135,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "3 * 4 - 25 = -13",
+        "valid": false
+      },
+      "id": "dc-equation-179",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "19 - 23 * 13 - 11 = -291",
+      "duration_us": 971321,
+      "feedback": {
+        "reason": null,
+        "reference": "19 - 23 * 13 - 11 = -291",
+        "valid": true
+      },
+      "id": "dc-equation-029",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "6 + 2 * 9 = 24",
+      "duration_us": 1030490,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "6 - 2 + 9 = 13",
+        "valid": false
+      },
+      "id": "dc-equation-034",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "4 * 22 / 13 / 12 = 1",
+      "duration_us": 1118995,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "4 + 22 - 13 - 12 = 1",
+        "valid": false
+      },
+      "id": "dc-equation-189",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "13 + 3 * 6 = 31",
+      "duration_us": 1502823,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "13 / 3 * 6 = 26",
+        "valid": false
+      },
+      "id": "dc-equation-150",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "14 - 24 + 1 * 7 + 28 = 58",
+      "duration_us": 1241287,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "14 + 24 - 1 - 7 + 28 = 58",
+        "valid": false
+      },
+      "id": "dc-equation-120",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "1 + 5 - 8 / 3 * 7 = -8",
+      "duration_us": 907327,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "1 * 5 + 8 - 3 * 7 = -8",
+        "valid": false
+      },
+      "id": "dc-equation-052",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "3 - 21 * 1 = -18",
+      "duration_us": 1035173,
+      "feedback": {
+        "reason": null,
+        "reference": "3 - 21 / 1 = -18",
+        "valid": true
+      },
+      "id": "dc-equation-019",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "8 - 26 + 4 * 6 = -20",
+      "duration_us": 1011278,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "8 - 26 + 4 - 6 = -20",
+        "valid": false
+      },
+      "id": "dc-equation-234",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "6 * 5 * 2 = 60",
+      "duration_us": 1204524,
+      "feedback": {
+        "reason": null,
+        "reference": "6 * 5 * 2 = 60",
+        "valid": true
+      },
+      "id": "dc-equation-191",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "3 * 15 * 22 * 27 - 14 = 124743",
+      "duration_us": 992511,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "3 + 15 * 22 * 27 * 14 = 124743",
+        "valid": false
+      },
+      "id": "dc-equation-098",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "27 * 17 - 11 + 4 * 24 = 498",
+      "duration_us": 945563,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "27 * 17 + 11 + 4 + 24 = 498",
+        "valid": false
+      },
+      "id": "dc-equation-081",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_audit"
+    },
+    {
+      "answer": "17 - 23 + 24 = 18",
+      "duration_us": 775278,
+      "feedback": {
+        "reason": null,
+        "reference": "17 - 23 + 24 = 18",
+        "valid": true
+      },
+      "id": "dc-equation-232",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "13 + 16 / 9 - 19 = 1",
+      "duration_us": 827791,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "13 + 16 - 9 - 19 = 1",
+        "valid": false
+      },
+      "id": "dc-equation-046",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "19 - 8 * 28 = -205",
+      "duration_us": 900281,
+      "feedback": {
+        "reason": null,
+        "reference": "19 - 8 * 28 = -205",
+        "valid": true
+      },
+      "id": "dc-equation-093",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "7 * 24 * 4 = 672",
+      "duration_us": 890015,
+      "feedback": {
+        "reason": null,
+        "reference": "7 * 24 * 4 = 672",
+        "valid": true
+      },
+      "id": "dc-equation-004",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "15 - 18 + 2 * 24 = 81",
+      "duration_us": 846076,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "15 + 18 + 2 * 24 = 81",
+        "valid": false
+      },
+      "id": "dc-equation-218",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "17 + 10 * 26 = 144",
+      "duration_us": 922447,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "17 * 10 - 26 = 144",
+        "valid": false
+      },
+      "id": "dc-equation-223",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "20 * 4 + 10 * 1 = 89",
+      "duration_us": 977815,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "20 * 4 + 10 - 1 = 89",
+        "valid": false
+      },
+      "id": "dc-equation-087",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "18 * 11 - 19 = 179",
+      "duration_us": 952133,
+      "feedback": {
+        "reason": null,
+        "reference": "18 * 11 - 19 = 179",
+        "valid": true
+      },
+      "id": "dc-equation-040",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "12 / 2 - 22 = 2",
+      "duration_us": 1017524,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "12 * 2 - 22 = 2",
+        "valid": false
+      },
+      "id": "dc-equation-155",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "21 * 11 + 3 = 234",
+      "duration_us": 852108,
+      "feedback": {
+        "reason": null,
+        "reference": "21 * 11 + 3 = 234",
+        "valid": true
+      },
+      "id": "dc-equation-092",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "26 - 28 * 24 = -646",
+      "duration_us": 1246529,
+      "feedback": {
+        "reason": null,
+        "reference": "26 - 28 * 24 = -646",
+        "valid": true
+      },
+      "id": "dc-equation-031",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 1.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "1 + 23 - 16 * 25 / 20 = -38",
+      "duration_us": 1049838,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "1 * 23 - 16 - 25 - 20 = -38",
+        "valid": false
+      },
+      "id": "dc-equation-115",
+      "playbook_hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+      "score": 0.0,
+      "stage": "candidate_promotion"
+    },
+    {
+      "answer": "28 - 7 * 23 = -133",
+      "duration_us": 1306832,
+      "feedback": {
+        "reason": null,
+        "reference": "28 - 7 * 23 = -133",
+        "valid": true
+      },
+      "id": "dc-equation-108",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "10 + 26 - 29 + 23 * 6 = 151",
+      "duration_us": 1054470,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "10 - 26 + 29 + 23 * 6 = 151",
+        "valid": false
+      },
+      "id": "dc-equation-017",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "18 - 13 + 9 = 14",
+      "duration_us": 1223643,
+      "feedback": {
+        "reason": null,
+        "reference": "18 - 13 + 9 = 14",
+        "valid": true
+      },
+      "id": "dc-equation-041",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "23 - 1 - 10 = 13",
+      "duration_us": 982695,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "23 - 1 * 10 = 13",
+        "valid": false
+      },
+      "id": "dc-equation-083",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "10 - 6 * 21 = -5",
+      "duration_us": 1042493,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "10 + 6 - 21 = -5",
+        "valid": false
+      },
+      "id": "dc-equation-105",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "9 + 10 - 18 / 4 - 12 = -3",
+      "duration_us": 1085948,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "9 - 10 - 18 + 4 + 12 = -3",
+        "valid": false
+      },
+      "id": "dc-equation-062",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "26 - 3 * 1 = 23",
+      "duration_us": 946267,
+      "feedback": {
+        "reason": null,
+        "reference": "26 - 3 / 1 = 23",
+        "valid": true
+      },
+      "id": "dc-equation-084",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 1.0,
+      "stage": "training_evaluation"
+    },
+    {
+      "answer": "26 - 14 / 7 * 6 = 13",
+      "duration_us": 970948,
+      "feedback": {
+        "reason": "{:error, :equation_mismatch}",
+        "reference": "26 - 14 + 7 - 6 = 13",
+        "valid": false
+      },
+      "id": "dc-equation-136",
+      "playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "score": 0.0,
+      "stage": "training_evaluation"
+    }
+  ],
+  "schema_version": 1,
+  "splits": {
+    "audit_ids": [
+      "dc-equation-179",
+      "dc-equation-029",
+      "dc-equation-034",
+      "dc-equation-189",
+      "dc-equation-150",
+      "dc-equation-120",
+      "dc-equation-052",
+      "dc-equation-019",
+      "dc-equation-234",
+      "dc-equation-191",
+      "dc-equation-098",
+      "dc-equation-081"
+    ],
+    "promotion_ids": [
+      "dc-equation-232",
+      "dc-equation-046",
+      "dc-equation-093",
+      "dc-equation-004",
+      "dc-equation-218",
+      "dc-equation-223",
+      "dc-equation-087",
+      "dc-equation-040",
+      "dc-equation-155",
+      "dc-equation-092",
+      "dc-equation-031",
+      "dc-equation-115"
+    ],
+    "seed": 55,
+    "source_group_disjoint": true,
+    "train_ids": [
+      "dc-equation-108",
+      "dc-equation-017",
+      "dc-equation-041",
+      "dc-equation-083",
+      "dc-equation-105",
+      "dc-equation-062",
+      "dc-equation-084",
+      "dc-equation-136"
+    ]
+  },
+  "usage": {
+    "authority": "derived",
+    "cost_usd": 0.0100628,
+    "input_tokens": 21069,
+    "models": [
+      "openai:gpt-4.1-mini-2025-04-14"
+    ],
+    "output_tokens": 1022,
+    "requests": 57
+  }
+}

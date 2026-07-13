@@ -1,0 +1,3973 @@
+{
+  "payload": {
+    "identity": {
+      "baseline_playbook_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+      "budget": {
+        "authority": "derived",
+        "cost_usd": 0.0698112,
+        "input_tokens": 152000,
+        "models": [
+          "openai:gpt-4.1-mini-2025-04-14"
+        ],
+        "output_tokens": 5632,
+        "requests": 57
+      },
+      "max_growth_bytes": 0,
+      "max_growth_ratio": 1.0,
+      "min_lift": 0.01,
+      "optimizer": "dsex_playbook_optimizer",
+      "parameter": {
+        "type": "atom",
+        "value": "playbook"
+      },
+      "reservations": {
+        "baseline_audit": {
+          "authority": "derived",
+          "cost_usd": 0.0138432,
+          "input_tokens": 30000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 1152,
+          "requests": 12
+        },
+        "baseline_promotion": {
+          "authority": "derived",
+          "cost_usd": 0.0138432,
+          "input_tokens": 30000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 1152,
+          "requests": 12
+        },
+        "candidate_audit": {
+          "authority": "derived",
+          "cost_usd": 0.0138432,
+          "input_tokens": 30000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 1152,
+          "requests": 12
+        },
+        "candidate_promotion": {
+          "authority": "derived",
+          "cost_usd": 0.0138432,
+          "input_tokens": 30000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 1152,
+          "requests": 12
+        },
+        "proposal": {
+          "authority": "derived",
+          "cost_usd": 0.0052096,
+          "input_tokens": 12000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 256,
+          "requests": 1
+        },
+        "training_evaluation": {
+          "authority": "derived",
+          "cost_usd": 0.0092288,
+          "input_tokens": 20000,
+          "models": [
+            "openai:gpt-4.1-mini-2025-04-14"
+          ],
+          "output_tokens": 768,
+          "requests": 8
+        }
+      },
+      "schema_version": 1,
+      "split_sha256": {
+        "audit": "7d3464b86e8d5fffcb143d3d6f42e3b60afff47005415c13c0f5470467f3613c",
+        "promotion": "74f64246f52c384259a1d98f9bfe47e9c48895d67bc15fb6a165811c1596a4ad",
+        "train": "0e65afbd16bc532a888a887c08092d6c8c99de45e309f7a803696c8fea8e8f9f"
+      }
+    },
+    "schema_version": 1,
+    "stage": "complete",
+    "state": {
+      "baseline_playbook": {
+        "entries": [
+          {
+            "content": "Complete each equation by replacing every question mark with one arithmetic operator. Keep the given numbers in their original order, use ordinary operator precedence, and return only one completed equation with the stated right-hand value. Work carefully and check that the expression is valid before answering. Do not add numbers, omit numbers, reorder numbers, or introduce parentheses.\n\nTreat the right-hand side as a hard arithmetic constraint. Every placeholder must become exactly one operator from addition, subtraction, multiplication, or division. Preserve every printed integer and the equality sign exactly. Before returning, independently recompute the complete left-hand expression under standard precedence and compare it with the requested value. If the check fails, reconsider the operator choices rather than changing the numbers or output format. The final response must contain the equation alone, without explanation, markdown, alternatives, or intermediate work.",
+            "harmful": 0,
+            "hash": "36df3bfc4096f4a0e56446ed2c42550feabeb4e7ebe43e01b087c8566e785030",
+            "helpful": 0,
+            "id": "equation-strategy",
+            "parent_hash": null,
+            "provenance": {
+              "digests": [
+                "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+              ],
+              "source_ids": [
+                "dynamic-cheatsheet:task-contract"
+              ]
+            },
+            "revision": 1,
+            "section": "Equation balancing",
+            "status": "active"
+          }
+        ],
+        "hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+        "id": "dynamic-cheatsheet-equation-balancer",
+        "parent_hash": "b538adbda5bf8c35c37a16bdfd9bed441b7c9a644873fbff41fca83b06dfd521",
+        "policy": {
+          "max_counter": 1000000,
+          "max_entries": 8,
+          "max_entry_bytes": 1024,
+          "max_operations": 4,
+          "max_playbook_bytes": 8192,
+          "max_provenance_items": 64,
+          "max_section_bytes": 128,
+          "max_source_id_bytes": 128,
+          "max_tombstones": 16,
+          "reject_secrets": true
+        },
+        "revision": 1,
+        "schema_version": 2,
+        "tombstones": []
+      },
+      "candidate_playbook": {
+        "entries": [
+          {
+            "content": "Enumerate every possible combination of operators (+, -, *, /) for each question mark exhaustively. Evaluate each generated expression strictly according to standard operator precedence without adding parentheses. Return only the equation whose evaluated left side exactly matches the target right side, ensuring all numbers remain in original order and no numbers are added or reordered.",
+            "harmful": 0,
+            "hash": "f6f4bd22fa1a1acaa924efc1cbbf4edec311bd11a48aa1b3da6549d8f9e08147",
+            "helpful": 0,
+            "id": "equation-strategy",
+            "parent_hash": "36df3bfc4096f4a0e56446ed2c42550feabeb4e7ebe43e01b087c8566e785030",
+            "provenance": {
+              "digests": [
+                "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+              ],
+              "source_ids": [
+                "dynamic-cheatsheet:equation:017",
+                "dynamic-cheatsheet:equation:041",
+                "dynamic-cheatsheet:equation:062",
+                "dynamic-cheatsheet:equation:083",
+                "dynamic-cheatsheet:equation:084",
+                "dynamic-cheatsheet:equation:105",
+                "dynamic-cheatsheet:equation:108",
+                "dynamic-cheatsheet:equation:136"
+              ]
+            },
+            "revision": 2,
+            "section": "Equation balancing",
+            "status": "active"
+          }
+        ],
+        "hash": "2120270da86bfa6bc546839ec83b8fd87a906c82bb18db6a484c0e490fa9015e",
+        "id": "dynamic-cheatsheet-equation-balancer",
+        "parent_hash": "6f71ba011126802b98275e41c46a5028093d2c9ff0ec7347c11062960bd5b7ee",
+        "policy": {
+          "max_counter": 1000000,
+          "max_entries": 8,
+          "max_entry_bytes": 1024,
+          "max_operations": 4,
+          "max_playbook_bytes": 8192,
+          "max_provenance_items": 64,
+          "max_section_bytes": 128,
+          "max_source_id_bytes": 128,
+          "max_tombstones": 16,
+          "reject_secrets": true
+        },
+        "revision": 2,
+        "schema_version": 2,
+        "tombstones": []
+      },
+      "promoted": false,
+      "rejection_reasons": [
+        "{:promotion_lift_below_threshold, 0.0, 0.01}",
+        "{:audit_lift_below_threshold, 0.0, 0.01}"
+      ],
+      "scores": {
+        "baseline_audit": 0.25,
+        "baseline_promotion": 0.5,
+        "candidate_audit": 0.25,
+        "candidate_promotion": 0.5
+      },
+      "trajectories": {
+        "baseline_audit": [
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:824ae411b2f04e092ce4",
+              "id": "dc-equation-179",
+              "source_id": "dynamic-cheatsheet:equation:179"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "3 * 4 - 25 = -13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 0,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 - 4 * 25 = -13"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1034904,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:7c2ed3702770752361e0",
+              "id": "dc-equation-029",
+              "source_id": "dynamic-cheatsheet:equation:029"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "19 - 23 * 13 - 11 = -291",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 1,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "19 - 23 * 13 - 11 = -291"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1052249,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:6c29b3bf46c3e8cf951f",
+              "id": "dc-equation-034",
+              "source_id": "dynamic-cheatsheet:equation:034"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "6 - 2 + 9 = 13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 2,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "6 + 2 * 9 = 24"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 880318,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:bc4afdcf13e50a558941",
+              "id": "dc-equation-189",
+              "source_id": "dynamic-cheatsheet:equation:189"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "4 + 22 - 13 - 12 = 1",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 3,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "4 - 22 / 13 * 12 = 1"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 3082438,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:6c28fa83a7074ff9a7dc",
+              "id": "dc-equation-150",
+              "source_id": "dynamic-cheatsheet:equation:150"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "13 / 3 * 6 = 26",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 4,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "13 + 3 * 6 = 26"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1081996,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:bbe479a18f5519c7d811",
+              "id": "dc-equation-120",
+              "source_id": "dynamic-cheatsheet:equation:120"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "14 + 24 - 1 - 7 + 28 = 58",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 5,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "14 + 24 / 1 - 7 * 28 = 58"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 987624,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:ec37ede383699578523e",
+              "id": "dc-equation-052",
+              "source_id": "dynamic-cheatsheet:equation:052"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "1 * 5 + 8 - 3 * 7 = -8",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 6,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "1 + 5 - 8 * 3 / 7 = -8"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1197450,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:ae1c95b31ba3ca897657",
+              "id": "dc-equation-019",
+              "source_id": "dynamic-cheatsheet:equation:019"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "3 - 21 / 1 = -18",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 7,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 - 21 * 1 = -18"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 881670,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:3d63a4b064effc06eff9",
+              "id": "dc-equation-234",
+              "source_id": "dynamic-cheatsheet:equation:234"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "8 - 26 + 4 - 6 = -20",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 8,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "8 + 26 / 4 - 6 = -20"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 910243,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:871ce531e3494a2c0b20",
+              "id": "dc-equation-191",
+              "source_id": "dynamic-cheatsheet:equation:191"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "6 * 5 * 2 = 60",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 9,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "6 * 5 * 2 = 60"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 940605,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:1f9b8f0619f3e58365fb",
+              "id": "dc-equation-098",
+              "source_id": "dynamic-cheatsheet:equation:098"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "3 + 15 * 22 * 27 * 14 = 124743",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 10,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 + 15 * 22 * 27 + 14 = 124743"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 769497,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:afdcf51154bbf71baa5a",
+              "id": "dc-equation-081",
+              "source_id": "dynamic-cheatsheet:equation:081"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "27 * 17 + 11 + 4 + 24 = 498",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 11,
+            "metadata": {
+              "stage_elapsed_us": 14326942
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "27 * 17 - 11 * 4 + 24 = 498"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1507673,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          }
+        ],
+        "baseline_promotion": [
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:73ca045dcb98ffee75d8",
+              "id": "dc-equation-232",
+              "source_id": "dynamic-cheatsheet:equation:232"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "17 - 23 + 24 = 18",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 0,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "17 - 23 + 24 = 18"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 838587,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:a69721a71592f199b36b",
+              "id": "dc-equation-046",
+              "source_id": "dynamic-cheatsheet:equation:046"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "13 + 16 - 9 - 19 = 1",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 1,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "13 - 16 + 9 / 19 = 1"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1042512,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:c437d3a68c5a03cb7242",
+              "id": "dc-equation-093",
+              "source_id": "dynamic-cheatsheet:equation:093"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "19 - 8 * 28 = -205",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 2,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "19 - 8 * 28 = -205"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 2212211,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:1a1fd02925c3aedd97cd",
+              "id": "dc-equation-004",
+              "source_id": "dynamic-cheatsheet:equation:004"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "7 * 24 * 4 = 672",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 3,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "7 * 24 * 4 = 672"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1045217,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:a82875d63dd9b85bbf01",
+              "id": "dc-equation-218",
+              "source_id": "dynamic-cheatsheet:equation:218"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "15 + 18 + 2 * 24 = 81",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 4,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "15 - 18 / 2 * 24 = 81"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1171235,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:4916e300f4ae492ee259",
+              "id": "dc-equation-223",
+              "source_id": "dynamic-cheatsheet:equation:223"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "17 * 10 - 26 = 144",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 5,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "17 + 10 * 26 = 144"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 951342,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:c200b6078c333297cef4",
+              "id": "dc-equation-087",
+              "source_id": "dynamic-cheatsheet:equation:087"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "20 * 4 + 10 - 1 = 89",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 6,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "20 * 4 + 10 * 1 = 89"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1056729,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:42bc959a48d023ec885b",
+              "id": "dc-equation-040",
+              "source_id": "dynamic-cheatsheet:equation:040"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "18 * 11 - 19 = 179",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 7,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "18 * 11 - 19 = 179"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1025351,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:4f7d0883275314fd3542",
+              "id": "dc-equation-155",
+              "source_id": "dynamic-cheatsheet:equation:155"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "12 * 2 - 22 = 2",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 8,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "12 / 2 - 22 = 2"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 935810,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:09b9c4e26a9f80667b1a",
+              "id": "dc-equation-092",
+              "source_id": "dynamic-cheatsheet:equation:092"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "21 * 11 + 3 = 234",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 9,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "21 * 11 + 3 = 234"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 941341,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:40c8337c4d90dad3d7e5",
+              "id": "dc-equation-031",
+              "source_id": "dynamic-cheatsheet:equation:031"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "26 - 28 * 24 = -646",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 10,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "26 - 28 * 24 = -646"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 962595,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:715c1cb6fd0cbf6177c7",
+              "id": "dc-equation-115",
+              "source_id": "dynamic-cheatsheet:equation:115"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "1 * 23 - 16 - 25 - 20 = -38",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 11,
+            "metadata": {
+              "stage_elapsed_us": 13278177
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "baseline_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "1 + 23 - 16 - 25 * 20 = -38"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1094857,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          }
+        ],
+        "candidate_audit": [
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:824ae411b2f04e092ce4",
+              "id": "dc-equation-179",
+              "source_id": "dynamic-cheatsheet:equation:179"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "3 * 4 - 25 = -13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 0,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 + 4 - 25 = -13"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 958135,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:7c2ed3702770752361e0",
+              "id": "dc-equation-029",
+              "source_id": "dynamic-cheatsheet:equation:029"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "19 - 23 * 13 - 11 = -291",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 1,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "19 - 23 * 13 - 11 = -291"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 971321,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:6c29b3bf46c3e8cf951f",
+              "id": "dc-equation-034",
+              "source_id": "dynamic-cheatsheet:equation:034"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "6 - 2 + 9 = 13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 2,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "6 + 2 * 9 = 24"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1030490,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:bc4afdcf13e50a558941",
+              "id": "dc-equation-189",
+              "source_id": "dynamic-cheatsheet:equation:189"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "4 + 22 - 13 - 12 = 1",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 3,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "4 * 22 / 13 / 12 = 1"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1118995,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:6c28fa83a7074ff9a7dc",
+              "id": "dc-equation-150",
+              "source_id": "dynamic-cheatsheet:equation:150"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "13 / 3 * 6 = 26",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 4,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "13 + 3 * 6 = 31"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1502823,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:bbe479a18f5519c7d811",
+              "id": "dc-equation-120",
+              "source_id": "dynamic-cheatsheet:equation:120"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "14 + 24 - 1 - 7 + 28 = 58",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 5,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "14 - 24 + 1 * 7 + 28 = 58"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1241287,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:ec37ede383699578523e",
+              "id": "dc-equation-052",
+              "source_id": "dynamic-cheatsheet:equation:052"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "1 * 5 + 8 - 3 * 7 = -8",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 6,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "1 + 5 - 8 / 3 * 7 = -8"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 907327,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:ae1c95b31ba3ca897657",
+              "id": "dc-equation-019",
+              "source_id": "dynamic-cheatsheet:equation:019"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "3 - 21 / 1 = -18",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 7,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 - 21 * 1 = -18"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1035173,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:3d63a4b064effc06eff9",
+              "id": "dc-equation-234",
+              "source_id": "dynamic-cheatsheet:equation:234"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "8 - 26 + 4 - 6 = -20",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 8,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "8 - 26 + 4 * 6 = -20"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1011278,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:871ce531e3494a2c0b20",
+              "id": "dc-equation-191",
+              "source_id": "dynamic-cheatsheet:equation:191"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "6 * 5 * 2 = 60",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 9,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "6 * 5 * 2 = 60"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1204524,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:1f9b8f0619f3e58365fb",
+              "id": "dc-equation-098",
+              "source_id": "dynamic-cheatsheet:equation:098"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "3 + 15 * 22 * 27 * 14 = 124743",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 10,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "3 * 15 * 22 * 27 - 14 = 124743"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 992511,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:afdcf51154bbf71baa5a",
+              "id": "dc-equation-081",
+              "source_id": "dynamic-cheatsheet:equation:081"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "27 * 17 + 11 + 4 + 24 = 498",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 11,
+            "metadata": {
+              "stage_elapsed_us": 12919707
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_audit"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "27 * 17 - 11 + 4 * 24 = 498"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 945563,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          }
+        ],
+        "candidate_promotion": [
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:73ca045dcb98ffee75d8",
+              "id": "dc-equation-232",
+              "source_id": "dynamic-cheatsheet:equation:232"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "17 - 23 + 24 = 18",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 0,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "17 - 23 + 24 = 18"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 775278,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:a69721a71592f199b36b",
+              "id": "dc-equation-046",
+              "source_id": "dynamic-cheatsheet:equation:046"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "13 + 16 - 9 - 19 = 1",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 1,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "13 + 16 / 9 - 19 = 1"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 827791,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:c437d3a68c5a03cb7242",
+              "id": "dc-equation-093",
+              "source_id": "dynamic-cheatsheet:equation:093"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "19 - 8 * 28 = -205",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 2,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "19 - 8 * 28 = -205"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 900281,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:1a1fd02925c3aedd97cd",
+              "id": "dc-equation-004",
+              "source_id": "dynamic-cheatsheet:equation:004"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "7 * 24 * 4 = 672",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 3,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "7 * 24 * 4 = 672"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 890015,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:a82875d63dd9b85bbf01",
+              "id": "dc-equation-218",
+              "source_id": "dynamic-cheatsheet:equation:218"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "15 + 18 + 2 * 24 = 81",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 4,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "15 - 18 + 2 * 24 = 81"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 846076,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:4916e300f4ae492ee259",
+              "id": "dc-equation-223",
+              "source_id": "dynamic-cheatsheet:equation:223"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "17 * 10 - 26 = 144",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 5,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "17 + 10 * 26 = 144"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 922447,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:c200b6078c333297cef4",
+              "id": "dc-equation-087",
+              "source_id": "dynamic-cheatsheet:equation:087"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "20 * 4 + 10 - 1 = 89",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 6,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "20 * 4 + 10 * 1 = 89"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 977815,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:42bc959a48d023ec885b",
+              "id": "dc-equation-040",
+              "source_id": "dynamic-cheatsheet:equation:040"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "18 * 11 - 19 = 179",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 7,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "18 * 11 - 19 = 179"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 952133,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:4f7d0883275314fd3542",
+              "id": "dc-equation-155",
+              "source_id": "dynamic-cheatsheet:equation:155"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "12 * 2 - 22 = 2",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 8,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "12 / 2 - 22 = 2"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1017524,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:09b9c4e26a9f80667b1a",
+              "id": "dc-equation-092",
+              "source_id": "dynamic-cheatsheet:equation:092"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "21 * 11 + 3 = 234",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 9,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "21 * 11 + 3 = 234"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 852108,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:40c8337c4d90dad3d7e5",
+              "id": "dc-equation-031",
+              "source_id": "dynamic-cheatsheet:equation:031"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "26 - 28 * 24 = -646",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 10,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "26 - 28 * 24 = -646"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1246529,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:715c1cb6fd0cbf6177c7",
+              "id": "dc-equation-115",
+              "source_id": "dynamic-cheatsheet:equation:115"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "1 * 23 - 16 - 25 - 20 = -38",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 11,
+            "metadata": {
+              "stage_elapsed_us": 11258106
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "candidate_promotion"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 2
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "1 + 23 - 16 * 25 / 20 = -38"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1049838,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          }
+        ],
+        "training_evaluation": [
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:941cc084c6988a34be71",
+              "id": "dc-equation-108",
+              "source_id": "dynamic-cheatsheet:equation:108"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "28 - 7 * 23 = -133",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 0,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "28 - 7 * 23 = -133"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1306832,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:8c9d23f67781384c6152",
+              "id": "dc-equation-017",
+              "source_id": "dynamic-cheatsheet:equation:017"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "10 - 26 + 29 + 23 * 6 = 151",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 1,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "10 + 26 - 29 + 23 * 6 = 151"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1054470,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:ceadee4cff2ce45553aa",
+              "id": "dc-equation-041",
+              "source_id": "dynamic-cheatsheet:equation:041"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "18 - 13 + 9 = 14",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 2,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "18 - 13 + 9 = 14"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 1223643,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:17925438ed8f575d9621",
+              "id": "dc-equation-083",
+              "source_id": "dynamic-cheatsheet:equation:083"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "23 - 1 * 10 = 13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 3,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "23 - 1 - 10 = 13"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 982695,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:c5cbb4ebb0bc5346607e",
+              "id": "dc-equation-105",
+              "source_id": "dynamic-cheatsheet:equation:105"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "10 + 6 - 21 = -5",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 4,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "10 - 6 * 21 = -5"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1042493,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:dd6d34b93d28f4d8c3ab",
+              "id": "dc-equation-062",
+              "source_id": "dynamic-cheatsheet:equation:062"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "9 - 10 - 18 + 4 + 12 = -3",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 5,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "9 + 10 - 18 / 4 - 12 = -3"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 1085948,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:5bafc29cb0d15095baca",
+              "id": "dc-equation-084",
+              "source_id": "dynamic-cheatsheet:equation:084"
+            },
+            "feedback": {
+              "reason": null,
+              "reference": "26 - 3 / 1 = 23",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "true"
+              }
+            },
+            "index": 6,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "26 - 3 * 1 = 23"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 1.0,
+            "timing": {
+              "duration_us": 946267,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          },
+          {
+            "cache": null,
+            "error": null,
+            "events": [],
+            "example": {
+              "group_id": "equation:9e8b7f895fc9b1710835",
+              "id": "dc-equation-136",
+              "source_id": "dynamic-cheatsheet:equation:136"
+            },
+            "feedback": {
+              "reason": "{:error, :equation_mismatch}",
+              "reference": "26 - 14 + 7 - 6 = 13",
+              "valid": {
+                "__trajectory_type__": "atom",
+                "value": "false"
+              }
+            },
+            "index": 7,
+            "metadata": {
+              "stage_elapsed_us": 8616219
+            },
+            "metric_metadata": {
+              "metric": "operator_assignment_exact_arithmetic_v1",
+              "stage": "training_evaluation"
+            },
+            "named_parameters": [
+              {
+                "kind": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "metadata": {
+                  "id": "dynamic-cheatsheet-equation-balancer",
+                  "revision": 1
+                },
+                "name": {
+                  "__trajectory_type__": "atom",
+                  "value": "playbook"
+                },
+                "value": "[REDACTED]"
+              }
+            ],
+            "prediction": {
+              "answer": "26 - 14 / 7 * 6 = 13"
+            },
+            "program_id": null,
+            "rollout_id": null,
+            "runtime": "evaluation",
+            "schema_version": 1,
+            "score": 0.0,
+            "timing": {
+              "duration_us": 970948,
+              "finished_at": null,
+              "started_at": null
+            },
+            "trace": [],
+            "type": "dsex_optimizer_trajectory",
+            "usage": {
+              "cost": null,
+              "currency": null,
+              "input_tokens": 0,
+              "metadata": {},
+              "output_tokens": 0,
+              "requests": 0,
+              "total_tokens": 0
+            }
+          }
+        ]
+      },
+      "usage": {
+        "authority": "derived",
+        "cost_usd": 0.0100628,
+        "input_tokens": 21069,
+        "models": [
+          "openai:gpt-4.1-mini-2025-04-14"
+        ],
+        "output_tokens": 1022,
+        "requests": 57
+      }
+    },
+    "status": "complete"
+  },
+  "payload_sha256": "b620e07fafc6345f69c1bb999017de3758eaaa71e8cd2d673ea2583f582cf1ed"
+}
