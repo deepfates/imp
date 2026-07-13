@@ -75,6 +75,7 @@ defmodule DSEx.MixProject do
           "benchmark.instruction_optimizer.contract.check": :test,
           "benchmark.gepa.contract.check": :test,
           "benchmark.gepa_replication.check": :test,
+          "benchmark.fast_slow.check": :test,
           "benchmark.overhead.check": :test,
           "benchmark.search.check": :test,
           "benchmark.rag_tool_agent.check": :test,
@@ -272,6 +273,7 @@ defmodule DSEx.MixProject do
         "benchmark.optimizer_lift.check",
         "benchmark.instruction_optimizer.contract.check",
         "benchmark.gepa_replication.check",
+        "benchmark.fast_slow.check",
         "benchmark.optimize_anything.check",
         "benchmark.rag_tool_agent.check",
         "benchmark.rlm.check",
@@ -316,6 +318,9 @@ defmodule DSEx.MixProject do
       ],
       "benchmark.gepa_replication.check": [
         "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
+      ],
+      "benchmark.fast_slow.check": [
+        "dsex.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
       ],
       "benchmark.optimize_anything.check": [
         "dsex.benchmark.optimize_anything --smoke --out tmp/optimize-anything"

@@ -260,6 +260,21 @@
       "notes": "Local protocol gates do not prove paid training completion, trained-model rebinding, or matched effectiveness."
     },
     {
+      "id": "family.optimizer_fast_slow",
+      "name": "Fast-Slow interleaved prompt and policy adaptation",
+      "kind": "optimizer",
+      "surface_tokens": ["FastSlow", "FastSlowTraining", "CISPO"],
+      "upstream_surface_ids": ["optimization.fast_slow"],
+      "coverage_matrix_concepts": ["Fast-Slow Training"],
+      "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
+      "upstream_repository": {"status": "gap", "repository": null, "version": null, "git_ref": null, "commit": null, "source_paths": []},
+      "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2605.12484v2", "revision": "v2", "title": "Learning, Fast and Slow: Towards LLMs That Adapt Continually"},
+      "upstream_tests": {"status": "absent", "references": ["The official Fast-Slow project article states that first-party code is forthcoming."]},
+      "dataset_protocol": {"status": "partial", "references": ["arXiv:2605.12484v2", "mix dsex.benchmark.fast_slow"], "immutable_digests": []},
+      "local_differential": {"status": "partial", "artifacts": ["mix dsex.benchmark.fast_slow", "test/fast_slow_campaign_test.exs"]},
+      "notes": "DSEx currently claims a paper-faithful BEAM orchestration adaptation, not source parity or provider effectiveness. The deterministic campaign proves protocol wiring only."
+    },
+    {
       "id": "family.optimizer_anything",
       "name": "Optimize Anything arbitrary artifact optimization",
       "kind": "optimizer",

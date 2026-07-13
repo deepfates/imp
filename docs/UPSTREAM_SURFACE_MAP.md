@@ -1,15 +1,15 @@
 # DSEx Executable Upstream Conformance
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
-Total: 22
+Total: 23
 Conformant: 10
 Elixir-native equivalents: 3
 Tracking: 2
-Gaps: 7
+Gaps: 8
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 7
+Release blockers: 8
 Passing: false
 
 | ID | Category | Status | Upstream surfaces | Ticket |
@@ -29,6 +29,7 @@ Passing: false
 | optimization.instructions | optimization | gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
 | optimization.gepa | optimization | gap | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
 | optimization.weights | optimization | gap | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
+| optimization.fast_slow | optimization | gap | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates | de-4bkz |
 | optimization.anything | optimization | tracking | optimize_anything, arbitrary text artifacts | de-16fo |
 | retrieval.data | retrieval | elixir_native_equivalent | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
 | runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
@@ -425,6 +426,38 @@ Missing evidence or behavior:
 - BetterTogether provider lifecycle completion and trained-model rebinding
 - matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether effectiveness
+
+### `optimization.fast_slow`
+
+Status: `gap`
+
+Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
+
+DSEx modules: `DSEx.Training.FastSlow.Runner`, `DSEx.Training.FastSlow.Backend`, durable state and checkpoint modules
+Semantic invariants:
+
+- each cycle prefetches exactly `T` slow-learning minibatches under the current policy
+- GEPA selects a `K`-member per-instance Pareto prompt population before slow learning
+- each question uses one shared `G`-rollout advantage group with `G / K` rollouts per prompt
+- the prompt population remains fixed through exactly `T` token-aligned slow updates
+- cached trajectories retain cycle, behavior-policy, prompt, input, token, mask, and old-logprob provenance
+- ambiguous external outcomes are not replayed without provider idempotency proof
+
+Executable evidence:
+
+- test: `test/fast_slow_state_test.exs`
+- test: `test/fast_slow_checkpoint_test.exs`
+- test: `test/fast_slow_runner_test.exs`
+- test: `test/fast_slow_campaign_test.exs`
+- docs: `docs/RESEARCH_LANDSCAPE.md`
+- docs: `docs/API_GUIDE.md`
+
+Missing evidence or behavior:
+
+- first-party source parity because the official implementation is not published
+- external-provider CISPO execution and model-artifact evidence
+- matched prompt-only, slow-only, and combined provider effectiveness
+- measured concurrent rollout throughput and paper-scale performance
 
 ### `optimization.anything`
 

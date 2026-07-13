@@ -28,6 +28,7 @@ defmodule GateContractTest do
              "benchmark.optimizer_lift.check",
              "benchmark.instruction_optimizer.contract.check",
              "benchmark.gepa_replication.check",
+             "benchmark.fast_slow.check",
              "benchmark.optimize_anything.check",
              "benchmark.rag_tool_agent.check",
              "benchmark.rlm.check",
@@ -91,6 +92,10 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"benchmark.gepa_replication.check") == [
              "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.fast_slow.check") == [
+             "dsex.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.rag_tool_agent.check") == [
