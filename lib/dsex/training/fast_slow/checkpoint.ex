@@ -9,6 +9,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     Lookahead,
     OperationIntent,
     PromptPopulation,
+    ReuseCache,
     Rollout,
     State,
     Terminal,
@@ -16,7 +17,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   }
 
   @type_name "dsex_fast_slow_training"
-  @schema_version 2
+  @schema_version 3
 
   @spec dump(Config.t(), State.t()) :: map()
   def dump(%Config{} = config, %State{} = state) do
@@ -49,6 +50,11 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   def load!(%{"type" => @type_name, "schema_version" => 1}, %Config{}) do
     raise ArgumentError,
           "Fast-Slow checkpoint schema 1 encoded t as a cycle horizon and cannot be resumed faithfully"
+  end
+
+  def load!(%{"type" => @type_name, "schema_version" => 2}, %Config{}) do
+    raise ArgumentError,
+          "Fast-Slow checkpoint schema 2 omitted durable rollout reuse and token provenance"
   end
 
   def load!(checkpoint, %Config{} = config) when is_map(checkpoint) do
@@ -144,6 +150,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       "prompt_population" => dump_population(state.prompt_population),
       "dataset" => dump_dataset(state.dataset),
       "lookahead" => if(state.lookahead, do: dump_lookahead(state.lookahead), else: nil),
+      "reuse_cache" => ReuseCache.dump(state.reuse_cache),
       "pending_operations" =>
         state.pending_operations
         |> Map.values()
@@ -222,9 +229,14 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       "prompt_revision" => rollout.prompt_revision,
       "dataset_indices" => rollout.dataset_indices,
       "input_digest" => rollout.input_digest,
+      "prompt_digest" => rollout.prompt_digest,
       "behavior_policy_id" => rollout.behavior_policy_id,
       "sampling_config_digest" => rollout.sampling_config_digest,
       "behavior_logprobs" => rollout.behavior_logprobs,
+      "response_token_ids" => rollout.response_token_ids,
+      "response_mask" => rollout.response_mask,
+      "source" => Atom.to_string(rollout.source),
+      "generated_at_step" => rollout.generated_at_step,
       "status" => Atom.to_string(rollout.status),
       "claim_id" => rollout.claim_id,
       "output" => rollout.output,
@@ -275,6 +287,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       prompt_population: data |> Map.fetch!("prompt_population") |> load_population!(),
       dataset: data |> Map.fetch!("dataset") |> load_dataset!(),
       lookahead: load_optional(data, "lookahead", &load_lookahead!/1),
+      reuse_cache: data |> Map.fetch!("reuse_cache") |> ReuseCache.load!(),
       pending_operations:
         data
         |> list!("pending_operations", &load_intent!/1)
@@ -381,9 +394,14 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       prompt_revision: non_negative!(data, "prompt_revision"),
       dataset_indices: integer_list!(data, "dataset_indices"),
       input_digest: string!(data, "input_digest"),
+      prompt_digest: string!(data, "prompt_digest"),
       behavior_policy_id: string!(data, "behavior_policy_id"),
       sampling_config_digest: string!(data, "sampling_config_digest"),
       behavior_logprobs: number_list!(data, "behavior_logprobs"),
+      response_token_ids: integer_list!(data, "response_token_ids"),
+      response_mask: integer_list!(data, "response_mask"),
+      source: enum!(data, "source", live: :live, gepa_cache: :gepa_cache),
+      generated_at_step: non_negative!(data, "generated_at_step"),
       status:
         enum!(data, "status",
           available: :available,

@@ -13,7 +13,12 @@ defmodule DSEx.Training.FastSlow.Config do
     :max_cycles
   ]
   defstruct @enforce_keys ++
-              [optimizer_config: %{}, provider_config: %{}, sampling_config: %{}]
+              [
+                optimizer_config: %{},
+                provider_config: %{},
+                sampling_config: %{},
+                reuse_rollouts: false
+              ]
 
   @type json_scalar :: nil | boolean() | number() | String.t()
   @type json_value :: json_scalar() | [json_value()] | %{String.t() => json_value()}
@@ -29,10 +34,11 @@ defmodule DSEx.Training.FastSlow.Config do
           max_cycles: pos_integer(),
           optimizer_config: json_value(),
           provider_config: json_value(),
-          sampling_config: json_value()
+          sampling_config: json_value(),
+          reuse_rollouts: boolean()
         }
 
-  @keys @enforce_keys ++ [:optimizer_config, :provider_config, :sampling_config]
+  @keys @enforce_keys ++ [:optimizer_config, :provider_config, :sampling_config, :reuse_rollouts]
   @credential_keys ~w(api_key apikey authorization auth bearer credential credentials password secret token access_token refresh_token private_key headers)
   @callback_keys ~w(callback callbacks callback_fn checkpoint_fn)
 
@@ -50,6 +56,9 @@ defmodule DSEx.Training.FastSlow.Config do
     validate_positive!(config.k, :k)
     validate_positive!(config.g, :g)
     validate_positive!(config.max_cycles, :max_cycles)
+
+    unless is_boolean(config.reuse_rollouts),
+      do: raise(ArgumentError, "reuse_rollouts must be a boolean")
 
     unless rem(config.g, config.k) == 0,
       do: raise(ArgumentError, "g must be divisible by k")
@@ -87,7 +96,8 @@ defmodule DSEx.Training.FastSlow.Config do
       "max_cycles" => config.max_cycles,
       "optimizer_config" => config.optimizer_config,
       "provider_config" => config.provider_config,
-      "sampling_config" => config.sampling_config
+      "sampling_config" => config.sampling_config,
+      "reuse_rollouts" => config.reuse_rollouts
     }
   end
 

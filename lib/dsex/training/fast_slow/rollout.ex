@@ -17,9 +17,14 @@ defmodule DSEx.Training.FastSlow.Rollout do
     :prompt_revision,
     :dataset_indices,
     :input_digest,
+    :prompt_digest,
     :behavior_policy_id,
     :sampling_config_digest,
-    :behavior_logprobs
+    :behavior_logprobs,
+    :response_token_ids,
+    :response_mask,
+    :source,
+    :generated_at_step
   ]
   defstruct @enforce_keys ++
               [
@@ -46,9 +51,14 @@ defmodule DSEx.Training.FastSlow.Rollout do
           prompt_revision: non_neg_integer(),
           dataset_indices: [non_neg_integer()],
           input_digest: String.t(),
+          prompt_digest: String.t(),
           behavior_policy_id: String.t(),
           sampling_config_digest: String.t(),
           behavior_logprobs: [number()],
+          response_token_ids: [non_neg_integer()],
+          response_mask: [0 | 1],
+          source: :live | :gepa_cache,
+          generated_at_step: non_neg_integer(),
           status: status(),
           claim_id: String.t() | nil,
           output: Config.json_value() | nil,
@@ -73,9 +83,14 @@ defmodule DSEx.Training.FastSlow.Rollout do
       :prompt_revision,
       :dataset_indices,
       :input_digest,
+      :prompt_digest,
       :behavior_policy_id,
       :sampling_config_digest,
-      :behavior_logprobs
+      :behavior_logprobs,
+      :response_token_ids,
+      :response_mask,
+      :source,
+      :generated_at_step
     ]
 
     missing = Enum.reject(required, &Map.has_key?(attrs, &1))
@@ -93,6 +108,45 @@ defmodule DSEx.Training.FastSlow.Rollout do
   end
 
   def new!(_attrs), do: raise(ArgumentError, "rollout attributes must be a keyword list or map")
+
+  @doc false
+  def from_cached!(%DSEx.Training.FastSlow.CachedTrajectory{} = cached, slot, state)
+      when is_map(slot) do
+    problem_id = fetch_slot!(slot, :problem_id)
+    input_digest = fetch_slot!(slot, :input_digest)
+    prompt_digest = fetch_slot!(slot, :prompt_digest)
+
+    unless {problem_id, input_digest, prompt_digest} ==
+             {cached.problem_id, cached.input_digest, cached.prompt_digest} do
+      raise ArgumentError, "cached trajectory does not match the planned rollout slot"
+    end
+
+    rollout =
+      new!(
+        cycle: state.cycle,
+        group_id: fetch_slot!(slot, :group_id),
+        problem_id: problem_id,
+        group_size: state.g,
+        member_index: fetch_slot!(slot, :member_index),
+        prompt_index: fetch_slot!(slot, :prompt_index),
+        theta_id: cached.theta_id,
+        prompt_revision: state.prompt_population.revision,
+        dataset_indices: fetch_slot!(slot, :dataset_indices),
+        input_digest: input_digest,
+        prompt_digest: prompt_digest,
+        behavior_policy_id: cached.theta_id,
+        sampling_config_digest: state.sampling_config_digest,
+        behavior_logprobs: cached.behavior_logprobs,
+        response_token_ids: cached.response_token_ids,
+        response_mask: cached.response_mask,
+        source: :gepa_cache,
+        generated_at_step: 0
+      )
+
+    claim_id = "gepa-cache:" <> cached.id
+    {:ok, rollout} = claim(rollout, claim_id)
+    complete!(rollout, claim_id, cached.output, cached.reward, %{"source" => "gepa_cache"})
+  end
 
   @spec claim(t(), String.t()) :: {:ok, t()} | {:error, :already_claimed | :terminal}
   def claim(%__MODULE__{status: :available} = rollout, claim_id)
@@ -214,8 +268,11 @@ defmodule DSEx.Training.FastSlow.Rollout do
         is_binary(rollout.theta_id) and rollout.theta_id != "" and
         is_integer(rollout.prompt_revision) and rollout.prompt_revision >= 0 and
         valid_indices?(rollout.dataset_indices) and digest?(rollout.input_digest) and
+        digest?(rollout.prompt_digest) and
         rollout.behavior_policy_id == rollout.theta_id and
         digest?(rollout.sampling_config_digest) and valid_logprobs?(rollout.behavior_logprobs) and
+        valid_token_alignment?(rollout) and rollout.source in [:live, :gepa_cache] and
+        is_integer(rollout.generated_at_step) and rollout.generated_at_step >= 0 and
         valid_status_data?(rollout)
 
     unless valid, do: raise(ArgumentError, "rollout identity or state is invalid")
@@ -234,9 +291,14 @@ defmodule DSEx.Training.FastSlow.Rollout do
       "prompt_revision" => Map.fetch!(attrs, :prompt_revision),
       "dataset_indices" => Map.fetch!(attrs, :dataset_indices),
       "input_digest" => Map.fetch!(attrs, :input_digest),
+      "prompt_digest" => Map.fetch!(attrs, :prompt_digest),
       "behavior_policy_id" => Map.fetch!(attrs, :behavior_policy_id),
       "sampling_config_digest" => Map.fetch!(attrs, :sampling_config_digest),
-      "behavior_logprobs" => Map.fetch!(attrs, :behavior_logprobs)
+      "behavior_logprobs" => Map.fetch!(attrs, :behavior_logprobs),
+      "response_token_ids" => Map.fetch!(attrs, :response_token_ids),
+      "response_mask" => Map.fetch!(attrs, :response_mask),
+      "source" => attrs |> Map.fetch!(:source) |> Atom.to_string(),
+      "generated_at_step" => Map.fetch!(attrs, :generated_at_step)
     }
     |> Config.json_safe!([:rollout, :identity])
   end
@@ -250,6 +312,20 @@ defmodule DSEx.Training.FastSlow.Rollout do
     do: values != [] and Enum.all?(values, &is_number/1)
 
   defp valid_logprobs?(_values), do: false
+
+  defp valid_token_alignment?(rollout) do
+    values = [rollout.behavior_logprobs, rollout.response_token_ids, rollout.response_mask]
+
+    if Enum.all?(values, &is_list/1) do
+      lengths = Enum.map(values, &length/1)
+
+      length(Enum.uniq(lengths)) == 1 and hd(lengths) > 0 and
+        Enum.all?(rollout.response_token_ids, &(is_integer(&1) and &1 >= 0)) and
+        Enum.all?(rollout.response_mask, &(&1 in [0, 1]))
+    else
+      false
+    end
+  end
 
   defp valid_status_data?(%__MODULE__{status: :available, claim_id: nil}), do: true
 
@@ -265,6 +341,13 @@ defmodule DSEx.Training.FastSlow.Rollout do
     do: is_binary(rollout.claim_id) and not is_nil(rollout.failure)
 
   defp digest?(value), do: is_binary(value) and Regex.match?(~r/\A[0-9a-f]{64}\z/, value)
+
+  defp fetch_slot!(slot, key) do
+    case Map.fetch(slot, key) do
+      {:ok, value} -> value
+      :error -> Map.fetch!(slot, Atom.to_string(key))
+    end
+  end
 end
 
 defmodule DSEx.Training.FastSlow.AdvantageGroup do
@@ -323,7 +406,10 @@ defmodule DSEx.Training.FastSlow.AdvantageGroup do
           "reward" => rollout.score,
           "advantage" => (rollout.score - mean) / (std + epsilon),
           "behavior_policy_id" => rollout.behavior_policy_id,
-          "behavior_logprobs" => rollout.behavior_logprobs
+          "behavior_logprobs" => rollout.behavior_logprobs,
+          "response_token_ids" => rollout.response_token_ids,
+          "response_mask" => rollout.response_mask,
+          "source" => Atom.to_string(rollout.source)
         }
       end)
 

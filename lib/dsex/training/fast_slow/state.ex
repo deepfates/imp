@@ -488,6 +488,7 @@ defmodule DSEx.Training.FastSlow.State do
     Lookahead,
     OperationIntent,
     PromptPopulation,
+    ReuseCache,
     Rollout,
     Terminal,
     Theta
@@ -508,7 +509,8 @@ defmodule DSEx.Training.FastSlow.State do
     :current_theta_id,
     :prompt_population,
     :dataset,
-    :budgets
+    :budgets,
+    :reuse_cache
   ]
   defstruct @enforce_keys ++
               [
@@ -536,6 +538,7 @@ defmodule DSEx.Training.FastSlow.State do
           lookahead: Lookahead.t() | nil,
           pending_operations: %{String.t() => OperationIntent.t()},
           budgets: Budget.t(),
+          reuse_cache: ReuseCache.t(),
           rollout_ledger: %{String.t() => Rollout.t()},
           events: [Event.t()],
           terminal: Terminal.t() | nil
@@ -564,7 +567,8 @@ defmodule DSEx.Training.FastSlow.State do
       current_theta_id: theta.id,
       prompt_population: PromptPopulation.new!(0, prompt_candidates),
       dataset: dataset,
-      budgets: budgets
+      budgets: budgets,
+      reuse_cache: ReuseCache.new!(0, theta.id)
     }
   end
 
@@ -622,7 +626,9 @@ defmodule DSEx.Training.FastSlow.State do
         cycle: state.cycle + 1,
         slow_step: 0,
         dataset: dataset,
-        lookahead: nil
+        lookahead: nil,
+        reuse_cache:
+          ReuseCache.next_cycle(state.reuse_cache, state.cycle + 1, state.current_theta_id)
     }
   end
 
@@ -683,6 +689,28 @@ defmodule DSEx.Training.FastSlow.State do
   def revise_prompts(%__MODULE__{}, _candidates, _metadata),
     do: raise(ArgumentError, "prompts may only be revised during the fast stage")
 
+  @spec put_reuse_cache(t(), ReuseCache.t()) :: t()
+  def put_reuse_cache(%__MODULE__{stage: :fast, terminal: nil} = state, %ReuseCache{} = cache) do
+    ReuseCache.validate!(cache)
+
+    unless current_lookahead?(state) and cache.cycle == state.cycle and
+             cache.theta_id == state.current_theta_id and
+             state.prompt_population.revision == state.cycle do
+      raise ArgumentError, "GEPA reuse cache is not bound to the current fast update"
+    end
+
+    %{state | reuse_cache: cache}
+  end
+
+  @spec claim_cached(t(), String.t(), String.t(), String.t()) ::
+          {:ok, DSEx.Training.FastSlow.CachedTrajectory.t(), t()} | :miss
+  def claim_cached(%__MODULE__{stage: :slow} = state, problem_id, input_digest, prompt_digest) do
+    case ReuseCache.claim(state.reuse_cache, problem_id, input_digest, prompt_digest) do
+      {:ok, trajectory, cache} -> {:ok, trajectory, %{state | reuse_cache: cache}}
+      :miss -> :miss
+    end
+  end
+
   @spec put_dataset(t(), DatasetState.t()) :: t()
   def put_dataset(%__MODULE__{terminal: nil, lookahead: nil} = state, %DatasetState{} = dataset),
     do: %{state | dataset: dataset}
@@ -729,10 +757,10 @@ defmodule DSEx.Training.FastSlow.State do
   def put_rollout(%__MODULE__{stage: :slow, terminal: nil} = state, %Rollout{} = rollout) do
     Rollout.validate!(rollout)
 
-    unless rollout.cycle == state.cycle and rollout.theta_id == state.current_theta_id and
+    unless rollout.cycle == state.cycle and behavior_policy_in_lineage?(state, rollout.theta_id) and
              rollout.prompt_revision == state.prompt_population.revision and
              rollout.sampling_config_digest == state.sampling_config_digest and
-             rollout.prompt_index < state.k do
+             rollout.prompt_index < state.k and rollout.generated_at_step <= state.slow_step do
       raise ArgumentError, "rollout does not match the current cycle identity"
     end
 
@@ -827,6 +855,7 @@ defmodule DSEx.Training.FastSlow.State do
     Enum.each(state.theta_lineage, &Theta.validate!/1)
     PromptPopulation.validate!(state.prompt_population)
     if state.lookahead, do: Lookahead.validate!(state.lookahead, state.t)
+    ReuseCache.validate!(state.reuse_cache)
     Budget.validate!(state.budgets)
 
     Enum.each(state.pending_operations, fn {id, intent} ->
@@ -847,6 +876,7 @@ defmodule DSEx.Training.FastSlow.State do
         is_integer(state.k) and state.k > 0 and is_integer(state.g) and state.g > 0 and
         rem(state.g, state.k) == 0 and valid_population?(state) and
         valid_lookahead?(state) and
+        valid_reuse_cache?(state) and
         digest?(state.sampling_config_digest) and
         valid_lineage?(state.theta_lineage, state.current_theta_id, state.cycle) and
         length(state.theta_lineage) == state.cycle * state.t + state.slow_step + 1 and
@@ -921,6 +951,14 @@ defmodule DSEx.Training.FastSlow.State do
       is_binary(state.prompt_population.parent_digest) and
       is_binary(state.prompt_population.anchor_digest)
   end
+
+  defp valid_reuse_cache?(state) do
+    state.reuse_cache.cycle == state.cycle and
+      behavior_policy_in_lineage?(state, state.reuse_cache.theta_id)
+  end
+
+  defp behavior_policy_in_lineage?(state, theta_id),
+    do: Enum.any?(state.theta_lineage, &(&1.id == theta_id))
 
   defp valid_dataset?(%DatasetState{cursor: cursor, epoch: epoch})
        when cursor >= 0 and epoch >= 0,

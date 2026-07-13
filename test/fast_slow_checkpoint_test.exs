@@ -18,7 +18,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     decoded = checkpoint |> Jason.encode!() |> Jason.decode!()
 
     assert decoded["type"] == "dsex_fast_slow_training"
-    assert decoded["schema_version"] == 2
+    assert decoded["schema_version"] == 3
     assert byte_size(decoded["payload_sha256"]) == 64
     assert Checkpoint.load!(decoded, config) == state
   end
@@ -50,7 +50,8 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
           config(models: %{"behavior" => "other", "optimizer" => "model-b"}),
           config(dataset_digests: %{"train" => String.duplicate("b", 64)}),
           config(sampling_config: %{"temperature" => 0.1}),
-          config(verifier_version: "verifier-v2")
+          config(verifier_version: "verifier-v2"),
+          config(reuse_rollouts: true)
         ] do
       assert_raise ArgumentError, ~r/compatibility/, fn ->
         Checkpoint.load!(checkpoint, mismatch)
@@ -69,6 +70,12 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
   test "legacy schema with incorrect t semantics is rejected explicitly" do
     assert_raise ArgumentError, ~r/schema 1 encoded t as a cycle horizon/, fn ->
       Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 1}, config())
+    end
+  end
+
+  test "schema 2 without durable token reuse provenance is rejected explicitly" do
+    assert_raise ArgumentError, ~r/schema 2 omitted durable rollout reuse/, fn ->
+      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 2}, config())
     end
   end
 
@@ -113,7 +120,14 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     config = config()
     checkpoint = Checkpoint.dump(config, populated_state(config))
 
-    for key <- ["behavior_policy_id", "sampling_config_digest", "behavior_logprobs"] do
+    for key <- [
+          "behavior_policy_id",
+          "sampling_config_digest",
+          "behavior_logprobs",
+          "response_token_ids",
+          "response_mask",
+          "prompt_digest"
+        ] do
       adversarial =
         checkpoint
         |> update_in(["payload", "state", "rollout_ledger", Access.at(0)], &Map.delete(&1, key))
@@ -194,7 +208,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     end
   end
 
-  test "callbacks cannot enter schema v2 persisted state" do
+  test "callbacks cannot enter schema v3 persisted state" do
     config = config()
 
     state =
@@ -238,9 +252,14 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
         prompt_revision: state.prompt_population.revision,
         dataset_indices: [3],
         input_digest: Config.digest(%{"input" => 3}),
+        prompt_digest: Config.digest("p0"),
         behavior_policy_id: state.current_theta_id,
         sampling_config_digest: state.sampling_config_digest,
-        behavior_logprobs: [-0.4, -0.2]
+        behavior_logprobs: [-0.4, -0.2],
+        response_token_ids: [10, 11],
+        response_mask: [1, 1],
+        source: :live,
+        generated_at_step: 0
       )
 
     state = State.put_rollout(state, rollout)

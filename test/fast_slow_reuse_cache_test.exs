@@ -8,6 +8,7 @@ defmodule DSEx.Training.FastSlow.ReuseCacheTest do
     first = trajectory(theta, output: %{"answer" => "a"})
     second = trajectory(theta, output: %{"answer" => "b"}, behavior_logprobs: [-0.3, -0.4])
     cache = ReuseCache.new!(0, theta, [second, first])
+    assert cache |> ReuseCache.dump() |> ReuseCache.load!() == cache
 
     assert {:ok, claimed, cache} =
              ReuseCache.claim(cache, "problem-0", digest("input"), digest("prompt"))
@@ -19,6 +20,14 @@ defmodule DSEx.Training.FastSlow.ReuseCacheTest do
 
     assert :miss = ReuseCache.claim(cache, "problem-0", digest("input"), digest("prompt"))
     assert ReuseCache.next_cycle(cache, 1, digest("next")) == ReuseCache.new!(1, digest("next"))
+  end
+
+  test "valid-looking cache tampering fails its trajectory identity" do
+    theta = digest("theta")
+    dumped = ReuseCache.new!(0, theta, [trajectory(theta)]) |> ReuseCache.dump()
+    tampered = put_in(dumped, ["entries", Access.at(0), "reward"], 0.0)
+
+    assert_raise ArgumentError, ~r/identity is invalid/, fn -> ReuseCache.load!(tampered) end
   end
 
   test "requires exact policy generation and token-aligned old probabilities" do

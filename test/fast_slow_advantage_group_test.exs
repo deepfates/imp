@@ -63,9 +63,14 @@ defmodule DSEx.Training.FastSlow.AdvantageGroupTest do
       prompt_revision: 1,
       dataset_indices: [0],
       input_digest: Config.digest(%{"problem" => 0}),
+      prompt_digest: Config.digest("prompt-#{rem(index, 2)}"),
       behavior_policy_id: theta_id,
       sampling_config_digest: Config.digest(%{"temperature" => 0.7}),
-      behavior_logprobs: [-0.1, -0.2]
+      behavior_logprobs: [-0.1, -0.2],
+      response_token_ids: [10, 11],
+      response_mask: [1, 1],
+      source: :live,
+      generated_at_step: 0
     ]
 
     Rollout.new!(Keyword.merge(defaults, overrides))

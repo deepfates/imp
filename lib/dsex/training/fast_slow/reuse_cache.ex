@@ -58,6 +58,38 @@ defmodule DSEx.Training.FastSlow.CachedTrajectory do
     trajectory
   end
 
+  @doc false
+  def dump(%__MODULE__{} = trajectory),
+    do: Map.from_struct(trajectory) |> Config.persisted_safe!()
+
+  @doc false
+  def load!(state) when is_map(state) do
+    expected =
+      ~w(behavior_logprobs cycle id input_digest output problem_id prompt_digest response_mask response_token_ids reward theta_id)
+
+    unless Enum.sort(Map.keys(state)) == Enum.sort(expected),
+      do: raise(ArgumentError, "cached Fast-Slow trajectory keys are invalid")
+
+    trajectory =
+      new!(
+        cycle: state["cycle"],
+        theta_id: state["theta_id"],
+        problem_id: state["problem_id"],
+        input_digest: state["input_digest"],
+        prompt_digest: state["prompt_digest"],
+        output: state["output"],
+        reward: state["reward"],
+        response_token_ids: state["response_token_ids"],
+        response_mask: state["response_mask"],
+        behavior_logprobs: state["behavior_logprobs"]
+      )
+
+    unless trajectory.id == state["id"],
+      do: raise(ArgumentError, "cached Fast-Slow trajectory identity is invalid")
+
+    trajectory
+  end
+
   defp payload(trajectory),
     do: trajectory |> Map.from_struct() |> Map.drop([:id]) |> Config.persisted_safe!()
 
@@ -171,8 +203,22 @@ defmodule DSEx.Training.FastSlow.ReuseCache do
         |> Map.values()
         |> List.flatten()
         |> Enum.sort_by(& &1.id)
-        |> Enum.map(&(Map.from_struct(&1) |> Config.persisted_safe!()))
+        |> Enum.map(&CachedTrajectory.dump/1)
     }
+  end
+
+  @doc false
+  def load!(%{"cycle" => cycle, "theta_id" => theta_id, "entries" => entries} = state)
+      when map_size(state) == 3 and is_list(entries) do
+    new!(cycle, theta_id, Enum.map(entries, &CachedTrajectory.load!/1))
+  end
+
+  @doc false
+  def validate!(%__MODULE__{} = cache) do
+    trajectories = cache.entries |> Map.values() |> List.flatten()
+    expected = new!(cache.cycle, cache.theta_id, trajectories)
+    unless expected == cache, do: raise(ArgumentError, "Fast-Slow reuse cache is invalid")
+    cache
   end
 
   defp key(trajectory),

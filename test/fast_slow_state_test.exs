@@ -217,9 +217,15 @@ defmodule DSEx.Training.FastSlow.StateTest do
       prompt_revision: state.prompt_population.revision,
       dataset_indices: [0],
       input_digest: Config.digest(%{"input" => index}),
+      prompt_digest:
+        Config.digest(Enum.at(state.prompt_population.candidates, rem(index, state.k))),
       behavior_policy_id: state.current_theta_id,
       sampling_config_digest: state.sampling_config_digest,
-      behavior_logprobs: [-0.1, -0.2]
+      behavior_logprobs: [-0.1, -0.2],
+      response_token_ids: [10, 11],
+      response_mask: [1, 1],
+      source: :live,
+      generated_at_step: state.slow_step
     ]
 
     Keyword.merge(defaults, overrides)
