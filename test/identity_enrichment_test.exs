@@ -23,6 +23,17 @@ defmodule DSEx.IdentityEnrichmentTest do
     assert Enum.any?(forms["code_concerns"], &String.contains?(&1, "No ASCII"))
   end
 
+  test "marks mechanical accent folding as requiring transliteration review" do
+    forms = IdentityEnrichment.code_forms("Ecoute" <> <<0xCC, 0x81>>)
+
+    assert forms["hex_package"] == "ecoute"
+
+    assert Enum.any?(
+             forms["code_concerns"],
+             &String.contains?(&1, "human transliteration review")
+           )
+  end
+
   test "emits exactly one baseline enrichment for each normalized candidate entity" do
     registry = [
       observation("cand-a", "Form Lab", "occ-a"),
@@ -53,7 +64,41 @@ defmodule DSEx.IdentityEnrichmentTest do
              form_lab["architecture_forms"]
   end
 
-  defp observation(candidate_id, surface, occurrence_id) do
+  test "adds a labeled neutral architecture when the raw candidate has no lens" do
+    registry = [observation("cand-a", "Open Form", "occ-a", [])]
+
+    atlas = %{
+      "brand_architectures" => [
+        %{
+          "id" => "neutral-master-beam-implementation",
+          "label" => "Neutral master with BEAM implementation"
+        }
+      ]
+    }
+
+    [enrichment] =
+      IdentityEnrichment.baseline(registry, atlas, generated_at: "2026-07-13T20:00:00Z")
+
+    assert [
+             %{
+               "architecture_id" => "neutral-master-beam-implementation",
+               "form" => "Open Form for Elixir",
+               "notes" => notes
+             }
+           ] = enrichment["architecture_forms"]
+
+    assert notes =~ "neutral fallback"
+  end
+
+  defp observation(
+         candidate_id,
+         surface,
+         occurrence_id,
+         architecture_lenses \\ [
+           "beam-master",
+           "neutral-master-beam-implementation"
+         ]
+       ) do
     %{
       "event_type" => "candidate_observed",
       "candidate_id" => candidate_id,
@@ -64,10 +109,7 @@ defmodule DSEx.IdentityEnrichmentTest do
       "candidate" => %{
         "territories" => ["declaration-contract"],
         "strategies" => ["ordinary-object"],
-        "architecture_lenses" => [
-          "beam-master",
-          "neutral-master-beam-implementation"
-        ],
+        "architecture_lenses" => architecture_lenses,
         "wildcard" => false
       }
     }

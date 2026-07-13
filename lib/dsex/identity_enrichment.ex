@@ -74,7 +74,7 @@ defmodule DSEx.IdentityEnrichment do
       []
       |> maybe_add(
         not ascii_only?(surface),
-        "Display form contains non-ASCII characters; no transliteration was inferred."
+        "Display form contains non-ASCII characters; the identifier uses mechanical accent folding only and still requires human transliteration review."
       )
       |> maybe_add(
         slug == "",
@@ -129,17 +129,38 @@ defmodule DSEx.IdentityEnrichment do
   defp architecture_forms(observations, display, atlas) do
     labels = Map.new(atlas["brand_architectures"] || [], &{&1["id"], &1["label"]})
 
-    observations
-    |> Enum.flat_map(&(get_in(&1, ["candidate", "architecture_lenses"]) || []))
-    |> Enum.uniq()
+    architecture_ids =
+      observations
+      |> Enum.flat_map(&(get_in(&1, ["candidate", "architecture_lenses"]) || []))
+      |> Enum.uniq()
+
+    {architecture_ids, fallback?} =
+      case architecture_ids do
+        [] -> {["neutral-master-beam-implementation"], true}
+        ids -> {ids, false}
+      end
+
+    architecture_ids
     |> Enum.map(fn architecture_id ->
       %{
         "architecture_id" => architecture_id,
         "form" => architecture_form(architecture_id, display),
-        "notes" => Map.get(labels, architecture_id, architecture_id)
+        "notes" =>
+          architecture_notes(
+            architecture_id,
+            labels,
+            fallback?
+          )
       }
     end)
   end
+
+  defp architecture_notes(architecture_id, labels, true) do
+    "#{Map.get(labels, architecture_id, architecture_id)}; neutral fallback because no raw architecture lens was supplied"
+  end
+
+  defp architecture_notes(architecture_id, labels, false),
+    do: Map.get(labels, architecture_id, architecture_id)
 
   defp architecture_form("neutral-master-beam-implementation", display),
     do: "#{display} for Elixir"
