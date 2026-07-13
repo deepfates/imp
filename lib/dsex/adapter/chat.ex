@@ -25,8 +25,10 @@ defmodule DSEx.Adapter.Chat do
         %{
           role: :user,
           content:
-            render_inputs(signature, inputs, skip: history_fields) <>
+            append_content(
+              render_inputs(signature, inputs, skip: history_fields),
               render_response_instruction(signature, response_instruction?)
+            )
         }
       ]
   end
@@ -172,31 +174,71 @@ defmodule DSEx.Adapter.Chat do
     prefix = Keyword.get(opts, :prefix, "")
     skip = opts |> Keyword.get(:skip, MapSet.new()) |> MapSet.new()
 
-    signature.inputs
-    |> Enum.reduce([], fn field, acc ->
-      value = fetch_field(inputs, field.name)
+    sections =
+      signature.inputs
+      |> Enum.reduce([], fn field, acc ->
+        value = fetch_field(inputs, field.name)
 
-      if is_nil(value) or MapSet.member?(skip, field.name) do
-        acc
-      else
-        [
-          """
-          [[ ## #{field.name} ## ]]
-          #{format_value(value)}
-          """
-          |> String.trim()
-          | acc
-        ]
-      end
+        if is_nil(value) or MapSet.member?(skip, field.name) do
+          acc
+        else
+          [render_input_section(field, value) | acc]
+        end
+      end)
+      |> Enum.reverse()
+      |> then(fn sections ->
+        case prefix do
+          "" -> sections
+          _prefix -> [prefix | sections]
+        end
+      end)
+
+    if Enum.any?(sections, &is_list/1) do
+      sections
+      |> Enum.intersperse("\n\n")
+      |> List.flatten()
+      |> merge_adjacent_text_parts()
+    else
+      Enum.join(sections, "\n\n")
+    end
+  end
+
+  defp render_input_section(field, value) do
+    if native_content?(value) do
+      ["[[ ## #{field.name} ## ]]\n" | native_content_parts(value)]
+    else
+      "[[ ## #{field.name} ## ]]\n#{format_value(value)}"
+    end
+  end
+
+  defp native_content?(value) when is_list(value), do: Enum.any?(value, &native_content?/1)
+  defp native_content?(%DSEx.Adapters.Types.Image{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Audio{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.File{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Document{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Code{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Reasoning{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Citation{}), do: true
+  defp native_content?(%DSEx.Adapters.Types.Type{}), do: true
+  defp native_content?(_value), do: false
+
+  defp native_content_parts(values) when is_list(values),
+    do: Enum.flat_map(values, &native_content_parts/1)
+
+  defp native_content_parts(value) do
+    if native_content?(value), do: [value], else: [format_value(value)]
+  end
+
+  defp merge_adjacent_text_parts(parts) do
+    parts
+    |> Enum.reduce([], fn
+      text, [previous | rest] when is_binary(text) and is_binary(previous) ->
+        [previous <> text | rest]
+
+      part, acc ->
+        [part | acc]
     end)
     |> Enum.reverse()
-    |> then(fn sections ->
-      case prefix do
-        "" -> sections
-        _prefix -> [prefix | sections]
-      end
-    end)
-    |> Enum.join("\n\n")
   end
 
   defp render_outputs(signature, outputs, opts) do
@@ -349,6 +391,12 @@ defmodule DSEx.Adapter.Chat do
     "\n\nRespond with the corresponding output fields, starting with #{final}, and then ending with the marker for `[[ ## completed ## ]]`."
   end
 
+  defp append_content(content, ""), do: content
+  defp append_content(content, suffix) when is_binary(content), do: content <> suffix
+
+  defp append_content(content, suffix) when is_list(content),
+    do: merge_adjacent_text_parts(content ++ [suffix])
+
   defp format_value(value) when is_binary(value), do: value
 
   defp format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
@@ -404,22 +452,75 @@ defmodule DSEx.Adapter.Chat do
     |> Enum.flat_map(fn turn ->
       turn = DSEx.Example.new(turn) |> DSEx.Example.to_map()
 
-      [
-        %{
-          role: :user,
-          content: render_inputs(signature, turn, skip: history_input_fields(signature))
-        },
-        %{
-          role: :assistant,
-          content:
-            render_outputs(signature, turn,
-              missing_field_message: "Not supplied for this conversation history message. "
-            )
-        }
-      ]
-      |> Enum.reject(&blank_message?/1)
+      if native_tool_history_turn?(turn) do
+        render_native_tool_history_turn(signature, turn)
+      else
+        [
+          %{
+            role: :user,
+            content: render_inputs(signature, turn, skip: history_input_fields(signature))
+          },
+          %{
+            role: :assistant,
+            content:
+              render_outputs(signature, turn,
+                missing_field_message: "Not supplied for this conversation history message. "
+              )
+          }
+        ]
+        |> Enum.reject(&blank_message?/1)
+      end
     end)
   end
+
+  defp native_tool_history_turn?(turn), do: not is_nil(fetch_field(turn, :tool_calls))
+
+  defp render_native_tool_history_turn(signature, turn) do
+    calls = normalize_history_tool_calls(fetch_field(turn, :tool_calls))
+    results = List.wrap(fetch_field(turn, :tool_call_results))
+
+    user = %{
+      role: :user,
+      content: render_inputs(signature, turn, skip: history_input_fields(signature))
+    }
+
+    assistant = %{
+      role: :assistant,
+      content: fetch_field(turn, :next_thought) |> blank_to_empty(),
+      tool_calls: calls
+    }
+
+    tool_messages =
+      Enum.map(results, fn result ->
+        id = fetch_field(result, :id)
+
+        %{
+          role: :tool,
+          content: result |> fetch_field(:result) |> format_value(),
+          tool_calls: [%{id: id}]
+        }
+      end)
+
+    [user, assistant | tool_messages]
+    |> Enum.reject(fn
+      %{role: :assistant, tool_calls: calls} -> calls == []
+      message -> blank_message?(message)
+    end)
+  end
+
+  defp normalize_history_tool_calls(%DSEx.Adapters.Types.ToolCalls{tool_calls: calls}),
+    do: Enum.map(calls, &DSEx.Adapters.Types.ToolCall.format/1)
+
+  defp normalize_history_tool_calls(calls) when is_list(calls) do
+    calls
+    |> DSEx.Adapters.Types.ToolCalls.new()
+    |> normalize_history_tool_calls()
+  end
+
+  defp normalize_history_tool_calls(_calls), do: []
+
+  defp blank_to_empty(nil), do: ""
+  defp blank_to_empty(value), do: to_string(value)
 
   defp history_input_fields(signature) do
     signature.inputs
@@ -428,7 +529,14 @@ defmodule DSEx.Adapter.Chat do
     |> MapSet.new()
   end
 
-  defp blank_message?(%{content: content}), do: String.trim(content) == ""
+  defp blank_message?(%{content: content}) when is_binary(content), do: String.trim(content) == ""
+
+  defp blank_message?(%{content: content}) when is_list(content) do
+    Enum.all?(content, fn
+      text when is_binary(text) -> String.trim(text) == ""
+      _part -> false
+    end)
+  end
 
   defp complete_demo?(signature, demo) do
     (signature.inputs ++ signature.outputs)

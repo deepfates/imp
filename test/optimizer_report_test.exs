@@ -36,6 +36,15 @@ defmodule OptimizerReportTest do
     {train, dev}
   end
 
+  test "JSON-safe optimizer values preserve structured tuple errors" do
+    value = %{error: {:metric_error, {:provider, :offline}}, lineage: [nil, {:parent, 2}]}
+
+    encoded = DSEx.Optimizer.Report.json_safe(value)
+
+    assert Jason.encode!(encoded) |> Jason.decode!() |> DSEx.Optimizer.Report.restore_json_safe() ==
+             value
+  end
+
   test "random search attaches candidate history and best score" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
@@ -56,6 +65,36 @@ defmodule OptimizerReportTest do
              report
 
     assert Enum.all?(report.candidates, &Map.has_key?(&1, :score))
+  end
+
+  test "upstream bootstrap random-search aliases delegate to the canonical optimizer" do
+    metric = DSEx.Metrics.exact_match(:answer)
+
+    assert %DSEx.Optimizer.RandomSearch{candidates: 2, demos_per_candidate: 1} =
+             DSEx.Optimizer.BootstrapRS.new(metric, candidates: 2, demos_per_candidate: 1)
+
+    assert %DSEx.Optimizer.RandomSearch{candidates: 3, demos_per_candidate: 2} =
+             DSEx.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+               candidates: 3,
+               demos_per_candidate: 2
+             )
+  end
+
+  test "InferRules preserves upstream name while using signature optimization" do
+    {_train, dev} = sets()
+    metric = DSEx.Metrics.exact_match(:answer)
+    program = DSEx.predict("question -> answer", lm: lm())
+
+    compiled =
+      metric
+      |> DSEx.Optimizer.InferRules.new(candidates: ["Always answer Paris."])
+      |> DSEx.Optimizer.InferRules.compile(program, [], dev)
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :infer_rules
+    assert report.metadata.implementation == DSEx.Optimizer.SignatureOptimizer
+    assert report.metadata.adapter == DSEx.Optimizer.InferRules
   end
 
   test "labeled few-shot reports selected demonstrations without scoring them" do
@@ -743,8 +782,10 @@ defmodule OptimizerReportTest do
     [%{role: :system}, %{role: :user, content: payload}] = messages
     decoded = Jason.decode!(payload)
 
-    assert decoded["signature"] == "x, context -> doubled"
-    assert decoded["lm_signature"] == "x, context -> program, tool, arguments"
+    assert get_in(decoded, ["program", "signature"]) == "x, context -> doubled"
+
+    assert get_in(decoded, ["program", "lm_signature"]) ==
+             "x, context -> program, tool, arguments"
 
     assert decoded["current_instruction"] ==
              "Given the fields `x`, `context`, produce the fields `doubled`."

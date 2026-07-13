@@ -99,7 +99,9 @@ defmodule DSEx.Predict.Predict do
              inputs,
              predict.demos
            ) do
-      {:ok, add_trace(prediction, trace_messages, trace_raw, trace_lm_metadata)}
+      prediction = add_trace(prediction, trace_messages, trace_raw, trace_lm_metadata)
+      DSEx.Optimizer.Trace.capture(predict, inputs, prediction)
+      {:ok, prediction}
     end
   end
 

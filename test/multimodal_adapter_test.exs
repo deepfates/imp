@@ -3,6 +3,91 @@ defmodule MultimodalAdapterTest do
 
   alias DSEx.Adapters.Types
 
+  @fixtures Path.join(__DIR__, "fixtures/multimodal")
+
+  test "chat adapter preserves typed image inputs as ordered message content" do
+    signature = DSEx.signature("question, image -> answer")
+
+    [%{role: :system}, %{role: :user, content: content}] =
+      DSEx.Adapter.Chat.format(
+        signature,
+        %{
+          question: "What landmark is shown?",
+          image: %Types.Image{
+            url: "https://example.com/eiffel-tower.jpg",
+            metadata: %{detail: "high"}
+          }
+        },
+        []
+      )
+
+    assert [prompt, %Types.Image{} = image, response_instruction] = content
+    assert prompt == "[[ ## question ## ]]\nWhat landmark is shown?\n\n[[ ## image ## ]]\n"
+    assert image.url == "https://example.com/eiffel-tower.jpg"
+    assert image.metadata == %{detail: "high"}
+    assert response_instruction =~ "Respond with the corresponding output fields"
+  end
+
+  test "chat adapter preserves typed images in signature-shaped history" do
+    signature = DSEx.signature("question, image, history -> answer")
+
+    history =
+      DSEx.history([
+        %{
+          question: "What was shown before?",
+          image: %Types.Image{url: "https://example.com/previous.jpg"},
+          answer: "A bridge"
+        }
+      ])
+
+    messages =
+      DSEx.Adapter.Chat.format(
+        signature,
+        %{question: "And now?", history: history},
+        []
+      )
+
+    assert [%{role: :system}, %{role: :user, content: prior}, %{role: :assistant} | _] =
+             messages
+
+    assert Enum.any?(prior, &match?(%Types.Image{url: "https://example.com/previous.jpg"}, &1))
+  end
+
+  test "provider-shaped OpenAI image request and response traverse Predict and ReqLLM" do
+    expected_user = fixture!("openai_image_request.json")
+    provider_response = fixture!("openai_image_response.json")
+    test_pid = self()
+
+    base_url =
+      DSEx.Test.LocalHTTP.start(fn request ->
+        send(test_pid, {:provider_request, request})
+        {200, provider_response}
+      end)
+
+    lm =
+      DSEx.req_llm("openai:gpt-4-turbo",
+        api_key: "sk-test",
+        base_url: base_url <> "/v1"
+      )
+
+    program = DSEx.predict("question, image -> answer", lm: lm)
+
+    assert {:ok, prediction} =
+             DSEx.call(program, %{
+               question: "What landmark is shown?",
+               image: %Types.Image{
+                 url: "https://example.com/eiffel-tower.jpg",
+                 metadata: %{detail: "high"}
+               }
+             })
+
+    assert DSEx.get(prediction, :answer) == "Eiffel Tower"
+    assert_received {:provider_request, %{body: body, path: "/v1/chat/completions"}}
+
+    request_body = Jason.decode!(body)
+    assert List.last(request_body["messages"]) == expected_user
+  end
+
   test "encodes image/audio/file/document/code content to OpenAI-compatible blocks" do
     blocks =
       Types.content_to_openai([
@@ -171,5 +256,12 @@ defmodule MultimodalAdapterTest do
     assert_raise ArgumentError, ~r/tool call requires :name/, fn ->
       Types.ToolCall.from_map(%{arguments: %{query: "x"}})
     end
+  end
+
+  defp fixture!(name) do
+    @fixtures
+    |> Path.join(name)
+    |> File.read!()
+    |> Jason.decode!()
   end
 end

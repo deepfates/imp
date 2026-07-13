@@ -26,6 +26,14 @@ defmodule ProviderTrainingLifecycleTest do
              body: Jason.encode!(%{id: "ftjob_123", status: "running", model: decoded["model"]})
            }}
 
+        String.ends_with?(url, "/fine_tuning/jobs/ftjob_123/cancel") ->
+          {:ok,
+           %{
+             status: 200,
+             headers: [],
+             body: Jason.encode!(%{id: "ftjob_123", status: "cancelled"})
+           }}
+
         String.ends_with?(url, "/fine_tuning/jobs/ftjob_123") ->
           {:ok,
            %{
@@ -50,12 +58,84 @@ defmodule ProviderTrainingLifecycleTest do
       decoded = Jason.decode!(body)
       send(self(), {:databricks_training_request, url, headers, decoded})
 
+      response =
+        cond do
+          String.ends_with?(url, "/dbx_1/cancel") ->
+            %{job_id: "dbx_1", state: "CANCELED"}
+
+          String.ends_with?(url, "/dbx_1") ->
+            %{job_id: "dbx_1", state: "SUCCESS", result_model: "dbx-model-output"}
+
+          true ->
+            %{job_id: "dbx_1", state: "PENDING", result_model: nil}
+        end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(response)}}
+    end
+  end
+
+  defmodule RetryTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(url, headers, body, _opts) do
+      attempt = Process.get({__MODULE__, url}, 0) + 1
+      Process.put({__MODULE__, url}, attempt)
+      send(self(), {:retry_training_request, attempt, headers, Jason.decode!(body)})
+
+      if attempt == 1 do
+        {:error, :connection_closed_after_write}
+      else
+        {:ok,
+         %{
+           status: 200,
+           headers: [],
+           body:
+             Jason.encode!(%{
+               id: "retry_job",
+               status: "running",
+               api_key: "sk-provider-response-secret-1234567890"
+             })
+         }}
+      end
+    end
+  end
+
+  defmodule SecretErrorTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts) do
       {:ok,
        %{
-         status: 200,
+         status: 400,
          headers: [],
-         body: Jason.encode!(%{job_id: "dbx_1", state: "pending", result_model: nil})
+         body: Jason.encode!(%{error: "sk-provider-error-secret-1234567890"})
        }}
+    end
+  end
+
+  defmodule RetryLifecycleTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(url, headers, body, _opts) do
+      attempt = Process.get({__MODULE__, url}, 0) + 1
+      Process.put({__MODULE__, url}, attempt)
+      send(self(), {:retry_lifecycle_request, url, attempt, headers})
+
+      if attempt == 1 do
+        {:ok, %{status: 503, headers: [], body: Jason.encode!(%{error: "try again"})}}
+      else
+        status = if String.ends_with?(url, "/cancel"), do: "cancelled", else: "succeeded"
+
+        response =
+          %{id: "retry_lifecycle_job", status: status}
+          |> Map.put(:fine_tuned_model, "retry-lifecycle-model")
+
+        assert Jason.decode!(body)["job_id"] == "retry_lifecycle_job"
+        {:ok, %{status: 200, headers: [], body: Jason.encode!(response)}}
+      end
     end
   end
 
@@ -82,6 +162,15 @@ defmodule ProviderTrainingLifecycleTest do
     def post(_url, _headers, _body, _opts), do: :not_an_http_response
   end
 
+  defmodule MissingJobIdTrainingTransport do
+    @behaviour DSEx.HTTP
+
+    @impl true
+    def post(_url, _headers, _body, _opts) do
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "running"})}}
+    end
+  end
+
   defmodule SecretRefreshTransport do
     @behaviour DSEx.HTTP
 
@@ -93,7 +182,12 @@ defmodule ProviderTrainingLifecycleTest do
        %{
          status: 200,
          headers: [],
-         body: Jason.encode!(%{id: "job_secret", status: "succeeded"})
+         body:
+           Jason.encode!(%{
+             id: "job_secret",
+             status: "succeeded",
+             fine_tuned_model: "model-secret-fixture"
+           })
        }}
     end
   end
@@ -141,13 +235,40 @@ defmodule ProviderTrainingLifecycleTest do
     assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
     assert refreshed.status == :succeeded
     assert refreshed.result_model == "ft:gpt-test:org:abc"
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-trained-program-#{System.unique_integer([:positive])}.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    assert {:ok, rebound} =
+             DSEx.Clients.TrainingJob.rebind(refreshed, program, path: path)
+
+    assert %DSEx.Clients.ReqLLM{model: "ft:gpt-test:org:abc"} =
+             DSEx.ProgramAccess.lm(rebound)
+
+    assert DSEx.ProgramAccess.get_metadata(rebound, :training_artifact) == %{
+             provider: :openai,
+             job_id: "ftjob_123",
+             base_model: "gpt-test",
+             result_model: "ft:gpt-test:org:abc"
+           }
+
+    loaded = DSEx.load!(path)
+    assert %DSEx.Clients.ReqLLM{model: "ft:gpt-test:org:abc"} = DSEx.ProgramAccess.lm(loaded)
+
     assert_received {^ref, [:dsex, :training, :submit, :start], _, %{provider: :openai}}
     assert_received {^ref, [:dsex, :training, :refresh, :start], _, %{job_id: "ftjob_123"}}
   end
 
   test "training jobs normalize provider lifecycle status at construction and refresh" do
     assert %DSEx.Clients.TrainingJob{status: :succeeded} =
-             DSEx.Clients.TrainingJob.new(%{status: "completed"})
+             DSEx.Clients.TrainingJob.new(%{status: "completed", result_model: "model-output"})
 
     assert %DSEx.Clients.TrainingJob{status: :pending} =
              DSEx.Clients.TrainingJob.new(%{status: "queued"})
@@ -159,6 +280,64 @@ defmodule ProviderTrainingLifecycleTest do
              DSEx.Clients.TrainingJob.new(%{status: "provider-paused"})
 
     assert DSEx.Clients.TrainingJob.normalize_status("canceled") == :cancelled
+
+    unknown = DSEx.Clients.TrainingJob.new(%{status: "provider-paused"})
+
+    assert DSEx.Clients.TrainingJob.load(DSEx.Clients.TrainingJob.dump(unknown)).status ==
+             {:unknown, "provider-paused"}
+  end
+
+  test "training success without a provider artifact cannot be rebound or reported as success" do
+    job = DSEx.Clients.TrainingJob.new(%{id: "job_no_artifact", status: "succeeded"})
+
+    assert job.status == :artifact_missing
+    assert job.metadata.error == :training_artifact_missing
+
+    program = DSEx.predict("question -> answer", lm: DSEx.req_llm("gpt-test"))
+    assert {:error, :training_artifact_missing} = DSEx.Clients.TrainingJob.rebind(job, program)
+
+    whitespace = DSEx.Clients.TrainingJob.new(%{status: "succeeded", result_model: "  "})
+    assert whitespace.status == :artifact_missing
+
+    assert DSEx.Clients.TrainingJob.load(DSEx.Clients.TrainingJob.dump(whitespace)).status ==
+             :artifact_missing
+
+    raw_callback = fn _lm, _examples, _opts ->
+      {:ok, %DSEx.Clients.TrainingJob{id: "raw", status: :succeeded, metadata: %{}}}
+    end
+
+    assert {:ok, callback_job} =
+             DSEx.Clients.Trainer.finetune(
+               raw_callback,
+               DSEx.req_llm("gpt-test"),
+               examples()
+             )
+
+    assert callback_job.status == :artifact_missing
+  end
+
+  test "OpenAI training jobs expose provider-shaped cancellation" do
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport,
+        training_file: "file-abc"
+      )
+
+    assert {:ok, job} =
+             DSEx.Clients.Trainer.finetune(trainer, DSEx.req_llm("gpt-test"), examples())
+
+    assert job.cancel_url == "https://api.example/v1/fine_tuning/jobs/ftjob_123/cancel"
+    assert {:ok, cancelled} = DSEx.Clients.TrainingJob.cancel(job)
+    assert cancelled.status == :cancelled
+
+    assert_received {:openai_training_request,
+                     "https://api.example/v1/fine_tuning/jobs/ftjob_123/cancel", _headers,
+                     %{"job_id" => "ftjob_123"}}
+
+    unsupported = %{job | cancel_url: nil}
+    assert {:error, :training_cancel_not_supported} = DSEx.Clients.TrainingJob.cancel(unsupported)
   end
 
   test "training jobs accept decoded provider-style attrs and reject malformed attrs clearly" do
@@ -221,6 +400,136 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
     assert refreshed.status == :succeeded
+
+    trainer =
+      DSEx.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test-secret-1234567890",
+        training_file: "file-abc"
+      )
+
+    refute inspect(trainer) =~ "sk-test-secret-1234567890"
+    assert inspect(trainer) =~ "[REDACTED]"
+  end
+
+  test "training job checkpoint is credential-free and resumes refresh explicitly" do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-training-job-#{System.unique_integer([:positive])}.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
+    job =
+      DSEx.Clients.TrainingJob.new(%{
+        id: "job_secret",
+        provider: :openai,
+        model: "gpt-test",
+        status: :running,
+        training_data: [%{authorization: "Bearer abcdefghijklmnop"}],
+        status_url: "https://trainer.example/jobs/job_secret",
+        api_key: "sk-test-secret-1234567890",
+        transport: SecretRefreshTransport,
+        metadata: %{api_key: "sk-metadata-secret-1234567890"}
+      })
+
+    assert :ok = DSEx.Clients.TrainingJob.save!(job, path)
+    persisted = File.read!(path)
+    refute persisted =~ "sk-test-secret-1234567890"
+    refute persisted =~ "sk-metadata-secret-1234567890"
+    refute persisted =~ "abcdefghijklmnop"
+
+    resumed =
+      DSEx.Clients.TrainingJob.load!(path,
+        transport: SecretRefreshTransport,
+        api_key: "sk-test-secret-1234567890"
+      )
+
+    assert resumed.provider == :openai
+    assert resumed.api_key == "sk-test-secret-1234567890"
+    assert {:ok, completed} = DSEx.Clients.TrainingJob.refresh(resumed)
+    assert completed.status == :succeeded
+    assert completed.result_model == "model-secret-fixture"
+  end
+
+  test "generic HTTP trainer retries ambiguous submission with one stable idempotency key" do
+    Process.delete({RetryTrainingTransport, "https://trainer.example/jobs"})
+
+    trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: RetryTrainingTransport,
+        max_attempts: 2,
+        retry_backoff_ms: 0
+      )
+
+    assert {:ok, job} =
+             DSEx.Clients.Trainer.finetune(
+               trainer,
+               DSEx.req_llm("gpt-test"),
+               examples(),
+               idempotency_key: "training-request-123"
+             )
+
+    assert job.idempotency_key == "training-request-123"
+    assert job.metadata["submit_response"]["api_key"] == "[REDACTED]"
+
+    assert_received {:retry_training_request, 1, first_headers, first_payload}
+    assert_received {:retry_training_request, 2, second_headers, ^first_payload}
+    assert {"idempotency-key", "training-request-123"} in first_headers
+    assert {"idempotency-key", "training-request-123"} in second_headers
+  end
+
+  test "training jobs retry transient refresh and cancel failures idempotently" do
+    status_url = "https://trainer.example/jobs/retry_lifecycle_job"
+    cancel_url = status_url <> "/cancel"
+    Process.delete({RetryLifecycleTransport, status_url})
+    Process.delete({RetryLifecycleTransport, cancel_url})
+
+    job =
+      DSEx.Clients.TrainingJob.new(%{
+        id: "retry_lifecycle_job",
+        provider: :test,
+        status: :running,
+        status_url: status_url,
+        cancel_url: cancel_url,
+        transport: RetryLifecycleTransport,
+        idempotency_key: "retry-lifecycle-request",
+        max_attempts: 2,
+        retry_backoff_ms: 0
+      })
+
+    assert {:ok, completed} = DSEx.Clients.TrainingJob.refresh(job)
+    assert completed.status == :succeeded
+    assert completed.result_model == "retry-lifecycle-model"
+
+    assert_received {:retry_lifecycle_request, ^status_url, 1, first_refresh_headers}
+    assert_received {:retry_lifecycle_request, ^status_url, 2, second_refresh_headers}
+
+    assert {"idempotency-key", "retry-lifecycle-request:refresh"} in first_refresh_headers
+    assert {"idempotency-key", "retry-lifecycle-request:refresh"} in second_refresh_headers
+
+    assert {:ok, cancelled} = DSEx.Clients.TrainingJob.cancel(job)
+    assert cancelled.status == :cancelled
+
+    assert_received {:retry_lifecycle_request, ^cancel_url, 1, first_cancel_headers}
+    assert_received {:retry_lifecycle_request, ^cancel_url, 2, second_cancel_headers}
+    assert {"idempotency-key", "retry-lifecycle-request:cancel"} in first_cancel_headers
+    assert {"idempotency-key", "retry-lifecycle-request:cancel"} in second_cancel_headers
+  end
+
+  test "HTTP training failures redact provider secrets" do
+    trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: SecretErrorTrainingTransport,
+        max_attempts: 1
+      )
+
+    assert {:error, {:http_error, 400, body}} =
+             DSEx.Clients.Trainer.finetune(trainer, DSEx.req_llm("gpt-test"), examples())
+
+    assert body =~ "[REDACTED]"
+    refute body =~ "sk-provider-error-secret"
   end
 
   test "OpenAI trainer requires an uploaded training file id" do
@@ -326,6 +635,14 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:error, {:invalid_training_job, "mapper exploded"}} =
              DSEx.Clients.Trainer.finetune(mapper_trainer, lm, examples(), [])
+
+    missing_id_trainer =
+      DSEx.Clients.HTTPTrainer.new(:test, "https://trainer.example/jobs",
+        transport: MissingJobIdTrainingTransport
+      )
+
+    assert {:error, :training_job_id_missing} =
+             DSEx.Clients.Trainer.finetune(missing_id_trainer, lm, examples(), [])
   end
 
   test "HTTP trainer validates direct call inputs before transport work starts" do
@@ -402,7 +719,7 @@ defmodule ProviderTrainingLifecycleTest do
     Process.delete(:previous_training_openai_api_key)
   end
 
-  test "Databricks trainer submits expected payload and auth" do
+  test "Databricks trainer executes submit refresh cancel and artifact lifecycle" do
     lm = DSEx.req_llm("databricks-meta-llama")
 
     trainer =
@@ -429,6 +746,17 @@ defmodule ProviderTrainingLifecycleTest do
     assert payload["task_type"] == "grpo"
     assert payload["config"] == %{"learning_rate" => 1.0e-5}
     assert [%{"question" => "2+2?", "answer" => "4"}] = payload["train_data"]
+
+    assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
+    assert refreshed.status == :succeeded
+    assert refreshed.result_model == "dbx-model-output"
+
+    program = DSEx.predict("question -> answer", lm: lm)
+    assert {:ok, rebound} = DSEx.Clients.TrainingJob.rebind(refreshed, program)
+    assert DSEx.ProgramAccess.lm(rebound).model == "dbx-model-output"
+
+    assert {:ok, cancelled} = DSEx.Clients.TrainingJob.cancel(job)
+    assert cancelled.status == :cancelled
   end
 
   test "BootstrapFinetune accepts provider trainer structs" do

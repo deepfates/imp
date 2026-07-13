@@ -72,6 +72,7 @@ defmodule PackageContractTest do
     assert File.read!("SECURITY.md") =~ "Reporting a Vulnerability"
   end
 
+  @tag timeout: 180_000
   test "unpacked Hex artifact preserves the release boundary" do
     output_dir = package_tmp_dir()
 

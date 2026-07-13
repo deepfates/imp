@@ -93,6 +93,13 @@ defmodule DSEx.Optimizer.Report do
 
   defp dump_value(list) when is_list(list), do: Enum.map(list, &dump_value/1)
 
+  defp dump_value(tuple) when is_tuple(tuple) do
+    %{
+      "__dsex_type__" => "tuple",
+      "items" => tuple |> Tuple.to_list() |> Enum.map(&dump_value/1)
+    }
+  end
+
   defp dump_value(value) when is_atom(value),
     do: %{"__dsex_type__" => "atom", "value" => Atom.to_string(value)}
 
@@ -115,6 +122,10 @@ defmodule DSEx.Optimizer.Report do
     |> DSEx.Example.new()
     |> maybe_with_inputs(load_value(Map.get(state, "input_keys")))
     |> maybe_with_demos(load_value(Map.get(state, "demos", [])))
+  end
+
+  defp load_value(%{"__dsex_type__" => "tuple", "items" => items}) when is_list(items) do
+    items |> Enum.map(&load_value/1) |> List.to_tuple()
   end
 
   defp load_value(map) when is_map(map),

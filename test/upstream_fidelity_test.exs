@@ -25,7 +25,7 @@ defmodule DSEx.UpstreamFidelityTest do
     assert by_id["programming.contracts"].status == :conformant
     assert by_id["models.runtime"].status == :elixir_native_equivalent
     assert by_id["models.normalized_runtime_prerelease"].status == :tracking
-    assert by_id["agents.react_family"].status == :gap
+    assert by_id["agents.react_family"].status == :conformant
     assert by_id["optimization.instructions"].status == :gap
     assert by_id["product.release"].status == :gap
 

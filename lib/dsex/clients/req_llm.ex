@@ -276,12 +276,16 @@ defmodule DSEx.Clients.ReqLLM do
 
   defp content_to_req(content), do: content_to_text(content)
 
-  defp content_part(%DSEx.Adapters.Types.Image{url: url}) when is_binary(url),
-    do: [ReqLLM.Message.ContentPart.image_url(url)]
+  defp content_part(%DSEx.Adapters.Types.Image{url: url, metadata: metadata}) when is_binary(url),
+    do: [ReqLLM.Message.ContentPart.image_url(url, metadata)]
 
-  defp content_part(%DSEx.Adapters.Types.Image{data: data, mime_type: mime_type})
+  defp content_part(%DSEx.Adapters.Types.Image{
+         data: data,
+         mime_type: mime_type,
+         metadata: metadata
+       })
        when is_binary(data),
-       do: [ReqLLM.Message.ContentPart.image(data, mime_type || "image/png")]
+       do: [ReqLLM.Message.ContentPart.image(data, mime_type || "image/png", metadata)]
 
   defp content_part(%DSEx.Adapters.Types.File{data: data, mime_type: mime_type})
        when is_binary(data),

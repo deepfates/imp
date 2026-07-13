@@ -47,7 +47,7 @@ defmodule OptimizeGEPATest do
     assert Enum.any?(report.candidates, &(&1.mutation =~ "Paris"))
     assert report.best.aggregate_score == 1.0
     assert report.best.parent_id in ["baseline", "gepa-1", nil]
-    assert report.metadata.parent_sampling == :pareto_round_robin
+    assert report.metadata.parent_sampling == :pareto_coverage_weighted
     assert report.metadata.component_selector == :actionable_side_information
     assert report.metadata.merge_strategy == :pareto_frontier_union
   end
@@ -317,6 +317,147 @@ defmodule OptimizeGEPATest do
     assert report.best.metadata.dev_score == 0.0
     assert report.best.metadata.dev_error == RuntimeError
     assert Enum.any?(report.errors, &(&1.candidate_id == report.best.id))
+  end
+
+  test "checkpoints evolution state and resumes without reevaluating completed generations" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+    {:ok, calls} = Agent.start_link(fn -> %{} end)
+    {:ok, saved} = Agent.start_link(fn -> nil end)
+
+    evaluator = fn candidate, examples ->
+      Agent.update(calls, &Map.update(&1, candidate.id, 1, fn count -> count + 1 end))
+
+      %{
+        per_example_scores:
+          Enum.map(examples, &if(String.contains?(candidate.text, &1), do: 1.0, else: 0.0)),
+        asi: Enum.reject(examples, &String.contains?(candidate.text, &1))
+      }
+    end
+
+    checkpoint_fn = fn state ->
+      Agent.update(saved, fn _ -> state end)
+
+      if length(state["candidates"]) == 2 do
+        raise "simulated interruption"
+      end
+
+      :ok
+    end
+
+    assert_raise RuntimeError, "simulated interruption", fn ->
+      GEPA.optimize(artifact, evaluator,
+        examples: ["one", "two"],
+        generations: 2,
+        mutation_fn: fn _artifact, asi, _generation -> Enum.join(asi, "\n") end,
+        checkpoint_fn: checkpoint_fn
+      )
+    end
+
+    state = saved |> Agent.get(& &1) |> Jason.encode!() |> Jason.decode!()
+    assert state["schema_version"] == 2
+    assert %{"algorithm" => "exsss", "words" => [_ | _]} = state["rng_state"]
+    assert Enum.map(state["candidates"], & &1["id"]) == ["baseline", "gepa-1"]
+    calls_before_resume = Agent.get(calls, & &1)
+
+    report =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["one", "two"],
+        generations: 2,
+        mutation_fn: fn _artifact, asi, _generation -> Enum.join(asi, "\n") end,
+        resume_state: state
+      )
+
+    calls_after_resume = Agent.get(calls, & &1)
+    assert calls_after_resume[artifact.id] == calls_before_resume[artifact.id]
+    assert calls_after_resume["gepa-1"] == calls_before_resume["gepa-1"]
+    assert calls_after_resume["gepa-2"] == 1
+    assert report.best.aggregate_score == 1.0
+  end
+
+  test "checkpoint resume preserves the seeded Pareto sampling sequence" do
+    artifact = Anything.new_artifact(:prompt, "base")
+
+    evaluator = fn candidate, examples ->
+      %{
+        per_example_scores:
+          Enum.map(examples, &if(String.contains?(candidate.text, &1), do: 1.0, else: 0.0)),
+        asi: examples
+      }
+    end
+
+    mutation = fn _artifact, _asi, generation ->
+      {:replace, Enum.at(["a", "b", "a b", "a", "b"], generation - 1)}
+    end
+
+    uninterrupted =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["a", "b"],
+        generations: 5,
+        seed: 19,
+        mutation_fn: mutation
+      )
+
+    receiver = self()
+
+    assert_raise RuntimeError, "interrupt", fn ->
+      GEPA.optimize(artifact, evaluator,
+        examples: ["a", "b"],
+        generations: 5,
+        seed: 19,
+        mutation_fn: mutation,
+        checkpoint_fn: fn state ->
+          if length(state["candidates"]) == 4 do
+            send(receiver, {:resume_state, state})
+            raise "interrupt"
+          end
+
+          :ok
+        end
+      )
+    end
+
+    assert_receive {:resume_state, resume_state}
+
+    resumed =
+      GEPA.optimize(artifact, evaluator,
+        examples: ["a", "b"],
+        generations: 5,
+        seed: 999,
+        mutation_fn: mutation,
+        resume_state: resume_state
+      )
+
+    lineage = fn report -> Enum.map(report.candidates, &{&1.id, &1.parent_id}) end
+    assert lineage.(resumed) == lineage.(uninterrupted)
+  end
+
+  test "rejects resume state from a different baseline artifact" do
+    artifact = Anything.new_artifact(:prompt, "Base")
+
+    evaluator = fn _artifact, examples ->
+      %{per_example_scores: Enum.map(examples, fn _ -> 1.0 end)}
+    end
+
+    send_state = self()
+
+    GEPA.optimize(artifact, evaluator,
+      examples: [:example],
+      generations: 0,
+      checkpoint_fn: fn state ->
+        send(send_state, {:checkpoint, state})
+        :ok
+      end
+    )
+
+    assert_receive {:checkpoint, state}
+
+    assert_raise ArgumentError, ~r/resume state/, fn ->
+      GEPA.optimize(Anything.new_artifact(:prompt, "Changed"), evaluator,
+        examples: [:example],
+        generations: 0,
+        resume_state: state
+      )
+    end
   end
 
   test "covers single-task multi-task and held-out generalization behavior" do

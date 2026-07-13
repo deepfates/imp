@@ -47,7 +47,8 @@ defmodule DSEx.Evaluate do
     display_progress: false,
     failure_score: 0.0,
     max_errors: :infinity,
-    max_concurrency: 1
+    max_concurrency: 1,
+    timeout: 5000
   ]
 
   @option_schema [
@@ -57,7 +58,8 @@ defmodule DSEx.Evaluate do
       type: {:custom, __MODULE__, :validate_max_errors, []},
       default: :infinity
     ],
-    max_concurrency: [type: :pos_integer, default: 1]
+    max_concurrency: [type: :pos_integer, default: 1],
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5000]
   ]
 
   def new(devset, metric, opts \\ []) do
@@ -71,7 +73,8 @@ defmodule DSEx.Evaluate do
       display_progress: opts[:display_progress],
       failure_score: opts[:failure_score],
       max_errors: opts[:max_errors],
-      max_concurrency: opts[:max_concurrency]
+      max_concurrency: opts[:max_concurrency],
+      timeout: opts[:timeout]
     }
   end
 
@@ -111,7 +114,8 @@ defmodule DSEx.Evaluate do
     |> DSEx.Tasks.async_stream(
       fn {example, index} -> evaluate_row(evaluator, program, example, index) end,
       ordered: true,
-      max_concurrency: evaluator.max_concurrency
+      max_concurrency: evaluator.max_concurrency,
+      timeout: evaluator.timeout
     )
     |> Enum.reduce_while({[], []}, fn
       {:ok, {row, error}}, {rows, errors} ->

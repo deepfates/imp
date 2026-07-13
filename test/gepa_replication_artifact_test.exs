@@ -86,6 +86,76 @@ defmodule GepaReplicationArtifactTest do
            ]
   end
 
+  test "GEPA replication contract rejects duplicate and unknown family rows" do
+    rows = full_rows()
+    duplicate = rows ++ [hd(rows)]
+    unknown = rows ++ [Map.put(hd(rows), "family", "UnknownBench")]
+
+    duplicate_validation =
+      DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(duplicate)
+
+    refute duplicate_validation.passing
+    assert duplicate_validation.duplicate_families == ["AIMEBench"]
+    assert duplicate_validation.unknown_families == []
+
+    unknown_validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(unknown)
+    refute unknown_validation.passing
+    assert unknown_validation.unknown_families == ["UnknownBench"]
+  end
+
+  test "GEPA research evidence rejects configured budgets presented as metric-call counts" do
+    rows =
+      Enum.map(full_rows(), fn row ->
+        row
+        |> Map.delete("metric_call_evidence")
+        |> Map.put("metric_calls", get_in(row, ["optimizer_budgets", "dsex_gepa"]))
+      end)
+
+    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+
+    refute validation.passing
+
+    assert %{"family" => "AIMEBench", "field" => "metric_call_evidence"} in validation.missing_fields
+
+    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(full_artifact(rows))
+  end
+
+  test "GEPA research evidence rejects non-observed call bases and unenforced counts" do
+    [configured_row, unenforced_row | rest] = full_rows()
+
+    configured =
+      put_in(configured_row, ["metric_call_evidence", "basis"], "configured_budget")
+
+    unenforced =
+      unenforced_row
+      |> put_in(["metric_call_evidence", "enforced_limits", "dsex_gepa"], false)
+
+    rows = [configured, unenforced | rest]
+    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+
+    refute validation.passing
+
+    assert %{"family" => "AIMEBench", "field" => "metric_call_evidence"} in validation.missing_fields
+
+    assert %{"family" => "HotpotQABench", "field" => "metric_call_evidence"} in validation.missing_fields
+  end
+
+  test "GEPA research evidence rejects best-test seed selection" do
+    rows =
+      Enum.map(full_rows(), fn row ->
+        row
+        |> put_in(["seed_selection", "dsex_gepa", "method"], "best_test")
+        |> put_in(["seed_selection", "dsex_gepa", "selection_split"], "test")
+        |> put_in(["seed_selection", "dsex_gepa", "test_scores_used"], true)
+      end)
+
+    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+
+    refute validation.passing
+    assert %{"family" => "AIMEBench", "field" => "seed_selection"} in validation.missing_fields
+    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(full_artifact(rows))
+  end
+
   test "GEPA replication task rejects Papillon research rows without judge metadata" do
     out_dir = tmp_dir("gepa-replication-papillon-judge")
 
@@ -115,6 +185,42 @@ defmodule GepaReplicationArtifactTest do
     artifact = path |> File.read!() |> Jason.decode!()
 
     assert %{"family" => "Papillon", "field" => "metric_judge"} in artifact["summary"][
+             "missing_fields"
+           ]
+  end
+
+  test "GEPA replication task rejects capped dataset rows for full research claims" do
+    out_dir = tmp_dir("gepa-replication-capped-dataset")
+
+    capped =
+      Enum.map(full_rows(), fn row ->
+        row
+        |> put_in(["dataset", "scope"], "capped")
+        |> put_in(["dataset", "max_per_split"], 1)
+        |> put_in(["dataset", "split_counts"], %{"train" => 1, "dev" => 1, "test" => 1})
+      end)
+
+    input_path = write_rows!("capped-gepa", capped)
+
+    assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
+      capture_io(fn ->
+        Mix.Task.reenable("dsex.benchmark.gepa_replication")
+
+        Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+          "--input",
+          input_path,
+          "--out",
+          out_dir
+        ])
+      end)
+    end
+
+    [path] = Path.wildcard(Path.join(out_dir, "gepa-replication-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    refute artifact["summary"]["full_gepa_replication"]
+
+    assert %{"family" => "AIMEBench", "field" => "dataset"} in artifact["summary"][
              "missing_fields"
            ]
   end
@@ -210,6 +316,19 @@ defmodule GepaReplicationArtifactTest do
     end)
   end
 
+  defp full_artifact(rows) do
+    %{
+      "runner" => "dsex-gepa-replication",
+      "source" => %{"mode" => "input"},
+      "summary" => %{
+        "all_passing" => true,
+        "full_gepa_replication" => true,
+        "evidence_level" => "research_campaign"
+      },
+      "rows" => rows
+    }
+  end
+
   defp write_upstream_gepa_results!(artifact_dir, model) do
     Enum.each(full_rows(), fn row ->
       family = row["family"]
@@ -258,9 +377,32 @@ defmodule GepaReplicationArtifactTest do
         "dsex_gepa" => budget,
         "mipro_v2" => budget
       },
+      "metric_call_evidence" => %{
+        "basis" => "observed_and_enforced",
+        "source" => "runtime metric callback counters and optimizer limit checks",
+        "observed" => %{
+          "baseline" => 1,
+          "dspy_gepa" => budget - 3,
+          "dsex_gepa" => budget - 2,
+          "mipro_v2" => budget - 1
+        },
+        "enforced_limits" => %{
+          "baseline" => true,
+          "dspy_gepa" => true,
+          "dsex_gepa" => true,
+          "mipro_v2" => true
+        }
+      },
       "dataset" => %{
         "source" => "github.com/gepa-ai/gepa-artifact@abcdef1",
         "split" => "train_dev_test",
+        "scope" => "full",
+        "max_per_split" => nil,
+        "split_counts" => %{
+          "train" => 100,
+          "dev" => 50,
+          "test" => 50
+        },
         "checksums" => %{
           "train" => "sha256:#{family}:train",
           "dev" => "sha256:#{family}:dev",
@@ -280,6 +422,12 @@ defmodule GepaReplicationArtifactTest do
       },
       "wall_clock_ms" => 12_345,
       "seed_variance" => %{"seeds" => [0, 1, 2], "stddev" => 0.01},
+      "seed_selection" => %{
+        "baseline" => seed_selection("predeclared", nil, 0),
+        "dspy_gepa" => seed_selection("best_dev", "dev", 1),
+        "dsex_gepa" => seed_selection("best_dev", "dev", 1),
+        "mipro_v2" => seed_selection("best_dev", "dev", 1)
+      },
       "train_dev_test_gap" => %{
         "train" => 0.8,
         "dev" => 0.75,
@@ -299,6 +447,18 @@ defmodule GepaReplicationArtifactTest do
       }
     }
 
+    row =
+      if family == "hoverBench" do
+        put_in(row, ["dataset", "retrieval"], %{
+          "verified" => true,
+          "implementation" => "upstream_python_bm25s",
+          "corpus_checksum" => "sha256:" <> String.duplicate("1", 64),
+          "index_checksum" => "sha256:" <> String.duplicate("2", 64)
+        })
+      else
+        row
+      end
+
     if family == "Papillon" do
       Map.put(row, "metric_judge", %{
         "kind" => "papillon_quality_leakage",
@@ -312,5 +472,16 @@ defmodule GepaReplicationArtifactTest do
     else
       row
     end
+  end
+
+  defp seed_selection(method, split, selected_seed) do
+    %{
+      "method" => method,
+      "selection_split" => split,
+      "selected_seed" => selected_seed,
+      "seeds" => [0, 1, 2],
+      "test_scores_used" => false,
+      "source" => "campaign seed manifest and dev-only selection trace"
+    }
   end
 end

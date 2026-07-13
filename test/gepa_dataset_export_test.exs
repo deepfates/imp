@@ -21,6 +21,14 @@ defmodule GepaDatasetExportTest do
 
     families = Path.join(out, "families.json") |> File.read!() |> Jason.decode!()
     assert families["runner"] == "gepa_export_dataset_root.py"
+    assert families["dataset_scope"] == "capped"
+    assert families["max_per_split"] == 1
+
+    assert families["dataset_aliases"] == %{
+             "hotpot_qa" => "hotpotqa/hotpot_qa",
+             "hover" => "hover-nlp/hover"
+           }
+
     assert length(families["families"]) == 6
 
     assert Enum.all?(families["families"], fn spec ->
@@ -29,6 +37,8 @@ defmodule GepaDatasetExportTest do
              File.exists?(Path.join([out, family, "train.jsonl"])) and
                File.exists?(Path.join([out, family, "dev.jsonl"])) and
                File.exists?(Path.join([out, family, "test.jsonl"])) and
+               spec["dataset_scope"] == "capped" and
+               spec["max_per_split"] == 1 and
                spec["split_counts"] == %{"dev" => 1, "test" => 1, "train" => 1} and
                spec["split_checksums"]["train"] =~ "sha256:"
            end)

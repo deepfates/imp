@@ -4,7 +4,7 @@ defmodule DSEx.Predict.RLM.SandboxSerializable do
 
   Use this for large or expensive inputs that should be advertised to the RLM
   controller as metadata before the full value is loaded into the sandbox state.
-  The controller loads it with `%{action: "load", name: "context"}`.
+  Controller code loads it with `context = load("context")`.
   """
 
   defstruct [:name, :loader, metadata: %{}]

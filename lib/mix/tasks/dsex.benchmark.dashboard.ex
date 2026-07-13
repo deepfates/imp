@@ -17,6 +17,23 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
   @default_results_dir "benchmarks/results"
+  @instruction_optimizer_tier "t1_instruction_optimizer_differential_contract"
+  @instruction_optimizer_dspy_version "3.3.0b1"
+  @instruction_optimizer_dspy_commit "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+  @instruction_optimizer_sources %{
+    "dspy/propose/grounded_proposer.py" =>
+      "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3",
+    "dspy/teleprompt/bootstrap.py" =>
+      "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255",
+    "dspy/teleprompt/mipro_optimizer_v2.py" =>
+      "6bf7632836d3a54ab0da3f38a8f1963813472312e9c0e3f2ff19b4377af407f3",
+    "dspy/teleprompt/simba.py" =>
+      "4de72e1d0cb1cd30a180569c21973c41fa272c3ebb82a365e3f307986ab67a55",
+    "dspy/teleprompt/simba_utils.py" =>
+      "ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c",
+    "dspy/teleprompt/utils.py" =>
+      "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182"
+  }
 
   @impl true
   def run(args) do
@@ -28,6 +45,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           trace_dir: :string,
           overhead_dir: :string,
           optimizer_dir: :string,
+          instruction_optimizer_dir: :string,
           gepa_dir: :string,
           rag_tool_agent_dir: :string,
           rlm_dir: :string,
@@ -61,6 +79,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp dashboard(opts) do
     max_age_hours = Keyword.get(opts, :max_age_hours, 24)
+
+    instruction_optimizer_contract =
+      instruction_optimizer_contract_lane(
+        Keyword.get(opts, :instruction_optimizer_dir, "tmp/instruction-optimizer-contract"),
+        max_age_hours
+      )
+
+    optimizer_lift =
+      optimizer_lift_lane(
+        Keyword.get(opts, :optimizer_dir, "tmp/optimizer-lift"),
+        max_age_hours,
+        instruction_optimizer_contract
+      )
 
     lanes = %{
       "product_package" =>
@@ -99,11 +130,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           results_dir(opts),
           max_age_hours
         ),
-      "optimizer_lift" =>
-        optimizer_lift_lane(
-          Keyword.get(opts, :optimizer_dir, "tmp/optimizer-lift"),
-          max_age_hours
-        ),
+      "instruction_optimizer_contract" => instruction_optimizer_contract,
+      "optimizer_lift" => optimizer_lift,
       "gepa_replication" =>
         gepa_replication_lane(
           Keyword.get(opts, :gepa_dir, "tmp/gepa-replication"),
@@ -130,6 +158,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "protocol_gates",
       "golden_trace",
       "live_matched_model",
+      "instruction_optimizer_contract",
       "optimizer_lift",
       "gepa_replication",
       "rag_tool_agent",
@@ -448,11 +477,107 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp optimizer_lift_lane(dir, max_age_hours) do
+  defp instruction_optimizer_contract_lane(dir, max_age_hours) do
+    with {:ok, path} <- latest(Path.join(dir, "instruction-optimizer-contract-*.json")),
+         {:ok, artifact} <- read_artifact(path) do
+      authority = instruction_optimizer_authority(artifact)
+      required_cases = get_in(artifact, ["summary", "required_cases"])
+      required_passing = get_in(artifact, ["summary", "required_passing"])
+
+      structural_complete =
+        get_in(artifact, ["summary", "structural_contract_complete"]) == true and
+          is_integer(required_cases) and required_cases > 0 and required_passing == required_cases
+
+      passing = structural_complete and authority["complete"]
+
+      blockers =
+        []
+        |> maybe_add_requirement(not structural_complete, %{
+          "kind" => "instruction_optimizer_structural_contract_failed",
+          "message" => "The required MIPROv2/SIMBA structural differential did not pass."
+        })
+        |> maybe_add_requirement(not authority["complete"], %{
+          "kind" => "instruction_optimizer_authority_mismatch",
+          "authority" => authority,
+          "message" => "The structural differential does not match the pinned DSPy authority."
+        })
+
+      artifact_lane("instruction_optimizer_contract", path, artifact, max_age_hours,
+        passing: passing,
+        full_evidence: passing,
+        scale: "full",
+        summary: %{
+          "evidence_tier" => artifact["evidence_tier"],
+          "required_cases" => required_cases,
+          "required_passing" => required_passing,
+          "structural_contract_complete" => structural_complete,
+          "authority" => authority,
+          "declared_native_deviations" => artifact["declared_native_deviations"] || []
+        },
+        limitation:
+          if(passing,
+            do:
+              "T1 structural control-flow parity is established; optimizer effectiveness and exact RNG/sampler sequence parity remain separate claims.",
+            else:
+              "Instruction-optimizer structural evidence is failed or does not match the pinned DSPy authority."
+          ),
+        blocking_requirements: blockers
+      )
+    else
+      _ ->
+        missing_lane(
+          "instruction_optimizer_contract",
+          "no instruction-optimizer-contract artifact found in #{dir}"
+        )
+    end
+  end
+
+  defp instruction_optimizer_authority(artifact) do
+    dspy = if is_map(artifact["dspy"]), do: artifact["dspy"], else: %{}
+
+    actual_sources =
+      dspy
+      |> Map.get("sources", [])
+      |> Map.new(fn
+        %{"path" => path, "sha256" => hash} when is_binary(path) and is_binary(hash) ->
+          {path, hash}
+
+        _source ->
+          {nil, nil}
+      end)
+
+    checks = %{
+      "evidence_tier" => artifact["evidence_tier"] == @instruction_optimizer_tier,
+      "dspy_version" => dspy["version"] == @instruction_optimizer_dspy_version,
+      "dspy_commit" => dspy["commit"] == @instruction_optimizer_dspy_commit,
+      "source_hashes" => actual_sources == @instruction_optimizer_sources
+    }
+
+    %{
+      "complete" => Enum.all?(checks, fn {_id, passing} -> passing end),
+      "checks" => checks,
+      "expected_dspy_version" => @instruction_optimizer_dspy_version,
+      "expected_dspy_commit" => @instruction_optimizer_dspy_commit,
+      "expected_sources" => @instruction_optimizer_sources
+    }
+  end
+
+  defp optimizer_lift_lane(dir, max_age_hours, instruction_optimizer_contract) do
     with {:ok, path} <- latest(Path.join(dir, "optimizer-lift-parity-*.json")),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
-      full = get_in(artifact, ["summary", "full_optimizer_parity"]) == true
+      reported_full = get_in(artifact, ["summary", "full_optimizer_parity"]) == true
+      structural_complete = instruction_optimizer_contract["full_evidence"] == true
+      full = reported_full and structural_complete
+
+      blockers =
+        maybe_add_requirement([], not structural_complete, %{
+          "kind" => "instruction_optimizer_contract_required",
+          "lane" => "instruction_optimizer_contract",
+          "status" => instruction_optimizer_contract["status"],
+          "message" =>
+            "Full optimizer parity requires a fresh, passing pinned instruction-optimizer structural contract."
+        })
 
       artifact_lane("optimizer_lift", path, artifact, max_age_hours,
         passing: passing,
@@ -465,14 +590,22 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "dsex_only_or_deviation" => get_in(artifact, ["summary", "dsex_only_or_deviation"]),
           "direct_optimizers" => row_names_by_status(artifact, "direct"),
           "dsex_only_or_deviation_optimizers" => non_direct_row_names(artifact),
+          "reported_full_optimizer_parity" => reported_full,
+          "instruction_optimizer_contract_complete" => structural_complete,
           "full_optimizer_parity" => full
         },
         limitation:
-          if(full,
-            do: nil,
-            else:
+          cond do
+            not structural_complete ->
+              "Optimizer lift cannot authorize full parity without fresh pinned MIPROv2/SIMBA structural differential evidence."
+
+            full ->
+              nil
+
+            true ->
               "Optimizer lift artifact is passing as a sample, but direct DSPy comparisons do not yet cover every production optimizer/trainer path."
-          )
+          end,
+        blocking_requirements: blockers
       )
     else
       _ -> missing_lane("optimizer_lift", "no optimizer-lift-parity artifact found in #{dir}")
@@ -575,24 +708,29 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     with {:ok, path} <- latest(Path.join(dir, "rlm-benchmark-parity-*.json")),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
-      full = get_in(artifact, ["summary", "full_rlm_benchmark_parity"]) == true
+      tier = artifact["evidence_tier"]
+
+      full =
+        tier == "t3_paper_scale" and
+          get_in(artifact, ["summary", "paper_protocol_complete"]) == true
 
       artifact_lane("rlm_benchmark", path, artifact, max_age_hours,
         passing: passing,
         full_evidence: passing and full,
-        scale: if(full, do: "full", else: "sample"),
+        scale: if(full, do: "full", else: tier || "unknown"),
         summary: %{
           "total" => get_in(artifact, ["summary", "total"]),
           "passing" => get_in(artifact, ["summary", "passing"]),
           "approaches" => get_in(artifact, ["summary", "approaches"]),
-          "uncertainty" => get_in(artifact, ["summary", "uncertainty"]),
+          "evidence_tier" => tier,
+          "paper_protocol_complete" => get_in(artifact, ["summary", "paper_protocol_complete"]),
           "full_rlm_benchmark_parity" => full
         },
         limitation:
           if(full,
             do: nil,
             else:
-              "RLM benchmark artifact is not full evidence; run mix benchmark.rlm.check for provider-free RLM parity."
+              "RLM evidence is below T3 paper scale; the deterministic mix benchmark.rlm.check replay cannot satisfy this release lane."
           )
       )
     else
@@ -689,6 +827,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "claim_type",
       "comparison",
       "sources",
+      "decision",
+      "release",
+      "scope",
+      "limitations",
       "release_blocking"
     ])
     |> Map.put("release_blocking", release_blocking)

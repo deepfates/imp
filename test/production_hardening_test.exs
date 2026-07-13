@@ -519,15 +519,14 @@ defmodule ProductionHardeningTest do
       DSEx.Saving.load(%{"type" => "unknown"})
     end
 
-    react = DSEx.react("question -> answer", [])
-
     error =
       assert_raise ArgumentError, fn ->
-        DSEx.Saving.dump(react)
+        DSEx.Saving.dump(%URI{scheme: "https", host: "example.com"})
       end
 
-    assert error.message =~ "unsupported DSEx program for saving: DSEx.Predict.ReAct"
-    assert error.message =~ "Predict, ChainOfThought, ProgramOfThought, and RAG"
+    assert error.message =~ "unsupported DSEx program for saving: URI"
+    assert error.message =~ "data-only program graphs"
+    assert error.message =~ "callback-bearing programs require named registries"
   end
 
   test "saving rejects malformed program artifacts with explicit errors" do

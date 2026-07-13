@@ -166,6 +166,8 @@ for focused optimization work, not for marketing claims.
 
 ```sh
 mix benchmark.optimizer_lift.check
+mix benchmark.instruction_optimizer.contract.check
+mix benchmark.gepa.contract.check
 ```
 
 This provider-free lane uses a deterministic task with known baseline and
@@ -181,6 +183,27 @@ classification, QA, retrieval/KNN few-shot, and instruction following, with
 baseline score, optimized score, lift, call counts, cost estimate, and selected
 demos or instructions.
 
+The second command runs the separate T1 structural differential against pinned
+DSPy `3.3.0b1`. It validates exact source hashes and compares MIPROv2 budgets,
+demo topology, proposal rotation, search-space shape, and full-evaluation cadence
+plus SIMBA bucket, finalist, rollout, tied-rule, and eviction invariants.
+
+The third command runs a T1 structural differential against standalone GEPA
+`v0.1.1` at commit `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`.
+Set `DSEX_GEPA_V011_ROOT` to the exact checkout and, when needed,
+`DSEX_GEPA_V011_PYTHON` to its Python environment. The task validates the tag,
+commit, tagged project-version anomaly, and source hashes before comparing
+provider-free acceptance, Pareto, component rotation, merge, frontier, budget,
+JSON resume/RNG, and named-program mutation semantics. It explicitly does not
+establish paper reproduction, effectiveness, or full optimizer parity.
+
+Optimizer lift is outcome evidence, not full optimizer parity. The dashboard
+keeps `full_optimizer_parity` false when the structural artifact is missing,
+stale, authority-mismatched, or failing. Even a passing T1 artifact does not
+replace held-out multi-seed T3 effectiveness evidence. DSEx-only rows and equal
+scores under unmatched internal decision paths cannot satisfy that stronger
+claim.
+
 ## Run GEPA Paper Replication
 
 ```sh
@@ -192,13 +215,33 @@ validates GEPA paper-family artifact shape. It does not turn provider-free
 optimizer lift or smoke rows into a paper claim. A full artifact must cover
 `AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
 `LiveBenchMathBench`, and `Papillon`; for each row it must report baseline,
-DSPy GEPA, DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock,
-seed variance, and train/dev/test gap. Full rows must also carry a campaign id,
-dataset source and split checksums, source commits for DSPy, DSEx, and the GEPA
-artifact, concrete non-placeholder comparator sources, distinct train/dev/test
-split digests, and positive live token/cost accounting. SIMBA can appear as an
-extra comparator when a campaign includes it, but it is not part of the upstream
-GEPA artifact's required optimizer list.
+DSPy GEPA, DSEx GEPA, MIPROv2, configured metric-call budget, observed metric
+calls with enforced limits, token/cost, wall-clock, seed variance, seed-selection
+provenance, and train/dev/test gap. Full rows must also carry a campaign id,
+dataset source, dataset scope, split counts, split checksums, source commits
+for DSPy, DSEx, and the GEPA artifact, concrete non-placeholder comparator
+sources, distinct train/dev/test split digests, and positive live token/cost
+accounting. The full-evidence contract requires `dataset.scope == "full"` and
+rejects capped `--max-per-split` dataset roots; capped roots are useful for
+engineering proof runs only. SIMBA can appear as an extra comparator when a
+campaign includes it, but it is not part of the upstream GEPA artifact's
+required optimizer list.
+
+The scalar `metric_calls` and `optimizer_budgets` fields describe configuration;
+they are not proof that the optimizer observed or enforced those limits. Every
+full row must additionally include `metric_call_evidence` with basis
+`observed_and_enforced`, a concrete counter/export source, observed counts for
+all four required optimizer rows, and an affirmed enforced limit for each count.
+Copying configured budgets into an "actual" field, omitting runtime provenance,
+using a configured-only basis, or reporting an observed count above its limit
+keeps the dashboard GEPA lane red. Smoke evidence remains valid only at its
+explicit lower tier.
+
+Full rows must also include per-optimizer `seed_selection`. Accepted selection
+methods are a predeclared seed, dev-only best-seed selection, or an aggregate
+over declared seeds, all with concrete provenance and `test_scores_used: false`.
+Choosing the reported best seed from test scores is test-set leakage and cannot
+support parity or source-fidelity claims, even when seed variance is reported.
 
 When upstream GEPA artifact experiments have been run, convert their
 `experiment_runs_data` output into DSEx dashboard rows with:
@@ -228,17 +271,31 @@ mix dsex.benchmark.gepa_replication \
   --artifact-model gpt-41-mini
 ```
 
+For long full-scope runs, execute one or more families at a time with
+`--families AIMEBench,HotpotQABench`. These partial campaign artifacts are
+resumable operator evidence; before conversion, merge the six family rows into
+one DSEx input artifact so the replication contract can verify the complete
+paper-family set.
+
 The DSEx campaign producer expects a `families.json` file plus one directory
 per GEPA family, each with `train.jsonl`, `dev.jsonl`, and `test.jsonl`.
 `families.json` declares each family’s signature, instructions, input keys,
 output key, program name, metric-call budget, upstream metric name, source
-commit, split counts, and split checksums. The dataset exporter imports the
-upstream GEPA artifact benchmark classes and preserves their split construction.
-The converter then reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
+commit, dataset scope, optional max-per-split cap, split counts, and split
+checksums. The dataset exporter imports the upstream GEPA artifact benchmark
+classes and preserves their split construction. Passing `--max-per-split`
+marks the root as `capped`, and those rows cannot satisfy a full GEPA research
+claim. The converter then reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
 `evaluation_result.txt` files and merges them with DSEx-produced `dsex_gepa`
 rows. It refuses missing families, missing comparator outputs, ambiguous
 artifact models, and rows that do not satisfy the full-evidence contract after
 merge.
+
+Campaign or converted rows that still expose only configured call budgets or
+select their reported seed by test score are useful operator artifacts, but they
+do not satisfy the full GEPA contract. They must remain red until the producer
+emits the observed/enforced call evidence and non-test seed-selection provenance
+described above.
 
 The exported `families.json` records upstream metric names. DSEx currently
 ports deterministic metric adapters for AIME integer exact match, HotPotQA
@@ -254,9 +311,16 @@ must include `dataset.retrieval` provenance for the upstream
 checksums; the DSEx campaign runner rejects HoVer research rows without that
 provenance and uses a native BM25 corpus retriever for HoVer rows instead of
 asking the LM to invent `retrieved_docs`. Exact ranking parity against upstream
-`bm25s`/PyStemmer retrieval is an opt-in source-checkout validation because
-those Python packages are research-environment dependencies:
-`DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`.
+`bm25s`/PyStemmer retrieval is available through the source-checkout validation
+path because those Python packages are research-environment dependencies:
+`DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`. For
+campaign rows over the full upstream corpus, set `DSEX_HOVER_UPSTREAM_BM25=1`,
+`DSEX_GEPA_ROOT`, and `DSEX_GEPA_PYTHON` so HoVer retrieval runs through the
+upstream Python BM25 index instead of loading the full wiki corpus into the
+BEAM. HoVer campaign rows use LM-generated multi-hop search queries and report
+ReqLLM usage telemetry. Full GEPA research artifacts remain blocked until those
+rows are produced from an uncapped dataset root and merged with upstream
+comparator outputs.
 IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages
@@ -294,11 +358,29 @@ models remains covered by the live matched-model lane.
 mix benchmark.rlm.check
 ```
 
-This provider-free lane compares DSEx RLM and Python DSPy RLM over
-HotPotQA-shaped long-context fixture rows. The artifact includes direct prompt,
-simple RAG, and RLM approaches with score, latency, subcall count, trace shape,
-and statistical uncertainty. It proves operational parity for the RLM execution
-surface; live model-quality RLM claims require a separate sampled live campaign.
+This command runs T0 deterministic contract replay over two hand-authored,
+HotPotQA-shaped rows. It verifies that the local DSEx and Python DSPy harnesses
+execute their scripted paths and records traces for inspection. Gold-derived
+outputs, tiny contexts, and intentionally different traces mean this artifact
+does not prove effectiveness, long-context behavior, operational parity, or
+statistical uncertainty. The release RLM lane requires a separate T3
+paper-protocol artifact.
+
+For matched provider-free operational semantics against the current DSPy RLM:
+
+```sh
+scripts/setup_dspy_parity_env.sh
+uv pip install --target tmp/dspy-current-target --no-deps 'dspy==3.3.0b1'
+mix benchmark.rlm.contract.check
+```
+
+This T1 suite executes twelve required cases in both DSEx and DSPy 3.3.0b1:
+persistent state, typed submission, safe transformations, single and
+programmatic-loop subqueries, ordered batches, exact and atomic call accounting,
+submit repair, extraction fallback, and trajectory retention. The artifact pins
+the installed upstream source SHA256 and declares DSEx's symbolic `recurse/2`
+helper as an extension. T1 proves matched execution semantics only; it does not
+measure long-context effectiveness and cannot satisfy the T3 release lane.
 
 ## Run Live Benchmark Smoke
 

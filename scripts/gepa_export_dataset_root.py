@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 
+DATASET_ALIASES = {
+    "hotpot_qa": "hotpotqa/hotpot_qa",
+    "hover": "hover-nlp/hover",
+}
+
+
 FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "AIMEBench": {
         "module": "gepa_artifact.benchmarks.AIME",
@@ -83,10 +89,12 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--max-per-split", type=int)
     args = parser.parse_args()
+    dataset_scope = "full" if args.max_per_split is None else "capped"
 
     gepa_root = Path(args.gepa_root).resolve()
     out = Path(args.out).resolve()
     sys.path.insert(0, str(gepa_root))
+    install_dataset_compatibility_shims()
 
     out.mkdir(parents=True, exist_ok=True)
     exported_specs: List[Dict[str, Any]] = []
@@ -117,6 +125,8 @@ def main() -> int:
                 **{key: value for key, value in spec.items() if key != "module"},
                 "family": family,
                 "dataset_source": f"{gepa_root}@{git_sha(gepa_root)}",
+                "dataset_scope": dataset_scope,
+                "max_per_split": args.max_per_split,
                 "split_counts": split_counts,
                 "split_checksums": split_checksums,
                 **family_extra_metadata(gepa_root, family),
@@ -135,12 +145,45 @@ def main() -> int:
             "runner": "gepa_export_dataset_root.py",
             "gepa_root": str(gepa_root),
             "gepa_commit": git_sha(gepa_root),
+            "dataset_scope": dataset_scope,
+            "max_per_split": args.max_per_split,
+            "dataset_aliases": DATASET_ALIASES,
             "families": exported_specs,
         },
     )
 
     print(out)
     return 0
+
+
+def install_dataset_compatibility_shims() -> None:
+    try:
+        import datasets
+    except ImportError:
+        return
+
+    original_load_dataset = datasets.load_dataset
+
+    def load_dataset_compat(path: str, *args: Any, **kwargs: Any):
+        return original_load_dataset(DATASET_ALIASES.get(path, path), *args, **kwargs)
+
+    datasets.load_dataset = load_dataset_compat
+
+    try:
+        import spacy.util
+        import spacy.cli
+    except ImportError:
+        return
+
+    original_spacy_download = spacy.cli.download
+
+    def download_spacy_model_compat(model: str, *args: Any, **kwargs: Any):
+        if spacy.util.is_package(model):
+            return None
+
+        return original_spacy_download(model, *args, **kwargs)
+
+    spacy.cli.download = download_spacy_model_compat
 
 
 def instantiate_benchmark(module_name: str, family: str):

@@ -15,6 +15,7 @@ defmodule DSEx.Optimize.GEPA do
 
   alias DSEx.Optimize.Anything
   alias DSEx.Optimize.Anything.Artifact
+  alias DSEx.Optimizer.GEPA.Pareto
 
   defmodule Candidate do
     @moduledoc "GEPA candidate with per-example scores and lineage."
@@ -52,7 +53,10 @@ defmodule DSEx.Optimize.GEPA do
       type: {:custom, __MODULE__, :validate_mutation_fn, []},
       default: nil
     ],
-    reflection_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil]
+    reflection_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil],
+    seed: [type: :non_neg_integer, default: 0],
+    resume_state: [type: {:custom, __MODULE__, :validate_resume_state, []}, default: nil],
+    checkpoint_fn: [type: {:custom, __MODULE__, :validate_checkpoint_fn, []}, default: nil]
   ]
 
   def optimize(artifact, evaluator, opts \\ [])
@@ -64,27 +68,41 @@ defmodule DSEx.Optimize.GEPA do
     generations = opts[:generations]
     mutation_fn = opts[:mutation_fn] || reflection_mutation_fn(opts)
 
-    baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
+    {evolved, rng_state} =
+      case opts[:resume_state] do
+        nil ->
+          baseline = evaluate(artifact, evaluator, examples, "baseline", nil, "baseline")
+          rng_state = seed_rng(opts[:seed])
+          checkpoint!([baseline], rng_state, opts[:checkpoint_fn])
+          {[baseline], rng_state}
 
-    evolved =
+        state ->
+          load_resume_state!(state, artifact, examples, generations, opts[:seed])
+      end
+
+    {evolved, _rng_state} =
       generations
       |> generation_indices()
-      |> Enum.reduce([baseline], fn generation, candidates ->
-        frontier = pareto_frontier(candidates)
-        parent = Enum.at(frontier, rem(generation - 1, length(frontier)))
+      |> Enum.reduce({evolved, rng_state}, fn generation, {candidates, rng_state} ->
+        if Enum.any?(candidates, &(&1.id == "gepa-#{generation}")) do
+          {candidates, rng_state}
+        else
+          {parent, rng_state} = sample_parent(candidates, rng_state)
 
-        candidate =
-          case mutate_candidate(parent, mutation_fn, generation) do
-            {:ok, artifact, mutation} ->
-              evaluate(artifact, evaluator, examples, "gepa-#{generation}", parent.id, mutation)
+          candidate =
+            case mutate_candidate(parent, mutation_fn, generation) do
+              {:ok, artifact, mutation} ->
+                evaluate(artifact, evaluator, examples, "gepa-#{generation}", parent.id, mutation)
 
-            {:error, candidate} ->
-              candidate
-          end
+              {:error, candidate} ->
+                candidate
+            end
 
-        [candidate | candidates]
+          updated = candidates ++ [candidate]
+          checkpoint!(updated, rng_state, opts[:checkpoint_fn])
+          {updated, rng_state}
+        end
       end)
-      |> Enum.reverse()
 
     frontier = pareto_frontier(evolved)
     {merged_candidates, merges} = merge_frontier(frontier, evaluator, examples)
@@ -94,6 +112,7 @@ defmodule DSEx.Optimize.GEPA do
       |> Kernel.++(merged_candidates)
       |> annotate_dev_scores(evaluator, dev_examples)
 
+    baseline = hd(candidates)
     final_frontier = pareto_frontier(candidates)
     best = Enum.max_by(candidates, &selection_score/1)
 
@@ -109,7 +128,7 @@ defmodule DSEx.Optimize.GEPA do
         examples: length(examples),
         dev_examples: length(dev_examples),
         frontier_size: length(final_frontier),
-        parent_sampling: :pareto_round_robin,
+        parent_sampling: :pareto_coverage_weighted,
         component_selector: :actionable_side_information,
         merge_strategy: :pareto_frontier_union,
         selection_score: if(dev_examples == [], do: :train_aggregate, else: :held_out_dev)
@@ -122,28 +141,63 @@ defmodule DSEx.Optimize.GEPA do
           "DSEx.Optimize.GEPA.optimize/3 expects an evaluator function with arity 2; got: #{inspect(evaluator)}"
   end
 
+  @doc "Serializes completed GEPA evolution candidates for durable resume."
+  def dump_resume_state(candidates) when is_list(candidates) do
+    dump_resume_state(candidates, advance_rng(seed_rng(0), max(length(candidates) - 1, 0)))
+  end
+
+  def dump_resume_state(candidates) do
+    raise ArgumentError,
+          "DSEx.Optimize.GEPA.dump_resume_state/1 expects a candidate list; got: #{inspect(candidates)}"
+  end
+
+  defp dump_resume_state(candidates, rng_state) do
+    %{
+      "schema_version" => 2,
+      "phase" => "evolution",
+      "rng_state" => dump_rng(rng_state),
+      "candidates" => Enum.map(candidates, &dump_candidate!/1)
+    }
+  end
+
   defp generation_indices(count) when is_integer(count) and count > 0, do: 1..count
   defp generation_indices(_count), do: []
 
   def pareto_frontier(candidates) do
-    candidates
-    |> Enum.reject(fn candidate ->
-      Enum.any?(candidates, fn other ->
-        other.id != candidate.id and
-          dominates?(other.per_example_scores, candidate.per_example_scores)
+    scores =
+      Enum.map(candidates, fn candidate ->
+        {candidate.id,
+         candidate.per_example_scores
+         |> Enum.with_index()
+         |> Map.new(fn {score, index} -> {index, score} end)}
       end)
-    end)
+
+    aggregate_scores = Map.new(candidates, &{&1.id, &1.aggregate_score})
+
+    frontier_ids =
+      scores |> Pareto.winner_mapping() |> Pareto.candidate_ids(aggregate_scores) |> MapSet.new()
+
+    candidates
+    |> Enum.filter(&MapSet.member?(frontier_ids, &1.id))
     |> Enum.sort_by(& &1.aggregate_score, :desc)
   end
 
-  defp dominates?(left, right) when length(left) == length(right) do
-    Enum.zip(left, right)
-    |> then(fn pairs ->
-      Enum.all?(pairs, fn {l, r} -> l >= r end) and Enum.any?(pairs, fn {l, r} -> l > r end)
-    end)
-  end
+  defp sample_parent(candidates, rng_state) do
+    scores =
+      Enum.map(candidates, fn candidate ->
+        {candidate.id,
+         candidate.per_example_scores
+         |> Enum.with_index()
+         |> Map.new(fn {score, index} -> {index, score} end)}
+      end)
 
-  defp dominates?(_left, _right), do: false
+    aggregate_scores = Map.new(candidates, &{&1.id, &1.aggregate_score})
+
+    {id, rng_state} =
+      scores |> Pareto.winner_mapping() |> Pareto.sample(aggregate_scores, rng_state)
+
+    {Enum.find(candidates, &(&1.id == id)), rng_state}
+  end
 
   defp evaluate(%Artifact{} = artifact, evaluator, examples, id, parent_id, mutation) do
     result = normalize_evaluation(evaluator.(artifact, examples), examples)
@@ -422,6 +476,162 @@ defmodule DSEx.Optimize.GEPA do
     end
   end
 
+  defp checkpoint!(candidates, _rng_state, nil) do
+    emit_progress(candidates)
+    :ok
+  end
+
+  defp checkpoint!(candidates, rng_state, checkpoint_fn) do
+    emit_progress(candidates)
+
+    case checkpoint_fn.(dump_resume_state(candidates, rng_state)) do
+      :ok ->
+        :ok
+
+      other ->
+        raise ArgumentError, "GEPA checkpoint callback must return :ok; got: #{inspect(other)}"
+    end
+  end
+
+  defp emit_progress(candidates) do
+    candidate = List.last(candidates)
+
+    DSEx.Telemetry.execute(
+      [:dsex, :optimizer, :progress],
+      %{
+        completed_generations: max(length(candidates) - 1, 0),
+        candidate_count: length(candidates)
+      },
+      %{optimizer: :gepa, candidate_id: candidate.id, aggregate_score: candidate.aggregate_score}
+    )
+  end
+
+  defp load_resume_state!(
+         %{"schema_version" => 1, "phase" => "evolution", "candidates" => states},
+         artifact,
+         examples,
+         generations,
+         seed
+       )
+       when is_list(states) do
+    candidates = validate_resume_candidates!(states, artifact, examples, generations)
+    {candidates, advance_rng(seed_rng(seed), max(length(candidates) - 1, 0))}
+  end
+
+  defp load_resume_state!(
+         %{
+           "schema_version" => 2,
+           "phase" => "evolution",
+           "rng_state" => rng_state,
+           "candidates" => states
+         },
+         artifact,
+         examples,
+         generations,
+         _seed
+       )
+       when is_list(states) do
+    {validate_resume_candidates!(states, artifact, examples, generations), load_rng!(rng_state)}
+  end
+
+  defp load_resume_state!(_state, _artifact, _examples, _generations, _seed) do
+    raise ArgumentError, "invalid GEPA resume state schema"
+  end
+
+  defp validate_resume_candidates!(states, artifact, examples, generations) do
+    candidates = Enum.map(states, &load_candidate!/1)
+
+    expected_ids = [
+      "baseline" | Enum.map(generation_indices(length(candidates) - 1), &"gepa-#{&1}")
+    ]
+
+    unless candidates != [] and Enum.map(candidates, & &1.id) == expected_ids and
+             length(candidates) <= generations + 1 and hd(candidates).artifact == artifact and
+             Enum.all?(candidates, &(length(&1.per_example_scores) == length(examples))) and
+             valid_resume_lineage?(candidates) do
+      raise ArgumentError, "GEPA resume state does not match the requested optimization"
+    end
+
+    candidates
+  end
+
+  defp seed_rng(seed), do: :rand.seed_s(:exsss, {seed + 1, seed + 2, seed + 3})
+
+  defp advance_rng(rng_state, count) do
+    Enum.reduce(1..count//1, rng_state, fn _, rng_state -> elem(:rand.uniform_s(rng_state), 1) end)
+  end
+
+  defp dump_rng(rng_state) do
+    {:exsss, [first | second]} = :rand.export_seed_s(rng_state)
+    %{"algorithm" => "exsss", "words" => [first, second]}
+  end
+
+  defp load_rng!(%{"algorithm" => "exsss", "words" => [first, second]})
+       when is_integer(first) and is_integer(second) do
+    :rand.seed_s({:exsss, [first | second]})
+  end
+
+  defp load_rng!(state), do: raise(ArgumentError, "invalid GEPA RNG state: #{inspect(state)}")
+
+  defp valid_resume_lineage?([%Candidate{id: "baseline", parent_id: nil} | rest]) do
+    rest
+    |> Enum.with_index(1)
+    |> Enum.all?(fn {candidate, index} ->
+      prior_ids = ["baseline" | Enum.map(generation_indices(index - 1), &"gepa-#{&1}")]
+      candidate.parent_id in prior_ids
+    end)
+  end
+
+  defp valid_resume_lineage?(_candidates), do: false
+
+  defp dump_candidate!(%Candidate{} = candidate) do
+    DSEx.Optimizer.Report.json_safe(%{
+      "id" => candidate.id,
+      "artifact" => Map.from_struct(candidate.artifact),
+      "parent_id" => candidate.parent_id,
+      "mutation" => candidate.mutation,
+      "aggregate_score" => candidate.aggregate_score,
+      "per_example_scores" => candidate.per_example_scores,
+      "asi" => candidate.asi,
+      "diagnostics" => candidate.diagnostics,
+      "metadata" => candidate.metadata
+    })
+  end
+
+  defp dump_candidate!(candidate) do
+    raise ArgumentError, "GEPA resume state expects candidates; got: #{inspect(candidate)}"
+  end
+
+  defp load_candidate!(state) when is_map(state) do
+    state =
+      Map.new(state, fn {key, value} ->
+        {key, DSEx.Optimizer.Report.restore_json_safe(value)}
+      end)
+
+    artifact = state |> Map.fetch!("artifact") |> then(&struct!(Artifact, &1))
+    scores = Map.fetch!(state, "per_example_scores")
+    aggregate_score = Map.fetch!(state, "aggregate_score")
+
+    unless is_list(scores) and Enum.all?(scores, &is_number/1) and is_number(aggregate_score) do
+      raise ArgumentError, "GEPA resume candidate scores must be numeric"
+    end
+
+    %Candidate{
+      id: Map.fetch!(state, "id"),
+      artifact: artifact,
+      parent_id: Map.get(state, "parent_id"),
+      mutation: Map.get(state, "mutation"),
+      aggregate_score: aggregate_score,
+      per_example_scores: scores,
+      asi: Map.get(state, "asi", []),
+      diagnostics: Map.get(state, "diagnostics", []),
+      metadata: Map.get(state, "metadata", %{})
+    }
+  end
+
+  defp load_candidate!(state),
+    do: raise(ArgumentError, "GEPA resume candidates must be maps; got: #{inspect(state)}")
+
   defp average([]), do: 0.0
   defp average(scores), do: Enum.sum(scores) / length(scores)
 
@@ -431,4 +641,18 @@ defmodule DSEx.Optimize.GEPA do
   def validate_mutation_fn(mutation_fn) do
     {:error, "expected nil or an arity-3 function, got: #{inspect(mutation_fn)}"}
   end
+
+  def validate_resume_state(nil), do: {:ok, nil}
+  def validate_resume_state(state) when is_map(state), do: {:ok, state}
+
+  def validate_resume_state(state),
+    do: {:error, "expected nil or a resume-state map, got: #{inspect(state)}"}
+
+  def validate_checkpoint_fn(nil), do: {:ok, nil}
+
+  def validate_checkpoint_fn(checkpoint_fn) when is_function(checkpoint_fn, 1),
+    do: {:ok, checkpoint_fn}
+
+  def validate_checkpoint_fn(checkpoint_fn),
+    do: {:error, "expected nil or an arity-1 function, got: #{inspect(checkpoint_fn)}"}
 end

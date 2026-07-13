@@ -69,6 +69,40 @@ program =
 DSEx.get(pred, :answer)
 ```
 
+## Handle Failures
+
+Program calls return tagged tuples. Match both branches at application
+boundaries instead of assuming every provider call succeeds:
+
+```elixir
+case DSEx.call(program, %{question: question}) do
+  {:ok, prediction} ->
+    {:ok, DSEx.get(prediction, :answer)}
+
+  {:error, reason} ->
+    Logger.warning("DSEx call failed", reason: inspect(reason))
+    {:error, :language_model_unavailable}
+end
+```
+
+Missing inputs, provider failures, malformed provider returns, and exhausted
+adapter retries are returned as `{:error, reason}`. Invalid constructor options
+and unsupported program shapes raise `ArgumentError` because they are local
+configuration defects and should fail before serving traffic.
+
+Evaluation keeps per-example failures visible rather than hiding them:
+
+```elixir
+report = DSEx.evaluate(program, devset, metric, failure_score: 0.0, max_errors: 5)
+
+Enum.each(report.errors, fn error ->
+  Logger.warning("DSEx evaluation row failed", error: inspect(error))
+end)
+```
+
+Use a finite `:max_errors` in production jobs to stop a systematically broken
+campaign. Use `:infinity` only when collecting every failure is intentional.
+
 ## Conversation History
 
 Use `DSEx.history/1` when a signature should see prior task turns. History is
@@ -392,7 +426,9 @@ query with previously retrieved passages, deduplicates documents, injects the
 combined context, and records per-hop retrieval metadata.
 RAG programs backed by `DSEx.memory/2` can be saved and loaded with
 `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, and `DSEx.load!/1`; network
-retrievers and functions should be rebound by the caller instead of serialized.
+retrievers remain host-owned dependencies. Callback-bearing programs use a
+named `DSEx.Saving.Registry` supplied explicitly by the host when dumping and
+loading; functions are never written into artifacts.
 
 ## Local Embeddings
 
@@ -444,8 +480,8 @@ Use:
 | --- | --- |
 | `LabeledFewShot` | You already have good examples and want demos quickly. |
 | `BootstrapFewShot` | A teacher program can generate candidate demos. |
-| `RandomSearch` | You want a small deterministic baseline search. |
-| `InstructionSearch` / `COPRO` | Instructions are the likely bottleneck. |
+| `RandomSearch` / `BootstrapRS` | You want a small deterministic baseline search over demo sets. |
+| `InstructionSearch` / `InferRules` / `COPRO` | Instructions or signature-level rules are the likely bottleneck. |
 | `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
 | `GEPA` | You want DSEx-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
 | `BetterTogether` | You want to sequence prompt optimization and provider training. |
@@ -454,6 +490,16 @@ Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
 programs. `proposer_lm:`, `judge_lm:`, and `reflection_lm:` reject malformed
 values when the optimizer is built or run, before a search loop starts.
+
+Provider-backed `BootstrapFinetune` and `GRPO` return a
+`DSEx.Clients.TrainingJob`. The job can be refreshed, cancelled when the
+provider exposes a cancellation endpoint, saved without credentials, restored
+with an explicitly reinjected transport and API key, and rebound to a compiled
+program only after the provider reports a non-empty model artifact. Submit,
+refresh, and cancel requests use stable idempotency keys and bounded retries.
+These lifecycle APIs do not imply that an account-specific paid training job
+has run. From a source checkout, `mix protocol.training.check` exercises the
+provider wire contracts locally.
 
 ## Optimize Arbitrary Artifacts
 
@@ -544,6 +590,13 @@ DSEx.get(prediction, :answer)
 `ReAct` sends provider-style function definitions when the LM client supports
 them. A reserved `submit` tool validates final outputs against the original
 signature.
+
+Use `DSEx.react_v2/3` when native multi-turn tool history and parallel calls are
+required. ReActV2 preserves call/result IDs in `DSEx.History`, records unknown
+and failing tools as observations instead of aborting, and forces one final
+`submit` call when the normal loop ends. Existing `DSEx.react/3` retains its
+fail-fast behavior. The pinned source mapping and deliberate DSEx policy/redaction
+extensions are documented in `docs/REACT_V2_FIDELITY.md`.
 
 ### Tool Call Primitives
 
@@ -641,7 +694,10 @@ controller_lm = %{
   module: DSEx.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
-      %{action: "submit", result: %{answer: "Prefer concise answers backed by evidence."}}
+      %{
+        reasoning: "The answer is already available in the task context.",
+        code: ~S|submit(%{answer: "Prefer concise answers backed by evidence."})|
+      }
     end
   ]
 }
@@ -652,26 +708,41 @@ rlm =
   DSEx.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
-    max_iterations: 10,
-    max_llm_calls: 20,
+    max_iterations: 20,
+    max_llm_calls: 50,
+    max_recursion_depth: 1,
+    max_interpreter_value_bytes: 16_000_000,
+    max_interpreter_effects: 100,
     max_time_ms: 30_000
   )
 
 DSEx.call(rlm, %{context: long_context, question: "What matters?"})
 ```
 
-RLM controller actions:
+The primary controller response contains reasoning and constrained Elixir code:
 
 ```elixir
-%{action: "eval", code: "x + 1"}
-%{action: "assign", name: "scratch", value: "note"}
-%{action: "load", name: "large_context"}
-%{action: "tool", name: "lookup", arguments: %{"key" => "x"}}
-%{action: "llm_query", signature: "question -> answer", inputs: %{question: "q"}}
-%{action: "llm_query_batched", signature: "question -> answer", inputs: [%{question: "q1"}, %{question: "q2"}]}
-%{action: "recurse", signature: "question -> answer", inputs: %{question: "q"}}
-%{action: "submit", result: %{answer: "final"}}
+%{
+  reasoning: "Split the context and analyze each chunk semantically.",
+  code: """
+  context = load("large_context")
+  chunks = String.split(context, "\n\n")
+  findings = for chunk <- chunks, do: llm_query(chunk)
+  submit(%{answer: Enum.join(findings, "\n")})
+  """
+}
 ```
+
+Assignments persist across controller turns. The safe language includes data
+literals, maps, lists, arithmetic and comparisons, `if`, bounded `for`
+comprehensions, allowlisted `String`/`Enum` transformations, registered tools,
+`llm_query/1`, `llm_query_batched/1`, `recurse/2`, `load/1`, `print/1`, and
+`submit/1`. It cannot import modules, define functions, spawn processes, access
+files or the network, or invoke arbitrary BEAM functions. Generated source is
+never passed to `Code.eval_*`. Calls to LMs, tools, lazy loaders, and recursive
+children are yielded as typed effects and executed by the RLM runtime, not by
+the interpreter. Source, AST steps, generated value size, effect count, output,
+recursion, sub-LM calls, and optional wall time are all bounded explicitly.
 
 For large or expensive context, pass a lazy handle and let the controller load
 it explicitly:
@@ -688,9 +759,11 @@ DSEx.call(rlm, %{large_context: context, question: "What changed?"})
 ```
 
 The controller initially sees only metadata for the serializable value. The
-`load` action materializes it once into the RLM variable space. `llm_query_batched`
-runs sub-LM calls concurrently, preserves result order, and counts every item
-against `max_llm_calls`. If a controller submits malformed output, DSEx records
+`load/1` materializes it into the RLM variable space. `llm_query_batched/1`
+runs sub-LM calls concurrently through supervised BEAM tasks, preserves result
+order, and atomically reserves every item against the shared `max_llm_calls`
+ledger. Recursive children use that same ledger and deadline. If controller
+code submits malformed output, DSEx records
 the parse feedback as an observation and gives the controller another turn. If
 the loop exhausts its iteration budget, DSEx runs an extract pass over the
 variables, observations, and trace to recover final structured output when
@@ -708,11 +781,39 @@ loaded = DSEx.load!(path)
 File.rm(path)
 ```
 
+File artifacts use a versioned, checksummed envelope and atomic same-directory
+replacement. Callback-bearing programs use trusted names:
+
+```elixir
+metric = fn _example, prediction -> DSEx.get(prediction, :answer, "") != "" end
+registry = DSEx.Saving.Registry.new(quality_metric: metric)
+program = DSEx.Predict.BestOfN.new(program, metric)
+
+DSEx.save!(program, path, registry: registry)
+loaded = DSEx.load!(path, registry: registry)
+```
+
+The deploying application must provide every referenced callback with the
+expected arity. Unknown names and malformed or tampered artifacts fail before a
+program is returned.
+
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
-credentials; reconfigure credentials explicitly before live use. Portable
-saving supports `Predict`, `ChainOfThought`, and RAG programs backed by
-`DSEx.memory/2`. Programs that hold functions, external service clients,
-or live tool closures should be rebuilt by application code.
+credentials. Rebind a freshly configured LM explicitly before live use:
+
+```elixir
+lm =
+  DSEx.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
+    api_key: System.fetch_env!("OPENAI_API_KEY"),
+    temperature: 0
+  )
+
+loaded = DSEx.with_lm(loaded, lm)
+DSEx.call(loaded, %{question: "What changed?"})
+```
+
+Portable saving supports `Predict`, `ChainOfThought`, `ProgramOfThought`, and
+RAG programs backed by `DSEx.memory/2`. Programs that hold functions, external
+service clients, or live tool closures should be rebuilt by application code.
 
 ## Streaming
 

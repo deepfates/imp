@@ -429,6 +429,297 @@ defmodule ProductionAdapterPersistenceTest do
     assert loaded.config == []
   end
 
+  test "file persistence uses a checksummed transactional artifact envelope" do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-transactional-#{System.unique_integer([:positive])}.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
+    original = DSEx.predict("question -> answer")
+    assert :ok = DSEx.Saving.save!(original, path)
+
+    artifact = path |> File.read!() |> Jason.decode!()
+    assert artifact["artifact_type"] == "dsex_program_artifact"
+    assert artifact["schema_version"] == 1
+    assert artifact["payload_sha256"] =~ ~r/^sha256:[a-f0-9]{64}$/
+
+    tampered = put_in(artifact, ["payload", "signature", "instructions"], "tampered")
+    File.write!(path, Jason.encode!(tampered))
+
+    assert_raise ArgumentError, ~r/payload checksum mismatch/, fn ->
+      DSEx.Saving.load!(path)
+    end
+
+    assert :ok = DSEx.Saving.save!(original, path)
+
+    assert_raise ArgumentError, ~r/unsupported DSEx program for saving/, fn ->
+      DSEx.Saving.save!(%DSEx.Predict.BestOfN{}, path)
+    end
+
+    assert %DSEx.Predict.Predict{} = DSEx.Saving.load!(path)
+  end
+
+  test "load accepts legacy unwrapped program state" do
+    path = Path.join(System.tmp_dir!(), "dsex-legacy-#{System.unique_integer([:positive])}.json")
+    on_exit(fn -> File.rm(path) end)
+    File.write!(path, Jason.encode!(DSEx.Saving.dump(DSEx.predict("question -> answer"))))
+
+    assert %DSEx.Predict.Predict{} = DSEx.Saving.load!(path)
+  end
+
+  test "portable structural program types round-trip and remain executable" do
+    comparison = DSEx.Predict.MultiChainComparison.new("question -> answer", m: 2)
+    loaded_comparison = comparison |> DSEx.Saving.dump() |> DSEx.Saving.load()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{rationale: "agreed", answer: "Paris"} end]
+    }
+
+    assert {:ok, prediction} =
+             DSEx.context([lm: lm], fn ->
+               DSEx.call(loaded_comparison, %{
+                 question: "Capital?",
+                 completions: [
+                   %{reasoning: "one", answer: "Paris"},
+                   %{reasoning: "two", answer: "Paris"}
+                 ]
+               })
+             end)
+
+    assert DSEx.get(prediction, :answer) == "Paris"
+
+    examples = [
+      DSEx.example(question: "capital france", answer: "Paris") |> DSEx.with_inputs(:question),
+      DSEx.example(question: "capital italy", answer: "Rome") |> DSEx.with_inputs(:question)
+    ]
+
+    loaded_knn =
+      DSEx.Predict.KNN.new(1, examples)
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    assert [%DSEx.Example{} = nearest] = DSEx.Predict.KNN.call(loaded_knn, %{question: "france"})
+    assert DSEx.Example.get(nearest, :answer) == "Paris"
+  end
+
+  test "named callback registry round-trips callback-bearing program compositions" do
+    metric = fn _example, prediction -> DSEx.get(prediction, :answer) == "Paris" end
+    feedback = fn _predictions -> "selected" end
+    predicate = fn prediction -> DSEx.get(prediction, :answer) == "Paris" end
+
+    registry =
+      DSEx.Saving.Registry.new(
+        answer_metric: metric,
+        selection_feedback: feedback,
+        paris_assertion: predicate
+      )
+
+    base = DSEx.predict("question -> answer")
+
+    programs = [
+      DSEx.Predict.BestOfN.new(base, metric, n: 2, feedback_fn: feedback),
+      DSEx.Predict.Refine.new(base, metric, max_attempts: 2),
+      DSEx.Predict.Assertions.new(
+        base,
+        [DSEx.Assertion.new(:paris, predicate, message: "must be Paris")],
+        strict: true
+      )
+    ]
+
+    loaded =
+      Enum.map(programs, fn program ->
+        program
+        |> DSEx.dump(registry: registry)
+        |> DSEx.load(registry: registry)
+      end)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    Enum.each(loaded, fn program ->
+      assert {:ok, prediction} =
+               DSEx.context([lm: lm], fn -> DSEx.call(program, %{question: "Capital?"}) end)
+
+      assert DSEx.get(prediction, :answer) == "Paris"
+    end)
+
+    state = DSEx.dump(hd(programs), registry: registry)
+
+    assert_raise ArgumentError, ~r/unknown registry callback "answer_metric"/, fn ->
+      DSEx.load(state)
+    end
+  end
+
+  test "named registry round-trips ReAct CodeAct and RLM tool graphs" do
+    lookup = fn %{query: query} -> "found #{query}" end
+    policy = fn name, _args -> name in [:lookup, "lookup"] end
+    registry = DSEx.Saving.Registry.new(lookup_runner: lookup, tool_policy: policy)
+    tool = DSEx.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})
+
+    react = DSEx.react("question -> answer", [tool], max_iters: 0, tool_policy: policy)
+    code_act = DSEx.code_act("question -> answer", [tool], max_iters: 0, tool_policy: policy)
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: DSEx.req_llm("openai:gpt-test", api_key: "not-persisted"),
+        sub_lm: DSEx.req_llm("openai:gpt-sub", api_key: "also-not-persisted"),
+        tools: [tool],
+        tool_policy: policy,
+        max_iterations: 0,
+        max_recursion_depth: 3,
+        max_interpreter_steps: 2_500,
+        max_interpreter_value_bytes: 2_000_000,
+        max_interpreter_effects: 25
+      )
+
+    [loaded_react, loaded_code_act, loaded_rlm] =
+      Enum.map([react, code_act, rlm], fn program ->
+        state = DSEx.dump(program, registry: registry)
+        refute inspect(state) =~ "not-persisted"
+        refute inspect(state) =~ "also-not-persisted"
+        DSEx.load(state, registry: registry)
+      end)
+
+    assert DSEx.Tool.call(loaded_react.tools[:lookup], %{query: "beam"}) == "found beam"
+    assert DSEx.ToolPolicy.authorize(loaded_react.tool_policy, :lookup, %{}) == :ok
+    assert {:error, {:react_max_iters, []}} = DSEx.call(loaded_react, %{question: "q"})
+
+    assert DSEx.Tool.call(loaded_code_act.tools[:lookup], %{query: "otp"}) == "found otp"
+    assert {:error, {:code_act_max_iters, 0, []}} = DSEx.call(loaded_code_act, %{question: "q"})
+
+    assert %DSEx.Clients.ReqLLM{model: "openai:gpt-test", opts: []} = loaded_rlm.lm
+    assert %DSEx.Clients.ReqLLM{model: "openai:gpt-sub", opts: []} = loaded_rlm.sub_lm
+    assert loaded_rlm.max_recursion_depth == 3
+    assert loaded_rlm.max_interpreter_steps == 2_500
+    assert loaded_rlm.max_interpreter_value_bytes == 2_000_000
+    assert loaded_rlm.max_interpreter_effects == 25
+    assert DSEx.Tool.call(loaded_rlm.tools[:lookup], %{query: "rlm"}) == "found rlm"
+    assert {:error, {:rlm_max_iterations, 0, []}} = DSEx.call(loaded_rlm, %{question: "q"})
+  end
+
+  test "compiled executable wrappers round-trip through portable persistence" do
+    base = DSEx.predict("question -> answer")
+
+    examples = [
+      DSEx.example(question: "capital france", answer: "Paris") |> DSEx.with_inputs(:question)
+    ]
+
+    knn_program =
+      DSEx.Optimizer.KNNFewShot.new(1, examples)
+      |> DSEx.Optimizer.KNNFewShot.compile(base)
+
+    reducer = fn predictions -> hd(predictions) end
+    registry = DSEx.Saving.Registry.new(ensemble_reducer: reducer)
+
+    ensemble =
+      DSEx.Optimizer.Ensemble.new(reduce_fn: reducer, deterministic: true)
+      |> DSEx.Optimizer.Ensemble.compile([base])
+
+    semantic = DSEx.Evaluate.SemanticF1.new()
+    grounded = DSEx.Evaluate.CompleteAndGrounded.new()
+
+    [loaded_knn, loaded_ensemble, loaded_semantic, loaded_grounded] =
+      Enum.map([knn_program, ensemble, semantic, grounded], fn program ->
+        program |> DSEx.dump(registry: registry) |> DSEx.load(registry: registry)
+      end)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            prompt =~ "precision" -> %{reasoning: "exact", precision: 1, recall: 1, f1: 1}
+            prompt =~ "completeness" -> %{reasoning: "grounded", completeness: 1, groundedness: 1}
+            true -> %{answer: "Paris"}
+          end
+        end
+      ]
+    }
+
+    DSEx.context([lm: lm], fn ->
+      assert {:ok, knn_prediction} = DSEx.call(loaded_knn, %{question: "france"})
+      assert DSEx.get(knn_prediction, :answer) == "Paris"
+
+      assert {:ok, ensemble_prediction} = DSEx.call(loaded_ensemble, %{question: "capital"})
+      assert DSEx.get(ensemble_prediction, :answer) == "Paris"
+
+      assert {:ok, semantic_prediction} =
+               DSEx.call(loaded_semantic, %{
+                 question: "q",
+                 ground_truth: "a",
+                 system_response: "a"
+               })
+
+      assert DSEx.get(semantic_prediction, :f1) == 1
+
+      assert {:ok, grounded_prediction} =
+               DSEx.call(loaded_grounded, %{question: "q", context: "a", answer: "a"})
+
+      assert DSEx.get(grounded_prediction, :groundedness) == 1
+    end)
+  end
+
+  test "recursive agent graphs round-trip through the named registry" do
+    parent_handler = fn _agent, inputs, runtime -> {:ok, %{answer: inputs.question}, runtime} end
+    child_handler = fn inputs, runtime -> {:ok, %{child: inputs.value}, runtime} end
+    lookup = fn %{query: query} -> String.upcase(query) end
+
+    registry =
+      DSEx.Saving.Registry.new(
+        parent_handler: parent_handler,
+        child_handler: child_handler,
+        lookup_runner: lookup
+      )
+
+    child = DSEx.Agent.new(:child, child_handler)
+    tool = DSEx.tool(:lookup, "uppercase", lookup)
+
+    parent =
+      DSEx.Agent.new(:parent, parent_handler,
+        children: [child],
+        tools: [tool],
+        input_schema: %{required: [:question]},
+        output_schema: %{required: [:answer]},
+        tool_policy: [:lookup]
+      )
+
+    loaded = parent |> DSEx.dump(registry: registry) |> DSEx.load(registry: registry)
+
+    assert %DSEx.Agent{children: %{child: %DSEx.Agent{}}, tools: %{lookup: %DSEx.Tool{}}} = loaded
+    assert {:ok, %{answer: "hello"}, _runtime} = DSEx.Agent.run(loaded, %{question: "hello"})
+    assert DSEx.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "BEAM"
+  end
+
+  test "loaded pinned provider programs can be rebound through the public facade" do
+    original =
+      DSEx.predict("question -> answer",
+        lm: DSEx.req_llm("openai:gpt-test", api_key: "must-not-survive")
+      )
+
+    state = DSEx.dump(original)
+    refute inspect(state) =~ "must-not-survive"
+
+    loaded = DSEx.load(state)
+
+    replacement = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "rebound"} end]
+    }
+
+    rebound = DSEx.with_lm(loaded, replacement)
+
+    assert {:ok, prediction} = DSEx.call(rebound, %{question: "works?"})
+    assert DSEx.get(prediction, :answer) == "rebound"
+  end
+
   test "save/load preserves dynamic LM rebinding for settings-based programs" do
     program = DSEx.predict("question -> answer")
 

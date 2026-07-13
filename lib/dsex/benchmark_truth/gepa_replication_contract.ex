@@ -16,8 +16,10 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
     "campaign_id",
     "dataset",
     "evidence_level",
+    "metric_call_evidence",
     "metric_calls",
     "optimizer_budgets",
+    "seed_selection",
     "source_commits",
     "token_cost",
     "wall_clock_ms",
@@ -44,6 +46,15 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
       @optimizer_fields ++ if(mode == :smoke, do: @smoke_fields, else: @research_fields)
 
     present_families = rows |> Enum.map(& &1["family"]) |> Enum.uniq()
+    family_counts = Enum.frequencies(Enum.map(rows, & &1["family"]))
+
+    duplicate_families =
+      family_counts
+      |> Enum.filter(fn {_family, count} -> count > 1 end)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.sort()
+
+    unknown_families = present_families -- @required_families
 
     missing_fields =
       rows
@@ -56,8 +67,13 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
 
     %{
       missing_families: @required_families -- present_families,
+      duplicate_families: duplicate_families,
+      unknown_families: unknown_families,
       missing_fields: missing_fields,
-      passing: missing_fields == [] and @required_families -- present_families == []
+      passing:
+        missing_fields == [] and @required_families -- present_families == [] and
+          duplicate_families == [] and unknown_families == [] and
+          length(rows) == length(@required_families)
     }
   end
 
@@ -85,12 +101,22 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
     is_map(result) and numeric?(result["score"]) and concrete_source?(result["source"])
   end
 
-  defp present_field?(row, "dataset", _mode) do
+  defp present_field?(row, "dataset", :smoke) do
     dataset = Map.get(row, "dataset")
 
     is_map(dataset) and concrete_source?(dataset["source"]) and
       dataset["split"] in ["train", "dev", "test", "train_dev_test"] and
       is_map(dataset["checksums"]) and map_size(dataset["checksums"]) > 0
+  end
+
+  defp present_field?(row, "dataset", _mode) do
+    dataset = Map.get(row, "dataset")
+
+    is_map(dataset) and concrete_source?(dataset["source"]) and
+      dataset["split"] in ["train", "dev", "test", "train_dev_test"] and
+      dataset["scope"] == "full" and is_nil(dataset["max_per_split"]) and
+      full_split_counts?(dataset["split_counts"]) and is_map(dataset["checksums"]) and
+      map_size(dataset["checksums"]) > 0 and research_retrieval_valid?(row, dataset)
   end
 
   defp present_field?(row, "evidence_level", _mode),
@@ -107,6 +133,21 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
     budgets = Map.get(row, "optimizer_budgets")
 
     is_map(budgets) and Enum.all?(@optimizer_fields, &positive_integer?(budgets[&1]))
+  end
+
+  defp present_field?(row, "metric_call_evidence", _mode) do
+    evidence = row["metric_call_evidence"]
+    observed = if(is_map(evidence), do: evidence["observed"], else: nil)
+    enforced_limits = if(is_map(evidence), do: evidence["enforced_limits"], else: nil)
+    budgets = row["optimizer_budgets"]
+
+    is_map(evidence) and evidence["basis"] == "observed_and_enforced" and
+      concrete_source?(evidence["source"]) and is_map(observed) and is_map(enforced_limits) and
+      is_map(budgets) and
+      Enum.all?(@optimizer_fields, fn optimizer ->
+        positive_integer?(observed[optimizer]) and enforced_limits[optimizer] == true and
+          positive_integer?(budgets[optimizer]) and observed[optimizer] <= budgets[optimizer]
+      end)
   end
 
   defp present_field?(row, "metric_calls", _mode), do: positive_integer?(row["metric_calls"])
@@ -133,6 +174,19 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
       numeric?(variance["stddev"])
   end
 
+  defp present_field?(row, "seed_selection", _mode) do
+    selections = row["seed_selection"]
+    declared_seeds = get_in(row, ["seed_variance", "seeds"])
+
+    is_map(selections) and is_list(declared_seeds) and
+      Enum.all?(@optimizer_fields, fn optimizer ->
+        selection = selections[optimizer]
+
+        honest_seed_selection?(selection) and
+          Enum.sort(selection["seeds"]) == Enum.sort(declared_seeds)
+      end)
+  end
+
   defp present_field?(row, "train_dev_test_gap", :smoke), do: is_map(row["train_dev_test_gap"])
 
   defp present_field?(row, "train_dev_test_gap", _mode) do
@@ -143,6 +197,20 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
   end
 
   defp present_field?(row, field, _mode), do: concrete_source?(row[field])
+
+  defp research_retrieval_valid?(%{"family" => "hoverBench"}, dataset) do
+    retrieval = dataset["retrieval"]
+
+    is_map(retrieval) and retrieval["verified"] == true and
+      retrieval["implementation"] == "upstream_python_bm25s" and
+      concrete_sha256?(retrieval["corpus_checksum"]) and
+      concrete_sha256?(retrieval["index_checksum"])
+  end
+
+  defp research_retrieval_valid?(_row, _dataset), do: true
+
+  defp concrete_sha256?("sha256:" <> digest), do: byte_size(digest) == 64
+  defp concrete_sha256?(_value), do: false
 
   defp papillon_judge_missing_fields(_rows, :smoke), do: []
 
@@ -169,6 +237,32 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
       digests["train"] != digests["dev"] and digests["train"] != digests["test"] and
       digests["dev"] != digests["test"]
   end
+
+  defp full_split_counts?(counts) when is_map(counts) do
+    Enum.all?(["train", "dev", "test"], fn split ->
+      positive_integer?(counts[split]) and counts[split] > 1
+    end)
+  end
+
+  defp full_split_counts?(_counts), do: false
+
+  defp honest_seed_selection?(selection) when is_map(selection) do
+    method = selection["method"]
+    seeds = selection["seeds"]
+    selected_seed = selection["selected_seed"]
+
+    is_list(seeds) and seeds != [] and length(Enum.uniq(seeds)) == length(seeds) and
+      Enum.all?(seeds, &is_integer/1) and selection["test_scores_used"] == false and
+      concrete_source?(selection["source"]) and
+      case method do
+        "predeclared" -> selected_seed in seeds and is_nil(selection["selection_split"])
+        "best_dev" -> selected_seed in seeds and selection["selection_split"] == "dev"
+        "aggregate" -> is_nil(selected_seed) and is_nil(selection["selection_split"])
+        _ -> false
+      end
+  end
+
+  defp honest_seed_selection?(_selection), do: false
 
   defp numeric?(value), do: is_integer(value) or is_float(value)
   defp positive_integer?(value), do: is_integer(value) and value > 0

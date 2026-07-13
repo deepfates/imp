@@ -61,6 +61,7 @@ defmodule DSEx do
     ProgramOfThought,
     RAG,
     ReAct,
+    ReActV2,
     Refine
   }
 
@@ -113,6 +114,28 @@ defmodule DSEx do
 
   @doc "Appends a signature-shaped turn to conversation history."
   defdelegate append_history(history, turn), to: DSEx.History, as: :append
+
+  @doc "Renders recent history turns with secret redaction enabled by default."
+  defdelegate inspect_history(history, opts \\ []), to: DSEx.Observability
+
+  @doc "Runs a function while collecting selected redacted DSEx telemetry events."
+  defdelegate trace(fun, opts \\ []), to: DSEx.Observability
+
+  @doc "Subscribes the current process to normalized optimizer progress events."
+  defdelegate subscribe_optimizer_progress(opts \\ []),
+    to: DSEx.Observability,
+    as: :subscribe_optimizer
+
+  @doc "Detaches an optimizer progress subscription."
+  defdelegate unsubscribe_optimizer_progress(subscription),
+    to: DSEx.Observability,
+    as: :unsubscribe_optimizer
+
+  @doc "Enables DSEx-scoped logging."
+  defdelegate enable_logging(), to: DSEx.Observability
+
+  @doc "Disables DSEx-scoped logging."
+  defdelegate disable_logging(), to: DSEx.Observability
 
   @doc "Converts a prediction or example to its field map."
   def to_map(container)
@@ -168,6 +191,12 @@ defmodule DSEx do
   def with_demos(%RAG{program: program} = rag, demos),
     do: %{rag | program: with_demos(program, demos)}
 
+  def with_demos(%ReAct{react: predict} = react, demos),
+    do: %{react | react: with_demos(predict, demos)}
+
+  def with_demos(%ReActV2{react: predict} = react, demos),
+    do: %{react | react: with_demos(predict, demos)}
+
   def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
 
   def with_demos(program_or_example, _demos) do
@@ -219,6 +248,9 @@ defmodule DSEx do
   @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
 
+  @doc "Creates a native-tool-aware ReActV2 program with structured history and forced submit."
+  def react_v2(signature, tools, opts \\ []), do: ReActV2.new(signature, tools, opts)
+
   @doc "Creates a named tool for ReAct programs and agents."
   def tool(name, description, run, opts \\ []), do: Tool.new(name, description, run, opts)
 
@@ -239,6 +271,29 @@ defmodule DSEx do
 
   @doc "Calls any DSEx program struct."
   defdelegate call(program, inputs), to: DSEx.Module
+
+  @doc """
+  Returns a copy of a DSEx program pinned to `lm`.
+
+  This is the public rebinding path for programs loaded from portable artifacts.
+  Saved provider programs retain non-secret provider configuration, but never
+  credentials, so bind a newly configured LM before calling them:
+
+      loaded
+      |> DSEx.with_lm(DSEx.req_llm("openai:gpt-4.1-mini", api_key: api_key))
+      |> DSEx.call(%{question: "What changed?"})
+
+  Core predictors, callback wrappers, evaluators, and optimizer-produced KNN
+  few-shot and ensemble graphs are supported. Rebinding traverses the complete
+  executable graph and pins every nested predictor to the supplied LM.
+  """
+  def with_lm(program, lm) do
+    case DSEx.LM.validate_lm(lm) do
+      {:ok, nil} -> raise ArgumentError, "DSEx.with_lm/2 requires a configured LM"
+      {:ok, validated} -> DSEx.ProgramAccess.put_lm(program, validated)
+      {:error, message} -> raise ArgumentError, "invalid LM for DSEx.with_lm/2: #{message}"
+    end
+  end
 
   @doc """
   Evaluates a program against examples with a metric.
@@ -313,15 +368,19 @@ defmodule DSEx do
 
   @doc "Returns a JSON-safe portable representation of a DSEx program."
   defdelegate dump(program), to: DSEx.Saving
+  defdelegate dump(program, opts), to: DSEx.Saving
 
   @doc "Loads a DSEx program from a portable saved representation."
   defdelegate load(state), to: DSEx.Saving
+  defdelegate load(state, opts), to: DSEx.Saving
 
   @doc "Writes a DSEx program artifact to disk as JSON."
   defdelegate save!(program, path), to: DSEx.Saving
+  defdelegate save!(program, path, opts), to: DSEx.Saving
 
   @doc "Loads a DSEx program artifact from disk."
   defdelegate load!(path), to: DSEx.Saving
+  defdelegate load!(path, opts), to: DSEx.Saving
 
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: DSEx.Clients.ReqLLM.new(model_spec, opts)

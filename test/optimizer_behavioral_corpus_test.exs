@@ -57,14 +57,17 @@ defmodule OptimizerBehavioralCorpusTest do
     report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :mipro_v2
-    assert report.metadata.search == :categorical_tpe
-    assert report.metadata.acquisition == :laplace_density_ratio
+    assert report.metadata.algorithm == :mipro_v2
+    assert report.metadata.sampler == :joint_categorical_parzen
+    assert report.metadata.upstream_sampler == :optuna_multivariate_tpe
+    refute report.metadata.exact_sampler_sequence_parity
     assert report.best_score >= baseline_score
     assert report.best_score == evaluator(compiled).score
-    assert Enum.any?(report.candidates, &Map.get(&1, :baseline))
-    assert Enum.any?(report.candidates, &(&1[:source] == :random_cold_start))
-    assert Enum.any?(report.candidates, &(&1[:source] == :tpe_density_ratio))
-    assert Enum.any?(report.candidates, &(not Enum.empty?(Map.get(&1, :demos, []))))
+    assert report.candidate_count == 5
+    assert length(report.metadata.full_evaluations) == 6
+    assert Enum.any?(report.metadata.full_evaluations, &(&1.kind == :baseline))
+    assert report.metadata.search_space["atom:main:demos"] >= 1
+    assert Enum.all?(report.candidates, &is_map(&1.params))
   end
 
   test "MIPROv2 treats zero search counts as baseline-only compile" do
@@ -83,46 +86,31 @@ defmodule OptimizerBehavioralCorpusTest do
 
     assert report.optimizer == :mipro_v2
     assert report.best_score == baseline_score
-    assert report.candidate_count == 1
-    assert [%{baseline: true, trial: 0, score: ^baseline_score}] = report.candidates
-    assert report.metadata.cold_start == 0
-    assert report.metadata.demo_candidate_count == 1
-  end
-
-  test "MIPROv2 reports invalid devset setup without crashing" do
-    program = france_program()
-
-    compiled =
-      DSEx.Optimizer.MIPROv2.new(metric(), trials: 2, demos_per_candidate: 1)
-      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
-
-    report = DSEx.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :mipro_v2
-    assert report.best_score == nil
     assert report.candidate_count == 0
     assert report.candidates == []
-    assert report.metadata.status == :all_candidates_failed
-    assert [%{stage: :setup, reason: reason}] = report.errors
-    assert String.contains?(reason, "Enumerable")
+
+    assert [%{kind: :baseline, trial: 0, score: ^baseline_score}] =
+             report.metadata.full_evaluations
+
+    assert report.metadata.effective_config.num_trials == 0
   end
 
-  test "MIPROv2 records trainset errors while preserving baseline evaluation" do
+  test "MIPROv2 rejects invalid devsets at the public boundary" do
     program = france_program()
-    baseline_score = evaluator(program).score
 
-    compiled =
+    assert_raise ArgumentError, ~r/valset must be enumerable/, fn ->
+      DSEx.Optimizer.MIPROv2.new(metric(), trials: 2, demos_per_candidate: 1)
+      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
+    end
+  end
+
+  test "MIPROv2 rejects invalid trainsets at the public boundary" do
+    program = france_program()
+
+    assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
       DSEx.Optimizer.MIPROv2.new(metric(), trials: 1, demos_per_candidate: 1)
       |> DSEx.Optimizer.MIPROv2.compile(program, :not_an_enumerable_trainset, devset())
-
-    report = DSEx.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :mipro_v2
-    assert report.best_score == baseline_score
-    assert report.metadata.status == :with_errors
-    assert Enum.any?(report.candidates, &Map.get(&1, :baseline))
-    assert [%{stage: :trainset, reason: reason}] = report.errors
-    assert String.contains?(reason, "Enumerable")
+    end
   end
 
   test "GEPA turns textual feedback into reflective candidates and keeps the best" do
@@ -188,6 +176,25 @@ defmodule OptimizerBehavioralCorpusTest do
            end)
   end
 
+  test "GEPA keeps truncated multibyte diagnostics valid UTF-8" do
+    reason = String.duplicate("é", 241)
+
+    broken_program =
+      DSEx.predict("question -> answer",
+        lm: fn _messages, _opts -> {:error, reason} end
+      )
+
+    compiled =
+      DSEx.Optimizer.GEPA.new(metric(), generations: 1)
+      |> DSEx.Optimizer.GEPA.compile(broken_program, trainset(), devset())
+
+    report = DSEx.Optimizer.Report.fetch(compiled)
+
+    assert Enum.all?(report.candidates, fn candidate ->
+             String.valid?(candidate.instruction) and String.valid?(candidate.mutation)
+           end)
+  end
+
   test "GEPA reports feedback callback failures and falls back to default feedback" do
     compiled =
       DSEx.Optimizer.GEPA.new(metric(),
@@ -236,7 +243,7 @@ defmodule OptimizerBehavioralCorpusTest do
            end)
   end
 
-  test "SIMBA performs monotonic mini-batch ascent over candidate programs" do
+  test "SIMBA performs stochastic trajectory sampling without regressing final selection" do
     program = france_program()
     baseline_score = evaluator(program).score
 
@@ -245,10 +252,11 @@ defmodule OptimizerBehavioralCorpusTest do
     report = DSEx.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :simba
-    assert report.metadata.policy == :monotonic_minibatch_ascent
+    assert report.metadata.algorithm == :stochastic_introspective_minibatch_ascent
     assert report.best_score >= baseline_score
     assert report.best_score == evaluator(compiled).score
-    assert Enum.any?(report.candidates, & &1.accepted)
+    assert length(report.metadata.trial_logs) == 3
+    assert report.metadata.trajectory_calls == 3
   end
 
   test "SIMBA treats zero steps as a baseline-only compile" do
@@ -270,7 +278,7 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.errors == []
   end
 
-  test "SIMBA can use introspective LM feedback for candidate instructions" do
+  test "SIMBA records an explicitly configured reflection model" do
     judge_lm = %{
       module: DSEx.LM.Static,
       opts: [
@@ -286,48 +294,27 @@ defmodule OptimizerBehavioralCorpusTest do
       |> DSEx.Optimizer.SIMBA.compile(france_program(), trainset(), devset())
 
     report = DSEx.Optimizer.Report.fetch(compiled)
-    assert report.metadata.introspection
-    assert report.best_score == 1.0
-    assert_received {:simba_judge, _messages}
+    assert {:deprecated_option, :judge_lm} in report.metadata.compatibility
+    assert report.best_score >= 0.0
+    refute_received {:simba_judge, _messages}
   end
 
-  test "SIMBA reports invalid devset setup without crashing" do
+  test "SIMBA rejects invalid final sets at the public boundary" do
     program = france_program()
 
-    compiled =
+    assert_raise ArgumentError, ~r/final_set must be enumerable/, fn ->
       DSEx.Optimizer.SIMBA.new(metric(), steps: 2, demos_per_step: 1)
       |> DSEx.Optimizer.SIMBA.compile(program, trainset(), :not_an_enumerable_devset)
-
-    report = DSEx.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :simba
-    assert report.best_score == nil
-    assert report.candidate_count == 0
-    assert report.candidates == []
-    assert report.metadata.status == :all_candidates_failed
-    assert report.metadata.baseline_score == nil
-    assert [%{stage: :setup, reason: reason}] = report.errors
-    assert String.contains?(reason, "Enumerable")
+    end
   end
 
-  test "SIMBA records trainset materialization errors while preserving baseline search" do
+  test "SIMBA rejects invalid trainsets at the public boundary" do
     program = france_program()
-    baseline_score = evaluator(program).score
 
-    compiled =
+    assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
       DSEx.Optimizer.SIMBA.new(metric(), steps: 1, demos_per_step: 1)
       |> DSEx.Optimizer.SIMBA.compile(program, :not_an_enumerable_trainset, devset())
-
-    report = DSEx.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :simba
-    assert report.best_score == baseline_score
-    assert report.candidate_count == 1
-    assert report.metadata.status == :with_errors
-    assert report.metadata.baseline_score == baseline_score
-    assert [%{stage: :trainset, reason: reason}] = report.errors
-    assert String.contains?(reason, "Enumerable")
-    assert [%{demos: [], accepted: true}] = report.candidates
+    end
   end
 
   test "COPRO reports coordinate prompt optimization across breadth and depth" do
@@ -425,31 +412,31 @@ defmodule OptimizerBehavioralCorpusTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :trials option: expected non negative integer/,
+                 ~r/num_trials must be a non-negative integer/,
                  fn ->
                    DSEx.Optimizer.MIPROv2.new(metric(), trials: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :demos_per_candidate option: expected non negative integer/,
+                 ~r/max_labeled_demos must be a non-negative integer/,
                  fn ->
                    DSEx.Optimizer.MIPROv2.new(metric(), demos_per_candidate: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: invalid value for :cold_start option: expected non negative integer/,
+                 ~r/startup_trials must be a non-negative integer/,
                  fn ->
                    DSEx.Optimizer.MIPROv2.new(metric(), cold_start: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :steps option: expected non negative integer/,
+                 ~r/max_steps must be an integer >= 0/,
                  fn ->
                    DSEx.Optimizer.SIMBA.new(metric(), steps: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :demos_per_step option: expected non negative integer/,
+                 ~r/max_demos must be an integer >= 0/,
                  fn ->
                    DSEx.Optimizer.SIMBA.new(metric(), demos_per_step: -1)
                  end
@@ -487,7 +474,7 @@ defmodule OptimizerBehavioralCorpusTest do
                  fn -> DSEx.Optimizer.COPRO.new(metric(), proposer_lm: %{provider: :missing}) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: invalid value for :judge_lm option: expected nil, an LM module/,
+                 ~r/prompt_lm expected/,
                  fn -> DSEx.Optimizer.SIMBA.new(metric(), judge_lm: %{provider: :missing}) end
   end
 

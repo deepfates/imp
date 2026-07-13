@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl_multimodal_fixture",
+  "object": "chat.completion",
+  "created": 1710000000,
+  "model": "gpt-4-turbo",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "[[ ## answer ## ]]\nEiffel Tower\n[[ ## completed ## ]]"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 12,
+    "total_tokens": 54
+  }
+}

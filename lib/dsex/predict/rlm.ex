@@ -3,21 +3,21 @@ defmodule DSEx.Predict.RLM do
   Recursive Language Model module.
 
   RLM is not retrieval-augmented generation. It is an inference-time strategy
-  for large or awkward contexts: inputs are exposed as sandbox variables and a
-  controller LM iteratively chooses actions until it submits structured output.
+  for large or awkward contexts: inputs are exposed as variables in a
+  persistent constrained-Elixir environment, and a controller LM iteratively
+  writes code until that code submits structured output.
 
   This implementation uses a BEAM-safe sandbox for production control.
-  Supported controller actions are:
+  The primary controller response is `%{reasoning: "...", code: "..."}`. Safe
+  code supports persistent assignment, bounded comprehensions and
+  transformations, `llm_query/1`, `llm_query_batched/1`, `recurse/2`,
+  `load/1`, registered tools, `print/1`, and `submit/1`. Legacy discrete action
+  maps remain accepted as compatibility shims.
 
-  - `%{action: "eval", code: "x + 1"}` to evaluate a safe expression.
-  - `%{action: "load", name: "context"}` to load a lazy `SandboxSerializable` input.
-  - `%{action: "llm_query", signature: "...", inputs: %{...}}` to call a sub-LM.
-  - `%{action: "llm_query_batched", signature: "...", inputs: [%{...}]}` to call a sub-LM over a batch.
-  - `%{action: "recurse", signature: "...", inputs: %{...}}` to invoke a smaller child RLM.
-  - `%{action: "submit", result: %{...}}` to return signature outputs.
-
-  The loop enforces `max_iterations` and `max_llm_calls` budgets and stores an
-  interpretable trajectory in prediction metadata.
+  A shared atomic ledger enforces `max_iterations`, `max_llm_calls`,
+  `max_recursion_depth`, and `max_time_ms` across recursive children. Generated
+  source is parsed but never evaluated by `Code.eval_*`; only an explicit AST
+  allowlist executes, with atom-safe parsing and an interpreter step budget.
 
   Tool execution is policy-gated. Unknown, denied, crashing, or policy-crashing
   tool actions return `{:error, {:rlm_tool_error, reason, trace}}` with the
@@ -26,6 +26,11 @@ defmodule DSEx.Predict.RLM do
 
   @behaviour DSEx.Module
 
+  alias DSEx.Predict.RLM.{Budget, Interpreter, Runtime, Trace}
+  alias DSEx.Predict.RLM.Interpreter.Effect
+
+  @task_process_keys [:"$ancestors", :"$callers", :"$initial_call"]
+
   defstruct [
     :signature,
     :lm,
@@ -33,8 +38,12 @@ defmodule DSEx.Predict.RLM do
     :sub_lm,
     tools: %{},
     tool_policy: :allow,
-    max_iterations: 10,
-    max_llm_calls: 20,
+    max_iterations: 20,
+    max_llm_calls: 50,
+    max_recursion_depth: 1,
+    max_interpreter_steps: 10_000,
+    max_interpreter_value_bytes: 16_000_000,
+    max_interpreter_effects: 100,
     max_time_ms: nil,
     max_preview_chars: 2_000,
     max_observation_chars: 10_000,
@@ -52,7 +61,11 @@ defmodule DSEx.Predict.RLM do
   - `:sub_lm` - LM used for `llm_query` actions; defaults to `:lm`.
   - `:tools` - list of `DSEx.Tool` values available to `tool` actions.
   - `:tool_policy` - `:allow`, a list of allowed tool names, or a predicate.
-  - `:max_iterations`, `:max_llm_calls`, `:max_time_ms` - execution budgets.
+  - `:max_iterations` / `:max_iters`, `:max_llm_calls`, `:max_time_ms` - execution budgets.
+  - `:max_recursion_depth` - maximum symbolic child depth; defaults to `1`.
+  - `:max_interpreter_steps` - AST execution steps per controller turn.
+  - `:max_interpreter_value_bytes` - maximum serialized size of an interpreter value.
+  - `:max_interpreter_effects` - external effects allowed per controller turn.
   - `:max_preview_chars` - how much large input context the controller sees.
   - `:max_observation_chars` - truncation limit for string observations.
   """
@@ -65,8 +78,13 @@ defmodule DSEx.Predict.RLM do
       type: {:custom, DSEx.ToolPolicy, :validate, []},
       default: :allow
     ],
-    max_iterations: [type: :non_neg_integer, default: 10],
-    max_llm_calls: [type: :non_neg_integer, default: 20],
+    max_iterations: [type: :non_neg_integer, default: 20],
+    max_iters: [type: :non_neg_integer],
+    max_llm_calls: [type: :non_neg_integer, default: 50],
+    max_recursion_depth: [type: :non_neg_integer, default: 1],
+    max_interpreter_steps: [type: :pos_integer, default: 10_000],
+    max_interpreter_value_bytes: [type: :pos_integer, default: 16_000_000],
+    max_interpreter_effects: [type: :pos_integer, default: 100],
     max_time_ms: [type: :non_neg_integer],
     max_preview_chars: [type: :non_neg_integer, default: 2_000],
     max_observation_chars: [type: :non_neg_integer, default: 10_000],
@@ -85,8 +103,12 @@ defmodule DSEx.Predict.RLM do
       sub_lm: Keyword.get(opts, :sub_lm, opts[:lm]),
       tools: tools,
       tool_policy: opts[:tool_policy],
-      max_iterations: non_negative_integer(opts[:max_iterations]),
+      max_iterations: non_negative_integer(Keyword.get(opts, :max_iters, opts[:max_iterations])),
       max_llm_calls: non_negative_integer(opts[:max_llm_calls]),
+      max_recursion_depth: non_negative_integer(opts[:max_recursion_depth]),
+      max_interpreter_steps: opts[:max_interpreter_steps],
+      max_interpreter_value_bytes: opts[:max_interpreter_value_bytes],
+      max_interpreter_effects: opts[:max_interpreter_effects],
       max_time_ms: non_negative_integer_or_nil(opts[:max_time_ms]),
       max_preview_chars: non_negative_integer(opts[:max_preview_chars]),
       max_observation_chars:
@@ -119,16 +141,19 @@ defmodule DSEx.Predict.RLM do
   with `:rlm_trace` metadata.
   """
   def call(%__MODULE__{} = rlm, inputs) when is_list(inputs) or is_map(inputs) do
-    with {:ok, vars} <- normalize_inputs(inputs) do
-      state = %{
-        vars: vars,
-        observations: [],
-        trace: [],
-        llm_calls: 0,
-        started_at: System.monotonic_time(:millisecond)
-      }
-
-      run_loop(rlm, state, 1)
+    with {:ok, vars} <- normalize_inputs(inputs),
+         :ok <- validate_required_inputs(rlm.signature, vars),
+         {:ok, budget} <-
+           Budget.start_link(
+             max_lm_calls: rlm.max_llm_calls,
+             max_time_ms: rlm.max_time_ms,
+             max_recursion_depth: rlm.max_recursion_depth
+           ) do
+      try do
+        call_with_budget(rlm, vars, budget)
+      after
+        if Process.alive?(budget), do: GenServer.stop(budget, :normal)
+      end
     end
   end
 
@@ -142,6 +167,45 @@ defmodule DSEx.Predict.RLM do
     {:ok, Map.new(inputs)}
   rescue
     _error -> {:error, {:invalid_rlm_inputs, "expected inputs as {key, value} pairs"}}
+  end
+
+  defp validate_required_inputs(signature, inputs) do
+    missing =
+      signature.inputs
+      |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
+      |> Enum.map(& &1.name)
+      |> Enum.reject(&input_present?(inputs, &1))
+
+    if missing == [], do: :ok, else: {:error, {:missing_input_fields, missing}}
+  end
+
+  defp input_present?(inputs, name),
+    do: Map.has_key?(inputs, name) or Map.has_key?(inputs, to_string(name))
+
+  defp call_with_budget(%__MODULE__{} = rlm, vars, budget, depth \\ 0) do
+    runtime = Runtime.new(rlm, budget, vars, depth)
+
+    interpreter =
+      Interpreter.new(vars, interpreter_callbacks(rlm), runtime,
+        max_steps: rlm.max_interpreter_steps,
+        max_output_chars: rlm.max_observation_chars,
+        max_value_bytes: rlm.max_interpreter_value_bytes,
+        max_effects: rlm.max_interpreter_effects
+      )
+
+    state = %{
+      vars: vars,
+      interpreter: interpreter,
+      budget: budget,
+      depth: depth,
+      observations: [],
+      trace: [],
+      trace_limit: rlm.max_observation_chars,
+      llm_calls: Budget.snapshot(budget).lm_calls,
+      started_at: System.monotonic_time(:millisecond)
+    }
+
+    run_loop(rlm, state, 1)
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration)
@@ -164,6 +228,9 @@ defmodule DSEx.Predict.RLM do
       {:done, prediction, state} ->
         {:ok, add_trace(prediction, state)}
 
+      {:error, :rlm_time_budget_exceeded} ->
+        {:error, {:rlm_max_time_ms, rlm.max_time_ms, Enum.reverse(state.trace)}}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -181,15 +248,17 @@ defmodule DSEx.Predict.RLM do
       %{
         role: :system,
         content:
-          "You are an RLM controller. Return JSON with action eval, assign, load, tool, llm_query, llm_query_batched, recurse, or submit."
+          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly and return JSON with reasoning and code. Code may inspect and assign variables, use for comprehensions, call llm_query(prompt), llm_query_batched(prompts), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). State persists across turns. Explore and compute in code; submit only when every required signature output is ready."
       },
       %{
         role: :user,
         content:
           Jason.encode!(%{
             signature: DSEx.Signature.to_spec(rlm.signature),
+            task_instructions: rlm.signature.instructions,
+            required_outputs: DSEx.Signature.output_names(rlm.signature),
             iteration: iteration,
-            variables: variable_metadata(state.vars, rlm.max_preview_chars),
+            variables: variable_metadata(state.interpreter.vars, rlm.max_preview_chars),
             observations: Enum.map(state.observations, &safe_json/1),
             tools: tool_metadata(rlm.tools),
             budget: %{
@@ -201,13 +270,37 @@ defmodule DSEx.Predict.RLM do
       }
     ]
 
-    DSEx.LM.generate(lm, messages, [])
+    run_budgeted(state.budget, fn -> DSEx.LM.generate(lm, messages, []) end)
   end
+
+  defp normalize_action(%{"code" => code} = action)
+       when is_binary(code) and not is_map_key(action, "action") do
+    {:ok,
+     %{
+       "action" => "run",
+       "code" => code,
+       "reasoning" => Map.get(action, "reasoning", "")
+     }}
+  end
+
+  defp normalize_action(%{"action" => "submit", "result" => result}),
+    do: {:ok, %{"action" => "submit", "result" => result}}
+
+  defp normalize_action(%{"action" => "submit"} = action),
+    do: {:ok, %{"action" => "submit", "result" => Map.delete(action, "action")}}
 
   defp normalize_action(%{"action" => _action} = action), do: {:ok, action}
 
   defp normalize_action(%{action: action_name} = action),
-    do: {:ok, action |> stringify_action_keys() |> Map.put("action", to_string(action_name))}
+    do:
+      action
+      |> stringify_action_keys()
+      |> Map.put("action", to_string(action_name))
+      |> normalize_action()
+
+  defp normalize_action(%{code: code} = action)
+       when is_binary(code) and not is_map_key(action, :action),
+       do: action |> stringify_action_keys() |> normalize_action()
 
   defp normalize_action(%{"submit" => result}),
     do: {:ok, %{"action" => "submit", "result" => result}}
@@ -228,6 +321,62 @@ defmodule DSEx.Predict.RLM do
       {key, value} when is_atom(key) -> {Atom.to_string(key), value}
       pair -> pair
     end)
+  end
+
+  defp step(%__MODULE__{} = rlm, %{"action" => "run", "code" => code} = action, state, iteration)
+       when is_binary(code) do
+    reasoning = Map.get(action, "reasoning", "")
+
+    {execution, state} =
+      drive_interpreter(rlm, state, Interpreter.execute(state.interpreter, code))
+
+    case execution do
+      {:ok, value, interpreter} ->
+        output = interpreter_output(interpreter, value, rlm.max_observation_chars)
+
+        state =
+          state
+          |> sync_interpreter(interpreter)
+          |> add_observation(%{reasoning: reasoning, code: code, output: output})
+          |> trace(iteration, :run, %{reasoning: reasoning, code: code}, output)
+
+        {:cont, state}
+
+      {:final, result, interpreter} ->
+        case resolve_adapter(rlm).parse(rlm.signature, result, []) do
+          {:ok, prediction} ->
+            state = sync_interpreter(state, Interpreter.commit(interpreter))
+            state = trace(state, iteration, :submit, %{reasoning: reasoning, code: code}, result)
+            {:done, prediction, state}
+
+          {:error, reason} ->
+            output = {:submit_error, reason}
+
+            state =
+              state
+              |> sync_interpreter(interpreter)
+              |> add_observation(%{reasoning: reasoning, code: code, output: output})
+              |> trace(iteration, :submit_error, %{reasoning: reasoning, code: code}, output)
+
+            {:cont, state}
+        end
+
+      {:error, reason, interpreter} ->
+        state = sync_interpreter(state, interpreter)
+
+        if budget_error?(reason) do
+          {:error, attach_rlm_trace(reason, state)}
+        else
+          output = {:error, reason}
+
+          state =
+            state
+            |> add_observation(%{reasoning: reasoning, code: code, output: output})
+            |> trace(iteration, :run_error, %{reasoning: reasoning, code: code}, output)
+
+          {:cont, state}
+        end
+    end
   end
 
   defp step(rlm, %{"action" => "submit", "result" => result}, state, iteration)
@@ -263,9 +412,11 @@ defmodule DSEx.Predict.RLM do
 
     case Map.fetch(state.vars, key) do
       {:ok, %DSEx.Predict.RLM.SandboxSerializable{} = serializable} ->
-        case DSEx.Predict.RLM.SandboxSerializable.load(serializable) do
+        case run_budgeted(state.budget, fn ->
+               DSEx.Predict.RLM.SandboxSerializable.load(serializable)
+             end) do
           {:ok, loaded} ->
-            state = %{state | vars: Map.put(state.vars, key, loaded)}
+            state = put_state_var(state, key, loaded)
 
             observation = %{
               action: :load,
@@ -312,49 +463,16 @@ defmodule DSEx.Predict.RLM do
   defp step(_rlm, %{"action" => "assign", "name" => name, "value" => value}, state, iteration)
        when is_binary(name) do
     key = existing_atom_or_string(name)
-    state = %{state | vars: Map.put(state.vars, key, value)}
+    state = put_state_var(state, key, value)
     state = add_observation(state, %{action: :assign, name: key, value: value})
     {:cont, trace(state, iteration, :assign, %{name: key, value: value}, :ok)}
   end
 
   defp step(%__MODULE__{} = rlm, %{"action" => "llm_query"} = action, state, iteration) do
-    if state.llm_calls >= rlm.max_llm_calls do
-      {:error, {:rlm_max_llm_calls, rlm.max_llm_calls, Enum.reverse(state.trace)}}
-    else
-      signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
-      inputs = Map.get(action, "inputs", %{})
-
-      program =
-        DSEx.Predict.Predict.new(signature,
-          lm: resolve_sub_lm(rlm),
-          adapter: resolve_adapter(rlm)
-        )
-
-      result = DSEx.Predict.Predict.call(program, inputs)
-
-      state =
-        state
-        |> Map.update!(:llm_calls, &(&1 + 1))
-        |> add_observation(%{
-          action: :llm_query,
-          signature: signature,
-          inputs: inputs,
-          result: result
-        })
-        |> trace(iteration, :llm_query, action, result)
-
-      {:cont, state}
-    end
-  end
-
-  defp step(%__MODULE__{} = rlm, %{"action" => "llm_query_batched"} = action, state, iteration) do
-    with {:ok, inputs_list} <- batched_inputs(action) do
-      required_calls = length(inputs_list)
-
-      if state.llm_calls + required_calls > rlm.max_llm_calls do
-        {:error, {:rlm_max_llm_calls, rlm.max_llm_calls, Enum.reverse(state.trace)}}
-      else
+    case Budget.reserve_lm(state.budget, 1) do
+      {:ok, _used} ->
         signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
+        inputs = Map.get(action, "inputs", %{})
 
         program =
           DSEx.Predict.Predict.new(signature,
@@ -362,30 +480,63 @@ defmodule DSEx.Predict.RLM do
             adapter: resolve_adapter(rlm)
           )
 
-        results =
-          inputs_list
-          |> Task.async_stream(&DSEx.Predict.Predict.call(program, &1),
-            ordered: true,
-            max_concurrency: min(max(required_calls, 1), 8),
-            timeout: :infinity
-          )
-          |> Enum.map(fn
-            {:ok, result} -> result
-            {:exit, reason} -> {:error, {:batched_llm_query_exit, reason}}
-          end)
+        result =
+          run_budgeted(state.budget, fn -> DSEx.Predict.Predict.call(program, inputs) end)
 
         state =
           state
-          |> Map.update!(:llm_calls, &(&1 + required_calls))
+          |> sync_budget_usage()
           |> add_observation(%{
-            action: :llm_query_batched,
+            action: :llm_query,
             signature: signature,
-            inputs: inputs_list,
-            result: results
+            inputs: inputs,
+            result: result
           })
-          |> trace(iteration, :llm_query_batched, action, results)
+          |> trace(iteration, :llm_query, action, result)
 
         {:cont, state}
+
+      {:error, {:rlm_max_llm_calls, max}} ->
+        {:error, {:rlm_max_llm_calls, max, Enum.reverse(state.trace)}}
+
+      {:error, reason} ->
+        {:error, attach_rlm_trace(reason, state)}
+    end
+  end
+
+  defp step(%__MODULE__{} = rlm, %{"action" => "llm_query_batched"} = action, state, iteration) do
+    with {:ok, inputs_list} <- batched_inputs(action) do
+      case run_leased_batch(state.budget, inputs_list, fn input ->
+             DSEx.Predict.Predict.call(
+               DSEx.Predict.Predict.new(
+                 Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature)),
+                 lm: resolve_sub_lm(rlm),
+                 adapter: resolve_adapter(rlm)
+               ),
+               input
+             )
+           end) do
+        {:ok, results} ->
+          signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
+
+          state =
+            state
+            |> sync_budget_usage()
+            |> add_observation(%{
+              action: :llm_query_batched,
+              signature: signature,
+              inputs: inputs_list,
+              result: results
+            })
+            |> trace(iteration, :llm_query_batched, action, results)
+
+          {:cont, state}
+
+        {:error, {:rlm_max_llm_calls, max}} ->
+          {:error, {:rlm_max_llm_calls, max, Enum.reverse(state.trace)}}
+
+        {:error, reason} ->
+          {:error, attach_rlm_trace(reason, state)}
       end
     end
   end
@@ -394,7 +545,9 @@ defmodule DSEx.Predict.RLM do
     requested_name = Map.get(action, "name")
     name = normalize_tool_name(rlm.tools, requested_name)
     args = action |> Map.get("arguments", Map.get(action, "args", %{})) |> normalize_tool_args()
-    result = execute_tool_call(rlm, name, requested_name, args)
+
+    result =
+      run_budgeted(state.budget, fn -> execute_tool_call(rlm, name, requested_name, args) end)
 
     state =
       state
@@ -411,30 +564,373 @@ defmodule DSEx.Predict.RLM do
     signature = Map.get(action, "signature", DSEx.Signature.to_spec(rlm.signature))
     inputs = Map.get(action, "inputs", state.vars)
 
-    child = %{
-      rlm
-      | signature: DSEx.Signature.ensure(signature),
-        max_iterations: max(rlm.max_iterations - iteration, 1),
-        max_llm_calls: max(rlm.max_llm_calls - state.llm_calls, 0),
-        max_time_ms: remaining_time(rlm, state)
-    }
+    with true <- is_map(inputs),
+         {:ok, child_signature} <- safe_signature(signature),
+         {:ok, depth} <- Budget.enter_recursion(state.budget, state.depth) do
+      child = %{
+        rlm
+        | signature: child_signature,
+          max_iterations: max(rlm.max_iterations - iteration, 1)
+      }
 
-    result = call(child, inputs)
+      result = call_with_budget(child, inputs, state.budget, depth)
 
-    state =
-      state
-      |> add_observation(%{
-        action: :recurse,
-        signature: signature,
-        inputs: inputs,
-        result: result
-      })
-      |> trace(iteration, :recurse, action, result)
+      state =
+        state
+        |> sync_budget_usage()
+        |> add_observation(%{
+          action: :recurse,
+          signature: signature,
+          inputs: inputs,
+          result: result
+        })
+        |> trace(iteration, :recurse, action, result)
 
-    {:cont, state}
+      {:cont, state}
+    else
+      false -> {:error, {:invalid_rlm_recurse, {:inputs_must_be_a_map, inputs}}}
+      {:error, reason} -> {:error, {:invalid_rlm_recurse, reason}}
+    end
   end
 
   defp step(_rlm, action, _state, _iteration), do: {:error, {:unsupported_rlm_action, action}}
+
+  defp interpreter_callbacks(%__MODULE__{} = rlm) do
+    builtins = %{
+      "llm_query" => :llm_query,
+      "llm_query_batched" => :llm_query_batched,
+      "recurse" => :recurse,
+      "load" => :load
+    }
+
+    Enum.reduce(rlm.tools, builtins, fn {name, _tool}, callbacks ->
+      Map.put(callbacks, to_string(name), {:tool, name})
+    end)
+  end
+
+  defp drive_interpreter(rlm, state, {:effect, request, continuation}) do
+    {result, state} = execute_interpreter_effect(rlm, state, request)
+
+    continuation = %{
+      continuation
+      | interpreter: %{
+          continuation.interpreter
+          | runtime: state.interpreter.runtime,
+            vars: state.interpreter.vars
+        }
+    }
+
+    drive_interpreter(rlm, state, Interpreter.resume(continuation, result))
+  end
+
+  defp drive_interpreter(_rlm, state, result), do: {result, state}
+
+  defp execute_interpreter_effect(_rlm, state, request) do
+    runtime = state.interpreter.runtime
+
+    result =
+      case request do
+        %Effect{kind: :llm_query, arguments: args} ->
+          interpreter_llm_query(args, runtime)
+
+        %Effect{kind: :llm_query_batched, arguments: args} ->
+          interpreter_llm_query_batched(args, runtime)
+
+        %Effect{kind: :recurse, arguments: args} ->
+          interpreter_recurse(args, runtime)
+
+        %Effect{kind: :load, arguments: args} ->
+          interpreter_load(args, runtime)
+
+        %Effect{kind: {:tool, name}, arguments: args} ->
+          interpreter_tool(name, args, runtime)
+
+        _other ->
+          {:error, {:unknown_rlm_effect, request}, runtime}
+      end
+
+    case result do
+      {:ok, value, runtime} ->
+        state = put_interpreter_runtime(state, runtime)
+        {{:ok, value}, sync_budget_usage(state)}
+
+      {:error, reason, runtime} ->
+        state = put_interpreter_runtime(state, runtime)
+        {{:error, reason}, sync_budget_usage(state)}
+    end
+  rescue
+    error ->
+      reason = {:rlm_effect_exception, request.kind, Exception.message(error)}
+      {{:error, reason}, sync_budget_usage(state)}
+  catch
+    kind, reason ->
+      error = {:rlm_effect_throw, request.kind, {kind, reason}}
+      {{:error, error}, sync_budget_usage(state)}
+  end
+
+  defp interpreter_llm_query([prompt], %{budget: budget, rlm: rlm} = runtime)
+       when is_binary(prompt) do
+    with {:ok, _used} <- Budget.reserve_lm(budget, 1),
+         :ok <- Budget.check(budget),
+         {:ok, raw} <- run_budgeted(budget, fn -> query_sub_lm(rlm, prompt) end) do
+      {:ok, subquery_value(raw), runtime}
+    else
+      {:error, reason} -> {:error, reason, runtime}
+    end
+  end
+
+  defp interpreter_llm_query(args, runtime),
+    do: {:error, {:invalid_llm_query_arguments, args}, runtime}
+
+  defp interpreter_llm_query_batched([prompts], %{budget: budget, rlm: rlm} = runtime)
+       when is_list(prompts) do
+    with true <- Enum.all?(prompts, &(is_binary(&1) and &1 != "")),
+         {:ok, results} <- run_leased_batch(budget, prompts, &query_sub_lm(rlm, &1)) do
+      normalized =
+        Enum.map(results, fn
+          {:ok, value} -> subquery_value(value)
+          {:error, reason} -> {:error, reason}
+        end)
+
+      {:ok, normalized, runtime}
+    else
+      false -> {:error, {:invalid_llm_query_batched_arguments, prompts}, runtime}
+      {:error, reason} -> {:error, reason, runtime}
+    end
+  end
+
+  defp interpreter_llm_query_batched(args, runtime),
+    do: {:error, {:invalid_llm_query_batched_arguments, args}, runtime}
+
+  defp interpreter_recurse(
+         [signature, inputs],
+         %{budget: budget, rlm: rlm, depth: parent_depth} = runtime
+       )
+       when (is_binary(signature) or is_struct(signature, DSEx.Signature)) and is_map(inputs) do
+    with {:ok, child_signature} <- safe_signature(signature),
+         {:ok, depth} <- Budget.enter_recursion(budget, parent_depth) do
+      child = %{rlm | signature: child_signature}
+
+      case call_with_budget(child, inputs, budget, depth) do
+        {:ok, prediction} -> {:ok, DSEx.Prediction.to_map(prediction), runtime}
+        {:error, reason} -> {:error, reason, runtime}
+      end
+    else
+      {:error, reason} -> {:error, reason, runtime}
+    end
+  end
+
+  defp interpreter_recurse(args, runtime),
+    do: {:error, {:invalid_recurse_arguments, args}, runtime}
+
+  defp interpreter_load([name], %{inputs: inputs} = runtime)
+       when is_atom(name) or is_binary(name) do
+    key = find_var_key(inputs, to_string(name))
+
+    case Map.fetch(inputs, key) do
+      {:ok, %DSEx.Predict.RLM.SandboxSerializable{} = serializable} ->
+        case run_budgeted(runtime.budget, fn ->
+               DSEx.Predict.RLM.SandboxSerializable.load(serializable)
+             end) do
+          {:ok, value} -> {:ok, value, Runtime.put_input(runtime, key, value)}
+          {:error, reason} -> {:error, {:sandbox_load_failed, name, reason}, runtime}
+        end
+
+      {:ok, value} ->
+        {:ok, value, runtime}
+
+      :error ->
+        {:error, {:unknown_variable, name}, runtime}
+    end
+  end
+
+  defp interpreter_load(args, runtime), do: {:error, {:invalid_load_arguments, args}, runtime}
+
+  defp interpreter_tool(name, [args], %{rlm: rlm} = runtime) when is_map(args) do
+    case run_budgeted(runtime.budget, fn -> execute_tool_call(rlm, name, name, args) end) do
+      {:error, reason} -> {:error, {:rlm_tool_error, reason}, runtime}
+      value -> {:ok, value, runtime}
+    end
+  end
+
+  defp interpreter_tool(name, args, runtime),
+    do: {:error, {:invalid_tool_arguments, name, args}, runtime}
+
+  defp query_sub_lm(%__MODULE__{} = rlm, prompt) do
+    case resolve_sub_lm(rlm) do
+      nil -> {:error, :rlm_requires_sub_lm}
+      lm -> DSEx.LM.generate(lm, [%{role: :user, content: prompt}], [])
+    end
+  end
+
+  defp run_budgeted(budget, fun) when is_function(fun, 0) do
+    with :ok <- Budget.check(budget) do
+      {task, result_ref, inherited_keys} = start_budgeted_effect(fun)
+
+      case Budget.register_effect(budget, task.pid) do
+        :ok ->
+          await_budgeted_effect(budget, task, result_ref, inherited_keys)
+
+        {:error, reason} ->
+          DSEx.Tasks.cancel(task, 1_000)
+          {:error, reason}
+      end
+    end
+  end
+
+  defp start_budgeted_effect(fun) do
+    inherited_dictionary = effect_process_dictionary()
+    result_ref = make_ref()
+
+    task =
+      DSEx.Tasks.async_nolink(fn ->
+        put_effect_process_dictionary(inherited_dictionary)
+        result = fun.()
+        {result_ref, result, effect_process_dictionary()}
+      end)
+
+    {task, result_ref, Map.keys(inherited_dictionary)}
+  end
+
+  defp await_budgeted_effect(budget, task, result_ref, inherited_keys) do
+    case Task.yield(task, interpreter_timeout(budget)) do
+      {:ok, {^result_ref, result, effect_dictionary}} ->
+        sync_effect_process_dictionary(inherited_keys, effect_dictionary)
+        result
+
+      {:exit, reason} ->
+        {:error, {:rlm_effect_exit, reason}}
+
+      nil ->
+        DSEx.Tasks.cancel(task, 1_000)
+        {:error, :rlm_time_budget_exceeded}
+    end
+  after
+    if Process.alive?(budget), do: Budget.unregister_effect(budget, task.pid)
+  end
+
+  defp effect_process_dictionary do
+    Process.get()
+    |> Enum.reject(fn {key, _value} -> key in @task_process_keys end)
+    |> Map.new()
+  end
+
+  defp put_effect_process_dictionary(dictionary) do
+    Enum.each(dictionary, fn {key, value} -> Process.put(key, value) end)
+  end
+
+  defp sync_effect_process_dictionary(inherited_keys, effect_dictionary) do
+    Enum.each(inherited_keys, &Process.delete/1)
+    put_effect_process_dictionary(effect_dictionary)
+  end
+
+  defp run_leased_batch(budget, items, fun) do
+    with {:ok, lease} <- Budget.lease_lm(budget, length(items)) do
+      try do
+        run_budgeted(budget, fn ->
+          results =
+            items
+            |> DSEx.Tasks.async_stream(
+              fn item ->
+                with :ok <- Budget.check(budget),
+                     {:ok, _used} <- Budget.commit_lm(budget, lease) do
+                  fun.(item)
+                end
+              end,
+              ordered: true,
+              max_concurrency: min(max(length(items), 1), 8),
+              timeout: interpreter_timeout(budget),
+              on_timeout: :kill_task
+            )
+            |> Enum.map(fn
+              {:ok, result} -> result
+              {:exit, reason} -> {:error, {:batched_llm_query_exit, reason}}
+            end)
+
+          {:ok, results}
+        end)
+      after
+        if Process.alive?(budget), do: Budget.release_lm(budget, lease)
+      end
+    end
+  end
+
+  defp subquery_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
+  defp subquery_value(value), do: value
+
+  defp interpreter_timeout(budget) do
+    case Budget.snapshot(budget).remaining_time_ms do
+      nil -> 120_000
+      0 -> 1
+      remaining -> remaining
+    end
+  end
+
+  defp sync_interpreter(state, interpreter) do
+    calls = Budget.snapshot(state.budget).lm_calls
+
+    runtime = %{
+      interpreter.runtime
+      | inputs: Map.merge(interpreter.runtime.inputs, interpreter.vars)
+    }
+
+    interpreter = %{interpreter | runtime: runtime}
+    %{state | interpreter: interpreter, vars: interpreter.vars, llm_calls: calls}
+  end
+
+  defp put_interpreter_runtime(state, runtime) do
+    previous_inputs = state.interpreter.runtime.inputs
+
+    vars =
+      Enum.reduce(runtime.inputs, state.interpreter.vars, fn {key, value}, vars ->
+        case Map.fetch(previous_inputs, key) do
+          {:ok, ^value} -> vars
+          _other -> Map.put(vars, key, value)
+        end
+      end)
+
+    %{state | interpreter: %{state.interpreter | runtime: runtime, vars: vars}, vars: vars}
+  end
+
+  defp sync_budget_usage(state) do
+    %{state | llm_calls: Budget.snapshot(state.budget).lm_calls}
+  end
+
+  defp put_state_var(state, key, value) do
+    runtime = Runtime.put_input(state.interpreter.runtime, key, value)
+
+    interpreter = %{
+      state.interpreter
+      | vars: Map.put(state.interpreter.vars, key, value),
+        runtime: runtime
+    }
+
+    %{state | vars: Map.put(state.vars, key, value), interpreter: interpreter}
+  end
+
+  defp interpreter_output(interpreter, value, max_chars) do
+    rendered = if interpreter.output == "", do: inspect(value), else: interpreter.output
+    length = String.length(rendered)
+
+    if length <= max_chars do
+      rendered
+    else
+      half = div(max(max_chars - 40, 0), 2)
+
+      %{
+        head: String.slice(rendered, 0, half),
+        tail: String.slice(rendered, max(length - half, 0), half),
+        length: length,
+        truncated: true
+      }
+    end
+  end
+
+  defp budget_error?({:rlm_cancelled, _reason}), do: true
+  defp budget_error?(:rlm_time_budget_exceeded), do: true
+  defp budget_error?(_reason), do: false
+
+  defp attach_rlm_trace(reason, state), do: {reason, Enum.reverse(state.trace)}
 
   defp batched_inputs(action) do
     inputs =
@@ -482,7 +978,7 @@ defmodule DSEx.Predict.RLM do
       }
     ]
 
-    with {:ok, raw} <- DSEx.LM.generate(lm, messages, []),
+    with {:ok, raw} <- run_budgeted(state.budget, fn -> DSEx.LM.generate(lm, messages, []) end),
          {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []) do
       state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
       {:ok, add_trace(prediction, state)}
@@ -493,18 +989,50 @@ defmodule DSEx.Predict.RLM do
   end
 
   defp add_observation(state, observation),
-    do: Map.update!(state, :observations, &[DSEx.Redaction.redact(observation) | &1])
+    do: Map.update!(state, :observations, &[trace_term(observation, state.trace_limit) | &1])
 
   defp trace(state, iteration, action, input, output) do
-    event =
-      DSEx.Redaction.redact(%{iteration: iteration, action: action, input: input, output: output})
+    event = %{
+      iteration: iteration,
+      action: action,
+      input: trace_term(input, state.trace_limit),
+      output: trace_term(output, state.trace_limit)
+    }
 
     Map.update!(state, :trace, &[event | &1])
   end
 
+  defp trace_term(value, limit) do
+    Trace.compact(value, limit)
+  end
+
   defp add_trace(%DSEx.Prediction{} = prediction, state) do
-    metadata = Map.put(prediction.metadata, :rlm_trace, Enum.reverse(state.trace))
+    trace = Enum.reverse(state.trace)
+    trajectory = normalized_trajectory(trace)
+    final_reasoning = trajectory |> List.last() |> then(&if(&1, do: &1.reasoning))
+
+    metadata =
+      prediction.metadata
+      |> Map.put(:rlm_trace, trace)
+      |> Map.put(:trajectory, trajectory)
+      |> Map.put(:final_reasoning, final_reasoning)
+      |> Map.put(:rlm, %{
+        iterations: trace |> Enum.map(& &1.iteration) |> Enum.max(fn -> 0 end),
+        sub_lm_calls: state.llm_calls,
+        elapsed_ms: System.monotonic_time(:millisecond) - state.started_at
+      })
+
     %{prediction | metadata: metadata}
+  end
+
+  defp normalized_trajectory(trace) do
+    Enum.flat_map(trace, fn
+      %{input: %{code: code} = input, output: output} when is_binary(code) ->
+        [%{reasoning: Map.get(input, :reasoning, ""), code: code, output: output}]
+
+      _event ->
+        []
+    end)
   end
 
   defp variable_metadata(vars, preview_chars) do
@@ -649,6 +1177,12 @@ defmodule DSEx.Predict.RLM do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> name
+  end
+
+  defp safe_signature(signature) do
+    {:ok, DSEx.Signature.ensure(signature)}
+  rescue
+    error -> {:error, {:invalid_signature, Exception.message(error)}}
   end
 
   defp find_var_key(vars, name) do

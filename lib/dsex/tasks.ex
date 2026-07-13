@@ -78,6 +78,23 @@ defmodule DSEx.Tasks do
           "DSEx.Tasks.async_nolink/1 expects a zero-arity function, got: #{inspect(fun)}"
   end
 
+  @doc "Cancels a supervised task and waits up to `timeout` milliseconds for termination."
+  def cancel(task, timeout \\ 5_000)
+
+  def cancel(%Task{} = task, timeout)
+      when timeout == :infinity or (is_integer(timeout) and timeout > 0) do
+    Task.shutdown(task, timeout)
+  end
+
+  def cancel(%Task{}, timeout) do
+    raise ArgumentError,
+          "DSEx.Tasks.cancel/2 expects :infinity or a positive timeout, got: #{inspect(timeout)}"
+  end
+
+  def cancel(task, _timeout) do
+    raise ArgumentError, "DSEx.Tasks.cancel/2 expects a Task struct, got: #{inspect(task)}"
+  end
+
   @doc """
   Runs a function over an enumerable through DSEx's supervised task boundary.
 

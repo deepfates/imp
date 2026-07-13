@@ -104,6 +104,12 @@ defmodule DSEx.Optimizer.InstructionSearch do
     %{program | program: put_instruction(inner, instruction)}
   end
 
+  def put_instruction(%module{} = program, instruction) do
+    if function_exported?(module, :put_instruction, 2),
+      do: module.put_instruction(program, instruction),
+      else: program
+  end
+
   def put_instruction(program, _instruction), do: program
 
   def current_instruction(%DSEx.Predict.Predict{signature: signature}),
@@ -120,6 +126,12 @@ defmodule DSEx.Optimizer.InstructionSearch do
 
   def current_instruction(%DSEx.Predict.RAG{program: inner}),
     do: current_instruction(inner)
+
+  def current_instruction(%module{} = program) do
+    if function_exported?(module, :current_instruction, 1),
+      do: module.current_instruction(program),
+      else: nil
+  end
 
   def current_instruction(_program), do: nil
 

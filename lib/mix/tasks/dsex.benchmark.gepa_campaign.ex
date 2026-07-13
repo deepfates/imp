@@ -8,10 +8,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         --model openai:gpt-4.1-mini-2025-04-14 \\
         --reflection-model openai:gpt-5 \\
         --api-key-env OPENAI_API_KEY \\
-        --pricing-source "OpenAI pricing 2026-07-09" \\
-        --input-tokens 100000 \\
-        --output-tokens 20000 \\
-        --usd 0.25 \\
+        --families AIMEBench,HotpotQABench \\
+        --max-concurrency 8 \\
+        --max-tokens 256 \\
+        --pricing-source "ReqLLM usage telemetry with provider pricing metadata" \\
+        --token-cost-file path/to/fallback-costs.json \\
         --dspy-source stanfordnlp/dspy@... \\
         --gepa-artifact-source gepa-ai/gepa-artifact@...
 
@@ -19,6 +20,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   required GEPA family, each with `train.jsonl`, `dev.jsonl`, and `test.jsonl`.
   The task writes `dsex-gepa-rows-*.json`, which is then consumed by
   `mix dsex.benchmark.gepa_replication --from-gepa-artifact ... --dsex-input ...`.
+  Pass `--families` to run a resumable subset; final replication still requires
+  all six family rows merged into one DSEx input artifact. Completed seeds are
+  checkpointed under the output directory and reused when the same campaign is
+  rerun with matching settings and dataset checksums.
+
+  ReqLLM telemetry is the preferred cost source. If telemetry is unavailable,
+  `--token-cost-file` accepts JSON keyed first by family and then by seed, with
+  each leaf containing `usd`, `input_tokens`, and `output_tokens`. The scalar
+  cost flags are valid only for a single-family, single-seed run.
   """
 
   use Mix.Task
@@ -36,12 +46,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
           reflection_model: :string,
           api_key_env: :string,
           out: :string,
+          families: :string,
           seeds: :string,
           generations: :integer,
           pricing_source: :string,
+          token_cost_file: :string,
           input_tokens: :integer,
           output_tokens: :integer,
           usd: :float,
+          max_concurrency: :integer,
+          max_tokens: :integer,
           dspy_source: :string,
           gepa_artifact_source: :string
         ]
@@ -55,6 +69,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
     model = fetch!(opts, :model)
 
+    families = parse_families(Keyword.get(opts, :families))
+    require_upstream_hover!(families)
+
     result =
       DSEx.BenchmarkTruth.GepaCampaign.run(
         dataset_root: fetch!(opts, :dataset_root),
@@ -62,12 +79,20 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         model: model,
         reflection_model: fetch!(opts, :reflection_model),
         out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+        families: families,
+        max_concurrency: Keyword.get(opts, :max_concurrency, 1),
         seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
         generations: Keyword.get(opts, :generations, 1),
         pricing_source: fetch!(opts, :pricing_source),
         token_cost: token_cost(opts),
         source_commits: source_commits(opts),
-        lm: DSEx.req_llm(model, api_key: api_key, temperature: 0)
+        execution: execution_identity(opts),
+        reporter: &report_progress/1,
+        lm:
+          DSEx.req_llm(
+            model,
+            Keyword.merge([api_key: api_key, temperature: 0], generation_opts(opts))
+          )
       )
 
     Mix.shell().info("DSEx GEPA rows: #{result.out_path}")
@@ -82,12 +107,68 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     |> Enum.map(&String.to_integer/1)
   end
 
+  defp parse_families(nil), do: DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+
+  defp parse_families(value) do
+    value
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+  end
+
   defp token_cost(opts) do
+    scalar? =
+      Keyword.has_key?(opts, :usd) or Keyword.has_key?(opts, :input_tokens) or
+        Keyword.has_key?(opts, :output_tokens)
+
+    case {Keyword.get(opts, :token_cost_file), scalar?} do
+      {path, false} when is_binary(path) ->
+        path |> File.read!() |> Jason.decode!()
+
+      {nil, true} ->
+        %{
+          "usd" => fetch!(opts, :usd),
+          "input_tokens" => fetch!(opts, :input_tokens),
+          "output_tokens" => fetch!(opts, :output_tokens)
+        }
+
+      {nil, false} ->
+        nil
+
+      {_path, true} ->
+        Mix.raise("--token-cost-file cannot be combined with scalar token-cost options")
+    end
+  end
+
+  defp generation_opts(opts) do
+    case Keyword.get(opts, :max_tokens) do
+      nil -> []
+      max_tokens -> [max_tokens: max_tokens]
+    end
+  end
+
+  defp execution_identity(opts) do
     %{
-      "usd" => fetch!(opts, :usd),
-      "input_tokens" => fetch!(opts, :input_tokens),
-      "output_tokens" => fetch!(opts, :output_tokens)
+      "lm" => %{
+        "provider" => "req_llm",
+        "temperature" => 0,
+        "max_tokens" => Keyword.get(opts, :max_tokens)
+      },
+      "retrieval" => %{
+        "hover_upstream_bm25" => truthy_env?("DSEX_HOVER_UPSTREAM_BM25"),
+        "python" => System.get_env("DSEX_GEPA_PYTHON"),
+        "gepa_root" => System.get_env("DSEX_GEPA_ROOT")
+      }
     }
+  end
+
+  defp truthy_env?(name), do: System.get_env(name) in ["1", "true", "TRUE", "yes"]
+
+  defp require_upstream_hover!(families) do
+    if "hoverBench" in families and not truthy_env?("DSEX_HOVER_UPSTREAM_BM25") do
+      Mix.raise(
+        "full HoVer GEPA campaigns require DSEX_HOVER_UPSTREAM_BM25=1 for source-exact upstream BM25S retrieval"
+      )
+    end
   end
 
   defp source_commits(opts) do
@@ -97,6 +178,39 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       "gepa_artifact" => fetch!(opts, :gepa_artifact_source)
     }
   end
+
+  defp report_progress(%{event: :family_start} = event) do
+    counts = event.split_counts
+
+    Mix.shell().info(
+      "[GEPA] #{event.family} start train=#{counts.train} dev=#{counts.dev} test=#{counts.test} seeds=#{Enum.join(event.seeds, ",")} generations=#{event.generations}"
+    )
+  end
+
+  defp report_progress(%{event: :seed_start} = event) do
+    Mix.shell().info("[GEPA] #{event.family} seed=#{event.seed} start")
+  end
+
+  defp report_progress(%{event: :seed_done} = event) do
+    Mix.shell().info(
+      "[GEPA] #{event.family} seed=#{event.seed} done train=#{format_score(event.train)} dev=#{format_score(event.dev)} test=#{format_score(event.test)} candidates=#{event.candidate_count}"
+    )
+  end
+
+  defp report_progress(%{event: :seed_resumed} = event) do
+    Mix.shell().info("[GEPA] #{event.family} seed=#{event.seed} resumed from checkpoint")
+  end
+
+  defp report_progress(%{event: :family_done} = event) do
+    Mix.shell().info(
+      "[GEPA] #{event.family} done best_test=#{format_score(event.best_test)} wall_clock_ms=#{event.wall_clock_ms}"
+    )
+  end
+
+  defp report_progress(_event), do: :ok
+
+  defp format_score(score) when is_float(score), do: :erlang.float_to_binary(score, decimals: 4)
+  defp format_score(score), do: to_string(score)
 
   defp git_sha do
     case System.cmd("git", ["rev-parse", "--short", "HEAD"], stderr_to_stdout: true) do

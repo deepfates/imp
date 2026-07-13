@@ -5,7 +5,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
       mix dsex.benchmark.rlm
 
   The lane compares DSEx RLM, Python DSPy RLM, direct prompting, and simple RAG
-  over HotPotQA-shaped fixture rows. It is an operational parity lane, not a
+  over hand-authored HotPotQA-shaped fixture rows. It is deterministic T0
+  contract replay, not operational parity, long-context evidence, or a
   live-model leaderboard.
   """
 
@@ -68,10 +69,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
       "elixir" => System.version(),
       "otp" => System.otp_release(),
       "dataset" => %{
-        "name" => "hotpotqa_fixture",
+        "name" => "synthetic_hotpotqa_shaped_fixture",
         "path" => data_path,
         "examples" => length(examples),
-        "source" => "HotPotQA-shaped public benchmark fixture"
+        "source" => "hand-authored DSEx contract fixture"
       },
       "rows" => rows,
       "summary" => summarize(rows)
@@ -257,6 +258,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
 
     %{
       "schema_version" => 1,
+      "evidence_tier" => "t0_contract_replay",
+      "claim_scope" => "deterministic component wiring only",
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
       "summary" => %{
@@ -264,10 +267,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
         "passing" => passing,
         "all_passing" => passing == length(rows),
         "approaches" => summarize_comparison(rows),
-        "uncertainty" => uncertainty(rows),
-        "full_rlm_benchmark_parity" => true,
+        "operational_contract_replay" => passing == length(rows),
+        "full_rlm_benchmark_parity" => false,
+        "paper_protocol_complete" => false,
         "note" =>
-          "Provider-free RLM benchmark lane over HotPotQA fixture rows. It compares DSEx RLM, Python DSPy RLM, direct prompting, and simple RAG on score, latency, subcall count, and trace shape. Live model effectiveness remains a separate evidence question."
+          "T0 deterministic replay over hand-authored fixture rows. Gold-derived scripted outputs make accuracy and latency unsuitable for effectiveness, long-context, or parity claims."
       },
       "dataset" => dsex["dataset"],
       "dsex" => Map.take(dsex, ["runner", "elixir", "otp", "git_sha", "summary"]),
@@ -338,20 +342,6 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
     do: latency
 
   defp row_latency_ms(_row), do: 0
-
-  defp uncertainty(rows) do
-    n = max(length(rows), 1)
-    p = Enum.count(rows, & &1["passing"]) / n
-    se = :math.sqrt(p * (1.0 - p) / n)
-
-    %{
-      "method" => "normal_approximation_over_provider_free_rows",
-      "n" => length(rows),
-      "accuracy" => p,
-      "stderr" => se,
-      "ci95" => [max(p - 1.96 * se, 0.0), min(p + 1.96 * se, 1.0)]
-    }
-  end
 
   defp split_docs(context),
     do: context |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))

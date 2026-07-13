@@ -27,6 +27,8 @@ Every guide and notebook follows the same product story:
   library.
 - [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
+- [Research Landscape](RESEARCH_LANDSCAPE.md): the paper lineage, neighboring
+  repositories, implementation comparators, and architecture implications.
 
 ## Build With DSEx
 
@@ -34,6 +36,14 @@ Every guide and notebook follows the same product story:
   code.
 - [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic fixtures.
+- [RLM Fidelity](RLM_FIDELITY.md): the BEAM-native recursive-control design,
+  upstream invariants, evidence tiers, and remaining paper-scale blocker.
+- [Instruction Optimizer Fidelity](INSTRUCTION_OPTIMIZER_FIDELITY.md): pinned
+  MIPROv2 and SIMBA algorithms, BEAM-native design, and evidence boundaries.
+
+The source checkout also contains maintainer-only authority, coverage, parity,
+and release ledgers. They are intentionally excluded from the consumer package
+because their commands operate on repository evidence infrastructure.
 
 ## Learn By Running Code
 

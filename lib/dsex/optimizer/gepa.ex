@@ -1,19 +1,69 @@
 defmodule DSEx.Optimizer.GEPA do
   @moduledoc """
-  Program-level GEPA-style optimizer for DSEx signatures.
+  Program-level GEPA optimizer for DSEx programs.
 
-  `DSEx.Optimizer.GEPA` treats a program's instruction as the artifact under
-  search, then uses `DSEx.Optimize.GEPA` to generate reflective instruction
-  candidates. It is the DSEx-native bridge between signature programs and
-  artifact optimization, not a Python compatibility layer or a claim to
-  reproduce every paper-scale GEPA training regime.
+  The optimizer exposes every predictor through `DSEx.ProgramParameters`,
+  evaluates named candidate maps through a trace-rich adapter, applies strict
+  minibatch improvement before validation, and maintains the source-shaped
+  per-instance Pareto archive in `DSEx.Optimizer.GEPA.Engine`.
+
+  The `:callbacks` option accepts callback modules or `{module, context}`
+  tuples implementing any subset of `DSEx.Optimizer.GEPA.Callback`. Hooks are
+  synchronous and observational; failures are isolated from optimization.
   """
 
-  defstruct [:metric, feedback_fn: nil, generations: 4]
+  alias DSEx.Optimizer.GEPA.{Callback, Candidate, Engine, ProgramAdapter}
+
+  defstruct [
+    :metric,
+    :reflection_lm,
+    callbacks: [],
+    feedback_fn: nil,
+    generations: 4,
+    max_concurrency: 1,
+    minibatch_size: nil,
+    seed: 0,
+    use_merge: false,
+    max_merge_invocations: 5,
+    merge_val_overlap_floor: 5,
+    frontier_type: :instance,
+    evaluation_policy: :full,
+    acceptance_policy: :strict_improvement,
+    merge_acceptance_policy: :equal_or_better,
+    stopper: nil,
+    max_metric_calls: :infinity,
+    max_full_evaluations: :infinity
+  ]
 
   @option_schema [
+    callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
-    generations: [type: :non_neg_integer, default: 4]
+    generations: [type: :non_neg_integer, default: 4],
+    max_concurrency: [type: :pos_integer, default: 1],
+    minibatch_size: [type: {:or, [nil, :pos_integer]}, default: nil],
+    seed: [type: :non_neg_integer, default: 0],
+    use_merge: [type: :boolean, default: false],
+    max_merge_invocations: [type: :non_neg_integer, default: 5],
+    merge_val_overlap_floor: [type: :pos_integer, default: 5],
+    frontier_type: [
+      type: {:in, [:instance, :objective, :hybrid, :cartesian]},
+      default: :instance
+    ],
+    evaluation_policy: [type: :any, default: :full],
+    acceptance_policy: [type: :any, default: :strict_improvement],
+    merge_acceptance_policy: [type: :any, default: :equal_or_better],
+    stopper: [type: :any, default: nil],
+    reflection_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil],
+    max_metric_calls: [type: :any, default: :infinity],
+    max_full_evaluations: [type: :any, default: :infinity]
+  ]
+
+  @compile_option_schema [
+    resume_state: [type: {:custom, DSEx.Optimize.GEPA, :validate_resume_state, []}, default: nil],
+    checkpoint_fn: [
+      type: {:custom, DSEx.Optimize.GEPA, :validate_checkpoint_fn, []},
+      default: nil
+    ]
   ]
 
   def new(metric, opts \\ []) do
@@ -22,97 +72,251 @@ defmodule DSEx.Optimizer.GEPA do
 
     %__MODULE__{
       metric: metric,
+      callbacks: opts[:callbacks],
       feedback_fn: opts[:feedback_fn],
-      generations: opts[:generations]
+      generations: opts[:generations],
+      max_concurrency: opts[:max_concurrency],
+      minibatch_size: opts[:minibatch_size],
+      seed: opts[:seed],
+      use_merge: opts[:use_merge],
+      max_merge_invocations: opts[:max_merge_invocations],
+      merge_val_overlap_floor: opts[:merge_val_overlap_floor],
+      frontier_type: opts[:frontier_type],
+      evaluation_policy: opts[:evaluation_policy],
+      acceptance_policy: opts[:acceptance_policy],
+      merge_acceptance_policy: opts[:merge_acceptance_policy],
+      stopper: opts[:stopper],
+      reflection_lm: opts[:reflection_lm],
+      max_metric_calls: validate_limit!(opts[:max_metric_calls], :max_metric_calls),
+      max_full_evaluations: validate_limit!(opts[:max_full_evaluations], :max_full_evaluations)
     }
   end
 
-  def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
+  def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
+    opts = DSEx.Options.validate!(opts, @compile_option_schema, "DSEx.Optimizer.GEPA.compile/5")
+    trainset = Enum.to_list(trainset)
+    devset = Enum.to_list(devset)
     {feedback, feedback_errors} = feedback(optimizer, trainset)
-    examples = Enum.map(devset, &DSEx.Example.to_map/1)
+    seed_candidate = Candidate.from_program(program)
 
-    artifact =
-      DSEx.Optimize.Anything.new_artifact(
-        :instruction,
-        DSEx.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
+    adapter =
+      ProgramAdapter.new(program, optimizer.metric, max_concurrency: optimizer.max_concurrency)
+
+    engine_opts =
+      [
+        max_iterations: optimizer.generations,
+        minibatch_size: optimizer.minibatch_size || min(3, length(trainset)),
+        seed: optimizer.seed,
+        use_merge: optimizer.use_merge,
+        max_merge_invocations: optimizer.max_merge_invocations,
+        merge_val_overlap_floor: optimizer.merge_val_overlap_floor,
+        frontier_type: optimizer.frontier_type,
+        evaluation_policy: optimizer.evaluation_policy,
+        acceptance_policy: optimizer.acceptance_policy,
+        merge_acceptance_policy: optimizer.merge_acceptance_policy,
+        callbacks: optimizer.callbacks,
+        stopper: optimizer.stopper,
+        max_metric_calls: optimizer.max_metric_calls,
+        max_full_evaluations: optimizer.max_full_evaluations,
+        resume_state: opts[:resume_state],
+        checkpoint_fn: opts[:checkpoint_fn]
+      ]
+
+    state =
+      Engine.run(
+        adapter,
+        seed_candidate,
+        trainset,
+        devset,
+        proposer(optimizer.reflection_lm, feedback),
+        engine_opts
       )
 
-    report =
-      DSEx.Optimize.GEPA.optimize(
-        artifact,
-        evaluator(program, optimizer.metric),
-        examples: examples,
-        generations: optimizer.generations,
-        mutation_fn: fn _artifact, asi, generation ->
-          "#{feedback}\nReflection #{generation}: #{Enum.join(asi, "; ")}"
-        end
-      )
-
-    candidates =
-      Enum.map(report.candidates, fn candidate ->
-        %{
-          score: candidate.aggregate_score,
-          instruction: candidate.artifact.text,
-          id: candidate.id,
-          parent_id: candidate.parent_id,
-          mutation: candidate.mutation,
-          diagnostics: candidate.diagnostics
-        }
-      end)
-
-    compiled =
-      DSEx.Optimizer.InstructionSearch.put_instruction(program, report.best.artifact.text)
+    best = Engine.best(state)
+    compiled = Candidate.apply_to_program(program, best.candidate)
+    candidates = report_candidates(state)
+    errors = feedback_errors ++ evaluation_errors(state)
 
     DSEx.Optimizer.Report.attach(
       compiled,
       DSEx.Optimizer.Report.new(%{
         optimizer: :gepa,
-        best_score: report.best.aggregate_score,
+        best_score: best.validation.aggregate_score,
         candidate_count: length(candidates),
         candidates: candidates,
-        errors: feedback_errors ++ report.errors,
+        errors: errors,
         metadata: %{
           feedback: feedback,
           generations: optimizer.generations,
+          max_concurrency: optimizer.max_concurrency,
           implementation: DSEx.Optimize.GEPA,
-          frontier_size: length(report.frontier),
-          status: if(feedback_errors == [] and report.errors == [], do: :ok, else: :with_errors)
+          engine: Engine,
+          frontier_size: length(Engine.frontier(state)),
+          frontier_type: optimizer.frontier_type,
+          evaluation_policy: optimizer.evaluation_policy,
+          acceptance_policy: policy_name(optimizer.acceptance_policy),
+          merge_acceptance_policy: policy_name(optimizer.merge_acceptance_policy),
+          merge_candidates: Enum.count(state.history, &(&1[:operation] == :merge)),
+          merges_accepted: state.total_merges_tested,
+          metric_calls: state.budget.metric_calls,
+          reflection_calls: state.budget.reflection_calls,
+          full_evaluations: state.budget.full_evaluations,
+          rejected_candidates: length(state.rejected),
+          stop_reason: state.stop_reason,
+          status: if(errors == [], do: :ok, else: :with_errors)
         }
       })
     )
   end
 
-  defp evaluator(program, metric) do
-    fn artifact, examples ->
-      instruction = artifact.text
-      candidate = DSEx.Optimizer.InstructionSearch.put_instruction(program, instruction)
-
-      {per_example_scores, failures} =
-        Enum.map(examples, fn example_map ->
-          example = DSEx.Example.new(example_map)
-
-          case DSEx.call(candidate, DSEx.Example.inputs(example) |> DSEx.Example.to_map()) do
-            {:ok, prediction} ->
-              {metric.(example, prediction) |> DSEx.Metrics.score(), nil}
-
-            {:error, reason} ->
-              {0.0, "Program call failed for #{inspect(example_map)}: #{inspect(reason)}"}
-          end
-        end)
-        |> Enum.unzip()
-
-      %{
-        per_example_scores: per_example_scores,
-        asi: failures |> Enum.reject(&is_nil/1) |> Kernel.++(misses(examples, per_example_scores))
-      }
+  defp proposer(reflection_lm, feedback) do
+    fn candidate, component, records, generation ->
+      case reflection_lm do
+        nil -> fallback_proposal(candidate, component, records, generation, feedback)
+        lm -> reflection_proposal(lm, candidate, component, records, generation, feedback)
+      end
     end
   end
 
-  defp misses(examples, scores) do
-    examples
-    |> Enum.zip(scores)
-    |> Enum.reject(fn {_example, score} -> score > 0 end)
-    |> Enum.map(fn {example, _score} -> "Improve result for #{inspect(example)}" end)
+  defp fallback_proposal(candidate, component, records, generation, feedback) do
+    record_feedback =
+      records
+      |> Enum.map(&Map.get(&1, "Feedback", inspect(&1)))
+      |> Enum.take(8)
+      |> Enum.join("; ")
+
+    [Map.fetch!(candidate, component), feedback, "Reflection #{generation}: #{record_feedback}"]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
+
+  defp reflection_proposal(lm, candidate, component, records, generation, feedback) do
+    messages = [
+      %{
+        role: :system,
+        content:
+          "Improve exactly one named program component from execution traces and feedback. Return JSON with an instruction field."
+      },
+      %{
+        role: :user,
+        content:
+          Jason.encode!(%{
+            component: component,
+            current_instruction: Map.fetch!(candidate, component),
+            generation: generation,
+            global_feedback: feedback,
+            reflective_dataset: records
+          })
+      }
+    ]
+
+    case DSEx.LM.generate(lm, messages, []) do
+      {:ok, %{"instruction" => instruction}} when is_binary(instruction) -> instruction
+      {:ok, %{instruction: instruction}} when is_binary(instruction) -> instruction
+      {:ok, instruction} when is_binary(instruction) -> instruction
+      {:error, _reason} -> fallback_proposal(candidate, component, records, generation, feedback)
+      {:ok, _other} -> fallback_proposal(candidate, component, records, generation, feedback)
+    end
+  end
+
+  defp report_candidates(state) do
+    accepted =
+      Enum.map(state.candidates, fn entry ->
+        diagnostics = result_diagnostics(entry.validation)
+
+        %{
+          score: entry.validation.aggregate_score,
+          instruction: primary_instruction(entry.candidate),
+          parameters: entry.candidate,
+          id: candidate_id(entry.id),
+          parent_id: entry.parent_ids |> List.first() |> candidate_id(),
+          mutation: if(entry.id == 0, do: "baseline", else: "accepted reflection"),
+          diagnostics: diagnostics
+        }
+      end)
+
+    rejected =
+      state.rejected
+      |> Enum.filter(&is_map(&1.candidate))
+      |> Enum.map(fn event ->
+        diagnostics = rejection_diagnostics(event)
+
+        %{
+          score: event.minibatch_candidate_score || 0.0,
+          instruction: primary_instruction(event.candidate),
+          parameters: event.candidate,
+          id: "gepa-#{event.iteration}",
+          parent_id: event.parent_ids |> List.first() |> candidate_id(),
+          mutation:
+            if(diagnostics == [],
+              do: "Reflection #{event.iteration}",
+              else: "Program call failed: #{Enum.join(diagnostics, "; ")}"
+            ),
+          diagnostics: diagnostics
+        }
+      end)
+
+    accepted ++ rejected
+  end
+
+  defp evaluation_errors(state) do
+    state.candidates
+    |> Enum.flat_map(fn entry ->
+      case result_diagnostics(entry.validation) do
+        [] -> []
+        diagnostics -> [%{candidate_id: candidate_id(entry.id), diagnostics: diagnostics}]
+      end
+    end)
+  end
+
+  defp result_diagnostics(result) do
+    result.side_information
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.map(&diagnostic_text/1)
+    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
+    |> Enum.uniq()
+  end
+
+  defp rejection_diagnostics(event) do
+    reason =
+      case event.reason do
+        {:proposal_error, reason} -> [reason]
+        _reason -> []
+      end
+
+    [
+      Map.get(event, :parent_side_information, %{}),
+      Map.get(event, :candidate_side_information, %{})
+    ]
+    |> Enum.flat_map(&(&1 |> Map.values() |> List.flatten()))
+    |> Kernel.++(reason)
+    |> Enum.map(&diagnostic_text/1)
+    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
+    |> Enum.uniq()
+  end
+
+  defp diagnostic_text({:metric_error, message}), do: truncate_text(to_string(message), 240)
+  defp diagnostic_text({_kind, message}) when is_binary(message), do: truncate_text(message, 240)
+  defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)
+  defp diagnostic_text(nil), do: nil
+  defp diagnostic_text(value), do: truncate_text(inspect(value), 240)
+
+  defp primary_instruction(candidate) do
+    Map.get(candidate, :main) || Map.get(candidate, "main") || candidate |> Map.values() |> hd()
+  end
+
+  defp candidate_id(nil), do: nil
+  defp candidate_id(0), do: "baseline"
+  defp candidate_id(id), do: "gepa-#{id}"
+
+  defp policy_name({:callback, _callback}), do: :custom
+  defp policy_name(policy), do: policy
+
+  defp truncate_text(text, max_graphemes) do
+    if String.length(text) <= max_graphemes,
+      do: text,
+      else: String.slice(text, 0, max_graphemes) <> "..."
   end
 
   defp feedback(%__MODULE__{feedback_fn: fun}, trainset) when is_function(fun, 1) do
@@ -147,6 +351,14 @@ defmodule DSEx.Optimizer.GEPA do
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
+
+  defp validate_limit!(:infinity, _name), do: :infinity
+  defp validate_limit!(value, _name) when is_integer(value) and value >= 0, do: value
+
+  defp validate_limit!(value, name) do
+    raise ArgumentError,
+          "#{name} must be a non-negative integer or :infinity, got: #{inspect(value)}"
+  end
 
   def validate_feedback_fn(nil), do: {:ok, nil}
   def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}

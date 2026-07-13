@@ -177,14 +177,17 @@ end
 
 ## RLM
 
-RLM explores large or awkward context through actions rather than stuffing the
-entire context into one prompt.
+RLM explores large or awkward context through persistent, constrained Elixir
+code rather than stuffing the entire context into one prompt.
 
 ```elixir
 actions = [
-  %{action: "assign", name: "scratch", value: "Paris"},
-  %{action: "tool", name: "lookup", arguments: %{"query" => "capital-france"}},
-  %{action: "submit", result: %{answer: "Paris"}}
+  %{reasoning: "Keep an exact symbolic value.", code: ~S|scratch = "Paris"|},
+  %{
+    reasoning: "Exercise the registered tool inside the environment.",
+    code: ~S|fact = lookup(%{"query" => "capital-france"})|
+  },
+  %{reasoning: "Submit the persisted value.", code: ~S|submit(%{answer: scratch})|}
 ]
 
 controller_lm = %{
@@ -234,9 +237,9 @@ lazy_context =
   )
 
 Process.put(:rlm_lazy_actions, [
-  %{action: "load", name: "context"},
-  %{action: "eval", code: "String.length(context)"},
-  %{action: "submit", result: %{answer: "loaded"}}
+  %{reasoning: "Materialize the lazy handle.", code: ~S|context = load("context")|},
+  %{reasoning: "Inspect it without copying it into controller JSON.", code: "print(String.length(context))"},
+  %{reasoning: "Submit.", code: ~S|submit(%{answer: "loaded"})|}
 ])
 
 lazy_controller = %{
@@ -259,8 +262,8 @@ Process.delete(:rlm_lazy_actions)
 
 ## RLM Batched Subqueries
 
-RLM can ask a sub-LM several ordered questions in one action. Each batch item
-counts against `max_llm_calls`.
+RLM code can ask a sub-LM several ordered questions and retain the results as
+ordinary environment values. Each batch item counts against `max_llm_calls`.
 
 ```elixir
 parent = self()
@@ -289,11 +292,10 @@ batch_sub_lm = %{
 
 Process.put(:rlm_batch_actions, [
   %{
-    action: "llm_query_batched",
-    signature: "question -> answer",
-    inputs: [%{question: "first"}, %{question: "second"}]
+    reasoning: "Run two semantic calls from inside the environment.",
+    code: ~S|results = llm_query_batched(["first", "second"])|
   },
-  %{action: "submit", result: %{answer: "batched"}}
+  %{reasoning: "Results persist for later computation.", code: ~S|submit(%{answer: "batched"})|}
 ])
 
 batch_rlm =
@@ -320,7 +322,7 @@ loop_lm = %{
       if Enum.map_join(messages, "\n", & &1.content) =~ "RLM extract pass" do
         %{answer: "recovered by extract"}
       else
-        %{action: "eval", code: "1 + 1"}
+        %{reasoning: "Inspect without submitting.", code: "1 + 1"}
       end
     end
   ]
@@ -332,9 +334,9 @@ DSEx.call(rlm, %{question: "loop?"})
 
 ## Live RLM Submit Proof
 
-This small live check asks the controller to submit immediately. It proves the
-provider can drive the RLM action boundary without exercising a long recursive
-search.
+This small live check asks the controller to emit constrained Elixir and submit
+from the persistent environment. The source-checkout live suite separately
+requires a real `llm_query/1` call from generated code.
 
 ```elixir
 case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"}) do
@@ -343,7 +345,7 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
       DSEx.rlm(
         DSEx.signature(
           "question -> answer",
-          ~s(Return only {"action":"submit","result":{"answer":"Paris"}}.)
+          "Return reasoning and Elixir code that assigns Paris to a variable and submits it as answer."
         ),
         lm: lm,
         max_iterations: 2,
@@ -352,7 +354,7 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
 
     {:ok, live_prediction} =
       DSEx.call(live_rlm, %{
-        question: ~s(Return only {"action":"submit","result":{"answer":"Paris"}}.)
+        question: "Capital of France?"
       })
 
     unless DSEx.get(live_prediction, :answer) == "Paris" do

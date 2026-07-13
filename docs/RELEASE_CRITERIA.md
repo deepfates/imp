@@ -2,6 +2,10 @@
 
 This document records the release criteria for a production-ready DSEx build.
 
+For v0.1, "production-ready" means the scoped product contract in
+`docs/V0_1_RELEASE_LEDGER.md`. It does not mean full DSPy parity or paper-level
+replication. Research gates authorize those stronger claims independently.
+
 The central standard is simple: DSEx should feel like an Elixir-native system
 from a world where declarative self-improving programs were designed on the
 BEAM from the start. It should not be a Python compatibility layer, a set of
@@ -48,7 +52,7 @@ criteria; current commands, docs, tests, and artifacts are.
 | External workflows | MCP, retrievers, save/load/rebind, streaming, tools, and provider-compatible training are exercised through local integration or protocol gates before they appear as production surface. |
 | Evaluation and optimization | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal; optimizers emit executable compiled programs and reports. |
 | Documentation | README, ExDoc, docs, and Livebooks teach DSEx as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
-| Parity evidence | Release claims are backed by the dashboard lanes for golden trace parity, live matched models, optimizer lift, production semantics, and provider-free performance. |
+| Parity evidence | Release claims are backed by separate dashboard lanes for golden trace parity, live matched models, optimizer lift, pinned instruction-optimizer structure, production semantics, and provider-free performance. |
 | Clean-room product proof | A fresh Mix project can consume the unpacked package and exercise the golden user journey through the public API: predict, optimize, save/load, ReAct tools, provider construction, and credential redaction. |
 
 ## Gate Model
@@ -60,6 +64,7 @@ mix production.check
 mix integration.check
 mix protocol.check
 mix benchmark.trace.check
+mix benchmark.instruction_optimizer.contract.check
 mix package.check
 mix livebook.check
 mix livebook.execute.check
@@ -133,3 +138,7 @@ DSEx is production complete when:
     or isolated.
 21. Any missing parity lane is reflected in public docs as a limitation, not
     hidden behind a passing smoke benchmark.
+22. Full GEPA replication and source-fidelity claims cite per-optimizer runtime
+    metric-call counts with enforced limits and concrete provenance. Configured
+    budgets copied into result fields are not execution evidence, and any score
+    selected by comparing test-seed outcomes keeps the GEPA dashboard lane red.

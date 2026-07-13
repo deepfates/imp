@@ -4,6 +4,12 @@
 release claims. The benchmark dashboard evaluates that file alongside the
 evidence lanes and adds a `public_claims` release-gate check.
 
+This inventory governs full parity, comparative effectiveness, and benchmark
+claims. It is additive to the scoped v0.1 product contract in
+`docs/V0_1_RELEASE_LEDGER.md`; deferred research rows may keep
+`benchmark.dashboard.full` red without invalidating a product-only v0.1
+candidate, provided those claims are not presented as current capabilities.
+
 The rule is simple: if a claim is release-blocking, the dashboard must be able
 to trace it to fresh passing evidence before `mix benchmark.dashboard.full`
 passes. Claims that are true only for a narrower path must say so in the claim
@@ -21,6 +27,11 @@ Each claim has:
 - `claim_type`: feature completeness, conformance, live-provider proof,
   functional effectiveness, or performance.
 - `comparison`: `dspy`, `dsex_native`, or a narrower comparison target.
+- `decision`: `proven_target` or `active_gap` for the named release scope.
+- `release`: the release whose policy owns the decision, such as `v0.1` or
+  `post-v0.1`.
+- `scope`: the precise boundary of the claim.
+- `limitations`: explicit exclusions or evidence still required.
 - `release_blocking`: whether this claim blocks `benchmark.dashboard.full`.
 - `sources`: docs, tests, fixtures, or papers that explain the claim.
 - `requirements`: evidence rows the dashboard can evaluate.
@@ -73,10 +84,11 @@ non-smoke `gepa-replication-*.json` artifact covers the required GEPA paper
 families and reports baseline, DSPy GEPA, DSEx GEPA, MIPROv2, metric-call
 budget, token/cost, wall-clock, seed variance, and train/dev/test gap. The
 dashboard recomputes full evidence from the row contract: campaign provenance,
-dataset checksums, source commits, concrete comparator sources, distinct split
-digests, and positive live token/cost accounting are required. SIMBA may be
-reported as extra comparator evidence when present, but it is not required by
-the upstream GEPA artifact.
+dataset scope, split counts, dataset checksums, source commits, concrete
+comparator sources, distinct split digests, and positive live token/cost
+accounting are required. Capped `--max-per-split` dataset roots are explicitly
+rejected for full GEPA claims. SIMBA may be reported as extra comparator
+evidence when present, but it is not required by the upstream GEPA artifact.
 
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
@@ -86,5 +98,7 @@ evidence artifact.
 
 Do not add a marketing or README claim without adding or updating a row in
 `benchmarks/claims.json`. Do not mark a claim non-blocking merely because the
-evidence is inconvenient; use non-blocking claims only for future roadmap
-language that is not presented as current product capability.
+evidence is inconvenient. Unfinished telos work remains an `active_gap` and
+release-blocking until its evidence passes. A claim may become non-blocking
+only after an explicit product decision changes the telos, not as a way to make
+the current dashboard green.

@@ -8,6 +8,7 @@ defmodule DashboardTest do
     trace_dir = Path.join(root, "trace")
     overhead_dir = Path.join(root, "overhead")
     optimizer_dir = Path.join(root, "optimizer")
+    instruction_optimizer_dir = Path.join(root, "instruction-optimizer")
     gepa_dir = Path.join(root, "gepa")
     rag_tool_agent_dir = Path.join(root, "rag-tool-agent")
     rlm_dir = Path.join(root, "rlm-benchmark")
@@ -21,6 +22,7 @@ defmodule DashboardTest do
         trace_dir,
         overhead_dir,
         optimizer_dir,
+        instruction_optimizer_dir,
         gepa_dir,
         rag_tool_agent_dir,
         rlm_dir,
@@ -97,6 +99,8 @@ defmodule DashboardTest do
       ]
     })
 
+    write_instruction_optimizer_contract!(instruction_optimizer_dir)
+
     write_json!(Path.join(gepa_dir, "gepa-replication-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "runner" => "dsex-gepa-replication",
@@ -127,13 +131,14 @@ defmodule DashboardTest do
 
     write_json!(Path.join(rlm_dir, "rlm-benchmark-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
+      "evidence_tier" => "t3_paper_scale",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "summary" => %{
         "total" => 6,
         "passing" => 6,
         "all_passing" => true,
-        "full_rlm_benchmark_parity" => true,
+        "paper_protocol_complete" => true,
         "approaches" => %{
           "direct_prompt" => %{"examples" => 2, "accuracy" => 1.0},
           "simple_rag" => %{"examples" => 2, "accuracy" => 1.0},
@@ -303,6 +308,8 @@ defmodule DashboardTest do
         overhead_dir,
         "--optimizer-dir",
         optimizer_dir,
+        "--instruction-optimizer-dir",
+        instruction_optimizer_dir,
         "--gepa-dir",
         gepa_dir,
         "--rag-tool-agent-dir",
@@ -332,14 +339,16 @@ defmodule DashboardTest do
     assert dashboard["release_gate"]["blocking_lanes"] == [
              "live_provider_smoke",
              "live_matched_model",
+             "gepa_replication",
              "public_claims"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 12
+    assert Enum.count(dashboard["release_gate"]["checks"]) == 13
     assert dashboard["claims"]["status"] == "failing"
     assert dashboard["claims"]["summary"]["total"] == 10
-    assert dashboard["claims"]["summary"]["proven"] == 8
-    assert dashboard["claims"]["summary"]["blocked"] == 2
+    assert dashboard["claims"]["summary"]["proven"] == 7
+    assert dashboard["claims"]["summary"]["blocked"] == 3
+    assert dashboard["claims"]["summary"]["non_blocking"] == 0
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -349,7 +358,6 @@ defmodule DashboardTest do
 
     assert proven_claim_ids == [
              "claim.dspy_semantics.golden_trace",
-             "claim.gepa_replication.full",
              "claim.optimizer_lift.full",
              "claim.performance.provider_free",
              "claim.product.public_api_installable",
@@ -368,8 +376,19 @@ defmodule DashboardTest do
              &{&1["claim_id"], &1["missing_requirements"]}
            ) == [
              {"claim.docs.livebooks_real_provider", ["live.provider.smoke"]},
-             {"claim.live_matched_model.full_parity", ["live_matched_model.full"]}
+             {"claim.live_matched_model.full_parity", ["live_matched_model.full"]},
+             {"claim.gepa_replication.full", ["gepa_replication.full"]}
            ]
+
+    active_live_claim =
+      Enum.find(
+        dashboard["claims"]["claims"],
+        &(&1["id"] == "claim.live_matched_model.full_parity")
+      )
+
+    assert active_live_claim["status"] == "blocked"
+    assert active_live_claim["decision"] == "active_gap"
+    assert active_live_claim["release"] == "telos"
 
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
     assert dashboard["lanes"]["rlm_benchmark"]["status"] == "full"
@@ -484,6 +503,7 @@ defmodule DashboardTest do
     refute dashboard["lanes"]["live_matched_model"]["summary"]["prompt_contract"]["complete"]
 
     assert dashboard["lanes"]["optimizer_lift"]["status"] == "full"
+    assert dashboard["lanes"]["instruction_optimizer_contract"]["status"] == "full"
 
     assert dashboard["lanes"]["optimizer_lift"]["summary"]["direct_optimizers"] == [
              "BootstrapFewShot",
@@ -503,10 +523,10 @@ defmodule DashboardTest do
              "InstructionSearch"
            ]
 
-    assert dashboard["lanes"]["gepa_replication"]["status"] == "full"
-    assert dashboard["lanes"]["gepa_replication"]["summary"]["full_gepa_replication"]
+    assert dashboard["lanes"]["gepa_replication"]["status"] == "failing"
+    refute dashboard["lanes"]["gepa_replication"]["summary"]["full_gepa_replication"]
     assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_families"] == []
-    assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_fields"] == []
+    assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_fields"] != []
 
     assert dashboard["lanes"]["rag_tool_agent"]["status"] == "full"
 
@@ -520,6 +540,8 @@ defmodule DashboardTest do
             overhead_dir,
             "--optimizer-dir",
             optimizer_dir,
+            "--instruction-optimizer-dir",
+            instruction_optimizer_dir,
             "--gepa-dir",
             gepa_dir,
             "--rag-tool-agent-dir",
@@ -550,6 +572,115 @@ defmodule DashboardTest do
     assert error.message =~ "claim claim.docs.livebooks_real_provider"
     refute error.message =~ "claim claim.product.public_api_installable"
     refute error.message =~ "claim claim.protocols.production_boundaries"
+  end
+
+  test "instruction optimizer lane selects the newest pinned structural contract" do
+    root = tmp_dir("dashboard-instruction-optimizer-newest")
+    contract_dir = Path.join(root, "contracts")
+    out_dir = Path.join(root, "out")
+    Enum.each([contract_dir, out_dir], &File.mkdir_p!/1)
+
+    old_path =
+      write_instruction_optimizer_contract!(contract_dir,
+        name: "instruction-optimizer-contract-old.json",
+        structural_complete: false
+      )
+
+    newest_path =
+      write_instruction_optimizer_contract!(contract_dir,
+        name: "instruction-optimizer-contract-newest.json"
+      )
+
+    File.touch!(old_path, {{2026, 1, 1}, {0, 0, 0}})
+    File.touch!(newest_path, {{2026, 1, 1}, {0, 0, 1}})
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--instruction-optimizer-dir",
+        contract_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "1"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+    lane = dashboard["lanes"]["instruction_optimizer_contract"]
+
+    assert lane["artifact"]["path"] == newest_path
+    assert lane["status"] == "full"
+    assert lane["full_evidence"]
+    assert lane["summary"]["structural_contract_complete"]
+    assert lane["summary"]["authority"]["complete"]
+  end
+
+  test "missing stale failed or unpinned structural evidence stays red and blocks optimizer parity" do
+    scenarios = [
+      {"missing", :missing, "missing"},
+      {"stale", [generated_at: "2020-01-01T00:00:00Z"], "stale"},
+      {"failed", [structural_complete: false], "failing"},
+      {"unpinned", [dspy_version: "3.3.0"], "failing"}
+    ]
+
+    Enum.each(scenarios, fn {name, contract_opts, expected_status} ->
+      root = tmp_dir("dashboard-instruction-optimizer-#{name}")
+      contract_dir = Path.join(root, "contracts")
+      optimizer_dir = Path.join(root, "optimizer")
+      out_dir = Path.join(root, "out")
+      Enum.each([contract_dir, optimizer_dir, out_dir], &File.mkdir_p!/1)
+
+      if contract_opts != :missing do
+        write_instruction_optimizer_contract!(contract_dir, contract_opts)
+      end
+
+      write_json!(Path.join(optimizer_dir, "optimizer-lift-parity-full.json"), %{
+        "schema_version" => 1,
+        "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "git_sha" => "abc",
+        "summary" => %{
+          "total" => 1,
+          "passing" => 1,
+          "all_passing" => true,
+          "full_optimizer_parity" => true
+        },
+        "rows" => []
+      })
+
+      capture_io(fn ->
+        Mix.Task.reenable("dsex.benchmark.dashboard")
+
+        Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+          "--instruction-optimizer-dir",
+          contract_dir,
+          "--optimizer-dir",
+          optimizer_dir,
+          "--out",
+          out_dir,
+          "--max-age-hours",
+          "1"
+        ])
+      end)
+
+      [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+      dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+      contract_lane = dashboard["lanes"]["instruction_optimizer_contract"]
+      optimizer_lane = dashboard["lanes"]["optimizer_lift"]
+
+      assert contract_lane["status"] == expected_status
+      refute contract_lane["full_evidence"]
+      assert optimizer_lane["status"] == "sample"
+      refute optimizer_lane["full_evidence"]
+      refute optimizer_lane["summary"]["full_optimizer_parity"]
+
+      optimizer_claim =
+        Enum.find(dashboard["claims"]["claims"], &(&1["id"] == "claim.optimizer_lift.full"))
+
+      assert optimizer_claim["status"] == "blocked"
+    end)
   end
 
   test "dashboard does not trust forged GEPA full summary without row provenance" do
@@ -837,6 +968,54 @@ defmodule DashboardTest do
 
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
 
+  defp write_instruction_optimizer_contract!(dir, opts \\ []) do
+    sources = [
+      {"dspy/propose/grounded_proposer.py",
+       "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3"},
+      {"dspy/teleprompt/bootstrap.py",
+       "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255"},
+      {"dspy/teleprompt/mipro_optimizer_v2.py",
+       "6bf7632836d3a54ab0da3f38a8f1963813472312e9c0e3f2ff19b4377af407f3"},
+      {"dspy/teleprompt/simba.py",
+       "4de72e1d0cb1cd30a180569c21973c41fa272c3ebb82a365e3f307986ab67a55"},
+      {"dspy/teleprompt/simba_utils.py",
+       "ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c"},
+      {"dspy/teleprompt/utils.py",
+       "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182"}
+    ]
+
+    structural_complete = Keyword.get(opts, :structural_complete, true)
+    path = Path.join(dir, Keyword.get(opts, :name, "instruction-optimizer-contract-current.json"))
+
+    write_json!(path, %{
+      "schema_version" => 1,
+      "evidence_tier" => "t1_instruction_optimizer_differential_contract",
+      "generated_at" =>
+        Keyword.get(opts, :generated_at, DateTime.utc_now() |> DateTime.to_iso8601()),
+      "git_sha" => "abc",
+      "dspy" => %{
+        "version" => Keyword.get(opts, :dspy_version, "3.3.0b1"),
+        "commit" => "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+        "sources" =>
+          Enum.map(sources, fn {path, hash} ->
+            %{"path" => path, "sha256" => hash}
+          end)
+      },
+      "summary" => %{
+        "required_cases" => 10,
+        "required_passing" => if(structural_complete, do: 10, else: 9),
+        "structural_contract_complete" => structural_complete,
+        "exact_sampler_sequence_parity" => false,
+        "paper_protocol_complete" => false,
+        "full_optimizer_parity" => false
+      },
+      "declared_native_deviations" => [%{"id" => "optimizer_rng_sequence"}],
+      "rows" => []
+    })
+
+    path
+  end
+
   defp write_gate_evidence!(dir, gate, mix_task) do
     write_json!(Path.join(dir, "gate-evidence-#{gate}-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -943,6 +1122,13 @@ defmodule DashboardTest do
           "dataset" => %{
             "source" => "github.com/gepa-ai/gepa-artifact@abcdef1",
             "split" => "train_dev_test",
+            "scope" => "full",
+            "max_per_split" => nil,
+            "split_counts" => %{
+              "train" => 100,
+              "dev" => 50,
+              "test" => 50
+            },
             "checksums" => %{
               "train" => "sha256:#{family}:train",
               "dev" => "sha256:#{family}:dev",
@@ -980,6 +1166,18 @@ defmodule DashboardTest do
             "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
           }
         }
+
+        row =
+          if family == "hoverBench" do
+            put_in(row, ["dataset", "retrieval"], %{
+              "verified" => true,
+              "implementation" => "upstream_python_bm25s",
+              "corpus_checksum" => "sha256:" <> String.duplicate("1", 64),
+              "index_checksum" => "sha256:" <> String.duplicate("2", 64)
+            })
+          else
+            row
+          end
 
         if family == "Papillon" do
           Map.put(row, "metric_judge", %{

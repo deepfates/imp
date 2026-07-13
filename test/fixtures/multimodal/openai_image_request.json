@@ -1,0 +1,20 @@
+{
+  "role": "user",
+  "content": [
+    {
+      "type": "text",
+      "text": "[[ ## question ## ]]\nWhat landmark is shown?\n\n[[ ## image ## ]]\n"
+    },
+    {
+      "type": "image_url",
+      "image_url": {
+        "url": "https://example.com/eiffel-tower.jpg",
+        "detail": "high"
+      }
+    },
+    {
+      "type": "text",
+      "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+    }
+  ]
+}

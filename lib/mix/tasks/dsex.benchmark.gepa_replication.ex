@@ -88,6 +88,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
         "all_passing" => passing,
         "full_gepa_replication" => full_research,
         "missing_families" => validation.missing_families,
+        "duplicate_families" => validation.duplicate_families,
+        "unknown_families" => validation.unknown_families,
         "missing_fields" => validation.missing_fields,
         "evidence_level" => if(full_research, do: "research_campaign", else: "smoke")
       },
@@ -95,7 +97,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
     }
 
     out_path = Path.join(out_dir, "gepa-replication-#{timestamp_slug()}.json")
-    File.write!(out_path, Jason.encode!(artifact, pretty: true) <> "\n")
+    out_path = DSEx.BenchmarkTruth.ArtifactFile.write_json!(out_path, artifact)
     Mix.shell().info("GEPA replication artifact: #{out_path}")
 
     unless passing do
@@ -126,7 +128,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
       |> File.read!()
       |> Jason.decode!()
       |> normalize_rows!()
-      |> Map.new(&{&1["family"], &1})
+      |> unique_map!(& &1["family"], "DSEx GEPA family rows")
 
     artifact_dir
     |> experiment_runs_dir!()
@@ -220,9 +222,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
 
   defp rows_from_upstream!({model, results}, dsex_rows, campaign_id) do
     grouped =
-      Map.new(results, fn result ->
-        {{result.family, result.program, result.optimizer}, result}
-      end)
+      unique_map!(
+        results,
+        &{&1.family, &1.program, &1.optimizer},
+        "upstream GEPA result rows"
+      )
 
     Enum.map(required_family_programs(), fn {family, program, budget} ->
       baseline = fetch_upstream!(grouped, family, program, "Baseline")
@@ -252,6 +256,17 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
         }
       })
     end)
+  end
+
+  defp unique_map!(values, key_fun, label) do
+    duplicates =
+      values
+      |> Enum.group_by(key_fun)
+      |> Enum.filter(fn {_key, entries} -> length(entries) > 1 end)
+      |> Enum.map(&elem(&1, 0))
+
+    if duplicates != [], do: Mix.raise("duplicate #{label}: #{inspect(duplicates)}")
+    Map.new(values, &{key_fun.(&1), &1})
   end
 
   defp fetch_upstream!(grouped, family, program, optimizer) do

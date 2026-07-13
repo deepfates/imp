@@ -263,10 +263,10 @@ defmodule DSEx.UpstreamFidelity do
       category: :tools_agents,
       upstream: ["ReAct", "ReActV2", "CodeAct", "ProgramOfThought", "PythonInterpreter"],
       source: "dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py",
-      disposition: :gap,
-      ticket: "de-3uxx",
+      disposition: :conformant,
       dsex: [
         DSEx.Predict.ReAct,
+        DSEx.Predict.ReActV2,
         DSEx.Predict.CodeAct,
         DSEx.Predict.ProgramOfThought,
         DSEx.Sandbox
@@ -278,12 +278,12 @@ defmodule DSEx.UpstreamFidelity do
       ],
       evidence: %{
         tests: [
+          "test/react_v2_test.exs",
           "test/react_contract_test.exs",
           "test/completion_surface_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"],
-        missing: ["ReActV2", "source-fidelity audit", "live CodeAct user story"]
+        docs: ["docs/API_GUIDE.md", "docs/REACT_V2_FIDELITY.md"]
       }
     },
     %{
@@ -301,11 +301,19 @@ defmodule DSEx.UpstreamFidelity do
         "paper-scale effectiveness is compared with upstream"
       ],
       evidence: %{
-        tests: ["test/rlm_test.exs"],
-        docs: ["livebooks/04_tools_agents_mcp_rlm.livemd"],
+        tests: [
+          "test/rlm_test.exs",
+          "test/rlm_interpreter_test.exs",
+          "test/rlm_budget_test.exs",
+          "test/live_provider_e2e_test.exs"
+        ],
+        docs: [
+          "docs/API_GUIDE.md",
+          "docs/ARCHITECTURE.md",
+          "docs/RLM_FIDELITY.md",
+          "livebooks/04_tools_agents_mcp_rlm.livemd"
+        ],
         missing: [
-          "live RLM user story",
-          "current upstream matched benchmark",
           "paper-scale reproduction"
         ]
       }
@@ -376,11 +384,12 @@ defmodule DSEx.UpstreamFidelity do
         "KNNFewShot"
       ],
       source: "dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py",
-      disposition: :gap,
-      ticket: "de-9x31",
+      disposition: :conformant,
       dsex: [
         DSEx.Optimizer.LabeledFewShot,
         DSEx.Optimizer.BootstrapFewShot,
+        DSEx.Optimizer.BootstrapFewShotWithRandomSearch,
+        DSEx.Optimizer.BootstrapRS,
         DSEx.Optimizer.RandomSearch,
         DSEx.Optimizer.KNNFewShot
       ],
@@ -390,9 +399,11 @@ defmodule DSEx.UpstreamFidelity do
         "candidate selection uses held-out evaluation"
       ],
       evidence: %{
-        tests: ["test/optimizer_behavioral_corpus_test.exs"],
-        docs: ["docs/API_GUIDE.md"],
-        missing: ["source-level algorithm audit", "matched optimizer-lift campaign"]
+        tests: [
+          "test/optimizer_behavioral_corpus_test.exs",
+          "test/optimizer_lift_artifact_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md", "docs/BENCHMARK_TRUTH.md"]
       }
     },
     %{
@@ -407,6 +418,7 @@ defmodule DSEx.UpstreamFidelity do
         DSEx.Optimizer.COPRO,
         DSEx.Optimizer.MIPROv2,
         DSEx.Optimizer.SIMBA,
+        DSEx.Optimizer.InferRules,
         DSEx.Optimizer.SignatureOptimizer
       ],
       invariants: [
@@ -417,7 +429,11 @@ defmodule DSEx.UpstreamFidelity do
       evidence: %{
         tests: ["test/optimizer_behavioral_corpus_test.exs"],
         docs: ["docs/API_GUIDE.md"],
-        missing: ["InferRules", "faithful MIPROv2", "faithful SIMBA", "paper-scale lift evidence"]
+        missing: [
+          "matched DSPy 3.3.0b1 MIPROv2 differential artifact",
+          "matched DSPy 3.3.0b1 SIMBA differential artifact",
+          "paper-scale lift evidence"
+        ]
       }
     },
     %{
@@ -539,7 +555,7 @@ defmodule DSEx.UpstreamFidelity do
         "track_usage"
       ],
       source: "dspy/utils; dspy/streaming; dspy/clients/cache.py",
-      disposition: :gap,
+      disposition: :conformant,
       ticket: "de-tt5j",
       dsex: [DSEx.Tasks, DSEx.Streaming, DSEx.Cache],
       invariants: [
@@ -549,14 +565,12 @@ defmodule DSEx.UpstreamFidelity do
         "provider-free overhead is measured against upstream"
       ],
       evidence: %{
-        tests: ["test/task_supervision_test.exs", "test/production_hardening_test.exs"],
-        docs: ["docs/ARCHITECTURE.md"],
-        missing: [
-          "cancellation parity",
-          "stream listener parity",
-          "cache policy parity",
-          "current overhead comparison"
-        ]
+        tests: [
+          "test/runtime_async_stream_cache_test.exs",
+          "test/task_supervision_test.exs",
+          "test/production_hardening_test.exs"
+        ],
+        docs: ["docs/ARCHITECTURE.md", "docs/PARITY_VALIDATION_PROGRAM.md"]
       }
     },
     %{
@@ -573,22 +587,20 @@ defmodule DSEx.UpstreamFidelity do
         "optimizer tracking"
       ],
       source: "dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs",
-      disposition: :gap,
-      ticket: "de-xt9k",
-      dsex: [DSEx.Telemetry, DSEx.Streaming.Messages],
+      disposition: :conformant,
+      dsex: [DSEx.Observability, DSEx.Telemetry, DSEx.Streaming.Messages],
       invariants: [
         "developers can inspect model, tool, optimizer, and RLM traces",
         "progress is observable without parsing internal structs",
         "all emitted data is redacted"
       ],
       evidence: %{
-        tests: ["test/support/telemetry_helpers.ex", "test/history_test.exs"],
-        docs: ["docs/PRODUCTION_OPERATIONS.md"],
-        missing: [
-          "public trace inspector",
-          "optimizer progress provider",
-          "logging control user story"
-        ]
+        tests: [
+          "test/observability_test.exs",
+          "test/support/telemetry_helpers.ex",
+          "test/history_test.exs"
+        ],
+        docs: ["docs/PRODUCTION_OPERATIONS.md"]
       }
     },
     %{
@@ -596,9 +608,8 @@ defmodule DSEx.UpstreamFidelity do
       category: :operations,
       upstream: ["Module.save", "Module.load", "load", "dump_state", "load_state", "deployment"],
       source: "dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs",
-      disposition: :gap,
-      ticket: "de-g3wa",
-      dsex: [DSEx.Saving],
+      disposition: :conformant,
+      dsex: [DSEx.Saving, DSEx.Saving.Registry],
       invariants: [
         "portable state round-trips transactionally",
         "credentials are excluded",
@@ -606,13 +617,12 @@ defmodule DSEx.UpstreamFidelity do
         "deployment from a clean package is documented and tested"
       ],
       evidence: %{
-        tests: ["test/production_adapter_persistence_test.exs", "test/package_contract_test.exs"],
-        docs: ["docs/PRODUCTION_OPERATIONS.md"],
-        missing: [
-          "all public program types",
-          "transactional load",
-          "deployment reference application"
-        ]
+        tests: [
+          "test/production_adapter_persistence_test.exs",
+          "test/deployment_reference_test.exs",
+          "test/package_contract_test.exs"
+        ],
+        docs: ["docs/PRODUCTION_OPERATIONS.md", "examples/deployment/README.md"]
       }
     },
     %{
@@ -666,13 +676,17 @@ defmodule DSEx.UpstreamFidelity do
         "a clean project consumes the exact artifact"
       ],
       evidence: %{
-        tests: ["test/package_contract_test.exs"],
-        docs: ["README.md", "docs/RELEASE_CRITERIA.md"],
-        missing: [
-          "GitHub remote",
-          "Hex release",
+        tests: ["test/package_contract_test.exs", "test/gate_contract_test.exs"],
+        docs: [
+          "README.md",
+          "CHANGELOG.md",
           "LICENSE",
-          "green security audit",
+          "SECURITY.md",
+          "docs/RELEASE_CRITERIA.md"
+        ],
+        missing: [
+          "canonical public GitHub remote after rename",
+          "Hex release",
           "release stewardship"
         ]
       }

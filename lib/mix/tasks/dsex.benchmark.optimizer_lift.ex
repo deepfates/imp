@@ -165,13 +165,32 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
 
   defp compile_mipro(metric, program, {trainset, devset}),
     do:
-      DSEx.Optimizer.MIPROv2.new(metric, trials: 3, demos_per_candidate: 1, cold_start: 1)
+      DSEx.Optimizer.MIPROv2.new(metric,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 2,
+        max_bootstrapped_demos: 1,
+        max_labeled_demos: 1,
+        minibatch: false,
+        program_aware_proposer: false,
+        data_aware_proposer: false,
+        tip_aware_proposer: false,
+        fewshot_aware_proposer: false,
+        max_errors: 2
+      )
       |> DSEx.Optimizer.MIPROv2.compile(program, trainset, devset)
 
-  defp compile_simba(metric, program, {trainset, devset}),
+  defp compile_simba(metric, program, {trainset, _devset}),
     do:
-      DSEx.Optimizer.SIMBA.new(metric, steps: 2, demos_per_step: 1)
-      |> DSEx.Optimizer.SIMBA.compile(program, trainset, devset)
+      DSEx.Optimizer.SIMBA.new(metric,
+        bsize: 2,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 1,
+        sampling_temperature: 0.01,
+        candidate_temperature: 0.01
+      )
+      |> DSEx.Optimizer.SIMBA.compile(program, trainset)
 
   defp compile_gepa(metric, program, {trainset, devset}),
     do:
@@ -219,7 +238,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
         "all_passing" => passing == length(rows),
         "direct_comparisons" => Enum.count(rows, &(&1["comparison_status"] == "direct")),
         "dsex_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
-        "full_optimizer_parity" => true,
+        "lift_evidence_complete" => passing == length(rows),
+        "control_flow_parity" => false,
+        "full_optimizer_parity" => false,
         "note" => optimizer_summary_note(dspy, rows)
       },
       "dsex" => Map.take(dsex, ["runner", "elixir", "otp", "git_sha"]),
@@ -601,8 +622,22 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
       lm: fn messages, _opts ->
         Agent.update(calls, &(&1 + 1))
         prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
-        answer = if should_answer_paris?(prompt), do: "Paris", else: "unknown"
-        {:ok, %{answer: answer}}
+
+        cond do
+          String.contains?(prompt, "Propose DSEx instruction candidates") ->
+            {:ok, %{instructions: ["Always answer Paris when asked about France."]}}
+
+          String.contains?(prompt, "better_program_trajectory") ->
+            {:ok,
+             %{
+               discussion: "The better trajectory identifies the expected capital.",
+               module_advice: %{main: "Always answer Paris when asked about France."}
+             }}
+
+          true ->
+            answer = if should_answer_paris?(prompt), do: "Paris", else: "unknown"
+            {:ok, %{answer: answer}}
+        end
       end
     )
   end
@@ -740,6 +775,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.OptimizerLift do
   end
 
   defp normalize(values) when is_list(values), do: Enum.map(values, &normalize/1)
+  defp normalize(value) when is_tuple(value), do: value |> Tuple.to_list() |> normalize()
+  defp normalize(value) when is_boolean(value) or is_nil(value), do: value
   defp normalize(value) when is_atom(value), do: to_string(value)
   defp normalize(value), do: value
 

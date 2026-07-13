@@ -37,11 +37,42 @@ defmodule DSEx.Streaming.Messages do
   end
 
   defmodule StreamListener do
-    @moduledoc "In-memory stream event listener for tests and local tools."
+    @moduledoc "Stream observer that records events and can attach a callback without altering them."
 
-    defstruct events: []
+    defstruct events: [], on_event: nil
+
+    def new(opts \\ []) do
+      opts =
+        DSEx.Options.validate!(
+          opts,
+          [on_event: [type: {:custom, __MODULE__, :validate_callback, []}, default: nil]],
+          "DSEx.Streaming.Messages.StreamListener.new/1"
+        )
+
+      %__MODULE__{on_event: opts[:on_event]}
+    end
 
     def record(%__MODULE__{events: events} = listener, event),
       do: %{listener | events: events ++ [event]}
+
+    def attach(%__MODULE__{} = listener, enumerable) do
+      unless Enumerable.impl_for(enumerable) do
+        raise ArgumentError, "StreamListener.attach/2 expects an enumerable"
+      end
+
+      Stream.map(enumerable, fn event ->
+        notify(listener, event)
+        event
+      end)
+    end
+
+    def validate_callback(nil), do: {:ok, nil}
+    def validate_callback(callback) when is_function(callback, 1), do: {:ok, callback}
+
+    def validate_callback(callback),
+      do: {:error, "expected nil or an arity-1 function, got: #{inspect(callback)}"}
+
+    defp notify(%__MODULE__{on_event: nil}, _event), do: :ok
+    defp notify(%__MODULE__{on_event: callback}, event), do: callback.(event)
   end
 end

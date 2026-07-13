@@ -2118,10 +2118,10 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     initial = Map.new(0..cols, &{{0, &1}, &1})
 
     table =
-      Enum.reduce(1..rows, initial, fn i, table ->
+      Enum.reduce(positive_range(rows), initial, fn i, table ->
         table = Map.put(table, {i, 0}, i)
 
-        Enum.reduce(1..cols, table, fn j, table ->
+        Enum.reduce(positive_range(cols), table, fn j, table ->
           cost = if Enum.at(left, i - 1) == Enum.at(right, j - 1), do: 0, else: 1
 
           value =
@@ -2136,6 +2136,9 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
 
     Map.fetch!(table, {rows, cols})
   end
+
+  defp positive_range(0), do: []
+  defp positive_range(count), do: 1..count
 
   defp papillon_overall(nil) do
     fn _example, _prediction ->

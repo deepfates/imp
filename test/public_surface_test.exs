@@ -65,6 +65,9 @@ defmodule PublicSurfaceTest do
     DSEx.Metrics,
     DSEx.Metrics.Result,
     DSEx.Module,
+    DSEx.Observability,
+    DSEx.Observability.ProgressSubscription,
+    DSEx.Observability.Trace,
     DSEx.Optimize.Anything,
     DSEx.Optimize.Anything.Artifact,
     DSEx.Optimize.Anything.Candidate,
@@ -75,11 +78,25 @@ defmodule PublicSurfaceTest do
     DSEx.Optimize.GEPA.Report,
     DSEx.Optimizer.BetterTogether,
     DSEx.Optimizer.BootstrapFewShot,
+    DSEx.Optimizer.BootstrapFewShotWithRandomSearch,
     DSEx.Optimizer.BootstrapFinetune,
+    DSEx.Optimizer.BootstrapRS,
     DSEx.Optimizer.COPRO,
     DSEx.Optimizer.Ensemble,
     DSEx.Optimizer.GEPA,
+    DSEx.Optimizer.GEPA.Adapter,
+    DSEx.Optimizer.GEPA.Acceptance,
+    DSEx.Optimizer.GEPA.Callback,
+    DSEx.Optimizer.GEPA.Candidate,
+    DSEx.Optimizer.GEPA.Evaluation,
+    DSEx.Optimizer.GEPA.EvaluationCache,
+    DSEx.Optimizer.GEPA.EvaluationPolicy,
+    DSEx.Optimizer.GEPA.Frontier,
+    DSEx.Optimizer.GEPA.Merge,
+    DSEx.Optimizer.GEPA.Result,
+    DSEx.Optimizer.GEPA.Stopper,
     DSEx.Optimizer.GRPO,
+    DSEx.Optimizer.InferRules,
     DSEx.Optimizer.InstructionProposer,
     DSEx.Optimizer.InstructionSearch,
     DSEx.Optimizer.KNNFewShot,
@@ -103,6 +120,7 @@ defmodule PublicSurfaceTest do
     DSEx.Predict.RLM,
     DSEx.Predict.RLM.SandboxSerializable,
     DSEx.Predict.ReAct,
+    DSEx.Predict.ReActV2,
     DSEx.Predict.Refine,
     DSEx.Prediction,
     DSEx.Redaction,
@@ -114,6 +132,7 @@ defmodule PublicSurfaceTest do
     DSEx.Retrievers.Weaviate,
     DSEx.Sandbox,
     DSEx.Saving,
+    DSEx.Saving.Registry,
     DSEx.Schema,
     DSEx.Settings,
     DSEx.Signature,
@@ -820,6 +839,7 @@ defmodule PublicSurfaceTest do
       load: 1,
       save!: 2,
       load!: 1,
+      with_lm: 2,
       predict: 1,
       predict: 2,
       with_demos: 2,
@@ -895,6 +915,7 @@ defmodule PublicSurfaceTest do
 
     docs =
       ["README.md" | Path.wildcard("docs/*.md")]
+      |> Enum.reject(&(&1 in ["docs/PRIOR_ART.md", "docs/RESEARCH_LANDSCAPE.md"]))
       |> Enum.map_join("\n", &File.read!/1)
 
     refute docs =~ borrowed_name

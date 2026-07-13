@@ -30,6 +30,171 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_actions)
   end
 
+  test "RLM accepts provider-style inline submit outputs" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{"action" => "submit", "answer" => "Paris"} end]
+    }
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm)
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert [%{action: :submit}] = prediction.metadata.rlm_trace
+  end
+
+  test "RLM executes persistent Elixir code with programmatic sub-LM calls" do
+    actions = [
+      %{
+        reasoning: "split the external context",
+        code: "chunks = String.split(context, \"|\")"
+      },
+      %{
+        reasoning: "analyze every chunk inside the environment",
+        code: ~S|answers = for chunk <- chunks, do: llm_query(chunk)|
+      },
+      %{
+        reasoning: "submit the exact computed value",
+        code: ~S|submit(%{answer: Enum.join(answers, " ")})|
+      }
+    ]
+
+    controller = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:symbolic_rlm_actions)
+          Process.put(:symbolic_rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    sub_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn [%{content: prompt}], _opts -> String.upcase(prompt) end
+      ]
+    }
+
+    Process.put(:symbolic_rlm_actions, actions)
+
+    rlm =
+      DSEx.Predict.RLM.new("context -> answer",
+        lm: controller,
+        sub_lm: sub_lm,
+        max_iterations: 3,
+        max_llm_calls: 2
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{context: "alpha|beta"})
+    assert DSEx.Prediction.get(prediction, :answer) == "ALPHA BETA"
+    assert prediction.metadata.rlm.sub_lm_calls == 2
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run, :run, :submit]
+
+    assert Enum.map(prediction.metadata.trajectory, &Map.take(&1, [:reasoning, :code])) ==
+             Enum.map(actions, &Map.take(&1, [:reasoning, :code]))
+
+    assert prediction.metadata.final_reasoning == "submit the exact computed value"
+  after
+    Process.delete(:symbolic_rlm_actions)
+  end
+
+  test "programmatic batches reserve the full shared call budget and permit repair" do
+    parent = self()
+
+    controller = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          turn = Process.get(:over_budget_turn, 0)
+          Process.put(:over_budget_turn, turn + 1)
+
+          if turn == 0,
+            do: %{code: ~S|llm_query_batched(["one", "two", "three"])|},
+            else: %{code: ~S|submit(%{answer: "repaired"})|}
+        end
+      ]
+    }
+
+    sub_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> send(parent, :unexpected_subcall) end]
+    }
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: controller,
+        sub_lm: sub_lm,
+        max_iterations: 2,
+        max_llm_calls: 2
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "repaired"
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run_error, :submit]
+    refute_received :unexpected_subcall
+  after
+    Process.delete(:over_budget_turn)
+  end
+
+  test "RLM code recursively invokes a child that shares the execution ledger" do
+    actions = [
+      %{
+        reasoning: "delegate symbolically",
+        code: ~S|child = recurse("question -> answer", %{question: "child"})
+submit(%{answer: child[:answer]})|
+      },
+      %{reasoning: "answer child", code: ~S|submit(%{answer: "child answer"})|}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:symbolic_recursive_actions)
+          Process.put(:symbolic_recursive_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:symbolic_recursive_actions, actions)
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: lm,
+        max_iterations: 2,
+        max_recursion_depth: 1
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "parent"})
+    assert DSEx.Prediction.get(prediction, :answer) == "child answer"
+    assert Process.get(:symbolic_recursive_actions) == []
+    assert prediction.metadata.rlm.sub_lm_calls == 0
+  after
+    Process.delete(:symbolic_recursive_actions)
+  end
+
+  test "malformed legacy recurse actions return structured errors" do
+    actions = [
+      %{action: "recurse", signature: "invalid", inputs: %{}},
+      %{action: "recurse", signature: "x -> answer", inputs: :not_a_map}
+    ]
+
+    Enum.each(actions, fn action ->
+      lm = %{
+        module: DSEx.LM.Static,
+        opts: [handler: fn _messages, _opts -> action end]
+      }
+
+      rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm)
+
+      assert {:error, {:invalid_rlm_recurse, _reason}} =
+               DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    end)
+  end
+
   test "RLM exposes large context as metadata and preview, not full prompt text" do
     hidden = "DO_NOT_PROMPT_FULL_CONTEXT"
     context = String.duplicate("a", 40) <> hidden
@@ -197,6 +362,9 @@ defmodule RLMPublicSurfaceTest do
 
     assert {:error, {:invalid_rlm_inputs, "expected inputs as {key, value} pairs"}} =
              DSEx.Predict.RLM.call(rlm, [:not_a_pair])
+
+    assert {:error, {:missing_input_fields, [:question]}} =
+             DSEx.Predict.RLM.call(rlm, %{})
   end
 
   test "RLM supports persistent assignment and tool actions" do
@@ -231,6 +399,32 @@ defmodule RLMPublicSurfaceTest do
   after
     Process.delete(:rlm_actions)
     Process.delete(:rlm_tool_prompt)
+  end
+
+  test "legacy assignment is visible to the authoritative symbolic environment" do
+    actions = [
+      %{action: "assign", name: "derived", value: 42},
+      %{reasoning: "use compatibility state", code: ~S|submit(%{answer: derived})|}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:mixed_rlm_actions)
+          Process.put(:mixed_rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:mixed_rlm_actions, actions)
+    rlm = DSEx.Predict.RLM.new("question -> answer: integer", lm: lm)
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == 42
+  after
+    Process.delete(:mixed_rlm_actions)
   end
 
   test "RLM loads sandbox serializable inputs explicitly without prompt leakage" do
@@ -384,10 +578,10 @@ defmodule RLMPublicSurfaceTest do
     assert {:ok, second_prediction} = second
     assert DSEx.Prediction.get(first_prediction, :answer) == "one"
     assert DSEx.Prediction.get(second_prediction, :answer) == "two"
-    assert_received {:sub_prompt, first_prompt}
-    assert first_prompt =~ "first"
-    assert_received {:sub_prompt, second_prompt}
-    assert second_prompt =~ "second"
+    assert_received {:sub_prompt, prompt_a}
+    assert_received {:sub_prompt, prompt_b}
+    assert Enum.any?([prompt_a, prompt_b], &String.contains?(&1, "first"))
+    assert Enum.any?([prompt_a, prompt_b], &String.contains?(&1, "second"))
 
     Process.put(:rlm_actions, actions)
 
@@ -548,6 +742,46 @@ defmodule RLMPublicSurfaceTest do
              policy_trace
   end
 
+  test "RLM bounds large tool observations and traces without retaining payload content" do
+    payload = String.duplicate("private-medical-record-", 20_000)
+    echo = DSEx.tool(:echo, "return a large trusted payload", fn _args -> payload end)
+
+    actions = [
+      %{action: "tool", name: "echo", arguments: %{}},
+      %{action: "submit", result: %{answer: "ok"}}
+    ]
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:bounded_trace_actions)
+          Process.put(:bounded_trace_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:bounded_trace_actions, actions)
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: lm,
+        tools: [echo],
+        max_observation_chars: 1_000
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    trace = prediction.metadata.rlm_trace
+    assert :erlang.external_size(trace) < 10_000
+    refute inspect(trace) =~ payload
+
+    assert hd(trace).output == "[REDACTED]" or
+             (is_map(hd(trace).output) and hd(trace).output.truncated)
+  after
+    Process.delete(:bounded_trace_actions)
+  end
+
   test "RLM enforces wall-clock budget" do
     timeout_lm = %{
       module: DSEx.LM.Static,
@@ -563,5 +797,84 @@ defmodule RLMPublicSurfaceTest do
 
     assert {:error, {:rlm_max_time_ms, 0, _trace}} =
              DSEx.Predict.RLM.call(timeout, %{question: "q"})
+  end
+
+  test "RLM deadline interrupts a blocked sub-LM effect" do
+    controller = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("slow")|} end]
+    }
+
+    sub_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          Process.sleep(250)
+          "late"
+        end
+      ]
+    }
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: controller,
+        sub_lm: sub_lm,
+        max_iterations: 1,
+        max_time_ms: 100
+      )
+
+    {elapsed_us, result} = :timer.tc(fn -> DSEx.Predict.RLM.call(rlm, %{question: "q"}) end)
+
+    assert {:error, {:rlm_time_budget_exceeded, _trace}} = result
+    assert elapsed_us < 500_000
+  end
+
+  test "batched subqueries obey one absolute deadline across concurrency waves" do
+    parent = self()
+    run_ref = make_ref()
+    prompts = Enum.map(1..24, &"prompt-#{&1}")
+    code = "llm_query_batched(#{inspect(prompts)})"
+
+    controller = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{code: code} end]
+    }
+
+    sub_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn [%{content: prompt}], _opts ->
+          send(parent, {:batch_started, run_ref, prompt})
+          Process.sleep(80)
+          send(parent, {:batch_finished, run_ref, prompt})
+          prompt
+        end
+      ]
+    }
+
+    rlm =
+      DSEx.Predict.RLM.new("question -> answer",
+        lm: controller,
+        sub_lm: sub_lm,
+        max_iterations: 1,
+        max_llm_calls: 24,
+        max_time_ms: 150
+      )
+
+    {elapsed_us, result} = :timer.tc(fn -> DSEx.Predict.RLM.call(rlm, %{question: "q"}) end)
+
+    assert {:error, _reason} = result
+    assert elapsed_us < 400_000
+    drain_batch_messages(run_ref)
+    refute_receive {:batch_finished, ^run_ref, _prompt}, 150
+  end
+
+  defp drain_batch_messages(run_ref) do
+    receive do
+      {:batch_started, ^run_ref, _prompt} -> drain_batch_messages(run_ref)
+      {:batch_finished, ^run_ref, _prompt} -> drain_batch_messages(run_ref)
+    after
+      0 -> :ok
+    end
   end
 end

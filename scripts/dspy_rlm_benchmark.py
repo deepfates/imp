@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free DSPy RLM benchmark sidecar."""
+"""Deterministic DSPy RLM contract-replay sidecar."""
 
 from __future__ import annotations
 
@@ -95,10 +95,10 @@ def main() -> int:
         "python": platform.python_version(),
         "dspy_version": getattr(dspy, "__version__", "unknown"),
         "dataset": {
-            "name": "hotpotqa_fixture",
+            "name": "synthetic_hotpotqa_shaped_fixture",
             "path": args.data,
             "examples": len(examples),
-            "source": "HotPotQA-shaped public benchmark fixture",
+            "source": "hand-authored DSEx contract fixture",
         },
         "rows": rows,
         "summary": summarize(rows),

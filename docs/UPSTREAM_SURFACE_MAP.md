@@ -1,15 +1,18 @@
 # DSEx Executable Upstream Conformance
 
+This generated maintainer ledger belongs to a DSEx source checkout. Repository
+paths and gate commands are not package-consumer APIs.
+
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 22
-Conformant: 6
+Conformant: 11
 Elixir-native equivalents: 2
 Tracking: 1
-Gaps: 13
+Gaps: 8
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 13
+Release blockers: 8
 Passing: false
 
 | ID | Category | Status | Upstream surfaces | Ticket |
@@ -21,19 +24,19 @@ Passing: false
 | adapters.structured_io | adapters | conformant | Adapter, ChatAdapter, JSONAdapter, XMLAdapter, TwoStepAdapter |  |
 | primitives.multimodal | primitives | gap | Image, Audio, File, Code, Document, Citations, Reasoning | de-ezg9 |
 | tools.typed_calls | tools_agents | conformant | Tool, ToolCalls, ToolCallResults, MCP |  |
-| agents.react_family | tools_agents | gap | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter | de-3uxx |
+| agents.react_family | tools_agents | conformant | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |  |
 | agents.rlm | tools_agents | gap | RLM, SandboxSerializable, Recursive Language Models paper | de-c7ui |
 | composition.refinement | programming_model | conformant | BestOfN, Refine, Assertions |  |
 | evaluation.metrics | evaluation | conformant | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |  |
-| optimization.few_shot | optimization | gap | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot | de-9x31 |
+| optimization.few_shot | optimization | conformant | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
 | optimization.instructions | optimization | gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
 | optimization.gepa | optimization | gap | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
 | optimization.weights | optimization | gap | BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
 | optimization.anything | optimization | gap | optimize_anything, arbitrary text artifacts | de-16fo |
 | retrieval.data | retrieval | elixir_native_equivalent | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
-| runtime.async_stream_cache | runtime | gap | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
-| runtime.observability | runtime | gap | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking | de-xt9k |
-| state.persistence_deployment | operations | gap | Module.save, Module.load, load, dump_state, load_state, deployment | de-g3wa |
+| runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |  |
+| runtime.observability | runtime | conformant | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |  |
+| state.persistence_deployment | operations | conformant | Module.save, Module.load, load, dump_state, load_state, deployment |  |
 | product.learning_path | product | gap | getting started, tutorials, real-world examples, API reference, production guide | de-2ia5 |
 | product.release | product | gap | installable package, versioned release, security policy, CI, clean-room consumer | de-p29x |
 
@@ -212,11 +215,11 @@ Missing evidence or behavior:
 
 ### `agents.react_family`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py`
 
-DSEx modules: `DSEx.Predict.ReAct`, `DSEx.Predict.CodeAct`, `DSEx.Predict.ProgramOfThought`, `DSEx.Sandbox`
+DSEx modules: `DSEx.Predict.ReAct`, `DSEx.Predict.ReActV2`, `DSEx.Predict.CodeAct`, `DSEx.Predict.ProgramOfThought`, `DSEx.Sandbox`
 Semantic invariants:
 
 - each module preserves upstream control-loop and termination semantics
@@ -225,16 +228,16 @@ Semantic invariants:
 
 Executable evidence:
 
+- test: `test/react_v2_test.exs`
 - test: `test/react_contract_test.exs`
 - test: `test/completion_surface_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
+- docs: `docs/REACT_V2_FIDELITY.md`
 
 Missing evidence or behavior:
 
-- ReActV2
-- source-fidelity audit
-- live CodeAct user story
+- none
 
 ### `agents.rlm`
 
@@ -253,12 +256,16 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/rlm_test.exs`
+- test: `test/rlm_interpreter_test.exs`
+- test: `test/rlm_budget_test.exs`
+- test: `test/live_provider_e2e_test.exs`
+- docs: `docs/API_GUIDE.md`
+- docs: `docs/ARCHITECTURE.md`
+- docs: `docs/RLM_FIDELITY.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 Missing evidence or behavior:
 
-- live RLM user story
-- current upstream matched benchmark
 - paper-scale reproduction
 
 ### `composition.refinement`
@@ -312,11 +319,11 @@ Missing evidence or behavior:
 
 ### `optimization.few_shot`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py`
 
-DSEx modules: `DSEx.Optimizer.LabeledFewShot`, `DSEx.Optimizer.BootstrapFewShot`, `DSEx.Optimizer.RandomSearch`, `DSEx.Optimizer.KNNFewShot`
+DSEx modules: `DSEx.Optimizer.LabeledFewShot`, `DSEx.Optimizer.BootstrapFewShot`, `DSEx.Optimizer.BootstrapFewShotWithRandomSearch`, `DSEx.Optimizer.BootstrapRS`, `DSEx.Optimizer.RandomSearch`, `DSEx.Optimizer.KNNFewShot`
 Semantic invariants:
 
 - successful traces become module-specific demonstrations
@@ -326,12 +333,13 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/optimizer_behavioral_corpus_test.exs`
+- test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
+- docs: `docs/BENCHMARK_TRUTH.md`
 
 Missing evidence or behavior:
 
-- source-level algorithm audit
-- matched optimizer-lift campaign
+- none
 
 ### `optimization.instructions`
 
@@ -339,7 +347,7 @@ Status: `gap`
 
 Upstream source: `dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py`
 
-DSEx modules: `DSEx.Optimizer.COPRO`, `DSEx.Optimizer.MIPROv2`, `DSEx.Optimizer.SIMBA`, `DSEx.Optimizer.SignatureOptimizer`
+DSEx modules: `DSEx.Optimizer.COPRO`, `DSEx.Optimizer.MIPROv2`, `DSEx.Optimizer.SIMBA`, `DSEx.Optimizer.InferRules`, `DSEx.Optimizer.SignatureOptimizer`
 Semantic invariants:
 
 - public names preserve the upstream optimization mechanism
@@ -353,7 +361,6 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- InferRules
 - faithful MIPROv2
 - faithful SIMBA
 - paper-scale lift evidence
@@ -462,7 +469,7 @@ Missing evidence or behavior:
 
 ### `runtime.async_stream_cache`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/utils; dspy/streaming; dspy/clients/cache.py`
 
@@ -476,24 +483,23 @@ Semantic invariants:
 
 Executable evidence:
 
+- test: `test/runtime_async_stream_cache_test.exs`
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
 - docs: `docs/ARCHITECTURE.md`
+- docs: `docs/PARITY_VALIDATION_PROGRAM.md`
 
 Missing evidence or behavior:
 
-- cancellation parity
-- stream listener parity
-- cache policy parity
-- current overhead comparison
+- none
 
 ### `runtime.observability`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs`
 
-DSEx modules: `DSEx.Telemetry`, `DSEx.Streaming.Messages`
+DSEx modules: `DSEx.Observability`, `DSEx.Telemetry`, `DSEx.Streaming.Messages`
 Semantic invariants:
 
 - developers can inspect model, tool, optimizer, and RLM traces
@@ -502,23 +508,22 @@ Semantic invariants:
 
 Executable evidence:
 
+- test: `test/observability_test.exs`
 - test: `test/support/telemetry_helpers.ex`
 - test: `test/history_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 
 Missing evidence or behavior:
 
-- public trace inspector
-- optimizer progress provider
-- logging control user story
+- none
 
 ### `state.persistence_deployment`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs`
 
-DSEx modules: `DSEx.Saving`
+DSEx modules: `DSEx.Saving`, `DSEx.Saving.Registry`
 Semantic invariants:
 
 - portable state round-trips transactionally
@@ -529,14 +534,14 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/production_adapter_persistence_test.exs`
+- test: `test/deployment_reference_test.exs`
 - test: `test/package_contract_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
+- docs: `examples/deployment/README.md`
 
 Missing evidence or behavior:
 
-- all public program types
-- transactional load
-- deployment reference application
+- none
 
 ### `product.learning_path`
 
@@ -583,13 +588,15 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/package_contract_test.exs`
+- test: `test/gate_contract_test.exs`
 - docs: `README.md`
+- docs: `CHANGELOG.md`
+- docs: `LICENSE`
+- docs: `SECURITY.md`
 - docs: `docs/RELEASE_CRITERIA.md`
 
 Missing evidence or behavior:
 
-- GitHub remote
+- canonical public GitHub remote after rename
 - Hex release
-- LICENSE
-- green security audit
 - release stewardship

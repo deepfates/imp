@@ -30,4 +30,5 @@ jobs:
       - run: mix integration.check
       - run: mix protocol.check
       - run: mix package.check
+      - run: mix livebook.check
       - run: mix quality.check

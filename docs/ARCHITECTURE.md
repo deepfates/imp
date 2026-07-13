@@ -200,6 +200,14 @@ helpers only for script-style library use before supervised startup. That keeps
 cancellation, crash reporting, telemetry context, and shutdown behavior visible
 to the host system in production.
 
+`DSEx.Tasks.cancel/2` terminates a supervised task with a bounded wait.
+`DSEx.Streaming.Messages.StreamListener.attach/2` observes normalized stream
+events while yielding the original chunks, including terminal and error events,
+unchanged. `DSEx.Cache.configure/1` controls enablement, TTL, and maximum entry
+count; `DSEx.Cache.stats/0` reports atomic hit, miss, write, bypass, expiration,
+and eviction counters. Cache reads and writes remain ETS hot paths while the
+owner process controls policy and table lifecycle.
+
 Runtime boundaries emit redacted telemetry events for LM calls, streaming
 chunks, adapter parse retries/failures, cache hits/misses, tool calls,
 retrievers, MCP requests, training jobs, and optimizer trials.
@@ -252,7 +260,10 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 - `BetterTogether`
 - `BootstrapFinetune`, `GRPO` build provider training jobs only when an
   explicit real trainer backend is supplied. DSEx does not include an in-process
-  local training fallback.
+  local training fallback. Training jobs enforce provider job and terminal
+  artifact identity, support idempotent bounded-retry submit/refresh/cancel,
+  persist credential-free checkpoints, and rebind a successful model artifact
+  onto the compiled program.
 
 Arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 
@@ -280,27 +291,36 @@ server executables; they are not a sandbox for untrusted commands.
 - tools
 - remaining budget
 
-The controller may return actions:
+The controller normally returns reasoning plus constrained Elixir code. One
+interpreter instance persists for the complete call, so assignments and
+subquery results survive across turns. Code can call `llm_query/1` and
+`llm_query_batched/1` from comprehensions, invoke `recurse/2`, load lazy values,
+call registered tools, inspect bounded output, and terminate through
+`submit/1`. Older discrete action maps remain compatibility shims.
 
-- `eval`
-- `assign`
-- `load`
-- `tool`
-- `llm_query`
-- `llm_query_batched`
-- `recurse`
-- `submit`
+The implementation is BEAM-native and does not call `Code.eval_*`. It parses
+Elixir syntax with atom-safe identifier handling, interprets an explicit AST
+allowlist, rejects arbitrary module/function execution, and enforces source,
+AST, execution, value, effect, output, recursion, call, and time limits. The
+interpreter is a deterministic symbolic component: it yields typed effects, and
+the RLM runtime executes them under OTP supervision before resuming through
+transactional replay. External closures never execute inside the evaluator.
+Batched subqueries use supervised BEAM tasks with deterministic ordering and
+atomically lease the complete call capacity before fan-out. Each lease unit is
+charged only when its worker starts; unstarted units are released. Recursive
+children carry immutable branch depth and share the same call/deadline ledger.
+Malformed submits and safe interpreter errors return to the controller as
+observations; normal iteration exhaustion invokes an extract pass.
 
-The implementation uses a BEAM-safe sandbox for production control. Batched
-subqueries run concurrently with bounded fan-out and count each item against
-`max_llm_calls`. Malformed submits are returned to the controller as
-observations, and normal iteration exhaustion invokes an extract pass over the
-trace instead of discarding work.
+Large trace terms are redacted and replaced with bounded type, size, and digest
+metadata before storage. A single absolute deadline governs controller calls,
+effects, batches, and recursive children; timed effects are registered with the
+execution coordinator so cancellation terminates in-flight tasks.
 
 Large or expensive values can enter the loop as
 `DSEx.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
-only their metadata; the `load` action materializes the value into variable
-space when needed. RLM also exposes internal action, extract, and subquery
+only their metadata; `context = load("context")` materializes the value into
+variable space when needed. RLM also exposes internal action, extract, and subquery
 predictors through the program-access helper so optimizers and audits can see the
 parts that govern behavior.
 

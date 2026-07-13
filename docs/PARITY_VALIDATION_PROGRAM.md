@@ -3,6 +3,9 @@
 This document defines the evidence required before DSEx can honestly claim
 full philosophical, operational, and performance parity with DSPy.
 
+This is a maintainer document for a DSEx source checkout. Its Mix commands and
+artifact paths are not package-consumer APIs.
+
 The old question, "Can DSEx answer the same benchmark rows as DSPy with one
 live model?", is useful but insufficient. It mostly measures provider behavior
 and prompt/adapter compatibility. DSPy's real thesis is broader: programs are
@@ -266,8 +269,11 @@ DSEx GEPA, MIPROv2, metric-call budget, token/cost, wall-clock, seed variance,
 and train/dev/test gap. Full rows must include campaign provenance, dataset
 source and split checksums, DSPy/DSEx/GEPA-artifact commits, concrete
 non-placeholder comparator sources, distinct train/dev/test split digests, and
-positive live token/cost accounting. SIMBA is optional extra comparator
-evidence, not a required optimizer in the upstream GEPA artifact.
+positive live token/cost accounting. Full rows must come from dataset roots
+exported with `dataset.scope == "full"`; capped `--max-per-split` roots are
+accepted only as engineering proof runs and are rejected for full research
+claims. SIMBA is optional extra comparator evidence, not a required optimizer
+in the upstream GEPA artifact.
 
 For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
 --from-gepa-artifact ... --dsex-input ...` to convert upstream GEPA artifact
@@ -280,15 +286,16 @@ Produce that DSEx input with `mix dsex.benchmark.gepa_campaign`. The command is
 path-driven: the dataset root must include a `families.json` contract and
 `train.jsonl` / `dev.jsonl` / `test.jsonl` files for every GEPA family. The
 runner records DSEx GEPA candidate/frontier metadata, seed variance, split
-digests, source commits, and explicit provider token/cost accounting. It writes
-partial `dsex-gepa-rows-*.json` artifacts; only the replication converter can
-turn those partial rows plus upstream comparator outputs into a full public
-claim artifact.
+digests, dataset scope, split counts, source commits, and explicit provider
+token/cost accounting. It writes partial `dsex-gepa-rows-*.json` artifacts;
+only the replication converter can turn full-scope partial rows plus upstream
+comparator outputs into a full public claim artifact.
 
 Build the dataset root with `mix dsex.benchmark.gepa_dataset --gepa-root
 path/to/gepa-artifact --out benchmarks/data/gepa-campaign`. This imports the
 upstream GEPA artifact benchmark classes and writes source-derived split JSONL
-plus a `families.json` manifest. The manifest records upstream metric names.
+plus a `families.json` manifest. The manifest records upstream metric names,
+dataset scope, optional max-per-split cap, split counts, and split checksums.
 DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
 supporting-title retrieval, IFBench IFEval-style constraints, Papillon LLM-judge
 quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME parser
@@ -296,8 +303,8 @@ paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
 HoVer rows must carry `dataset.retrieval` provenance for the upstream
 `wiki.abstracts.2017` BM25 corpus/index checksums; generic `retrieved_docs`
 predictions without that provenance are rejected for research campaign rows, and
-DSEx uses its native HoVer BM25 corpus retriever for those rows. Validate exact
-ranking parity in a GEPA source checkout with
+DSEx uses source-exact HoVer BM25 retrieval with LM-generated multi-hop queries
+for those rows. Validate exact ranking parity in a GEPA source checkout with
 `DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs` after
 installing upstream HoVer retrieval dependencies (`bm25s`, PyStemmer,
 `diskcache`, and `ujson`).
@@ -352,11 +359,16 @@ BEAM async execution, and save/load credential redaction. This is full
 provider-free production evidence; live matched-model campaigns remain the
 separate provider-behavior lane.
 
-The RLM artifact separately compares DSEx RLM and Python DSPy RLM on
-HotPotQA-shaped long-context fixture rows, alongside direct prompt and simple
-RAG baselines. It reports score, latency, subcall count, trace shape, and
-statistical uncertainty; it is provider-free operational parity, not a live model
-leaderboard.
+The RLM command produces T0 deterministic contract replay over hand-authored
+fixture rows. It is useful for checking harness wiring and inspecting traces,
+but gold-derived outputs and non-equivalent scripted executions make it
+ineligible for effectiveness, long-context, operational-parity, or uncertainty
+claims. T3 paper-protocol evidence is required for the release lane.
+
+`mix benchmark.rlm.contract.check` is the stronger T1 lane. It gates twelve
+matched execution contracts against DSPy 3.3.0b1 and records the exact upstream
+source hash. T1 remains operational evidence, not model-quality or paper-scale
+evidence.
 
 Pass condition:
 

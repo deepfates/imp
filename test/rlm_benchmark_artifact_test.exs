@@ -3,7 +3,7 @@ defmodule RLMBenchmarkArtifactTest do
 
   import ExUnit.CaptureIO
 
-  test "RLM benchmark task writes a passing DSEx-vs-DSPy artifact" do
+  test "RLM task writes honest T0 deterministic contract evidence" do
     out_dir = tmp_dir("rlm-benchmark")
 
     capture_io(fn ->
@@ -21,7 +21,11 @@ defmodule RLMBenchmarkArtifactTest do
     artifact = path |> File.read!() |> Jason.decode!()
 
     assert artifact["summary"]["all_passing"]
-    assert artifact["summary"]["full_rlm_benchmark_parity"]
+    assert artifact["evidence_tier"] == "t0_contract_replay"
+    assert artifact["summary"]["operational_contract_replay"]
+    refute artifact["summary"]["full_rlm_benchmark_parity"]
+    refute artifact["summary"]["paper_protocol_complete"]
+    refute Map.has_key?(artifact["summary"], "uncertainty")
     assert artifact["summary"]["approaches"]["rlm"]["accuracy"] == 1.0
 
     rows = Map.new(artifact["rows"], &{&1["id"], &1})

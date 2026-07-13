@@ -202,4 +202,79 @@ defmodule LiveProviderE2ETest do
 
     assert DSEx.Prediction.get(prediction, :answer) == 3
   end
+
+  test "live provider drives CodeAct through the BEAM-safe sandbox" do
+    program =
+      DSEx.code_act("question -> answer", [],
+        lm: live_lm(max_completion_tokens: 100),
+        adapter: DSEx.Adapter.JSON,
+        config: [json_retries: 1],
+        max_iters: 2
+      )
+
+    assert {:ok, prediction} =
+             DSEx.call(program, %{
+               question: "Return JSON with program exactly \"20 + 22\" and no tool."
+             })
+
+    assert DSEx.get(prediction, :answer) == 42
+  end
+
+  test "live provider drives ReActV2 native submit" do
+    program =
+      DSEx.react_v2(
+        DSEx.signature(
+          "question -> answer",
+          "Call submit with answer exactly Paris. Do not call any other tool."
+        ),
+        [],
+        lm: live_lm(max_completion_tokens: 100),
+        max_iters: 1
+      )
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    assert DSEx.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
+    assert DSEx.get(prediction, :termination_reason) in [:submit, :forced_submit]
+  end
+
+  test "live provider drives symbolic RLM code with observable budget" do
+    program =
+      DSEx.rlm(
+        DSEx.signature(
+          "question -> answer",
+          "Use the persistent Elixir environment. Return reasoning and code that assigns the answer to a variable, then calls submit with answer exactly Paris."
+        ),
+        lm: live_lm(max_completion_tokens: 100),
+        adapter: DSEx.Adapter.JSON,
+        max_iterations: 2,
+        max_llm_calls: 2
+      )
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    assert DSEx.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
+    assert prediction.metadata.rlm.sub_lm_calls <= 2
+    assert prediction.metadata.rlm.iterations <= 2
+    assert is_list(prediction.metadata.rlm_trace)
+    assert Enum.any?(prediction.metadata.rlm_trace, &(&1.action == :submit))
+  end
+
+  test "live provider RLM code invokes a real sub-LM from the environment" do
+    program =
+      DSEx.rlm(
+        DSEx.signature(
+          "question -> answer",
+          "Return reasoning and Elixir code. The code must call llm_query with a prompt asking for the one-word capital of France, assign its result, and submit that exact result as answer."
+        ),
+        lm: live_lm(max_completion_tokens: 160),
+        sub_lm: live_lm(max_completion_tokens: 40),
+        adapter: DSEx.Adapter.JSON,
+        max_iterations: 2,
+        max_llm_calls: 1
+      )
+
+    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    assert prediction.metadata.rlm.sub_lm_calls == 1, inspect(prediction, pretty: true)
+    assert String.contains?(to_string(DSEx.get(prediction, :answer)), "Paris")
+    assert Enum.any?(prediction.metadata.rlm_trace, &(&1.action == :submit))
+  end
 end

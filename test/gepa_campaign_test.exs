@@ -1,7 +1,7 @@
 defmodule GepaCampaignTest do
   use ExUnit.Case, async: false
 
-  test "DSEx GEPA campaign writes partial dsex_gepa rows that merge into full evidence" do
+  test "DSEx GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
     dataset_root = tmp_dir("gepa-campaign-data")
     upstream_dir = tmp_dir("gepa-campaign-upstream")
     rows_dir = tmp_dir("gepa-campaign-rows")
@@ -20,7 +20,11 @@ defmodule GepaCampaignTest do
         seeds: [0, 1],
         generations: 1,
         pricing_source: "test provider usage export",
-        token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
+        token_cost:
+          explicit_costs(
+            DSEx.BenchmarkTruth.GepaReplicationContract.required_families(),
+            [0, 1]
+          ),
         source_commits: %{
           "dspy" => "stanfordnlp/dspy@abcdef1",
           "dsex" => "deepfates/dsex@abcdef2",
@@ -37,6 +41,8 @@ defmodule GepaCampaignTest do
              is_map(get_in(row, ["results", "dsex_gepa"])) and
                get_in(row, ["results", "dsex_gepa", "source"]) =~ "DSEx GEPA campaign runner" and
                is_map(row["dataset"]) and
+               row["dataset"]["scope"] == "full" and
+               row["dataset"]["split_counts"] == %{"train" => 2, "dev" => 2, "test" => 2} and
                is_map(row["token_cost"]) and
                row["seed_variance"]["seeds"] == [0, 1]
            end)
@@ -45,28 +51,32 @@ defmodule GepaCampaignTest do
     assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
     assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
     assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
+    assert get_in(hover, ["dataset", "retrieval", "verified"]) == true
+    assert get_in(hover, ["dataset", "retrieval", "implementation"]) == "dsex_local_bm25"
     assert get_in(hover, ["results", "dsex_gepa", "score"]) == 1.0
 
     Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-    Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
-      "--from-gepa-artifact",
-      upstream_dir,
-      "--dsex-input",
-      result.out_path,
-      "--campaign-id",
-      "gepa-campaign-test",
-      "--artifact-model",
-      "gpt-41-mini",
-      "--out",
-      final_dir
-    ])
+    assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
+      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        "--from-gepa-artifact",
+        upstream_dir,
+        "--dsex-input",
+        result.out_path,
+        "--campaign-id",
+        "gepa-campaign-test",
+        "--artifact-model",
+        "gpt-41-mini",
+        "--out",
+        final_dir
+      ])
+    end
 
     [path] = Path.wildcard(Path.join(final_dir, "gepa-replication-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
 
-    assert artifact["summary"]["full_gepa_replication"]
-    assert DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(artifact)
+    refute artifact["summary"]["full_gepa_replication"]
+    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(artifact)
   end
 
   test "DSEx GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
@@ -98,6 +108,7 @@ defmodule GepaCampaignTest do
                      model: "openai:gpt-4.1-mini-2025-04-14",
                      reflection_model: "openai:gpt-5",
                      out_dir: rows_dir,
+                     families: ["hoverBench"],
                      seeds: [0],
                      generations: 1,
                      pricing_source: "test provider usage export",
@@ -112,24 +123,323 @@ defmodule GepaCampaignTest do
                  end
   end
 
+  test "DSEx GEPA campaign can write resumable partial family rows" do
+    dataset_root = tmp_dir("gepa-campaign-partial-data")
+    rows_dir = tmp_dir("gepa-campaign-partial-rows")
+    write_dataset_root!(dataset_root)
+
+    result =
+      DSEx.BenchmarkTruth.GepaCampaign.run(
+        dataset_root: dataset_root,
+        campaign_id: "gepa-campaign-partial-test",
+        model: "openai:gpt-4.1-mini-2025-04-14",
+        reflection_model: "openai:gpt-5",
+        out_dir: rows_dir,
+        families: ["AIMEBench"],
+        seeds: [0, 1],
+        generations: 1,
+        pricing_source: "test provider usage export",
+        token_cost: explicit_costs(["AIMEBench"], [0, 1]),
+        source_commits: %{
+          "dspy" => "stanfordnlp/dspy@abcdef1",
+          "dsex" => "deepfates/dsex@abcdef2",
+          "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+        },
+        lm: static_gold_lm()
+      )
+
+    assert %{"summary" => summary, "rows" => [%{"family" => "AIMEBench"}]} =
+             File.read!(result.out_path) |> Jason.decode!()
+
+    assert summary["partial"]
+    assert summary["families"] == ["AIMEBench"]
+    assert summary["max_concurrency"] == 1
+
+    [row] = result.report["rows"]
+    assert row["token_cost"]["usd"] == 0.02
+    assert row["token_cost"]["input_tokens"] == 200
+    assert Enum.map(row["token_cost"]["breakdown"], & &1["seed"]) == [0, 1]
+  end
+
+  test "DSEx GEPA campaign rejects one fallback cost tuple for multiple seeds" do
+    dataset_root = tmp_dir("gepa-campaign-ambiguous-cost-data")
+    rows_dir = tmp_dir("gepa-campaign-ambiguous-cost-rows")
+    write_dataset_root!(dataset_root)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        seeds: [0, 1],
+        token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50}
+      )
+
+    assert_raise ArgumentError, ~r/require token_cost keyed by family and seed/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    end
+  end
+
+  test "DSEx GEPA campaign rejects unknown partial family names" do
+    dataset_root = tmp_dir("gepa-campaign-unknown-family")
+    rows_dir = tmp_dir("gepa-campaign-unknown-family-rows")
+    write_dataset_root!(dataset_root)
+
+    assert_raise ArgumentError, ~r/unknown DSEx GEPA campaign families: MissingBench/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(
+        dataset_root: dataset_root,
+        campaign_id: "gepa-campaign-unknown-family-test",
+        model: "openai:gpt-4.1-mini-2025-04-14",
+        reflection_model: "openai:gpt-5",
+        out_dir: rows_dir,
+        families: ["MissingBench"],
+        pricing_source: "test provider usage export",
+        token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
+        source_commits: %{
+          "dspy" => "stanfordnlp/dspy@abcdef1",
+          "dsex" => "deepfates/dsex@abcdef2",
+          "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+        },
+        lm: static_gold_lm()
+      )
+    end
+  end
+
+  test "DSEx GEPA campaign resumes completed seeds without calling the LM again" do
+    dataset_root = tmp_dir("gepa-campaign-resume-data")
+    rows_dir = tmp_dir("gepa-campaign-resume-rows")
+    write_dataset_root!(dataset_root)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+    events = self()
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, opts ->
+        Agent.update(calls, &(&1 + 1))
+        static_gold_handler(messages, opts)
+      end)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-resume-test",
+        seeds: [0, 1],
+        token_cost: explicit_costs(["AIMEBench"], [0, 1]),
+        lm: lm,
+        reporter: &send(events, &1)
+      )
+
+    first = DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    first_calls = Agent.get(calls, & &1)
+    assert first_calls > 0
+
+    second = DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    assert Agent.get(calls, & &1) == first_calls
+    assert first.report["rows"] == second.report["rows"]
+    assert_received %{event: :seed_resumed, family: "AIMEBench", seed: 0}
+    assert_received %{event: :seed_resumed, family: "AIMEBench", seed: 1}
+
+    [checkpoint] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    assert %{"completed" => completed} = checkpoint |> File.read!() |> Jason.decode!()
+    assert Enum.map(completed, & &1["seed"]) == [0, 1]
+  end
+
+  test "DSEx GEPA campaign consumes and clears persisted optimizer generation state" do
+    dataset_root = tmp_dir("gepa-campaign-generation-resume-data")
+    rows_dir = tmp_dir("gepa-campaign-generation-resume-rows")
+    write_dataset_root!(dataset_root)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-generation-resume",
+        generations: 2
+      )
+
+    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    [completed] = checkpoint["completed"]
+
+    [spec | _] =
+      dataset_root
+      |> Path.join("families.json")
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.fetch!("families")
+
+    artifact =
+      DSEx.Optimize.Anything.new_artifact(:instruction, spec["instructions"])
+
+    receiver = self()
+
+    DSEx.Optimize.GEPA.optimize(
+      artifact,
+      fn _artifact, examples ->
+        %{per_example_scores: Enum.map(examples, fn _example -> 1.0 end)}
+      end,
+      examples: [:dev_one, :dev_two],
+      generations: 1,
+      mutation_fn: fn _artifact, _asi, _generation -> "checkpointed mutation" end,
+      checkpoint_fn: fn state ->
+        send(receiver, {:optimizer_checkpoint, state})
+        :ok
+      end
+    )
+
+    assert_receive {:optimizer_checkpoint, _baseline_state}
+    assert_receive {:optimizer_checkpoint, optimizer_state}
+
+    interrupted =
+      checkpoint
+      |> Map.put("completed", [])
+      |> Map.put("in_progress", %{
+        "0" => %{
+          "baseline" => %{
+            "train" => get_in(completed, ["result", "baseline_train"]),
+            "dev" => get_in(completed, ["result", "baseline_dev"]),
+            "test" => get_in(completed, ["result", "baseline_test"])
+          },
+          "optimizer_state" => optimizer_state,
+          "usage" => %{"usd" => 0.5, "input_tokens" => 50, "output_tokens" => 25}
+        }
+      })
+
+    File.write!(checkpoint_path, Jason.encode!(interrupted))
+
+    assert %{
+             "0" => %{
+               "baseline" => %{"train" => _, "dev" => _, "test" => _},
+               "optimizer_state" => %{"candidates" => candidates}
+             }
+           } = interrupted["in_progress"]
+
+    assert Enum.map(candidates, & &1["id"]) == ["baseline", "gepa-1"]
+    assert interrupted["completed"] == []
+
+    usage_lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, handler_opts ->
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{total_cost: 0.001, tokens: %{input_tokens: 10, output_tokens: 5}},
+          %{}
+        )
+
+        static_gold_handler(messages, handler_opts)
+      end)
+
+    result = opts |> Keyword.put(:lm, usage_lm) |> DSEx.BenchmarkTruth.GepaCampaign.run()
+
+    assert [
+             %{
+               "results" => %{"dsex_gepa" => %{"candidate_count" => count}},
+               "token_cost" => token_cost
+             }
+           ] =
+             result.report["rows"]
+
+    assert count >= 3
+    assert token_cost["usd"] > 0.5
+    assert token_cost["input_tokens"] > 50
+    assert token_cost["output_tokens"] > 25
+
+    resumed = checkpoint_path |> File.read!() |> Jason.decode!()
+    assert resumed["in_progress"] == %{}
+    assert Enum.map(resumed["completed"], & &1["seed"]) == [0]
+  end
+
+  test "DSEx GEPA campaign rejects checkpoint configuration and dataset mismatches" do
+    dataset_root = tmp_dir("gepa-campaign-checkpoint-identity-data")
+    rows_dir = tmp_dir("gepa-campaign-checkpoint-identity-rows")
+    write_dataset_root!(dataset_root)
+
+    opts = campaign_opts(dataset_root, rows_dir, campaign_id: "gepa-checkpoint-identity")
+    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+
+    assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(Keyword.put(opts, :generations, 2))
+    end
+
+    assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(
+        Keyword.put(opts, :execution, %{"lm" => %{"max_tokens" => 512}})
+      )
+    end
+
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    [entry] = checkpoint["completed"]
+
+    malformed =
+      checkpoint
+      |> Map.put("completed", [entry, entry])
+
+    File.write!(checkpoint_path, Jason.encode!(malformed))
+
+    assert_raise ArgumentError, ~r/duplicate seed entries in GEPA checkpoint/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    end
+
+    File.write!(checkpoint_path, Jason.encode!(checkpoint))
+
+    File.write!(
+      Path.join([dataset_root, "AIMEBench", "train.jsonl"]),
+      Jason.encode!(%{problem: "changed", answer: "42"}) <> "\n"
+    )
+
+    assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
+      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    end
+  end
+
   defp static_gold_lm do
     %{
       module: DSEx.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
-
-          cond do
-            prompt =~ "num_pii_leaked" -> %{reasoning: "No PII leaked.", num_pii_leaked: 0}
-            prompt =~ "judgment" -> %{reasoning: "Response A is good enough.", judgment: true}
-            prompt =~ "llm_request" -> %{llm_request: "redacted request", response: "gold"}
-            prompt =~ "retrieved_docs" -> %{retrieved_docs: ["gold | supporting document"]}
-            prompt =~ "response" -> %{response: "gold"}
-            true -> %{answer: "42"}
-          end
-        end
-      ]
+      opts: [handler: &static_gold_handler/2]
     }
+  end
+
+  defp static_gold_handler(messages, _opts) do
+    prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+
+    cond do
+      prompt =~ "num_pii_leaked" -> %{reasoning: "No PII leaked.", num_pii_leaked: 0}
+      prompt =~ "judgment" -> %{reasoning: "Response A is good enough.", judgment: true}
+      prompt =~ "llm_request" -> %{llm_request: "redacted request", response: "gold"}
+      prompt =~ "retrieved_docs" -> %{retrieved_docs: ["gold | supporting document"]}
+      prompt =~ "response" -> %{response: "gold"}
+      true -> %{answer: "42"}
+    end
+  end
+
+  defp campaign_opts(dataset_root, rows_dir, overrides) do
+    Keyword.merge(
+      [
+        dataset_root: dataset_root,
+        campaign_id: "gepa-campaign-checkpoint-test",
+        model: "openai:gpt-4.1-mini-2025-04-14",
+        reflection_model: "openai:gpt-5",
+        out_dir: rows_dir,
+        families: ["AIMEBench"],
+        seeds: [0],
+        generations: 1,
+        pricing_source: "test provider usage export",
+        token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
+        source_commits: %{
+          "dspy" => "stanfordnlp/dspy@abcdef1",
+          "dsex" => "deepfates/dsex@abcdef2",
+          "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+        },
+        lm: static_gold_lm()
+      ],
+      overrides
+    )
+  end
+
+  defp explicit_costs(families, seeds) do
+    Map.new(families, fn family ->
+      {family,
+       Map.new(seeds, fn seed ->
+         {Integer.to_string(seed), %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50}}
+       end)}
+    end)
   end
 
   defp write_dataset_root!(root) do
@@ -143,11 +453,13 @@ defmodule GepaCampaignTest do
             Enum.each(["train", "dev", "test"], fn split ->
               File.write!(
                 Path.join(family_dir, "#{split}.jsonl"),
-                Jason.encode!(%{
-                  user_query: "#{family} #{split} query",
-                  target_response: "gold",
-                  pii_str: "secret@example.com"
-                }) <> "\n"
+                Enum.map_join(1..2, "\n", fn index ->
+                  Jason.encode!(%{
+                    user_query: "#{family} #{split} query #{index}",
+                    target_response: "gold",
+                    pii_str: "secret#{index}@example.com"
+                  })
+                end) <> "\n"
               )
             end)
 
@@ -168,7 +480,8 @@ defmodule GepaCampaignTest do
             Enum.each(["train", "dev", "test"], fn split ->
               File.write!(
                 Path.join(family_dir, "#{split}.jsonl"),
-                campaign_record(family, split) <> "\n"
+                Enum.map_join(1..2, "\n", fn index -> campaign_record(family, split, index) end) <>
+                  "\n"
               )
             end)
 
@@ -185,52 +498,56 @@ defmodule GepaCampaignTest do
             }
           end
 
-        spec
+        Map.merge(spec, %{
+          "dataset_scope" => "full",
+          "max_per_split" => nil,
+          "split_counts" => %{"train" => 2, "dev" => 2, "test" => 2}
+        })
       end)
 
     File.write!(Path.join(root, "families.json"), Jason.encode!(%{"families" => families}))
   end
 
-  defp campaign_record("hoverBench", split) do
+  defp campaign_record("hoverBench", split, index) do
     Jason.encode!(%{
-      claim: "hoverBench #{split} claim",
+      claim: "hoverBench #{split} claim #{index}",
       supporting_facts: [%{key: "gold"}],
       label: "SUPPORTED"
     })
   end
 
-  defp campaign_record("AIMEBench", split) do
-    Jason.encode!(%{problem: "AIMEBench #{split} problem", answer: "42"})
+  defp campaign_record("AIMEBench", split, index) do
+    Jason.encode!(%{problem: "AIMEBench #{split} problem #{index}", answer: "42"})
   end
 
-  defp campaign_record("HotpotQABench", split) do
-    Jason.encode!(%{question: "HotpotQABench #{split} question", answer: "42"})
+  defp campaign_record("HotpotQABench", split, index) do
+    Jason.encode!(%{question: "HotpotQABench #{split} question #{index}", answer: "42"})
   end
 
-  defp campaign_record("IFBench", split) do
+  defp campaign_record("IFBench", split, index) do
     Jason.encode!(%{
-      prompt: "IFBench #{split} prompt",
+      prompt: "IFBench #{split} prompt #{index}",
       instruction_id_list: ["keywords:existence"],
       kwargs: [%{keywords: ["gold"]}]
     })
   end
 
-  defp campaign_record("LiveBenchMathBench", split) do
+  defp campaign_record("LiveBenchMathBench", split, index) do
     Jason.encode!(%{
-      question: "LiveBenchMathBench #{split} question",
+      question: "LiveBenchMathBench #{split} question #{index}",
       answer: "42",
       question_d: %{
         task: "aime",
         subtask: "aime_2024",
-        turns: ["LiveBenchMathBench #{split} question"],
+        turns: ["LiveBenchMathBench #{split} question #{index}"],
         ground_truth: "42",
-        question_id: "livebench-#{split}"
+        question_id: "livebench-#{split}-#{index}"
       }
     })
   end
 
-  defp campaign_record(family, split) do
-    raise ArgumentError, "unknown campaign fixture #{inspect({family, split})}"
+  defp campaign_record(family, split, index) do
+    raise ArgumentError, "unknown campaign fixture #{inspect({family, split, index})}"
   end
 
   defp campaign_contract("AIMEBench", _family_dir) do
@@ -283,9 +600,8 @@ defmodule GepaCampaignTest do
         "corpus_path" => corpus_path,
         "index_path" => index_dir,
         "corpus_checksum" =>
-          "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        "index_checksum" =>
-          "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(corpus_path),
+        "index_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(index_dir)
       }
     }
   end

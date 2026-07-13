@@ -4,6 +4,9 @@
   "claims": [
     {
       "id": "claim.product.public_api_installable",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Clean package consumption and documented public API behavior.",
       "statement": "DSEx is installable as a clean Elixir package and its documented public API works outside the source checkout.",
       "category": "package",
       "surface": ["package", "public_api", "docs"],
@@ -23,6 +26,9 @@
     },
     {
       "id": "claim.docs.livebooks_real_provider",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Executable shipped documentation plus a current provider smoke.",
       "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
       "category": "docs",
       "surface": ["README", "docs", "livebooks", "ReqLLM"],
@@ -49,6 +55,9 @@
     },
     {
       "id": "claim.dspy_semantics.golden_trace",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Normalized semantic traces; excludes byte-identical Python prompt templates.",
       "statement": "DSEx implements DSPy-shaped core semantics for signatures, Predict, ChainOfThought, typed adapters, ReAct tool traces, streaming, save/load redaction, and cache behavior.",
       "category": "dspy_parity",
       "surface": ["signature", "predict", "chain_of_thought", "adapters", "react", "streaming", "save_load", "cache"],
@@ -68,6 +77,10 @@
     },
     {
       "id": "claim.live_matched_model.full_parity",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Comparative matched-model effectiveness, not the v0.1 provider runtime contract.",
+      "limitations": ["Requires fresh complete matched-model campaigns."],
       "statement": "DSEx matches Python DSPy on live matched-model benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings.",
       "category": "dspy_parity",
       "surface": ["gsm8k", "hotpotqa", "predict", "chain_of_thought", "rag"],
@@ -87,9 +100,13 @@
     },
     {
       "id": "claim.optimizer_lift.full",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Comparative optimizer effectiveness for advanced optimizer families.",
+      "limitations": ["v0.1 guarantees deterministic optimizer contracts, not DSPy-equivalent lift."],
       "statement": "DSEx optimizer behavior has direct or intentionally-deviating evidence against DSPy for the optimizer surfaces it claims.",
       "category": "optimizer",
-      "surface": ["LabeledFewShot", "BootstrapFewShot", "RandomSearch", "COPRO", "MIPROv2", "SIMBA", "GEPA", "InstructionSearch", "BootstrapFinetune", "GRPO"],
+      "surface": ["LabeledFewShot", "BootstrapFewShot", "RandomSearch", "KNNFewShot", "BootstrapRS", "COPRO", "MIPROv2", "SIMBA", "GEPA", "InstructionSearch", "InferRules", "SignatureOptimizer", "BetterTogether", "Ensemble", "BootstrapFinetune", "GRPO", "OptimizeAnything"],
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "release_blocking": true,
@@ -106,6 +123,10 @@
     },
     {
       "id": "claim.gepa_replication.full",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Full six-family GEPA research replication.",
+      "limitations": ["Papillon and HoVer full-scope artifacts are incomplete."],
       "statement": "DSEx GEPA research claims are supported only by fresh GEPA paper-family replication artifacts that compare baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
       "category": "optimizer",
       "surface": ["GEPA", "MIPROv2", "SIMBA", "AIMEBench", "HotpotQABench", "hoverBench", "IFBench", "LiveBenchMathBench", "Papillon"],
@@ -125,6 +146,10 @@
     },
     {
       "id": "claim.rag_tools_agents.full",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Cross-system parity for advanced RAG, tool, and agent workflows.",
+      "limitations": ["v0.1 claims local contracts and selected live paths, not full upstream parity."],
       "statement": "DSEx RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load production semantics are covered by parity or DSEx-native evidence.",
       "category": "tools_agents_rag",
       "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
@@ -144,7 +169,11 @@
     },
     {
       "id": "claim.rlm.provider_free_benchmark",
-      "statement": "DSEx RLM has provider-free operational parity evidence against Python DSPy RLM on long-context benchmark-shaped tasks.",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Paper-scale RLM long-context effectiveness compared with upstream.",
+      "limitations": ["The deterministic RLM fixture lane is T0 contract replay and cannot prove effectiveness or long-context parity."],
+      "statement": "DSEx RLM effectiveness is supported by a complete paper-scale reproduction rather than scripted fixture replay.",
       "category": "rlm",
       "surface": ["rlm", "long_context", "recursive_control", "dspy_rlm"],
       "claim_type": "functional_effectiveness",
@@ -157,12 +186,16 @@
           "kind": "parity",
           "lane": "rlm_benchmark",
           "evidence": "full",
-          "threshold": "rlm-benchmark artifact reports full_rlm_benchmark_parity"
+          "threshold": "RLM artifact is T3 paper-scale evidence with a complete paper protocol"
         }
       ]
     },
     {
       "id": "claim.performance.provider_free",
+      "decision": "active_gap",
+      "release": "telos",
+      "scope": "Named-path comparative local overhead; excludes blanket speed claims.",
+      "limitations": ["No v0.1 claim that DSEx is faster than DSPy."],
       "statement": "DSEx provider-free local overhead is benchmarked against DSPy for core paths before any performance claim is made.",
       "category": "performance",
       "surface": ["signature_parse", "adapter_format_parse", "schema_validation", "evaluation", "metrics", "optimizer_scheduling", "redaction", "cache", "concurrency"],
@@ -182,6 +215,9 @@
     },
     {
       "id": "claim.protocols.production_boundaries",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Provider-compatible local protocol boundaries; excludes paid training completion.",
       "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
       "category": "operations",
       "surface": ["training_protocol", "retriever_protocol", "mcp_protocol"],

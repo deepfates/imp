@@ -72,10 +72,13 @@ defmodule DSEx.MixProject do
           "dsex.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
           "benchmark.optimizer_lift.check": :test,
+          "benchmark.instruction_optimizer.contract.check": :test,
+          "benchmark.gepa.contract.check": :test,
           "benchmark.gepa_replication.check": :test,
           "benchmark.overhead.check": :test,
           "benchmark.rag_tool_agent.check": :test,
           "benchmark.rlm.check": :test,
+          "benchmark.rlm.contract.check": :test,
           "benchmark.parity.check": :test,
           "benchmark.parity.full": :test,
           "upstream_fidelity.check": :test
@@ -122,6 +125,7 @@ defmodule DSEx.MixProject do
         Path.wildcard("lib/dsex/benchmark_truth/**/*.ex")
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
+      Path.wildcard("examples/deployment/**/*") ++
       product_docs() ++
       livebooks() ++
       [
@@ -140,9 +144,13 @@ defmodule DSEx.MixProject do
       "docs/GLOSSARY.md",
       "docs/DSEX_PHILOSOPHY.md",
       "docs/PRIOR_ART.md",
+      "docs/RESEARCH_LANDSCAPE.md",
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",
       "docs/ADVANCED.md",
+      "docs/REACT_V2_FIDELITY.md",
+      "docs/RLM_FIDELITY.md",
+      "docs/INSTRUCTION_OPTIMIZER_FIDELITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end
@@ -254,9 +262,11 @@ defmodule DSEx.MixProject do
         "benchmark.operations_stress.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
+        "benchmark.instruction_optimizer.contract.check",
         "benchmark.gepa_replication.check",
         "benchmark.rag_tool_agent.check",
         "benchmark.rlm.check",
+        "benchmark.rlm.contract.check",
         "upstream_fidelity.check"
       ],
       "upstream_fidelity.check": [
@@ -283,6 +293,12 @@ defmodule DSEx.MixProject do
       "benchmark.optimizer_lift.check": [
         "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"
       ],
+      "benchmark.instruction_optimizer.contract.check": [
+        "dsex.benchmark.instruction_optimizer_contract --out tmp/instruction-optimizer-contract"
+      ],
+      "benchmark.gepa.contract.check": [
+        "dsex.benchmark.gepa_contract --out tmp/gepa-v011-contract"
+      ],
       "benchmark.gepa_replication.check": [
         "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
       ],
@@ -292,6 +308,9 @@ defmodule DSEx.MixProject do
       "benchmark.rlm.check": [
         "dsex.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"
       ],
+      "benchmark.rlm.contract.check": [
+        "dsex.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
+      ],
       "benchmark.live_matrix": [
         "dsex.benchmark.live_matrix --in benchmarks/results/dsex-dspy-parity-campaign-*.json --out tmp/live-matrix"
       ],
@@ -299,10 +318,10 @@ defmodule DSEx.MixProject do
         "dsex.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.full": [
-        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+        "dsex.benchmark.dashboard --trace-dir tmp/golden-trace --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [
         "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

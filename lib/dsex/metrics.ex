@@ -47,11 +47,17 @@ defmodule DSEx.Metrics do
   def normalize_result(%DSEx.Prediction{} = prediction) do
     score = DSEx.Prediction.get(prediction, :score, prediction.score || 0.0)
 
+    metadata =
+      prediction
+      |> DSEx.Prediction.to_map()
+      |> Map.drop([:score, "score"])
+      |> Map.merge(prediction.metadata)
+
     %Result{
       score: numeric_score(score),
       passed?: passed?(score),
       feedback: DSEx.Prediction.get(prediction, :feedback),
-      metadata: prediction.metadata
+      metadata: metadata
     }
   end
 

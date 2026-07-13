@@ -25,7 +25,10 @@ defmodule BenchmarkCatalogTest do
     assert by_id["factuality_classification"].status == "missing"
     assert by_id["mipro_tabular"].status == "samplers_implemented_optimizer_scale_missing"
     assert by_id["mipro_scone"].status == "missing"
-    assert by_id["hover_verification"].status == "gepa_adapter_partial_retrieval_corpus_missing"
+
+    assert by_id["hover_verification"].status ==
+             "source_exact_capped_live_present_full_scale_pending"
+
     assert by_id["ifbench_instruction_following"].status == "provider_free_implemented"
     assert by_id["hard_math"].status == "provider_free_implemented"
     assert by_id["privacy_delegation"].status == "missing"
@@ -49,9 +52,13 @@ defmodule BenchmarkCatalogTest do
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
     assert "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"
+
+    assert "mix benchmark.instruction_optimizer.contract.check" in by_id["optimizer_lift"].commands
+
+    assert by_id["optimizer_lift"].next_step =~ "multi-seed"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
     assert "mix dsex.benchmark.gepa_campaign" in by_id["hover_verification"].commands
-    assert by_id["hover_verification"].next_step =~ "BM25"
+    assert by_id["hover_verification"].next_step =~ "uncapped"
     assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands
     assert "mix benchmark.truth.check" in by_id["hard_math"].commands
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"

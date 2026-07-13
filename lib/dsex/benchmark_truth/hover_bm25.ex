@@ -9,6 +9,7 @@ defmodule DSEx.BenchmarkTruth.HoverBM25 do
   defstruct [:corpus_path, :docs, :avgdl, :doc_count, :idf, :metadata, k: 24]
 
   def new(%{"corpus_path" => corpus_path} = retrieval, opts \\ []) do
+    verify_source!(retrieval)
     k = Keyword.get(opts, :k, 24)
     corpus_path = Path.expand(corpus_path)
 
@@ -31,6 +32,70 @@ defmodule DSEx.BenchmarkTruth.HoverBM25 do
       :metadata,
       Map.take(retrieval, ["kind", "source_url", "corpus_checksum", "index_checksum"])
     )
+  end
+
+  @doc false
+  def verify_source!(retrieval) when is_map(retrieval) do
+    verify_checksum!(retrieval, "corpus_path", "corpus_checksum")
+    verify_checksum!(retrieval, "index_path", "index_checksum")
+    :ok
+  end
+
+  @doc false
+  def checksum_path(path) do
+    path = Path.expand(path)
+
+    cond do
+      File.regular?(path) -> file_checksum(path)
+      File.dir?(path) -> tree_checksum(path)
+      true -> raise ArgumentError, "HoVer retrieval source not found: #{path}"
+    end
+  end
+
+  defp verify_checksum!(retrieval, path_key, checksum_key) do
+    path = retrieval[path_key] || raise ArgumentError, "HoVer retrieval missing #{path_key}"
+
+    expected =
+      case retrieval[checksum_key] do
+        "sha256:" <> digest when byte_size(digest) == 64 -> String.downcase(digest)
+        _ -> raise ArgumentError, "HoVer retrieval missing valid #{checksum_key}"
+      end
+
+    actual = checksum_path(path)
+
+    unless actual == expected do
+      raise ArgumentError,
+            "HoVer retrieval #{checksum_key} mismatch for #{Path.expand(path)}: expected #{expected}, got #{actual}"
+    end
+  end
+
+  defp file_checksum(path) do
+    path
+    |> File.stream!([], 1_048_576)
+    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
+  end
+
+  defp tree_checksum(root) do
+    root
+    |> Path.join("**/*")
+    |> Path.wildcard(match_dot: true)
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.sort()
+    |> Enum.reduce(:crypto.hash_init(:sha256), fn path, context ->
+      relative = path |> Path.relative_to(root) |> String.replace("\\", "/")
+      context = :crypto.hash_update(context, relative <> <<0>>)
+
+      context =
+        path
+        |> File.stream!([], 1_048_576)
+        |> Enum.reduce(context, &:crypto.hash_update(&2, &1))
+
+      :crypto.hash_update(context, <<0>>)
+    end)
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
   end
 
   @impl true
@@ -124,5 +189,88 @@ defmodule DSEx.BenchmarkTruth.HoverBM25 do
       a an and are as at be but by for from has have in is it its of on or
       that the this to was were will with
     ])
+  end
+end
+
+defmodule DSEx.BenchmarkTruth.HoverBM25.UpstreamPython do
+  @moduledoc false
+
+  @behaviour DSEx.Module
+
+  defstruct [:gepa_root, :python, :metadata, k: 24]
+
+  def new(retrieval, opts \\ []) do
+    DSEx.BenchmarkTruth.HoverBM25.verify_source!(retrieval)
+    corpus_path = Map.fetch!(retrieval, "corpus_path")
+    index_path = Map.fetch!(retrieval, "index_path")
+
+    gepa_root =
+      Keyword.get(opts, :gepa_root) || System.get_env("DSEX_GEPA_ROOT") ||
+        infer_gepa_root!(corpus_path)
+
+    python = Keyword.get(opts, :python) || System.get_env("DSEX_GEPA_PYTHON") || "python3"
+
+    unless File.exists?(Path.expand(corpus_path)) do
+      raise ArgumentError, "HoVer BM25 corpus not found: #{corpus_path}"
+    end
+
+    unless File.exists?(Path.expand(index_path)) do
+      raise ArgumentError, "HoVer BM25 index not found: #{index_path}"
+    end
+
+    %__MODULE__{
+      gepa_root: Path.expand(gepa_root),
+      python: python,
+      k: Keyword.get(opts, :k, 24),
+      metadata: Map.take(retrieval, ["kind", "source_url", "corpus_checksum", "index_checksum"])
+    }
+  end
+
+  @impl true
+  def call(%__MODULE__{} = retriever, inputs) do
+    claim =
+      inputs
+      |> Map.new()
+      |> Map.get(:claim, Map.get(Map.new(inputs), "claim", ""))
+
+    case search(retriever, claim) do
+      {:ok, docs} -> {:ok, DSEx.Prediction.new(retrieved_docs: docs)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def search(%__MODULE__{} = retriever, query) do
+    script = Path.expand("scripts/hover_bm25_upstream_eval.py")
+
+    args = [
+      script,
+      "--gepa-root",
+      retriever.gepa_root,
+      "--query",
+      query,
+      "--k",
+      Integer.to_string(retriever.k)
+    ]
+
+    case System.cmd(retriever.python, args, stderr_to_stdout: true) do
+      {json, 0} ->
+        {:ok, json |> Jason.decode!() |> Map.fetch!("retrieved_docs")}
+
+      {output, status} ->
+        {:error, {:hover_upstream_bm25_failed, status, output}}
+    end
+  end
+
+  defp infer_gepa_root!(corpus_path) do
+    marker = Path.join(["gepa_artifact", "benchmarks", "hover", "wiki.abstracts.2017.jsonl"])
+    expanded = Path.expand(corpus_path)
+    marker_suffix = Path.join(["", marker])
+
+    if String.ends_with?(expanded, marker_suffix) do
+      String.replace_suffix(expanded, marker_suffix, "")
+    else
+      raise ArgumentError,
+            "could not infer GEPA root from HoVer corpus path #{inspect(corpus_path)}; set DSEX_GEPA_ROOT"
+    end
   end
 end

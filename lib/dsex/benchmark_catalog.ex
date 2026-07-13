@@ -194,9 +194,12 @@ defmodule DSEx.BenchmarkCatalog do
       metric: "lift over baseline with trial/cost trace",
       tiers: ["smoke", "research"],
       status: "provider_free_implemented",
-      commands: ["mix benchmark.optimizer_lift.check"],
+      commands: [
+        "mix benchmark.optimizer_lift.check",
+        "mix benchmark.instruction_optimizer.contract.check"
+      ],
       next_step:
-        "Scale natural classification, QA, retrieval, and instruction-following lift lanes to larger sampled datasets when release policy requires model-quality evidence."
+        "Keep the pinned structural differential fresh, then run held-out multi-seed MIPROv2 and SIMBA effectiveness campaigns under matched provider and metric budgets."
     },
     %{
       id: "gepa_paper_replication",
@@ -258,10 +261,10 @@ defmodule DSEx.BenchmarkCatalog do
       task_shape: "claim + corpus/evidence -> supported/refuted label",
       metric: "label accuracy plus retrieval recall where available",
       tiers: ["smoke", "research", "full"],
-      status: "gepa_adapter_partial_retrieval_corpus_missing",
+      status: "source_exact_capped_live_present_full_scale_pending",
       commands: ["mix dsex.benchmark.gepa_dataset", "mix dsex.benchmark.gepa_campaign"],
       next_step:
-        "Pin or reproduce the upstream wiki.abstracts.2017 BM25 retriever before claiming source-exact HoVer campaign parity."
+        "Run uncapped HoVer GEPA campaign rows with source-exact upstream BM25 retrieval and positive usage accounting."
     },
     %{
       id: "ifbench_instruction_following",

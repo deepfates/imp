@@ -241,6 +241,8 @@ The library avoids persisting provider secrets in saved program JSON.
 Security-sensitive defaults:
 
 - saved provider clients load without serialized credentials
+- saved training-job checkpoints contain lifecycle state and checksums but no
+  transport or API key; both must be reinjected explicitly on load
 - custom provider endpoint configuration must be explicit and must not silently
   bind ambient provider credentials
 - provider clients use real transport by default; tests use injectable
@@ -267,6 +269,26 @@ Operational advice:
 
 DSEx emits redacted `:telemetry` events through `DSEx.Telemetry`.
 
+Use `DSEx.trace/2` to capture selected redacted runtime events around one
+operation without installing telemetry handlers manually. Use
+`DSEx.inspect_history/2` for a redacted rendering of recent signature-shaped
+turns. Long-running optimizer UIs can call
+`DSEx.subscribe_optimizer_progress/1` and detach the returned handle with
+`DSEx.unsubscribe_optimizer_progress/1`.
+
+`DSEx.disable_logging/0` and `DSEx.enable_logging/0` control only logs emitted
+through `DSEx.Observability.log/3`; they do not mutate the host application's
+global Logger level. Log metadata is redacted before emission.
+
+## Deployment Reference
+
+`examples/deployment` is a packaged OTP reference application. It loads a
+checksummed program artifact during supervised startup, resolves callback names
+through `DSEx.Saving.Registry`, obtains provider configuration from runtime
+environment variables, and serves calls through a GenServer. The accompanying
+test executes the same server with a deterministic LM and registry-backed
+artifact before release.
+
 Stable event families:
 
 - `[:dsex, :lm, :start | :stop]`
@@ -276,7 +298,7 @@ Stable event families:
 - `[:dsex, :tool, :start | :stop | :exception]`
 - `[:dsex, :retriever, :start | :stop | :exception]`
 - `[:dsex, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
-- `[:dsex, :training, :submit | :refresh, :start | :stop | :exception]`
+- `[:dsex, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
 - `[:dsex, :optimizer, :trial, :start | :stop | :exception]`
 
 Event metadata is redacted before dispatch. Secret-shaped values and common
@@ -309,7 +331,7 @@ Before tagging:
 3. `mix integration.check` passes.
 4. `mix protocol.check` passes.
 5. `mix quality.check` passes.
-6. `LIVE_PROVIDER=1 mix live.check` passes, or release notes explicitly say it was skipped.
+6. `LIVE_PROVIDER=1 mix live.check` passes for the exact candidate commit.
 7. Any production claim about paid training, external retrievers, or external
    MCP servers is backed by dedicated external-service tests.
 8. Docs and Livebooks match the current public API.
