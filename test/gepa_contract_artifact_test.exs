@@ -165,7 +165,8 @@ defmodule GEPAContractArtifactTest do
   defp front(dimension, winners), do: %{"dimension" => dimension, "winners" => winners}
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    nonce = Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
+    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{nonce}")
     File.mkdir_p!(path)
     path
   end
