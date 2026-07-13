@@ -1,0 +1,210 @@
+defmodule DSEx.ObservabilityInspectionTest do
+  use ExUnit.Case, async: false
+
+  alias DSEx.Observability.{Inspection, Status}
+  alias DSEx.Optimizer.Report, as: OptimizerReport
+
+  @secret "sk-test-secret-1234567890"
+
+  test "prediction inspection combines provider, tool, RLM, and optimizer history" do
+    report =
+      OptimizerReport.new(%{
+        optimizer: :gepa,
+        best_score: 0.9,
+        candidate_count: 1,
+        candidates: [%{id: "candidate-1", prompt: @secret}]
+      })
+
+    prediction =
+      DSEx.Prediction.new(
+        %{
+          answer: "Paris",
+          history: [%{tool: :lookup, input: %{token: @secret}, result: "Paris"}]
+        },
+        score: 1.0,
+        metadata: %{
+          trace: %{messages: [%{role: :user, content: @secret}], raw: "Paris"},
+          rlm_trace: [%{iteration: 1, action: :tool, input: @secret, output: "Paris"}],
+          optimizer_report: report
+        }
+      )
+
+    assert %Inspection{kind: :prediction, status: :ok} =
+             inspection = DSEx.Observability.inspect_artifact(prediction)
+
+    assert Enum.map(inspection.entries, & &1.source) == [
+             :provider,
+             :tool,
+             :rlm,
+             :optimizer_candidate
+           ]
+
+    assert inspection.summary.fields == ["answer", "history"]
+    assert inspection.summary.entry_count == 4
+    assert Kernel.inspect(inspection) =~ "[REDACTED]"
+    refute Kernel.inspect(inspection) =~ @secret
+  end
+
+  test "provider inspection mirrors recent prompt, messages, outputs, and timestamps" do
+    history = [
+      %{timestamp: "old", prompt: "old prompt", outputs: ["old output"]},
+      %{
+        timestamp: "new",
+        messages: [%{role: :user, content: @secret}],
+        outputs: [
+          %{text: "answer", tool_calls: [%{name: "lookup", arguments: %{token: @secret}}]}
+        ]
+      }
+    ]
+
+    inspection = DSEx.Observability.inspect_artifact({:provider, history}, limit: 1)
+
+    assert %Inspection{kind: :provider, summary: %{call_count: 2}} = inspection
+    assert [%{source: :provider, sequence: 1, payload: payload}] = inspection.entries
+    assert payload.timestamp == "new"
+    assert payload.messages == [%{role: :user, content: "[REDACTED]"}]
+    refute Kernel.inspect(payload) =~ @secret
+
+    rendered = DSEx.inspect_history(history, limit: 1)
+    assert rendered =~ ~s("kind": "provider")
+    assert rendered =~ "new"
+    refute rendered =~ "old prompt"
+    refute rendered =~ @secret
+  end
+
+  test "streaming status accumulators are inspectable immutable artifacts" do
+    provider = %DSEx.Streaming.Messages.StatusMessageProvider{
+      messages: [
+        %DSEx.Streaming.Messages.StatusMessage{
+          message: "calling provider",
+          metadata: %{authorization: @secret}
+        }
+      ]
+    }
+
+    assert %Inspection{kind: :status_stream, summary: %{message_count: 1}} =
+             inspection = DSEx.Observability.inspect_artifact(provider)
+
+    assert [%{source: :status, payload: payload}] = inspection.entries
+    assert payload.message == "calling provider"
+    assert payload.metadata.authorization == "[REDACTED]"
+  end
+
+  test "tool and RLM inspections are explicit and size bounded" do
+    tool = DSEx.Observability.inspect_artifact({:tool, [%{tool: :search, result: "ok"}]})
+    assert [%{source: :tool, payload: %{tool: :search}}] = tool.entries
+
+    rlm =
+      DSEx.Observability.inspect_artifact(
+        {:rlm, [%{iteration: 1, action: :load, output: String.duplicate("x ", 500)}]},
+        max_bytes: 100
+      )
+
+    assert %{event_count: 1, actions: %{load: 1}} = rlm.summary
+    assert [%{payload: %{truncated: true, bytes: bytes, fingerprint: fingerprint}}] = rlm.entries
+    assert bytes > 100
+    assert is_integer(fingerprint)
+  end
+
+  test "optimizer reports expose candidate and error status without internal parsing" do
+    report =
+      OptimizerReport.new(%{
+        optimizer: :mipro_v2,
+        best_score: 0.7,
+        candidate_count: 2,
+        candidates: [%{id: 1}],
+        errors: [%{candidate_id: 2, reason: :timeout, authorization: @secret}]
+      })
+
+    inspection = DSEx.Observability.inspect_artifact(report)
+    assert inspection.status == :with_errors
+    assert inspection.summary.error_count == 1
+    refute Kernel.inspect(inspection) =~ @secret
+
+    assert %Status{
+             state: :failed,
+             phase: :optimizer,
+             completed: 2,
+             total: 2,
+             metadata: %{error_count: 1}
+           } = DSEx.Observability.status(report)
+  end
+
+  test "optimizer subscriptions emit both compatible telemetry and normalized status" do
+    subscription = DSEx.Observability.subscribe_optimizer()
+
+    DSEx.Telemetry.execute(
+      [:dsex, :optimizer, :progress],
+      %{completed_generations: 2, total_generations: 5, candidate_count: 3},
+      %{optimizer: :gepa, api_key: @secret}
+    )
+
+    assert_receive {:dsex_optimizer_progress, [:dsex, :optimizer, :progress], _, _}
+
+    assert_receive {:dsex_status,
+                    %Status{
+                      state: :running,
+                      phase: "optimizer_progress",
+                      completed: 2,
+                      total: 5,
+                      metadata: metadata
+                    }}
+
+    refute Kernel.inspect(metadata) =~ @secret
+    assert DSEx.Observability.unsubscribe_optimizer(subscription) == :ok
+  end
+
+  test "captured telemetry renders deterministically as redacted JSON" do
+    trace =
+      DSEx.Observability.trace(
+        fn ->
+          DSEx.Telemetry.span([:dsex, :tool], %{tool: :lookup, password: @secret}, fn ->
+            {:ok, "Paris"}
+          end)
+        end,
+        events: [[:dsex, :tool, :start], [:dsex, :tool, :stop]]
+      )
+
+    first = DSEx.Observability.render_inspection(trace)
+    second = DSEx.Observability.render_inspection(trace)
+
+    assert first == second
+    assert first =~ ~s("kind": "trace")
+    assert first =~ "[REDACTED]"
+    refute first =~ @secret
+  end
+
+  test "redaction can only be disabled explicitly" do
+    inspection =
+      DSEx.Observability.inspect_artifact({:provider, [%{prompt: @secret, outputs: ["ok"]}]},
+        redact: false
+      )
+
+    assert Kernel.inspect(inspection) =~ @secret
+  end
+
+  test "callbacks redact measurements even when telemetry bypasses DSEx.Telemetry" do
+    trace =
+      DSEx.Observability.trace(
+        fn -> :telemetry.execute([:dsex, :tool, :stop], %{authorization: @secret}, %{}) end,
+        events: [[:dsex, :tool, :stop]]
+      )
+
+    assert [%{payload: %{measurements: %{authorization: "[REDACTED]"}}}] =
+             DSEx.Observability.inspect_artifact(trace).entries
+  end
+
+  test "unsupported artifact errors do not echo credentials" do
+    assert_raise ArgumentError, fn ->
+      DSEx.Observability.inspect_artifact({:unknown, %{api_key: @secret}})
+    end
+
+    try do
+      DSEx.Observability.inspect_artifact({:unknown, %{api_key: @secret}})
+    rescue
+      error ->
+        assert Exception.message(error) =~ "[REDACTED]"
+        refute Exception.message(error) =~ @secret
+    end
+  end
+end

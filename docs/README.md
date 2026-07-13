@@ -62,6 +62,8 @@ credentials are loaded.
 
 ## Operate It
 
+- [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
+  normalized status, progress subscriptions, and trace capture.
 - [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
   redaction, security posture, package shape, and release discipline.
 
