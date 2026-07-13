@@ -10,6 +10,7 @@ defmodule DSEx.Application do
     children = [
       DSEx.Settings,
       DSEx.Cache,
+      DSEx.Tasks.Admission,
       {Task.Supervisor, name: DSEx.TaskSupervisor},
       {Task.Supervisor, name: DSEx.UnlinkedTaskSupervisor}
     ]

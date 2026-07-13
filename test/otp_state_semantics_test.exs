@@ -60,6 +60,83 @@ defmodule OTPStateSemanticsTest do
     assert DSEx.settings().lm == :global
   end
 
+  test "settings contexts snapshot all effective values at entry" do
+    DSEx.configure(lm: :before, callbacks: [:before])
+    parent = self()
+
+    mutator =
+      Task.async(fn ->
+        receive do
+          :mutate ->
+            DSEx.configure(lm: :after, callbacks: [:after], added_later: true)
+            send(parent, :mutated)
+        end
+      end)
+
+    captured =
+      DSEx.context([tenant: :outer], fn ->
+        send(mutator.pid, :mutate)
+        assert_receive :mutated
+
+        DSEx.context([request_id: :inner], fn ->
+          DSEx.settings()
+        end)
+      end)
+
+    Task.await(mutator)
+    assert captured.lm == :before
+    assert captured.callbacks == [:before]
+    assert captured.tenant == :outer
+    assert captured.request_id == :inner
+    refute Map.has_key?(captured, :added_later)
+    assert DSEx.settings().lm == :after
+  end
+
+  test "DSEx tasks snapshot complete effective settings at submission" do
+    DSEx.configure(lm: :global_before, callbacks: [:before], stable: :before)
+    parent = self()
+
+    task =
+      DSEx.context([lm: :outer], fn ->
+        DSEx.context([tenant: :inner], fn ->
+          DSEx.Tasks.async_nolink(fn ->
+            send(parent, {:snapshot_worker_ready, self()})
+
+            receive do
+              :read_snapshot ->
+                base = DSEx.settings()
+                nested = DSEx.context([tenant: :worker_nested], &DSEx.settings/0)
+                {base, nested}
+            end
+          end)
+        end)
+      end)
+
+    assert_receive {:snapshot_worker_ready, worker_pid}
+    DSEx.configure(lm: :global_after, callbacks: [:after], stable: :after, added_later: true)
+    send(worker_pid, :read_snapshot)
+
+    assert {base, nested} = Task.await(task)
+    assert base.lm == :outer
+    assert base.callbacks == [:before]
+    assert base.stable == :before
+    assert base.tenant == :inner
+    refute Map.has_key?(base, :added_later)
+    assert nested.tenant == :worker_nested
+    assert nested.lm == :outer
+    assert nested.callbacks == [:before]
+  end
+
+  test "async_max_workers requires a positive integer" do
+    assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
+      DSEx.configure(async_max_workers: 0)
+    end
+
+    assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
+      DSEx.context([async_max_workers: :many], fn -> :ok end)
+    end
+  end
+
   test "supervisor restarts settings with defaults after a crash" do
     DSEx.configure(lm: :temporary)
     old = Process.whereis(DSEx.Settings)

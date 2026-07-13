@@ -13,8 +13,16 @@ defmodule DSEx.Settings do
   use Agent
 
   @name __MODULE__
-  @defaults %{lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil, callbacks: []}
+  @defaults %{
+    lm: nil,
+    adapter: DSEx.Adapter.Chat,
+    retriever: nil,
+    callbacks: [],
+    async_max_workers: 8
+  }
   @context_key :dsex_context_stack
+  @snapshot_key :dsex_settings_snapshot
+  @unset :dsex_settings_unset
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
@@ -48,13 +56,20 @@ defmodule DSEx.Settings do
 
   """
   def get do
-    ensure_started()
-    global = Agent.get(@name, & &1)
+    base =
+      case Process.get(@snapshot_key, @unset) do
+        @unset ->
+          ensure_started()
+          Agent.get(@name, & &1)
+
+        snapshot ->
+          snapshot
+      end
 
     @context_key
     |> Process.get([])
     |> Enum.reverse()
-    |> Enum.reduce(global, &Map.merge(&2, &1))
+    |> Enum.reduce(base, &Map.merge(&2, &1))
   end
 
   @doc """
@@ -81,10 +96,10 @@ defmodule DSEx.Settings do
   @doc """
   Runs a zero-arity function with process-local settings overrides.
 
-  Overrides are stack-based and restored even if the function raises. Child
-  processes do not inherit ordinary process-local settings automatically; use
-  DSEx-owned task helpers when you want context propagation through supervised
-  async work.
+  Each context snapshots all effective settings at entry, applies its overrides,
+  and restores the previous snapshot even if the function raises. Child processes
+  do not inherit process-local settings automatically; use DSEx-owned task helpers
+  when you want snapshot propagation through supervised async work.
 
       iex> DSEx.Settings.context([lm: :outer], fn ->
       ...>   DSEx.Settings.context([adapter: :inner], fn ->
@@ -105,14 +120,21 @@ defmodule DSEx.Settings do
 
   """
   def context(opts, fun) when is_function(fun, 0) do
-    settings = normalize_settings(opts, "DSEx.context/2")
-    previous = Process.get(@context_key, [])
-    Process.put(@context_key, [settings | previous])
+    settings =
+      opts
+      |> normalize_settings("DSEx.context/2")
+      |> then(&Map.merge(get(), &1))
+
+    previous_snapshot = Process.get(@snapshot_key, @unset)
+    previous_context = Process.get(@context_key, @unset)
+    Process.put(@snapshot_key, settings)
+    Process.put(@context_key, [])
 
     try do
       fun.()
     after
-      Process.put(@context_key, previous)
+      restore_process_value(@snapshot_key, previous_snapshot)
+      restore_process_value(@context_key, previous_context)
     end
   end
 
@@ -128,6 +150,24 @@ defmodule DSEx.Settings do
 
   @doc false
   def context_stack, do: Process.get(@context_key, [])
+
+  @doc false
+  def snapshot, do: get()
+
+  @doc false
+  def with_snapshot(snapshot, fun) when is_map(snapshot) and is_function(fun, 0) do
+    previous_snapshot = Process.get(@snapshot_key, @unset)
+    previous_context = Process.get(@context_key, @unset)
+    Process.put(@snapshot_key, snapshot)
+    Process.put(@context_key, [])
+
+    try do
+      fun.()
+    after
+      restore_process_value(@snapshot_key, previous_snapshot)
+      restore_process_value(@context_key, previous_context)
+    end
+  end
 
   @doc false
   def with_context_stack(stack, fun) when is_list(stack) and is_function(fun, 0) do
@@ -170,7 +210,15 @@ defmodule DSEx.Settings do
   end
 
   defp normalize_settings(settings, context) when is_list(settings) or is_map(settings) do
-    Enum.reduce(settings, %{}, fn
+    settings
+    |> Enum.reduce(%{}, fn
+      {:async_max_workers, value}, normalized when is_integer(value) and value > 0 ->
+        Map.put(normalized, :async_max_workers, value)
+
+      {:async_max_workers, value}, _normalized ->
+        raise ArgumentError,
+              "#{context} expects :async_max_workers to be a positive integer; got: #{inspect(value)}"
+
       {key, value}, normalized ->
         Map.put(normalized, key, value)
 
@@ -184,4 +232,7 @@ defmodule DSEx.Settings do
     raise ArgumentError,
           "#{context} expects settings as a map or settings pair list; got: #{inspect(settings)}"
   end
+
+  defp restore_process_value(key, @unset), do: Process.delete(key)
+  defp restore_process_value(key, value), do: Process.put(key, value)
 end
