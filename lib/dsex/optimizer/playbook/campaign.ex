@@ -59,22 +59,17 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
     handler = CampaignBudget.attach_req_llm(budget)
 
     try do
-      lm =
-        config.model
-        |> DSEx.req_llm(
-          api_key: api_key,
-          temperature: 0,
-          max_tokens: config.max_output_tokens,
-          cache: false
-        )
-        |> then(&%BudgetedLM{inner: &1, budget: budget})
+      evaluator_lm = budgeted_lm(config.model, api_key, config.max_output_tokens, budget)
+
+      proposer_lm =
+        budgeted_lm(config.model, api_key, config.max_proposal_output_tokens, budget)
 
       baseline = baseline_playbook(dataset)
-      program = equation_program(lm, baseline)
+      program = equation_program(evaluator_lm, baseline)
 
       optimizer =
         PlaybookOptimizer.new(
-          proposer: proposer(lm, budget, config, dataset),
+          proposer: proposer(proposer_lm, budget, config, dataset),
           evaluator: evaluator(budget, config),
           reservations: reservations(config),
           budget: usage_limit(limits, config.model),
@@ -139,7 +134,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         DSEx.signature(
           "current_strategy, training_evidence -> strategy",
           """
-          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 400 bytes. It must not contain any example equation, answer, dataset row ID, or copied number sequence. Preserve the original task contract, add only general operator-search and exact-verification guidance, and return strategy text only.
+          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 550 characters in at most three short sentences. It must not contain any example equation, answer, dataset row ID, or copied number sequence. Preserve the original task contract, add only general operator-search and exact-verification guidance, and return strategy text only.
           """
         )
 
@@ -166,7 +161,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
             strategy == "" ->
               {:error, :empty_strategy, usage}
 
-            byte_size(strategy) > 400 ->
+            byte_size(strategy) > 600 ->
               {:error, {:strategy_too_large, byte_size(strategy)}, usage}
 
             contains_training_instance?(strategy, request.rows) ->
@@ -295,6 +290,18 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       config: [native_json_schema: true]
     )
     |> DSEx.with_playbook(playbook)
+  end
+
+  defp budgeted_lm(model, api_key, max_tokens, budget) do
+    inner =
+      DSEx.req_llm(model,
+        api_key: api_key,
+        temperature: 0,
+        max_tokens: max_tokens,
+        cache: false
+      )
+
+    %BudgetedLM{inner: inner, budget: budget}
   end
 
   defp baseline_playbook(dataset) do
