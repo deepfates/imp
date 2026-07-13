@@ -3,6 +3,7 @@ defmodule DSEx.ProgramAccess do
 
   alias DSEx.Predict.{
     Assertions,
+    Avatar,
     BestOfN,
     ChainOfThought,
     CodeAct,
@@ -24,6 +25,7 @@ defmodule DSEx.ProgramAccess do
   def predict(%Assertions{program: program}), do: predict(program)
   def predict(%ReAct{react: predict}), do: predict
   def predict(%ReActV2{react: predict}), do: predict
+  def predict(%Avatar{actor: predict}), do: predict
   def predict(_program), do: nil
 
   def task_signature(%Predict{signature: signature}), do: signature
@@ -34,6 +36,7 @@ defmodule DSEx.ProgramAccess do
   def task_signature(%Assertions{program: program}), do: task_signature(program)
   def task_signature(%ReAct{signature: signature}), do: signature
   def task_signature(%ReActV2{signature: signature}), do: signature
+  def task_signature(%Avatar{signature: signature}), do: signature
   def task_signature(%RLM{signature: signature}), do: signature
   def task_signature(_program), do: nil
 
@@ -106,6 +109,8 @@ defmodule DSEx.ProgramAccess do
   def put_lm(%ReActV2{react: predict} = program, lm),
     do: %{program | react: put_lm(predict, lm)}
 
+  def put_lm(%Avatar{} = program, lm), do: Avatar.with_lm(program, lm)
+
   def put_lm(%RLM{} = program, lm),
     do: %{program | lm: lm, sub_lm: lm, dynamic_lm?: false, dynamic_sub_lm?: false}
 
@@ -128,6 +133,8 @@ defmodule DSEx.ProgramAccess do
 
   defp program_type(%module{}), do: module
   defp program_type(program), do: program
+
+  def get_metadata(%Avatar{metadata: metadata}, key), do: Map.get(metadata, key)
 
   def get_metadata(program, key) do
     case predict(program) do
@@ -162,6 +169,9 @@ defmodule DSEx.ProgramAccess do
   def put_metadata(%ReActV2{react: predict} = program, key, value),
     do: %{program | react: put_metadata(predict, key, value)}
 
+  def put_metadata(%Avatar{metadata: metadata} = program, key, value),
+    do: %{program | metadata: Map.put(metadata, key, value)}
+
   def put_metadata(program, _key, _value), do: program
 
   def merge_metadata(%Predict{metadata: existing} = program, metadata) when is_map(metadata) do
@@ -189,6 +199,9 @@ defmodule DSEx.ProgramAccess do
 
   def merge_metadata(%ReActV2{react: predict} = program, metadata),
     do: %{program | react: merge_metadata(predict, metadata)}
+
+  def merge_metadata(%Avatar{metadata: existing} = program, metadata),
+    do: %{program | metadata: Map.merge(existing, metadata)}
 
   def merge_metadata(program, _metadata), do: program
 end

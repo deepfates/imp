@@ -51,6 +51,7 @@ defmodule DSEx do
 
   alias DSEx.Predict.{
     Assertions,
+    Avatar,
     BestOfN,
     ChainOfThought,
     CodeAct,
@@ -250,6 +251,9 @@ defmodule DSEx do
 
   @doc "Creates a native-tool-aware ReActV2 program with structured history and forced submit."
   def react_v2(signature, tools, opts \\ []), do: ReActV2.new(signature, tools, opts)
+
+  @doc "Creates a bounded action-history Avatar actor with a reserved Finish action."
+  def avatar(signature, tools, opts \\ []), do: Avatar.new(signature, tools, opts)
 
   @doc "Creates a named tool for ReAct programs and agents."
   def tool(name, description, run, opts \\ []), do: Tool.new(name, description, run, opts)
