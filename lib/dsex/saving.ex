@@ -1166,6 +1166,8 @@ defmodule DSEx.Saving do
       "retry_backoff_ms" -> :retry_backoff_ms
       "max_completion_tokens" -> :max_completion_tokens
       "receive_timeout" -> :receive_timeout
+      "cache" -> :cache
+      "rollout_id" -> :rollout_id
       "provider_options" -> :provider_options
       other -> other
     end

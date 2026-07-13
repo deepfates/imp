@@ -104,6 +104,53 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     end
   end
 
+  test "ambiguous evaluation dispatch intent is never replayed" do
+    root = tmp_dir("ambiguous-evaluation")
+    dataset = write_aime_dataset!(root)
+    checkpoint_path = Path.join(root, "checkpoints/preflight-test-AIMEBench-17.json")
+    {:ok, captured} = Agent.start_link(fn -> nil end)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          Agent.update(calls, &(&1 + 1))
+
+          if is_nil(Agent.get(captured, & &1)) do
+            Agent.update(captured, fn _ -> File.read!(checkpoint_path) end)
+          end
+
+          %{reasoning: "computed", answer: "1"}
+        end
+      ]
+    }
+
+    opts = campaign_opts(root, dataset, lm, arms: [:baseline])
+    InstructionOptimizerCampaign.run(opts)
+    File.write!(checkpoint_path, Agent.get(captured, & &1))
+    Agent.update(calls, fn _ -> 0 end)
+
+    assert_raise ArgumentError, ~r/durable dispatch intent has an ambiguous outcome/, fn ->
+      InstructionOptimizerCampaign.run(opts)
+    end
+
+    assert Agent.get(calls, & &1) == 0
+  end
+
+  test "checkpointed optimizer predictor config survives JSON loading" do
+    program =
+      "question -> answer"
+      |> DSEx.chain_of_thought(config: [cache: false, rollout_id: 7])
+      |> DSEx.Saving.dump()
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> DSEx.Saving.load()
+
+    [predictor] = DSEx.ProgramParameters.predictors(program)
+    assert predictor.predictor.config == [cache: false, rollout_id: 7]
+  end
+
   defp campaign_opts(root, dataset, lm, extra) do
     base = [
       dataset_root: root,

@@ -251,13 +251,28 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp evaluate_split(program, examples, metric, split, progress, persist, budget) do
     key = split <> "_rows"
+    intent_key = split <> "_in_flight"
     rows = progress[key] || []
+
+    if progress[intent_key] do
+      intent = progress[intent_key]
+
+      raise ArgumentError,
+            "cannot safely resume instruction optimizer #{split} row #{intent["index"]}: a durable dispatch intent has an ambiguous outcome"
+    end
 
     rows =
       examples
       |> Enum.drop(length(rows))
       |> Enum.reduce(rows, fn example, rows ->
         reject_if_exhausted!(budget)
+        intent = %{"index" => length(rows), "status" => "dispatch_intent"}
+
+        progress
+        |> Map.put("phase", split)
+        |> Map.put(key, rows)
+        |> Map.put(intent_key, intent)
+        |> persist.()
 
         [trajectory] =
           TrajectoryRunner.run(program, [example], metric, max_concurrency: 1, timeout: :infinity)
@@ -273,13 +288,14 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
         progress
         |> Map.put("phase", split)
         |> Map.put(key, updated)
+        |> Map.delete(intent_key)
         |> persist.()
 
         updated
       end)
 
     score = if rows == [], do: 0.0, else: Enum.sum(Enum.map(rows, & &1["score"])) / length(rows)
-    {score, Map.put(progress, key, rows)}
+    {score, progress |> Map.put(key, rows) |> Map.delete(intent_key)}
   end
 
   defp reject_if_exhausted!(budget) do
