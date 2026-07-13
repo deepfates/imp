@@ -100,6 +100,80 @@ Reports preserve population score histories, batch indices, bucket ranks,
 candidate identities, trajectory and evaluation accounting, final candidates,
 seed, upstream release, and commit.
 
+## Durable Run-Level Resume
+
+Both optimizers return their latest JSON-safe checkpoint in
+`report.metadata.resume_state` and accept it on a later compile invocation as
+`resume_state:`. A synchronous arity-one `checkpoint_fn:` can persist each
+completed boundary. Reports set `metadata.resumed` when the invocation loaded a
+checkpoint and set `metadata.run_status` to `:paused` or `:complete`.
+
+MIPROv2's `compile/5` accepts `max_trials:`, the maximum number of **new**
+objective trials for that invocation. It emits once after bootstrapping,
+instruction proposal, and baseline evaluation, then after every completed
+trial. Resume restores proposal artifacts, categorical policy and observations,
+RNG state, full-evaluation history, counters, and errors. Setup and completed
+trials are not repeated. A trial is the atomic boundary, so interruption during
+a minibatch or promoted full evaluation retries that entire trial.
+
+SIMBA's `compile/5` accepts invocation-level `max_steps:` independently of the
+optimizer's total `max_steps`. It emits the initial state, every completed search
+step, and every completed finalist evaluation. Resume restores population and
+winning-program snapshots, policy and random state, minibatch order/cursor,
+logs, counters, errors, and finalist progress. Completed steps and finalist
+evaluations are not repeated; interrupted in-flight step or finalist evaluation
+work is retried. Finalist evaluation starts only after the configured total
+search-step budget has been reached.
+
+For either optimizer, `max_trials: 0` or invocation-level `max_steps: 0` can
+load and return an already paused boundary without advancing search. The
+returned checkpoint remains resumable across later invocations; the configured
+total budget, not the per-invocation cap, determines completion.
+
+### Rebinding And Trust Boundary
+
+Checkpoints contain data, not executable runtime state. Functions, processes,
+ports, references, and live LM clients are not restored from the payload.
+MIPROv2 reconstructs candidate programs from the supplied runtime program plus
+checkpointed instruction/demo choices. SIMBA applies checkpointed instructions
+and demos to the supplied runtime program. The current optimizer metric and the
+program/optimizer LM callbacks therefore provide the executable behavior after
+resume; closure captures such as process handles or credentials may be rebound
+without embedding them in the artifact.
+
+Resume validates a compatibility digest covering the program/predictor shape,
+resolved datasets, search configuration, and relevant runtime identities, then
+validates a SHA-256 payload checksum and structural invariants. A different
+dataset, program shape, or search budget is rejected. These checks detect
+mismatch and accidental corruption; they are not keyed signatures, proof of
+origin, encryption, or authorization to consume untrusted input. A checkpoint
+may contain instructions, demos, model outputs, scores, and errors. Hosts must
+treat it as sensitive, accept it only from trusted runs, and implement atomic
+durable storage inside `checkpoint_fn:` when process-crash recovery is required.
+
+```elixir
+checkpoint_path = Path.join(System.tmp_dir!(), "simba-run.json")
+
+persist = fn checkpoint ->
+  temporary_path = checkpoint_path <> ".tmp"
+  File.write!(temporary_path, Jason.encode!(checkpoint))
+  File.rename!(temporary_path, checkpoint_path)
+end
+
+paused =
+  DSEx.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
+    max_steps: 2,
+    checkpoint_fn: persist
+  )
+
+resume_state = checkpoint_path |> File.read!() |> Jason.decode!()
+
+DSEx.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
+  resume_state: resume_state,
+  checkpoint_fn: persist
+)
+```
+
 ## Evidence Tiers
 
 - **T0 local behavior:** deterministic unit and failure contracts.

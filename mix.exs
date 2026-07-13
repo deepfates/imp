@@ -76,6 +76,7 @@ defmodule DSEx.MixProject do
           "benchmark.gepa.contract.check": :test,
           "benchmark.gepa_replication.check": :test,
           "benchmark.overhead.check": :test,
+          "benchmark.search.check": :test,
           "benchmark.rag_tool_agent.check": :test,
           "benchmark.rlm.check": :test,
           "benchmark.rlm.contract.check": :test,
@@ -296,6 +297,9 @@ defmodule DSEx.MixProject do
       ],
       "benchmark.overhead.check": [
         "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+      ],
+      "benchmark.search.check": [
+        "dsex.benchmark.search --iterations 10 --max-concurrency 2 --work-ms 10 --out tmp/search-benchmark"
       ],
       "benchmark.optimizer_lift.check": [
         "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"

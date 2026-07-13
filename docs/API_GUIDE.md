@@ -273,6 +273,71 @@ knn = DSEx.knn(1, trainset, field: "question")
 DSEx.nearest(knn, %{question: "France"})
 ```
 
+## Request-Local Inference Search
+
+`DSEx.Predict.Search.run/3` is the shared request-local engine for evaluating
+explicitly identified inference candidates. It is an advanced module API, not
+an optimizer and not a globally registered service. Every call owns its
+candidate list, budget admission, tasks, outcomes, and provenance; no search
+state survives the request.
+
+```elixir
+alias DSEx.Predict.Search
+alias DSEx.Predict.Search.Candidate
+
+candidates = [
+  Candidate.new(:direct, %{answer: "Paris"}, %{calls: 1, cost_units: 1}),
+  Candidate.new(:reasoned, %{answer: "Paris"}, %{calls: 1, cost_units: 2})
+]
+
+result =
+  Search.run(
+    candidates,
+    fn candidate, context ->
+      {:ok, candidate.value, score(candidate.value, context.outcomes)}
+    end,
+    mode: :sequential,
+    threshold: 1.0,
+    tie_policy: :first,
+    budget: %{calls: 2, cost_units: 3}
+  )
+```
+
+Candidate ids must be non-nil and unique. Projected budgets are
+multidimensional non-negative maps. A finite budget admits only the longest
+ordered prefix that fits; once a candidate exceeds any dimension, that
+candidate and all later candidates are marked `:budget_exceeded`. The result
+contains the selected `best` successful outcome, ordered `outcomes`,
+full-list `provenance`, `stop_reason`, admitted projected budget, and the
+executed outcomes' projected budget in `observed_budget`. The latter is not
+provider billing or measured token usage. Record actual provider usage
+separately when an evaluator can observe it.
+
+The evaluator returns `{:ok, value, metric_result}` or `{:error, reason}`.
+Metric results use normal `DSEx.Metrics` normalization. Exceptions, throws,
+task exits, invalid returns, and timeouts become isolated failed outcomes.
+Selection is highest score with explicit `:first` or `:last` tie policy;
+threshold comparison is inclusive.
+
+`:sequential` mode supplies prior ordered outcomes to the next evaluator and
+stops before starting later candidates after reaching the threshold.
+`:concurrent` mode uses supervised tasks with `max_concurrency:` and cannot
+provide causal prior outcomes to concurrently evaluated candidates. A
+threshold can cancel work that has not completed, but already completed
+speculation remains in outcomes and projected-budget accounting. Result and
+provenance order always follows candidate order, not task completion order.
+
+`DSEx.Predict.BestOfN` and `DSEx.Predict.Refine` both delegate attempt
+execution and metric selection to this engine in sequential, first-tie mode.
+BestOfN creates one projected `attempts: 1` candidate per rollout, stops at its
+threshold, selects the highest-scoring prediction, and optionally computes
+comparison feedback over successful predictions. Refine also creates one
+candidate per rollout, but uses prior successful outcomes to build ordered
+history and inject the next `hint_`; after exhaustion it returns the best score
+rather than simply the last attempt. Their facade constructors intentionally
+do not expose Search concurrency or budget options, because Refine feedback is
+causal and both public modules retain their existing sequential semantics.
+
 ## Chain Of Thought
 
 ```elixir
@@ -484,7 +549,90 @@ Use:
 | `InstructionSearch` / `InferRules` / `COPRO` | Instructions or signature-level rules are the likely bottleneck. |
 | `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
 | `GEPA` | You want DSEx-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
-| `BetterTogether` | You want to sequence prompt optimization and provider training. |
+| `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
+| `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
+
+MIPROv2 and SIMBA can pause at durable run boundaries and resume from the
+JSON-safe checkpoint attached to the optimizer report:
+
+```elixir
+checkpoint_path = Path.join(System.tmp_dir!(), "mipro-run.json")
+
+persist = fn checkpoint ->
+  temporary_path = checkpoint_path <> ".tmp"
+  File.write!(temporary_path, Jason.encode!(checkpoint))
+  File.rename!(temporary_path, checkpoint_path)
+end
+
+paused =
+  DSEx.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
+    max_trials: 2,
+    checkpoint_fn: persist
+  )
+
+checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+
+resumed =
+  DSEx.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
+    resume_state: checkpoint,
+    checkpoint_fn: persist
+  )
+```
+
+For SIMBA, use the corresponding five-argument call and invocation-level
+`max_steps:` option:
+
+```elixir
+DSEx.Optimizer.SIMBA.compile(simba, program, trainset, devset,
+  max_steps: 1,
+  checkpoint_fn: persist
+)
+```
+
+`max_trials:` and the compile-time `max_steps:` cap only the new work performed
+by that invocation; the total run budgets remain `num_trials` and the SIMBA
+optimizer's configured `max_steps`. Reports expose `metadata.run_status` as
+`:paused` or `:complete`, `metadata.resumed`, progress counters, and the latest
+`metadata.resume_state`. MIPROv2 checkpoints after setup and each completed
+trial. SIMBA checkpoints before search, after each completed step, and after
+each completed finalist evaluation. Completed boundaries are not replayed;
+interrupted in-flight work is retried.
+
+Checkpoints do not serialize executable callbacks or live LM clients. Resume
+with the original program shape, datasets, and search configuration, while
+supplying the current metric and LM callbacks through the runtime optimizer and
+program. This deliberately allows callback captures such as process handles or
+credentials to be rebound. Compatibility hashes and payload checksums reject
+accidental mismatch or mutation, but they are not signatures, authentication,
+encryption, or a sandbox. Checkpoints can contain instructions, demos, outputs,
+and error details: store them as sensitive data, accept them only from a trusted
+run, and make `checkpoint_fn` persistence atomic when crash durability matters.
+
+Build an Avatar through the facade, then optimize its actor instruction with
+the dedicated optimizer:
+
+```elixir
+lookup = DSEx.tool(:lookup, "Look up a country capital", &lookup_country/1)
+avatar = DSEx.avatar("question -> answer", [lookup], lm: lm, max_iters: 3)
+
+avatar_optimizer =
+  DSEx.Optimizer.Avatar.new(DSEx.exact_match(:answer),
+    comparator_lm: feedback_lm,
+    rewrite_lm: rewrite_lm,
+    max_iters: 2
+  )
+
+compiled_avatar = DSEx.optimize(avatar, avatar_optimizer, trainset)
+```
+
+Avatar records typed action observations, treats unknown, denied, and failed
+tool calls as recoverable observations, and invokes a typed finalizer on
+`Finish` or iteration exhaustion. AvatarOptimizer keeps a rewritten instruction
+only when its trainset score improves. BetterTogether accepts named optimizers
+and atom, string, or repeated list strategies; with validation it retains the
+highest-scoring baseline/prefix candidate, and without validation it returns
+the latest successful prefix. Its provider-backed weight step still does not
+claim provider lifecycle completion or trained-model rebinding.
 
 Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as

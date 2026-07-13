@@ -25,7 +25,44 @@ defmodule DSEx.UpstreamFidelityTest do
     assert by_id["programming.contracts"].status == :conformant
     assert by_id["models.runtime"].status == :elixir_native_equivalent
     assert by_id["models.normalized_runtime_prerelease"].status == :tracking
-    assert by_id["agents.react_family"].status == :conformant
+    react = by_id["agents.react_family"]
+    assert react.status == :elixir_native_equivalent
+    assert react.rationale =~ "provider-native function calls"
+    assert react.rationale =~ "reserved submit tool"
+    assert react.rationale =~ "fails fast"
+
+    weights = by_id["optimization.weights"]
+    assert weights.status == :gap
+    assert "Avatar" in weights.upstream
+    assert "AvatarOptimizer" in weights.upstream
+    assert DSEx.Predict.Avatar in weights.dsex
+    assert DSEx.Optimizer.Avatar in weights.dsex
+
+    assert Enum.any?(weights.invariants, &String.starts_with?(&1, "Avatar runs"))
+    assert Enum.any?(weights.invariants, &String.starts_with?(&1, "AvatarOptimizer contrasts"))
+
+    assert Enum.any?(
+             weights.invariants,
+             &String.starts_with?(&1, "BetterTogether composes arbitrary named and repeated")
+           )
+
+    assert Enum.any?(
+             weights.invariants,
+             &String.starts_with?(&1, "BetterTogether evaluates the baseline")
+           )
+
+    refute Enum.any?(weights.evidence.missing, &String.contains?(&1, "implementation"))
+    refute Enum.any?(weights.evidence.missing, &String.contains?(&1, "sequencing"))
+    refute Enum.any?(weights.evidence.missing, &String.contains?(&1, "candidate-selection"))
+
+    assert MapSet.new(weights.evidence.missing) ==
+             MapSet.new([
+               "external-provider weight-training execution evidence",
+               "BetterTogether provider lifecycle completion and trained-model rebinding",
+               "matched Avatar and AvatarOptimizer effectiveness",
+               "matched BetterTogether effectiveness"
+             ])
+
     assert by_id["optimization.instructions"].status == :gap
     assert by_id["product.release"].status == :gap
 
@@ -40,13 +77,16 @@ defmodule DSEx.UpstreamFidelityTest do
 
   test "every stable surface has exactly one owning ledger row" do
     stable_rows = Enum.reject(DSEx.UpstreamFidelity.surfaces(), &(&1.disposition == :tracking))
+    manifest = DSEx.UpstreamFidelity.stable_api_manifest()
 
     surfaces = Enum.flat_map(stable_rows, & &1.upstream)
     duplicates = surfaces -- Enum.uniq(surfaces)
 
     assert duplicates == []
     assert length(surfaces) >= 75
-    assert length(DSEx.UpstreamFidelity.stable_api_manifest()) == 69
+    assert length(manifest) == 71
+    assert "Avatar" in manifest
+    assert "AvatarOptimizer" in manifest
   end
 
   test "gap and native-equivalent rows carry accountable decisions" do

@@ -38,6 +38,8 @@ defmodule DSEx.UpstreamFidelity do
   @stable_api_manifest """
                        Adapter
                        Audio
+                       Avatar
+                       AvatarOptimizer
                        BestOfN
                        BetterTogether
                        BootstrapFewShot
@@ -263,7 +265,9 @@ defmodule DSEx.UpstreamFidelity do
       category: :tools_agents,
       upstream: ["ReAct", "ReActV2", "CodeAct", "ProgramOfThought", "PythonInterpreter"],
       source: "dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py",
-      disposition: :conformant,
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "DSEx ReAct uses provider-native function calls with a reserved submit tool and fails fast on unknown tools, denied calls, malformed calls, and execution errors; upstream ReAct uses action fields, a finish control tool, and observation-based continuation. ReActV2 and code execution retain their separately documented DSEx contracts.",
       dsex: [
         DSEx.Predict.ReAct,
         DSEx.Predict.ReActV2,
@@ -272,7 +276,8 @@ defmodule DSEx.UpstreamFidelity do
         DSEx.Sandbox
       ],
       invariants: [
-        "each module preserves upstream control-loop and termination semantics",
+        "ReAct exposes provider-native function tools and terminates through a reserved submit tool",
+        "ReAct fails fast on invalid or failed tool calls instead of claiming upstream observation-and-continue semantics",
         "ReActV2 native history/tool-call semantics are either implemented or explicitly excluded",
         "code execution uses a documented Elixir security boundary"
       ],
@@ -463,30 +468,52 @@ defmodule DSEx.UpstreamFidelity do
     %{
       id: "optimization.weights",
       category: :optimization,
-      upstream: ["BootstrapFinetune", "GRPO", "BetterTogether", "Ensemble"],
-      source: "dspy/teleprompt/bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py",
+      upstream: [
+        "Avatar",
+        "AvatarOptimizer",
+        "BootstrapFinetune",
+        "GRPO",
+        "BetterTogether",
+        "Ensemble"
+      ],
+      source:
+        "dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py",
       disposition: :gap,
       ticket: "de-9x31",
       dsex: [
+        DSEx.Predict.Avatar,
+        DSEx.Optimizer.Avatar,
         DSEx.Optimizer.BootstrapFinetune,
         DSEx.Optimizer.GRPO,
         DSEx.Optimizer.BetterTogether,
         DSEx.Optimizer.Ensemble
       ],
       invariants: [
-        "training jobs execute through a real provider lifecycle",
-        "BetterTogether composes arbitrary named optimizers by strategy",
-        "compiled programs bind trained model state portably"
+        "Avatar runs a bounded typed-action loop with recoverable tool observations and a reserved Finish action",
+        "AvatarOptimizer contrasts positive and negative trajectories, rewrites actor instructions, and retains only improving candidates",
+        "BetterTogether composes arbitrary named and repeated optimizer steps in strategy order",
+        "BetterTogether evaluates the baseline and every successful prefix, selects the best validated prefix with earlier ties winning, and otherwise returns the latest successful prefix",
+        "BetterTogether stops at the first failed optimizer step and returns the best candidate found so far",
+        "provider-backed weight steps complete training and rebind trained model state portably"
       ],
       evidence: %{
         tests: [
+          "test/avatar_test.exs",
+          "test/avatar_optimizer_test.exs",
+          "test/better_together_test.exs",
           "test/provider_training_lifecycle_test.exs",
-          "test/protocol_training/provider_training_lifecycle_test.exs"
+          "test/protocol_training/provider_training_lifecycle_test.exs",
+          "test/public_surface_test.exs"
         ],
-        docs: ["docs/ADVANCED.md"],
+        docs: [
+          "docs/ADVANCED.md",
+          "docs/COVERAGE_MATRIX.md",
+          "docs/UPSTREAM_FIDELITY_AUDIT.md"
+        ],
         missing: [
-          "real training lifecycle",
-          "trained model rebinding",
+          "external-provider weight-training execution evidence",
+          "BetterTogether provider lifecycle completion and trained-model rebinding",
+          "matched Avatar and AvatarOptimizer effectiveness",
           "matched BetterTogether effectiveness"
         ]
       }

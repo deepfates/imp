@@ -84,12 +84,26 @@ owner tickets in the generated map.
 ## Current Frontier
 
 The generated map is the current source of truth. At this writing, the core
-programming contracts, basic modules, adapters, typed tools, refinement, and
-evaluation rows are conformant. ReqLLM/process context and retrieval are
-explicit Elixir-native equivalents. Multimodal quality, the ReAct family, RLM
-research evidence, every optimizer family, runtime operations, observability,
-persistence/deployment, the learning path, and release stewardship remain
-blocking gaps.
+programming contracts, basic modules, adapters, typed tools, refinement,
+evaluation, runtime operations, observability, and persistence/deployment rows
+are conformant. ReqLLM/process context, retrieval, and the ReAct family are
+explicit Elixir-native equivalents. ReAct specifically uses provider-native
+function calls, a reserved `submit` tool, and fail-fast tool errors rather than
+claiming DSPy's action-field, finish-tool, observation-and-continue semantics.
+
+Multimodal quality, RLM research evidence, instruction, GEPA, and weight
+optimizer fidelity, the learning path, and release stewardship remain blocking
+gaps. The weight-optimizer row includes implemented `DSEx.Predict.Avatar` and
+`DSEx.Optimizer.Avatar` surfaces with bounded typed-action execution and
+feedback-driven instruction optimization. BetterTogether implements arbitrary
+named and repeated optimizer sequences, evaluates the baseline and each
+successful prefix, selects the best validated prefix with stable tie handling,
+returns the latest successful prefix without validation, and stops on the first
+failed step.
+
+That row remains red only because external-provider weight-training execution,
+BetterTogether provider lifecycle completion and trained-model rebinding, and
+matched Avatar/AvatarOptimizer/BetterTogether effectiveness are not proven.
 
 The gate stays red until those rows are implemented and their evidence is
 strong enough to change their disposition. Closing a ticket or adding a module

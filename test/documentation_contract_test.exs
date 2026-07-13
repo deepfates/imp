@@ -278,6 +278,19 @@ defmodule DocumentationContractTest do
     assert parity =~ "GEPA-style optimizer rows"
   end
 
+  test "instruction optimizer docs define durable run-level resume boundaries" do
+    api = File.read!("docs/API_GUIDE.md")
+    fidelity = File.read!("docs/INSTRUCTION_OPTIMIZER_FIDELITY.md")
+
+    assert api =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
+    assert api =~ "Completed boundaries are not replayed"
+    assert api =~ "not signatures, authentication,\nencryption, or a sandbox"
+    assert fidelity =~ "## Durable Run-Level Resume"
+    assert fidelity =~ "A trial is the atomic boundary"
+    assert fidelity =~ "every completed finalist evaluation"
+    assert fidelity =~ "### Rebinding And Trust Boundary"
+  end
+
   test "embedding documentation names the deterministic baseline and provider shape contract" do
     api = File.read!("docs/API_GUIDE.md")
     coverage = File.read!("docs/COVERAGE_MATRIX.md")

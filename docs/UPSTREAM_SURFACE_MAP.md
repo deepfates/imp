@@ -2,8 +2,8 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 22
-Conformant: 11
-Elixir-native equivalents: 2
+Conformant: 10
+Elixir-native equivalents: 3
 Tracking: 2
 Gaps: 7
 Invalid evidence: 0
@@ -21,14 +21,14 @@ Passing: false
 | adapters.structured_io | adapters | conformant | Adapter, ChatAdapter, JSONAdapter, XMLAdapter, TwoStepAdapter |  |
 | primitives.multimodal | primitives | gap | Image, Audio, File, Code, Document, Citations, Reasoning | de-ezg9 |
 | tools.typed_calls | tools_agents | conformant | Tool, ToolCalls, ToolCallResults, MCP |  |
-| agents.react_family | tools_agents | conformant | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |  |
+| agents.react_family | tools_agents | elixir_native_equivalent | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |  |
 | agents.rlm | tools_agents | gap | RLM, SandboxSerializable, Recursive Language Models paper | de-c7ui |
 | composition.refinement | programming_model | conformant | BestOfN, Refine, Assertions |  |
 | evaluation.metrics | evaluation | conformant | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |  |
 | optimization.few_shot | optimization | conformant | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
 | optimization.instructions | optimization | gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
 | optimization.gepa | optimization | gap | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
-| optimization.weights | optimization | gap | BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
+| optimization.weights | optimization | gap | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
 | optimization.anything | optimization | tracking | optimize_anything, arbitrary text artifacts | de-16fo |
 | retrieval.data | retrieval | elixir_native_equivalent | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
 | runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
@@ -212,14 +212,17 @@ Missing evidence or behavior:
 
 ### `agents.react_family`
 
-Status: `conformant`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py`
 
 DSEx modules: `DSEx.Predict.ReAct`, `DSEx.Predict.ReActV2`, `DSEx.Predict.CodeAct`, `DSEx.Predict.ProgramOfThought`, `DSEx.Sandbox`
+Elixir-native rationale: DSEx ReAct uses provider-native function calls with a reserved submit tool and fails fast on unknown tools, denied calls, malformed calls, and execution errors; upstream ReAct uses action fields, a finish control tool, and observation-based continuation. ReActV2 and code execution retain their separately documented DSEx contracts.
+
 Semantic invariants:
 
-- each module preserves upstream control-loop and termination semantics
+- ReAct exposes provider-native function tools and terminates through a reserved submit tool
+- ReAct fails fast on invalid or failed tool calls instead of claiming upstream observation-and-continue semantics
 - ReActV2 native history/tool-call semantics are either implemented or explicitly excluded
 - code execution uses a documented Elixir security boundary
 
@@ -392,25 +395,35 @@ Missing evidence or behavior:
 
 Status: `gap`
 
-Upstream source: `dspy/teleprompt/bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
+Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
-DSEx modules: `DSEx.Optimizer.BootstrapFinetune`, `DSEx.Optimizer.GRPO`, `DSEx.Optimizer.BetterTogether`, `DSEx.Optimizer.Ensemble`
+DSEx modules: `DSEx.Predict.Avatar`, `DSEx.Optimizer.Avatar`, `DSEx.Optimizer.BootstrapFinetune`, `DSEx.Optimizer.GRPO`, `DSEx.Optimizer.BetterTogether`, `DSEx.Optimizer.Ensemble`
 Semantic invariants:
 
-- training jobs execute through a real provider lifecycle
-- BetterTogether composes arbitrary named optimizers by strategy
-- compiled programs bind trained model state portably
+- Avatar runs a bounded typed-action loop with recoverable tool observations and a reserved Finish action
+- AvatarOptimizer contrasts positive and negative trajectories, rewrites actor instructions, and retains only improving candidates
+- BetterTogether composes arbitrary named and repeated optimizer steps in strategy order
+- BetterTogether evaluates the baseline and every successful prefix, selects the best validated prefix with earlier ties winning, and otherwise returns the latest successful prefix
+- BetterTogether stops at the first failed optimizer step and returns the best candidate found so far
+- provider-backed weight steps complete training and rebind trained model state portably
 
 Executable evidence:
 
+- test: `test/avatar_test.exs`
+- test: `test/avatar_optimizer_test.exs`
+- test: `test/better_together_test.exs`
 - test: `test/provider_training_lifecycle_test.exs`
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
+- test: `test/public_surface_test.exs`
 - docs: `docs/ADVANCED.md`
+- docs: `docs/COVERAGE_MATRIX.md`
+- docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
 
 Missing evidence or behavior:
 
-- real training lifecycle
-- trained model rebinding
+- external-provider weight-training execution evidence
+- BetterTogether provider lifecycle completion and trained-model rebinding
+- matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether effectiveness
 
 ### `optimization.anything`

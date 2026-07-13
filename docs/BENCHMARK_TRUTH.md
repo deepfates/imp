@@ -162,6 +162,27 @@ pretending every local path is faster. Speed claims must name the exact case and
 artifact they come from; slower paths such as cache miss overhead are evidence
 for focused optimization work, not for marketing claims.
 
+## Run Shared Inference-Time Search Evidence
+
+```sh
+mix benchmark.search.check
+```
+
+This provider-free source-checkout lane runs the same natural answer-candidate
+fixture through sequential and bounded-concurrent `DSEx.Predict.Search`. Its
+deterministic checks cover selected answer and quality, candidate-order
+provenance, admitted projected budget, executed outcomes' projected budget,
+and the observed concurrency bound. The artifact labels projected cost units
+separately from actual provider cost; no provider is called, so billed usage is
+unavailable rather than inferred.
+
+The artifact also records latency sample distributions and the observed median
+ratio. Those fields are measurements for the checkout, runtime, scheduler, and
+configured synthetic work only. A concurrent speedup is not required and does
+not participate in artifact pass/fail status. This lane therefore complements
+the focused runtime tests without making a flaky wall-time release assertion or
+a live model-quality, provider-latency, or provider-cost claim.
+
 ## Run Optimizer Lift Parity
 
 ```sh

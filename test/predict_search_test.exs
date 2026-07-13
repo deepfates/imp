@@ -235,7 +235,7 @@ defmodule DSEx.Predict.SearchTest do
                     %{result: :ok}}
   end
 
-  test "provider-free natural task artifact compares sequential and bounded concurrent search" do
+  test "provider-free natural task records comparable sequential and concurrent measurements" do
     candidates =
       [
         {"four", "4", 0.5},
@@ -265,13 +265,16 @@ defmodule DSEx.Predict.SearchTest do
 
     artifact = %{
       sequential: summary(sequential, sequential_us),
-      bounded_concurrent: summary(concurrent, concurrent_us)
+      bounded_concurrent: summary(concurrent, concurrent_us),
+      latency_is_release_assertion: false
     }
 
     assert artifact.sequential.quality == artifact.bounded_concurrent.quality
     assert artifact.sequential.answer == artifact.bounded_concurrent.answer
     assert artifact.sequential.projected_cost == artifact.bounded_concurrent.projected_cost
-    assert artifact.bounded_concurrent.latency_us < artifact.sequential.latency_us
+    refute artifact.latency_is_release_assertion
+    assert artifact.sequential.latency_us > 0
+    assert artifact.bounded_concurrent.latency_us > 0
   end
 
   defp summary(result, latency_us) do

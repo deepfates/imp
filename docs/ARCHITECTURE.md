@@ -86,7 +86,32 @@ All major program structs implement the `DSEx.Module` behaviour.
 | `DSEx.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
 | `DSEx.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
 | `DSEx.Predict.Refine` | Repeated attempts with reward threshold. |
+| `DSEx.Predict.Search` | Request-local candidate execution, selection, budgets, and provenance shared by BestOfN and Refine. |
 | `DSEx.Predict.Parallel` | Parallel map helpers. |
+
+### Request-Local Search Boundary
+
+`DSEx.Predict.Search` is an immutable orchestration boundary for one inference
+request. Callers supply explicit `Search.Candidate` values and an evaluator;
+the engine does not read optimizer state, cache search results, register a
+process, or persist state between calls. BestOfN and Refine translate their
+rollouts into candidates and delegate scoring, threshold stopping, deterministic
+tie selection, failure isolation, and provenance to this shared engine.
+
+Finite multidimensional budgets perform ordered-prefix admission before work
+starts. `admitted_budget` is the sum of all admitted projections, while
+`observed_budget` is the sum of projections attached to completed outcomes.
+Neither field is actual provider usage. Sequential evaluators receive prior
+ordered outcomes, which Refine uses for feedback history. Concurrent evaluators
+run under `DSEx.TaskSupervisor` through `DSEx.Tasks.async_stream/3`, bounded by
+`max_concurrency`, and receive no causal prior outcomes. Concurrent threshold
+stopping may therefore include completed speculative work; incomplete work is
+cancelled and represented in full-list provenance.
+
+The source-checkout `mix benchmark.search.check` lane records deterministic
+quality, ordering, projected-cost, failure-free completion, and observed
+concurrency-bound checks. It records latency samples as measurements only and
+does not turn local scheduler timing into a release assertion.
 
 ## Adapters
 
