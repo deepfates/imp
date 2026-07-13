@@ -156,24 +156,7 @@ defmodule DSEx.Clients.ReqLLM do
       |> normalize_opts()
       |> normalize_provider_profile_opts(lm.model)
 
-    DSEx.Telemetry.execute([:dsex, :lm, :stream, :start], %{system_time: System.system_time()}, %{
-      lm: redact_lm(lm)
-    })
-
-    case safe_stream(lm, messages, opts) do
-      {:ok, %ReqLLM.StreamResponse{} = response} ->
-        normalize_stream(response, lm)
-
-      {:error, reason} ->
-        emit_stream_stop(lm)
-
-        [
-          %DSEx.Streaming.Messages.StreamResponse{
-            chunk: {:error, reason},
-            done: true
-          }
-        ]
-    end
+    normalize_stream(lm, messages, opts)
   end
 
   defp safe_stream(lm, messages, opts) do
@@ -645,23 +628,50 @@ defmodule DSEx.Clients.ReqLLM do
 
   defp from_stream_chunk(_chunk), do: []
 
-  defp normalize_stream(%ReqLLM.StreamResponse{} = response, lm) do
+  defp normalize_stream(lm, messages, opts) do
     Stream.resource(
-      fn ->
+      fn -> open_stream(lm, messages, opts) end,
+      &next_stream_chunk/1,
+      &cleanup_stream(&1, lm)
+    )
+  end
+
+  defp open_stream(lm, messages, opts) do
+    DSEx.Telemetry.execute([:dsex, :lm, :stream, :start], %{system_time: System.system_time()}, %{
+      lm: redact_lm(lm)
+    })
+
+    case safe_stream(lm, messages, opts) do
+      {:ok, %ReqLLM.StreamResponse{} = response} ->
         %{
+          response: response,
           resume: fn -> suspend_stream(response.stream) end,
           continuation: nil,
           started?: false,
           completed?: false,
-          failed?: false
+          failed?: false,
+          terminal_error: nil
         }
-      end,
-      &next_stream_chunk/1,
-      &cleanup_stream(&1, response.cancel, lm)
-    )
+
+      {:error, reason} ->
+        %{
+          response: nil,
+          resume: nil,
+          continuation: nil,
+          started?: false,
+          completed?: false,
+          failed?: true,
+          terminal_error: reason
+        }
+    end
   end
 
   defp next_stream_chunk(%{completed?: true} = state), do: {:halt, state}
+
+  defp next_stream_chunk(%{terminal_error: reason} = state) when not is_nil(reason) do
+    {[%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
+     %{state | completed?: true, terminal_error: nil}}
+  end
 
   defp next_stream_chunk(state) do
     case state.resume.() do
@@ -699,12 +709,14 @@ defmodule DSEx.Clients.ReqLLM do
      %{state | completed?: true, failed?: true}}
   end
 
-  defp cleanup_stream(state, cancel, lm) do
+  defp cleanup_stream(state, lm) do
     try do
-      halt_provider_stream(state)
+      if state.response do
+        halt_provider_stream(state)
 
-      if not state.completed? or state.failed? do
-        cancel_provider_stream(cancel)
+        if not state.completed? or state.failed? do
+          cancel_provider_stream(state.response.cancel)
+        end
       end
     after
       emit_stream_stop(lm)

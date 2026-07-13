@@ -180,14 +180,31 @@ defmodule DSEx.Streaming do
   defp stream_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
   defp stream_value(value), do: value
 
+  @doc """
+  Collects stream chunks into a string.
+
+  Successful streams return the collected string. If the stream emits an error
+  chunk, collection stops and returns `{:error, reason}` instead of partial output.
+  """
+  @spec collect(term(), term(), keyword()) :: String.t() | {:error, term()}
   def collect(program, inputs, opts \\ []) do
     validate_opts!(opts, "DSEx.Streaming.collect/3")
     outputs = output_names(program)
 
-    program
-    |> stream(inputs, opts)
-    |> Enum.reject(&error_chunk?/1)
-    |> Enum.map_join(&collect_value(&1, outputs))
+    result =
+      program
+      |> stream(inputs, opts)
+      |> Enum.reduce_while([], fn value, chunks ->
+        case stream_error(value) do
+          {:error, reason} -> {:halt, {:error, reason}}
+          nil -> {:cont, [collect_value(value, outputs) | chunks]}
+        end
+      end)
+
+    case result do
+      {:error, _reason} = error -> error
+      chunks -> chunks |> Enum.reverse() |> Enum.join()
+    end
   end
 
   defp collect_value(%DSEx.Streaming.Messages.StreamResponse{chunk: nil}, _outputs), do: ""
@@ -249,9 +266,11 @@ defmodule DSEx.Streaming do
     end
   end
 
-  defp error_chunk?(%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, _reason}}), do: true
-  defp error_chunk?({:error, _reason}), do: true
-  defp error_chunk?(_value), do: false
+  defp stream_error(%DSEx.Streaming.Messages.StreamResponse{chunk: {:error, reason}}),
+    do: {:error, reason}
+
+  defp stream_error({:error, reason}), do: {:error, reason}
+  defp stream_error(_value), do: nil
 
   defp output_names(program), do: DSEx.ProgramAccess.output_names(program)
 

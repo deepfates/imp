@@ -164,6 +164,8 @@ defmodule ReqLLMClientTest do
   defmodule AdversarialStreamStub do
     def stream_text(model, messages, opts) do
       test_pid = Keyword.fetch!(opts, :test_pid)
+      failure = Keyword.get(opts, :stream_failure, :raise)
+      send(test_pid, {:provider_open, failure})
 
       stream =
         Stream.resource(
@@ -175,7 +177,12 @@ defmodule ReqLLMClientTest do
 
             1 ->
               send(test_pid, {:provider_pull, 2})
-              raise "provider enumeration exploded"
+
+              case failure do
+                :raise -> raise "provider enumeration exploded"
+                :throw -> throw(:provider_enumeration_threw)
+                :exit -> exit(:provider_enumeration_exited)
+              end
           end,
           fn _state -> send(test_pid, :provider_cleanup) end
         )
@@ -188,6 +195,21 @@ defmodule ReqLLMClientTest do
          model: model,
          context: ReqLLM.Context.new(messages)
        }}
+    end
+  end
+
+  defmodule OpenFailureStub do
+    def stream_text(_model, _messages, opts) do
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      failure = Keyword.fetch!(opts, :open_failure)
+      send(test_pid, {:provider_open, failure})
+
+      case failure do
+        :error -> {:error, :provider_open_failed}
+        :raise -> raise "provider open exploded"
+        :throw -> throw(:provider_open_threw)
+        :exit -> exit(:provider_open_exited)
+      end
     end
   end
 
@@ -584,10 +606,29 @@ defmodule ReqLLMClientTest do
                chunk: {:error, {:req_llm_stream_failed, "{:throw, :stream_exploded}"}},
                done: true
              }
-           ] = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+           ] =
+             lm
+             |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+             |> Enum.to_list()
   end
 
-  test "ReqLLM normalizes enumeration-time provider failures and always cleans up" do
+  test "ReqLLM stream construction and dropping have no provider or telemetry side effects" do
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :stream, :start],
+        [:dsex, :lm, :stream, :stop]
+      ])
+
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    _stream = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+
+    refute_received {:provider_open, _failure}
+    refute_received {:provider_pull, _count}
+    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+  end
+
+  test "ReqLLM first pull opens once and early halt cleans and cancels once" do
     ref =
       DSEx.Test.TelemetryHelpers.attach([
         [:dsex, :lm, :stream, :start],
@@ -597,40 +638,128 @@ defmodule ReqLLMClientTest do
     lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
     stream = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
 
+    refute_received {:provider_open, _failure}
     refute_received {:provider_pull, _count}
 
-    assert [
-             %DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
-             %DSEx.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:req_llm_stream_failed, "provider enumeration exploded"}},
-               done: true
-             }
-           ] = Enum.to_list(stream)
+    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false}] =
+             Enum.take(stream, 1)
 
-    assert_received {:provider_pull, 1}
-    assert_received {:provider_pull, 2}
-    assert_received :provider_cleanup
-    assert_received :provider_cancelled
-    assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
-    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
-  end
-
-  test "ReqLLM cancels and cleans up a provider stream when consumption stops early" do
-    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :lm, :stream, :stop]])
-
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
-
-    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: "partial"}] =
-             lm
-             |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
-             |> Enum.take(1)
-
+    assert_received {:provider_open, :raise}
     assert_received {:provider_pull, 1}
     refute_received {:provider_pull, 2}
     assert_received :provider_cleanup
     assert_received :provider_cancelled
+    assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
     assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+    refute_received {:provider_open, _failure}
+    refute_received :provider_cleanup
+    refute_received :provider_cancelled
+    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+  end
+
+  test "ReqLLM open failures emit one terminal error with balanced telemetry" do
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :stream, :start],
+        [:dsex, :lm, :stream, :stop]
+      ])
+
+    expected = [
+      error: :provider_open_failed,
+      raise: {:req_llm_stream_failed, "provider open exploded"},
+      throw: {:req_llm_stream_failed, "{:throw, :provider_open_threw}"},
+      exit: {:req_llm_stream_failed, "{:exit, :provider_open_exited}"}
+    ]
+
+    Enum.each(expected, fn {failure, reason} ->
+      lm =
+        DSEx.req_llm("openai:gpt-test",
+          test_pid: self(),
+          open_failure: failure,
+          req_module: OpenFailureStub
+        )
+
+      assert [
+               %DSEx.Streaming.Messages.StreamResponse{
+                 chunk: {:error, ^reason},
+                 done: true
+               }
+             ] =
+               lm
+               |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+               |> Enum.to_list()
+
+      assert_received {:provider_open, ^failure}
+      assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+      assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+      refute_received :provider_cleanup
+      refute_received :provider_cancelled
+    end)
+
+    refute_received {:provider_open, _failure}
+    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+  end
+
+  test "ReqLLM enumeration raise, throw, and exit emit one terminal error and clean once" do
+    ref =
+      DSEx.Test.TelemetryHelpers.attach([
+        [:dsex, :lm, :stream, :start],
+        [:dsex, :lm, :stream, :stop]
+      ])
+
+    expected = [
+      raise: "provider enumeration exploded",
+      throw: "{:throw, :provider_enumeration_threw}",
+      exit: "{:exit, :provider_enumeration_exited}"
+    ]
+
+    Enum.each(expected, fn {failure, message} ->
+      lm =
+        DSEx.req_llm("openai:gpt-test",
+          test_pid: self(),
+          stream_failure: failure,
+          req_module: AdversarialStreamStub
+        )
+
+      assert [
+               %DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
+               %DSEx.Streaming.Messages.StreamResponse{
+                 chunk: {:error, {:req_llm_stream_failed, ^message}},
+                 done: true
+               }
+             ] =
+               lm
+               |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+               |> Enum.to_list()
+
+      assert_received {:provider_open, ^failure}
+      assert_received {:provider_pull, 1}
+      assert_received {:provider_pull, 2}
+      assert_received :provider_cleanup
+      assert_received :provider_cancelled
+      assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+      assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+      refute_received :provider_cleanup
+      refute_received :provider_cancelled
+    end)
+
+    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+  end
+
+  test "stream collection returns a terminal provider error instead of partial output" do
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    assert {:error, {:req_llm_stream_failed, "provider enumeration exploded"}} =
+             DSEx.Streaming.collect(program, %{question: "hello"}, provider_stream: true)
+
+    assert_received :provider_cleanup
+    assert_received :provider_cancelled
+    refute_received :provider_cleanup
+    refute_received :provider_cancelled
   end
 
   test "ReqLLM client reports invalid provider module return shapes" do
