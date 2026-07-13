@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Dsex.Identity.Evaluate do
         strict: [
           registry: :string,
           assessments: :string,
-          flags: :string,
+          flags: :keep,
           dissent: :string,
           atlas: :string,
           scenarios: :string,
@@ -28,7 +28,15 @@ defmodule Mix.Tasks.Dsex.Identity.Evaluate do
 
     registry = jsonl(opts, :registry, "identity/registry.jsonl")
     assessments = jsonl(opts, :assessments, "identity/assessments.jsonl", optional: true)
-    flags = jsonl(opts, :flags, "identity/flags.jsonl", optional: true)
+
+    flags =
+      jsonls(
+        opts,
+        :flags,
+        ["identity/flags.jsonl", "identity/research/package-collision-flags.jsonl"],
+        optional: true
+      )
+
     dissent = jsonl(opts, :dissent, "identity/dissent.jsonl", optional: true)
     atlas = json(opts, :atlas, "identity/atlas.json")
     scenarios = json(opts, :scenarios, "identity/scenarios.json")
@@ -49,6 +57,16 @@ defmodule Mix.Tasks.Dsex.Identity.Evaluate do
     opts
     |> Keyword.get(key, default)
     |> DSEx.IdentityEvaluation.load_jsonl!(load_opts)
+  end
+
+  defp jsonls(opts, key, defaults, load_opts) do
+    paths =
+      case Keyword.get_values(opts, key) do
+        [] -> defaults
+        configured -> configured
+      end
+
+    Enum.flat_map(paths, &DSEx.IdentityEvaluation.load_jsonl!(&1, load_opts))
   end
 
   defp json(opts, key, default) do
