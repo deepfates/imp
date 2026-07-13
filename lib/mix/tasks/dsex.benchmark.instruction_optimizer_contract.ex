@@ -94,7 +94,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerContract do
   defp mipro_budget_rows(mipro) do
     auto =
       Enum.map(mipro["budgets"]["auto"], fn expected ->
-        mode = String.to_existing_atom(expected["mode"])
+        mode = auto_mode!(expected["mode"])
 
         opts =
           if expected["zeroshot"],
@@ -142,6 +142,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerContract do
           "zeroshot" => Config.recommended_num_trials(2, true, 5)
         })
       ]
+  end
+
+  @doc false
+  def auto_mode!("light"), do: :light
+  def auto_mode!("medium"), do: :medium
+  def auto_mode!("heavy"), do: :heavy
+
+  def auto_mode!(mode) do
+    Mix.raise("unsupported MIPROv2 auto mode in DSPy contract: #{inspect(mode)}")
   end
 
   defp mipro_demo_rows(mipro) do

@@ -37,6 +37,18 @@ defmodule InstructionOptimizerContractArtifactTest do
     assert rows["simba_tie_strictly_between"]["actual"] == "suppress_good"
   end
 
+  test "contract auto modes use a closed mapping independent of VM atom state" do
+    contract = Mix.Tasks.Dsex.Benchmark.InstructionOptimizerContract
+
+    assert contract.auto_mode!("light") == :light
+    assert contract.auto_mode!("medium") == :medium
+    assert contract.auto_mode!("heavy") == :heavy
+
+    assert_raise Mix.Error, ~r/unsupported MIPROv2 auto mode/, fn ->
+      contract.auto_mode!("unexpected")
+    end
+  end
+
   defp tmp_dir(name) do
     path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
