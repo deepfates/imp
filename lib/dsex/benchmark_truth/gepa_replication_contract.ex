@@ -11,6 +11,7 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
   ]
 
   @optimizer_fields ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"]
+  @source_commit_fields ["dspy", "dsex", "gepa_artifact"]
 
   @research_fields [
     "campaign_id",
@@ -38,6 +39,14 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
   def required_families, do: @required_families
   def optimizer_fields, do: @optimizer_fields
   def research_fields, do: @research_fields
+
+  @doc false
+  def valid_source_commits?(commits) when is_map(commits) do
+    Map.keys(commits) |> Enum.sort() == Enum.sort(@source_commit_fields) and
+      Enum.all?(@source_commit_fields, &concrete_source?(commits[&1]))
+  end
+
+  def valid_source_commits?(_commits), do: false
 
   def validate_rows(rows, opts \\ []) when is_list(rows) do
     mode = Keyword.get(opts, :mode, :research)
@@ -123,10 +132,7 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
     do: row["evidence_level"] == "research_campaign"
 
   defp present_field?(row, "source_commits", _mode) do
-    commits = Map.get(row, "source_commits")
-
-    is_map(commits) and concrete_source?(commits["dspy"]) and concrete_source?(commits["dsex"]) and
-      concrete_source?(commits["gepa_artifact"])
+    valid_source_commits?(Map.get(row, "source_commits"))
   end
 
   defp present_field?(row, "optimizer_budgets", _mode) do
@@ -273,6 +279,7 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
     downcased = String.downcase(value)
 
     value != "" and
+      downcased not in ["unknown", "unavailable", "pending", "todo", "tbd", "n/a"] and
       not String.contains?(downcased, "smoke") and
       not String.contains?(downcased, "placeholder") and
       not String.contains?(downcased, "not run") and

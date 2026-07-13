@@ -28,6 +28,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     pricing_source = Keyword.fetch!(opts, :pricing_source)
     token_cost = Keyword.get(opts, :token_cost)
     source_commits = Keyword.fetch!(opts, :source_commits)
+    validate_source_commits!(source_commits)
     lm = Keyword.fetch!(opts, :lm)
     reflection_lm = Keyword.get(opts, :reflection_lm)
     {judge_lm, judge_model} = judge_config!(opts, lm, model)
@@ -112,6 +113,13 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     out_path = Path.join(out_dir, "dsex-gepa-rows-#{timestamp_slug()}.json")
     out_path = DSEx.BenchmarkTruth.ArtifactFile.write_json!(out_path, report)
     %{report: report, out_path: out_path}
+  end
+
+  defp validate_source_commits!(source_commits) do
+    unless DSEx.BenchmarkTruth.GepaReplicationContract.valid_source_commits?(source_commits) do
+      raise ArgumentError,
+            "source_commits must contain concrete dspy, dsex, and gepa_artifact identities"
+    end
   end
 
   @doc false

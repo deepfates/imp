@@ -89,6 +89,20 @@ defmodule GepaReplicationArtifactTest do
            ]
   end
 
+  test "GEPA replication contract rejects unknown or noncanonical source identities" do
+    [row | rest] = full_rows()
+
+    unknown = put_in(row, ["source_commits", "dspy"], "unknown")
+    extra = put_in(row, ["source_commits", "untracked"], "example/repo@abcdef4")
+
+    for invalid <- [unknown, extra] do
+      validation = GepaReplicationContract.validate_rows([invalid | rest])
+
+      refute validation.passing
+      assert %{"family" => "AIMEBench", "field" => "source_commits"} in validation.missing_fields
+    end
+  end
+
   test "GEPA replication contract rejects duplicate and unknown family rows" do
     rows = full_rows()
     duplicate = rows ++ [hd(rows)]

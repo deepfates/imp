@@ -209,6 +209,42 @@ defmodule GepaCampaignTest do
     end
   end
 
+  test "DSEx GEPA campaign rejects invalid source identities before filesystem or LM work" do
+    root = tmp_dir("gepa-campaign-invalid-source")
+    dataset_root = Path.join(root, "missing-dataset")
+    rows_dir = Path.join(root, "rows")
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, opts ->
+        Agent.update(calls, &(&1 + 1))
+        static_gold_handler(messages, opts)
+      end)
+
+    assert_raise ArgumentError,
+                 ~r/source_commits must contain concrete dspy, dsex, and gepa_artifact identities/,
+                 fn ->
+                   GepaCampaign.run(
+                     dataset_root: dataset_root,
+                     campaign_id: "gepa-campaign-invalid-source-test",
+                     model: "openai:gpt-4.1-mini-2025-04-14",
+                     reflection_model: "openai:gpt-4.1-mini-2025-04-14",
+                     out_dir: rows_dir,
+                     pricing_source: "test provider usage export",
+                     source_commits: %{
+                       "dspy" => "unknown",
+                       "dsex" => "deepfates/dsex@abcdef2",
+                       "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+                     },
+                     lm: lm
+                   )
+                 end
+
+    assert Agent.get(calls, & &1) == 0
+    refute File.exists?(rows_dir)
+  end
+
   test "DSEx GEPA campaign rejects unknown partial family names" do
     dataset_root = tmp_dir("gepa-campaign-unknown-family")
     rows_dir = tmp_dir("gepa-campaign-unknown-family-rows")
