@@ -6,6 +6,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     Config,
     DatasetState,
     Event,
+    Lookahead,
     OperationIntent,
     PromptPopulation,
     Rollout,
@@ -142,6 +143,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       "current_theta_id" => state.current_theta_id,
       "prompt_population" => dump_population(state.prompt_population),
       "dataset" => dump_dataset(state.dataset),
+      "lookahead" => if(state.lookahead, do: dump_lookahead(state.lookahead), else: nil),
       "pending_operations" =>
         state.pending_operations
         |> Map.values()
@@ -169,7 +171,24 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     %{
       "revision" => population.revision,
       "digest" => population.digest,
-      "candidates" => population.candidates
+      "candidates" => population.candidates,
+      "candidate_ids" => population.candidate_ids,
+      "instance_scores" => population.instance_scores,
+      "instance_frontier" => population.instance_frontier,
+      "parent_digest" => population.parent_digest,
+      "anchor_digest" => population.anchor_digest,
+      "lookahead_digest" => population.lookahead_digest
+    }
+  end
+
+  defp dump_lookahead(lookahead) do
+    %{
+      "cycle" => lookahead.cycle,
+      "dataset_cursor" => lookahead.dataset_cursor,
+      "digest" => lookahead.digest,
+      "checksum" => lookahead.checksum,
+      "minibatches" => lookahead.minibatches,
+      "consumed_steps" => lookahead.consumed_steps
     }
   end
 
@@ -255,6 +274,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       current_theta_id: string!(data, "current_theta_id"),
       prompt_population: data |> Map.fetch!("prompt_population") |> load_population!(),
       dataset: data |> Map.fetch!("dataset") |> load_dataset!(),
+      lookahead: load_optional(data, "lookahead", &load_lookahead!/1),
       pending_operations:
         data
         |> list!("pending_operations", &load_intent!/1)
@@ -283,10 +303,34 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     population = %PromptPopulation{
       revision: non_negative!(data, "revision"),
       digest: string!(data, "digest"),
-      candidates: raw_list!(data, "candidates")
+      candidates: raw_list!(data, "candidates"),
+      candidate_ids: string_list!(data, "candidate_ids"),
+      instance_scores: map!(data, "instance_scores"),
+      instance_frontier: map!(data, "instance_frontier"),
+      parent_digest: optional_string!(data, "parent_digest"),
+      anchor_digest: optional_string!(data, "anchor_digest"),
+      lookahead_digest: optional_string!(data, "lookahead_digest")
     }
 
     PromptPopulation.validate!(population)
+  end
+
+  defp load_lookahead!(data) when is_map(data) do
+    lookahead =
+      Lookahead.new!(
+        non_negative!(data, "cycle"),
+        non_negative!(data, "dataset_cursor"),
+        raw_list!(data, "minibatches")
+      )
+
+    lookahead = %{
+      lookahead
+      | digest: string!(data, "digest"),
+        checksum: string!(data, "checksum"),
+        consumed_steps: non_negative!(data, "consumed_steps")
+    }
+
+    Lookahead.validate!(lookahead)
   end
 
   defp load_dataset!(data) when is_map(data),
@@ -451,6 +495,14 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     if values != [] and Enum.all?(values, &is_number/1),
       do: values,
       else: raise(ArgumentError, "#{key} must contain numbers")
+  end
+
+  defp string_list!(data, key) do
+    values = raw_list!(data, key)
+
+    if Enum.all?(values, &(is_binary(&1) and &1 != "")),
+      do: values,
+      else: raise(ArgumentError, "#{key} must contain non-empty strings")
   end
 
   defp enum!(data, key, allowed) do

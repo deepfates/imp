@@ -44,34 +44,332 @@ defmodule DSEx.Training.FastSlow.PromptPopulation do
 
   alias DSEx.Training.FastSlow.Config
 
-  @enforce_keys [:revision, :digest, :candidates]
+  @enforce_keys [
+    :revision,
+    :digest,
+    :candidates,
+    :candidate_ids,
+    :instance_scores,
+    :instance_frontier,
+    :parent_digest,
+    :anchor_digest,
+    :lookahead_digest
+  ]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           revision: non_neg_integer(),
           digest: String.t(),
-          candidates: [Config.json_value()]
+          candidates: [Config.json_value()],
+          candidate_ids: [String.t()],
+          instance_scores: %{String.t() => %{String.t() => number()}},
+          instance_frontier: %{String.t() => [String.t()]},
+          parent_digest: String.t() | nil,
+          anchor_digest: String.t() | nil,
+          lookahead_digest: String.t() | nil
         }
 
-  @spec new!(non_neg_integer(), [term()]) :: t()
-  def new!(revision, candidates)
-      when is_integer(revision) and revision >= 0 and is_list(candidates) and candidates != [] do
+  @metadata_keys [
+    :candidate_ids,
+    :instance_scores,
+    :instance_frontier,
+    :parent_digest,
+    :anchor_digest,
+    :lookahead_digest
+  ]
+
+  @spec new!(non_neg_integer(), [term()], keyword() | map()) :: t()
+  def new!(revision, candidates, metadata \\ %{})
+
+  def new!(revision, candidates, metadata)
+      when is_integer(revision) and revision >= 0 and is_list(candidates) and candidates != [] and
+             (is_list(metadata) or is_map(metadata)) do
     candidates = Config.json_safe!(candidates, [:prompt_population, :candidates])
-    %__MODULE__{revision: revision, digest: Config.digest(candidates), candidates: candidates}
+    metadata = normalize_metadata!(metadata)
+
+    candidate_ids =
+      metadata
+      |> Map.get(:candidate_ids, Enum.map(candidates, &Config.digest/1))
+      |> candidate_ids!(length(candidates))
+
+    instance_scores = scores!(Map.get(metadata, :instance_scores, %{}), candidate_ids)
+    instance_frontier = frontier!(Map.get(metadata, :instance_frontier, %{}), candidate_ids)
+    parent_digest = optional_digest!(Map.get(metadata, :parent_digest), :parent_digest)
+    anchor_digest = optional_digest!(Map.get(metadata, :anchor_digest), :anchor_digest)
+    lookahead_digest = optional_digest!(Map.get(metadata, :lookahead_digest), :lookahead_digest)
+
+    if revision == 0 do
+      unless map_size(instance_scores) == 0 and map_size(instance_frontier) == 0 and
+               is_nil(parent_digest) and is_nil(anchor_digest) and is_nil(lookahead_digest) do
+        raise ArgumentError, "Phi0 may not claim GEPA frontier provenance"
+      end
+    else
+      validate_revision_provenance!(
+        candidate_ids,
+        instance_scores,
+        instance_frontier,
+        parent_digest,
+        anchor_digest,
+        lookahead_digest
+      )
+    end
+
+    identity = %{
+      "revision" => revision,
+      "candidates" => candidates,
+      "candidate_ids" => candidate_ids,
+      "instance_scores" => instance_scores,
+      "instance_frontier" => instance_frontier,
+      "parent_digest" => parent_digest,
+      "anchor_digest" => anchor_digest,
+      "lookahead_digest" => lookahead_digest
+    }
+
+    %__MODULE__{
+      revision: revision,
+      digest: Config.digest(identity),
+      candidates: candidates,
+      candidate_ids: candidate_ids,
+      instance_scores: instance_scores,
+      instance_frontier: instance_frontier,
+      parent_digest: parent_digest,
+      anchor_digest: anchor_digest,
+      lookahead_digest: lookahead_digest
+    }
   end
 
-  def new!(_revision, _candidates),
+  def new!(_revision, _candidates, _metadata),
     do: raise(ArgumentError, "prompt population requires a revision and non-empty candidates")
 
   @spec validate!(t()) :: t()
   def validate!(%__MODULE__{} = population) do
-    expected = new!(population.revision, population.candidates)
+    expected =
+      new!(population.revision, population.candidates,
+        candidate_ids: population.candidate_ids,
+        instance_scores: population.instance_scores,
+        instance_frontier: population.instance_frontier,
+        parent_digest: population.parent_digest,
+        anchor_digest: population.anchor_digest,
+        lookahead_digest: population.lookahead_digest
+      )
 
-    unless expected.digest == population.digest,
+    unless expected == population,
       do: raise(ArgumentError, "prompt population digest is invalid")
 
     population
   end
+
+  defp normalize_metadata!(metadata) do
+    metadata = if is_list(metadata), do: Map.new(metadata), else: metadata
+
+    metadata =
+      Map.new(metadata, fn
+        {key, value} when is_atom(key) ->
+          {key, value}
+
+        {key, value} when is_binary(key) ->
+          {String.to_existing_atom(key), value}
+
+        {key, _value} ->
+          raise ArgumentError, "invalid prompt population metadata key: #{inspect(key)}"
+      end)
+
+    unknown = Map.keys(metadata) -- @metadata_keys
+
+    unless unknown == [],
+      do: raise(ArgumentError, "unknown prompt population metadata: #{inspect(unknown)}")
+
+    metadata
+  rescue
+    error in [ArgumentError] ->
+      reraise ArgumentError,
+              [message: "prompt population metadata is invalid: #{Exception.message(error)}"],
+              __STACKTRACE__
+  end
+
+  defp candidate_ids!(ids, count) when is_list(ids) do
+    ids = Config.json_safe!(ids, [:prompt_population, :candidate_ids])
+
+    unless length(ids) == count and Enum.all?(ids, &(is_binary(&1) and &1 != "")) and
+             MapSet.size(MapSet.new(ids)) == count do
+      raise ArgumentError, "candidate IDs must be exact, unique, and aligned with candidates"
+    end
+
+    ids
+  end
+
+  defp candidate_ids!(_ids, _count),
+    do: raise(ArgumentError, "candidate IDs must be exact, unique, and aligned with candidates")
+
+  defp scores!(scores, candidate_ids) when is_map(scores) and not is_struct(scores) do
+    scores = Config.json_safe!(scores, [:prompt_population, :instance_scores])
+
+    Enum.each(scores, fn {instance_id, by_candidate} ->
+      unless instance_id != "" and is_map(by_candidate) and
+               Enum.sort(Map.keys(by_candidate)) == Enum.sort(candidate_ids) and
+               Enum.all?(by_candidate, fn {_id, score} -> is_number(score) end) do
+        raise ArgumentError,
+              "per-instance scores must contain every candidate ID with numeric fitness"
+      end
+    end)
+
+    scores
+  end
+
+  defp scores!(_scores, _candidate_ids),
+    do: raise(ArgumentError, "per-instance scores must be a data-only map")
+
+  defp frontier!(frontier, candidate_ids) when is_map(frontier) and not is_struct(frontier) do
+    frontier = Config.json_safe!(frontier, [:prompt_population, :instance_frontier])
+    allowed = MapSet.new(candidate_ids)
+
+    Enum.each(frontier, fn {instance_id, winners} ->
+      unless instance_id != "" and is_list(winners) and winners != [] and
+               Enum.all?(winners, &(is_binary(&1) and MapSet.member?(allowed, &1))) and
+               MapSet.size(MapSet.new(winners)) == length(winners) do
+        raise ArgumentError, "per-instance frontier contains invalid candidate identities"
+      end
+    end)
+
+    frontier
+  end
+
+  defp frontier!(_frontier, _candidate_ids),
+    do: raise(ArgumentError, "per-instance frontier must be a data-only map")
+
+  defp validate_revision_provenance!(
+         candidate_ids,
+         scores,
+         frontier,
+         parent_digest,
+         anchor_digest,
+         lookahead_digest
+       ) do
+    selected = frontier |> Map.values() |> List.flatten() |> MapSet.new()
+
+    unless map_size(scores) > 0 and
+             Enum.sort(Map.keys(scores)) == Enum.sort(Map.keys(frontier)) and
+             selected == MapSet.new(candidate_ids) and is_binary(parent_digest) and
+             is_binary(anchor_digest) and is_binary(lookahead_digest) do
+      raise ArgumentError,
+            "revised population requires per-instance scores and exactly frontier-selected candidates"
+    end
+  end
+
+  defp optional_digest!(nil, _name), do: nil
+
+  defp optional_digest!(digest, _name) when is_binary(digest) do
+    if Regex.match?(~r/\A[0-9a-f]{64}\z/, digest),
+      do: digest,
+      else: raise(ArgumentError, "prompt population provenance digest is invalid")
+  end
+
+  defp optional_digest!(_digest, name),
+    do: raise(ArgumentError, "#{name} must be a SHA-256 digest or nil")
+end
+
+defmodule DSEx.Training.FastSlow.Lookahead do
+  @moduledoc false
+
+  alias DSEx.Training.FastSlow.Config
+
+  @enforce_keys [:cycle, :dataset_cursor, :digest, :checksum, :minibatches, :consumed_steps]
+  defstruct @enforce_keys
+
+  @type minibatch :: map()
+  @type t :: %__MODULE__{
+          cycle: non_neg_integer(),
+          dataset_cursor: non_neg_integer(),
+          digest: String.t(),
+          checksum: String.t(),
+          minibatches: [minibatch()],
+          consumed_steps: non_neg_integer()
+        }
+
+  @spec new!(non_neg_integer(), non_neg_integer(), [map()]) :: t()
+  def new!(cycle, dataset_cursor, minibatches)
+      when is_integer(cycle) and cycle >= 0 and is_integer(dataset_cursor) and dataset_cursor >= 0 and
+             is_list(minibatches) and minibatches != [] do
+    minibatches = Enum.map(minibatches, &minibatch!/1)
+
+    unless minibatches |> Enum.map(& &1["id"]) |> MapSet.new() |> MapSet.size() ==
+             length(minibatches),
+           do: raise(ArgumentError, "lookahead minibatch identities must be unique")
+
+    digest = identity_digest(cycle, dataset_cursor, minibatches)
+
+    %__MODULE__{
+      cycle: cycle,
+      dataset_cursor: dataset_cursor,
+      digest: digest,
+      checksum: progress_checksum(digest, 0),
+      minibatches: minibatches,
+      consumed_steps: 0
+    }
+  end
+
+  def new!(_cycle, _dataset_cursor, _minibatches),
+    do: raise(ArgumentError, "lookahead cycle, dataset cursor, or minibatches are invalid")
+
+  @spec consume!(t()) :: t()
+  def consume!(%__MODULE__{} = lookahead) do
+    if lookahead.consumed_steps < length(lookahead.minibatches) do
+      consumed_steps = lookahead.consumed_steps + 1
+
+      %{
+        lookahead
+        | consumed_steps: consumed_steps,
+          checksum: progress_checksum(lookahead.digest, consumed_steps)
+      }
+    else
+      raise ArgumentError, "lookahead minibatches are already fully consumed"
+    end
+  end
+
+  @spec validate!(t(), pos_integer() | nil) :: t()
+  def validate!(%__MODULE__{} = lookahead, expected_t \\ nil) do
+    expected = new!(lookahead.cycle, lookahead.dataset_cursor, lookahead.minibatches)
+
+    unless expected.digest == lookahead.digest and is_integer(lookahead.consumed_steps) and
+             lookahead.consumed_steps in 0..length(lookahead.minibatches) and
+             lookahead.checksum == progress_checksum(lookahead.digest, lookahead.consumed_steps) and
+             (is_nil(expected_t) or length(lookahead.minibatches) == expected_t) do
+      raise ArgumentError, "lookahead identity, checksum, length, or consumption is invalid"
+    end
+
+    lookahead
+  end
+
+  defp minibatch!(minibatch) when is_map(minibatch) and not is_struct(minibatch) do
+    minibatch = Config.json_safe!(minibatch, [:lookahead, :minibatches])
+
+    case minibatch do
+      %{"id" => id, "digest" => digest} when map_size(minibatch) == 2 ->
+        unless is_binary(id) and id != "" and is_binary(digest) and
+                 Regex.match?(~r/\A[0-9a-f]{64}\z/, digest) do
+          raise ArgumentError, "lookahead minibatch identity or digest is invalid"
+        end
+
+        minibatch
+
+      _other ->
+        raise ArgumentError, "lookahead minibatches require exactly id and digest"
+    end
+  end
+
+  defp minibatch!(_minibatch),
+    do: raise(ArgumentError, "lookahead minibatches require exactly id and digest")
+
+  defp identity_digest(cycle, dataset_cursor, minibatches) do
+    Config.digest(%{
+      "cycle" => cycle,
+      "dataset_cursor" => dataset_cursor,
+      "minibatches" => minibatches
+    })
+  end
+
+  defp progress_checksum(digest, consumed_steps),
+    do: Config.digest(%{"digest" => digest, "consumed_steps" => consumed_steps})
 end
 
 defmodule DSEx.Training.FastSlow.DatasetState do
@@ -187,6 +485,7 @@ defmodule DSEx.Training.FastSlow.State do
     Config,
     DatasetState,
     Event,
+    Lookahead,
     OperationIntent,
     PromptPopulation,
     Rollout,
@@ -212,7 +511,13 @@ defmodule DSEx.Training.FastSlow.State do
     :budgets
   ]
   defstruct @enforce_keys ++
-              [pending_operations: %{}, rollout_ledger: %{}, events: [], terminal: nil]
+              [
+                lookahead: nil,
+                pending_operations: %{},
+                rollout_ledger: %{},
+                events: [],
+                terminal: nil
+              ]
 
   @type t :: %__MODULE__{
           config_fingerprint: String.t(),
@@ -228,6 +533,7 @@ defmodule DSEx.Training.FastSlow.State do
           current_theta_id: String.t(),
           prompt_population: PromptPopulation.t(),
           dataset: DatasetState.t(),
+          lookahead: Lookahead.t() | nil,
           pending_operations: %{String.t() => OperationIntent.t()},
           budgets: Budget.t(),
           rollout_ledger: %{String.t() => Rollout.t()},
@@ -237,8 +543,8 @@ defmodule DSEx.Training.FastSlow.State do
 
   @spec new!(Config.t(), term(), [term()], keyword()) :: t()
   def new!(%Config{} = config, theta_payload, prompt_candidates, options \\ []) do
-    unless length(prompt_candidates) in 1..config.k,
-      do: raise(ArgumentError, "seed prompt population must contain between one and k candidates")
+    unless length(prompt_candidates) == 1,
+      do: raise(ArgumentError, "Phi0 must contain exactly one seed candidate")
 
     theta = Theta.new!(0, theta_payload)
     dataset = DatasetState.new!(0, 0, Keyword.get(options, :rng, %{"seed" => 0}))
@@ -271,13 +577,36 @@ defmodule DSEx.Training.FastSlow.State do
 
     if next == :slow and
          (length(state.prompt_population.candidates) != state.k or
-            state.prompt_population.revision != state.cycle + 1) do
+            state.prompt_population.revision != state.cycle + 1 or
+            not current_lookahead?(state) or
+            state.prompt_population.lookahead_digest != state.lookahead.digest) do
       raise ArgumentError,
             "slow stage requires a current-cycle GEPA population of exactly k candidates"
     end
 
+    if next == :slow do
+      Lookahead.validate!(state.lookahead, state.t)
+      PromptPopulation.validate!(state.prompt_population)
+    end
+
     %{state | stage: next}
   end
+
+  @spec put_lookahead(t(), Lookahead.t()) :: t()
+  def put_lookahead(%__MODULE__{stage: stage, terminal: nil} = state, %Lookahead{} = lookahead)
+      when stage in [:initialized, :fast] do
+    Lookahead.validate!(lookahead, state.t)
+
+    unless state.prompt_population.revision == state.cycle and lookahead.cycle == state.cycle and
+             lookahead.dataset_cursor == state.dataset.cursor and lookahead.consumed_steps == 0 do
+      raise ArgumentError, "lookahead is not bound to the current cycle and dataset cursor"
+    end
+
+    %{state | lookahead: lookahead}
+  end
+
+  def put_lookahead(%__MODULE__{}, %Lookahead{}),
+    do: raise(ArgumentError, "lookahead may only be installed before the current fast update")
 
   @spec next_cycle(t(), DatasetState.t()) :: t()
   def next_cycle(%__MODULE__{stage: :slow, terminal: nil} = state, %DatasetState{} = dataset) do
@@ -287,7 +616,14 @@ defmodule DSEx.Training.FastSlow.State do
     unless state.cycle + 1 < state.max_cycles,
       do: raise(ArgumentError, "configured Fast-Slow cycle horizon is exhausted")
 
-    %{state | stage: :fast, cycle: state.cycle + 1, slow_step: 0, dataset: dataset}
+    %{
+      state
+      | stage: :fast,
+        cycle: state.cycle + 1,
+        slow_step: 0,
+        dataset: dataset,
+        lookahead: nil
+    }
   end
 
   def next_cycle(%__MODULE__{}, %DatasetState{}),
@@ -298,37 +634,61 @@ defmodule DSEx.Training.FastSlow.State do
     unless state.slow_step < state.t,
       do: raise(ArgumentError, "configured Fast-Slow cycle already has t slow updates")
 
+    unless current_lookahead?(state) and state.lookahead.consumed_steps == state.slow_step,
+      do: raise(ArgumentError, "slow update is not aligned with the current lookahead")
+
+    Lookahead.validate!(state.lookahead, state.t)
+
     theta = Theta.new!(state.cycle, payload, state.current_theta_id)
 
     %{
       state
       | theta_lineage: state.theta_lineage ++ [theta],
         current_theta_id: theta.id,
-        slow_step: state.slow_step + 1
+        slow_step: state.slow_step + 1,
+        lookahead: Lookahead.consume!(state.lookahead)
     }
   end
 
   def complete_slow_step(%__MODULE__{}, _payload),
     do: raise(ArgumentError, "a slow update may only complete during the slow stage")
 
-  @spec revise_prompts(t(), [term()]) :: t()
-  def revise_prompts(%__MODULE__{stage: :fast, terminal: nil} = state, candidates) do
+  @spec revise_prompts(t(), [term()], keyword() | map()) :: t()
+  def revise_prompts(state, candidates, metadata \\ %{})
+
+  def revise_prompts(%__MODULE__{stage: :fast, terminal: nil} = state, candidates, metadata) do
     unless length(candidates) == state.k,
       do: raise(ArgumentError, "active prompt population must contain exactly k candidates")
 
     unless state.prompt_population.revision == state.cycle,
       do: raise(ArgumentError, "GEPA prompt population was already revised for this cycle")
 
+    unless current_lookahead?(state),
+      do: raise(ArgumentError, "GEPA prompt revision requires the current cycle lookahead")
+
+    Lookahead.validate!(state.lookahead, state.t)
+
     revision = state.prompt_population.revision + 1
-    %{state | prompt_population: PromptPopulation.new!(revision, candidates)}
+    metadata = if is_list(metadata), do: Map.new(metadata), else: metadata
+
+    metadata =
+      metadata
+      |> Map.put(:parent_digest, state.prompt_population.digest)
+      |> Map.put(:lookahead_digest, state.lookahead.digest)
+      |> Map.put_new(:anchor_digest, state.lookahead.digest)
+
+    %{state | prompt_population: PromptPopulation.new!(revision, candidates, metadata)}
   end
 
-  def revise_prompts(%__MODULE__{}, _candidates),
+  def revise_prompts(%__MODULE__{}, _candidates, _metadata),
     do: raise(ArgumentError, "prompts may only be revised during the fast stage")
 
   @spec put_dataset(t(), DatasetState.t()) :: t()
-  def put_dataset(%__MODULE__{terminal: nil} = state, %DatasetState{} = dataset),
+  def put_dataset(%__MODULE__{terminal: nil, lookahead: nil} = state, %DatasetState{} = dataset),
     do: %{state | dataset: dataset}
+
+  def put_dataset(%__MODULE__{terminal: nil}, %DatasetState{}),
+    do: raise(ArgumentError, "dataset cursor may not move while a lookahead is active")
 
   @spec put_intent(t(), OperationIntent.t()) :: t()
   def put_intent(%__MODULE__{terminal: nil} = state, %OperationIntent{cycle: cycle} = intent)
@@ -466,6 +826,7 @@ defmodule DSEx.Training.FastSlow.State do
   def validate!(%__MODULE__{} = state) do
     Enum.each(state.theta_lineage, &Theta.validate!/1)
     PromptPopulation.validate!(state.prompt_population)
+    if state.lookahead, do: Lookahead.validate!(state.lookahead, state.t)
     Budget.validate!(state.budgets)
 
     Enum.each(state.pending_operations, fn {id, intent} ->
@@ -485,6 +846,7 @@ defmodule DSEx.Training.FastSlow.State do
         is_integer(state.slow_step) and state.slow_step in 0..state.t and
         is_integer(state.k) and state.k > 0 and is_integer(state.g) and state.g > 0 and
         rem(state.g, state.k) == 0 and valid_population?(state) and
+        valid_lookahead?(state) and
         digest?(state.sampling_config_digest) and
         valid_lineage?(state.theta_lineage, state.current_theta_id, state.cycle) and
         length(state.theta_lineage) == state.cycle * state.t + state.slow_step + 1 and
@@ -509,20 +871,55 @@ defmodule DSEx.Training.FastSlow.State do
 
   defp valid_population?(%__MODULE__{stage: stage} = state)
        when stage in [:initialized, :fast] do
-    length(state.prompt_population.candidates) in 1..state.k and
-      state.prompt_population.revision == state.cycle
+    old_population =
+      state.prompt_population.revision == state.cycle and
+        ((state.cycle == 0 and length(state.prompt_population.candidates) == 1) or
+           (state.cycle > 0 and length(state.prompt_population.candidates) == state.k))
+
+    revised_population =
+      state.stage == :fast and state.prompt_population.revision == state.cycle + 1 and
+        length(state.prompt_population.candidates) == state.k and
+        current_population_binding?(state)
+
+    old_population or revised_population
   end
 
   defp valid_population?(%__MODULE__{stage: :terminal} = state) do
-    (length(state.prompt_population.candidates) in 1..state.k and
-       state.prompt_population.revision == state.cycle) or
+    (state.cycle == 0 and length(state.prompt_population.candidates) == 1 and
+       state.prompt_population.revision == 0) or
+      (state.cycle > 0 and length(state.prompt_population.candidates) == state.k and
+         state.prompt_population.revision == state.cycle) or
       (length(state.prompt_population.candidates) == state.k and
-         state.prompt_population.revision == state.cycle + 1)
+         state.prompt_population.revision == state.cycle + 1 and
+         current_population_binding?(state))
   end
 
   defp valid_population?(%__MODULE__{} = state) do
     length(state.prompt_population.candidates) == state.k and
-      state.prompt_population.revision == state.cycle + 1
+      state.prompt_population.revision == state.cycle + 1 and current_population_binding?(state)
+  end
+
+  defp valid_lookahead?(%__MODULE__{lookahead: nil} = state) do
+    state.stage in [:initialized, :fast, :terminal] and state.slow_step == 0 and
+      state.prompt_population.revision == state.cycle
+  end
+
+  defp valid_lookahead?(%__MODULE__{} = state) do
+    current_lookahead?(state) and state.lookahead.consumed_steps == state.slow_step
+  end
+
+  defp current_lookahead?(%__MODULE__{lookahead: %Lookahead{} = lookahead} = state) do
+    lookahead.cycle == state.cycle and lookahead.dataset_cursor == state.dataset.cursor and
+      length(lookahead.minibatches) == state.t
+  end
+
+  defp current_lookahead?(%__MODULE__{}), do: false
+
+  defp current_population_binding?(%__MODULE__{} = state) do
+    current_lookahead?(state) and
+      state.prompt_population.lookahead_digest == state.lookahead.digest and
+      is_binary(state.prompt_population.parent_digest) and
+      is_binary(state.prompt_population.anchor_digest)
   end
 
   defp valid_dataset?(%DatasetState{cursor: cursor, epoch: epoch})

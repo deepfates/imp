@@ -1,7 +1,7 @@
 defmodule DSEx.Training.FastSlow.StateTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{Config, DatasetState, OperationIntent, Rollout, State}
+  alias DSEx.Training.FastSlow.{Config, DatasetState, Lookahead, OperationIntent, Rollout, State}
 
   test "config enforces K divides G, JSON-only values, and credential exclusion" do
     assert_raise ArgumentError, ~r/g must be divisible by k/, fn -> config(k: 3, g: 4) end
@@ -19,10 +19,14 @@ defmodule DSEx.Training.FastSlow.StateTest do
     config = config()
 
     state =
-      State.new!(config, %{"weights" => [0.0]}, ["prompt-a", "prompt-b"], rng: %{"seed" => 7})
+      State.new!(config, %{"weights" => [0.0]}, ["prompt-a"], rng: %{"seed" => 7})
 
-    assert_raise ArgumentError, ~r/between one and k/, fn ->
+    assert_raise ArgumentError, ~r/Phi0/, fn ->
       State.new!(config, %{}, [])
+    end
+
+    assert_raise ArgumentError, ~r/Phi0/, fn ->
+      State.new!(config, %{}, ["seed-a", "seed-b"])
     end
 
     intent = OperationIntent.new!("train", 0, %{"theta" => state.current_theta_id})
@@ -34,9 +38,47 @@ defmodule DSEx.Training.FastSlow.StateTest do
 
     state = State.reconcile_intent(state, intent.id, :confirmed, %{"job" => "done"})
     state = State.set_stage(state, :fast)
-    state = State.revise_prompts(state, ["prompt-c", "prompt-d"])
+
+    assert_raise ArgumentError, ~r/requires the current cycle lookahead/, fn ->
+      State.revise_prompts(
+        state,
+        ["prompt-c", "prompt-d"],
+        population_metadata(["prompt-c", "prompt-d"])
+      )
+    end
+
+    too_short =
+      Lookahead.new!(0, 0, [
+        %{"id" => "only-batch", "digest" => Config.digest(%{"batch" => 0})}
+      ])
+
+    assert_raise ArgumentError, ~r/lookahead identity, checksum, length/, fn ->
+      State.put_lookahead(state, too_short)
+    end
+
+    wrong_cursor = Lookahead.new!(0, 1, lookahead(state).minibatches)
+
+    assert_raise ArgumentError, ~r/not bound to the current cycle and dataset cursor/, fn ->
+      State.put_lookahead(state, wrong_cursor)
+    end
+
+    state = State.put_lookahead(state, lookahead(state))
+
+    assert_raise ArgumentError, ~r/dataset cursor may not move/, fn ->
+      State.put_dataset(state, DatasetState.new!(1, 0, %{"seed" => 8}))
+    end
+
+    state =
+      State.revise_prompts(
+        state,
+        ["prompt-c", "prompt-d"],
+        population_metadata(["prompt-c", "prompt-d"])
+      )
+
     state = State.set_stage(state, :slow)
     state = State.complete_slow_step(state, %{"weights" => [0.1]})
+
+    assert state.lookahead.consumed_steps == 1
 
     assert_raise ArgumentError, ~r/incomplete slow updates/, fn ->
       State.next_cycle(state, DatasetState.new!(8, 1, %{"seed" => 9}))
@@ -63,7 +105,11 @@ defmodule DSEx.Training.FastSlow.StateTest do
 
     exhausted =
       state
-      |> State.revise_prompts(["prompt-e", "prompt-f"])
+      |> State.put_lookahead(lookahead(state))
+      |> State.revise_prompts(
+        ["prompt-e", "prompt-f"],
+        population_metadata(["prompt-e", "prompt-f"])
+      )
       |> State.set_stage(:slow)
       |> State.complete_slow_step(%{"weights" => [0.3]})
       |> State.complete_slow_step(%{"weights" => [0.4]})
@@ -85,7 +131,8 @@ defmodule DSEx.Training.FastSlow.StateTest do
       config
       |> State.new!(%{"weights" => []}, ["seed"])
       |> State.set_stage(:fast)
-      |> State.revise_prompts(["a", "b"])
+      |> then(&State.put_lookahead(&1, lookahead(&1)))
+      |> State.revise_prompts(["a", "b"], population_metadata(["a", "b"]))
       |> State.set_stage(:slow)
 
     rollout = rollout(state, 0)
@@ -170,11 +217,34 @@ defmodule DSEx.Training.FastSlow.StateTest do
       prompt_revision: state.prompt_population.revision,
       dataset_indices: [0],
       input_digest: Config.digest(%{"input" => index}),
-      behavior_policy_id: "behavior-v1",
+      behavior_policy_id: state.current_theta_id,
       sampling_config_digest: state.sampling_config_digest,
       behavior_logprobs: [-0.1, -0.2]
     ]
 
     Keyword.merge(defaults, overrides)
+  end
+
+  defp lookahead(state) do
+    minibatches =
+      for step <- 0..(state.t - 1) do
+        identity = "cycle-#{state.cycle}-batch-#{step}"
+        %{"id" => identity, "digest" => Config.digest(%{"batch" => identity})}
+      end
+
+    Lookahead.new!(state.cycle, state.dataset.cursor, minibatches)
+  end
+
+  defp population_metadata(candidates) do
+    [left, right] = Enum.map(candidates, &Config.digest/1)
+
+    %{
+      candidate_ids: [left, right],
+      instance_scores: %{
+        "instance-a" => %{left => 1.0, right => 0.0},
+        "instance-b" => %{left => 0.0, right => 1.0}
+      },
+      instance_frontier: %{"instance-a" => [left], "instance-b" => [right]}
+    }
   end
 end

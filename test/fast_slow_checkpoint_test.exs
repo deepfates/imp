@@ -1,7 +1,15 @@
 defmodule DSEx.Training.FastSlow.CheckpointTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{Checkpoint, Config, Event, OperationIntent, Rollout, State}
+  alias DSEx.Training.FastSlow.{
+    Checkpoint,
+    Config,
+    Event,
+    Lookahead,
+    OperationIntent,
+    Rollout,
+    State
+  }
 
   test "checkpoint JSON round trip retains provider-independent training state" do
     config = config()
@@ -115,12 +123,104 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     end
   end
 
+  test "valid-checksum adversarial payloads cannot forge lookahead or GEPA provenance" do
+    config = config()
+    checkpoint = Checkpoint.dump(config, populated_state(config))
+
+    forged_minibatch =
+      checkpoint
+      |> put_in(
+        ["payload", "state", "lookahead", "minibatches", Access.at(0), "digest"],
+        String.duplicate("f", 64)
+      )
+      |> resign()
+
+    assert_raise ArgumentError, ~r/lookahead identity|checksum/, fn ->
+      Checkpoint.load!(forged_minibatch, config)
+    end
+
+    overconsumed =
+      checkpoint
+      |> put_in(["payload", "state", "lookahead", "consumed_steps"], config.t + 1)
+      |> resign()
+
+    assert_raise ArgumentError, ~r/consumption/, fn ->
+      Checkpoint.load!(overconsumed, config)
+    end
+
+    forged_candidate =
+      checkpoint
+      |> put_in(
+        ["payload", "state", "prompt_population", "candidate_ids", Access.at(0)],
+        "forged-candidate"
+      )
+      |> resign()
+
+    assert_raise ArgumentError, ~r/frontier|scores|digest/, fn ->
+      Checkpoint.load!(forged_candidate, config)
+    end
+
+    missing_frontier_winner =
+      checkpoint
+      |> put_in(
+        ["payload", "state", "prompt_population", "instance_frontier", "instance-b"],
+        [
+          get_in(checkpoint, [
+            "payload",
+            "state",
+            "prompt_population",
+            "candidate_ids",
+            Access.at(0)
+          ])
+        ]
+      )
+      |> resign()
+
+    assert_raise ArgumentError, ~r/frontier-selected/, fn ->
+      Checkpoint.load!(missing_frontier_winner, config)
+    end
+
+    wrong_lookahead_binding =
+      checkpoint
+      |> put_in(
+        ["payload", "state", "prompt_population", "lookahead_digest"],
+        String.duplicate("e", 64)
+      )
+      |> update_in(["payload", "state", "prompt_population"], &resign_population/1)
+      |> resign()
+
+    assert_raise ArgumentError, ~r/aggregate invariants/, fn ->
+      Checkpoint.load!(wrong_lookahead_binding, config)
+    end
+  end
+
+  test "callbacks cannot enter schema v2 persisted state" do
+    config = config()
+
+    state =
+      config
+      |> populated_state()
+      |> State.record_event(
+        Event.new!(
+          sequence: 0,
+          kind: "callback-leak",
+          cycle: 0,
+          data: %{"checkpoint_fn" => "runtime-only"}
+        )
+      )
+
+    assert_raise ArgumentError, ~r/callbacks may not be persisted/, fn ->
+      Checkpoint.dump(config, state)
+    end
+  end
+
   defp populated_state(config) do
     state =
       config
       |> State.new!(%{"weights" => [0.0]}, ["seed"])
       |> State.set_stage(:fast)
-      |> State.revise_prompts(["p0", "p1"])
+      |> then(&State.put_lookahead(&1, lookahead(&1)))
+      |> State.revise_prompts(["p0", "p1"], population_metadata(["p0", "p1"]))
       |> State.set_stage(:slow)
 
     intent = OperationIntent.new!("provider-operation", 0, %{"job" => "job-1"})
@@ -138,7 +238,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
         prompt_revision: state.prompt_population.revision,
         dataset_indices: [3],
         input_digest: Config.digest(%{"input" => 3}),
-        behavior_policy_id: "behavior-v1",
+        behavior_policy_id: state.current_theta_id,
         sampling_config_digest: state.sampling_config_digest,
         behavior_logprobs: [-0.4, -0.2]
       )
@@ -180,5 +280,33 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
       |> Base.encode16(case: :lower)
 
     Map.put(checkpoint, "payload_sha256", digest)
+  end
+
+  defp resign_population(population) do
+    identity = Map.delete(population, "digest")
+    Map.put(population, "digest", Config.digest(identity))
+  end
+
+  defp lookahead(state) do
+    minibatches =
+      for step <- 0..(state.t - 1) do
+        identity = "cycle-#{state.cycle}-batch-#{step}"
+        %{"id" => identity, "digest" => Config.digest(%{"batch" => identity})}
+      end
+
+    Lookahead.new!(state.cycle, state.dataset.cursor, minibatches)
+  end
+
+  defp population_metadata(candidates) do
+    [left, right] = Enum.map(candidates, &Config.digest/1)
+
+    %{
+      candidate_ids: [left, right],
+      instance_scores: %{
+        "instance-a" => %{left => 1.0, right => 0.0},
+        "instance-b" => %{left => 0.0, right => 1.0}
+      },
+      instance_frontier: %{"instance-a" => [left], "instance-b" => [right]}
+    }
   end
 end

@@ -34,6 +34,7 @@ defmodule DSEx.Training.FastSlow.Config do
 
   @keys @enforce_keys ++ [:optimizer_config, :provider_config, :sampling_config]
   @credential_keys ~w(api_key apikey authorization auth bearer credential credentials password secret token access_token refresh_token private_key headers)
+  @callback_keys ~w(callback callbacks callback_fn checkpoint_fn)
 
   @spec new!(keyword() | map()) :: t()
   def new!(options) when is_list(options) or is_map(options) do
@@ -97,6 +98,7 @@ defmodule DSEx.Training.FastSlow.Config do
   def persisted_safe!(value) do
     value = json_safe!(value)
     reject_credentials!(value)
+    reject_callbacks!(value)
     value
   end
 
@@ -157,6 +159,8 @@ defmodule DSEx.Training.FastSlow.Config do
 
   defp reject_credentials!(value), do: walk_keys!(value, [])
 
+  defp reject_callbacks!(value), do: walk_callback_keys!(value, [])
+
   defp walk_keys!(map, path) when is_map(map) do
     Enum.each(map, fn {key, value} ->
       normalized = key |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "_")
@@ -178,6 +182,28 @@ defmodule DSEx.Training.FastSlow.Config do
   end
 
   defp walk_keys!(_value, _path), do: :ok
+
+  defp walk_callback_keys!(map, path) when is_map(map) do
+    Enum.each(map, fn {key, value} ->
+      normalized = key |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "_")
+
+      if normalized in @callback_keys or String.ends_with?(normalized, "_callback") or
+           String.ends_with?(normalized, "_callbacks") do
+        raise ArgumentError,
+              "Fast-Slow callbacks may not be persisted at #{format_path(path ++ [key])}"
+      end
+
+      walk_callback_keys!(value, path ++ [key])
+    end)
+  end
+
+  defp walk_callback_keys!(list, path) when is_list(list) do
+    list
+    |> Enum.with_index()
+    |> Enum.each(fn {value, index} -> walk_callback_keys!(value, path ++ [index]) end)
+  end
+
+  defp walk_callback_keys!(_value, _path), do: :ok
 
   defp json_key!(key, _path) when is_binary(key), do: key
   defp json_key!(key, _path) when is_atom(key), do: Atom.to_string(key)

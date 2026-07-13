@@ -117,6 +117,11 @@ defmodule DSEx.Training.FastSlow.Rollout do
         metrics
       )
       when is_binary(claim_id) and is_number(score) do
+    score = Config.json_safe!(score, [:rollout, :score])
+
+    unless score >= 0 and score <= 1,
+      do: raise(ArgumentError, "Fast-Slow verifier reward must be between zero and one")
+
     output = Config.json_safe!(output, [:rollout, :output])
     metrics = Config.json_safe!(metrics, [:rollout, :metrics])
 
@@ -209,7 +214,7 @@ defmodule DSEx.Training.FastSlow.Rollout do
         is_binary(rollout.theta_id) and rollout.theta_id != "" and
         is_integer(rollout.prompt_revision) and rollout.prompt_revision >= 0 and
         valid_indices?(rollout.dataset_indices) and digest?(rollout.input_digest) and
-        is_binary(rollout.behavior_policy_id) and rollout.behavior_policy_id != "" and
+        rollout.behavior_policy_id == rollout.theta_id and
         digest?(rollout.sampling_config_digest) and valid_logprobs?(rollout.behavior_logprobs) and
         valid_status_data?(rollout)
 
@@ -260,4 +265,86 @@ defmodule DSEx.Training.FastSlow.Rollout do
     do: is_binary(rollout.claim_id) and not is_nil(rollout.failure)
 
   defp digest?(value), do: is_binary(value) and Regex.match?(~r/\A[0-9a-f]{64}\z/, value)
+end
+
+defmodule DSEx.Training.FastSlow.AdvantageGroup do
+  @moduledoc false
+
+  alias DSEx.Training.FastSlow.{Config, Rollout}
+
+  @enforce_keys [
+    :id,
+    :cycle,
+    :problem_id,
+    :size,
+    :prompt_count,
+    :mean_reward,
+    :std_reward,
+    :epsilon,
+    :members
+  ]
+  defstruct @enforce_keys
+
+  @type t :: %__MODULE__{
+          id: String.t(),
+          cycle: non_neg_integer(),
+          problem_id: String.t(),
+          size: pos_integer(),
+          prompt_count: pos_integer(),
+          mean_reward: float(),
+          std_reward: float(),
+          epsilon: float(),
+          members: [map()]
+        }
+
+  @doc "Builds one question-level advantage group across every prompt allocation."
+  @spec new!([Rollout.t()], String.t(), non_neg_integer(), pos_integer(), pos_integer(), float()) ::
+          t()
+  def new!(rollouts, group_id, cycle, group_size, prompt_count, epsilon \\ 1.0e-6)
+
+  def new!(rollouts, group_id, cycle, group_size, prompt_count, epsilon)
+      when is_list(rollouts) and is_binary(group_id) and is_integer(cycle) and cycle >= 0 and
+             is_integer(group_size) and group_size > 0 and is_integer(prompt_count) and
+             prompt_count > 0 and is_float(epsilon) and epsilon > 0 do
+    selected =
+      Rollout.validate_complete_group!(rollouts, group_id, cycle, group_size, prompt_count)
+
+    rewards = Enum.map(selected, &(&1.score * 1.0))
+    mean = Enum.sum(rewards) / group_size
+    variance = Enum.reduce(rewards, 0.0, &(&2 + :math.pow(&1 - mean, 2))) / group_size
+    std = :math.sqrt(variance)
+
+    members =
+      Enum.map(selected, fn rollout ->
+        %{
+          "rollout_id" => rollout.id,
+          "member_index" => rollout.member_index,
+          "prompt_index" => rollout.prompt_index,
+          "reward" => rollout.score,
+          "advantage" => (rollout.score - mean) / (std + epsilon),
+          "behavior_policy_id" => rollout.behavior_policy_id,
+          "behavior_logprobs" => rollout.behavior_logprobs
+        }
+      end)
+
+    %__MODULE__{
+      id: group_id,
+      cycle: cycle,
+      problem_id: hd(selected).problem_id,
+      size: group_size,
+      prompt_count: prompt_count,
+      mean_reward: mean,
+      std_reward: std,
+      epsilon: epsilon,
+      members: members
+    }
+  end
+
+  def new!(_rollouts, _group_id, _cycle, _group_size, _prompt_count, _epsilon) do
+    raise ArgumentError, "invalid Fast-Slow advantage group configuration"
+  end
+
+  @doc "Returns a deterministic JSON-safe representation for provider training boundaries."
+  @spec dump(t()) :: map()
+  def dump(%__MODULE__{} = group), do: Config.json_safe!(Map.from_struct(group))
 end
