@@ -1,0 +1,18 @@
+{
+  "builder": {
+    "path": "benchmarks/data/playbook/build_dataset.py",
+    "sha256": "e92fa3ef1ca8abf031a12787bc3ecae9e9c5a4d82c71b340b4131f88ad9430d2"
+  },
+  "materialized": {
+    "path": "benchmarks/data/playbook/math-equation-balancer.jsonl",
+    "rows": 250,
+    "sha256": "00fb77cb5940a2066d922fc7cf53beaf040a9fedae109af15eaa2cc39cbc04e1"
+  },
+  "schema_version": 1,
+  "source": {
+    "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+    "path": "data/MathEquationBalancer/data-00000-of-00001.arrow",
+    "repository": "https://github.com/suzgunmirac/dynamic-cheatsheet",
+    "sha256": "4f7a605807efb3b2b5e739f39032d4e9bb5026e57ca3c8d45a3e99a861c3e5e2"
+  }
+}

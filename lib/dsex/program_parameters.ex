@@ -23,6 +23,7 @@ defmodule DSEx.ProgramParameters do
 
   @type name :: atom() | String.t()
   @type entry :: %{name: name(), predictor: struct()}
+  @type playbook_entry :: %{name: name(), playbook: DSEx.Playbook.t()}
 
   @spec predictors(struct()) :: [entry()]
   def predictors(%module{} = program) do
@@ -62,6 +63,41 @@ defmodule DSEx.ProgramParameters do
   @spec put_demos(struct(), name(), [term()]) :: struct()
   def put_demos(program, name, demos) when is_list(demos) do
     update_predictor(program, name, &Predict.with_demos(&1, demos))
+  end
+
+  @doc "Returns named persistent playbook parameters exposed by a program."
+  @spec playbooks(struct()) :: [playbook_entry()]
+  def playbooks(%module{} = program) do
+    if function_exported?(module, :optimizer_playbooks, 1) do
+      program
+      |> module.optimizer_playbooks()
+      |> normalize_custom_playbooks!()
+    else
+      []
+    end
+  end
+
+  @doc "Functionally updates one named persistent playbook parameter."
+  @spec update_playbook(struct(), name(), (DSEx.Playbook.t() -> DSEx.Playbook.t())) :: struct()
+  def update_playbook(%module{} = program, name, update) when is_function(update, 1) do
+    if function_exported?(module, :update_optimizer_playbook, 3) do
+      updated = module.update_optimizer_playbook(program, name, update)
+
+      unless match?(%DSEx.Playbook{}, fetch_playbook!(updated, name)) do
+        raise ArgumentError, "optimizer playbook update must return a DSEx.Playbook"
+      end
+
+      updated
+    else
+      raise ArgumentError,
+            "program #{inspect(module)} has no optimizer playbook named #{inspect(name)}"
+    end
+  end
+
+  @doc "Replaces one named persistent playbook parameter."
+  @spec put_playbook(struct(), name(), DSEx.Playbook.t()) :: struct()
+  def put_playbook(program, name, %DSEx.Playbook{} = playbook) do
+    update_playbook(program, name, fn _current -> playbook end)
   end
 
   defp builtin_predictors(program) do
@@ -141,6 +177,34 @@ defmodule DSEx.ProgramParameters do
   defp normalize_custom_predictors!(other) do
     raise ArgumentError,
           "optimizer_predictors/1 must return a list, got: #{inspect(other)}"
+  end
+
+  defp normalize_custom_playbooks!(playbooks) when is_list(playbooks) do
+    entries =
+      Enum.map(playbooks, fn
+        {name, %DSEx.Playbook{} = playbook} -> %{name: name, playbook: playbook}
+        %{name: name, playbook: %DSEx.Playbook{} = playbook} -> %{name: name, playbook: playbook}
+        other -> raise ArgumentError, "invalid optimizer playbook entry: #{inspect(other)}"
+      end)
+
+    names = Enum.map(entries, & &1.name)
+    normalized_names = Enum.map(names, &{name_type(&1), to_string(&1)})
+
+    if length(normalized_names) == MapSet.size(MapSet.new(normalized_names)),
+      do: entries,
+      else: raise(ArgumentError, "optimizer playbook names must be unique")
+  end
+
+  defp normalize_custom_playbooks!(other) do
+    raise ArgumentError,
+          "optimizer_playbooks/1 must return a list, got: #{inspect(other)}"
+  end
+
+  defp fetch_playbook!(program, name) do
+    case Enum.find(playbooks(program), &(&1.name == name)) do
+      %{playbook: playbook} -> playbook
+      nil -> raise ArgumentError, "optimizer playbook update removed #{inspect(name)}"
+    end
   end
 
   defp name_type(name) when is_atom(name), do: :atom

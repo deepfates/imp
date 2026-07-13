@@ -788,6 +788,21 @@ defmodule DSEx.Saving do
     |> redact_dump()
   end
 
+  defp redact_dump(%{
+         "type" => "with_playbook",
+         "program" => program,
+         "playbook" => %{"policy" => %{"reject_secrets" => true}} = playbook
+       }) do
+    # Playbook admission already rejects secrets. Revalidate before preserving
+    # integrity hashes that generic secret-shaped-value redaction would destroy.
+    validated = playbook |> DSEx.Playbook.load!() |> DSEx.Playbook.dump()
+    %{"type" => "with_playbook", "program" => redact_dump(program), "playbook" => validated}
+  end
+
+  defp redact_dump(%{"type" => "with_playbook"}) do
+    raise ArgumentError, "portable playbook persistence requires reject_secrets: true"
+  end
+
   defp redact_dump(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
       cond do

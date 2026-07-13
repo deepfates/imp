@@ -54,6 +54,22 @@ defmodule DSEx.Playbook.WithContext do
     %{wrapper | program: ProgramParameters.update_predictor(wrapper.program, name, update)}
   end
 
+  @doc false
+  def optimizer_playbooks(%__MODULE__{playbook: playbook}),
+    do: [%{name: :playbook, playbook: playbook}]
+
+  @doc false
+  def update_optimizer_playbook(%__MODULE__{} = wrapper, :playbook, update) do
+    case update.(wrapper.playbook) do
+      %Playbook{} = playbook -> %{wrapper | playbook: playbook}
+      other -> raise ArgumentError, "playbook update returned #{inspect(other)}"
+    end
+  end
+
+  def update_optimizer_playbook(%__MODULE__{}, name, _update) do
+    raise ArgumentError, "with_playbook has no optimizer playbook named #{inspect(name)}"
+  end
+
   defp contextualize(program, playbook) do
     case Playbook.render(playbook) do
       "" ->
