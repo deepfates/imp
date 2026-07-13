@@ -9,8 +9,8 @@ defmodule DSEx.Optimizer.MIPROv2 do
   program.
   """
 
-  alias DSEx.Optimizer.{DemoCandidates, InstructionProposer, Sampling, SearchPolicy}
-  alias DSEx.Optimizer.MIPROv2.Config
+  alias DSEx.Optimizer.{DemoCandidates, InstructionProposer, Report, Sampling, SearchPolicy}
+  alias DSEx.Optimizer.MIPROv2.{Checkpoint, Config}
   alias DSEx.Optimizer.SearchPolicy.CategoricalTPE, as: CategoricalPolicy
 
   defstruct [
@@ -38,6 +38,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
     :startup_trials
   ]
   @legacy_keys [:trials, :demos_per_candidate, :cold_start]
+  @compile_runtime_keys [:resume_state, :checkpoint_fn, :max_trials]
 
   def new(metric, opts \\ []) do
     DSEx.FunctionContract.validate!(metric, [2, 3], "DSEx.Optimizer.MIPROv2.new/2", "metric")
@@ -64,7 +65,23 @@ defmodule DSEx.Optimizer.MIPROv2 do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, valset) do
-    compile(optimizer, program, trainset: trainset, valset: valset)
+    compile(optimizer, program, trainset, valset, [])
+  end
+
+  @doc """
+  Compiles with optional invocation-level checkpoint and resume controls.
+
+  `:max_trials` limits the number of new objective trials executed by this
+  invocation. `:checkpoint_fn` receives a JSON-safe checkpoint after setup and
+  after each completed trial. Pass any emitted checkpoint back as
+  `:resume_state` to continue without replaying setup or completed trials.
+  Checkpoints are trial-atomic, so an interrupted in-flight trial is retried.
+  """
+  def compile(%__MODULE__{} = optimizer, program, trainset, valset, opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "DSEx.Optimizer.MIPROv2.compile/5 expects keyword options")
+
+    compile(optimizer, program, Keyword.merge(opts, trainset: trainset, valset: valset))
   end
 
   def compile(%__MODULE__{} = optimizer, program, opts) when is_list(opts) do
@@ -73,7 +90,8 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
     trainset = Keyword.fetch!(opts, :trainset)
     valset = Keyword.get(opts, :valset)
-    compile_overrides = Keyword.drop(opts, [:trainset, :valset])
+    compile_overrides = Keyword.drop(opts, [:trainset, :valset] ++ @compile_runtime_keys)
+    run_opts = opts |> Keyword.take(@compile_runtime_keys) |> validate_compile_options!()
     predictors = DSEx.ProgramParameters.predictors(program)
 
     if predictors == [] do
@@ -83,7 +101,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
     config =
       Config.resolve(optimizer.config, length(predictors), trainset, valset, compile_overrides)
 
-    run(optimizer, config, program, predictors)
+    run(optimizer, config, program, predictors, run_opts)
   end
 
   @doc false
@@ -128,18 +146,96 @@ defmodule DSEx.Optimizer.MIPROv2 do
     search_space(predictors, instructions, demos)
   end
 
-  defp run(optimizer, config, program, predictors) do
+  defp run(optimizer, config, program, predictors, run_opts) do
     prompt_lm =
       optimizer.prompt_lm || predictors |> hd() |> Map.fetch!(:predictor) |> Map.get(:lm)
 
     program = maybe_rebind_task_lm(program, predictors, optimizer.task_lm)
     predictors = DSEx.ProgramParameters.predictors(program)
 
-    if is_nil(prompt_lm) do
+    if is_nil(prompt_lm) and is_nil(run_opts[:resume_state]) do
       raise ArgumentError,
             "MIPROv2 requires :prompt_lm or a concrete LM on the program's first predictor"
     end
 
+    compatibility = resume_compatibility(program, predictors, config, optimizer)
+
+    {artifacts, state, resumed?} =
+      case run_opts[:resume_state] do
+        nil ->
+          {artifacts, state} = setup_run(optimizer, config, program, predictors, prompt_lm)
+          emit_checkpoint(run_opts[:checkpoint_fn], compatibility, artifacts, state)
+          {artifacts, state, false}
+
+        checkpoint ->
+          %{artifacts: artifacts, state: state} =
+            Checkpoint.load!(checkpoint, compatibility)
+
+          {artifacts, restore_programs(state, program, predictors, artifacts), true}
+      end
+
+    %{instruction_candidates: instruction_candidates, search_demos: search_demos} = artifacts
+    completed_trials = length(state.trials)
+    run_limit = invocation_trial_limit(config.num_trials, completed_trials, run_opts[:max_trials])
+
+    state =
+      Enum.reduce(trial_range(completed_trials + 1, run_limit), state, fn trial, state ->
+        state =
+          run_trial(
+            trial,
+            state,
+            optimizer,
+            config,
+            program,
+            predictors,
+            instruction_candidates,
+            search_demos
+          )
+
+        emit_checkpoint(run_opts[:checkpoint_fn], compatibility, artifacts, state)
+        state
+      end)
+
+    checkpoint = Checkpoint.dump(compatibility, artifacts, state)
+    run_status = if length(state.trials) == config.num_trials, do: :complete, else: :paused
+    best = Enum.max_by(state.full_evaluations, & &1.score)
+
+    DSEx.Optimizer.Report.attach(
+      best.program,
+      DSEx.Optimizer.Report.new(%{
+        optimizer: :mipro_v2,
+        best_score: best.score,
+        candidate_count: length(state.trials),
+        candidates: Enum.map(state.trials, &Map.drop(&1, [:program])),
+        errors: state.errors,
+        metadata: %{
+          algorithm: :mipro_v2,
+          sampler: :joint_categorical_parzen,
+          upstream_sampler: :optuna_multivariate_tpe,
+          exact_sampler_sequence_parity: false,
+          upstream_release: "DSPy 3.3.0b1",
+          upstream_commit: "b2829b7",
+          seed: config.seed,
+          effective_config: config_metadata(config),
+          bootstrap: artifacts.bootstrap_metadata,
+          proposals: artifacts.proposal_metadata,
+          predictor_names: Enum.map(predictors, & &1.name),
+          search_space: Map.new(artifacts.space, fn {key, choices} -> {key, length(choices)} end),
+          search_policy: SearchPolicy.dump(state.policy),
+          full_evaluations: Enum.map(state.full_evaluations, &Map.drop(&1, [:program])),
+          evaluation_calls: state.evaluation_calls,
+          compatibility: optimizer.compatibility,
+          resumed: resumed?,
+          run_status: run_status,
+          completed_trials: length(state.trials),
+          resume_state: checkpoint,
+          status: if(state.errors == [], do: :ok, else: :with_errors)
+        }
+      })
+    )
+  end
+
+  defp setup_run(optimizer, config, program, predictors, prompt_lm) do
     teacher = optimizer.teacher || program
 
     {demo_candidates, bootstrap_metadata} =
@@ -209,51 +305,37 @@ defmodule DSEx.Optimizer.MIPROv2 do
       errors: Map.get(bootstrap_metadata, :errors, []) ++ proposal_errors ++ baseline.errors
     }
 
-    state =
-      Enum.reduce(trial_indices(config.num_trials), state, fn trial, state ->
-        run_trial(
-          trial,
-          state,
-          optimizer,
-          config,
+    artifacts = %{
+      instruction_candidates: instruction_candidates,
+      search_demos: search_demos,
+      bootstrap_metadata: bootstrap_metadata,
+      proposal_metadata: proposal_metadata,
+      space: space
+    }
+
+    {artifacts, state}
+  end
+
+  defp restore_programs(state, program, predictors, artifacts) do
+    restore = fn record ->
+      Map.put(
+        record,
+        :program,
+        apply_params(
           program,
           predictors,
-          instruction_candidates,
-          search_demos
+          record.params,
+          artifacts.instruction_candidates,
+          artifacts.search_demos
         )
-      end)
+      )
+    end
 
-    best = Enum.max_by(state.full_evaluations, & &1.score)
-
-    DSEx.Optimizer.Report.attach(
-      best.program,
-      DSEx.Optimizer.Report.new(%{
-        optimizer: :mipro_v2,
-        best_score: best.score,
-        candidate_count: length(state.trials),
-        candidates: Enum.map(state.trials, &Map.drop(&1, [:program])),
-        errors: state.errors,
-        metadata: %{
-          algorithm: :mipro_v2,
-          sampler: :joint_categorical_parzen,
-          upstream_sampler: :optuna_multivariate_tpe,
-          exact_sampler_sequence_parity: false,
-          upstream_release: "DSPy 3.3.0b1",
-          upstream_commit: "b2829b7",
-          seed: config.seed,
-          effective_config: config_metadata(config),
-          bootstrap: bootstrap_metadata,
-          proposals: proposal_metadata,
-          predictor_names: Enum.map(predictors, & &1.name),
-          search_space: Map.new(space, fn {key, choices} -> {key, length(choices)} end),
-          search_policy: SearchPolicy.dump(state.policy),
-          full_evaluations: Enum.map(state.full_evaluations, &Map.drop(&1, [:program])),
-          evaluation_calls: state.evaluation_calls,
-          compatibility: optimizer.compatibility,
-          status: if(state.errors == [], do: :ok, else: :with_errors)
-        }
-      })
-    )
+    %{
+      state
+      | trials: Enum.map(state.trials, restore),
+        full_evaluations: Enum.map(state.full_evaluations, restore)
+    }
   end
 
   defp run_trial(
@@ -443,6 +525,53 @@ defmodule DSEx.Optimizer.MIPROv2 do
   defp trial_indices(count) when count > 0, do: 1..count
   defp trial_indices(_count), do: []
 
+  defp trial_range(first, last) when first <= last, do: first..last
+  defp trial_range(_first, _last), do: []
+
+  defp invocation_trial_limit(total, _completed, :infinity), do: total
+  defp invocation_trial_limit(total, _completed, nil), do: total
+  defp invocation_trial_limit(total, completed, maximum), do: min(total, completed + maximum)
+
+  defp emit_checkpoint(nil, _compatibility, _artifacts, _state), do: :ok
+
+  defp emit_checkpoint(callback, compatibility, artifacts, state) do
+    callback.(Checkpoint.dump(compatibility, artifacts, state))
+    :ok
+  end
+
+  defp resume_compatibility(program, predictors, config, optimizer) do
+    payload = %{
+      config: config_metadata(config),
+      datasets: %{trainset: config.trainset, valset: config.valset},
+      evaluation: %{
+        metric: callback_identity(optimizer.metric),
+        max_concurrency: optimizer.max_concurrency,
+        max_errors: optimizer.max_errors,
+        timeout: optimizer.timeout
+      },
+      predictors:
+        Enum.map(predictors, fn %{name: name, predictor: predictor} ->
+          %{name: name, signature: predictor.signature}
+        end),
+      program_module: program.__struct__
+    }
+
+    digest =
+      payload
+      |> Report.json_safe()
+      |> :erlang.term_to_binary([:deterministic])
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    %{"sha256" => digest}
+  end
+
+  defp callback_identity(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      {key, callback |> :erlang.fun_info(key) |> elem(1)}
+    end)
+  end
+
   defp full_record(trial, params, score, program, kind),
     do: %{trial: trial, params: params, score: score, program: program, kind: kind}
 
@@ -495,6 +624,23 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
     runtime = Keyword.put_new(runtime, :startup_trials, Keyword.get(legacy, :cold_start, 10))
     {config, runtime, Enum.map(Keyword.keys(legacy), &{:deprecated_option, &1})}
+  end
+
+  defp validate_compile_options!(opts) do
+    resume_state = Keyword.get(opts, :resume_state)
+    checkpoint_fn = Keyword.get(opts, :checkpoint_fn)
+    max_trials = Keyword.get(opts, :max_trials, :infinity)
+
+    unless is_nil(resume_state) or is_map(resume_state),
+      do: raise(ArgumentError, ":resume_state must be a checkpoint map or nil")
+
+    unless is_nil(checkpoint_fn) or is_function(checkpoint_fn, 1),
+      do: raise(ArgumentError, ":checkpoint_fn must be an arity-one function or nil")
+
+    unless max_trials == :infinity or (is_integer(max_trials) and max_trials >= 0),
+      do: raise(ArgumentError, ":max_trials must be :infinity or a non-negative integer")
+
+    [resume_state: resume_state, checkpoint_fn: checkpoint_fn, max_trials: max_trials]
   end
 
   defp validate_runtime!(optimizer) do

@@ -8,8 +8,8 @@ defmodule DSEx.Optimizer.SIMBA do
   population and performs final selection on the full validation dataset.
   """
 
-  alias DSEx.Optimizer.{Sampling, SearchPolicy, TrajectoryRunner}
-  alias DSEx.Optimizer.SIMBA.{Buckets, Population}
+  alias DSEx.Optimizer.{Report, Sampling, SearchPolicy, TrajectoryRunner}
+  alias DSEx.Optimizer.SIMBA.{Buckets, Checkpoint, Population}
 
   defstruct [
     :metric,
@@ -43,6 +43,7 @@ defmodule DSEx.Optimizer.SIMBA do
     :seed
   ]
   @legacy_keys [:steps, :demos_per_step, :judge_lm]
+  @compile_runtime_keys [:resume_state, :checkpoint_fn, :max_steps]
 
   def new(metric, opts \\ []) do
     DSEx.FunctionContract.validate!(metric, [2, 3], "DSEx.Optimizer.SIMBA.new/2", "metric")
@@ -82,11 +83,28 @@ defmodule DSEx.Optimizer.SIMBA do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
-    compile_run(optimizer, program, trainset, nil)
+    compile_run(optimizer, program, trainset, nil, [])
   end
 
-  def compile(%__MODULE__{} = optimizer, program, trainset, final_set) do
-    compile_run(optimizer, program, trainset, final_set)
+  def compile(%__MODULE__{} = optimizer, program, trainset, final_set_or_opts) do
+    if Keyword.keyword?(final_set_or_opts) do
+      compile_run(optimizer, program, trainset, nil, final_set_or_opts)
+    else
+      compile_run(optimizer, program, trainset, final_set_or_opts, [])
+    end
+  end
+
+  @doc """
+  Compiles with invocation-level durable checkpoint and resume controls.
+
+  `:max_steps` limits new completed search steps in this invocation.
+  `:checkpoint_fn` receives a JSON-safe checkpoint before work, after every
+  completed step, and after every completed final evaluation. Pass any emitted
+  checkpoint back through `:resume_state`. Step and final-evaluation boundaries
+  are atomic; interrupted in-flight work is retried.
+  """
+  def compile(%__MODULE__{} = optimizer, program, trainset, final_set, opts) do
+    compile_run(optimizer, program, trainset, final_set, opts)
   end
 
   @doc false
@@ -158,7 +176,8 @@ defmodule DSEx.Optimizer.SIMBA do
     }
   end
 
-  defp compile_run(optimizer, program, trainset, final_set) do
+  defp compile_run(optimizer, program, trainset, final_set, opts) do
+    run_opts = validate_compile_options!(opts)
     trainset = materialize!(trainset, "trainset")
     final_set = if is_nil(final_set), do: trainset, else: materialize!(final_set, "final_set")
 
@@ -172,79 +191,88 @@ defmodule DSEx.Optimizer.SIMBA do
     if predictors == [],
       do: raise(ArgumentError, "SIMBA requires at least one optimizer predictor")
 
+    if final_set == [], do: raise(ArgumentError, "SIMBA final_set must not be empty")
+
     prompt_lm =
       optimizer.prompt_lm || predictors |> hd() |> Map.fetch!(:predictor) |> Map.get(:lm)
 
     if is_nil(prompt_lm),
       do: raise(ArgumentError, "SIMBA requires :prompt_lm or a concrete program LM")
 
-    {order, rng} =
-      Sampling.shuffle(Enum.to_list(0..(length(trainset) - 1)), Sampling.new(optimizer.seed))
+    compatibility = resume_compatibility(program, predictors, trainset, final_set, optimizer)
 
-    state = %{
-      population: Population.new(program, rng: rng),
-      winning_programs: [program],
-      trial_logs: [],
-      order: order,
-      cursor: 0,
-      poisson_rng: Sampling.new(optimizer.seed + 1_000_003),
-      errors: [],
-      trajectory_calls: 0,
-      candidate_evaluation_calls: 0
-    }
+    {state, resumed?} =
+      case run_opts[:resume_state] do
+        nil ->
+          {order, rng} =
+            Sampling.shuffle(
+              Enum.to_list(0..(length(trainset) - 1)),
+              Sampling.new(optimizer.seed)
+            )
+
+          state = %{
+            completed_steps: 0,
+            population: Population.new(program, rng: rng),
+            winning_programs: [program],
+            trial_logs: [],
+            order: order,
+            cursor: 0,
+            poisson_rng: Sampling.new(optimizer.seed + 1_000_003),
+            errors: [],
+            trajectory_calls: 0,
+            candidate_evaluation_calls: 0,
+            final_evaluation_calls: 0,
+            final_evaluations: []
+          }
+
+          emit_checkpoint(run_opts[:checkpoint_fn], compatibility, state)
+          {state, false}
+
+        checkpoint ->
+          state = Checkpoint.load!(checkpoint, compatibility, program)
+          validate_resumed_state!(state, optimizer, trainset)
+          {state, true}
+      end
+
+    run_limit =
+      invocation_step_limit(optimizer.max_steps, state.completed_steps, run_opts[:max_steps])
 
     state =
-      Enum.reduce(step_indices(optimizer.max_steps), state, fn step, state ->
-        run_step(step, state, optimizer, trainset, prompt_lm)
+      Enum.reduce(step_range(state.completed_steps + 1, run_limit), state, fn step, state ->
+        state = run_step(step, state, optimizer, trainset, prompt_lm)
+        emit_checkpoint(run_opts[:checkpoint_fn], compatibility, state)
+        state
       end)
 
-    finalists = finalist_programs(state.winning_programs, optimizer.num_candidates + 1)
+    state =
+      if state.completed_steps == optimizer.max_steps do
+        complete_final_evaluations(
+          state,
+          optimizer,
+          final_set,
+          compatibility,
+          run_opts[:checkpoint_fn]
+        )
+      else
+        state
+      end
 
-    {scored_finalists, trial_logs} =
-      finalists
-      |> Enum.with_index()
-      |> Enum.map_reduce(state.trial_logs, fn {finalist, finalist_index}, trial_logs ->
-        trajectories =
-          TrajectoryRunner.run(finalist, final_set, optimizer.metric,
-            max_concurrency: optimizer.max_concurrency,
-            timeout: optimizer.timeout,
-            runtime: :simba
-          )
-
-        scored = %{
-          program: finalist,
-          score: average_score(trajectories),
-          scores: Enum.map(trajectories, & &1.score),
-          errors: trajectory_errors(trajectories, :final_evaluation)
-        }
-
-        trial_logs =
-          if finalist_index == 0 do
-            trial_logs
-          else
-            List.update_at(
-              trial_logs,
-              finalist_index - 1,
-              &Map.put(&1, :train_score, scored.score)
-            )
-          end
-
-        {scored, trial_logs}
-      end)
-
-    best = Enum.max_by(scored_finalists, & &1.score)
-    errors = state.errors ++ Enum.flat_map(scored_finalists, & &1.errors)
+    checkpoint = Checkpoint.dump(compatibility, state)
+    complete? = state.completed_steps == optimizer.max_steps
+    scored_finalists = state.final_evaluations
+    best = if complete?, do: Enum.max_by(scored_finalists, & &1.score), else: nil
+    attached_program = if best, do: best.program, else: List.last(state.winning_programs)
 
     final_candidates =
       scored_finalists
       |> Enum.sort_by(& &1.score, :desc)
       |> Enum.map(&Map.drop(&1, [:program]))
 
-    DSEx.Optimizer.Report.attach(
-      best.program,
-      DSEx.Optimizer.Report.new(%{
+    Report.attach(
+      attached_program,
+      Report.new(%{
         optimizer: :simba,
-        best_score: best.score,
+        best_score: if(best, do: best.score, else: nil),
         candidate_count: state.population.next_id - 1,
         candidates:
           state.population.program_ids
@@ -256,21 +284,34 @@ defmodule DSEx.Optimizer.SIMBA do
               average_score: Population.average_score(state.population, id)
             }
           end),
-        errors: errors,
+        errors: state.errors,
         metadata: %{
           algorithm: :stochastic_introspective_minibatch_ascent,
           upstream_release: "DSPy 3.3.0b1",
           upstream_commit: "b2829b7",
           seed: optimizer.seed,
-          trial_logs: trial_logs,
+          trial_logs: state.trial_logs,
           final_candidates: final_candidates,
-          baseline_score: scored_finalists |> hd() |> Map.fetch!(:score),
+          baseline_score: if(scored_finalists == [], do: nil, else: hd(scored_finalists).score),
           population_size: length(state.population.program_ids),
           trajectory_calls: state.trajectory_calls,
           candidate_evaluation_calls: state.candidate_evaluation_calls,
+          final_evaluation_calls: state.final_evaluation_calls,
           search_policy: SearchPolicy.dump(state.population.policy),
           compatibility: optimizer.compatibility,
-          status: if(errors == [], do: :ok, else: :with_errors)
+          resumed: resumed?,
+          run_status: if(complete?, do: :complete, else: :paused),
+          completed_steps: state.completed_steps,
+          resume_state: checkpoint,
+          budgets: %{
+            max_steps: optimizer.max_steps,
+            completed_steps: state.completed_steps,
+            remaining_steps: optimizer.max_steps - state.completed_steps,
+            trajectory_calls: state.trajectory_calls,
+            candidate_evaluation_calls: state.candidate_evaluation_calls,
+            final_evaluation_calls: state.final_evaluation_calls
+          },
+          status: if(state.errors == [], do: :ok, else: :with_errors)
         }
       })
     )
@@ -321,7 +362,12 @@ defmodule DSEx.Optimizer.SIMBA do
       candidate_scores: Enum.map(evaluated, & &1.average_score)
     }
 
-    %{state | winning_programs: winning_programs, trial_logs: state.trial_logs ++ [log]}
+    %{
+      state
+      | completed_steps: step,
+        winning_programs: winning_programs,
+        trial_logs: state.trial_logs ++ [log]
+    }
   end
 
   defp sample_trajectories(population, batch, optimizer) do
@@ -802,6 +848,158 @@ defmodule DSEx.Optimizer.SIMBA do
     end
   end
 
+  defp complete_final_evaluations(
+         state,
+         optimizer,
+         final_set,
+         compatibility,
+         checkpoint_fn
+       ) do
+    finalists = finalist_programs(state.winning_programs, optimizer.num_candidates + 1)
+    completed = length(state.final_evaluations)
+
+    finalists
+    |> Enum.drop(completed)
+    |> Enum.with_index(completed)
+    |> Enum.reduce(state, fn {finalist, finalist_index}, state ->
+      trajectories =
+        TrajectoryRunner.run(finalist, final_set, optimizer.metric,
+          max_concurrency: optimizer.max_concurrency,
+          timeout: optimizer.timeout,
+          runtime: :simba
+        )
+
+      errors = trajectory_errors(trajectories, :final_evaluation)
+
+      evaluation = %{
+        finalist_index: finalist_index,
+        program: finalist,
+        score: average_score(trajectories),
+        scores: Enum.map(trajectories, & &1.score),
+        errors: errors
+      }
+
+      trial_logs =
+        if finalist_index == 0 do
+          state.trial_logs
+        else
+          List.update_at(
+            state.trial_logs,
+            finalist_index - 1,
+            &Map.put(&1, :train_score, evaluation.score)
+          )
+        end
+
+      state = %{
+        state
+        | final_evaluations: state.final_evaluations ++ [evaluation],
+          final_evaluation_calls: state.final_evaluation_calls + length(final_set),
+          trial_logs: trial_logs,
+          errors: state.errors ++ errors
+      }
+
+      emit_checkpoint(checkpoint_fn, compatibility, state)
+      state
+    end)
+  end
+
+  defp emit_checkpoint(nil, _compatibility, _state), do: :ok
+
+  defp emit_checkpoint(callback, compatibility, state) do
+    callback.(Checkpoint.dump(compatibility, state))
+    :ok
+  end
+
+  defp invocation_step_limit(total, _completed, :infinity), do: total
+  defp invocation_step_limit(total, completed, maximum), do: min(total, completed + maximum)
+
+  defp step_range(first, last) when first <= last, do: first..last
+  defp step_range(_first, _last), do: []
+
+  defp validate_resumed_state!(state, optimizer, trainset) do
+    expected_order = Enum.to_list(0..(length(trainset) - 1))
+
+    unless Enum.sort(state.order) == expected_order and state.cursor <= length(state.order) do
+      raise ArgumentError, "invalid SIMBA resume state: minibatch order or cursor is invalid"
+    end
+
+    unless state.completed_steps <= optimizer.max_steps do
+      raise ArgumentError,
+            "invalid SIMBA resume state: completed steps exceed the configured budget"
+    end
+
+    finalists = finalist_programs(state.winning_programs, optimizer.num_candidates + 1)
+
+    unless length(state.final_evaluations) <= length(finalists) and
+             (state.final_evaluations == [] or state.completed_steps == optimizer.max_steps) do
+      raise ArgumentError, "invalid SIMBA resume state: final evaluation progress is inconsistent"
+    end
+
+    state
+  end
+
+  defp resume_compatibility(program, predictors, trainset, final_set, optimizer) do
+    payload = %{
+      optimizer: %{
+        bsize: optimizer.bsize,
+        num_candidates: optimizer.num_candidates,
+        max_steps: optimizer.max_steps,
+        max_demos: optimizer.max_demos,
+        demo_input_field_maxlen: optimizer.demo_input_field_maxlen,
+        max_concurrency: optimizer.max_concurrency,
+        timeout: optimizer.timeout,
+        sampling_temperature: optimizer.sampling_temperature,
+        candidate_temperature: optimizer.candidate_temperature,
+        seed: optimizer.seed
+      },
+      datasets: %{trainset: trainset, final_set: final_set},
+      metric: runtime_identity(optimizer.metric),
+      prompt_lm: runtime_identity(optimizer.prompt_lm),
+      teacher_lm: runtime_identity(optimizer.teacher_lm),
+      predictors:
+        Enum.map(predictors, fn %{name: name, predictor: predictor} ->
+          %{
+            name: name,
+            signature: predictor.signature,
+            demos: predictor.demos,
+            lm: runtime_identity(predictor.lm)
+          }
+        end),
+      program_module: program.__struct__
+    }
+
+    digest =
+      payload
+      |> Report.json_safe()
+      |> :erlang.term_to_binary([:deterministic])
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    %{"sha256" => digest}
+  end
+
+  defp runtime_identity(callback) when is_function(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      {key, callback |> :erlang.fun_info(key) |> elem(1)}
+    end)
+  end
+
+  defp runtime_identity(%_{} = struct),
+    do: struct |> Map.from_struct() |> runtime_identity()
+
+  defp runtime_identity(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, runtime_identity(value)} end)
+
+  defp runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
+
+  defp runtime_identity(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.map(&runtime_identity/1) |> List.to_tuple()
+
+  defp runtime_identity(pid) when is_pid(pid), do: :runtime_pid
+  defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
+  defp runtime_identity(port) when is_port(port), do: :runtime_port
+  defp runtime_identity(value), do: value
+
   defp finalist_programs(winners, limit) do
     winners
     |> then(&finalist_indices(length(&1) - 1, limit - 1))
@@ -854,6 +1052,32 @@ defmodule DSEx.Optimizer.SIMBA do
   defp legacy_bsize(_legacy), do: 1
   defp legacy_candidates([]), do: 6
   defp legacy_candidates(_legacy), do: 1
+
+  defp validate_compile_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "DSEx.Optimizer.SIMBA.compile/5 expects keyword options"
+    end
+
+    unknown = Keyword.keys(opts) -- @compile_runtime_keys
+
+    if unknown != [],
+      do: raise(ArgumentError, "unknown SIMBA compile options: #{inspect(unknown)}")
+
+    resume_state = Keyword.get(opts, :resume_state)
+    checkpoint_fn = Keyword.get(opts, :checkpoint_fn)
+    max_steps = Keyword.get(opts, :max_steps, :infinity)
+
+    unless is_nil(resume_state) or is_map(resume_state),
+      do: raise(ArgumentError, ":resume_state must be a checkpoint map or nil")
+
+    unless is_nil(checkpoint_fn) or is_function(checkpoint_fn, 1),
+      do: raise(ArgumentError, ":checkpoint_fn must be an arity-one function or nil")
+
+    unless max_steps == :infinity or (is_integer(max_steps) and max_steps >= 0),
+      do: raise(ArgumentError, ":max_steps must be :infinity or a non-negative integer")
+
+    [resume_state: resume_state, checkpoint_fn: checkpoint_fn, max_steps: max_steps]
+  end
 
   defp validate!(optimizer) do
     for {key, value, minimum} <- [
