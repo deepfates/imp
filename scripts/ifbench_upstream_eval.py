@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import types
+import warnings
 
 
 def install_spacy_stub_if_needed():
@@ -39,6 +40,11 @@ def load_fixtures(path):
 
 
 def import_registry(artifact_root):
+    warnings.filterwarnings(
+        "ignore",
+        message="pkg_resources is deprecated as an API.*",
+        category=UserWarning,
+    )
     install_spacy_stub_if_needed()
     dspy = sys.modules.setdefault("dspy", types.ModuleType("dspy"))
     dspy.Module = getattr(dspy, "Module", object)

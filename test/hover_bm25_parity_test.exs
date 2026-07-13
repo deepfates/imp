@@ -7,6 +7,9 @@ defmodule HoverBM25ParityTest do
     retriever =
       DSEx.BenchmarkTruth.HoverBM25.new(retrieval(corpus_path, index_path))
 
+    assert retriever.metadata["ranking_parity"] == "approximate"
+    assert retriever.metadata["implementation"] == "dsex_native_bm25_approximation"
+
     {:ok, prediction} =
       DSEx.Module.call(retriever, %{claim: "The Eiffel Tower is located in Paris."})
 
@@ -23,9 +26,10 @@ defmodule HoverBM25ParityTest do
     end
   end
 
-  test "native HoVer BM25 can be compared with upstream bm25s when explicitly enabled" do
+  test "source-exact HoVer adapter matches pinned upstream bm25s title order" do
     if System.get_env("DSEX_HOVER_UPSTREAM_PARITY") == "1" do
-      gepa_root = Path.expand("tmp/gepa-artifact")
+      gepa_root = Path.expand(System.get_env("DSEX_GEPA_ROOT") || "tmp/gepa-artifact")
+      python = System.get_env("DSEX_GEPA_PYTHON") || "python3"
 
       corpus_path =
         Path.join(gepa_root, "gepa_artifact/benchmarks/hover/wiki.abstracts.2017.jsonl")
@@ -37,33 +41,32 @@ defmodule HoverBM25ParityTest do
         raise "HoVer upstream corpus is missing at #{corpus_path}"
       end
 
-      query =
-        System.get_env("DSEX_HOVER_UPSTREAM_QUERY") || "The Eiffel Tower is located in Paris."
+      unless File.dir?(index_path) do
+        raise "HoVer upstream index is missing at #{index_path}"
+      end
 
-      k = String.to_integer(System.get_env("DSEX_HOVER_UPSTREAM_K") || "7")
+      for {query, expected_titles} <- upstream_title_fixtures() do
+        {json, 0} =
+          System.cmd(python, [
+            "scripts/hover_bm25_upstream_eval.py",
+            "--gepa-root",
+            gepa_root,
+            "--query",
+            query,
+            "--k",
+            Integer.to_string(length(expected_titles))
+          ])
 
-      {json, 0} =
-        System.cmd("python3", [
-          "scripts/hover_bm25_upstream_eval.py",
-          "--gepa-root",
-          gepa_root,
-          "--query",
-          query,
-          "--k",
-          Integer.to_string(k)
-        ])
+        result = Jason.decode!(json)
+        assert result["upstream_commit"] == "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
 
-      upstream_titles = json |> Jason.decode!() |> Map.fetch!("titles")
+        assert result["upstream_source_sha256"] ==
+                 "705a1d4fa5452d66d21c00d8d915d5dcd57e820b077a68bf3786407d040d3522"
 
-      dsex_titles =
-        DSEx.BenchmarkTruth.HoverBM25.new(
-          retrieval(corpus_path, index_path),
-          k: k
-        )
-        |> DSEx.BenchmarkTruth.HoverBM25.retrieve(query)
-        |> Enum.map(& &1.title)
-
-      assert dsex_titles == upstream_titles
+        assert result["bm25s_version"] == "0.2.12"
+        assert result["titles"] == expected_titles
+        assert length(result["scores"]) == length(expected_titles)
+      end
     else
       assert :skipped
     end
@@ -105,5 +108,34 @@ defmodule HoverBM25ParityTest do
       "corpus_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(corpus_path),
       "index_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(index_path)
     }
+  end
+
+  defp upstream_title_fixtures do
+    [
+      {"The Eiffel Tower is located in Paris.",
+       [
+         "Eiffel Tower (Paris, Texas)",
+         "Eiffel Tower (Paris, Tennessee)",
+         "Eiffel Tower",
+         "Eiffel Tower (disambiguation)",
+         "Eiffel Tower (Cedar Fair)"
+       ]},
+      {"Ada Lovelace worked on the Analytical Engine.",
+       [
+         "Ada Lovelace",
+         "The Thrilling Adventures of Lovelace and Babbage",
+         "Ada Lovelace Award",
+         "History of women in engineering",
+         "Ada. National College for Digital Skills"
+       ]},
+      {"The Beatles were formed in Liverpool.",
+       [
+         "The Beatles timeline",
+         "Liverpool poets",
+         "Songs We Remember",
+         "Cultural impact of the Beatles",
+         "Kingsize Taylor and the Dominoes"
+       ]}
+    ]
   end
 end

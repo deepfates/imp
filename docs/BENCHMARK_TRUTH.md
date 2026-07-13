@@ -349,9 +349,12 @@ must include `dataset.retrieval` provenance for the upstream
 `wiki.abstracts.2017` BM25 corpus and index, including corpus and index
 checksums; the DSEx campaign runner rejects HoVer research rows without that
 provenance and uses a native BM25 corpus retriever for HoVer rows instead of
-asking the LM to invent `retrieved_docs`. Exact ranking parity against upstream
-`bm25s`/PyStemmer retrieval is available through the source-checkout validation
-path because those Python packages are research-environment dependencies:
+asking the LM to invent `retrieved_docs`. That native retriever is a deliberate
+approximation: it does not reproduce the upstream English stopword tokenizer or
+PyStemmer stemming and is not valid for source-exact ranking claims. The pinned
+Python adapter uses upstream commit
+`cbefbc1aa0f43dd39874ec4bf42211365dbda42e`, `bm25s==0.2.12`, and
+`pystemmer==2.2.0.3`; its fixed top-k title order is validated with
 `DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`. For
 campaign rows over the full upstream corpus, set `DSEX_HOVER_UPSTREAM_BM25=1`,
 `DSEX_GEPA_ROOT`, and `DSEX_GEPA_PYTHON` so HoVer retrieval runs through the
@@ -367,6 +370,24 @@ scoring as false. Four upstream IFBench checks depend on Python NLP packages
 checks for normal deterministic evidence and a source-exact bridge for research
 campaigns: set `DSEX_IFBENCH_NLP_BRIDGE=scripts/ifbench_nlp_check.py` and, when
 needed, `DSEX_IFBENCH_NLP_PYTHON` to a Python with those packages and corpora.
+The registry differential covers all 83 active merged-registry instruction ids
+and matches the pinned GEPA artifact fixtures, including language detection and
+the four NLP-backed checks. Reproduce it with:
+
+```sh
+python3 -m venv tmp/ifbench-parity-venv
+tmp/ifbench-parity-venv/bin/python -m pip install \
+  -r benchmarks/requirements-ifbench-parity.txt
+tmp/ifbench-parity-venv/bin/python -m nltk.downloader \
+  -d tmp/ifbench-parity-venv/nltk_data \
+  stopwords averaged_perceptron_tagger_eng
+DSEX_IFBENCH_UPSTREAM_PARITY=1 \
+DSEX_IFBENCH_UPSTREAM_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
+  mix test test/gepa_metrics_test.exs
+```
+
+The absolute interpreter path is intentional because the test runner may
+change its working directory while spawning the upstream evaluator.
 Papillon campaigns must pass a judge LM and emitted research rows must include
 `metric_judge` metadata naming the judge model plus quality/leakage judge
 semantics; the full GEPA replication contract rejects Papillon rows without

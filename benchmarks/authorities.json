@@ -391,8 +391,8 @@
       "primary_authority": {"status": "gap", "locator": null, "revision": null, "title": null},
       "upstream_tests": {"status": "not_applicable", "references": []},
       "dataset_protocol": {"status": "partial", "references": ["HoVer supporting-title retrieval", "wiki.abstracts.2017 BM25 corpus/index provenance requirement"], "immutable_digests": []},
-      "local_differential": {"status": "partial", "artifacts": ["test/hover_bm25_parity_test.exs"]},
-      "notes": "A local test path is not a completed full-scope campaign artifact; corpus and index checksums are not recorded in this audit ledger."
+      "local_differential": {"status": "present", "artifacts": ["test/hover_bm25_parity_test.exs", "scripts/hover_bm25_upstream_eval.py", "DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs"]},
+      "notes": "The source-exact Python adapter matches pinned upstream BM25S top-five title order over the 5,233,330-document index; the native Elixir retriever is explicitly labeled approximate. Full campaign evidence remains separate."
     },
     {
       "id": "family.benchmark_ifbench",
@@ -406,8 +406,8 @@
       "primary_authority": {"status": "gap", "locator": null, "revision": null, "title": null},
       "upstream_tests": {"status": "not_applicable", "references": []},
       "dataset_protocol": {"status": "partial", "references": ["AllenAI extended registry", "IFEval-style constraints"], "immutable_digests": []},
-      "local_differential": {"status": "gap", "artifacts": []},
-      "notes": "Dedicated upstream fixture comparisons are still required before full registry parity."
+      "local_differential": {"status": "present", "artifacts": ["test/fixtures/ifbench_registry_parity.jsonl", "scripts/ifbench_upstream_eval.py", "DSEX_IFBENCH_UPSTREAM_PARITY=1 mix test test/gepa_metrics_test.exs"]},
+      "notes": "The source-checkout differential covers all 83 active merged-registry instruction ids against the pinned GEPA artifact, including language detection and NLP-backed checks. Full paper-campaign evidence remains separate."
     },
     {
       "id": "family.benchmark_livebench_math",

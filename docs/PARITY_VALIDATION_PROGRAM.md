@@ -303,17 +303,22 @@ paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
 HoVer rows must carry `dataset.retrieval` provenance for the upstream
 `wiki.abstracts.2017` BM25 corpus/index checksums; generic `retrieved_docs`
 predictions without that provenance are rejected for research campaign rows, and
-DSEx uses source-exact HoVer BM25 retrieval with LM-generated multi-hop queries
-for those rows. Validate exact ranking parity in a GEPA source checkout with
+DSEx uses LM-generated multi-hop queries for those rows. The native Elixir BM25
+retriever is an explicitly labeled approximation because it does not reproduce
+the upstream English stopword tokenizer or PyStemmer stemming. Source-exact
+campaigns use the pinned upstream Python BM25S index. Validate its fixed top-k
+title fixtures in a GEPA source checkout at commit
+`cbefbc1aa0f43dd39874ec4bf42211365dbda42e` with
 `DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs` after
-installing upstream HoVer retrieval dependencies (`bm25s`, PyStemmer,
-`diskcache`, and `ujson`).
+setting `DSEX_GEPA_PYTHON` to an environment with `bm25s==0.2.12` and
+`pystemmer==2.2.0.3`.
 IFBench imports the larger AllenAI extended registry; DSEx ports those registry
 checks in Elixir and keeps unknown ids fail-closed. Four IFBench NLP-dependent
 checks have native deterministic fallbacks plus a source-exact Python bridge for
-research campaigns. Papillon campaigns must pass a judge LM and include
-`metric_judge` provenance in research rows. Dedicated upstream fixture
-comparisons are still required before claiming full IFBench registry parity.
+research campaigns. The source-checkout differential covers all 83 active
+merged-registry ids and passes against the pinned GEPA artifact, including
+language detection and NLP-backed checks. Papillon campaigns must pass a judge
+LM and include `metric_judge` provenance in research rows.
 LiveBenchMath `amps_hard` is guarded by the SymPy/Lark symbolic bridge and must
 be validated in the research campaign Python environment before claiming
 AMPS_Hard parity.

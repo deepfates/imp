@@ -5,6 +5,7 @@ defmodule DSEx.BenchmarkTruth.HoverBM25 do
 
   @k1 0.9
   @b 0.4
+  @native_implementation "dsex_native_bm25_approximation"
 
   defstruct [:corpus_path, :docs, :avgdl, :doc_count, :idf, :metadata, k: 24]
 
@@ -30,7 +31,13 @@ defmodule DSEx.BenchmarkTruth.HoverBM25 do
     }
     |> Map.put(
       :metadata,
-      Map.take(retrieval, ["kind", "source_url", "corpus_checksum", "index_checksum"])
+      retrieval
+      |> Map.take(["kind", "source_url", "corpus_checksum", "index_checksum"])
+      |> Map.merge(%{
+        "implementation" => @native_implementation,
+        "ranking_parity" => "approximate",
+        "deviation" => "no bm25s English stopword tokenizer or PyStemmer stemming"
+      })
     )
   end
 
@@ -197,6 +204,9 @@ defmodule DSEx.BenchmarkTruth.HoverBM25.UpstreamPython do
 
   @behaviour DSEx.Module
 
+  @upstream_commit "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+  @bm25s_version "0.2.12"
+
   defstruct [:gepa_root, :python, :metadata, k: 24]
 
   def new(retrieval, opts \\ []) do
@@ -222,7 +232,15 @@ defmodule DSEx.BenchmarkTruth.HoverBM25.UpstreamPython do
       gepa_root: Path.expand(gepa_root),
       python: python,
       k: Keyword.get(opts, :k, 24),
-      metadata: Map.take(retrieval, ["kind", "source_url", "corpus_checksum", "index_checksum"])
+      metadata:
+        retrieval
+        |> Map.take(["kind", "source_url", "corpus_checksum", "index_checksum"])
+        |> Map.merge(%{
+          "implementation" => "upstream_python_bm25s",
+          "ranking_parity" => "source_exact",
+          "upstream_commit" => @upstream_commit,
+          "bm25s_version" => @bm25s_version
+        })
     }
   end
 

@@ -39,14 +39,14 @@
 {"instruction_id":"words:palindrome","kwargs":{},"prompt":"p","response":"level radar civic madam rotor refer kayak reviver racecar redder"}
 {"instruction_id":"count:punctuation","kwargs":{},"prompt":"p","response":"Use . , ! ? ; : and ?! now"}
 {"instruction_id":"format:parentheses","kwargs":{},"prompt":"p","response":"alpha (beta [gamma {delta (epsilon [zeta])}])"}
-{"instruction_id":"format:quotes","kwargs":{},"prompt":"p","response":"\"alpha 'beta \"gamma\"' delta"}
+{"instruction_id":"format:quotes","kwargs":{},"prompt":"p","response":"\"alpha 'beta \"gamma\"' delta\""}
 {"instruction_id":"words:prime_lengths","kwargs":{},"prompt":"p","response":"to cat seven prime"}
 {"instruction_id":"format:options","kwargs":{"options":"yes/no/maybe"},"prompt":"p","response":"yes"}
 {"instruction_id":"format:newline","kwargs":{},"prompt":"p","response":"alpha\nbeta\ngamma"}
 {"instruction_id":"format:emoji","kwargs":{},"prompt":"p","response":"First sentence 🙂. Second sentence 🚀."}
 {"instruction_id":"ratio:sentence_words","kwargs":{},"prompt":"p","response":"Aaa. Bbb. Ccc."}
 {"instruction_id":"count:words_japanese","kwargs":{"N":2},"prompt":"p","response":"alpha 日本 beta 東京"}
-{"instruction_id":"words:start_verb","kwargs":{},"prompt":"p","response":"Write the answer."}
+{"instruction_id":"words:start_verb","kwargs":{},"prompt":"p","response":"Create a list."}
 {"instruction_id":"words:repeats","kwargs":{"small_n":2},"prompt":"p","response":"alpha beta alpha gamma"}
 {"instruction_id":"sentence:keyword","kwargs":{"word":"needle","N":2},"prompt":"p","response":"First sentence. Needle is here."}
 {"instruction_id":"count:pronouns","kwargs":{"N":4},"prompt":"p","response":"she/her and they/them"}
