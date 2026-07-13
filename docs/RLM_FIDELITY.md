@@ -102,8 +102,9 @@ for ticket `de-m7aa`. It pins arXiv:2512.24601v3,
 timeouts, and the paper context grid.
 
 The checked-in manifest intentionally contains `ACQUIRE_AND_PIN_SHA256` and
-`ACQUIRE_AND_FREEZE_IDS` for ignored/local datasets. Those values are accepted
-only by `--plan`. Dry-run and live execution reject them.
+`ACQUIRE_AND_FREEZE_IDS` for unavailable families. Planning, dry-run, and live
+execution reject a selected unavailable family. A pinned family remains
+runnable when unavailable families are excluded explicitly.
 
 ```console
 mix dsex.benchmark.rlm_campaign --plan
@@ -111,7 +112,18 @@ mix dsex.benchmark.rlm_campaign --dry-run
 mix dsex.benchmark.rlm_campaign --runtime dsex
 mix dsex.benchmark.rlm_campaign --runtime dspy
 mix dsex.benchmark.rlm_campaign --runtime both
+mix dsex.benchmark.rlm_campaign --plan --family oolong \
+  --approach direct,simple_retrieval,rlm --runtime both --row-limit 1
 ```
+
+`--family` and `--approach` accept repeated or comma-separated values.
+`--runtime` accepts `dsex`, `dspy`, or `both`. `--row-limit` is a positive,
+per-family limit over frozen normalized row order; `--sample-limit` is an
+alias. Plan output contains the exact ordered job keys and always reports zero
+provider calls. The same normalized selection controls execution, checkpoint
+identity, and artifact metadata. Changing any family, approach, runtime, or
+limit fails checkpoint identity validation. Any filtered selection is labeled
+`t2_live_sample` even when its source manifest requests T3.
 
 There is no fixture/oracle execution mode. Before each external row dispatch,
 the runner atomically writes an intent. It atomically replaces that intent with
@@ -153,6 +165,25 @@ bootstraps logical queries as clusters across context sizes. BrowseComp+ cannot
 fall back to exact match: it requires the pinned official LLM answer judge plus
 `trec_eval` evidence/gold retrieval provenance. The current runner does not yet
 execute that judge contract, so `official_scorers` remains red.
+
+### 2026-07-13 bounded live preflight
+
+The first paid preflight used OOLONG `trec_coarse` sample `17000206` and pinned
+`gpt-5-mini-2025-08-07` for all roles. The exact plan contained six jobs:
+direct, deterministic lexical retrieval, and RLM on both DSEx and DSPy. It used
+one-row selection, serialized execution, low reasoning, a four-call RLM bound,
+and independent eight-request/$2 runtime-approach ceilings.
+
+The run is failed operational evidence, not T2 effectiveness evidence. Three
+DSEx provider calls consumed 185,435 input and 965 output tokens. All three rows
+failed closed because ReqLLM cost metadata was unauditable to the campaign
+meter, so authoritative artifact cost is $0 and no score or latency is valid.
+Applying the manifest's pinned $0.25/M input and $2/M output rates gives a
+disclosed exposure estimate of $0.04828875, not an accepted row cost. DSPy then
+rejected the 4,096-token model configuration before making a provider call;
+its durable intent remains ambiguous and resume is refused. The campaign was
+not expanded. The ignored manifest, checkpoint, and audit report are under
+`benchmarks/results/rlm-preflight/` and are committed as failure evidence.
 
 ## Mechanical T3 Gate
 

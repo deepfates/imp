@@ -15,41 +15,51 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     manifest = RLMManifest.load!(manifest_path, allow_pending: true)
     root = Keyword.get(opts, :root, File.cwd!())
     source_status = source_status(manifest, root)
-    dataset_status = dataset_status(manifest)
+    selection = selection!(manifest, opts)
+    ensure_runnable_selection!(manifest, selection)
+    datasets = load_selected_datasets!(manifest, selection)
+    planned_jobs = jobs(manifest, datasets, selection)
 
     %{
       "campaign_id" => manifest["campaign_id"],
-      "evidence_tier" => manifest["evidence_tier"],
-      "pending_acquisition" => RLMManifest.pending?(manifest),
+      "requested_evidence_tier" => manifest["evidence_tier"],
+      "evidence_tier" => evidence_tier(manifest, selection),
+      "subset" => subset?(manifest, selection),
+      "selection" => selection,
+      "job_count" => length(planned_jobs),
+      "jobs" => Enum.map(planned_jobs, &job_evidence/1),
+      "families" => Map.new(datasets, fn {family, data} -> {family, data["evaluated_rows"]} end),
+      "pending_acquisition" => false,
       "source_validation" => source_status,
-      "dataset_validation" => dataset_status,
+      "dataset_validation" => dataset_status(manifest, selection),
       "provider_calls" => 0
     }
   end
 
   def run(manifest_path, opts \\ []) do
-    manifest = RLMManifest.load!(manifest_path)
+    manifest = RLMManifest.load!(manifest_path, allow_pending: true)
     RLMManifest.verify_sources!(manifest, Keyword.get(opts, :root, File.cwd!()))
-    datasets = RLMDataset.load_all!(manifest)
-    runtime_selection = Keyword.get(opts, :runtime, "dsex")
-    runtimes = selected_runtimes!(runtime_selection)
+    selection = selection!(manifest, opts)
+    ensure_runnable_selection!(manifest, selection)
+    datasets = load_selected_datasets!(manifest, selection)
+    runtimes = selection["runtimes"]
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
     checkpoint_dir = Keyword.get(opts, :checkpoint_dir, Path.join(out_dir, "rlm-checkpoints"))
     File.mkdir_p!(out_dir)
     File.mkdir_p!(checkpoint_dir)
 
-    identity = identity(manifest, datasets, runtime_selection)
+    identity = identity(manifest, datasets, selection)
 
     checkpoint_path =
-      Path.join(checkpoint_dir, "#{slug(manifest["campaign_id"])}-#{runtime_selection}.json")
+      Path.join(checkpoint_dir, "#{slug(manifest["campaign_id"])}-#{selection["runtime"]}.json")
 
     checkpoint = start_checkpoint!(checkpoint_path, identity)
     existing = RLMCheckpoint.rows(checkpoint)
     budgets = start_budgets!(manifest, runtimes, existing)
-    jobs = jobs(manifest, datasets, runtimes)
-    execute_jobs!(jobs, manifest, checkpoint, budgets, opts)
+    planned_jobs = jobs(manifest, datasets, selection)
+    execute_jobs!(planned_jobs, manifest, checkpoint, budgets, opts)
     rows = RLMCheckpoint.rows(checkpoint)
-    artifact = artifact(manifest, datasets, rows, runtime_selection, checkpoint_path)
+    artifact = artifact(manifest, datasets, rows, selection, checkpoint_path)
     protocol = RLMProtocol.evaluate(artifact)
 
     artifact =
@@ -456,9 +466,9 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
 
   defp close?(_left, _right), do: false
 
-  defp jobs(manifest, datasets, runtimes) do
-    for runtime <- runtimes,
-        approach <- RLMManifest.approach_ids(),
+  defp jobs(manifest, datasets, selection) do
+    for runtime <- selection["runtimes"],
+        approach <- selection["approaches"],
         runtime in manifest["approaches"][approach]["runtimes"],
         {_family, dataset} <- Enum.sort(datasets),
         row <- dataset["rows"] do
@@ -509,7 +519,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     end
   end
 
-  defp artifact(manifest, datasets, rows, runtime_selection, checkpoint_path) do
+  defp artifact(manifest, datasets, rows, selection, checkpoint_path) do
     dataset_evidence =
       Map.new(datasets, fn {family, data} ->
         spec = manifest["datasets"][family]
@@ -532,13 +542,16 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     %{
       "schema_version" => 2,
       "runner" => "dsex-rlm-campaign",
-      "evidence_tier" => manifest["evidence_tier"],
+      "evidence_tier" => evidence_tier(manifest, selection),
+      "requested_evidence_tier" => manifest["evidence_tier"],
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
       "manifest" => Map.drop(manifest, ["manifest_path"]),
       "datasets" => dataset_evidence,
       "execution" => %{
-        "runtime_selection" => runtime_selection,
+        "runtime_selection" => selection["runtime"],
+        "selection" => selection,
+        "subset" => subset?(manifest, selection),
         "checkpoint_path" => checkpoint_path,
         "concurrency" => manifest["execution"]["concurrency"],
         "row_timeout_ms" => manifest["execution"]["row_timeout_ms"]
@@ -555,8 +568,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     }
   end
 
-  defp dataset_status(manifest) do
-    Map.new(manifest["datasets"], fn {family, spec} ->
+  defp dataset_status(manifest, selection) do
+    manifest["datasets"]
+    |> Map.take(selection["families"])
+    |> Map.new(fn {family, spec} ->
       {family,
        %{
          "path" => spec["path"],
@@ -602,6 +617,126 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
 
   defp selected_runtimes!(other),
     do: raise(ArgumentError, "runtime must be dsex, dspy, or both; got #{inspect(other)}")
+
+  defp selection!(manifest, opts) do
+    runtime = Keyword.get(opts, :runtime, "dsex")
+    runtimes = selected_runtimes!(runtime)
+    families = selected_ids!(Keyword.get(opts, :families, []), RLMManifest.family_ids(), "family")
+
+    approaches =
+      selected_ids!(Keyword.get(opts, :approaches, []), RLMManifest.approach_ids(), "approach")
+
+    row_limit = Keyword.get(opts, :row_limit)
+
+    unless is_nil(row_limit) or (is_integer(row_limit) and row_limit > 0),
+      do: raise(ArgumentError, "row limit must be a positive integer")
+
+    unsupported =
+      for runtime_id <- runtimes,
+          approach <- approaches,
+          runtime_id not in manifest["approaches"][approach]["runtimes"],
+          do: "#{runtime_id}:#{approach}"
+
+    unless unsupported == [],
+      do:
+        raise(
+          ArgumentError,
+          "unsupported runtime/approach selections: #{Enum.join(unsupported, ", ")}"
+        )
+
+    %{
+      "runtime" => runtime,
+      "runtimes" => runtimes,
+      "families" => families,
+      "approaches" => approaches,
+      "row_limit_per_family" => row_limit
+    }
+  end
+
+  defp selected_ids!([], allowed, _label), do: allowed
+
+  defp selected_ids!(values, allowed, label) when is_list(values) do
+    values = Enum.uniq(values)
+    invalid = values -- allowed
+
+    unless invalid == [],
+      do: raise(ArgumentError, "invalid #{label} filter: #{Enum.join(invalid, ", ")}")
+
+    Enum.filter(allowed, &(&1 in values))
+  end
+
+  defp ensure_runnable_selection!(manifest, selection) do
+    pending =
+      selection["families"]
+      |> Enum.filter(fn family ->
+        spec = manifest["datasets"][family]
+        spec["sha256"] == "ACQUIRE_AND_PIN_SHA256" or not is_list(spec["sample_ids"])
+      end)
+
+    unless pending == [],
+      do:
+        raise(
+          ArgumentError,
+          "selected RLM families are unavailable or unpinned: #{Enum.join(pending, ", ")}"
+        )
+  end
+
+  defp load_selected_datasets!(manifest, selection) do
+    selected_manifest =
+      put_in(manifest["datasets"], Map.take(manifest["datasets"], selection["families"]))
+
+    selected_manifest
+    |> RLMDataset.load_all!()
+    |> Map.new(fn {family, data} ->
+      {family, limit_dataset(data, selection["row_limit_per_family"])}
+    end)
+  end
+
+  defp limit_dataset(data, nil), do: data
+
+  defp limit_dataset(data, limit) do
+    rows = Enum.take(data["rows"], limit)
+    keys = Enum.take(data["evaluated_keys"], limit)
+    sample_ids = rows |> Enum.map(&(&1["query_id"] || &1["id"])) |> Enum.uniq()
+
+    data
+    |> Map.put("rows", rows)
+    |> Map.put("evaluated_keys", keys)
+    |> Map.put("evaluated_rows", length(rows))
+    |> Map.put("logical_instances", length(sample_ids))
+    |> Map.put("sample_ids", sample_ids)
+    |> Map.put("sample_ids_sha256", sha256(Jason.encode!(sample_ids)))
+  end
+
+  defp subset?(manifest, selection) do
+    selection["families"] != RLMManifest.family_ids() or
+      selection["approaches"] != RLMManifest.approach_ids() or
+      selection["runtimes"] != all_manifest_runtimes(manifest) or
+      not is_nil(selection["row_limit_per_family"])
+  end
+
+  defp all_manifest_runtimes(manifest) do
+    manifest["approaches"]
+    |> Map.values()
+    |> Enum.flat_map(& &1["runtimes"])
+    |> Enum.uniq()
+    |> Enum.sort_by(&Enum.find_index(~w(dsex dspy), fn id -> id == &1 end))
+  end
+
+  defp evidence_tier(manifest, selection) do
+    if subset?(manifest, selection), do: "t2_live_sample", else: manifest["evidence_tier"]
+  end
+
+  defp job_evidence(job),
+    do: %{
+      "key" => Enum.join([job.runtime, job.approach, job.row["family"], job.row["id"]], ":"),
+      "runtime" => job.runtime,
+      "approach" => job.approach,
+      "family" => job.row["family"],
+      "example_id" => job.row["id"],
+      "query_id" => job.row["query_id"] || job.row["id"],
+      "context_size" => job.row["context_size"]
+    }
 
   def score(answer, gold, "token_f1"), do: token_f1(answer, gold)
   def score(answer, gold, "pair_set_f1"), do: pair_set_f1(answer, gold)
@@ -690,7 +825,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
       |> Enum.reject(&(&1 in ~w(a an the)))
       |> Enum.join(" ")
 
-  defp identity(manifest, datasets, runtime),
+  defp identity(manifest, datasets, selection),
     do: %{
       "campaign_id" => manifest["campaign_id"],
       "manifest_sha256" => manifest["manifest_sha256"],
@@ -699,7 +834,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
           {family,
            %{"sha256" => data["sha256"], "sample_ids_sha256" => data["sample_ids_sha256"]}}
         end),
-      "runtime" => runtime
+      "selection" => selection
     }
 
   defp slug(value), do: String.replace(value, ~r/[^a-zA-Z0-9_.-]+/, "-")

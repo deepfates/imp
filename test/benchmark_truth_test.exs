@@ -7,6 +7,41 @@ defmodule BenchmarkTruthTest do
 
   @fixtures Path.expand("fixtures/benchmarks", __DIR__)
 
+  test "RLM campaign plan task emits exact bounded jobs without execution" do
+    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+
+    output =
+      capture_io(fn ->
+        Mix.Task.reenable("dsex.benchmark.rlm_campaign")
+
+        Mix.Tasks.Dsex.Benchmark.RlmCampaign.run([
+          "--plan",
+          "--manifest",
+          manifest,
+          "--family",
+          "oolong",
+          "--approach",
+          "direct,rlm",
+          "--runtime",
+          "both",
+          "--sample-limit",
+          "1"
+        ])
+      end)
+
+    plan = Jason.decode!(output)
+    assert plan["provider_calls"] == 0
+    assert plan["evidence_tier"] == "t2_live_sample"
+    assert plan["job_count"] == 4
+
+    assert Enum.map(plan["jobs"], & &1["key"]) == [
+             "dsex:direct:oolong:17000206",
+             "dsex:rlm:oolong:17000206",
+             "dspy:direct:oolong:17000206",
+             "dspy:rlm:oolong:17000206"
+           ]
+  end
+
   defmodule ReqLLMStub do
     def generate_text(_model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:benchmark_req_llm_generate, length(messages)})

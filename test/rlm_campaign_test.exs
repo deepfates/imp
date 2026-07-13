@@ -215,6 +215,90 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert resumed.artifact["summary"]["all_passing"]
   end
 
+  test "plan selection is deterministic and enumerates exact jobs" do
+    fixture = fixture!()
+
+    opts = [families: ["oolong", "s_niah"], approaches: ["rlm", "direct"], row_limit: 1]
+    plan = RLMCampaign.plan(fixture.manifest_path, opts)
+    repeated = RLMCampaign.plan(fixture.manifest_path, Enum.reverse(opts))
+
+    assert plan["provider_calls"] == 0
+    assert plan["selection"]["families"] == ~w(s_niah oolong)
+    assert plan["selection"]["approaches"] == ~w(direct rlm)
+    assert plan["job_count"] == 4
+    assert plan["jobs"] == repeated["jobs"]
+
+    assert Enum.map(plan["jobs"], & &1["key"]) == [
+             "dsex:direct:oolong:oolong-1",
+             "dsex:direct:s_niah:s_niah-1",
+             "dsex:rlm:oolong:oolong-1",
+             "dsex:rlm:s_niah:s_niah-1"
+           ]
+  end
+
+  test "invalid campaign filters fail before dispatch" do
+    fixture = fixture!()
+
+    assert_raise ArgumentError, ~r/invalid family filter: missing/, fn ->
+      RLMCampaign.plan(fixture.manifest_path, families: ["missing"])
+    end
+
+    assert_raise ArgumentError, ~r/invalid approach filter: fake/, fn ->
+      RLMCampaign.plan(fixture.manifest_path, approaches: ["fake"])
+    end
+
+    assert_raise ArgumentError, ~r/row limit must be a positive integer/, fn ->
+      RLMCampaign.plan(fixture.manifest_path, row_limit: 0)
+    end
+  end
+
+  test "selection changes are checkpoint identity mismatches" do
+    fixture = fixture!()
+    run!(fixture, GoodRuntime, families: ["oolong"], approaches: ["direct"], row_limit: 1)
+
+    assert_raise ArgumentError, ~r/checkpoint identity mismatch/, fn ->
+      run!(fixture, GoodRuntime, families: ["oolong"], approaches: ["direct"])
+    end
+  end
+
+  test "filtered committed rows resume without replay" do
+    fixture = fixture!()
+    opts = [families: ["oolong"], approaches: ["direct", "rlm"], row_limit: 1]
+    result = run!(fixture, GoodRuntime, opts)
+    assert result.artifact["summary"]["total"] == 2
+    assert result.artifact["execution"]["subset"]
+
+    resumed = run!(fixture, CrashRuntime, opts)
+    assert resumed.artifact["summary"]["total"] == 2
+  end
+
+  test "a bounded subset of a T3 manifest is labeled only T2" do
+    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+
+    plan =
+      RLMCampaign.plan(manifest,
+        families: ["oolong"],
+        approaches: ["direct", "simple_retrieval", "rlm"],
+        runtime: "both",
+        row_limit: 1
+      )
+
+    assert plan["requested_evidence_tier"] == "t3_paper_scale"
+    assert plan["evidence_tier"] == "t2_live_sample"
+    assert plan["subset"]
+    assert plan["job_count"] == 6
+  end
+
+  test "an unavailable selected family fails closed while pinned families remain runnable" do
+    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+
+    assert_raise ArgumentError, ~r/unavailable or unpinned: s_niah/, fn ->
+      RLMCampaign.plan(manifest, families: ["s_niah"], row_limit: 1)
+    end
+
+    assert RLMCampaign.plan(manifest, families: ["oolong"], row_limit: 1)["job_count"] == 4
+  end
+
   test "dataset drift is rejected before dispatch" do
     fixture = fixture!()
     File.write!(fixture.dataset_paths["s_niah"], "{}\n", [:append])
@@ -703,13 +787,16 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     refute Enum.find(gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
   end
 
-  defp run!(fixture, runtime) do
-    RLMCampaign.run(fixture.manifest_path,
-      out: fixture.out,
-      checkpoint_dir: fixture.checkpoints,
-      runtime: "dsex",
-      runtime_modules: %{"dsex" => runtime}
-    )
+  defp run!(fixture, runtime, opts \\ []) do
+    defaults =
+      [
+        out: fixture.out,
+        checkpoint_dir: fixture.checkpoints,
+        runtime: "dsex",
+        runtime_modules: %{"dsex" => runtime}
+      ]
+
+    RLMCampaign.run(fixture.manifest_path, Keyword.merge(defaults, opts))
   end
 
   defp fixture!(opts \\ []) do

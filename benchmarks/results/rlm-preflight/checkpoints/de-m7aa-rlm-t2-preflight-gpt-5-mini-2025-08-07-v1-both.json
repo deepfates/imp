@@ -1,0 +1,230 @@
+{
+  "payload": {
+    "committed": {
+      "dsex:direct:oolong:17000206": {
+        "answer": null,
+        "approach": "direct",
+        "call_semantics": {
+          "configured_max_depth": 0,
+          "max_llm_calls_scope": "not_applicable",
+          "max_observed_depth": 0,
+          "provider_calls": 1,
+          "root_calls": 1,
+          "sub_calls": 0
+        },
+        "context_size": null,
+        "error": ":provider_cost_unauditable",
+        "example_id": "17000206",
+        "family": "oolong",
+        "key": "dsex:direct:oolong:17000206",
+        "latency_ms": 0.0,
+        "metric": "oolong_official",
+        "model_family": "gpt_5_mini_2025_08_07",
+        "provenance": {
+          "dataset_key": "17000206",
+          "dataset_sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b",
+          "manifest_sha256": "d75a2e838d645a73680e758d71e92cce5885c19eebdb46cbefe5d2c9cf86b40c"
+        },
+        "query_id": "17000206",
+        "runtime": "dsex",
+        "score": 0.0,
+        "scorer_evidence": null,
+        "status": "error",
+        "trace": [],
+        "trace_shape": [
+          "error"
+        ],
+        "usage": {
+          "cost_audit": [
+            {
+              "authority": "unavailable",
+              "input_tokens": 92567,
+              "output_tokens": 116,
+              "provider_reported_usd": null,
+              "rates": {
+                "input_per_million": 0.25,
+                "output_per_million": 2.0
+              },
+              "request": 1,
+              "role": "root",
+              "usd": 0.0
+            }
+          ],
+          "cost_authority": "unavailable",
+          "cost_rates": {
+            "input_per_million": 0.25,
+            "output_per_million": 2.0
+          },
+          "input_tokens": 92567,
+          "output_tokens": 116,
+          "requests": 1,
+          "root_calls": 1,
+          "sub_calls": 0,
+          "usd": 0.0
+        }
+      },
+      "dsex:rlm:oolong:17000206": {
+        "answer": null,
+        "approach": "rlm",
+        "call_semantics": {
+          "configured_max_depth": 1,
+          "max_llm_calls_scope": "total_provider_calls",
+          "max_observed_depth": 0,
+          "provider_calls": 1,
+          "root_calls": 1,
+          "sub_calls": 0
+        },
+        "context_size": null,
+        "error": ":provider_cost_unauditable",
+        "example_id": "17000206",
+        "family": "oolong",
+        "key": "dsex:rlm:oolong:17000206",
+        "latency_ms": 0.0,
+        "metric": "oolong_official",
+        "model_family": "gpt_5_mini_2025_08_07",
+        "provenance": {
+          "dataset_key": "17000206",
+          "dataset_sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b",
+          "manifest_sha256": "d75a2e838d645a73680e758d71e92cce5885c19eebdb46cbefe5d2c9cf86b40c"
+        },
+        "query_id": "17000206",
+        "runtime": "dsex",
+        "score": 0.0,
+        "scorer_evidence": null,
+        "status": "error",
+        "trace": [],
+        "trace_shape": [
+          "error"
+        ],
+        "usage": {
+          "cost_audit": [
+            {
+              "authority": "unavailable",
+              "input_tokens": 301,
+              "output_tokens": 722,
+              "provider_reported_usd": null,
+              "rates": {
+                "input_per_million": 0.25,
+                "output_per_million": 2.0
+              },
+              "request": 1,
+              "role": "root",
+              "usd": 0.0
+            }
+          ],
+          "cost_authority": "unavailable",
+          "cost_rates": {
+            "input_per_million": 0.25,
+            "output_per_million": 2.0
+          },
+          "input_tokens": 301,
+          "output_tokens": 722,
+          "requests": 1,
+          "root_calls": 1,
+          "sub_calls": 0,
+          "usd": 0.0
+        }
+      },
+      "dsex:simple_retrieval:oolong:17000206": {
+        "answer": null,
+        "approach": "simple_retrieval",
+        "call_semantics": {
+          "configured_max_depth": 0,
+          "max_llm_calls_scope": "not_applicable",
+          "max_observed_depth": 0,
+          "provider_calls": 1,
+          "root_calls": 1,
+          "sub_calls": 0
+        },
+        "context_size": null,
+        "error": ":provider_cost_unauditable",
+        "example_id": "17000206",
+        "family": "oolong",
+        "key": "dsex:simple_retrieval:oolong:17000206",
+        "latency_ms": 0.0,
+        "metric": "oolong_official",
+        "model_family": "gpt_5_mini_2025_08_07",
+        "provenance": {
+          "dataset_key": "17000206",
+          "dataset_sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b",
+          "manifest_sha256": "d75a2e838d645a73680e758d71e92cce5885c19eebdb46cbefe5d2c9cf86b40c"
+        },
+        "query_id": "17000206",
+        "runtime": "dsex",
+        "score": 0.0,
+        "scorer_evidence": null,
+        "status": "error",
+        "trace": [],
+        "trace_shape": [
+          "error"
+        ],
+        "usage": {
+          "cost_audit": [
+            {
+              "authority": "unavailable",
+              "input_tokens": 92567,
+              "output_tokens": 127,
+              "provider_reported_usd": null,
+              "rates": {
+                "input_per_million": 0.25,
+                "output_per_million": 2.0
+              },
+              "request": 1,
+              "role": "root",
+              "usd": 0.0
+            }
+          ],
+          "cost_authority": "unavailable",
+          "cost_rates": {
+            "input_per_million": 0.25,
+            "output_per_million": 2.0
+          },
+          "input_tokens": 92567,
+          "output_tokens": 127,
+          "requests": 1,
+          "root_calls": 1,
+          "sub_calls": 0,
+          "usd": 0.0
+        }
+      }
+    },
+    "identity": {
+      "campaign_id": "de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v1",
+      "datasets": {
+        "oolong": {
+          "sample_ids_sha256": "bfe6d8d1e0f05500b52b2793aa8c25857009ab4e3cb3a21264cf1878df7d63cf",
+          "sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b"
+        }
+      },
+      "manifest_sha256": "d75a2e838d645a73680e758d71e92cce5885c19eebdb46cbefe5d2c9cf86b40c",
+      "selection": {
+        "approaches": [
+          "direct",
+          "simple_retrieval",
+          "rlm"
+        ],
+        "families": [
+          "oolong"
+        ],
+        "row_limit_per_family": 1,
+        "runtime": "both",
+        "runtimes": [
+          "dsex",
+          "dspy"
+        ]
+      }
+    },
+    "intents": {
+      "dspy:direct:oolong:17000206": {
+        "approach": "direct",
+        "example_id": "17000206",
+        "family": "oolong",
+        "key": "dspy:direct:oolong:17000206",
+        "runtime": "dspy",
+        "status": "dispatch_intent"
+      }
+    },
+    "schema_version": 1
+  },
+  "payload_sha256": "475a98989e3f9e15a7c1d699c690bdf1d72d027532df6bcbf4300337351a60d7"
+}

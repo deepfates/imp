@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "rlm_t2_preflight_failure_audit",
+  "generated_at": "2026-07-13T23:10:01Z",
+  "campaign_id": "de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v1",
+  "valid_t2_effectiveness_evidence": false,
+  "valid_t3_evidence": false,
+  "expanded": false,
+  "model": {
+    "id": "gpt-5-mini-2025-08-07",
+    "reasoning": "low",
+    "pricing_usd_per_million": {"input": 0.25, "output": 2.0}
+  },
+  "selection": {
+    "family": "oolong",
+    "sample_ids": ["17000206"],
+    "sample_count": 1,
+    "approaches": ["direct", "simple_retrieval", "rlm"],
+    "runtimes": ["dsex", "dspy"],
+    "planned_jobs": 6,
+    "row_limit_per_family": 1
+  },
+  "observed": {
+    "provider_calls": 3,
+    "dsex_provider_calls": 3,
+    "dspy_provider_calls": 0,
+    "valid_scored_rows": 0,
+    "scores": null,
+    "valid_latency_ms": null,
+    "authoritative_artifact_usd": 0.0,
+    "pricing_derived_exposure_estimate_usd": 0.04828875,
+    "input_tokens": 185435,
+    "output_tokens": 965
+  },
+  "terminal_rows": [
+    {
+      "key": "dsex:direct:oolong:17000206",
+      "status": "error",
+      "input_tokens": 92567,
+      "output_tokens": 116,
+      "pricing_derived_exposure_estimate_usd": 0.02337375,
+      "reason": "provider_cost_unauditable"
+    },
+    {
+      "key": "dsex:simple_retrieval:oolong:17000206",
+      "status": "error",
+      "input_tokens": 92567,
+      "output_tokens": 127,
+      "pricing_derived_exposure_estimate_usd": 0.02339575,
+      "reason": "provider_cost_unauditable"
+    },
+    {
+      "key": "dsex:rlm:oolong:17000206",
+      "status": "error",
+      "input_tokens": 301,
+      "output_tokens": 722,
+      "pricing_derived_exposure_estimate_usd": 0.00151925,
+      "reason": "provider_cost_unauditable"
+    }
+  ],
+  "ambiguous_intent": {
+    "key": "dspy:direct:oolong:17000206",
+    "provider_call_started": false,
+    "reason": "DSPy 3.3.0b1 requires max_tokens >= 16000 for this reasoning model; the sidecar exited during LM construction",
+    "resume_allowed": false
+  },
+  "limitations": [
+    "No row has valid cost authority, score, or measured latency.",
+    "The USD exposure is derived from pinned rates and observed tokens; it is not accepted artifact cost.",
+    "DSEx RLM made no recursive subcall before the root result failed cost validation.",
+    "No DSPy provider request was sent and the remaining two DSPy jobs were not attempted.",
+    "One OOLONG sample cannot support statistical uncertainty or effectiveness claims."
+  ],
+  "manifest_path": "benchmarks/results/rlm-preflight/manifest.json",
+  "checkpoint_path": "benchmarks/results/rlm-preflight/checkpoints/de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v1-both.json"
+}
