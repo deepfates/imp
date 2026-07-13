@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "campaign_id": "instruction-optimizer-aime-preflight-20260713",
+  "family": "AIMEBench",
+  "model": "openai:gpt-4.1-mini-2025-04-14",
+  "temperature": 1.0,
+  "max_output_tokens": 4096,
+  "seed": 17,
+  "arms": ["baseline", "bootstrap_few_shot", "mipro_v2", "simba"],
+  "arm_configs": {
+    "bootstrap_few_shot": {
+      "max_bootstrapped_demos": 4
+    },
+    "mipro_v2": {
+      "auto": null,
+      "num_candidates": 3,
+      "num_trials": 3,
+      "minibatch": false,
+      "max_bootstrapped_demos": 4,
+      "max_labeled_demos": 4,
+      "startup_trials": 2,
+      "max_errors": 1,
+      "timeout": 300000
+    },
+    "simba": {
+      "bsize": 8,
+      "num_candidates": 2,
+      "max_steps": 2,
+      "max_demos": 4,
+      "timeout": 300000
+    }
+  },
+  "budget": {
+    "requests": 1200,
+    "input_tokens": 3000000,
+    "output_tokens": 3000000,
+    "usd": 25.0
+  },
+  "reservation_pricing": {
+    "input_per_million": 1.0,
+    "output_per_million": 4.0,
+    "source": "conservative pre-call reservation rates; artifact records actual ReqLLM provider telemetry"
+  },
+  "source_commits": {
+    "dspy": "stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+    "dsex": "resolved from campaign git_sha",
+    "gepa_artifact": "gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+  }
+}

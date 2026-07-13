@@ -69,4 +69,23 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
              "usd" => 0.25
            }
   end
+
+  test "restores observed usage and request counts without restoring active reservations" do
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10,
+        initial: %{
+          "requests" => 2,
+          "usage" => %{"input_tokens" => 7, "output_tokens" => 3, "usd" => 0.25},
+          "active_reservations" => 9
+        }
+      )
+
+    snapshot = CampaignBudget.snapshot(budget)
+    assert snapshot["requests"] == 2
+    assert snapshot["usage"]["input_tokens"] == 7
+    assert snapshot["active_reservations"] == 0
+  end
 end

@@ -24,13 +24,16 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
       :telemetry.attach(
         id,
         [:req_llm, :token_usage],
-        fn _event, measurements, _metadata, pid ->
-          record_usage(pid, usage_from_measurements(measurements))
-        end,
+        &__MODULE__.handle_req_llm_usage_event/4,
         server
       )
 
     id
+  end
+
+  @doc false
+  def handle_req_llm_usage_event(_event, measurements, _metadata, server) do
+    record_usage(server, usage_from_measurements(measurements))
   end
 
   @impl true
@@ -38,6 +41,7 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
     limits = Keyword.fetch!(opts, :limits)
     pricing = Keyword.fetch!(opts, :pricing)
     default_max_output_tokens = Keyword.fetch!(opts, :default_max_output_tokens)
+    initial = Keyword.get(opts, :initial, %{})
 
     unless is_integer(default_max_output_tokens) and default_max_output_tokens >= 0 do
       raise ArgumentError, "default_max_output_tokens must be a non-negative integer"
@@ -48,8 +52,8 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
        limits: validate_limits!(limits),
        pricing: validate_pricing!(pricing),
        default_max_output_tokens: default_max_output_tokens,
-       requests: 0,
-       usage: empty_usage(),
+       requests: initial_requests!(initial),
+       usage: initial_usage!(initial),
        reservations: %{},
        exhausted: nil
      }}
@@ -207,6 +211,23 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
   end
 
   defp number(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key), 0))
+
+  defp initial_requests!(initial) when is_map(initial) do
+    requests = Map.get(initial, "requests", Map.get(initial, :requests, 0))
+
+    if is_integer(requests) and requests >= 0,
+      do: requests,
+      else: raise(ArgumentError, "initial campaign requests must be a non-negative integer")
+  end
+
+  defp initial_requests!(other),
+    do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
+
+  defp initial_usage!(initial) do
+    initial
+    |> Map.get("usage", Map.get(initial, :usage, empty_usage()))
+    |> normalize_usage!()
+  end
 
   defp usage_from_measurements(measurements) do
     tokens = Map.get(measurements, :tokens, %{})
