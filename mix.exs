@@ -265,6 +265,7 @@ defmodule DSEx.MixProject do
         "benchmark.operations_stress.check",
         "benchmark.failure_campaign.check",
         "benchmark.overhead.check",
+        "benchmark.search.check",
         "benchmark.optimizer_lift.check",
         "benchmark.instruction_optimizer.contract.check",
         "benchmark.gepa_replication.check",

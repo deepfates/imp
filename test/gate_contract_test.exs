@@ -21,7 +21,9 @@ defmodule GateContractTest do
              "benchmark.truth.check",
              "benchmark.trace.check",
              "benchmark.operations_stress.check",
+             "benchmark.failure_campaign.check",
              "benchmark.overhead.check",
+             "benchmark.search.check",
              "benchmark.optimizer_lift.check",
              "benchmark.instruction_optimizer.contract.check",
              "benchmark.gepa_replication.check",
@@ -66,8 +68,16 @@ defmodule GateContractTest do
              "dsex.benchmark.operations_stress --out tmp/operations-stress"
            ]
 
+    assert Keyword.fetch!(aliases, :"benchmark.failure_campaign.check") == [
+             "dsex.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
+           ]
+
     assert Keyword.fetch!(aliases, :"benchmark.overhead.check") == [
              "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.search.check") == [
+             "dsex.benchmark.search --iterations 10 --max-concurrency 2 --work-ms 10 --out tmp/search-benchmark"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.optimizer_lift.check") == [
