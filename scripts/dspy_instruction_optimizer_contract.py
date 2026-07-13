@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Emit a provider-free DSPy MIPROv2/SIMBA T1 differential contract.
 
-Run with DSPy 3.3.0b1 first on ``PYTHONPATH``.  The artifact is deliberately
+Run with the registry-pinned DSPy checkout first on ``PYTHONPATH``. The artifact is deliberately
 timeless: identical source and inputs produce byte-for-byte identical JSON.
 """
 
@@ -13,42 +13,47 @@ import inspect
 import json
 import random
 import sys
+from functools import partial
 from pathlib import Path
 from typing import Any
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from upstream_authority_registry import (  # noqa: E402
+    REGISTRY_PATH,
+    load_registry_authority,
+    source_hash_failures as registry_source_hash_failures,
+)
+
+CONTRACT_ID = "t1_instruction_optimizer_differential_contract"
+load_authority_registry = partial(load_registry_authority, CONTRACT_ID)
+
+
+UPSTREAM_REGISTRY, AUTHORITY = load_authority_registry()
+EXPECTED_VERSION = AUTHORITY["version"]
+EXPECTED_COMMIT = AUTHORITY["commit"]
 
 import dspy
 from dspy.propose import grounded_proposer
 from dspy.teleprompt import mipro_optimizer_v2, simba, simba_utils, utils
 
 
-EXPECTED_VERSION = "3.3.0b1"
-EXPECTED_COMMIT = "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
 SOURCE_PINS = {
-    "dspy/propose/grounded_proposer.py": (
-        grounded_proposer,
-        "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3",
-    ),
+    "dspy/propose/grounded_proposer.py": grounded_proposer,
     "dspy/teleprompt/bootstrap.py": (
-        __import__("dspy.teleprompt.bootstrap", fromlist=["bootstrap"]),
-        "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255",
+        __import__("dspy.teleprompt.bootstrap", fromlist=["bootstrap"])
     ),
-    "dspy/teleprompt/mipro_optimizer_v2.py": (
-        mipro_optimizer_v2,
-        "6bf7632836d3a54ab0da3f38a8f1963813472312e9c0e3f2ff19b4377af407f3",
-    ),
-    "dspy/teleprompt/simba.py": (
-        simba,
-        "4de72e1d0cb1cd30a180569c21973c41fa272c3ebb82a365e3f307986ab67a55",
-    ),
-    "dspy/teleprompt/simba_utils.py": (
-        simba_utils,
-        "ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c",
-    ),
-    "dspy/teleprompt/utils.py": (
-        utils,
-        "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182",
-    ),
+    "dspy/teleprompt/mipro_optimizer_v2.py": mipro_optimizer_v2,
+    "dspy/teleprompt/simba.py": simba,
+    "dspy/teleprompt/simba_utils.py": simba_utils,
+    "dspy/teleprompt/utils.py": utils,
 }
+
+if set(SOURCE_PINS) != set(AUTHORITY["source_hashes"]):
+    raise RuntimeError("DSPy contract source set is incompatible with the upstream authority registry")
 
 
 class DummyProgram:
@@ -83,6 +88,10 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def source_hash_failures(actual_hashes: dict[str, str], authority: dict[str, Any] = AUTHORITY) -> list[str]:
+    return registry_source_hash_failures(actual_hashes, authority)
+
+
 def validate_pins() -> list[dict[str, str]]:
     failures: list[str] = []
     version = getattr(dspy, "__version__", "unknown")
@@ -90,19 +99,19 @@ def validate_pins() -> list[dict[str, str]]:
         failures.append(f"DSPy version: expected {EXPECTED_VERSION}, got {version}")
 
     sources = []
-    for relative_path, (module, expected_hash) in SOURCE_PINS.items():
+    actual_hashes = {}
+    for relative_path, module in SOURCE_PINS.items():
         path = Path(inspect.getsourcefile(module) or "").resolve()
         actual_hash = sha256(path) if path.is_file() else "missing"
-        if actual_hash != expected_hash:
-            failures.append(
-                f"{relative_path}: expected sha256 {expected_hash}, got {actual_hash} ({path})"
-            )
+        actual_hashes[relative_path] = actual_hash
         sources.append(
             {
                 "path": relative_path,
                 "sha256": actual_hash,
             }
         )
+
+    failures.extend(source_hash_failures(actual_hashes))
 
     if failures:
         raise RuntimeError("pinned DSPy validation failed:\n- " + "\n- ".join(failures))
@@ -439,7 +448,7 @@ def tied_rule_semantics() -> dict[str, Any]:
 def build_artifact(sources: list[dict[str, str]]) -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "evidence_tier": "t1_instruction_optimizer_differential_contract",
+        "evidence_tier": CONTRACT_ID,
         "scope": "provider-free operational control-flow contract; not optimizer effectiveness evidence",
         "dspy": {
             "version": EXPECTED_VERSION,

@@ -1,27 +1,6 @@
 defmodule DSEx.UpstreamFidelity do
   @moduledoc false
 
-  @stable_baseline %{
-    project: "stanfordnlp/dspy",
-    version: "3.2.1",
-    git_ref: "refs/tags/3.2.1",
-    tag_object_sha: "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376",
-    git_sha: "29448ae12756abdd14bd8796c819247ebb83673c",
-    released_on: "2026-05-05",
-    api_index: "https://dspy.ai/api/",
-    api_manifest_sha256: "3e6243532fba8a8412850cb6b3f5c277c044c3f021c5626869db74665b1e933d"
-  }
-
-  @prerelease_tracking %{
-    project: "stanfordnlp/dspy",
-    version: "3.3.0b1",
-    git_ref: "refs/tags/3.3.0b1",
-    tag_object_sha: "ee3687c36e832010a38c4091fcb8cf1d4c9fb841",
-    git_sha: "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
-    release_blocking: false,
-    tracked_surfaces: ["BaseLM normalized runtime", "ReActV2", "GEPA 0.1.1 result contract"]
-  }
-
   @source_anchors %{
     dspy: "https://github.com/stanfordnlp/dspy",
     dspy_docs: "https://dspy.ai/",
@@ -736,10 +715,10 @@ defmodule DSEx.UpstreamFidelity do
   ]
 
   @doc false
-  def baseline, do: @stable_baseline
+  def baseline, do: baseline(DSEx.UpstreamAuthorityRegistry.load!())
 
   @doc false
-  def prerelease_tracking, do: @prerelease_tracking
+  def prerelease_tracking, do: prerelease_tracking(DSEx.UpstreamAuthorityRegistry.load!())
 
   @doc false
   def stable_api_manifest, do: @stable_api_manifest
@@ -750,6 +729,14 @@ defmodule DSEx.UpstreamFidelity do
   @doc false
   def report(opts \\ []) do
     root = Keyword.get(opts, :root, File.cwd!())
+
+    registry =
+      DSEx.UpstreamAuthorityRegistry.load!(
+        Keyword.get(opts, :registry_path, DSEx.UpstreamAuthorityRegistry.path())
+      )
+
+    stable_baseline = baseline(registry)
+    prerelease_tracking = prerelease_tracking(registry)
     rows = Enum.map(@ledger, &evaluate_row(&1, root))
     blocking = Enum.filter(rows, &release_blocking_gap?/1)
     {manifest_missing, manifest_duplicates} = manifest_errors(rows)
@@ -761,8 +748,9 @@ defmodule DSEx.UpstreamFidelity do
     %{
       schema_version: 2,
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-      baseline: @stable_baseline,
-      prerelease_tracking: @prerelease_tracking,
+      baseline: stable_baseline,
+      prerelease_tracking: prerelease_tracking,
+      upstream_authority_registry: registry,
       source_anchors: @source_anchors,
       summary: %{
         total: length(rows),
@@ -783,6 +771,45 @@ defmodule DSEx.UpstreamFidelity do
       },
       blocking_ids: Enum.map(blocking, & &1.id) ++ manifest_blockers,
       surfaces: rows
+    }
+  end
+
+  defp baseline(registry) do
+    authority =
+      DSEx.UpstreamAuthorityRegistry.authority!(registry, "dspy_stable_upstream_fidelity")
+
+    metadata = Map.fetch!(authority, "metadata")
+    source_hashes = Map.fetch!(authority, "source_hashes")
+
+    %{
+      project: Map.fetch!(authority, "project"),
+      version: Map.fetch!(authority, "version"),
+      git_ref: Map.fetch!(authority, "git_ref"),
+      tag_object_sha: Map.fetch!(authority, "tag_object_sha"),
+      git_sha: Map.fetch!(authority, "commit"),
+      released_on: Map.fetch!(metadata, "released_on"),
+      api_index: Map.fetch!(metadata, "api_index"),
+      api_manifest_sha256: Map.fetch!(source_hashes, "api_manifest")
+    }
+  end
+
+  defp prerelease_tracking(registry) do
+    authority =
+      DSEx.UpstreamAuthorityRegistry.authority!(
+        registry,
+        "t1_instruction_optimizer_differential_contract"
+      )
+
+    metadata = Map.fetch!(authority, "metadata")
+
+    %{
+      project: Map.fetch!(authority, "project"),
+      version: Map.fetch!(authority, "version"),
+      git_ref: Map.fetch!(authority, "git_ref"),
+      tag_object_sha: Map.fetch!(authority, "tag_object_sha"),
+      git_sha: Map.fetch!(authority, "commit"),
+      release_blocking: Map.fetch!(metadata, "release_blocking"),
+      tracked_surfaces: Map.fetch!(metadata, "tracked_surfaces")
     }
   end
 

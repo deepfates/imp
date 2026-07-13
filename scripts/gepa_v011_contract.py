@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit provider-free structural contracts for GEPA v0.1.1.
+"""Emit provider-free structural contracts for the registry-pinned GEPA release.
 
 The script requires an exact source checkout. It imports only released GEPA
 helpers and uses deterministic fixtures; it does not invoke an LM or provider.
@@ -13,26 +13,32 @@ import json
 import random
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 
-EXPECTED_VERSION = "0.1.1"
-EXPECTED_TAG = "v0.1.1"
-EXPECTED_COMMIT = "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
-# v0.1.1 was tagged with 0.1.0 still present in pyproject.toml. Pin both facts
-# so a repackaged wheel or a later checkout cannot masquerade as this source.
-EXPECTED_PROJECT_VERSION = "0.1.0"
-SOURCE_PINS = {
-    "src/gepa/core/engine.py": "92627720354261b9eb5359337b9b237a2a29ebf179b22a4b724b737bde81a088",
-    "src/gepa/core/result.py": "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
-    "src/gepa/core/state.py": "08108908eb922808c2ad134c9717d32b107581a5766e6b99199c248d538999e5",
-    "src/gepa/gepa_utils.py": "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
-    "src/gepa/proposer/merge.py": "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
-    "src/gepa/strategies/component_selector.py": "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
-    "src/gepa/utils/stop_condition.py": "3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c",
-}
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from upstream_authority_registry import (  # noqa: E402
+    REGISTRY_PATH,
+    load_registry_authority,
+    source_hash_failures as registry_source_hash_failures,
+)
+
+CONTRACT_ID = "t1_gepa_v011_structural_differential_contract"
+load_authority_registry = partial(load_registry_authority, CONTRACT_ID)
+
+
+UPSTREAM_REGISTRY, AUTHORITY = load_authority_registry()
+EXPECTED_VERSION = AUTHORITY["version"]
+EXPECTED_TAG = AUTHORITY["git_ref"].removeprefix("refs/tags/")
+EXPECTED_COMMIT = AUTHORITY["commit"]
+EXPECTED_PROJECT_VERSION = AUTHORITY["metadata"]["project_version"]
+SOURCE_PINS = AUTHORITY["source_hashes"]
 
 
 def sha256(path: Path) -> str:
@@ -58,6 +64,10 @@ def project_version(root: Path) -> str:
     return "missing"
 
 
+def source_hash_failures(actual_hashes: dict[str, str], authority: dict[str, Any] = AUTHORITY) -> list[str]:
+    return registry_source_hash_failures(actual_hashes, authority)
+
+
 def validate_pins(root: Path) -> list[dict[str, str]]:
     failures: list[str] = []
     commit = git(root, "rev-parse", "HEAD")
@@ -74,12 +84,14 @@ def validate_pins(root: Path) -> list[dict[str, str]]:
         )
 
     sources = []
-    for relative, expected in SOURCE_PINS.items():
+    actual_hashes = {}
+    for relative in SOURCE_PINS:
         path = root / relative
         actual = sha256(path) if path.is_file() else "missing"
-        if actual != expected:
-            failures.append(f"{relative}: expected sha256 {expected}, got {actual}")
+        actual_hashes[relative] = actual
         sources.append({"path": relative, "sha256": actual})
+
+    failures.extend(source_hash_failures(actual_hashes))
 
     if failures:
         raise RuntimeError("pinned GEPA validation failed:\n- " + "\n- ".join(failures))
@@ -342,14 +354,16 @@ def named_mutation_contract() -> dict[str, Any]:
 def build_artifact(root: Path, sources: list[dict[str, str]]) -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "evidence_tier": "t1_gepa_v011_structural_differential_contract",
-        "scope": "provider-free GEPA v0.1.1 structural semantics; not effectiveness evidence",
+        "evidence_tier": CONTRACT_ID,
+        "scope": f"provider-free GEPA {EXPECTED_VERSION} structural semantics; not effectiveness evidence",
         "gepa": {
             "version": EXPECTED_VERSION,
             "tag": EXPECTED_TAG,
             "commit": EXPECTED_COMMIT,
             "project_metadata_version": EXPECTED_PROJECT_VERSION,
-            "project_metadata_version_note": "the v0.1.1 tag retains version=0.1.0 in pyproject.toml",
+            "project_metadata_version_note": (
+                f"the {EXPECTED_TAG} tag retains version={EXPECTED_PROJECT_VERSION} in pyproject.toml"
+            ),
             "checkout": str(root.resolve()),
             "sources": sources,
         },
@@ -366,7 +380,7 @@ def build_artifact(root: Path, sources: list[dict[str, str]]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gepa-root", type=Path, required=True, help="exact GEPA v0.1.1 checkout")
+    parser.add_argument("--gepa-root", type=Path, required=True, help="exact registry-pinned GEPA checkout")
     parser.add_argument("--out", type=Path, help="also write deterministic JSON here")
     args = parser.parse_args()
 
