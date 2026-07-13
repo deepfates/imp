@@ -16,11 +16,20 @@ defmodule ProviderTrainingLifecycleTest do
            body: Jason.encode!(%{id: "file-uploaded-demos", purpose: "fine-tune"})
          }}
       else
-        decoded = Jason.decode!(body)
+        decoded = if IO.iodata_to_binary(body) == "", do: %{}, else: Jason.decode!(body)
         send(self(), {:openai_training_request, url, headers, decoded})
 
         response(url, decoded)
       end
+    end
+
+    @impl true
+    def request(:post, url, headers, body, opts), do: post(url, headers, body, opts)
+
+    def request(:get, url, headers, body, _opts) do
+      assert IO.iodata_to_binary(body) == ""
+      send(self(), {:openai_training_request, url, headers, :empty})
+      response(url, %{})
     end
 
     defp response(url, decoded) do
@@ -262,7 +271,7 @@ defmodule ProviderTrainingLifecycleTest do
         [:dsex, :training, :refresh, :start]
       ])
 
-    lm = DSEx.req_llm("gpt-test")
+    lm = DSEx.req_llm("openai:gpt-test")
 
     trainer =
       DSEx.Clients.OpenAITrainer.new(
@@ -286,7 +295,13 @@ defmodule ProviderTrainingLifecycleTest do
     assert {"authorization", "Bearer sk-test"} in headers
     assert payload["model"] == "gpt-test"
     assert payload["training_file"] == "file-abc"
-    assert payload["hyperparameters"] == %{"n_epochs" => 1}
+
+    assert payload["method"] == %{
+             "type" => "supervised",
+             "supervised" => %{"hyperparameters" => %{"n_epochs" => 1}}
+           }
+
+    refute Map.has_key?(payload, "hyperparameters")
     refute Map.has_key?(payload, "dsex_training_data")
 
     assert {:ok, refreshed} = DSEx.Clients.TrainingJob.refresh(job)
@@ -306,18 +321,20 @@ defmodule ProviderTrainingLifecycleTest do
     assert {:ok, rebound} =
              DSEx.Clients.TrainingJob.rebind(refreshed, program, path: path)
 
-    assert %DSEx.Clients.ReqLLM{model: "ft:gpt-test:org:abc"} =
+    assert %DSEx.Clients.ReqLLM{model: "openai:ft:gpt-test:org:abc"} =
              DSEx.ProgramAccess.lm(rebound)
 
     assert DSEx.ProgramAccess.get_metadata(rebound, :training_artifact) == %{
              provider: :openai,
              job_id: "ftjob_123",
-             base_model: "gpt-test",
+             base_model: "openai:gpt-test",
              result_model: "ft:gpt-test:org:abc"
            }
 
     loaded = DSEx.load!(path)
-    assert %DSEx.Clients.ReqLLM{model: "ft:gpt-test:org:abc"} = DSEx.ProgramAccess.lm(loaded)
+
+    assert %DSEx.Clients.ReqLLM{model: "openai:ft:gpt-test:org:abc"} =
+             DSEx.ProgramAccess.lm(loaded)
 
     assert_received {^ref, [:dsex, :training, :submit, :start], _, %{provider: :openai}}
     assert_received {^ref, [:dsex, :training, :refresh, :start], _, %{job_id: "ftjob_123"}}
@@ -390,8 +407,7 @@ defmodule ProviderTrainingLifecycleTest do
     assert cancelled.status == :cancelled
 
     assert_received {:openai_training_request,
-                     "https://api.example/v1/fine_tuning/jobs/ftjob_123/cancel", _headers,
-                     %{"job_id" => "ftjob_123"}}
+                     "https://api.example/v1/fine_tuning/jobs/ftjob_123/cancel", _headers, %{}}
 
     unsupported = %{job | cancel_url: nil}
     assert {:error, :training_cancel_not_supported} = DSEx.Clients.TrainingJob.cancel(unsupported)

@@ -24,13 +24,12 @@ defmodule ProtocolTrainingProviderLifecycleTest do
 
     base_url =
       DSEx.Test.LocalHTTP.start(fn request ->
-        assert request.method == "POST"
         assert request.headers["authorization"] == "Bearer sk-live-training-test"
-
-        payload = Jason.decode!(request.body)
 
         case request.path do
           "/v1/fine_tuning/jobs" ->
+            assert request.method == "POST"
+            payload = Jason.decode!(request.body)
             assert payload["model"] == "gpt-training-test"
             assert payload["training_file"] == "file-live-training-test"
             assert payload["suffix"] == "dsex-live-gate"
@@ -44,7 +43,8 @@ defmodule ProtocolTrainingProviderLifecycleTest do
              }}
 
           "/v1/fine_tuning/jobs/ftjob_protocol_training_gate" ->
-            assert payload["job_id"] == "ftjob_protocol_training_gate"
+            assert request.method == "GET"
+            assert request.body == ""
 
             {200,
              %{
@@ -54,6 +54,9 @@ defmodule ProtocolTrainingProviderLifecycleTest do
              }}
 
           "/v1/fine_tuning/jobs/ftjob_protocol_training_gate/cancel" ->
+            assert request.method == "POST"
+            assert request.body == ""
+
             {200,
              %{
                id: "ftjob_protocol_training_gate",
@@ -123,7 +126,7 @@ defmodule ProtocolTrainingProviderLifecycleTest do
     assert {:ok, prediction} = DSEx.call(compiled, %{question: "2+2?"})
     assert DSEx.get(prediction, :answer) == "4"
 
-    assert %DSEx.Clients.ReqLLM{model: "ft:gpt-training-test:dsex:live-gate"} =
+    assert %DSEx.Clients.ReqLLM{model: "openai:ft:gpt-training-test:dsex:live-gate"} =
              DSEx.ProgramAccess.lm(DSEx.load!(path))
 
     assert {:ok, cancelled} = DSEx.Clients.TrainingJob.cancel(job)

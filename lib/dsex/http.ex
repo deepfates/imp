@@ -1,6 +1,8 @@
 defmodule DSEx.HTTP do
   @moduledoc "Small injectable HTTP boundary used by provider clients."
 
+  @type method :: :get | :post | :put | :patch | :delete
+
   @callback post(String.t(), [{String.t(), String.t()}], iodata(), keyword()) ::
               {:ok, %{status: non_neg_integer(), body: binary(), headers: list()}}
               | {:error, term()}
@@ -8,7 +10,22 @@ defmodule DSEx.HTTP do
   @callback stream(String.t(), [{String.t(), String.t()}], iodata(), keyword()) ::
               Enumerable.t()
 
-  @optional_callbacks stream: 4
+  @callback request(method(), String.t(), [{String.t(), String.t()}], iodata(), keyword()) ::
+              {:ok, %{status: non_neg_integer(), body: binary(), headers: list()}}
+              | {:error, term()}
+
+  @optional_callbacks stream: 4, request: 5
+
+  def request(transport, method, url, headers, body, opts \\ [])
+
+  def request(transport, method, url, headers, body, opts)
+      when method in [:get, :post, :put, :patch, :delete] do
+    opts = validate_opts!(opts, "DSEx.HTTP.request/6")
+    do_request(transport, method, url, headers, body, opts)
+  end
+
+  def request(_transport, method, _url, _headers, _body, _opts),
+    do: {:error, {:unsupported_http_method, method}}
 
   def post(transport, url, headers, body, opts \\ [])
 
@@ -16,6 +33,28 @@ defmodule DSEx.HTTP do
     opts = validate_opts!(opts, "DSEx.HTTP.post/5")
     do_post(transport, url, headers, body, opts)
   end
+
+  defp do_request(module, method, url, headers, body, opts) when is_atom(module) do
+    cond do
+      Code.ensure_loaded?(module) and function_exported?(module, :request, 5) ->
+        safe_transport_call(module, fn -> module.request(method, url, headers, body, opts) end)
+
+      method == :post ->
+        do_post(module, url, headers, body, opts)
+
+      true ->
+        {:error, {:http_method_not_supported, module, method}}
+    end
+  end
+
+  defp do_request(fun, :post, url, headers, body, opts) when is_function(fun, 4),
+    do: do_post(fun, url, headers, body, opts)
+
+  defp do_request(fun, method, _url, _headers, _body, _opts) when is_function(fun, 4),
+    do: {:error, {:http_method_not_supported, :anonymous_http_transport, method}}
+
+  defp do_request(transport, method, _url, _headers, _body, _opts),
+    do: {:error, {:http_method_not_supported, transport, method}}
 
   def validate_transport(transport) when is_atom(transport), do: {:ok, transport}
   def validate_transport(transport) when is_function(transport, 4), do: {:ok, transport}
@@ -115,8 +154,12 @@ defmodule DSEx.HTTP.Hackneyless do
   @default_timeout 15_000
 
   @impl true
-  def post(url, headers, body, opts) do
-    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.post/4")
+  def post(url, headers, body, opts), do: request(:post, url, headers, body, opts)
+
+  @impl true
+  def request(method, url, headers, body, opts)
+      when method in [:get, :post, :put, :patch, :delete] do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.request/5")
 
     :inets.start()
     :ssl.start()
@@ -131,17 +174,12 @@ defmodule DSEx.HTTP.Hackneyless do
         end
       end)
 
-    request = {
-      String.to_charlist(url),
-      Enum.reverse(headers),
-      String.to_charlist(content_type),
-      IO.iodata_to_binary(body)
-    }
+    request = request_tuple(method, url, headers, content_type, body)
 
     http_opts = http_opts(opts)
     request_opts = Keyword.get(opts, :request_opts, [])
 
-    case :httpc.request(:post, request, http_opts, request_opts) do
+    case :httpc.request(method, request, http_opts, request_opts) do
       {:ok, {{_version, status, _reason}, response_headers, response_body}} ->
         {:ok,
          %{status: status, headers: response_headers, body: IO.iodata_to_binary(response_body)}}
@@ -149,6 +187,19 @@ defmodule DSEx.HTTP.Hackneyless do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp request_tuple(:get, url, headers, _content_type, _body),
+    do: {String.to_charlist(url), Enum.reverse(headers)}
+
+  defp request_tuple(method, url, headers, content_type, body)
+       when method in [:post, :put, :patch, :delete] do
+    {
+      String.to_charlist(url),
+      Enum.reverse(headers),
+      String.to_charlist(content_type),
+      IO.iodata_to_binary(body)
+    }
   end
 
   def secure_http_opts(http_opts) do

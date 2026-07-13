@@ -6,7 +6,23 @@ defmodule DSEx.Clients.TrainingHTTP do
   def request(transport, url, headers, body, opts, max_attempts, retry_backoff_ms)
       when is_integer(max_attempts) and max_attempts > 0 and is_integer(retry_backoff_ms) and
              retry_backoff_ms >= 0 do
-    do_request(transport, url, headers, body, opts, max_attempts, retry_backoff_ms, 1)
+    request(transport, :post, url, headers, body, opts, max_attempts, retry_backoff_ms)
+  end
+
+  def request(transport, method, url, headers, body, opts, max_attempts, retry_backoff_ms)
+      when method in [:get, :post, :put, :patch, :delete] and is_integer(max_attempts) and
+             max_attempts > 0 and is_integer(retry_backoff_ms) and retry_backoff_ms >= 0 do
+    do_request(
+      transport,
+      method,
+      url,
+      headers,
+      body,
+      opts,
+      max_attempts,
+      retry_backoff_ms,
+      1
+    )
   end
 
   def idempotency_key(provider, model, body, nil) do
@@ -44,12 +60,33 @@ defmodule DSEx.Clients.TrainingHTTP do
 
   def redact_response(response), do: DSEx.Redaction.redact(response)
 
-  defp do_request(transport, url, headers, body, opts, max_attempts, backoff, attempt) do
-    response = DSEx.HTTP.post(transport, url, headers, body, opts)
+  defp do_request(
+         transport,
+         method,
+         url,
+         headers,
+         body,
+         opts,
+         max_attempts,
+         backoff,
+         attempt
+       ) do
+    response = DSEx.HTTP.request(transport, method, url, headers, body, opts)
 
     if attempt < max_attempts and retryable?(response) do
       Process.sleep(backoff * attempt)
-      do_request(transport, url, headers, body, opts, max_attempts, backoff, attempt + 1)
+
+      do_request(
+        transport,
+        method,
+        url,
+        headers,
+        body,
+        opts,
+        max_attempts,
+        backoff,
+        attempt + 1
+      )
     else
       response
     end
@@ -81,6 +118,10 @@ defmodule DSEx.Clients.TrainingJob do
           transport: module() | function() | nil,
           status_url: String.t() | nil,
           cancel_url: String.t() | nil,
+          status_method: DSEx.HTTP.method(),
+          cancel_method: DSEx.HTTP.method(),
+          status_body: :job_id | :empty,
+          cancel_body: :job_id | :empty,
           api_key: String.t() | nil,
           idempotency_key: String.t() | nil,
           max_attempts: pos_integer(),
@@ -100,6 +141,10 @@ defmodule DSEx.Clients.TrainingJob do
     :cancel_url,
     :api_key,
     :idempotency_key,
+    status_method: :post,
+    cancel_method: :post,
+    status_body: :job_id,
+    cancel_body: :job_id,
     max_attempts: 3,
     retry_backoff_ms: 100,
     metadata: %{}
@@ -131,6 +176,10 @@ defmodule DSEx.Clients.TrainingJob do
       transport: fetch_attr(attrs, :transport),
       status_url: fetch_attr(attrs, :status_url),
       cancel_url: fetch_attr(attrs, :cancel_url),
+      status_method: normalize_method(fetch_attr(attrs, :status_method, :post)),
+      cancel_method: normalize_method(fetch_attr(attrs, :cancel_method, :post)),
+      status_body: normalize_body_mode(fetch_attr(attrs, :status_body, :job_id)),
+      cancel_body: normalize_body_mode(fetch_attr(attrs, :cancel_body, :job_id)),
       api_key: fetch_attr(attrs, :api_key),
       idempotency_key: fetch_attr(attrs, :idempotency_key),
       max_attempts: fetch_attr(attrs, :max_attempts, 3),
@@ -184,6 +233,10 @@ defmodule DSEx.Clients.TrainingJob do
       "result_model" => job.result_model,
       "status_url" => job.status_url,
       "cancel_url" => job.cancel_url,
+      "status_method" => Atom.to_string(job.status_method),
+      "cancel_method" => Atom.to_string(job.cancel_method),
+      "status_body" => Atom.to_string(job.status_body),
+      "cancel_body" => Atom.to_string(job.cancel_body),
       "idempotency_key" => DSEx.Redaction.redact(job.idempotency_key),
       "max_attempts" => job.max_attempts,
       "retry_backoff_ms" => job.retry_backoff_ms,
@@ -208,6 +261,10 @@ defmodule DSEx.Clients.TrainingJob do
       transport: Keyword.get(opts, :transport),
       status_url: state["status_url"],
       cancel_url: state["cancel_url"],
+      status_method: Map.get(state, "status_method", "post"),
+      cancel_method: Map.get(state, "cancel_method", "post"),
+      status_body: Map.get(state, "status_body", "job_id"),
+      cancel_body: Map.get(state, "cancel_body", "job_id"),
       api_key: Keyword.get(opts, :api_key),
       idempotency_key: state["idempotency_key"],
       max_attempts: Map.get(state, "max_attempts", 3),
@@ -267,7 +324,8 @@ defmodule DSEx.Clients.TrainingJob do
   def rebind(%__MODULE__{} = job, program, opts \\ []) do
     with :ok <- validate_rebind_opts(opts),
          :ok <- require_artifact(job),
-         {:ok, lm} <- rebound_lm(DSEx.ProgramAccess.lm(program), job.result_model) do
+         {:ok, lm} <-
+           rebound_lm(DSEx.ProgramAccess.lm(program), job.provider, job.result_model) do
       rebound =
         program
         |> DSEx.ProgramAccess.put_lm(lm)
@@ -352,7 +410,8 @@ defmodule DSEx.Clients.TrainingJob do
   end
 
   defp change_status(%__MODULE__{} = job, url, operation) do
-    body = Jason.encode!(%{job_id: job.id})
+    method = operation_method(job, operation)
+    body = operation_body(job, operation)
 
     {:ok, idempotency_key} =
       DSEx.Clients.TrainingHTTP.idempotency_key(
@@ -363,11 +422,16 @@ defmodule DSEx.Clients.TrainingJob do
       )
 
     headers =
-      ([{"content-type", "application/json"}] ++ auth_headers(job.api_key))
-      |> DSEx.Clients.TrainingHTTP.put_header("idempotency-key", idempotency_key)
+      if method == :get do
+        auth_headers(job.api_key)
+      else
+        ([{"content-type", "application/json"}] ++ auth_headers(job.api_key))
+        |> DSEx.Clients.TrainingHTTP.put_header("idempotency-key", idempotency_key)
+      end
 
     case DSEx.Clients.TrainingHTTP.request(
            job.transport || DSEx.HTTP.Hackneyless,
+           method,
            url,
            headers,
            body,
@@ -454,10 +518,18 @@ defmodule DSEx.Clients.TrainingJob do
   defp require_artifact(%__MODULE__{status: status}),
     do: {:error, {:training_not_succeeded, status}}
 
-  defp rebound_lm(%DSEx.Clients.ReqLLM{} = lm, model), do: {:ok, %{lm | model: model}}
-  defp rebound_lm(%{model: _} = lm, model), do: {:ok, Map.put(lm, :model, model)}
-  defp rebound_lm(nil, _model), do: {:error, :training_program_lm_required}
-  defp rebound_lm(_lm, _model), do: {:error, :training_program_lm_not_rebindable}
+  defp rebound_lm(%DSEx.Clients.ReqLLM{} = lm, provider, model),
+    do: {:ok, %{lm | model: provider_model_spec(provider, model)}}
+
+  defp rebound_lm(%{model: _} = lm, _provider, model), do: {:ok, Map.put(lm, :model, model)}
+  defp rebound_lm(nil, _provider, _model), do: {:error, :training_program_lm_required}
+
+  defp rebound_lm(_lm, _provider, _model),
+    do: {:error, :training_program_lm_not_rebindable}
+
+  defp provider_model_spec(:openai, "openai:" <> _model = spec), do: spec
+  defp provider_model_spec(:openai, model), do: "openai:" <> model
+  defp provider_model_spec(_provider, model), do: model
 
   defp validate_rebind_opts(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and
@@ -525,6 +597,38 @@ defmodule DSEx.Clients.TrainingJob do
 
   defp operation_idempotency_key(%__MODULE__{idempotency_key: key}, operation),
     do: key <> ":" <> Atom.to_string(operation)
+
+  defp operation_method(job, :refresh), do: job.status_method
+  defp operation_method(job, :cancel), do: job.cancel_method
+
+  defp operation_body(job, :refresh), do: encode_operation_body(job.status_body, job.id)
+  defp operation_body(job, :cancel), do: encode_operation_body(job.cancel_body, job.id)
+
+  defp encode_operation_body(:empty, _id), do: ""
+  defp encode_operation_body(:job_id, id), do: Jason.encode!(%{job_id: id})
+
+  defp normalize_method(method) when method in [:get, :post, :put, :patch, :delete], do: method
+
+  defp normalize_method(method) when is_binary(method) do
+    case String.downcase(method) do
+      "get" -> :get
+      "post" -> :post
+      "put" -> :put
+      "patch" -> :patch
+      "delete" -> :delete
+      other -> raise ArgumentError, "unsupported training HTTP method #{inspect(other)}"
+    end
+  end
+
+  defp normalize_method(method),
+    do: raise(ArgumentError, "unsupported training HTTP method #{inspect(method)}")
+
+  defp normalize_body_mode(mode) when mode in [:job_id, :empty], do: mode
+  defp normalize_body_mode("job_id"), do: :job_id
+  defp normalize_body_mode("empty"), do: :empty
+
+  defp normalize_body_mode(mode),
+    do: raise(ArgumentError, "unsupported training request body mode #{inspect(mode)}")
 
   defp json_normalize!(value), do: value |> Jason.encode!() |> Jason.decode!()
 
@@ -1003,6 +1107,10 @@ defmodule DSEx.Clients.HTTPTrainer do
     :cancel_url,
     :api_key,
     transport: DSEx.HTTP.Hackneyless,
+    status_method: :post,
+    cancel_method: :post,
+    status_body: :job_id,
+    cancel_body: :job_id,
     supported_methods: [:sft],
     headers: [],
     submission_preparer: nil,
@@ -1015,6 +1123,10 @@ defmodule DSEx.Clients.HTTPTrainer do
   @option_schema [
     status_url: [type: {:or, [:string, nil]}],
     cancel_url: [type: {:or, [:string, nil]}],
+    status_method: [type: {:in, [:get, :post, :put, :patch, :delete]}, default: :post],
+    cancel_method: [type: {:in, [:get, :post, :put, :patch, :delete]}, default: :post],
+    status_body: [type: {:in, [:job_id, :empty]}, default: :job_id],
+    cancel_body: [type: {:in, [:job_id, :empty]}, default: :job_id],
     api_key: [type: {:or, [:string, nil]}],
     transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
     supported_methods: [type: {:list, :atom}],
@@ -1036,6 +1148,10 @@ defmodule DSEx.Clients.HTTPTrainer do
       cancel_url: Keyword.get(opts, :cancel_url),
       api_key: Keyword.get(opts, :api_key),
       transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
+      status_method: opts[:status_method],
+      cancel_method: opts[:cancel_method],
+      status_body: opts[:status_body],
+      cancel_body: opts[:cancel_body],
       supported_methods: Keyword.get(opts, :supported_methods, [:sft]),
       headers: Keyword.get(opts, :headers, []),
       submission_preparer: Keyword.get(opts, :submission_preparer),
@@ -1246,6 +1362,10 @@ defmodule DSEx.Clients.HTTPTrainer do
           transport: trainer.transport,
           status_url: status_url(trainer, decoded),
           cancel_url: endpoint_url(trainer.cancel_url, decoded),
+          status_method: trainer.status_method,
+          cancel_method: trainer.cancel_method,
+          status_body: trainer.status_body,
+          cancel_body: trainer.cancel_body,
           api_key: trainer.api_key,
           max_attempts: trainer.max_attempts,
           retry_backoff_ms: trainer.retry_backoff_ms,
@@ -1389,6 +1509,10 @@ defmodule DSEx.Clients.OpenAITrainer do
       retry_backoff_ms: opts[:retry_backoff_ms],
       status_url: String.trim_trailing(base, "/") <> "/fine_tuning/jobs/{id}",
       cancel_url: String.trim_trailing(base, "/") <> "/fine_tuning/jobs/{id}/cancel",
+      status_method: :get,
+      cancel_method: :post,
+      status_body: :empty,
+      cancel_body: :empty,
       supported_methods: [:sft],
       submission_preparer: fn trainer, lm, examples, call_opts ->
         prepare_training_file(
@@ -1601,13 +1725,13 @@ defmodule DSEx.Clients.OpenAITrainer do
       {:ok, training_file} ->
         {:ok,
          %{
-           model: Map.get(lm, :model),
-           training_file: training_file
+           model: openai_model_id(Map.get(lm, :model)),
+           training_file: training_file,
+           method: supervised_method(Keyword.get(opts, :hyperparameters))
          }
          |> maybe_put(:validation_file, Keyword.get(opts, :validation_file))
          |> maybe_put(:suffix, Keyword.get(opts, :suffix))
-         |> maybe_put(:metadata, Keyword.get(opts, :metadata))
-         |> maybe_put(:hyperparameters, map_or_nil(Keyword.get(opts, :hyperparameters)))}
+         |> maybe_put(:metadata, Keyword.get(opts, :metadata))}
 
       :error ->
         {:error, :openai_training_file_required}
@@ -1618,6 +1742,18 @@ defmodule DSEx.Clients.OpenAITrainer do
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
   defp map_or_nil(nil), do: nil
   defp map_or_nil(values), do: Map.new(values)
+
+  defp supervised_method(nil), do: %{type: "supervised"}
+
+  defp supervised_method(hyperparameters) do
+    %{
+      type: "supervised",
+      supervised: %{hyperparameters: map_or_nil(hyperparameters)}
+    }
+  end
+
+  defp openai_model_id("openai:" <> model), do: model
+  defp openai_model_id(model), do: model
 
   defp request_opts(opts),
     do:
