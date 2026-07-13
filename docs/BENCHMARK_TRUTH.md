@@ -209,6 +209,24 @@ DSPy `3.3.0b1`. It validates exact source hashes and compares MIPROv2 budgets,
 demo topology, proposal rotation, search-space shape, and full-evaluation cadence
 plus SIMBA bucket, finalist, rollout, tied-rule, and eviction invariants.
 
+Run the resumable, paid one-seed AIME preflight from the shared DSEx/DSPy
+manifest with:
+
+```sh
+mix dsex.benchmark.instruction_optimizer_experiment \
+  --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
+  --runtime both \
+  --python tmp/dspy-parity-venv/bin/python \
+  --dspy-pythonpath tmp/dspy-current-target \
+  --out benchmarks/results
+```
+
+This command pins DSPy and Optuna, verifies immutable split hashes, maps the
+same logical model to each runtime's provider identifier, and enforces the same
+per-arm request/input/output/USD ceilings before merging results. It reports
+frozen-test deltas for every arm. It does not choose a global winner from dev,
+and its one seed is explicitly research preflight rather than T3 evidence.
+
 The third command runs a T1 structural differential against standalone GEPA
 `v0.1.1` at commit `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`.
 Set `DSEX_GEPA_V011_ROOT` to the exact checkout and, when needed,
