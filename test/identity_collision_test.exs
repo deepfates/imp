@@ -5,6 +5,10 @@ defmodule DSEx.IdentityCollisionTest do
 
   @checked_at "2026-07-13T21:00:00Z"
 
+  test "uses a registry-safe default request cadence" do
+    assert IdentityCollision.default_delay_ms() >= 1_000
+  end
+
   test "constructs exact registry URLs and escapes a package path segment" do
     assert IdentityCollision.url_for("hex", "form_lab") ==
              "https://hex.pm/api/packages/form_lab"

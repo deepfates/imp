@@ -4,10 +4,10 @@ defmodule DSEx.IdentityCollision do
   alias DSEx.HTTP.Hackneyless
   alias DSEx.{IdentityCheckpoint, IdentityEvaluation}
 
-  @default_delay_ms 250
+  @default_delay_ms 1_000
   @default_checks_out "identity/research/package-collision-checks.jsonl"
   @default_flags_out "identity/research/package-collision-flags.jsonl"
-  @user_agent "DSEx-Identity-Collision-Audit/1.0 (+https://github.com/deepfates/dsex)"
+  @user_agent "Deepfates-Identity-Collision-Audit/1.0 (+https://github.com/deepfates)"
 
   @source_specs [
     {"hex", %{label: "Hex", base_url: "https://hex.pm/api/packages/"}},

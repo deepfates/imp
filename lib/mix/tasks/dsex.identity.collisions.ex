@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Dsex.Identity.Collisions do
   Check derived package forms against exact public registry endpoints.
 
       mix dsex.identity.collisions
-      mix dsex.identity.collisions --source hex --source npm,pypi --delay-ms 500
+      mix dsex.identity.collisions --source hex --source npm,pypi --delay-ms 1250
       mix dsex.identity.collisions --source all --refresh
   """
 
