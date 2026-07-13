@@ -118,12 +118,19 @@ class UsageLedger:
         pricing: Mapping[str, Any] | None = None,
         reservation: Mapping[str, Any] | None = None,
     ) -> None:
-        required = {"requests", "tokens", "usd"}
+        required = {"requests", "input_tokens", "output_tokens", "usd"}
         if set(ceilings) != required:
-            raise CampaignError("ceilings must contain exactly requests, tokens, and usd")
+            raise CampaignError(
+                "ceilings must contain exactly requests, input_tokens, output_tokens, and usd"
+            )
         self.ceilings = {
             "requests": _nonnegative_integer(ceilings["requests"], "ceilings.requests"),
-            "tokens": _nonnegative_integer(ceilings["tokens"], "ceilings.tokens"),
+            "input_tokens": _nonnegative_integer(
+                ceilings["input_tokens"], "ceilings.input_tokens"
+            ),
+            "output_tokens": _nonnegative_integer(
+                ceilings["output_tokens"], "ceilings.output_tokens"
+            ),
             "usd": _nonnegative_number(ceilings["usd"], "ceilings.usd"),
         }
         self.pricing = dict(pricing or {})
@@ -192,11 +199,13 @@ class UsageLedger:
         token_reservation = input_tokens + output_tokens
         usd_reservation = self._reservation_cost(input_tokens, output_tokens)
         with self._lock:
-            reserved_tokens = sum(item["tokens"] for item in self._reservations.values())
+            reserved_input = sum(item["input_tokens"] for item in self._reservations.values())
+            reserved_output = sum(item["output_tokens"] for item in self._reservations.values())
             reserved_usd = sum(item["usd"] for item in self._reservations.values())
             projected = {
                 "requests": self.totals["requests"] + 1,
-                "tokens": self.totals["tokens"] + reserved_tokens + token_reservation,
+                "input_tokens": self.totals["input_tokens"] + reserved_input + input_tokens,
+                "output_tokens": self.totals["output_tokens"] + reserved_output + output_tokens,
                 "usd": self.totals["usd"] + reserved_usd + usd_reservation,
             }
             for key, value in projected.items():

@@ -118,7 +118,12 @@ class CampaignTest(unittest.TestCase):
                 },
             },
             "budget_scope": "per_arm",
-            "per_arm_ceilings": {"requests": 100, "tokens": 1000, "usd": 1.0},
+            "per_arm_ceilings": {
+                "requests": 100,
+                "input_tokens": 500,
+                "output_tokens": 500,
+                "usd": 1.0,
+            },
             "seed": 7,
             "arms": [
                 {"name": "baseline", "config": {}},
@@ -188,7 +193,12 @@ class CampaignTest(unittest.TestCase):
         self.assertEqual(started_count, 1)
 
     def test_request_cap_is_checked_before_subsequent_call(self):
-        self.config["per_arm_ceilings"] = {"requests": 1, "tokens": 1000, "usd": 1.0}
+        self.config["per_arm_ceilings"] = {
+            "requests": 1,
+            "input_tokens": 500,
+            "output_tokens": 500,
+            "usd": 1.0,
+        }
         self.write_config()
         with self.assertRaisesRegex(campaign.BudgetExceeded, "requests ceiling reservation rejected"):
             self.runner().run()
@@ -196,9 +206,10 @@ class CampaignTest(unittest.TestCase):
         self.assertEqual(state["usage_by_arm"]["baseline"]["requests"], 1)
         self.assertEqual(state["status"], "failed")
 
-    def test_token_and_usd_caps_are_enforced(self):
+    def test_input_output_and_usd_caps_are_enforced_independently(self):
         cases = (
-            ("tokens", 3, "tokens ceiling reservation"),
+            ("input_tokens", 1, "input_tokens ceiling reservation"),
+            ("output_tokens", 9, "output_tokens ceiling reservation"),
             ("usd", 0.000001, "usd ceiling reservation"),
         )
         for ceiling, value, message in cases:
@@ -207,7 +218,12 @@ class CampaignTest(unittest.TestCase):
                 output = self.root / f"{ceiling}-out.json"
                 config = json.loads(json.dumps(self.config))
                 config["campaign_id"] = ceiling
-                config["per_arm_ceilings"] = {"requests": 100, "tokens": 1000, "usd": 1.0}
+                config["per_arm_ceilings"] = {
+                    "requests": 100,
+                    "input_tokens": 500,
+                    "output_tokens": 500,
+                    "usd": 1.0,
+                }
                 config["per_arm_ceilings"][ceiling] = value
                 with self.assertRaisesRegex(campaign.BudgetExceeded, message):
                     campaign.Campaign(config, self.config_path, checkpoint, output, runtime_factory=FakeRuntime).run()
@@ -215,7 +231,7 @@ class CampaignTest(unittest.TestCase):
     def test_atomic_reservations_reject_concurrent_overcommit(self):
         reservation = self.config["provider"]["reservation"]
         probe = campaign.UsageLedger(
-            {"requests": 2, "tokens": 16, "usd": 1.0},
+            {"requests": 2, "input_tokens": 6, "output_tokens": 10, "usd": 1.0},
             reservation=reservation,
         )
         barrier = threading.Barrier(2)
@@ -238,7 +254,12 @@ class CampaignTest(unittest.TestCase):
         self.assertEqual(probe.admission_snapshot()["active_reservations"], 1)
 
     def test_each_arm_has_an_independent_allowance_and_aggregate_usage(self):
-        self.config["per_arm_ceilings"] = {"requests": 5, "tokens": 1000, "usd": 1.0}
+        self.config["per_arm_ceilings"] = {
+            "requests": 5,
+            "input_tokens": 500,
+            "output_tokens": 500,
+            "usd": 1.0,
+        }
         self.write_config()
         report = self.runner().run()
         requests = {
