@@ -1,0 +1,914 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-17a-form-derivation-grammar-systems",
+    "generated_at": "2026-07-13T19:09:18Z",
+    "generator": {
+      "kind": "model",
+      "name": "form saturation generator A",
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "agent_id": null
+    },
+    "method": "isolated morphological matrix: derivation, conversion, identity grammar",
+    "brief": "Create a schema-version-1 identity portfolio for the pre-release Elixir/OTP library boundary: declared, callable, measurable, optimizable LM programs now, with a credible typed textual and artifact optimization horizon spanning instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, and configuration. Do not frame it as an official DSPy port, static proof system, universal agent OS, provider SDK, guaranteed autonomous self-improvement system, safety product, standards body, or institute. Generate exactly 30 contiguous candidates in three owned ten-candidate cells. Cell 1, derivation-clipping, covers declaration-contract and boundary-translation through coined-category-noun and ordinary-verb forms for elixir-newcomers, international-users, and future-maintainers; it contrasts full stem, clipping, elision, prefix, suffix, and conversion and states grammar and dictation risk. Cell 4, conversion-grammar, covers action-agency and care-stewardship-repair through ordinary-verb, ordinary-object, and phrase-imperative forms for affected-publics and backend-product-engineers; it exercises noun, verb, adjective, and command readings and states intended prose and code roles. Cell 7, identity-grammar, covers plurality-ecosystem and infrastructure-logistics through namespace-led, institutional-community, and descriptive-category systems for future-maintainers, buyers-founders, and oss-contributors; each candidate explicitly maps master, descriptor, library, research, community, company, protocol, and product-family roles and marks unavailable roles. Preserve affirmative, odd, adverse, and malformed observations. Use exactly six wildcards, two per cell; cell 1 and cell 7 each use five affirmative, three ambivalent, and two adverse records, while cell 4 uses five affirmative, two ambivalent, and three adverse records. Each cell uses exactly four current, four horizon, and two both scope records. Every candidate requires pronunciation, grammar, honest etymology, valid nonempty audience and architecture lenses, substantive rationale, concerns, and keyed notes for challenge wave, challenge cell, form mechanism, stance, scope, code projection, current embodiment, and horizon embodiment. Every code projection supplies hex, OTP, module, Mix, config, and telemetry forms, or an intentionally non-code role linked to a viable implementation identity. Use atlas IDs only, keep provisional concepts in notes, and avoid default -ex, -ly, -io, AI, LM, bot, and Latinate escape hatches. Do not browse or availability-check.",
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "declaration-contract",
+      "boundary-translation",
+      "action-agency",
+      "care-stewardship-repair",
+      "plurality-ecosystem",
+      "infrastructure-logistics"
+    ],
+    "intended_strategies": [
+      "coined-category-noun",
+      "ordinary-verb",
+      "ordinary-object",
+      "phrase-imperative",
+      "namespace-led",
+      "institutional-community",
+      "descriptive-category"
+    ],
+    "intended_audiences": [
+      "elixir-newcomers",
+      "international-users",
+      "future-maintainers",
+      "affected-publics",
+      "backend-product-engineers",
+      "buyers-founders",
+      "oss-contributors"
+    ],
+    "notes": [
+      "challenge_wave: form-saturation-a",
+      "owned_cell: 1 derivation-clipping",
+      "owned_cell: 4 conversion-grammar",
+      "owned_cell: 7 identity-grammar",
+      "Correction before acceptance: moved generated role-system presentations from surface into generated_system_surface notes so surface remains the master identity and code projections stay meaningful."
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Declare",
+      "pronunciation": "dih-KLAIR",
+      "grammar": "Full-stem ordinary verb; primary prose reading is the command or infinitive 'declare a program', while title-case Declare can convert to a product noun. The verb remains the intended role; noun use is secondary.",
+      "rationale": "Declare names the present front door accurately: a developer makes inputs, outputs, instructions, and constraints explicit before calling and measuring a program. It is plain enough for newcomers and does not imply compile-time proof.",
+      "etymology": "English 'declare', from Middle English and Latin lineage; an existing ordinary verb, not a coinage.",
+      "territories": ["declaration-contract"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["elixir-newcomers", "international-users"],
+      "architecture_lenses": ["single-branded-house", "beam-master"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Dictation risk: low for the word, but listeners may write 'declar' or assume a generic command rather than a name.",
+        "The ordinary verb is crowded and weakly distinctive, and it can suggest stronger contractual guarantees than runtime validation provides."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: full stem retained without affixation; title-case noun use is conversion only",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=declare; otp=:declare; module=Declare; mix=declare; config=:declare; telemetry=[:declare].",
+        "current_embodiment: Declare names signatures and callable Elixir program contracts.",
+        "horizon_embodiment: Declare can extend to declared typed parameters for demonstrations, policies, schemas, code fragments, and configuration without claiming that declaration proves correctness."
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Bound",
+      "pronunciation": "BOUND",
+      "grammar": "Conversion among verb, adjective, and noun: developers bound an action, a tool call is bounded, and a Bound can name the executable boundary object. The intended prose role is verb/adjective; the intended code role is noun namespace.",
+      "rationale": "Bound foregrounds the honest limit around stochastic behavior and tool use. It is compact, familiar, and close to Elixir's concern with explicit process and effect boundaries without promising static enforcement.",
+      "etymology": "Existing English word with Germanic and French lineages across its limit, leap, and destination senses; this proposal deliberately converts the limit sense into a software identity.",
+      "territories": ["declaration-contract", "boundary-translation"],
+      "strategies": ["ordinary-verb", "coined-category-noun"],
+      "audience_lenses": ["elixir-newcomers", "future-maintainers"],
+      "architecture_lenses": ["shared-prefix-family", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Dictation risk: medium because 'bound' may be heard as 'bounde' only in spelling recovery and has several unrelated senses.",
+        "The adjective can sound restrictive, while the leap and book senses dilute the contract meaning."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: zero-derivation conversion of an ordinary verb/adjective into a category noun",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=bound; otp=:bound; module=Bound; mix=bound; config=:bound; telemetry=[:bound].",
+        "current_embodiment: Bound names runtime-validated task and action boundaries around callable programs.",
+        "horizon_embodiment: Bound can organize separately typed and versioned artifact boundaries while keeping execution and optimization limits explicit."
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Decla",
+      "pronunciation": "DEK-luh",
+      "grammar": "Back-clipped coined category noun from 'declare'; it takes ordinary noun syntax ('a Decla program', 'Decla programs') and should not be used as a verb.",
+      "rationale": "Decla tests whether clipping can preserve declaration semantics while yielding a short package and module root. Its two syllables are lighter than Declaration and leave room for a family of named components.",
+      "etymology": "Coined by clipping the final syllable from English 'declare'; no external source.",
+      "territories": ["declaration-contract"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["international-users", "future-maintainers"],
+      "architecture_lenses": ["shared-prefix-family", "single-branded-house"],
+      "parent_surfaces": ["Declare"],
+      "known_concerns": [
+        "Dictation risk: high because DEK-luh may be written Decla, Dekla, or Declaah, and some speakers may stress the second syllable.",
+        "The clipping looks unfinished and can read as a typo or an abbreviation with no stable expansion."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: back-clipping declare to decla",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=decla; otp=:decla; module=Decla; mix=decla; config=:decla; telemetry=[:decla].",
+        "current_embodiment: Decla is a compact identity for declared signatures, programs, calls, evaluations, and optimizer reports.",
+        "horizon_embodiment: Decla can prefix typed artifact families such as Decla.Policy and Decla.Schema without narrowing the optimized value to prompts."
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Dclare",
+      "pronunciation": "dee-KLAIR",
+      "grammar": "Vowel-elided coined noun with an optional command echo; intended noun syntax is 'a Dclare program' and code uses title-case Dclare. Treating it as the ordinary verb 'declare' would erase the spelling distinction.",
+      "rationale": "Dclare exposes the tradeoff of preserving the audible declaration stem while removing an internal letter for compactness. It remains recognizable on the page and projects cleanly into an Elixir namespace.",
+      "etymology": "Coined by eliding the first 'e' from English 'declare'; no external source.",
+      "territories": ["declaration-contract", "boundary-translation"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["elixir-newcomers", "international-users", "future-maintainers"],
+      "architecture_lenses": ["beam-master", "shared-prefix-family"],
+      "parent_surfaces": ["Declare"],
+      "known_concerns": [
+        "Dictation risk: very high because the intended spoken form does not determine whether the missing vowel is reflected in spelling.",
+        "The elision resembles dropped-vowel startup naming and may be perceived as malformed rather than deliberate."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: internal vowel elision from declare to dclare",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=dclare; otp=:dclare; module=Dclare; mix=dclare; config=:dclare; telemetry=[:dclare].",
+        "current_embodiment: Dclare names the translation from a textual signature into a runtime-callable Elixir program.",
+        "horizon_embodiment: Dclare can cover explicit artifact declarations and optimizer lineage, though its spelling cost compounds across a larger portfolio."
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Predeclare",
+      "pronunciation": "pree-dih-KLAIR",
+      "grammar": "Prefixed ordinary verb and direct command: 'predeclare the task boundary'. As a title-case identity it is a converted noun, but the command reading is intended in prose and the namespace reading only in code.",
+      "rationale": "Predeclare makes sequence explicit: establish the typed task contract before runtime model behavior. It usefully challenges whether an identity can teach the workflow instead of merely naming a category.",
+      "etymology": "Existing English prefix 'pre-' attached productively to 'declare'; used here as a software identity rather than claimed as a new word.",
+      "territories": ["declaration-contract"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["elixir-newcomers", "future-maintainers"],
+      "architecture_lenses": ["lifecycle-planes", "beam-master"],
+      "parent_surfaces": ["Declare"],
+      "known_concerns": [
+        "Dictation risk: low in isolation, but speakers may collapse the middle syllables or write 'pre-declare'.",
+        "The name can imply declarations happen only before execution, while runtime context and iterative optimization also alter program behavior."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: productive pre- prefix on the full declare stem, plus title-case noun conversion",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=predeclare; otp=:predeclare; module=Predeclare; mix=predeclare; config=:predeclare; telemetry=[:predeclare].",
+        "current_embodiment: Predeclare describes signature-first construction before DSEx.call/2.",
+        "horizon_embodiment: Predeclare can require stable identities and types before instructions, demonstrations, tools, policies, schemas, code, or configuration enter an optimization campaign."
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "Declarework",
+      "pronunciation": "dih-KLAIR-wurk",
+      "grammar": "Suffixed compound category noun: 'declarework' is the work and artifact set produced by declaration. It is intentionally not a verb; prose needs 'write declarework' rather than the tempting but awkward 'declarework it'.",
+      "rationale": "Declarework broadens from a single declaration to the inspectable body of contracts, examples, metrics, traces, and optimized artifacts. The work suffix keeps human and machine labor visible.",
+      "etymology": "Coined compound of English 'declare' and 'work'; no external source.",
+      "territories": ["declaration-contract", "boundary-translation"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["future-maintainers", "international-users"],
+      "architecture_lenses": ["shared-prefix-family", "research-stable-split"],
+      "parent_surfaces": ["Declare"],
+      "known_concerns": [
+        "Dictation risk: medium because listeners may insert a space or hear 'declarer work'.",
+        "The compound is semantically broad but aesthetically heavy, and 'work' may imply a service or labor platform."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: work suffix/compound attached to the full declare stem",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=declarework; otp=:declarework; module=Declarework; mix=declarework; config=:declarework; telemetry=[:declarework].",
+        "current_embodiment: Declarework can denote the collection of signatures, examples, metrics, and persisted optimizer reports.",
+        "horizon_embodiment: Declarework naturally includes typed textual and code-bearing artifacts with provenance, feedback, and promotion history."
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Translate",
+      "pronunciation": "trans-LAYT",
+      "grammar": "Full-stem ordinary verb and command; intended prose is 'translate model output into an explicit contract'. Title-case Translate is a secondary product noun, and the noun 'translation' should remain descriptive rather than branded.",
+      "rationale": "Translate clearly describes adapters and validation at the stochastic-to-Elixir boundary. It keeps the mechanism legible to newcomers while acknowledging that model messages and typed predictions are different representations.",
+      "etymology": "Existing English verb from Latin through Middle English; no claim of coinage.",
+      "territories": ["boundary-translation"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["elixir-newcomers", "international-users"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Dictation risk: low, though the noun and verb stress shift in some related forms can complicate spoken brand grammar.",
+        "Translation can imply lossless equivalence or narrow the library to adapter work, both of which misstate the broader program and optimization system."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: full ordinary verb retained, with title-case noun conversion",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=translate; otp=:translate; module=Translate; mix=translate; config=:translate; telemetry=[:translate].",
+        "current_embodiment: Translate names adapter rendering, output parsing, and runtime validation at the Elixir boundary.",
+        "horizon_embodiment: Translate can encompass typed transformations among source artifacts, candidates, evaluations, and promoted configurations, but only if loss and uncertainty stay visible."
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Trans",
+      "pronunciation": "TRANZ",
+      "grammar": "Front-clipped coined category noun from 'translate'; intended syntax is 'the Trans boundary' or simply 'Trans'. It should never be improvised as a verb because the form is already an established adjective and identity term in ordinary language.",
+      "rationale": "Trans is the most aggressive clipping test: one syllable, clean code ergonomics, and a visible link to crossing boundaries. It demonstrates how formal compactness can become socially and semantically overloaded.",
+      "etymology": "Clipped from English 'translate' for this matrix, while honestly acknowledging pre-existing Latin-prefix and gender-identity uses; not claimed as a new word.",
+      "territories": ["boundary-translation"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["international-users", "future-maintainers"],
+      "architecture_lenses": ["single-branded-house", "beam-master"],
+      "parent_surfaces": ["Translate"],
+      "known_concerns": [
+        "Dictation risk: low for sound but high for semantic recovery because listeners cannot know the intended expansion.",
+        "The form would appropriate or confuse an established human identity term and is unsuitable as a master software brand despite excellent brevity."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: severe back-clipping of translate to trans",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: intentionally non-code master role because of semantic collision; linked implementation identity uses hex=translate_core; otp=:translate_core; module=TranslateCore; mix=translate_core; config=:translate_core; telemetry=[:translate_core].",
+        "current_embodiment: The clipped form points at the adapter boundary but should not displace a viable implementation identity.",
+        "horizon_embodiment: Its crossing sense could describe artifact transformations, but the social collision should keep Trans unavailable as master, package, and community identity."
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Trnslate",
+      "pronunciation": "trans-LAYT",
+      "grammar": "Malformed vowel-elided coined noun, visually distinct but intentionally pronounced like 'translate'. It has no defensible verb grammar because speech cannot distinguish the brand from the ordinary verb.",
+      "rationale": "Trnslate preserves a useful adverse observation: repeated elision can produce a code-safe token whose written novelty adds no spoken identity. It stress-tests whether compact typography is being mistaken for meaningful derivation.",
+      "etymology": "Coined by deleting the first 'a' from English 'translate'; no external source.",
+      "territories": ["boundary-translation"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["international-users", "future-maintainers"],
+      "architecture_lenses": ["shared-prefix-family"],
+      "parent_surfaces": ["Translate"],
+      "known_concerns": [
+        "Dictation risk: extreme because the proposed pronunciation always yields the correctly spelled ordinary word rather than Trnslate.",
+        "The missing vowel reads as a typo, harms accessibility, and adds no product-boundary information."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: internal vowel elision producing an intentionally malformed surface",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: hex=trnslate; otp=:trnslate; module=Trnslate; mix=trnslate; config=:trnslate; telemetry=[:trnslate].",
+        "current_embodiment: Trnslate could technically name adapter and validation modules but would create constant spelling repair work.",
+        "horizon_embodiment: A larger artifact family would multiply the malformed spelling and make provenance, documentation, and dictation less reliable."
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Unboundarywork",
+      "pronunciation": "un-BOUND-uh-ree-wurk",
+      "grammar": "Prefixed-and-suffixed coined category noun: nominally the work of undoing opaque boundaries so explicit ones can be rebuilt. It does not convert cleanly to a verb or adjective and requires explanatory prose every time.",
+      "rationale": "Unboundarywork deliberately saturates derivation past elegance. It captures a real operation, exposing hidden provider behavior and translating it into explicit contracts, while showing that semantic completeness can produce an unusable identity.",
+      "etymology": "Coined from English prefix 'un-', noun 'boundary', and noun 'work'; no external source.",
+      "territories": ["declaration-contract", "boundary-translation"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["elixir-newcomers", "international-users", "future-maintainers"],
+      "architecture_lenses": ["lifecycle-planes", "shared-prefix-family"],
+      "parent_surfaces": ["Bound", "Declarework"],
+      "known_concerns": [
+        "Dictation risk: high because listeners may write three words, hyphenate it, or reduce the unstressed middle syllables.",
+        "The negative prefix suggests removing safeguards, while the long compound is awkward, malformed in tone, and poor for repeated code use."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 1 derivation-clipping",
+        "form_mechanism: stacked un- prefix, boundary stem, and -work compound suffix",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: intentionally non-code research phrase; linked implementation identity uses hex=boundary_work; otp=:boundary_work; module=BoundaryWork; mix=boundary_work; config=:boundary_work; telemetry=[:boundary_work].",
+        "current_embodiment: As a research phrase it describes making hidden adapter and runtime boundaries inspectable, not removing operational limits.",
+        "horizon_embodiment: It can label studies of artifact-boundary migration, provenance, and rollback, but should remain unavailable as package, protocol, or master identity."
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "Tend",
+      "pronunciation": "TEND",
+      "grammar": "Verb and command are primary in prose ('tend the program'); a Tend is a secondary noun for one measured maintenance pass, and 'tended' supplies the participial adjective. In code, Tend is the namespace and :tend is the operation, not an autonomous actor.",
+      "rationale": "Tend frames optimization as bounded, observed care rather than inevitable self-improvement. It supports iteration, maintenance, and human responsibility while remaining short and ordinary for backend engineers.",
+      "etymology": "Existing English verb, with senses of attending and caring derived through Old French and Latin; no claim of coinage.",
+      "territories": ["care-stewardship-repair", "action-agency"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["single-branded-house", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Care language can understate the rigor of evaluation and promotion gates.",
+        "As an imperative, Tend may sound paternalistic unless the object and accountable human operator remain explicit."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: ordinary verb with command and count-noun conversion",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=tend; otp=:tend; module=Tend; mix=tend; config=:tend; telemetry=[:tend].",
+        "current_embodiment: Tend names an explicit evaluate-adjust-compare pass over a declared callable program.",
+        "horizon_embodiment: Tend can govern measured maintenance of typed artifacts, rejected edits, checkpoints, promotion, and rollback without claiming autonomous improvement."
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "Mend",
+      "pronunciation": "MEND",
+      "grammar": "Ordinary transitive verb and command in prose ('mend this program'); converted noun in code ('a Mend report'); 'mended' is the participial adjective for an evaluated artifact. The intended actor is the developer-operated optimizer, not the library itself as an agent.",
+      "rationale": "Mend makes repair concrete and modest. It fits optimization campaigns that respond to trace feedback and measured failures, and it naturally permits the honest outcome that some proposed repairs are rejected.",
+      "etymology": "Existing English verb from Middle English, related to amendment; no claim of coinage.",
+      "territories": ["care-stewardship-repair"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["beam-master", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Repair framing assumes a defect and may fit poorly when optimization explores alternatives rather than fixes an error.",
+        "The ordinary word is broad, and command use can make people affected by outputs sound like objects being repaired."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: ordinary verb and imperative converted to a report/category noun",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=mend; otp=:mend; module=Mend; mix=mend; config=:mend; telemetry=[:mend].",
+        "current_embodiment: Mend denotes a developer-invoked optimization run grounded in examples, metrics, traces, and comparison.",
+        "horizon_embodiment: Mend can describe bounded edits to many artifact types with lineage and held-out evidence, never people or social outcomes as repair objects."
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "Keep",
+      "pronunciation": "KEEP",
+      "grammar": "Noun, verb, and command readings are all active: 'the Keep' is a retained artifact store, 'keep this candidate' is a promotion decision, and 'kept' is the adjective/participle. Code intends the noun namespace and verb operation together.",
+      "rationale": "Keep links stewardship to durable optimizer artifacts: candidates, parentage, reports, checkpoints, and rollback state. The promotion verb is familiar and makes retention an explicit decision rather than automatic improvement.",
+      "etymology": "Existing English noun and verb from Old English; the storage and retention senses are reused directly.",
+      "territories": ["care-stewardship-repair", "action-agency"],
+      "strategies": ["ordinary-object", "ordinary-verb"],
+      "audience_lenses": ["backend-product-engineers", "affected-publics"],
+      "architecture_lenses": ["lifecycle-planes", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The fortress noun can imply enclosure, central control, or permanent retention.",
+        "Retention language needs privacy and deletion discipline; the name itself supplies no safety or governance guarantee."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: existing noun/verb polysemy with imperative and participial adjective readings",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=keep; otp=:keep; module=Keep; mix=keep; config=:keep; telemetry=[:keep].",
+        "current_embodiment: Keep names persisted program values and explicit selection of evaluated candidates and reports.",
+        "horizon_embodiment: Keep can hold versioned typed artifact candidates, rejected changes, promotion evidence, and rollback points with finite retention policies."
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "Repair",
+      "pronunciation": "rih-PAIR",
+      "grammar": "Existing noun, verb, participial adjective, and direct command: 'a repair', 'repair the instruction', 'a repaired instruction', and 'Repair'. Prose intends the bounded verb; code uses Repair for an optimizer policy or result, never for an autonomous repair agent.",
+      "rationale": "Repair is unusually honest about optimization responding to observed shortfalls. It can name incremental edits, validation, comparison, and rollback without implying that every campaign improves its target.",
+      "etymology": "Existing English noun and verb from Old French; no claim of coinage.",
+      "territories": ["care-stewardship-repair"],
+      "strategies": ["ordinary-verb", "ordinary-object"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["research-stable-split", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The word presupposes damage and may stigmatize data, users, or communities if the object is not explicitly a software artifact.",
+        "It can be confused with system recovery tooling rather than LM program evaluation and optimization."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: ordinary noun/verb conversion with imperative command reading",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=repair; otp=:repair; module=Repair; mix=repair; config=:repair; telemetry=[:repair].",
+        "current_embodiment: Repair is a policy and report grammar for measured edits to instructions, demonstrations, and program configuration.",
+        "horizon_embodiment: Repair extends to typed artifact patches and held-out promotion while keeping the repair object, evidence, and responsible operator explicit."
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Hold Fast",
+      "pronunciation": "HOHLD FAST",
+      "grammar": "Phrase-imperative with 'hold' as the verb and an adjective result: 'hold fast to the contract' is the command, while 'a holdfast' is a possible noun artifact and 'held-fast' describes a retained constraint. Prose carries the phrase; code uses the linked Holdfast noun.",
+      "rationale": "Hold Fast tests a two-word command that values stable constraints during optimization. It expresses refusal to promote regressions and gives a concrete noun for constraints that must survive candidate mutation.",
+      "etymology": "Existing English phrase 'hold fast' and noun 'holdfast'; not a coinage, though the software role is new.",
+      "territories": ["care-stewardship-repair", "action-agency"],
+      "strategies": ["phrase-imperative", "ordinary-object"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["lifecycle-planes", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The phrase can sound conservative or resistant to necessary change.",
+        "Its nautical and fastening senses may obscure evaluation, and Holdfast collapses the spoken spacing in code."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: phrase imperative linked to an existing closed-compound object noun and participial adjective",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: phrase is intentionally non-code; linked identity uses hex=holdfast; otp=:holdfast; module=Holdfast; mix=holdfast; config=:holdfast; telemetry=[:holdfast].",
+        "current_embodiment: Hold Fast describes preserving signature constraints, explicit tool policies, and deterministic gates while programs are changed.",
+        "horizon_embodiment: Holdfast can be a typed invariant artifact carried through proposals, merges, checkpoints, and promotion decisions without claiming formal proof."
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "Care",
+      "pronunciation": "KAIR",
+      "grammar": "Noun, verb, command, and attributive adjective readings coexist: 'care for the program', 'take care', and 'care policy'. The intended prose role is a bounded practice; code uses Care as a policy namespace, not a safety certification.",
+      "rationale": "Care centers maintenance, consequences, and limits rather than optimization spectacle. It forces the system to name who operates it and who may be affected, an important counterweight to action-agency language.",
+      "etymology": "Existing English noun and verb from Old English; no claim of coinage.",
+      "territories": ["care-stewardship-repair"],
+      "strategies": ["ordinary-verb", "ordinary-object"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["community-commercial-steward", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Care can be read as a safety or social-benefit promise that a general LM program library cannot guarantee.",
+        "The broad moral vocabulary risks paternalism and can obscure measurable technical behavior."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: ordinary noun/verb with imperative and attributive adjective conversion",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=care; otp=:care; module=Care; mix=care; config=:care; telemetry=[:care].",
+        "current_embodiment: Care can name explicit maintenance and review policy around program calls, tool boundaries, traces, and evaluation.",
+        "horizon_embodiment: Care can qualify artifact proposal and promotion practices, but must remain a process stance rather than a safety product or outcome warranty."
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "Ready",
+      "pronunciation": "RED-ee",
+      "grammar": "Adjective, transitive verb, command, and code-state noun: 'the program is ready', 'ready the program', 'Ready it', and 'a Ready result'. The intended prose role is the adjective after evidence gates; code uses the noun namespace for a result state and readiness check.",
+      "rationale": "Ready translates evaluation and operational gates into a familiar state without claiming perfection. It can connect optimization artifacts to explicit promotion decisions and production checks.",
+      "etymology": "Existing English adjective and verb from Old English; no claim of coinage.",
+      "territories": ["action-agency", "care-stewardship-repair"],
+      "strategies": ["ordinary-verb"],
+      "audience_lenses": ["backend-product-engineers", "affected-publics"],
+      "architecture_lenses": ["lifecycle-planes", "edition-architecture"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Ready is a state claim that can be mistaken for a universal quality or safety guarantee.",
+        "The verb is less common internationally, and the name is generic enough to collide across deployment tooling."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: adjective converted to transitive verb, imperative, and code-state noun",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=ready; otp=:ready; module=Ready; mix=ready; config=:ready; telemetry=[:ready].",
+        "current_embodiment: Ready can represent passing named deterministic and live checks for a specific declared program and environment.",
+        "horizon_embodiment: Ready can mark evidence-bound artifact promotion states with versioned criteria, never blanket readiness for every use or affected public."
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Be Careful",
+      "pronunciation": "bee KAIR-ful",
+      "grammar": "Phrase-imperative built from copula plus adjective; it has no natural noun or verb identity. The prose command is intelligible, but code must use a linked CarePolicy noun because BeCareful is an awkward module and task name.",
+      "rationale": "Be Careful preserves a useful failed direction: a responsible stance can be stated plainly, yet a warning is not a category or product architecture. It demonstrates the limit of imperative identities for durable code.",
+      "etymology": "Existing English imperative phrase; no claim of coinage.",
+      "territories": ["care-stewardship-repair"],
+      "strategies": ["phrase-imperative"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["lifecycle-planes"],
+      "parent_surfaces": ["Care"],
+      "known_concerns": [
+        "The warning sounds patronizing and offers no account of evidence, responsibility, or actual controls.",
+        "It invites safety-product interpretation and has poor noun, namespace, package, and telemetry grammar."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: copular imperative plus adjective with intentionally failed noun conversion",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: intentionally non-code operating maxim; linked identity uses hex=care_policy; otp=:care_policy; module=CarePolicy; mix=care.policy; config=:care_policy; telemetry=[:care_policy].",
+        "current_embodiment: The phrase can appear only as internal review language around bounded tools and explicit human responsibility.",
+        "horizon_embodiment: It should not become a master or product identity; CarePolicy is the viable implementation identity for inspectable artifact-governance rules."
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "Take Care",
+      "pronunciation": "TAYK KAIR",
+      "grammar": "Phrase-imperative with 'take' as the verb and idiomatic farewell and caution readings; 'care' supplies a noun object, but the phrase does not convert cleanly to an adjective or durable code noun. The command is the only intended prose role, and code uses the separately linked Tend identity.",
+      "rationale": "Take Care is warm and memorable, and it places responsibility before action. Its failure is equally informative: ordinary social speech overwhelms the intended technical meaning and cannot carry a precise Elixir namespace.",
+      "etymology": "Existing English idiom and imperative phrase; no claim of coinage.",
+      "territories": ["care-stewardship-repair", "action-agency"],
+      "strategies": ["phrase-imperative"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["community-commercial-steward"],
+      "parent_surfaces": ["Care"],
+      "known_concerns": [
+        "The dominant farewell reading makes technical dictation and search context poor.",
+        "The imperative can sound like vague safety theater and supplies no measurable contract or optimization mechanism."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: idiomatic verb-object imperative whose noun and adjective conversions fail",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: intentionally non-code community maxim; linked implementation identity uses hex=tend; otp=:tend; module=Tend; mix=tend; config=:tend; telemetry=[:tend].",
+        "current_embodiment: Take Care can express maintainer posture, while Tend remains the precise implementation identity for measured program maintenance.",
+        "horizon_embodiment: The phrase may guide review culture but must remain unavailable as package, protocol, safety mark, or optimization product."
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "Do Good",
+      "pronunciation": "doo GOOD",
+      "grammar": "Phrase-imperative with 'do' as verb and 'good' ambiguously noun, adjective, or adverbial complement. It has no honest technical noun conversion; prose command and moral slogan readings dominate, and no direct code role is available beyond the separately named Tend implementation.",
+      "rationale": "Do Good is retained as an adverse wildcard because it exposes the strongest possible collapse from bounded software action into guaranteed social benefit. The malformed grammar mirrors the category error: an optimizer metric is not moral proof.",
+      "etymology": "Existing English imperative phrase; no claim of coinage.",
+      "territories": ["action-agency", "care-stewardship-repair"],
+      "strategies": ["phrase-imperative"],
+      "audience_lenses": ["affected-publics", "backend-product-engineers"],
+      "architecture_lenses": ["community-commercial-steward", "single-branded-house"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "It makes an indefensible moral and safety implication for a general LM program library.",
+        "The slogan erases affected-public disagreement, metric limitations, operator responsibility, and the possibility of negative optimization lift."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 4 conversion-grammar",
+        "form_mechanism: moral phrase imperative with unstable noun/adjective complement grammar",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: intentionally non-code adverse slogan; linked implementation identity uses hex=tend; otp=:tend; module=Tend; mix=tend; config=:tend; telemetry=[:tend].",
+        "current_embodiment: No current product role is defensible; measured program behavior cannot substantiate the slogan.",
+        "horizon_embodiment: No horizon role is defensible; even broad artifact optimization must retain uncertainty, contested objectives, and explicit human accountability."
+      ]
+    },
+    {
+      "ordinal": 21,
+      "surface": "Commonwork",
+      "pronunciation": "KOM-un-wurk",
+      "grammar": "Commonwork is the singular mass-noun master and attributive family root; role labels follow it as plain compounds. 'Commonwork program' is preferred in prose, and Commonwork.* is the code namespace.",
+      "rationale": "Commonwork treats LM programming as shared, inspectable work among developers, evaluators, models, tools, and runtimes. The system separates the usable Elixir library from research and community roles while leaving institutional claims unavailable.",
+      "etymology": "Coined compound of English 'common' and 'work'; no external source.",
+      "territories": ["plurality-ecosystem", "infrastructure-logistics"],
+      "strategies": ["institutional-community", "namespace-led", "descriptive-category"],
+      "audience_lenses": ["future-maintainers", "oss-contributors", "buyers-founders"],
+      "architecture_lenses": ["community-commercial-steward", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Common can reduce distinctiveness and may imply shared ownership or governance that does not yet exist.",
+        "Work can evoke labor platforms, workplace surveillance, or generic productivity software."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Commonwork | Elixir / Research / Commons / Build-Measure-Improve",
+        "form_mechanism: institutional compound master with shared-prefix role grammar",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=commonwork; otp=:commonwork; module=Commonwork; mix=commonwork; config=:commonwork; telemetry=[:commonwork].",
+        "current_embodiment: Commonwork Elixir is the pre-release library; descriptor='declared, measurable LM programs'; Commonwork Research and Commonwork Commons are documentation and contributor contexts, not institutes.",
+        "horizon_embodiment: Commonwork Build, Measure, and Improve form a product family for typed artifacts; company=unavailable; protocol=unavailable until independent implementations and governance exist.",
+        "role_map: master=Commonwork; descriptor=declared, measurable LM programs; library=Commonwork Elixir; research=Commonwork Research; community=Commonwork Commons; company=unavailable; protocol=unavailable; product-family=Commonwork Build/Commonwork Measure/Commonwork Improve."
+      ]
+    },
+    {
+      "ordinal": 22,
+      "surface": "Wayline",
+      "pronunciation": "WAY-line",
+      "grammar": "Wayline is a count noun and attributive namespace root; plural Waylines is reserved for routes, not community members. Family roles use compounds, and code consistently uses Wayline.*.",
+      "rationale": "Wayline combines an explicit route with a durable line of artifacts and provenance. It supports movement from declaration through calls, evaluation, optimization, and operation without presenting one model or optimizer as the center.",
+      "etymology": "Coined compound of English 'way' and 'line'; no external source.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["namespace-led"],
+      "audience_lenses": ["future-maintainers", "oss-contributors"],
+      "architecture_lenses": ["shared-prefix-family", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The transport metaphor may overemphasize linear pipelines despite branching, merging, recursion, and rejected candidates.",
+        "Wayline is semantically light and may be confused with mapping, transit, or networking products."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Wayline | Elixir / Fieldwork / Contributors / Routes",
+        "form_mechanism: coined compound deployed as a namespace-led shared root across role compounds",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=wayline; otp=:wayline; module=Wayline; mix=wayline; config=:wayline; telemetry=[:wayline].",
+        "current_embodiment: Wayline Elixir is the library; descriptor='declared LM program route'; Wayline Fieldwork holds reproducibility work; Wayline Contributors names the informal community.",
+        "horizon_embodiment: Wayline Routes can become a family for program, artifact, evaluation, and promotion paths; company=unavailable; protocol=unavailable pending real cross-runtime use.",
+        "role_map: master=Wayline; descriptor=declared LM program routes; library=Wayline Elixir; research=Wayline Fieldwork; community=Wayline Contributors; company=unavailable; protocol=unavailable; product-family=Wayline Program/Wayline Artifact/Wayline Review."
+      ]
+    },
+    {
+      "ordinal": 23,
+      "surface": "Program Yard",
+      "pronunciation": "PROH-gram yard",
+      "grammar": "Two-word count-noun master; 'Program Yard' stays open in prose, ProgramYard closes in code, and role names remain descriptive compounds. The plural 'yards' refers to installations, not people.",
+      "rationale": "Program Yard is a place-system rather than a lone artifact: declared programs arrive, are tested, rearranged, repaired, and dispatched. It gives maintainers a practical family grammar while preserving the library's current software category.",
+      "etymology": "Coined English compound of 'program' and 'yard' in the worksite and logistics sense; no external source.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["descriptive-category", "namespace-led"],
+      "audience_lenses": ["future-maintainers", "oss-contributors", "buyers-founders"],
+      "architecture_lenses": ["umbrella-named-subsystems", "beam-master"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Yard can sound improvised, industrial, or geographically tied to American and British usage.",
+        "The place metaphor may suggest hosted infrastructure rather than a source library and can inherit rail or shipping imagery."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Program Yard | Library / Research / Community / Toolchain",
+        "form_mechanism: descriptive place compound with closed code namespace and open prose form",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=program_yard; otp=:program_yard; module=ProgramYard; mix=program_yard; config=:program_yard; telemetry=[:program_yard].",
+        "current_embodiment: Program Yard Library is the Elixir package; descriptor='yard for declared, callable, measurable programs'; Program Yard Research and Community are project activities only.",
+        "horizon_embodiment: Program Yard Toolchain can group artifact registry, evaluation, and optimizer products; company=unavailable; protocol=unavailable; hosted-yard claims remain unavailable.",
+        "role_map: master=Program Yard; descriptor=declared LM program workyard; library=Program Yard Library; research=Program Yard Research; community=Program Yard Community; company=unavailable; protocol=unavailable; product-family=Program Yard Declare/Program Yard Measure/Program Yard Improve."
+      ]
+    },
+    {
+      "ordinal": 24,
+      "surface": "Manyfold",
+      "pronunciation": "MEN-ee-fohld",
+      "grammar": "Singular master noun formed from an adjective-like compound; use Manyfold attributively, never pluralize it for contributors. Code takes the unbroken Manyfold.* namespace, while role compounds remain separate words.",
+      "rationale": "Manyfold embodies plurality without pretending neutrality: multiple models, tools, people, artifacts, and runtime paths can coexist under one explicit program contract. Its fold sense also accommodates composition and versioned alternatives.",
+      "etymology": "Coined from existing English 'manyfold', an uncommon adjective/adverb meaning many times or in many ways; the master-noun use is conversion, with no external coined source claimed.",
+      "territories": ["plurality-ecosystem"],
+      "strategies": ["namespace-led", "institutional-community"],
+      "audience_lenses": ["future-maintainers", "oss-contributors", "buyers-founders"],
+      "architecture_lenses": ["single-branded-house", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The converted adjective is unusual and may be heard as 'manifold', changing both spelling and technical associations.",
+        "Fold can suggest neural-network folds, paper craft, or hidden complexity without explaining the present library."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Manyfold | Elixir / Studies / Commons / Program Family",
+        "form_mechanism: uncommon adjective converted into a master noun with shared-prefix compounds",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=manyfold; otp=:manyfold; module=Manyfold; mix=manyfold; config=:manyfold; telemetry=[:manyfold].",
+        "current_embodiment: Manyfold Elixir is the library; descriptor='plural declared LM program system'; Manyfold Studies and Manyfold Commons are non-institutional research and contributor labels.",
+        "horizon_embodiment: Manyfold Program Family can include typed artifact, evaluation, and optimization components; company=unavailable; protocol=unavailable until implementations justify it.",
+        "role_map: master=Manyfold; descriptor=plural declared LM program system; library=Manyfold Elixir; research=Manyfold Studies; community=Manyfold Commons; company=unavailable; protocol=unavailable; product-family=Manyfold Programs/Manyfold Artifacts/Manyfold Runs."
+      ]
+    },
+    {
+      "ordinal": 25,
+      "surface": "Switchyard",
+      "pronunciation": "SWICH-yard",
+      "grammar": "Existing count noun promoted to master identity; Switchyard is singular and attributive, while Switchyard.* is the namespace. Role compounds describe distinct planes and never imply that community members are switches or cargo.",
+      "rationale": "Switchyard provides a strong system grammar for routing among models, tools, candidate artifacts, evaluators, and promotion paths. It handles branching and recombination better than a linear pipeline metaphor and resonates with explicit operational coordination.",
+      "etymology": "Existing English noun for a rail yard containing switches; reused metaphorically, not coined.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["namespace-led", "descriptive-category"],
+      "audience_lenses": ["future-maintainers", "buyers-founders", "oss-contributors"],
+      "architecture_lenses": ["lifecycle-planes", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Rail logistics can imply centralized control, industrial extraction, or military supply chains.",
+        "The metaphor may overstate routing infrastructure and understate typed declaration, measurement, and textual optimization."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Switchyard | Elixir / Lab Notes / Exchange / Lines",
+        "form_mechanism: ordinary infrastructure object expanded into lifecycle-plane and shared-prefix identity grammar",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=switchyard; otp=:switchyard; module=Switchyard; mix=switchyard; config=:switchyard; telemetry=[:switchyard].",
+        "current_embodiment: Switchyard Elixir is the library; descriptor='routing and evaluation for declared LM programs'; Switchyard Lab Notes and Exchange are informal research and contributor spaces.",
+        "horizon_embodiment: Switchyard Lines can group typed parameter, evaluation, archive, and promotion products; company=unavailable now; protocol=reserved but unavailable until independent implementations and governance exist.",
+        "role_map: master=Switchyard; descriptor=declared LM program switchyard; library=Switchyard Elixir; research=Switchyard Lab Notes; community=Switchyard Exchange; company=unavailable; protocol=unavailable/reserved; product-family=Switchyard Declare/Switchyard Compare/Switchyard Route."
+      ]
+    },
+    {
+      "ordinal": 26,
+      "surface": "Open Route",
+      "pronunciation": "OH-pun root",
+      "grammar": "Two-word descriptive master with adjective plus count noun; prose keeps the space, code closes it as OpenRoute.*, and Routes pluralizes products rather than contributors. 'Open' describes inspectability, not unrestricted action.",
+      "rationale": "Open Route combines transparent program paths with an extensible family grammar. It can cover declared calls, retrieval, tools, evaluation, and artifact promotion while making routing choices inspectable.",
+      "etymology": "Existing English words combined descriptively; no claim of coinage.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["descriptive-category", "institutional-community"],
+      "audience_lenses": ["oss-contributors", "future-maintainers", "buyers-founders"],
+      "architecture_lenses": ["community-commercial-steward", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Open can imply permissions, governance, or open-source commitments beyond the actual license and project state.",
+        "Route has ROOT/ROWT pronunciation variation and may narrow the product to orchestration or networking."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Open Route | Library / Research / Forum / Route Family",
+        "form_mechanism: adjective-noun descriptive system with closed code form and role compounds",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=open_route; otp=:open_route; module=OpenRoute; mix=open_route; config=:open_route; telemetry=[:open_route].",
+        "current_embodiment: Open Route Library is the pre-release Elixir package; descriptor='inspectable routes for declared LM programs'; Research and Forum are project functions, not institutions.",
+        "horizon_embodiment: Open Route Family can span typed artifact paths and optimization services; company=unavailable; protocol=unavailable until compatibility is implemented rather than announced.",
+        "role_map: master=Open Route; descriptor=inspectable declared LM program routes; library=Open Route Library; research=Open Route Research; community=Open Route Forum; company=unavailable; protocol=unavailable; product-family=Open Route Programs/Open Route Artifacts/Open Route Review."
+      ]
+    },
+    {
+      "ordinal": 27,
+      "surface": "Program Commons",
+      "pronunciation": "PROH-gram KOM-unz",
+      "grammar": "Plural-form institutional master treated as singular ('Program Commons is'); role compounds retain the full name. Code closes it as ProgramCommons.*, while 'commons' never labels individual contributors.",
+      "rationale": "Program Commons makes shared methods, examples, evaluation evidence, and optimizer artifacts visible as a collective technical resource. The explicit Program descriptor prevents the identity from floating into a generic institution.",
+      "etymology": "Descriptive compound of existing English 'program' and 'commons'; no claim of coinage.",
+      "territories": ["plurality-ecosystem"],
+      "strategies": ["institutional-community", "descriptive-category"],
+      "audience_lenses": ["oss-contributors", "future-maintainers", "buyers-founders"],
+      "architecture_lenses": ["community-commercial-steward", "research-stable-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Commons implies governance, shared ownership, and durable community infrastructure that a pre-release project may not possess.",
+        "The institutional tone can obscure that the current deliverable is a library and can invite premature foundation or standards expectations."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Program Commons | Elixir / Research / Commons / Workbench",
+        "form_mechanism: descriptive institutional-community compound with singular collective grammar",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=program_commons; otp=:program_commons; module=ProgramCommons; mix=program_commons; config=:program_commons; telemetry=[:program_commons].",
+        "current_embodiment: Program Commons Elixir is the library; descriptor='shared tooling for declared LM programs'; Research and Commons are repository practices, not a foundation or institute.",
+        "horizon_embodiment: Program Commons Workbench can group artifact optimization tools; company=unavailable; protocol=unavailable; foundation and standards-body roles must remain unavailable.",
+        "role_map: master=Program Commons; descriptor=shared declared LM program tooling; library=Program Commons Elixir; research=Program Commons Research; community=Program Commons; company=unavailable; protocol=unavailable; product-family=Program Commons Workbench/Registry/Review."
+      ]
+    },
+    {
+      "ordinal": 28,
+      "surface": "Shared Track",
+      "pronunciation": "SHAIRD trak",
+      "grammar": "Adjective plus count noun master; prose retains the space and code closes it as SharedTrack.*. Tracks pluralizes versioned program or artifact paths, and Observatory is descriptive research activity rather than an institute.",
+      "rationale": "Shared Track can represent reproducible trajectories, common interfaces, and visible lineage across models and tools. Its system roles separate the library, empirical observation, contributors, and future artifact products.",
+      "etymology": "Descriptive combination of existing English words 'shared' and 'track'; no claim of coinage.",
+      "territories": ["plurality-ecosystem", "infrastructure-logistics"],
+      "strategies": ["descriptive-category", "namespace-led"],
+      "audience_lenses": ["future-maintainers", "oss-contributors"],
+      "architecture_lenses": ["lifecycle-planes", "research-stable-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Shared can falsely imply neutral governance, interoperability, or collaborative ownership.",
+        "Track evokes monitoring and surveillance as well as trajectories, creating trust risk for affected people even when telemetry concerns software behavior."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Shared Track | Library / Observatory / Contributors / Tracks",
+        "form_mechanism: adjective-noun descriptive identity expanded through lifecycle role compounds",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=shared_track; otp=:shared_track; module=SharedTrack; mix=shared_track; config=:shared_track; telemetry=[:shared_track].",
+        "current_embodiment: Shared Track Library is the Elixir package; descriptor='traceable declared LM programs'; Observatory is empirical project work and Contributors is the community label.",
+        "horizon_embodiment: Shared Tracks can group typed trajectories, artifact archives, and promotion products; company=unavailable; protocol=unavailable until compatibility and governance are real.",
+        "role_map: master=Shared Track; descriptor=traceable declared LM programs; library=Shared Track Library; research=Shared Track Observatory; community=Shared Track Contributors; company=unavailable; protocol=unavailable; product-family=Shared Track Programs/Shared Track Artifacts/Shared Track Campaigns."
+      ]
+    },
+    {
+      "ordinal": 29,
+      "surface": "Public Works",
+      "pronunciation": "PUB-lik wurks",
+      "grammar": "Plural institutional master treated as singular for the project ('Public Works is') and plural for outputs ('the public works'). Role compounds preserve the space; code closes it as PublicWorks.*.",
+      "rationale": "Public Works deliberately tests a high-trust infrastructure system whose library, research, community, and product roles are immediately legible. It also reveals the danger of borrowing civic legitimacy for developer tooling.",
+      "etymology": "Existing English civic category for publicly financed infrastructure; reused as an identity, not coined.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["institutional-community", "descriptive-category"],
+      "audience_lenses": ["buyers-founders", "oss-contributors", "future-maintainers"],
+      "architecture_lenses": ["community-commercial-steward", "company-product-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The name appropriates government and civic-infrastructure legitimacy and is likely to confuse the project with public agencies or public-interest institutions.",
+        "It can imply public funding, universal access, standards authority, or social benefit that the library does not possess."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Public Works | Elixir / Research / Commons / Works Family",
+        "form_mechanism: existing civic institutional category forced into a complete branded-house grammar",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: intentionally non-code adverse identity; linked implementation identity uses hex=commonwork; otp=:commonwork; module=Commonwork; mix=commonwork; config=:commonwork; telemetry=[:commonwork].",
+        "current_embodiment: Public Works Elixir, Research, and Commons are grammatically possible but institutionally misleading for a pre-release library, so all remain unavailable.",
+        "horizon_embodiment: A Public Works Family, company, or protocol would intensify false civic and standards claims; all institutional roles should remain unavailable, with Commonwork as the viable linked system.",
+        "role_map: master=Public Works unavailable; descriptor=public LM program infrastructure unavailable; library=Public Works Elixir unavailable; research=Public Works Research unavailable; community=Public Works Commons unavailable; company=unavailable; protocol=unavailable; product-family=Public Works Family unavailable."
+      ]
+    },
+    {
+      "ordinal": 30,
+      "surface": "Model Railway",
+      "pronunciation": "MOD-ul RAIL-way",
+      "grammar": "Two-word count-noun master with an ambiguous attributive first noun: 'model' can mean exemplar, miniature, or statistical model. Prose keeps the space, code closes ModelRailway.*, and Lines pluralizes products rather than people.",
+      "rationale": "Model Railway is an adverse wildcard identity system, not a joke omitted from the record. Its routing, switching, observation, and family grammar map surprisingly well, but the miniature-hobby reading trivializes production LM programs and the rail metaphor overdetermines architecture.",
+      "etymology": "Existing English category for miniature railway systems; reused metaphorically, not coined.",
+      "territories": ["infrastructure-logistics", "plurality-ecosystem"],
+      "strategies": ["namespace-led", "institutional-community", "descriptive-category"],
+      "audience_lenses": ["future-maintainers", "buyers-founders", "oss-contributors"],
+      "architecture_lenses": ["umbrella-named-subsystems", "shared-prefix-family"],
+      "parent_surfaces": ["Switchyard"],
+      "known_concerns": [
+        "The dominant hobby and toy meaning makes the library seem unserious and can exclude people unfamiliar with railway culture.",
+        "Railway imposes linear tracks, centralized switching, industrial baggage, and a model-only scope that conflicts with the broader typed artifact horizon."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-a",
+        "challenge_cell: 7 identity-grammar",
+        "generated_system_surface: Model Railway | Library / Lab Notes / Club / Lines",
+        "form_mechanism: existing hobby category expanded into a deliberately over-literal identity system",
+        "stance: adverse",
+        "scope: both",
+        "code_projection: intentionally non-code adverse research metaphor; linked implementation identity uses hex=switchyard; otp=:switchyard; module=Switchyard; mix=switchyard; config=:switchyard; telemetry=[:switchyard].",
+        "current_embodiment: Model Railway Library, Lab Notes, and Club are grammatically coherent but misframe current production-oriented Elixir software and should remain unavailable.",
+        "horizon_embodiment: Model Railway Lines could map artifact routes, yet master, company, protocol, community, and product-family roles should remain unavailable; Switchyard is the viable linked implementation system.",
+        "role_map: master=Model Railway unavailable; descriptor=model-program railway unavailable; library=Model Railway Library unavailable; research=Model Railway Lab Notes unavailable; community=Model Railway Club unavailable; company=unavailable; protocol=unavailable; product-family=Model Railway Lines unavailable."
+      ]
+    }
+  ]
+}
