@@ -87,8 +87,10 @@ live in the calling process and are restored after the function returns.
 
 Cache entries live in an ETS table owned by `DSEx.Cache`. A cache owner
 crash/restart recreates the table and loses cached values by design.
-`fetch_or_store/2` is best-effort under concurrent misses and does not provide
-single-flight locking.
+`fetch_or_store/2` coalesces concurrent misses per key while unrelated keys
+continue independently. The owner monitors the active producer and promotes a
+waiting caller after a producer crash; coalescing, retries, and producer
+failures have dedicated redacted telemetry events.
 
 Provider access uses `DSEx.req_llm/2`, which delegates provider
 catalogs, Req/Finch transport, streaming, structured-output negotiation, and
@@ -178,8 +180,16 @@ Source-checkout maintainer aliases:
   `mix benchmark.gepa_replication.check`
 - RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
 - operations stress checks through `mix benchmark.operations_stress.check`
+- repeated deterministic timeout, cancellation, backpressure, partial-stream,
+  checkpoint, tamper, and leak checks through
+  `mix benchmark.failure_campaign.check`
 - RLM recursive-controller benchmark checks through `mix benchmark.rlm.check`
 - pinned executable upstream conformance through `mix upstream_fidelity.check`
+
+The failure campaign writes normalized per-iteration outcomes and flake rates.
+It is T0 provider-free evidence: its artifact deliberately keeps provider
+retry/idempotency and cross-surface live recovery lanes red until those probes
+have actually run.
 
 The live provider tests prove a real provider can execute:
 
@@ -294,7 +304,7 @@ Stable event families:
 - `[:dsex, :lm, :start | :stop]`
 - `[:dsex, :lm, :stream, :start | :chunk | :stop]`
 - `[:dsex, :adapter, :parse, :retry | :error]`
-- `[:dsex, :cache, :hit | :miss]`
+- `[:dsex, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
 - `[:dsex, :tool, :start | :stop | :exception]`
 - `[:dsex, :retriever, :start | :stop | :exception]`
 - `[:dsex, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`

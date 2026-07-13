@@ -49,13 +49,19 @@ defmodule DSEx.Streaming.Messages do
     `attach/2` always yields the source events unchanged. `:on_event` observes
     those events as they are pulled. When `:signature_field_name` (or its
     `:field` alias) and `:on_chunk` are configured, the listener also extracts
-    that ChatAdapter field incrementally and reports normalized
+    that adapter field incrementally and reports normalized
     `StreamResponse` chunks without waiting for the complete response.
+
+    `:adapter` selects the built-in Chat, JSON, or XML framing and defaults to
+    `DSEx.Adapter.Chat`. Custom adapters can opt in explicitly with a bounded,
+    exact-delimiter `:framing` map containing non-empty `:start` and `:end`
+    binaries. Delimiters are data, never regular expressions or callbacks.
 
     `:on_status` receives exactly one `:started` event and one terminal event:
     `:completed`, `:error`, or `:cancelled`. Early downstream halt is
-    cancellation. The implementation retains only possible delimiter prefixes,
-    so listener memory does not grow with response size.
+    cancellation. Chat, XML, and custom framing retain only possible delimiter
+    prefixes. JSON uses a bytewise lexer and retains only depth, escape, and
+    bounded key-match state, so listener memory does not grow with response size.
     """
 
     alias DSEx.Streaming.Messages.StatusMessage
@@ -71,6 +77,8 @@ defmodule DSEx.Streaming.Messages do
               on_status: nil,
               signature_field_name: nil,
               predict_name: nil,
+              adapter: DSEx.Adapter.Chat,
+              framing: nil,
               allow_reuse: false
 
     def new(opts \\ []) do
@@ -87,6 +95,11 @@ defmodule DSEx.Streaming.Messages do
             ],
             field: [type: {:custom, __MODULE__, :validate_field, []}, default: nil],
             predict_name: [type: {:custom, __MODULE__, :validate_name, []}, default: nil],
+            adapter: [
+              type: {:custom, __MODULE__, :validate_adapter, []},
+              default: DSEx.Adapter.Chat
+            ],
+            framing: [type: {:custom, __MODULE__, :validate_framing, []}, default: nil],
             allow_reuse: [type: :boolean, default: false]
           ],
           "DSEx.Streaming.Messages.StreamListener.new/1"
@@ -94,6 +107,7 @@ defmodule DSEx.Streaming.Messages do
 
       field = resolve_field!(opts[:signature_field_name], opts[:field])
       validate_chunk_listener!(field, opts[:on_chunk])
+      validate_adapter_framing!(opts[:adapter], opts[:framing])
 
       %__MODULE__{
         on_event: opts[:on_event],
@@ -101,6 +115,8 @@ defmodule DSEx.Streaming.Messages do
         on_status: opts[:on_status],
         signature_field_name: field,
         predict_name: opts[:predict_name],
+        adapter: opts[:adapter],
+        framing: opts[:framing],
         allow_reuse: opts[:allow_reuse]
       }
     end
@@ -142,6 +158,25 @@ defmodule DSEx.Streaming.Messages do
     def validate_name(name),
       do: {:error, "expected nil, an atom, or a string, got: #{inspect(name)}"}
 
+    def validate_adapter(adapter) when is_atom(adapter), do: {:ok, adapter}
+
+    def validate_adapter(adapter),
+      do: {:error, "expected an adapter module, got: #{inspect(adapter)}"}
+
+    def validate_framing(nil), do: {:ok, nil}
+
+    def validate_framing(%{start: start, end: ending} = framing)
+        when map_size(framing) == 2 and is_binary(start) and is_binary(ending) and
+               byte_size(start) > 0 and byte_size(start) <= @max_delimiter_bytes and
+               byte_size(ending) > 0 and byte_size(ending) <= @max_delimiter_bytes do
+      {:ok, %{start: start, end: ending}}
+    end
+
+    def validate_framing(framing) do
+      {:error,
+       "expected nil or %{start: binary, end: binary} with 1..#{@max_delimiter_bytes} byte exact delimiters, got: #{inspect(framing)}"}
+    end
+
     defp resolve_field!(nil, field), do: field
     defp resolve_field!(field, nil), do: field
     defp resolve_field!(field, field), do: field
@@ -156,7 +191,7 @@ defmodule DSEx.Streaming.Messages do
     defp start(listener) do
       state = %{
         listener: listener,
-        parser: new_parser(listener.signature_field_name),
+        parser: new_parser(listener.signature_field_name, listener.adapter, listener.framing),
         terminal: nil
       }
 
@@ -309,31 +344,100 @@ defmodule DSEx.Streaming.Messages do
     defp terminal_event?(%StreamResponse{done: true}), do: true
     defp terminal_event?(_event), do: false
 
-    defp new_parser(nil), do: nil
+    defp new_parser(nil, _adapter, _framing), do: nil
 
-    defp new_parser(field) do
-      %{start: "[[ ## #{field} ## ]]", phase: :searching, buffer: ""}
+    defp new_parser(_field, _adapter, %{start: start, end: ending}) do
+      delimited_parser(start, ending, false)
+    end
+
+    defp new_parser(field, DSEx.Adapter.Chat, nil) do
+      %{kind: :chat, start: "[[ ## #{field} ## ]]", phase: :searching, buffer: ""}
+    end
+
+    defp new_parser(field, DSEx.Adapter.XML, nil) do
+      delimited_parser("<#{field}>", "</#{field}>", true)
+    end
+
+    defp new_parser(field, DSEx.Adapter.JSON, nil) do
+      encoded_key = Jason.encode!(field)
+
+      %{
+        kind: :json,
+        phase: :searching,
+        depth: 0,
+        expect_key: false,
+        in_string: false,
+        escaped: false,
+        string_role: nil,
+        key_index: 0,
+        key_match: false,
+        encoded_key: binary_part(encoded_key, 1, byte_size(encoded_key) - 2),
+        target_key: false,
+        value_mode: nil,
+        value_depth: 0,
+        value_in_string: false,
+        value_escaped: false
+      }
+    end
+
+    defp delimited_parser(start, ending, trim?) do
+      %{
+        kind: :delimited,
+        start: start,
+        end: ending,
+        trim?: trim?,
+        phase: :searching,
+        buffer: ""
+      }
     end
 
     defp parse_chunk(%{phase: :done} = parser, _chunk), do: {parser, []}
 
-    defp parse_chunk(%{phase: :searching} = parser, chunk) do
+    defp parse_chunk(%{kind: :chat, phase: :searching} = parser, chunk) do
       combined = parser.buffer <> chunk
 
       case :binary.match(combined, parser.start) do
         {index, length} ->
           rest = binary_part(combined, index + length, byte_size(combined) - index - length)
           parser = %{parser | phase: :streaming, buffer: ""}
-          parse_streaming(parser, String.trim_leading(rest))
+          parse_chat_streaming(parser, String.trim_leading(rest))
 
         :nomatch ->
           {%{parser | buffer: delimiter_suffix(combined, parser.start)}, []}
       end
     end
 
-    defp parse_chunk(%{phase: :streaming} = parser, chunk), do: parse_streaming(parser, chunk)
+    defp parse_chunk(%{kind: :chat, phase: :streaming} = parser, chunk),
+      do: parse_chat_streaming(parser, chunk)
 
-    defp parse_streaming(parser, chunk) do
+    defp parse_chunk(%{kind: :delimited, phase: :searching} = parser, chunk) do
+      combined = parser.buffer <> chunk
+
+      case :binary.match(combined, parser.start) do
+        {index, length} ->
+          rest = binary_part(combined, index + length, byte_size(combined) - index - length)
+          rest = if parser.trim?, do: String.trim_leading(rest), else: rest
+          parser = %{parser | phase: :streaming, buffer: ""}
+          parse_delimited_streaming(parser, rest)
+
+        :nomatch ->
+          {%{parser | buffer: delimiter_suffix(combined, parser.start)}, []}
+      end
+    end
+
+    defp parse_chunk(%{kind: :delimited, phase: :streaming} = parser, chunk),
+      do: parse_delimited_streaming(parser, chunk)
+
+    defp parse_chunk(%{kind: :json} = parser, chunk) do
+      {parser, emitted} = json_bytes(parser, chunk, [])
+
+      case IO.iodata_to_binary(Enum.reverse(emitted)) do
+        "" -> {parser, []}
+        value -> {parser, [value]}
+      end
+    end
+
+    defp parse_chat_streaming(parser, chunk) do
       combined = parser.buffer <> chunk
 
       case Regex.run(@chat_end_pattern, combined, return: :index) do
@@ -349,9 +453,180 @@ defmodule DSEx.Streaming.Messages do
       end
     end
 
-    defp parser_finish(%{phase: :streaming} = parser) do
+    defp parse_delimited_streaming(parser, chunk) do
+      combined = parser.buffer <> chunk
+
+      case :binary.match(combined, parser.end) do
+        {index, _length} ->
+          value = binary_part(combined, 0, index)
+          value = if parser.trim?, do: String.trim_trailing(value), else: value
+          {%{parser | phase: :done, buffer: ""}, maybe_chunk(value)}
+
+        :nomatch ->
+          suffix = delimiter_suffix(combined, parser.end)
+          emit_size = byte_size(combined) - byte_size(suffix)
+          value = binary_part(combined, 0, emit_size)
+          {%{parser | buffer: suffix}, maybe_chunk(value)}
+      end
+    end
+
+    defp json_bytes(%{phase: :done} = parser, _bytes, emitted), do: {parser, emitted}
+    defp json_bytes(parser, <<>>, emitted), do: {parser, emitted}
+
+    defp json_bytes(parser, <<byte, rest::binary>>, emitted) do
+      {parser, output} = json_byte(parser, byte)
+      emitted = if is_nil(output), do: emitted, else: [output | emitted]
+      json_bytes(parser, rest, emitted)
+    end
+
+    defp json_byte(%{phase: :searching, in_string: true} = parser, byte) do
+      cond do
+        parser.escaped ->
+          {parser |> match_key_byte(byte) |> Map.put(:escaped, false), nil}
+
+        byte == ?\\ ->
+          {parser |> match_key_byte(byte) |> Map.put(:escaped, true), nil}
+
+        byte == ?" ->
+          matched? =
+            parser.string_role == :key and parser.key_match and
+              parser.key_index == byte_size(parser.encoded_key)
+
+          {%{
+             parser
+             | in_string: false,
+               string_role: nil,
+               target_key: matched?,
+               key_index: 0,
+               key_match: false
+           }, nil}
+
+        true ->
+          {match_key_byte(parser, byte), nil}
+      end
+    end
+
+    defp json_byte(%{phase: :searching} = parser, byte) do
+      cond do
+        byte == ?" ->
+          key? = parser.depth == 1 and parser.expect_key
+
+          {%{
+             parser
+             | in_string: true,
+               string_role: if(key?, do: :key, else: :other),
+               expect_key: if(key?, do: false, else: parser.expect_key),
+               key_index: 0,
+               key_match: key?
+           }, nil}
+
+        byte in [?{, ?[] ->
+          depth = parser.depth + 1
+          {%{parser | depth: depth, expect_key: parser.expect_key or depth == 1}, nil}
+
+        byte in [?}, ?]] ->
+          {%{parser | depth: max(parser.depth - 1, 0)}, nil}
+
+        byte == ?, and parser.depth == 1 ->
+          {%{parser | expect_key: true, target_key: false}, nil}
+
+        byte == ?: and parser.depth == 1 and parser.target_key ->
+          {%{parser | phase: :await_value, target_key: false}, nil}
+
+        true ->
+          {parser, nil}
+      end
+    end
+
+    defp json_byte(%{phase: :await_value} = parser, byte)
+         when byte in [32, 9, 10, 13],
+         do: {parser, nil}
+
+    defp json_byte(%{phase: :await_value} = parser, ?") do
+      {%{parser | phase: :streaming, value_mode: :string, value_escaped: false}, "\""}
+    end
+
+    defp json_byte(%{phase: :await_value} = parser, byte) when byte in [?{, ?[] do
+      {%{
+         parser
+         | phase: :streaming,
+           value_mode: :composite,
+           value_depth: 1,
+           value_in_string: false,
+           value_escaped: false
+       }, <<byte>>}
+    end
+
+    defp json_byte(%{phase: :await_value} = parser, byte) do
+      {%{parser | phase: :streaming, value_mode: :primitive}, <<byte>>}
+    end
+
+    defp json_byte(%{phase: :streaming, value_mode: :string} = parser, byte) do
+      cond do
+        parser.value_escaped -> {%{parser | value_escaped: false}, <<byte>>}
+        byte == ?\\ -> {%{parser | value_escaped: true}, <<byte>>}
+        byte == ?" -> {%{parser | phase: :done}, "\""}
+        true -> {parser, <<byte>>}
+      end
+    end
+
+    defp json_byte(
+           %{phase: :streaming, value_mode: :composite, value_in_string: true} = parser,
+           byte
+         ) do
+      cond do
+        parser.value_escaped -> {%{parser | value_escaped: false}, <<byte>>}
+        byte == ?\\ -> {%{parser | value_escaped: true}, <<byte>>}
+        byte == ?" -> {%{parser | value_in_string: false}, <<byte>>}
+        true -> {parser, <<byte>>}
+      end
+    end
+
+    defp json_byte(%{phase: :streaming, value_mode: :composite} = parser, byte) do
+      cond do
+        byte == ?" ->
+          {%{parser | value_in_string: true}, <<byte>>}
+
+        byte in [?{, ?[] ->
+          {%{parser | value_depth: parser.value_depth + 1}, <<byte>>}
+
+        byte in [?}, ?]] ->
+          depth = parser.value_depth - 1
+
+          {%{parser | value_depth: depth, phase: if(depth == 0, do: :done, else: :streaming)},
+           <<byte>>}
+
+        true ->
+          {parser, <<byte>>}
+      end
+    end
+
+    defp json_byte(%{phase: :streaming, value_mode: :primitive} = parser, byte)
+         when byte in [?,, ?}, 32, 9, 10, 13],
+         do: {%{parser | phase: :done}, nil}
+
+    defp json_byte(%{phase: :streaming, value_mode: :primitive} = parser, byte),
+      do: {parser, <<byte>>}
+
+    defp match_key_byte(%{string_role: role} = parser, _byte) when role != :key, do: parser
+
+    defp match_key_byte(parser, byte) do
+      index = parser.key_index
+
+      matches? =
+        parser.key_match and index < byte_size(parser.encoded_key) and
+          :binary.at(parser.encoded_key, index) == byte
+
+      %{parser | key_index: index + 1, key_match: matches?}
+    end
+
+    defp parser_finish(%{kind: kind, phase: :streaming} = parser)
+         when kind in [:chat, :delimited] do
       {%{parser | phase: :done, buffer: ""}, maybe_chunk(parser.buffer)}
     end
+
+    defp parser_finish(%{kind: :json, phase: :streaming} = parser),
+      do: {%{parser | phase: :done}, []}
 
     defp parser_finish(parser), do: {parser, []}
 
@@ -397,6 +672,18 @@ defmodule DSEx.Streaming.Messages do
     end
 
     defp validate_chunk_listener!(_field, _callback), do: :ok
+
+    defp validate_adapter_framing!(adapter, nil)
+         when adapter in [DSEx.Adapter.Chat, DSEx.Adapter.JSON, DSEx.Adapter.XML],
+         do: :ok
+
+    defp validate_adapter_framing!(_adapter, %{start: _start, end: _ending}), do: :ok
+
+    defp validate_adapter_framing!(adapter, nil) do
+      raise ArgumentError,
+            "DSEx.Streaming.Messages.StreamListener.new/1: unsupported streaming adapter #{inspect(adapter)}; " <>
+              "use DSEx.Adapter.Chat, DSEx.Adapter.JSON, DSEx.Adapter.XML, or provide exact :framing"
+    end
 
     defp notify(nil, _event), do: :ok
     defp notify(callback, event), do: callback.(event)

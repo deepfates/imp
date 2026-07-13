@@ -135,6 +135,96 @@ defmodule DSEx.StreamListenerIncrementalTest do
     assert Enum.count(chunks, & &1.done) == 1
   end
 
+  test "JSON streams an escaped string across one-byte splits without accumulating the object" do
+    owner = self()
+    value = ~S(say \"hi\"; braces } and slash \\ stay content)
+    json = ~S({"ignored":{"answer":"nested decoy"},"answer":") <> value <> ~S(","tail":1})
+
+    listener =
+      StreamListener.new(
+        adapter: DSEx.Adapter.JSON,
+        field: :answer,
+        on_chunk: &send(owner, {:field, &1})
+      )
+
+    events = for <<byte <- json>>, do: <<byte>>
+    assert listener |> StreamListener.attach(events) |> Enum.to_list() == events
+
+    chunks = receive_field_chunks([])
+    assert Enum.map_join(chunks, &(&1.chunk || "")) == "\"#{value}\""
+    assert Enum.count(chunks, & &1.done) == 1
+    assert List.last(chunks).done
+  end
+
+  test "JSON streams a nested selected value and ignores structural bytes in strings" do
+    owner = self()
+    value = ~S({"items":[1,{"text":"quoted \\\" } ]"}],"ok":true})
+    json = ~S({"before":[{"answer":"decoy"}],"answer":) <> value <> ~S(,"after":false})
+
+    listener =
+      StreamListener.new(
+        adapter: DSEx.Adapter.JSON,
+        field: "answer",
+        on_chunk: &send(owner, {:field, &1})
+      )
+
+    events = for <<byte <- json>>, do: <<byte>>
+    assert listener |> StreamListener.attach(events) |> Enum.to_list() == events
+
+    chunks = receive_field_chunks([])
+    assert Enum.map_join(chunks, &(&1.chunk || "")) == value
+    assert List.last(chunks).done
+  end
+
+  test "XML recognizes one-byte tags and keeps only a closing-tag prefix" do
+    owner = self()
+    value = "<section>one &lt; two</section>" <> String.duplicate("x", 32_000)
+    xml = "<ignored>decoy</ignored><answer>#{value}</answer><tail>no</tail>"
+
+    listener =
+      StreamListener.new(
+        adapter: DSEx.Adapter.XML,
+        field: :answer,
+        on_chunk: &send(owner, {:field, &1})
+      )
+
+    events = for <<byte <- xml>>, do: <<byte>>
+    assert listener |> StreamListener.attach(events) |> Enum.to_list() == events
+
+    chunks = receive_field_chunks([])
+    assert Enum.map_join(chunks, &(&1.chunk || "")) == value
+    assert Enum.count(chunks, & &1.done) == 1
+  end
+
+  test "custom adapters require explicit bounded exact framing" do
+    owner = self()
+
+    listener =
+      StreamListener.new(
+        adapter: __MODULE__.CustomAdapter,
+        field: :answer,
+        framing: %{start: "BEGIN answer\n", end: "\nEND answer"},
+        on_chunk: &send(owner, {:field, &1})
+      )
+
+    events = ["noiseBEGIN ans", "wer\nraw ", "value\nEND answerignored"]
+    assert listener |> StreamListener.attach(events) |> Enum.to_list() == events
+    assert_receive {:field, %StreamResponse{chunk: "raw ", done: false}}
+    assert_receive {:field, %StreamResponse{chunk: "value", done: true}}
+
+    assert_raise ArgumentError, ~r/unsupported streaming adapter/, fn ->
+      StreamListener.new(adapter: __MODULE__.CustomAdapter, field: :answer)
+    end
+
+    assert_raise ArgumentError, ~r/1\.\.256 byte exact delimiters/, fn ->
+      StreamListener.new(
+        adapter: __MODULE__.CustomAdapter,
+        field: :answer,
+        framing: %{start: String.duplicate("x", 257), end: "end"}
+      )
+    end
+  end
+
   test "reports an explicit stream error without converting partial output to success" do
     owner = self()
     reason = {:provider_failed, 503}

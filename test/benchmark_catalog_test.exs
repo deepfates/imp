@@ -48,6 +48,10 @@ defmodule BenchmarkCatalogTest do
              "operations_persistence_observability"
            ].commands
 
+    assert "mix benchmark.failure_campaign.check" in by_id[
+             "operations_persistence_observability"
+           ].commands
+
     assert by_id["adapter_streaming_structured_io"].metric =~ "incremental field"
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
     assert "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands

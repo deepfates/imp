@@ -161,12 +161,13 @@ defmodule DSEx.BenchmarkCatalog do
       status: "provider_free_implemented",
       commands: [
         "mix benchmark.operations_stress.check",
+        "mix benchmark.failure_campaign.check",
         "mix production.check",
         "mix integration.check",
         "mix benchmark.overhead.check"
       ],
       next_step:
-        "Extend lifecycle stress to long-running supervised service soak tests when DSEx ships service templates."
+        "Run the two live provider/training recovery lanes recorded as red by the deterministic failure campaign, then extend to long-running service soak tests."
     },
     %{
       id: "multimodal_primitives",

@@ -8,9 +8,9 @@ defmodule DSEx.Cache do
   the restarted process and cached values are intentionally lost. Calling cache
   functions before the application is started attempts to start the application.
 
-  `fetch_or_store/2` is a best-effort cache helper, not a single-flight lock:
-  concurrent misses for the same key may evaluate the supplied function more than
-  once, and the last writer wins.
+  `fetch_or_store/2` coalesces concurrent misses per key. The first caller computes
+  the value while other callers wait without blocking unrelated keys. Producers are
+  monitored so a crash promotes one waiting caller and does not strand the rest.
   """
 
   use GenServer
@@ -34,7 +34,14 @@ defmodule DSEx.Cache do
     create_table()
     :persistent_term.put(@policy_key, @default_policy)
     Process.register(self(), __MODULE__)
-    {:ok, %{policy: @default_policy, usage: @empty_usage}}
+
+    {:ok,
+     %{
+       policy: @default_policy,
+       usage: @empty_usage,
+       flights: %{},
+       flight_refs: %{}
+     }}
   end
 
   @doc """
@@ -138,9 +145,10 @@ defmodule DSEx.Cache do
   @doc """
   Returns a cached value or computes, stores, and returns a miss.
 
-  This helper is intentionally best-effort, not single-flight: concurrent misses
-  may run the function more than once. Cache hit/miss telemetry is emitted with
-  redacted metadata.
+  Concurrent misses for the same key are coalesced into one computation. If that
+  producer fails or exits, one waiting caller is promoted to compute the value.
+  Cache hit, miss, coalesced-wait, retry, and producer-failure telemetry is emitted
+  with redacted metadata.
 
       iex> DSEx.Cache.clear()
       :ok
@@ -151,10 +159,12 @@ defmodule DSEx.Cache do
 
   """
   def fetch_or_store(key, fun) when is_function(fun, 0) do
-    case get(key, :__missing__) do
-      :__missing__ ->
+    missing = make_ref()
+
+    case get(key, missing) do
+      ^missing ->
         DSEx.Telemetry.execute([:dsex, :cache, :miss], %{count: 1}, %{key: key})
-        put(key, fun.())
+        fetch_miss(key, fun)
 
       value ->
         DSEx.Telemetry.execute([:dsex, :cache, :hit], %{count: 1}, %{key: key})
@@ -190,6 +200,44 @@ defmodule DSEx.Cache do
     enforce_capacity_direct(policy.max_entries)
     state = %{state | policy: policy}
     {:reply, :ok, state}
+  end
+
+  def handle_call({:claim_flight, key, caller}, from, state) do
+    if state.policy.enabled do
+      case cached_value(key) do
+        {:ok, value} ->
+          {:reply, {:ready, value}, state}
+
+        :missing ->
+          claim_missing_flight(key, caller, from, state)
+      end
+    else
+      {:reply, :compute_untracked, state}
+    end
+  end
+
+  def handle_call({:complete_flight, key, caller, value}, _from, state) do
+    case state.flights[key] do
+      %{owner: ^caller} = flight ->
+        Enum.each(:queue.to_list(flight.waiters), fn {from, _pid, started_at} ->
+          GenServer.reply(from, {:coalesced, value, started_at})
+        end)
+
+        {:reply, :ok, drop_flight(state, key, flight)}
+
+      _other ->
+        {:reply, :ok, state}
+    end
+  end
+
+  def handle_call({:abandon_flight, key, caller}, _from, state) do
+    case state.flights[key] do
+      %{owner: ^caller} = flight ->
+        {:reply, :ok, promote_waiter(state, key, flight, :producer_failed)}
+
+      _other ->
+        {:reply, :ok, state}
+    end
   end
 
   def handle_call(:policy, _from, state), do: {:reply, state.policy, state}
@@ -241,6 +289,29 @@ defmodule DSEx.Cache do
     {:reply, :ok, %{state | usage: @empty_usage}}
   end
 
+  @impl true
+  def handle_info({:DOWN, monitor, :process, owner, reason}, state) do
+    case Map.fetch(state.flight_refs, monitor) do
+      {:ok, key} ->
+        case state.flights[key] do
+          %{owner: ^owner, monitor: ^monitor} = flight ->
+            DSEx.Telemetry.execute(
+              [:dsex, :cache, :producer_down],
+              %{count: 1},
+              %{key: key, reason: exit_class(reason)}
+            )
+
+            {:noreply, promote_waiter(state, key, flight, :producer_down)}
+
+          _other ->
+            {:noreply, %{state | flight_refs: Map.delete(state.flight_refs, monitor)}}
+        end
+
+      :error ->
+        {:noreply, state}
+    end
+  end
+
   defp ensure_table do
     case :ets.whereis(@table) do
       :undefined ->
@@ -289,6 +360,149 @@ defmodule DSEx.Cache do
 
   defp expired?(:infinity), do: false
   defp expired?(expires_at), do: expires_at <= System.monotonic_time(:millisecond)
+
+  defp fetch_miss(key, fun) do
+    case GenServer.call(__MODULE__, {:claim_flight, key, self()}, :infinity) do
+      :compute ->
+        compute_flight(key, fun)
+
+      :compute_untracked ->
+        increment_counter(:bypasses)
+        fun.()
+
+      {:ready, value} ->
+        value
+
+      {:coalesced, value, started_at} ->
+        emit_wait_event(:coalesced, key, started_at)
+        value
+
+      {:retry, started_at, reason} ->
+        emit_wait_event(:retry, key, started_at, %{reason: reason})
+        compute_flight(key, fun)
+    end
+  end
+
+  defp compute_flight(key, fun) do
+    started_at = System.monotonic_time()
+
+    try do
+      value = fun.()
+      put(key, value)
+      :ok = GenServer.call(__MODULE__, {:complete_flight, key, self(), value}, :infinity)
+      value
+    catch
+      kind, reason ->
+        stacktrace = __STACKTRACE__
+        abandon_flight(key)
+
+        DSEx.Telemetry.execute(
+          [:dsex, :cache, :producer_exception],
+          %{count: 1, duration: System.monotonic_time() - started_at},
+          %{key: key, kind: kind}
+        )
+
+        :erlang.raise(kind, reason, stacktrace)
+    end
+  end
+
+  defp abandon_flight(key) do
+    GenServer.call(__MODULE__, {:abandon_flight, key, self()}, :infinity)
+  catch
+    :exit, _reason -> :ok
+  end
+
+  defp cached_value(key) do
+    case :ets.lookup(@table, key) do
+      [{^key, value, expires_at, _inserted_at}] ->
+        if expired?(expires_at) do
+          :ets.delete(@table, key)
+          :missing
+        else
+          {:ok, value}
+        end
+
+      [{^key, value}] ->
+        {:ok, value}
+
+      [] ->
+        :missing
+    end
+  end
+
+  defp claim_missing_flight(key, caller, from, state) do
+    case state.flights[key] do
+      %{owner: ^caller} ->
+        {:reply, :compute_untracked, state}
+
+      flight when is_map(flight) ->
+        waiter = {from, caller, System.monotonic_time()}
+        flight = %{flight | waiters: :queue.in(waiter, flight.waiters)}
+        {:noreply, %{state | flights: Map.put(state.flights, key, flight)}}
+
+      nil ->
+        monitor = Process.monitor(caller)
+        flight = %{owner: caller, monitor: monitor, waiters: :queue.new()}
+
+        {:reply, :compute,
+         %{
+           state
+           | flights: Map.put(state.flights, key, flight),
+             flight_refs: Map.put(state.flight_refs, monitor, key)
+         }}
+    end
+  end
+
+  defp promote_waiter(state, key, flight, reason) do
+    state = drop_flight(state, key, flight)
+    promote_live_waiter(state, key, flight.waiters, reason)
+  end
+
+  defp promote_live_waiter(state, key, waiters, reason) do
+    case :queue.out(waiters) do
+      {{:value, {from, pid, started_at}}, remaining} ->
+        if Process.alive?(pid) do
+          monitor = Process.monitor(pid)
+          flight = %{owner: pid, monitor: monitor, waiters: remaining}
+          GenServer.reply(from, {:retry, started_at, reason})
+
+          %{
+            state
+            | flights: Map.put(state.flights, key, flight),
+              flight_refs: Map.put(state.flight_refs, monitor, key)
+          }
+        else
+          promote_live_waiter(state, key, remaining, reason)
+        end
+
+      {:empty, _remaining} ->
+        state
+    end
+  end
+
+  defp drop_flight(state, key, flight) do
+    Process.demonitor(flight.monitor, [:flush])
+
+    %{
+      state
+      | flights: Map.delete(state.flights, key),
+        flight_refs: Map.delete(state.flight_refs, flight.monitor)
+    }
+  end
+
+  defp emit_wait_event(event, key, started_at, metadata \\ %{}) do
+    DSEx.Telemetry.execute(
+      [:dsex, :cache, event],
+      %{count: 1, duration: System.monotonic_time() - started_at},
+      Map.put(metadata, :key, key)
+    )
+  end
+
+  defp exit_class(:normal), do: :normal
+  defp exit_class(:killed), do: :killed
+  defp exit_class(:shutdown), do: :shutdown
+  defp exit_class({:shutdown, _reason}), do: :shutdown
+  defp exit_class(_reason), do: :error
 
   defp increment(state, counter, amount \\ 1) do
     update_in(state, [:usage, counter], &(&1 + amount))

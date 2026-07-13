@@ -262,6 +262,7 @@ defmodule DSEx.MixProject do
         "benchmark.truth.check",
         "benchmark.trace.check",
         "benchmark.operations_stress.check",
+        "benchmark.failure_campaign.check",
         "benchmark.overhead.check",
         "benchmark.optimizer_lift.check",
         "benchmark.instruction_optimizer.contract.check",
@@ -289,6 +290,9 @@ defmodule DSEx.MixProject do
       ],
       "benchmark.operations_stress.check": [
         "dsex.benchmark.operations_stress --out tmp/operations-stress"
+      ],
+      "benchmark.failure_campaign.check": [
+        "dsex.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
       ],
       "benchmark.overhead.check": [
         "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
