@@ -35,6 +35,8 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
   @baseline_strategy """
   Complete each equation by replacing every question mark with one arithmetic operator. Keep the given numbers in their original order, use ordinary operator precedence, and return only one completed equation with the stated right-hand value. Work carefully and check that the expression is valid before answering. Do not add numbers, omit numbers, reorder numbers, or introduce parentheses.
+
+  Treat the right-hand side as a hard arithmetic constraint. Every placeholder must become exactly one operator from addition, subtraction, multiplication, or division. Preserve every printed integer and the equality sign exactly. Before returning, independently recompute the complete left-hand expression under standard precedence and compare it with the requested value. If the check fails, reconsider the operator choices rather than changing the numbers or output format. The final response must contain the equation alone, without explanation, markdown, alternatives, or intermediate work.
   """
 
   @doc "Runs one bounded natural equation-balancing playbook campaign."
@@ -137,7 +139,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         DSEx.signature(
           "current_strategy, training_evidence -> strategy",
           """
-          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 300 bytes. It must not contain any example equation, answer, dataset row ID, or copied number sequence. Preserve the original task contract, add only general operator-search and exact-verification guidance, and return strategy text only.
+          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 400 bytes. It must not contain any example equation, answer, dataset row ID, or copied number sequence. Preserve the original task contract, add only general operator-search and exact-verification guidance, and return strategy text only.
           """
         )
 
@@ -164,7 +166,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
             strategy == "" ->
               {:error, :empty_strategy, usage}
 
-            byte_size(strategy) > 300 ->
+            byte_size(strategy) > 400 ->
               {:error, {:strategy_too_large, byte_size(strategy)}, usage}
 
             contains_training_instance?(strategy, request.rows) ->
