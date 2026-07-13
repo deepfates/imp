@@ -497,6 +497,69 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert usage["cost_authority"] == "unavailable"
   end
 
+  test "metered LM ignores structured ReqLLM cost metadata and derives pinned cost" do
+    rates = UsageFixture.rates()
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{
+          "requests" => 2,
+          "input_tokens" => 10_000,
+          "output_tokens" => 100,
+          "usd" => 1.0
+        },
+        pricing: rates,
+        default_max_output_tokens: 10
+      )
+
+    {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
+
+    inner = fn _messages, _opts ->
+      {:ok,
+       %{
+         usage: %{
+           input_tokens: 9,
+           output_tokens: 2,
+           total_cost: 0.0,
+           cost: %{total: 0.0}
+         }
+       }}
+    end
+
+    lm = %RLMRuntime.MeteredLM{
+      inner: inner,
+      budget: budget,
+      usage: usage_agent,
+      max_tokens: 10,
+      role: "root",
+      pricing: rates
+    }
+
+    assert {:ok, _result} =
+             RLMRuntime.MeteredLM.generate(lm, [%{role: :user, content: "charged"}], [])
+
+    usage = Agent.get(usage_agent, & &1)
+    assert usage["cost_authority"] == "pricing_derived"
+    assert_in_delta usage["usd"], 0.000011, 1.0e-12
+    assert get_in(usage, ["cost_audit", Access.at(0), "provider_reported_usd"]) == nil
+  end
+
+  test "RLM controller adapter decodes ReqLLM metadata content after metering" do
+    action = %{"reasoning" => "inspect", "code" => "submit(%{answer: \"yes\"})"}
+
+    inner = fn _messages, _opts ->
+      {:ok,
+       %{
+         __dsex_lm_metadata__: %{
+           req_llm: %{content: Jason.encode!(action), usage: %{input_tokens: 1}}
+         }
+       }}
+    end
+
+    lm = %RLMRuntime.ControllerLM{inner: inner}
+    assert {:ok, ^action} = RLMRuntime.ControllerLM.generate(lm, [], [])
+  end
+
   test "checkpoint payload tamper is rejected" do
     root = tmp_dir("checkpoint")
     path = Path.join(root, "checkpoint.json")

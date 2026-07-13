@@ -1,0 +1,550 @@
+{
+  "schema_version": 1,
+  "campaign_id": "de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v7",
+  "evidence_tier": "t2_live_sample",
+  "authorities": {
+    "paper": {
+      "arxiv": "2512.24601v3"
+    },
+    "rlm": {
+      "repository": "https://github.com/alexzhang13/rlm",
+      "commit": "72d6940142ddfb84ee6be573dc999a37e633e671"
+    },
+    "dspy": {
+      "repository": "https://github.com/stanfordnlp/dspy",
+      "version": "3.3.0b1",
+      "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+    },
+    "sources": {
+      "paper_text": {
+        "path": "tmp/pdfs/rlm-2512.24601v3.txt",
+        "sha256": "4d3881423d60e0c0abdc77b5e08bd9e3d5835af49beb3833c000182ebdec4480"
+      },
+      "rlm_core": {
+        "path": "tmp/rlm-upstream/rlm/core/rlm.py",
+        "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
+      },
+      "rlm_prompts": {
+        "path": "tmp/rlm-upstream/rlm/utils/prompts.py",
+        "sha256": "579c8ef220739f691d3896257b8289eec7e7b634fe473f41dea4adb83560b47e"
+      },
+      "dspy_rlm": {
+        "path": "tmp/dspy-current-target/dspy/predict/rlm.py",
+        "sha256": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8"
+      },
+      "dspy_interpreter": {
+        "path": "tmp/dspy-current-target/dspy/primitives/python_interpreter.py",
+        "sha256": "fef9baa19cd979e8466ef19e364e5f7e67848c9738955a2d3e1f0d7dae2177d4"
+      }
+    }
+  },
+  "models": {
+    "root": {
+      "logical": "gpt-5-mini-2025-08-07",
+      "dsex": "openai:gpt-5-mini-2025-08-07",
+      "dspy": "openai/gpt-5-mini-2025-08-07",
+      "temperature": 1.0,
+      "reasoning": "low",
+      "max_output_tokens": 4096
+    },
+    "submodel": {
+      "logical": "gpt-5-mini-2025-08-07",
+      "dsex": "openai:gpt-5-mini-2025-08-07",
+      "dspy": "openai/gpt-5-mini-2025-08-07",
+      "temperature": 1.0,
+      "reasoning": "low",
+      "max_output_tokens": 2048
+    },
+    "compaction": {
+      "logical": "gpt-5-mini-2025-08-07",
+      "dsex": "openai:gpt-5-mini-2025-08-07",
+      "dspy": "openai/gpt-5-mini-2025-08-07",
+      "temperature": 1.0,
+      "reasoning": "low",
+      "max_output_tokens": 2048
+    }
+  },
+  "approaches": {
+    "direct": {
+      "enabled": true,
+      "runtimes": [
+        "dsex",
+        "dspy"
+      ],
+      "budget": {
+        "requests": 8,
+        "input_tokens": 2000000,
+        "output_tokens": 50000,
+        "usd": 2.0
+      },
+      "settings": {
+        "reservation_pricing": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        }
+      }
+    },
+    "simple_retrieval": {
+      "enabled": true,
+      "runtimes": [
+        "dsex",
+        "dspy"
+      ],
+      "budget": {
+        "requests": 8,
+        "input_tokens": 2000000,
+        "output_tokens": 50000,
+        "usd": 2.0
+      },
+      "settings": {
+        "k": 8,
+        "retriever": "deterministic_lexical",
+        "reservation_pricing": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        }
+      }
+    },
+    "compaction": {
+      "enabled": true,
+      "runtimes": [
+        "dsex",
+        "dspy"
+      ],
+      "budget": {
+        "requests": 8,
+        "input_tokens": 2000000,
+        "output_tokens": 50000,
+        "usd": 2.0
+      },
+      "settings": {
+        "chunk_chars": 100000,
+        "max_chunks": 32,
+        "reservation_pricing": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        }
+      }
+    },
+    "rlm": {
+      "enabled": true,
+      "runtimes": [
+        "dsex",
+        "dspy"
+      ],
+      "budget": {
+        "requests": 8,
+        "input_tokens": 2000000,
+        "output_tokens": 50000,
+        "usd": 2.0
+      },
+      "settings": {
+        "max_iterations": 4,
+        "max_llm_calls": 4,
+        "recursion_depth": 1,
+        "reservation_pricing": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        }
+      }
+    }
+  },
+  "execution": {
+    "seed": 251224601,
+    "concurrency": 1,
+    "row_timeout_ms": 600000,
+    "cancellation_grace_ms": 5000,
+    "bootstrap_samples": 10000,
+    "confidence": 0.95
+  },
+  "datasets": {
+    "s_niah": {
+      "path": "../../data/rlm/s_niah.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "https://github.com/NVIDIA/RULER",
+      "revision": "ab17b7853df4e0a30b78cd5d2b463ac7dff6ee13; exact paper instances unpublished",
+      "split": "paper_eval",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": "ACQUIRE_AND_FREEZE_IDS",
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "exact_match"
+    },
+    "browsecomp_plus": {
+      "path": "../../data/rlm/browsecomp_plus_1k.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "https://huggingface.co/datasets/Tevatron/browsecomp-plus + browsecomp-plus-corpus",
+      "revision": "queries@144cff8e35b5eaef7e526346aa60774a9deb941f; corpus@b27b02bc3e45511b8b82a13e6f90ce761df726f6",
+      "split": "operator_hash_150_not_paper_selection",
+      "sample_count": 150,
+      "sample_seed": 251224601,
+      "sample_ids": [
+        "731",
+        "480",
+        "309",
+        "1172",
+        "619",
+        "532",
+        "768",
+        "595",
+        "1034",
+        "1230",
+        "350",
+        "684",
+        "607",
+        "836",
+        "718",
+        "605",
+        "103",
+        "427",
+        "1233",
+        "1167",
+        "1182",
+        "1063",
+        "1201",
+        "1020",
+        "449",
+        "1023",
+        "776",
+        "90",
+        "1082",
+        "59",
+        "642",
+        "893",
+        "81",
+        "503",
+        "895",
+        "1177",
+        "421",
+        "577",
+        "1149",
+        "1053",
+        "1083",
+        "898",
+        "560",
+        "1003",
+        "111",
+        "590",
+        "568",
+        "383",
+        "601",
+        "438",
+        "1073",
+        "209",
+        "894",
+        "497",
+        "1153",
+        "544",
+        "678",
+        "289",
+        "420",
+        "739",
+        "37",
+        "1242",
+        "790",
+        "928",
+        "1254",
+        "1234",
+        "688",
+        "797",
+        "838",
+        "403",
+        "278",
+        "126",
+        "1246",
+        "856",
+        "628",
+        "1026",
+        "632",
+        "1260",
+        "759",
+        "257",
+        "169",
+        "299",
+        "932",
+        "280",
+        "947",
+        "819",
+        "523",
+        "405",
+        "501",
+        "529",
+        "703",
+        "587",
+        "884",
+        "333",
+        "434",
+        "422",
+        "250",
+        "980",
+        "1239",
+        "377",
+        "775",
+        "1198",
+        "478",
+        "1218",
+        "1193",
+        "764",
+        "484",
+        "714",
+        "10",
+        "584",
+        "156",
+        "865",
+        "166",
+        "761",
+        "1228",
+        "357",
+        "527",
+        "499",
+        "701",
+        "734",
+        "537",
+        "215",
+        "1060",
+        "95",
+        "753",
+        "1004",
+        "665",
+        "624",
+        "22",
+        "1142",
+        "514",
+        "320",
+        "830",
+        "712",
+        "833",
+        "349",
+        "155",
+        "749",
+        "1058",
+        "869",
+        "87",
+        "36",
+        "744",
+        "1008",
+        "758",
+        "79",
+        "1203",
+        "621",
+        "206",
+        "822"
+      ],
+      "context_grid": [],
+      "docs_per_instance": 1000,
+      "metric": "official_llm_judge"
+    },
+    "oolong": {
+      "path": "../../data/rlm/oolong_trec_coarse.jsonl",
+      "sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b",
+      "source": "https://huggingface.co/datasets/oolongbench/oolong-synth",
+      "revision": "49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "split": "trec_coarse",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": [
+        "17000206",
+        "17000207",
+        "17000208",
+        "17000209",
+        "17000210",
+        "17000211",
+        "17000212",
+        "17000213",
+        "17000214",
+        "17000215",
+        "17000216",
+        "17000217",
+        "17000218",
+        "17000219",
+        "17000220",
+        "17000221",
+        "17000222",
+        "17000223",
+        "17000224",
+        "17000225",
+        "17000226",
+        "17000227",
+        "17000228",
+        "17000229",
+        "17000230",
+        "17000231",
+        "17000232",
+        "17000233",
+        "17000234",
+        "17000235",
+        "17000236",
+        "17000237",
+        "17000238",
+        "17000239",
+        "17000240",
+        "17000241",
+        "17000242",
+        "17000243",
+        "17000244",
+        "17000245",
+        "17000246",
+        "17000247",
+        "17000248",
+        "17000249",
+        "17000250",
+        "17000251",
+        "17000252",
+        "17000253",
+        "17000254",
+        "17000255"
+      ],
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "oolong_official"
+    },
+    "oolong_pairs": {
+      "path": "../../data/rlm/oolong_pairs_trec_coarse.jsonl",
+      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs + oolongbench/oolong-synth",
+      "revision": "pairs@d1e1522b86ac0c169bbc890b0471408aaa29e8fa; contexts@49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "split": "trec_coarse",
+      "sample_count": 20,
+      "sample_seed": 251224601,
+      "sample_ids": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ],
+      "context_grid": [
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768,
+        65536,
+        131072,
+        262144,
+        524288,
+        1048576
+      ],
+      "docs_per_instance": null,
+      "metric": "set_f1"
+    },
+    "longbench_v2_codeqa": {
+      "path": "../../data/rlm/longbench_v2_codeqa.jsonl",
+      "sha256": "df1765c62e72cf5817d8ecfbf163dc72fe6e41642bae8b6e6adadb340d5ef030",
+      "source": "https://huggingface.co/datasets/zai-org/LongBench-v2",
+      "revision": "2b48e494f2c7a2f0af81aae178e05c7e1dde0fe9",
+      "split": "CodeQA",
+      "sample_count": 50,
+      "sample_seed": 251224601,
+      "sample_ids": [
+        "66fa208bbb02136c067c5fc1",
+        "66ec56dd821e116aacb1cd0e",
+        "66fa3843bb02136c067c655d",
+        "66f1dac1821e116aacb27df1",
+        "66fa50acbb02136c067c6827",
+        "66ebd3ba5a08c7b9b35e0446",
+        "66fa2734bb02136c067c627a",
+        "66fa542bbb02136c067c686d",
+        "66f3df1e821e116aacb2f7be",
+        "66ed5be2821e116aacb1fb57",
+        "66fcfb5fbb02136c067c93ae",
+        "66f530ce821e116aacb32f09",
+        "66f2cb0f821e116aacb2ba6d",
+        "66faa0f5bb02136c067c722c",
+        "66f3ad93821e116aacb2e29f",
+        "670cb73fbb02136c067d2502",
+        "66fa7c81bb02136c067c6e09",
+        "66fcf36fbb02136c067c919e",
+        "66ecf139821e116aacb1e0e1",
+        "66fa1e4cbb02136c067c5edf",
+        "66f39ac5821e116aacb2da81",
+        "66fb75adbb02136c067c7d73",
+        "6708ae87bb02136c067d1847",
+        "66f3fd3a821e116aacb30533",
+        "66ed3e90821e116aacb1f82f",
+        "6708a096bb02136c067d1789",
+        "66fa7269bb02136c067c6c73",
+        "66ece545821e116aacb1dd77",
+        "66fa69a4bb02136c067c6b75",
+        "66fa6702bb02136c067c6abb",
+        "6707f349bb02136c067d13b9",
+        "66fb77e7bb02136c067c7db1",
+        "66fa5fbcbb02136c067c6959",
+        "66f3e318821e116aacb2f9d1",
+        "66fa1b54bb02136c067c5df7",
+        "66fa700bbb02136c067c6c06",
+        "66f3c219821e116aacb2eb4e",
+        "66f3cb88821e116aacb2eeb9",
+        "67066b87bb02136c067cfaa3",
+        "66f57379821e116aacb33b7a",
+        "66f2e874821e116aacb2c0af",
+        "6700eb6ebb02136c067cb152",
+        "66ec3644821e116aacb1c312",
+        "66fa788abb02136c067c6d75",
+        "66fcf80dbb02136c067c928e",
+        "66f40c5e821e116aacb30ad2",
+        "66f51ab2821e116aacb325fb",
+        "66f908e3bb02136c067c4992",
+        "66ebdd1c5a08c7b9b35e113b",
+        "66fa36c9bb02136c067c6517"
+      ],
+      "context_grid": [],
+      "docs_per_instance": null,
+      "metric": "multiple_choice_accuracy"
+    }
+  },
+  "deviations": [
+    {
+      "id": "dsex_repl_language",
+      "scope": "dsex:rlm",
+      "paper_behavior": "Python REPL over external context variables",
+      "implementation": "BEAM-native constrained Elixir-shaped interpreter with equivalent persistent variable and sub-LM effects",
+      "impact": "trajectory syntax is not byte-for-byte comparable; answer, budget, and effect shape remain comparable"
+    },
+    {
+      "id": "retrieval_codeact_equivalent",
+      "scope": "simple_retrieval",
+      "paper_behavior": "CodeAct with BM25 where retrieval is usable",
+      "implementation": "deterministic lexical top-k retrieval followed by the root predictor",
+      "impact": "reported as a simple retrieval/CodeAct-equivalent baseline, never as exact CodeAct parity"
+    },
+    {
+      "id": "blocking_vs_bounded_concurrency",
+      "scope": "campaign",
+      "paper_behavior": "paper implementation reports blocking/sequential LM calls",
+      "implementation": "rows run with manifest-bounded concurrency; each row records wall latency and exact provider usage",
+      "impact": "quality and cost are paired; campaign wall time is not a paper runtime reproduction"
+    },
+    {
+      "id": "dspy_rlm_release_semantics",
+      "scope": "dspy:rlm",
+      "paper_behavior": "alexzhang13/rlm reference runtime",
+      "implementation": "DSPy 3.3.0b1 dspy.RLM with pinned source files",
+      "impact": "cross-runtime comparison is supported for RLM answer/effect evidence, not identical prompts or interpreter trajectories"
+    },
+    {
+      "id": "economical_t2_preflight",
+      "scope": "campaign",
+      "paper_behavior": "GPT-5 root with GPT-5-mini recursive calls at paper-scale settings",
+      "implementation": "Pinned gpt-5-mini-2025-08-07 for all roles with low reasoning, one-row filtering, serialized execution, four-call RLM loop bound plus separately metered extraction, DSPy BaseLM/max_completion_tokens adaptation, and ReqLLM controller-envelope decoding after metering",
+      "impact": "Operational T2 comparison only; not paper model parity or T3 evidence"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import unittest
 
 
 SCRIPT = pathlib.Path(__file__).parents[1] / "scripts" / "dspy_rlm_campaign.py"
-sys.modules.setdefault("dspy", types.SimpleNamespace())
+sys.modules.setdefault("dspy", types.SimpleNamespace(BaseLM=object))
 SPEC = importlib.util.spec_from_file_location("dspy_rlm_campaign", SCRIPT)
 campaign = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(campaign)
@@ -111,6 +111,9 @@ def wrapped(
 
 
 class BudgetLMTest(unittest.TestCase):
+    def test_wrapper_satisfies_dspy_base_lm_identity(self):
+        self.assertIsInstance(wrapped(FakeReasoningLM()), campaign.dspy.BaseLM)
+
     def test_gpt5_limit_and_provider_reported_cost_are_audited(self):
         inner = FakeReasoningLM()
         ledger = empty_ledger()
@@ -206,6 +209,54 @@ class BudgetLMTest(unittest.TestCase):
             {"input_per_million": 2.0, "output_per_million": 3.0},
         )
         self.assertIsNone(usage["cost_audit"][0]["provider_reported_usd"])
+
+    def test_structured_cost_breakdown_is_metadata_not_provider_cost(self):
+        inner = FakeReasoningLM(
+            {
+                "input_tokens": 12,
+                "output_tokens": 34,
+                "total_cost": 0.0,
+                "cost": {"total": 0.0},
+            }
+        )
+        ledger = empty_ledger()
+        lm = wrapped(
+            inner,
+            ledger=ledger,
+            pricing={"input_per_million": 2.0, "output_per_million": 3.0},
+        )
+
+        self.assertEqual(lm("hello"), ["ok"])
+        usage = campaign.auditable_usage(ledger)
+        self.assertAlmostEqual(usage["usd"], 0.000126)
+        self.assertEqual(usage["cost_authority"], "pricing_derived")
+
+    def test_gpt5_constructor_floor_preserves_lower_dispatch_budget(self):
+        self.assertEqual(
+            campaign.provider_constructor_max_tokens(
+                "openai/gpt-5-mini-2025-08-07", 4096
+            ),
+            16_000,
+        )
+        self.assertEqual(
+            campaign.provider_constructor_max_tokens("openai/gpt-4.1-mini", 4096),
+            4096,
+        )
+
+        inner = FakeReasoningLM()
+        lm = wrapped(
+            inner,
+            limits={
+                "requests": 2,
+                "input_tokens": 10_000,
+                "output_tokens": 4096,
+                "usd": 10.0,
+            },
+            max_tokens=4096,
+        )
+
+        self.assertEqual(lm("hello"), ["ok"])
+        self.assertEqual(inner.dispatched["max_completion_tokens"], 4096)
 
     def test_explicit_provider_free_authority_allows_zero_cost(self):
         inner = FakeReasoningLM(

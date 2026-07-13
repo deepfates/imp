@@ -128,6 +128,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         |> Enum.flat_map(fn key ->
           case fetch(usage, key) do
             value when value in [:missing, nil] -> []
+            value when key == :cost and is_map(value) -> []
             value -> [value]
           end
         end)
@@ -205,6 +206,35 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
     end
   end
 
+  defmodule ControllerLM do
+    @moduledoc false
+    defstruct [:inner]
+
+    def generate(%__MODULE__{inner: inner}, messages, opts) do
+      with {:ok, result} <- DSEx.LM.generate(inner, messages, opts),
+           {:ok, content} <- controller_content(result),
+           {:ok, action} when is_map(action) <- Jason.decode(content) do
+        {:ok, action}
+      else
+        {:ok, _other} -> {:error, :invalid_rlm_controller_json}
+        {:error, _reason} = error -> error
+      end
+    end
+
+    defp controller_content(%{__dsex_lm_metadata__: %{req_llm: %{content: content}}})
+         when is_binary(content),
+         do: {:ok, content}
+
+    defp controller_content(%{
+           "__dsex_lm_metadata__" => %{"req_llm" => %{"content" => content}}
+         })
+         when is_binary(content),
+         do: {:ok, content}
+
+    defp controller_content(content) when is_binary(content), do: {:ok, content}
+    defp controller_content(_result), do: {:error, :missing_rlm_controller_content}
+  end
+
   defmodule Dsex do
     @moduledoc false
     @behaviour Elixir.DSEx.BenchmarkTruth.RLMRuntime
@@ -214,6 +244,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       pricing = get_in(context, ["approach", "settings", "reservation_pricing"])
       {:ok, usage} = Agent.start_link(fn -> empty_usage(pricing) end)
       root = metered_lm(context, "root", usage)
+      controller = if approach == "rlm", do: %ControllerLM{inner: root}, else: root
 
       sub =
         metered_lm(
@@ -223,7 +254,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         )
 
       started = System.monotonic_time()
-      result = run(approach, row, root, sub, context)
+      result = run(approach, row, controller, sub, context)
 
       latency =
         System.convert_time_unit(System.monotonic_time() - started, :native, :microsecond) / 1000
@@ -437,7 +468,10 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         "root_calls" => usage["root_calls"],
         "sub_calls" => usage["sub_calls"],
         "max_llm_calls_scope" =>
-          if(approach == "rlm", do: "total_provider_calls", else: "not_applicable"),
+          if(approach == "rlm",
+            do: "rlm_loop_provider_calls_excluding_extract",
+            else: "not_applicable"
+          ),
         "configured_max_depth" =>
           if(approach == "rlm",
             do: get_in(context, ["approach", "settings", "recursion_depth"]) || 0,

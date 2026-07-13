@@ -1,0 +1,479 @@
+{
+  "schema_version": 1,
+  "kind": "rlm_t2_preflight_success_audit",
+  "generated_at": "2026-07-13T23:36:41Z",
+  "campaign_id": "de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v7",
+  "valid_t2_operational_evidence": true,
+  "valid_t2_effectiveness_evidence": false,
+  "valid_t3_evidence": false,
+  "expanded": false,
+  "artifact": {
+    "path": "benchmarks/results/rlm-preflight/rlm-benchmark-parity-20260713T233641Z.json",
+    "sha256": "049246ba8bed2ab1c9c993ce112cf0d56d4d19d861ae997853c8fb1e64dc28c5"
+  },
+  "manifest": {
+    "path": "benchmarks/results/rlm-preflight/manifest-v7.json",
+    "sha256": "c24aadd20da1bc3504d9ddc767c85b07d5771f88f881acf44e52e16eed36f163"
+  },
+  "checkpoint": {
+    "path": "benchmarks/results/rlm-preflight/checkpoints/de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v7-both.json",
+    "sha256": "776ee3377247dbf293b6effbd7b8d1fc5da82077bb4d16b503223cb6702c8c48"
+  },
+  "model": {
+    "id": "gpt-5-mini-2025-08-07",
+    "reasoning": "low",
+    "pricing_usd_per_million": {
+      "input": 0.25,
+      "output": 2.0
+    }
+  },
+  "selection": {
+    "approaches": [
+      "direct",
+      "simple_retrieval",
+      "rlm"
+    ],
+    "families": [
+      "oolong"
+    ],
+    "row_limit_per_family": 1,
+    "runtime": "both",
+    "runtimes": [
+      "dsex",
+      "dspy"
+    ]
+  },
+  "observed": {
+    "sample_ids": [
+      "17000206"
+    ],
+    "sample_count": 1,
+    "row_count": 6,
+    "passing_rows": 6,
+    "total_calls": 10,
+    "total_input_tokens": 395786,
+    "total_output_tokens": 5042,
+    "total_usd": 0.06744275
+  },
+  "rows": [
+    {
+      "key": "dsex:direct:oolong:17000206",
+      "answer": "Label: human being",
+      "score": 0.0,
+      "latency_ms": 2806.564,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "provider_reported",
+            "input_tokens": 92567,
+            "output_tokens": 128,
+            "provider_reported_usd": 0.002604,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.002604
+          }
+        ],
+        "cost_authority": "provider_reported",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 92567,
+        "output_tokens": 128,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.002604
+      },
+      "trace_shape": [
+        "predict:direct"
+      ],
+      "trace": [],
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "error": null
+    },
+    {
+      "key": "dsex:rlm:oolong:17000206",
+      "answer": "Label: abbreviation",
+      "score": 0.0,
+      "latency_ms": 3487.324,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "provider_reported",
+            "input_tokens": 301,
+            "output_tokens": 468,
+            "provider_reported_usd": 0.001011,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.001011
+          }
+        ],
+        "cost_authority": "provider_reported",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 301,
+        "output_tokens": 468,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.001011
+      },
+      "trace_shape": [
+        "rlm:submit"
+      ],
+      "trace": [
+        {
+          "action": "submit",
+          "bytes": 740,
+          "index": 0,
+          "sha256": "9bc91fa07e6eff991a204f88697a4cca397c12bf2fcf49e81c3bb80e426222ad"
+        }
+      ],
+      "call_semantics": {
+        "configured_max_depth": 1,
+        "max_llm_calls_scope": "rlm_loop_provider_calls_excluding_extract",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "error": null
+    },
+    {
+      "key": "dsex:simple_retrieval:oolong:17000206",
+      "answer": "Label: human being",
+      "score": 0.0,
+      "latency_ms": 2584.2,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "provider_reported",
+            "input_tokens": 92567,
+            "output_tokens": 109,
+            "provider_reported_usd": 0.002566,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.002566
+          }
+        ],
+        "cost_authority": "provider_reported",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 92567,
+        "output_tokens": 109,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.002566
+      },
+      "trace_shape": [
+        "retrieve:lexical",
+        "predict"
+      ],
+      "trace": [],
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "error": null
+    },
+    {
+      "key": "dspy:direct:oolong:17000206",
+      "answer": "Label: human being",
+      "score": 0.0,
+      "latency_ms": 4907.162167000934,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 92571,
+            "output_tokens": 88,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.02331875
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 92571,
+        "output_tokens": 88,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.02331875
+      },
+      "trace_shape": [
+        "predict:direct"
+      ],
+      "trace": [],
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "error": null
+    },
+    {
+      "key": "dspy:rlm:oolong:17000206",
+      "answer": "I cannot determine which label is least common because the provided context does not contain per-example annotation labels for the 3182 questions (no per-line label field, no trailing labels, no \"Label:\" fields). Therefore the exact per-example label distribution cannot be computed from the data given.\n\nFor transparency, here are counts of occurrences of the six label-words appearing anywhere inside the question text (these are NOT per-example labels):\n- numeric value: 2\n- entity: 2\n- human being: 2\n- location: 6\n- abbreviation: 114\n- description and abstract concept: 2\n\nBecause these are merely word-occurrence counts within question text and not the actual annotation labels, I cannot answer \"Label: answer\" as requested.",
+      "score": 0.0,
+      "latency_ms": 37865.83870800678,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 1193,
+            "output_tokens": 679,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.0016562500000000002
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 3299,
+            "output_tokens": 853,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 2,
+            "role": "root",
+            "usd": 0.00253075
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 5813,
+            "output_tokens": 1296,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 3,
+            "role": "root",
+            "usd": 0.00404525
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 7170,
+            "output_tokens": 967,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 4,
+            "role": "root",
+            "usd": 0.0037264999999999998
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 7734,
+            "output_tokens": 302,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 5,
+            "role": "root",
+            "usd": 0.0025375000000000003
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 25209,
+        "output_tokens": 4097,
+        "requests": 5,
+        "root_calls": 5,
+        "sub_calls": 0,
+        "usd": 0.01449625
+      },
+      "trace_shape": [
+        "rlm:repl",
+        "rlm:repl",
+        "rlm:repl",
+        "rlm:repl"
+      ],
+      "trace": [
+        {
+          "action": "repl",
+          "bytes": 7992,
+          "index": 0,
+          "sha256": "9b6ca8bc63b9239395f6cdc41a0c47f66954f5a286ed257aa03e9f2458c75549"
+        },
+        {
+          "action": "repl",
+          "bytes": 8961,
+          "index": 1,
+          "sha256": "4ee9d11d9a4adb33e13d3457ec205cbd31ed895123d581e0bf1b969637240283"
+        },
+        {
+          "action": "repl",
+          "bytes": 5516,
+          "index": 2,
+          "sha256": "0b8651c492751d2a1886cc7f0cd3a4b825508ce2801f397e2c5ef36fe75bcddd"
+        },
+        {
+          "action": "repl",
+          "bytes": 4710,
+          "index": 3,
+          "sha256": "53b5bf5832397a7eaae24ecd46f037e63e7adf476b4c8fd0e9824dcce5467691"
+        }
+      ],
+      "call_semantics": {
+        "configured_max_depth": 1,
+        "max_llm_calls_scope": "subcalls_only",
+        "max_observed_depth": 0,
+        "provider_calls": 5,
+        "root_calls": 5,
+        "sub_calls": 0
+      },
+      "error": null
+    },
+    {
+      "key": "dspy:simple_retrieval:oolong:17000206",
+      "answer": "Label: human being",
+      "score": 0.0,
+      "latency_ms": 5052.278082992416,
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 92571,
+            "output_tokens": 152,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 0.25,
+              "output_per_million": 2.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.02344675
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 0.25,
+          "output_per_million": 2.0
+        },
+        "input_tokens": 92571,
+        "output_tokens": 152,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.02344675
+      },
+      "trace_shape": [
+        "retrieve:lexical",
+        "predict"
+      ],
+      "trace": [],
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "error": null
+    }
+  ],
+  "deltas": [
+    {
+      "approach": "direct",
+      "score_dsex_minus_dspy": 0,
+      "latency_ms_dsex_minus_dspy": -2100.5981670009337,
+      "usd_dsex_minus_dspy": -0.02071475,
+      "calls_dsex_minus_dspy": 0,
+      "dsex_cost_authority": "provider_reported",
+      "dspy_cost_authority": "pricing_derived"
+    },
+    {
+      "approach": "simple_retrieval",
+      "score_dsex_minus_dspy": 0,
+      "latency_ms_dsex_minus_dspy": -2468.078082992416,
+      "usd_dsex_minus_dspy": -0.02088075,
+      "calls_dsex_minus_dspy": 0,
+      "dsex_cost_authority": "provider_reported",
+      "dspy_cost_authority": "pricing_derived"
+    },
+    {
+      "approach": "rlm",
+      "score_dsex_minus_dspy": 0,
+      "latency_ms_dsex_minus_dspy": -34378.514708006776,
+      "usd_dsex_minus_dspy": -0.01348525,
+      "calls_dsex_minus_dspy": -4,
+      "dsex_cost_authority": "provider_reported",
+      "dspy_cost_authority": "pricing_derived"
+    }
+  ],
+  "identity_resolution": {
+    "replayed_prior_intent": false,
+    "final_identity": "de-m7aa-rlm-t2-preflight-gpt-5-mini-2025-08-07-v7",
+    "prior_ambiguous_identities": [
+      "v1",
+      "v2",
+      "v3",
+      "v4"
+    ]
+  },
+  "limitations": [
+    "All six valid scores are 0.0; this run proves operation and accounting, not effectiveness.",
+    "DSEx USD is provider-reported while DSPy USD is derived from uncached manifest rates, so raw cost deltas are not matched billing parity.",
+    "The simple retrieval lane consumed nearly the same input tokens as direct because this OOLONG row does not split into useful blank-line documents.",
+    "One sample cannot support meaningful uncertainty; zero-width bootstrap intervals are mechanical only.",
+    "DSEx max_llm_calls bounds loop calls but excludes the separately metered extraction call; the campaign request budget bounds total calls.",
+    "DSPy max_llm_calls uses its pinned subcall-only semantics; root call counts are reported separately.",
+    "No recursive subcalls were observed in either RLM row."
+  ]
+}

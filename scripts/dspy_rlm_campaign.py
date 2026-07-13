@@ -22,7 +22,7 @@ class CampaignError(RuntimeError):
         self.usage = usage
 
 
-class BudgetLM:
+class BudgetLM(dspy.BaseLM):
     def __init__(
         self,
         inner: Any,
@@ -202,6 +202,8 @@ def provider_cost(usage: dict[str, Any]) -> tuple[float | None, str | None]:
         if key not in usage or usage[key] is None:
             continue
         value = usage[key]
+        if key == "cost" and isinstance(value, dict):
+            continue
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return None, f"invalid provider {key}"
         value = float(value)
@@ -322,6 +324,25 @@ def bounded_trace(events: list[Any]) -> list[dict[str, Any]]:
     return result
 
 
+def provider_constructor_max_tokens(model: str, configured_max_tokens: int) -> int:
+    if model.startswith("openai/gpt-5"):
+        return max(16_000, configured_max_tokens)
+    return configured_max_tokens
+
+
+def build_dspy_lm(config: dict[str, Any]) -> Any:
+    configured_max_tokens = int(config["max_output_tokens"])
+    return dspy.LM(
+        config["dspy"],
+        temperature=config["temperature"],
+        reasoning_effort=config["reasoning"],
+        max_tokens=provider_constructor_max_tokens(
+            config["dspy"], configured_max_tokens
+        ),
+        cache=False,
+    )
+
+
 def execute(payload: dict[str, Any]) -> dict[str, Any]:
     row = payload["row"]
     approach = payload["approach"]
@@ -340,11 +361,11 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
     sub_role = "compaction" if approach == "compaction" else "submodel"
     sub_cfg = manifest["models"][sub_role]
     root = BudgetLM(
-        dspy.LM(root_cfg["dspy"], temperature=root_cfg["temperature"], reasoning_effort=root_cfg["reasoning"], max_tokens=root_cfg["max_output_tokens"], cache=False),
+        build_dspy_lm(root_cfg),
         ledger, limits, pricing, root_cfg["max_output_tokens"], "root", ledger_lock,
     )
     sub = BudgetLM(
-        dspy.LM(sub_cfg["dspy"], temperature=sub_cfg["temperature"], reasoning_effort=sub_cfg["reasoning"], max_tokens=sub_cfg["max_output_tokens"], cache=False),
+        build_dspy_lm(sub_cfg),
         ledger, limits, pricing, sub_cfg["max_output_tokens"], "sub", ledger_lock,
     )
     dspy.configure(lm=root)

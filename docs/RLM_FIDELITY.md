@@ -136,22 +136,26 @@ before every DSEx provider call, and the DSPy sidecar snapshots its remaining
 ceiling inside the serialized budget section. Each wrapped DSPy LM permits one
 in-flight dispatch through history capture, so a concurrent caller cannot read
 another request's shared `history[-1]`. Root and submodel wrappers still share
-active input/output/USD reservations. The sidecar sends the explicit manifest
-output limit through either `max_tokens` or DSPy's GPT-5
-`max_completion_tokens` provider boundary. Cache is disabled and manifest
-reasoning settings are passed explicitly.
+active input/output/USD reservations. The DSPy LM constructor satisfies the
+GPT-5 reasoning-model 16,000-token validation floor, while the budget wrapper
+preserves the smaller manifest and remaining-output ceilings on every actual
+dispatch through the provider-supported `max_completion_tokens` parameter.
+The wrapper is a DSPy `BaseLM`, cache is disabled, and manifest reasoning
+settings are passed explicitly.
 
 Every dispatched request records its role, observed input and output dimensions,
 USD, cost authority, and the exact pinned input/output rates. A positive,
 finite provider cost is `provider_reported`; an absent or zero provider cost is
 `pricing_derived` from observed dimensions. Zero USD is accepted only with an
 explicit `free` authority. Invalid, inconsistent, or otherwise unprovable cost
-is `unavailable` and cannot pass row validation or the mechanical gate. The row
-audit must reconcile request/root/sub counts, tokens, and USD exactly to its
-totals. Usage-bearing provider errors remain charged terminal rows even when
-only one token dimension is reported, and resume reconstructs spend from
-successful and failed charged rows. Aggregate spend includes those terminal
-rows. Missing usage or malformed output is terminal row evidence. Campaign
+is `unavailable` and cannot pass row validation or the mechanical gate. A
+structured ReqLLM `cost` object is billing metadata rather than a scalar cost
+alias; scalar aliases remain authoritative and conflicting scalar costs fail
+closed. The row audit must reconcile request/root/sub counts, tokens, and USD
+exactly to its totals. Usage-bearing provider errors remain charged terminal
+rows even when only one token dimension is reported, and resume reconstructs
+spend from successful and failed charged rows. Aggregate spend includes those
+terminal rows. Missing usage or malformed output is terminal row evidence. Campaign
 concurrency and row timeouts are manifest bounded; timeout or task failure
 leaves the intent for an explicit operator audit.
 
@@ -168,22 +172,43 @@ execute that judge contract, so `official_scorers` remains red.
 
 ### 2026-07-13 bounded live preflight
 
-The first paid preflight used OOLONG `trec_coarse` sample `17000206` and pinned
-`gpt-5-mini-2025-08-07` for all roles. The exact plan contained six jobs:
-direct, deterministic lexical retrieval, and RLM on both DSEx and DSPy. It used
-one-row selection, serialized execution, low reasoning, a four-call RLM bound,
-and independent eight-request/$2 runtime-approach ceilings.
+The first paid `v1` attempt used OOLONG `trec_coarse` sample `17000206` and
+pinned `gpt-5-mini-2025-08-07`. It failed closed on structured ReqLLM cost
+metadata and DSPy's GPT-5 constructor output-token validation. Its durable
+intent was never resumed or replayed. Each subsequent semantic change used an
+explicit campaign identity/version; no ambiguous intent was silently reused.
 
-The run is failed operational evidence, not T2 effectiveness evidence. Three
-DSEx provider calls consumed 185,435 input and 965 output tokens. All three rows
-failed closed because ReqLLM cost metadata was unauditable to the campaign
-meter, so authoritative artifact cost is $0 and no score or latency is valid.
-Applying the manifest's pinned $0.25/M input and $2/M output rates gives a
-disclosed exposure estimate of $0.04828875, not an accepted row cost. DSPy then
-rejected the 4,096-token model configuration before making a provider call;
-its durable intent remains ambiguous and resume is refused. The campaign was
-not expanded. The ignored manifest, checkpoint, and audit report are under
-`benchmarks/results/rlm-preflight/` and are committed as failure evidence.
+The resolved `v7` plan selected the same single frozen row, direct,
+`simple_retrieval`, and RLM on both runtimes: exactly six jobs and zero provider
+calls during `--plan`. The completed artifact is
+`benchmarks/results/rlm-preflight/rlm-benchmark-parity-20260713T233641Z.json`;
+its manifest, checkpoint, and audit use the `v7` campaign identity in the same
+directory.
+
+| Runtime | Approach | Score | Calls | Input | Output | USD | Latency ms | Cost authority |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| DSEx | direct | 0.0 | 1 | 92,567 | 128 | 0.00260400 | 2,806.564 | provider reported |
+| DSEx | simple retrieval | 0.0 | 1 | 92,567 | 109 | 0.00256600 | 2,584.200 | provider reported |
+| DSEx | RLM | 0.0 | 1 | 301 | 468 | 0.00101100 | 3,487.324 | provider reported |
+| DSPy | direct | 0.0 | 1 | 92,571 | 88 | 0.02331875 | 4,907.162 | pricing derived |
+| DSPy | simple retrieval | 0.0 | 1 | 92,571 | 152 | 0.02344675 | 5,052.278 | pricing derived |
+| DSPy | RLM | 0.0 | 5 | 25,209 | 4,097 | 0.01449625 | 37,865.839 | pricing derived |
+
+The six valid scored rows used 10 calls, 395,786 input tokens, 5,042 output
+tokens, and $0.06744275 recorded cost. DSEx minus DSPy deltas were 0 score for
+every approach; -2,100.598 ms and -$0.02071475 for direct; -2,468.078 ms and
+-$0.02088075 for simple retrieval; and -34,378.515 ms, -$0.01348525, and four
+fewer calls for RLM. The USD comparison is not billing parity: ReqLLM reported
+DSEx cost directly, while DSPy cost was derived from the manifest's uncached
+pinned rates.
+
+This is valid T2 operational evidence only. Every answer scored zero, one row
+cannot establish effectiveness, and the bootstrap interval is mechanically
+zero-width. Simple retrieval selected effectively the full context on this
+row, and neither RLM made recursive subcalls. The runtimes also expose different
+`max_llm_calls` scopes. Traces are bounded and usage/cost audits reconcile, but
+these limitations make expansion unjustified. The campaign was not expanded;
+unavailable families and exact T3 remain red.
 
 ## Mechanical T3 Gate
 
@@ -234,8 +259,9 @@ T2 evidence and cannot satisfy T3.
 - The chunk-and-summarize lane is not the paper's iterative threshold-based
   compaction agent.
 - The campaign currently runs one configured RLM depth and does not execute the
-  paper's depth 0--3 matrix. DSEx counts `max_llm_calls` over total provider
-  calls while DSPy 3.3.0b1 counts subcalls; these are recorded separately and
+  paper's depth 0--3 matrix. DSEx bounds RLM-loop calls and separately meters a
+  possible answer-extraction call; the campaign budget bounds their total.
+  DSPy 3.3.0b1 counts subcalls. These scopes are recorded separately and
   mechanically fail equivalence.
 - Rows use bounded campaign concurrency although the paper reports blocking,
   sequential calls; campaign wall time is therefore not paper-runtime parity.
