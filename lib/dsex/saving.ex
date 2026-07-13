@@ -772,8 +772,9 @@ defmodule DSEx.Saving do
     |> Jason.decode!()
   rescue
     _error ->
-      raise ArgumentError,
-            "#{context} must contain only portable JSON data; functions and runtime references are not supported"
+      reraise ArgumentError,
+              "#{context} must contain only portable JSON data; functions and runtime references are not supported",
+              __STACKTRACE__
   end
 
   defp dump_tools(tools, context) when is_map(tools) do
