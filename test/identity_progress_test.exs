@@ -159,7 +159,9 @@ defmodule DSEx.IdentityProgressTest do
     }
 
     atlas = IdentityCheckpoint.load_atlas!(@atlas_path)
-    assert {:ok, %{events: events}} = IdentityCheckpoint.compile(atlas, [entry])
+
+    canonical_entry = %{entry | path: Path.relative_to(accepted_path, root)}
+    assert {:ok, %{events: events}} = IdentityCheckpoint.compile(atlas, [canonical_entry])
     write_jsonl!(Path.join(root, "identity/registry.jsonl"), events)
 
     candidate_id = IdentityCheckpoint.candidate_id("Form Lab")

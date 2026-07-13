@@ -43,8 +43,8 @@ defmodule DSEx.IdentityProgress do
     unplanned = Enum.filter(inspections, &(&1.state == "unplanned"))
     observable = accepted ++ pending
     accepted_ids = candidate_ids(accepted)
-    accepted_compile = compile_group(atlas, accepted)
-    observable_compile = compile_group(atlas, observable)
+    accepted_compile = compile_group(atlas, accepted, root)
+    observable_compile = compile_group(atlas, observable, root)
     target_raw = workflow_target(workflow)
     accepted_stats = corpus_stats(accepted)
 
@@ -538,10 +538,15 @@ defmodule DSEx.IdentityProgress do
   defp candidate_ids(inspections),
     do: inspections |> candidate_rows() |> Enum.map(& &1.id) |> MapSet.new()
 
-  defp compile_group(_atlas, []), do: %{events: [], errors: []}
+  defp compile_group(_atlas, [], _root), do: %{events: [], errors: []}
 
-  defp compile_group(atlas, inspections) do
-    case safe_compile(atlas, Enum.map(inspections, & &1.entry)) do
+  defp compile_group(atlas, inspections, root) do
+    entries =
+      Enum.map(inspections, fn inspection ->
+        Map.update!(inspection.entry, :path, &Path.relative_to(&1, root))
+      end)
+
+    case safe_compile(atlas, entries) do
       {:ok, %{events: events}} -> %{events: events, errors: []}
       {:error, errors} -> %{events: [], errors: Enum.take(errors, @max_errors)}
     end
