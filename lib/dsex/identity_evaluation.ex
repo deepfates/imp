@@ -374,14 +374,16 @@ defmodule DSEx.IdentityEvaluation do
   end
 
   defp dominates?(left, right, axes) do
-    comparisons =
-      Enum.map(axes, fn axis ->
-        {get_in(left, ["axis_scores", axis, "mean"]),
-         get_in(right, ["axis_scores", axis, "mean"])}
-      end)
+    Enum.reduce_while(axes, false, fn axis, strictly_better? ->
+      left_score = get_in(left, ["axis_scores", axis, "mean"])
+      right_score = get_in(right, ["axis_scores", axis, "mean"])
 
-    Enum.all?(comparisons, fn {left_score, right_score} -> left_score >= right_score end) and
-      Enum.any?(comparisons, fn {left_score, right_score} -> left_score > right_score end)
+      cond do
+        left_score < right_score -> {:halt, false}
+        left_score > right_score -> {:cont, true}
+        true -> {:cont, strictly_better?}
+      end
+    end)
   end
 
   defp tier(score, thresholds) do
