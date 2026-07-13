@@ -5,6 +5,7 @@ defmodule GepaDatasetExportTest do
     gepa_root = tmp_dir("gepa-export-source")
     out = tmp_dir("gepa-export-out")
     write_fake_gepa_package!(gepa_root)
+    initialize_source_repo!(gepa_root)
 
     {output, 0} =
       System.cmd("python3", [
@@ -20,9 +21,14 @@ defmodule GepaDatasetExportTest do
     assert normalize_tmp_path(String.trim(output)) == normalize_tmp_path(out)
 
     families = Path.join(out, "families.json") |> File.read!() |> Jason.decode!()
+    assert families["schema_version"] == 2
     assert families["runner"] == "gepa_export_dataset_root.py"
     assert families["dataset_scope"] == "capped"
     assert families["max_per_split"] == 1
+    assert families["upstream_source"]["repository"] == "https://github.com/gepa-ai/gepa-artifact"
+    assert families["upstream_source"]["commit"] =~ ~r/^[0-9a-f]{40}$/
+    assert families["upstream_source"]["tree"] =~ ~r/^[0-9a-f]{40}$/
+    refute Map.has_key?(families, "gepa_root")
 
     assert families["dataset_aliases"] == %{
              "hotpot_qa" => "hotpotqa/hotpot_qa",
@@ -40,6 +46,9 @@ defmodule GepaDatasetExportTest do
                spec["dataset_scope"] == "capped" and
                spec["max_per_split"] == 1 and
                spec["split_counts"] == %{"dev" => 1, "test" => 1, "train" => 1} and
+               spec["dataset_source"] =~
+                 ~r"^https://github.com/gepa-ai/gepa-artifact@[0-9a-f]{40}$" and
+               not String.contains?(spec["dataset_source"], gepa_root) and
                spec["split_checksums"]["train"] =~ "sha256:"
            end)
 
@@ -47,9 +56,32 @@ defmodule GepaDatasetExportTest do
     assert papillon["signature"] == "user_query -> llm_request, response"
     assert papillon["output_key"] == "response"
 
+    assert papillon["dataset_authorities"] == [
+             %{
+               "kind" => "huggingface_dataset",
+               "repository" => "Columbia-NLP/PUPA",
+               "revision" => "9981b49b6ced0033988a224b6712895ebf119294"
+             }
+           ]
+
+    aime = Enum.find(families["families"], &(&1["family"] == "AIMEBench"))
+
+    assert Enum.map(aime["dataset_authorities"], &{&1["repository"], &1["revision"]}) == [
+             {"AI-MO/aimo-validation-aime", "13f9e12f613e720c2a2b2f345dd04b998a29494d"},
+             {"MathArena/aime_2025", "c94da77eb22bbd6439e62a323bec18493a421302"}
+           ]
+
     hotpot = Enum.find(families["families"], &(&1["family"] == "HotpotQABench"))
     assert hotpot["retrieval"]["kind"] == "bm25s_wiki_abstracts_2017"
     assert hotpot["retrieval"]["corpus_checksum"] =~ "sha256:"
+
+    assert hotpot["retrieval"]["corpus_path"] ==
+             "gepa_artifact/benchmarks/hover/wiki.abstracts.2017.jsonl"
+
+    assert hotpot["retrieval"]["index_path"] ==
+             "gepa_artifact/benchmarks/hover/bm25s_retriever"
+
+    refute inspect(families) =~ gepa_root
 
     assert hotpot["retrieval"] ==
              Enum.find(families["families"], &(&1["family"] == "hoverBench"))["retrieval"]
@@ -62,6 +94,17 @@ defmodule GepaDatasetExportTest do
     assert hover["retrieval"]["status"] == "present"
     assert hover["retrieval"]["corpus_checksum"] =~ "sha256:"
     assert hover["retrieval"]["index_checksum"] =~ "sha256:"
+
+    ifbench = Enum.find(families["families"], &(&1["family"] == "IFBench"))
+    assert length(ifbench["dataset_authorities"]) == 2
+
+    assert Enum.all?(ifbench["dataset_authorities"], fn authority ->
+             authority["kind"] == "embedded_upstream_file" and
+               authority["repository"] == "https://github.com/gepa-ai/gepa-artifact" and
+               authority["revision"] =~ ~r/^[0-9a-f]{40}$/ and
+               authority["path"] =~ ~r{^gepa_artifact/} and
+               authority["sha256"] =~ ~r/^[0-9a-f]{64}$/
+           end)
   end
 
   defp write_fake_gepa_package!(root) do
@@ -86,6 +129,28 @@ defmodule GepaDatasetExportTest do
         File.mkdir_p!(index_dir)
         File.write!(Path.join(index_dir, "params.json"), ~s({"k1":0.9,"b":0.4}\n))
       end
+
+      if family == "IFBench" do
+        data_dir = Path.join(dir, "data")
+        File.mkdir_p!(data_dir)
+        File.write!(Path.join(data_dir, "IFBench_train.jsonl"), ~s({"prompt":"train"}\n))
+        File.write!(Path.join(data_dir, "IFBench_test.jsonl"), ~s({"prompt":"test"}\n))
+      end
+    end)
+  end
+
+  defp initialize_source_repo!(root) do
+    commands = [
+      ["init", "--quiet"],
+      ["config", "user.email", "authority-test@example.invalid"],
+      ["config", "user.name", "Authority Test"],
+      ["remote", "add", "origin", "git@github.com:gepa-ai/gepa-artifact.git"],
+      ["add", "."],
+      ["commit", "--quiet", "-m", "fixture"]
+    ]
+
+    Enum.each(commands, fn args ->
+      assert {_output, 0} = System.cmd("git", args, cd: root, stderr_to_stdout: true)
     end)
   end
 

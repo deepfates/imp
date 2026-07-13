@@ -59,33 +59,36 @@ open.
 
 ## Family Summary
 
+<!-- evidence-authority-summary:start -->
 | Family | Kind | Repository | Paper/spec | Upstream tests | Dataset/protocol | Local differential |
 | --- | --- | --- | --- | --- | --- | --- |
-| Package, public API, documentation, and release | product | gap | no primary authority | not audited | n/a | partial |
-| DSPy programming model | algorithm | DSPy 3.2.1 + commit | identified | not audited | n/a | present |
-| Model, provider, settings, and normalized runtime | runtime | DSPy 3.3.0b1 + commit | no primary authority | not audited | n/a | partial |
-| Structured adapters and multimodal value types | algorithm | DSPy 3.2.1 + commit | no primary authority | not audited | gap | partial |
-| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | present |
-| Recursive Language Models | algorithm | DSPy 3.3.0b1 + commit | identified | not audited | partial | partial |
-| Refinement, evaluation, and metrics | algorithm | DSPy 3.2.1 + commit | identified, immutable locator gap | not audited | n/a | partial |
-| Few-shot, KNN, and random search optimizers | optimizer | DSPy 3.2.1 + commit | no primary authority | partial | protocol defined | partial |
-| COPRO, InstructionSearch, InferRules, and SignatureOptimizer | optimizer | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | partial |
-| MIPROv2 | optimizer | DSPy 3.3.0b1 + commit + file hashes | paper v2 pinned | no dedicated tests | partial | partial; task implemented, fresh artifact pending |
-| SIMBA | optimizer | DSPy 3.3.0b1 + commit + file hashes | no primary authority | no dedicated tests | protocol defined | partial; task implemented, fresh artifact pending |
-| GEPA prompt and program optimization | optimizer | standalone v0.1.1 + commit + file hashes | paper v2 pinned | partial | protocol defined | partial; task implemented, fresh artifact pending |
-| Avatar, weight, and ensemble optimizers | optimizer | DSPy 3.2.1 + commit | gap | not audited | partial | gap |
-| Optimize Anything | optimizer | GEPA v0.1.1 + commit | paper v1 pinned | runtime contract and three non-prompt executable evaluator families covered | protocol defined | live multi-seed DSEx-native effectiveness lane implemented; paper-scale upstream comparison remains open |
-| Retrieval, RAG, embeddings, and dataset loading | algorithm | DSPy 3.2.1 + commit | no primary authority | not audited | partial | present |
-| Async, streaming, cache, observability, and overhead | runtime | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | present |
-| Persistence, deployment, and protocol boundaries | operations | DSPy 3.2.1 + commit | no primary authority | not audited | protocol defined | partial |
-| GSM8K | benchmark | gap | gap | n/a | partial | partial |
-| HotPotQA / HotpotQABench | benchmark | gap | gap | n/a | partial | partial |
-| Color and structured classification | benchmark | gap | gap | n/a | partial | partial |
-| AIMEBench | benchmark | gap | gap | n/a | protocol defined | gap |
-| HoVer / hoverBench | benchmark | gap | gap | n/a | partial | partial |
-| IFBench | benchmark | gap | gap | n/a | partial | gap |
-| LiveBenchMathBench | benchmark | gap | gap | n/a | partial | gap |
-| Papillon privacy delegation | benchmark | gap | gap | n/a | partial | gap |
+| Package, public API, documentation, and release | product | 3.2.1 @ 29448ae12756 | no_primary_authority | present | not_applicable | partial |
+| DSPy programming model | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | present |
+| Model, provider, settings, and normalized runtime | runtime | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | not_applicable | partial |
+| Structured adapters and multimodal value types | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | partial |
+| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |
+| Recursive Language Models | algorithm | 3.3.0b1 @ b2829b7ae3b6 | pinned | present | partial | partial |
+| Refinement, evaluation, and metrics | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | partial |
+| Few-shot, KNN, and random search optimizers | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |
+| COPRO, InstructionSearch, InferRules, and SignatureOptimizer | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | protocol_defined | partial |
+| MIPROv2 | optimizer | 3.3.0b1 @ b2829b7ae3b6 | pinned | absent | partial | partial |
+| SIMBA | optimizer | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | absent | protocol_defined | partial |
+| GEPA prompt and program optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | partial |
+| Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | gap |
+| Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
+| Optimize Anything arbitrary artifact optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | present |
+| Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | partial | present |
+| Async, streaming, cache, observability, and provider-free overhead | runtime | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |
+| Persistence, deployment, and protocol boundaries | operations | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |
+| GSM8K math | benchmark | dataset-head @ 3101c7d50724 | pinned | not_applicable | pinned | partial |
+| HotPotQA and HotpotQABench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | partial |
+| Color and structured classification tasks | benchmark | n/a | no_primary_authority | not_applicable | partial | partial |
+| AIMEBench | benchmark | paper-artifact @ cbefbc1aa0f4 | no_primary_authority | not_applicable | pinned | gap |
+| HoVer / hoverBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | present |
+| IFBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | present |
+| LiveBenchMathBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | gap |
+| Papillon privacy delegation | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | gap |
+<!-- evidence-authority-summary:end -->
 
 ## DSPy Instruction Optimizer Pins
 

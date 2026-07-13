@@ -18,6 +18,23 @@ DATASET_ALIASES = {
     "hover": "hover-nlp/hover",
 }
 
+DATASET_REVISIONS = {
+    "AI-MO/aimo-validation-aime": "13f9e12f613e720c2a2b2f345dd04b998a29494d",
+    "MathArena/aime_2025": "c94da77eb22bbd6439e62a323bec18493a421302",
+    "hotpotqa/hotpot_qa": "1908d6afbbead072334abe2965f91bd2709910ab",
+    "hover-nlp/hover": "c0e43052759879b3461642ca6c0dd26658f47691",
+    "livebench/math": "bb66571c8ccf32d3df9e6f48b920d3770ff4aacb",
+    "Columbia-NLP/PUPA": "9981b49b6ced0033988a224b6712895ebf119294",
+}
+
+FAMILY_DATASETS = {
+    "AIMEBench": ["AI-MO/aimo-validation-aime", "MathArena/aime_2025"],
+    "HotpotQABench": ["hotpotqa/hotpot_qa"],
+    "hoverBench": ["hover-nlp/hover"],
+    "LiveBenchMathBench": ["livebench/math"],
+    "Papillon": ["Columbia-NLP/PUPA"],
+}
+
 
 FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "AIMEBench": {
@@ -93,6 +110,7 @@ def main() -> int:
 
     gepa_root = Path(args.gepa_root).resolve()
     out = Path(args.out).resolve()
+    source = source_identity(gepa_root)
     sys.path.insert(0, str(gepa_root))
     install_dataset_compatibility_shims()
 
@@ -124,11 +142,12 @@ def main() -> int:
             {
                 **{key: value for key, value in spec.items() if key != "module"},
                 "family": family,
-                "dataset_source": f"{gepa_root}@{git_sha(gepa_root)}",
+                "dataset_source": f"{source['repository']}@{source['commit']}",
                 "dataset_scope": dataset_scope,
                 "max_per_split": args.max_per_split,
                 "split_counts": split_counts,
                 "split_checksums": split_checksums,
+                "dataset_authorities": dataset_authorities(gepa_root, family, source),
                 **family_extra_metadata(gepa_root, family),
                 "metric_fidelity": (
                     "upstream_metric_named_for_adapter; DSEx campaign runner ports "
@@ -141,10 +160,9 @@ def main() -> int:
     write_json(
         out / "families.json",
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "runner": "gepa_export_dataset_root.py",
-            "gepa_root": str(gepa_root),
-            "gepa_commit": git_sha(gepa_root),
+            "upstream_source": source,
             "dataset_scope": dataset_scope,
             "max_per_split": args.max_per_split,
             "dataset_aliases": DATASET_ALIASES,
@@ -165,7 +183,11 @@ def install_dataset_compatibility_shims() -> None:
     original_load_dataset = datasets.load_dataset
 
     def load_dataset_compat(path: str, *args: Any, **kwargs: Any):
-        return original_load_dataset(DATASET_ALIASES.get(path, path), *args, **kwargs)
+        canonical_path = DATASET_ALIASES.get(path, path)
+        revision = DATASET_REVISIONS.get(canonical_path)
+        if revision is not None:
+            kwargs.setdefault("revision", revision)
+        return original_load_dataset(canonical_path, *args, **kwargs)
 
     datasets.load_dataset = load_dataset_compat
 
@@ -212,8 +234,8 @@ def family_extra_metadata(gepa_root: Path, family: str) -> Dict[str, Any]:
     retrieval: Dict[str, Any] = {
         "kind": "bm25s_wiki_abstracts_2017",
         "source_url": "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
-        "corpus_path": str(corpus),
-        "index_path": str(index),
+        "corpus_path": corpus.relative_to(gepa_root).as_posix(),
+        "index_path": index.relative_to(gepa_root).as_posix(),
         "status": "present" if corpus.exists() and index.exists() else "missing",
     }
 
@@ -227,6 +249,36 @@ def family_extra_metadata(gepa_root: Path, family: str) -> Dict[str, Any]:
             retrieval["index_checksum"] = "sha256:" + sha256_tree(index)
 
     return {"retrieval": retrieval}
+
+
+def dataset_authorities(
+    gepa_root: Path, family: str, source: Dict[str, str]
+) -> List[Dict[str, Any]]:
+    authorities = [
+        {
+            "kind": "huggingface_dataset",
+            "repository": repository,
+            "revision": DATASET_REVISIONS[repository],
+        }
+        for repository in FAMILY_DATASETS.get(family, [])
+    ]
+
+    if family == "IFBench":
+        for relative_path in [
+            "gepa_artifact/benchmarks/IFBench/data/IFBench_train.jsonl",
+            "gepa_artifact/benchmarks/IFBench/data/IFBench_test.jsonl",
+        ]:
+            authorities.append(
+                {
+                    "kind": "embedded_upstream_file",
+                    "repository": source["repository"],
+                    "revision": source["commit"],
+                    "path": relative_path,
+                    "sha256": sha256(gepa_root / relative_path),
+                }
+            )
+
+    return authorities
 
 
 def example_to_record(example: Any) -> Dict[str, Any]:
@@ -280,13 +332,43 @@ def sha256_tree(path: Path) -> str:
     return h.hexdigest()
 
 
-def git_sha(path: Path) -> str:
+def source_identity(path: Path) -> Dict[str, str]:
+    repository = git_value(path, "remote", "get-url", "origin")
+    commit = git_value(path, "rev-parse", "HEAD")
+    tree = git_value(path, "rev-parse", "HEAD^{tree}")
+
+    if not repository or not is_hex_digest(commit, 40) or not is_hex_digest(tree, 40):
+        raise RuntimeError(
+            "GEPA artifact source must be a Git checkout with an origin, commit, and tree identity"
+        )
+
+    return {
+        "repository": canonical_repository(repository),
+        "commit": commit,
+        "tree": tree,
+    }
+
+
+def canonical_repository(repository: str) -> str:
+    value = repository.strip()
+    if value.startswith("git@github.com:"):
+        value = "https://github.com/" + value.removeprefix("git@github.com:")
+    if value.endswith(".git"):
+        value = value[:-4]
+    return value
+
+
+def is_hex_digest(value: str, length: int) -> bool:
+    return len(value) == length and all(char in "0123456789abcdef" for char in value)
+
+
+def git_value(path: Path, *args: str) -> str:
     try:
         return subprocess.check_output(
-            ["git", "-C", str(path), "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True
+            ["git", "-C", str(path), *args], stderr=subprocess.DEVNULL, text=True
         ).strip()
     except Exception:
-        return "unknown"
+        return ""
 
 
 if __name__ == "__main__":
