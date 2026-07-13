@@ -1,0 +1,806 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-22d-form-conversion-language",
+    "generated_at": "2026-07-13T20:55:50Z",
+    "generator": {
+      "kind": "agent",
+      "name": "Codex",
+      "provider": "OpenAI",
+      "model": "GPT-5",
+      "reasoning_effort": null,
+      "agent_id": null
+    },
+    "method": "isolated form-saturation-D two-cell generation for conversion grammar and source-language stewardship",
+    "brief": "Generate exactly 20 independent form-saturation-D observations: 10 for cell 4 Conversion and grammar and 10 for cell 8 Source-language stewardship, preserving weak/adverse outputs and avoiding ranking, selection, shortlisting, or availability checks.",
+    "prompt_path": "identity/prompts/form-correction.md",
+    "prompt_sha256": "5f4216d1b7ad963055aa36d2e9cc41181e53ae1a3d8fc54b70d3f9590f640c9d",
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "action-agency",
+      "care-stewardship-repair",
+      "language-semantics",
+      "civic-governance"
+    ],
+    "intended_strategies": [
+      "ordinary-verb",
+      "ordinary-object",
+      "phrase-imperative",
+      "archaic-cross-language"
+    ],
+    "intended_audiences": [
+      "affected-publics",
+      "backend-product-engineers",
+      "international-users",
+      "educators-writers"
+    ],
+    "notes": [
+      "audit_path=identity/reports/saturation-form-audit.md; audit_sha256=06831eef17c05a5faffcc1cb0376a5da838bd3fb5a5db907b7fd398ce2814ef7.",
+      "Product truth read before generation: identity/atlas.json, identity/schema/portfolio.schema.json, identity/README.md, README.md, docs/DSEX_PHILOSOPHY.md, docs/RESEARCH_LANDSCAPE.md, docs/COVERAGE_MATRIX.md, and identity/reports/saturation-form-audit.md.",
+      "Isolation statement: candidate surfaces were frozen before reading identity/inbox candidate files or identity/registry.jsonl; no availability, trademark, domain, popularity, ranking, selection, or shortlisting check was performed.",
+      "Post-freeze normalized overlap check against accepted-only identity/registry.jsonl found 9 overlaps: ordinal 1 Bound, ordinal 2 Tend, ordinal 3 Repair, ordinal 5 Gate, ordinal 6 Hold, ordinal 7 Witness, ordinal 8 Guard, ordinal 12 Kaitiaki, ordinal 15 Cura.",
+      "Cell 4 quota: 10 observations, 2 wildcards, stance 5 affirmative/3 ambivalent/2 adverse, scope 4 current/4 horizon/2 both.",
+      "Cell 8 quota: 10 observations, 2 wildcards, stance 5 affirmative/3 ambivalent/2 adverse, scope 4 current/4 horizon/2 both."
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Bound",
+      "pronunciation": "bound, one syllable, rhymes with found",
+      "grammar": "Verb: to set limits around a tool call or optimizer run. Noun: a bound on cost, retries, concurrency, or scope. Adjective: a bound program is constrained by explicit settings. Command: Bound this evaluator before live use.",
+      "rationale": "Cell 4 conversion test; affirmative/current. It truthfully names current DSEx behavior around explicit runtime boundaries, option validation, budgets, supervision, and gates without claiming formal verification or guaranteed safety.",
+      "etymology": "English bound, from boundary and limit senses; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can imply a safety guarantee if used without evidence; must say boundaries are explicit and tested, not absolute.",
+        "Accessibility/power: actor=platform operator; action=sets retry/cost/tool bounds; access=repo config and runtime options; cost=engineering time plus possible blocked calls; unavailable=public appeal or legal redress mechanism."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=affirmative; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-5e1cf42878df58fe normalized=bound matched registry surface Bound in run-17a-form-derivation-grammar-systems ordinal 2.",
+        "Embodiment: current=DSEx exposes signatures, options, budgets, telemetry, redaction, integration/live gates, and supervised runtime boundaries; horizon=could test artifact-parameter bounds for instructions, demos, retrieval policies, schemas, code fragments, and config, conditional only.",
+        "Code projections: hex=bound; otp=:bound; alias=Bound; mix task prefix=bound; config prefix=:bound; telemetry prefix=[:bound].",
+        "Role grammar: master=possible; category descriptor=bounded LM programs; Elixir library=Bound for Elixir; research effort=Bound Research unavailable unless separately organized; community/company/protocol/hosted product/product family unavailable for current claims."
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Tend",
+      "pronunciation": "tend, one syllable, short e",
+      "grammar": "Verb: to maintain or improve a program through evaluated feedback. Noun: a tend is a maintenance pass. Adjective: tend run is attributive shorthand for maintenance-oriented evaluation. Command: Tend this artifact after the metric changes.",
+      "rationale": "Cell 4 conversion test; affirmative/horizon. It emphasizes stewardship of evolving artifacts and optimizer reports while avoiding claims of automatic self-improvement.",
+      "etymology": "English tend, meaning attend to or care for; ordinary word/no special source.",
+      "territories": [
+        "care-stewardship-repair",
+        "action-agency"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May soften real operational power by sounding pastoral; must still name owners, gates, and failures.",
+        "Accessibility/power: actor=future maintainer; action=updates an optimizer artifact after evaluation drift; access=checkpoint and report files; cost=review time and rerun costs; unavailable=community review council or affected-person veto."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=affirmative; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-4f0a1f5aef53e953 normalized=tend matched registry surface Tend in run-19a-form-derivation-grammar-systems ordinal 11.",
+        "Embodiment: current=DSEx has evaluation, optimizer reports, save/load, checkpoints, and redaction; horizon=could name conditional playbook/schema/code-fragment maintenance workflows after artifact-parameter contracts mature.",
+        "Code projections: hex=tend; otp=:tend; alias=Tend; mix task prefix=tend; config prefix=:tend; telemetry prefix=[:tend].",
+        "Role grammar: master=possible but soft; category descriptor=tended LM programs; Elixir library=Tend for Elixir; research effort=possible future; community/company/protocol/hosted product/product family unavailable without actual institutions."
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Repair",
+      "pronunciation": "rih-PAIR, stress on second syllable",
+      "grammar": "Verb: to modify a failing program or artifact after evidence. Noun: a repair is the accepted change. Adjective: repair trace is an attributive noun phrase. Command: Repair the retrieval policy only after the held-out check fails.",
+      "rationale": "Cell 4 conversion test; affirmative/horizon. It connects optimizer feedback, rejected edits, and future artifact maintenance, but it must not promise redress to affected people.",
+      "etymology": "English repair, from making whole or restoring; ordinary word/no special source.",
+      "territories": [
+        "care-stewardship-repair",
+        "action-agency"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Repair language can imply a user remedy or institutional redress mechanism that DSEx does not ship.",
+        "Accessibility/power: actor=application developer; action=changes candidate instructions after metric feedback; access=local optimizer report and source checkout; cost=rerun time, provider cost when live, and regression review; unavailable=affected-user complaint intake or compensation process."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=affirmative; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-a1a14ff4aab4f1d3 normalized=repair matched registry surface Repair in run-19a-form-derivation-grammar-systems ordinal 16.",
+        "Embodiment: current=DSEx has assertions, evaluation, optimizer trajectories, reports, failure campaigns, and save/load; horizon=could test repair-oriented artifact proposals for demos, schemas, playbooks, and code fragments with promotion gates.",
+        "Code projections: hex=repair; otp=:repair; alias=Repair; mix task prefix=repair; config prefix=:repair; telemetry prefix=[:repair].",
+        "Role grammar: master=possible but ordinary; category descriptor=repairable LM programs; Elixir library=Repair for Elixir; research effort=possible; community/company/protocol/hosted product/product family unavailable unless built."
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Check",
+      "pronunciation": "chek, one syllable",
+      "grammar": "Verb: to evaluate or validate. Noun: a check is a gate result. Adjective: check run is an attributive use. Command: Check the program before a live provider run.",
+      "rationale": "Cell 4 conversion test; affirmative/current. It maps directly to DSEx gates, validation, tests, schema checks, telemetry checks, and benchmark truth lanes.",
+      "etymology": "English check, meaning inspect, restrain, or verify; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "backend-product-engineers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "shared-prefix-family"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Extremely generic and may collapse into existing CI vocabulary rather than a durable identity.",
+        "Accessibility/power: actor=CI maintainer; action=runs production, integration, protocol, and live checks; access=Mix task and repository gates; cost=compute, credentials for live paths, and failure triage; unavailable=guarantee that passing checks prevents downstream harm."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=affirmative; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Embodiment: current=DSEx documents production.check, integration.check, live.check, protocol gates, schema validation, and benchmark dashboards; horizon=could extend check grammar to artifact promotion gates, conditional only.",
+        "Code projections: hex=check; otp=:check; alias=Check; mix task prefix=check; config prefix=:check; telemetry prefix=[:check].",
+        "Role grammar: master=weak due genericness; category descriptor=checked LM programs; Elixir library=Check for Elixir awkward but viable; research/community/company/protocol/hosted product/product family unavailable or too generic."
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Gate",
+      "pronunciation": "gayt, one syllable",
+      "grammar": "Verb: to require a pass condition. Noun: a gate is a release or live-provider condition. Adjective: gate report is attributive. Command: Gate this optimizer claim on fresh evidence.",
+      "rationale": "Cell 4 conversion test; ambivalent/current. It is truthful for DSEx source-checkout gates and benchmark lanes, but can sound exclusionary or bureaucratic.",
+      "etymology": "English gate, an entry barrier or control point; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "backend-product-engineers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can imply access control, compliance authority, or social exclusion beyond the repository's actual quality gates.",
+        "Accessibility/power: actor=release operator; action=blocks a claim or release lane until evidence passes; access=Mix gate output and dashboard artifact; cost=delayed release and debugging labor; unavailable=external audit authority or affected-public participation."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=ambivalent; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-c974e17b8e7321ce normalized=gate matched registry surface Gate in run-06-built-navigation ordinal 45.",
+        "Embodiment: current=DSEx owns deterministic, local integration, protocol, and opt-in live gates; horizon=could gate artifact-optimization promotion but only after contract tests exist.",
+        "Code projections: hex=gate; otp=:gate; alias=Gate; mix task prefix=gate; config prefix=:gate; telemetry prefix=[:gate].",
+        "Role grammar: master=possible but hard-edged; category descriptor=gated LM programs; Elixir library=Gate for Elixir; protocol=unavailable because gates are local tasks, not public standards; community/company/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "Hold",
+      "pronunciation": "hohld, one syllable",
+      "grammar": "Verb: to delay a tool action or promotion. Noun: a hold is a paused state or withheld candidate. Adjective: hold policy is attributive. Command: Hold the champion until the held-out set passes.",
+      "rationale": "Cell 4 conversion test; adverse/both wildcard. It usefully names refusal and pause, but it can make the project feel passive and can imply durable rollback or governance powers DSEx does not currently supply.",
+      "etymology": "English hold, meaning keep, delay, contain, or maintain; ordinary word/no special source.",
+      "territories": [
+        "care-stewardship-repair",
+        "action-agency"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "oss-commercial-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Weak master identity; can imply guaranteed rollback, consent holds, or moratoria unavailable in current DSEx.",
+        "Accessibility/power: actor=optimizer operator; action=keeps a candidate out of promotion; access=local run state and report review; cost=missed improvement plus rerun/provider cost; unavailable=public moratorium process, rollback guarantee, or user redress queue."
+      ],
+      "wildcard": true,
+      "notes": [
+        "cell=4; stance=adverse; scope=both; wildcard=true; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-e8b22d83b417e85b normalized=hold matched registry surface >|hold in run-16-negative-space-futures ordinal 84.",
+        "Embodiment: current=DSEx can pause or fail gates and preserve checkpoints/reports in specific workflows; horizon=could test promotion holds for artifact archives, but durable rollback and governance holds remain unclaimed.",
+        "Code projections: hex=hold; otp=:hold; alias=Hold; mix task prefix=hold; config prefix=:hold; telemetry prefix=[:hold].",
+        "Role grammar: master=poor; category descriptor=holdable LM programs awkward; Elixir library=Hold for Elixir too broad; research effort=possible as negative-space study; community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Witness",
+      "pronunciation": "WIT-ness, stress on first syllable",
+      "grammar": "Verb: to observe and record a run. Noun: a witness is evidence attached to behavior. Adjective: witness trace is attributive. Command: Witness the optimizer run with metrics and telemetry.",
+      "rationale": "Cell 4 conversion test; affirmative/current. It fits evidence-bearing evaluation, traces, reports, telemetry, and source-checkout gates while avoiding claims that evidence is neutral or legally binding.",
+      "etymology": "English witness, one who observes or testimony itself; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "beam-master"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May import legal or religious testimony tone; must not imply public accountability institution.",
+        "Accessibility/power: actor=eval engineer; action=records metric rows, traces, costs, and failures; access=benchmark artifacts and telemetry; cost=storage, review, and possible provider spend; unavailable=independent auditor, subpoena-grade log, or affected-person access portal."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=affirmative; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-ba1c566a4bad288c normalized=witness matched registry surface Witness in run-08-civic-play-learning ordinal 23.",
+        "Embodiment: current=DSEx produces traces, optimizer reports, benchmark truth artifacts, redacted telemetry, and dashboard evidence; horizon=could witness artifact mutations with content hashes and parentage.",
+        "Code projections: hex=witness; otp=:witness; alias=Witness; mix task prefix=witness; config prefix=:witness; telemetry prefix=[:witness].",
+        "Role grammar: master=possible but solemn; category descriptor=witnessed LM programs; Elixir library=Witness for Elixir; protocol/company/community/hosted product/product family unavailable without institutions."
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Guard",
+      "pronunciation": "gard, one syllable",
+      "grammar": "Verb: to prevent an unsafe or out-of-contract action. Noun: a guard is a rule or boundary. Adjective: guard run is attributive. Command: Guard this tool call with schema validation.",
+      "rationale": "Cell 4 conversion test; adverse/both wildcard. It highlights schema, tool, sandbox, and redaction boundaries but risks overclaiming security, protection, and policing.",
+      "etymology": "English guard, from keeping watch or protecting; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Security overclaim risk: DSEx has explicit boundaries and tests, not a universal secure sandbox or guarantee against harm.",
+        "Accessibility/power: actor=security reviewer; action=requires schema, redaction, and tool-policy checks before deployment; access=source checkout, tests, and runtime configuration; cost=implementation delay and maintenance; unavailable=security certification, legal guarantee, or community safety board."
+      ],
+      "wildcard": true,
+      "notes": [
+        "cell=4; stance=adverse; scope=both; wildcard=true; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-a9d4034da07d8ef3 normalized=guard matched registry surface Guard in run-21d-form-conversion-language ordinal 2.",
+        "Embodiment: current=DSEx has schema validation, redaction, sandbox constraints, MCP/tool policies, and provider boundaries; horizon=could guard artifact promotions but cannot claim comprehensive security.",
+        "Code projections: hex=guard; otp=:guard; alias=Guard; mix task prefix=guard; config prefix=:guard; telemetry prefix=[:guard].",
+        "Role grammar: master=risky; category descriptor=guarded LM programs risks safety claim; Elixir library=Guard for Elixir possible; protocol/company/community/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Budget",
+      "pronunciation": "BUJ-it, stress on first syllable",
+      "grammar": "Verb: to allocate bounded tokens, retries, calls, or cost. Noun: a budget is the limit itself. Adjective: budget run is attributive. Command: Budget the reflection campaign before provider calls.",
+      "rationale": "Cell 4 conversion test; ambivalent/horizon. It fits current and future cost-aware optimizer work, but it may narrow the identity to finance or procurement.",
+      "etymology": "English budget, financial plan or allocation; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "backend-product-engineers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Finance frame can obscure semantic quality, user harm, and unpaid human labor behind cost control.",
+        "Accessibility/power: actor=research-ops lead; action=sets call, token, metric, and wall-time budgets; access=campaign config and benchmark artifacts; cost=foregone search and provider charges; unavailable=carbon accounting, labor accounting, or affected-public cost allocation."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=ambivalent; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Embodiment: current=DSEx has budgets in RLM/search/optimizer paths and reports usage/cost where available; horizon=could budget arbitrary artifact optimization across instructions, demos, schemas, and code fragments.",
+        "Code projections: hex=budget; otp=:budget; alias=Budget; mix task prefix=budget; config prefix=:budget; telemetry prefix=[:budget].",
+        "Role grammar: master=too narrow; category descriptor=budgeted LM programs; Elixir library=Budget for Elixir awkward; company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Brief",
+      "pronunciation": "breef, one syllable",
+      "grammar": "Verb: to provide task context. Noun: a brief is an instruction or artifact context. Adjective: brief program is ambiguous between short and briefed. Command: Brief the optimizer with objective and background context.",
+      "rationale": "Cell 4 conversion test; ambivalent/horizon. It points at instructions, background context, and artifact briefs, but risks collapsing DSEx back into prompt-writing.",
+      "etymology": "English brief, concise statement or instruction; ordinary word/no special source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May undermine the product boundary by sounding like prompt engineering or content strategy rather than declared programs.",
+        "Accessibility/power: actor=technical writer; action=states objective, constraints, and context for a program or artifact; access=docs, config, and optimizer inputs; cost=maintaining clear prose across versions; unavailable=user research validating that affected publics understand the brief."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=4; stance=ambivalent; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Embodiment: current=DSEx uses signatures, instructions, examples, and objective/background context in Optimize Anything; horizon=could name typed artifact briefs for tools, retrieval policies, schemas, and code fragments.",
+        "Code projections: hex=brief; otp=:brief; alias=Brief; mix task prefix=brief; config prefix=:brief; telemetry prefix=[:brief].",
+        "Role grammar: master=possible but generic; category descriptor=briefed LM programs risks prompt frame; Elixir library=Brief for Elixir viable; research/community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "Tikanga",
+      "pronunciation": "tee-KAH-ngah; te reo Māori vowels, ng as in singer",
+      "grammar": "Māori noun used here only as an unreviewed candidate surface. English product grammar would use it as a proper noun; adjective use would be attributive only, as in Tikanga library.",
+      "rationale": "Cell 8 source-language stewardship test; adverse/both wildcard. The meaning of customary procedure and protocol is tempting for DSEx boundaries, but borrowing it for an Elixir library risks appropriating Māori legal and cultural authority.",
+      "etymology": "Source language=te reo Māori; meaning=correct procedure, custom, method, rule, way, code, practice, convention, protocol; morphology=tika 'right/correct' plus nominalizing -nga; source=Te Aka Māori Dictionary, https://maoridictionary.co.nz/search?keywords=tikanga; review_status=unreviewed by native speaker or community.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: tikanga is embedded in Māori social, legal, and customary contexts; using it for software protocol without Māori governance would overclaim stewardship.",
+        "Accessibility/power: actor=non-Māori maintainer; action=uses an Indigenous legal-cultural term as project identity; access=public package/docs; cost=cultural burden and possible correction by Māori readers; unavailable=kaumātua, iwi, hapū, or Māori data-sovereignty review."
+      ],
+      "wildcard": true,
+      "notes": [
+        "cell=8; stance=adverse; scope=both; wildcard=true; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: native Latin-script Māori orthography with macrons where applicable; surface omits macron because tikanga has none.",
+        "Embodiment: current=DSEx has explicit contracts, gates, and protocol-like boundaries but no Māori governance; horizon=could not truthfully claim tikanga stewardship without competent community review and consent.",
+        "Code projections: hex=tikanga; otp=:tikanga; alias=Tikanga; mix task prefix=tikanga; config prefix=:tikanga; telemetry prefix=[:tikanga].",
+        "Role grammar: master=adverse; category descriptor=unavailable because it imports Māori law/custom; Elixir library=technically possible but culturally unsafe; research/community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "Kaitiaki",
+      "pronunciation": "kai-tee-AH-kee; te reo Māori vowels",
+      "grammar": "Māori noun meaning steward/guardian; English product grammar would be a proper noun or attributive noun, not a verb. Command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; affirmative/current with serious caveat. It names stewardship and custody, but DSEx can only claim technical stewardship of code, not cultural guardianship or community authority.",
+      "etymology": "Source language=te reo Māori; meaning=trustee, minder, guard, custodian, guardian, caregiver, keeper, steward; morphology=kai- agent prefix plus tiaki 'guard/preserve' family; source=Te Aka Māori Dictionary, https://maoridictionary.co.nz/search?histLoanWords=&idiom=&keywords=Kaitiaki&loan=&phrase=&proverb=; review_status=unreviewed by native speaker or community.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "beam-master"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: kaitiaki can carry stewardship obligations in Māori contexts; software maintainership is not the same authority.",
+        "Accessibility/power: actor=project owner; action=claims a steward identity; access=repository docs and package namespace; cost=pronunciation burden and cultural review labor; unavailable=native-speaker review, Māori governance, or consent process."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=affirmative; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-d182a18c0ef61fcb normalized=kaitiaki matched registry surface Kaitiaki in run-19b-form-blends-compact-language ordinal 28.",
+        "Transliteration system: native Latin-script Māori orthography; no transliteration needed beyond orthographic spelling.",
+        "Embodiment: current=DSEx maintainers steward explicit boundaries, redaction, tests, and release gates; horizon=could steward artifact archives technically, but cultural guardianship remains unclaimed.",
+        "Code projections: hex=kaitiaki; otp=:kaitiaki; alias=Kaitiaki; mix task prefix=kaitiaki; config prefix=:kaitiaki; telemetry prefix=[:kaitiaki].",
+        "Role grammar: master=possible only after review; category descriptor=stewarded LM programs; Elixir library=Kaitiaki for Elixir; community/company/protocol/hosted product/product family unavailable without real stewardship institution."
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "Tohutohu",
+      "pronunciation": "TOH-hoo-TOH-hoo; te reo Māori vowels",
+      "grammar": "Māori verb/noun family: to instruct, advise, guide, direct; in English product use it would be a proper noun. Command use in English unavailable without code-switching.",
+      "rationale": "Cell 8 source-language stewardship test; affirmative/horizon. It fits typed instructions and future artifact briefs, but DSEx must not use it as a translation claim without review.",
+      "etymology": "Source language=te reo Māori; meaning=to instruct, advise, guide, direct; morphology=reduplicated form related to tohu with passive suffix possibilities -a, -ngia, -tia in Te Aka; source=Te Aka Māori Dictionary, https://maoridictionary.co.nz/word/8329; review_status=unreviewed by native speaker or community.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: instruction and guidance in te reo Māori are not generic decoration for prompt instructions.",
+        "Accessibility/power: actor=educator-writer; action=teaches a borrowed name for typed instructions; access=docs/tutorials; cost=pronunciation and cultural explanation burden; unavailable=native-speaker validation or translation authority."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=affirmative; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: native Latin-script Māori orthography; no transliteration needed.",
+        "Embodiment: current=DSEx has signature instructions and objective/background context; horizon=could test instruction, playbook, schema, and tool-description artifacts under an instruction-stewardship frame.",
+        "Code projections: hex=tohutohu; otp=:tohutohu; alias=Tohutohu; mix task prefix=tohutohu; config prefix=:tohutohu; telemetry prefix=[:tohutohu].",
+        "Role grammar: master=possible only after review; category descriptor=guided LM programs too vague; Elixir library=Tohutohu for Elixir; community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "Sādhana",
+      "pronunciation": "SAA-dhuh-nuh; Sanskrit long ā; dh is aspirated d",
+      "grammar": "Sanskrit neuter noun/adjectival form; English product grammar would be proper noun or attributive noun. Verb and command use unavailable in English without distortion.",
+      "rationale": "Cell 8 source-language stewardship test; affirmative/horizon. It names disciplined means or practice toward a goal, matching artifact optimization, but religious and yogic contexts make unreviewed software use culturally loaded.",
+      "etymology": "Source language=Sanskrit; Devanagari=साधन; meaning=accomplishing, effecting, any means of accomplishing, instrument; morphology=from root sādh with nominal/adjectival suffixing; source=Monier-Williams Sanskrit-English Dictionary via Cologne/INRIA, https://sanskrit.inria.fr/MW/291.html and Sanskritdictionary.com Monier-Williams entry https://sanskritdictionary.com/s%C4%81dhana/158659/7; review_status=unreviewed by Sanskrit scholar or community.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: sādhana has religious and spiritual practice meanings in Indian traditions; a software optimizer identity may trivialize them.",
+        "Accessibility/power: actor=artifact-optimization researcher; action=uses Sanskrit practice language for optimization means; access=research docs and package name; cost=diacritics, pronunciation, and cultural review; unavailable=review by Sanskrit scholars or practitioners."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=affirmative; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: IAST; code projection drops diacritic as sadhana.",
+        "Embodiment: current=DSEx has optimizers and Optimize Anything surfaces; horizon=could name disciplined artifact-optimization means, but not spiritual attainment or guaranteed improvement.",
+        "Code projections: hex=sadhana; otp=:sadhana; alias=Sadhana; mix task prefix=sadhana; config prefix=:sadhana; telemetry prefix=[:sadhana].",
+        "Role grammar: master=culturally risky; category descriptor=optimization means; Elixir library=Sadhana for Elixir; research effort=possible; community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Cura",
+      "pronunciation": "KOO-rah in a restored Classical Latin approximation; KYOO-rah is likely English drift",
+      "grammar": "Latin feminine first-declension noun; English product grammar would be a proper noun or attributive noun. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; affirmative/current. It brings care, attention, and administration to DSEx operations, but it may sound medical or therapeutic.",
+      "etymology": "Source language=Latin; meaning=care, attention, pains, concern, treatment, administration, supervision; morphology=first declension feminine noun cura, curae; source=Latdict entry citing Oxford Latin Dictionary, https://latin-dictionary.net/search/latin/cura; review_status=unreviewed by Latinist.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: Latin medical and clerical associations can imply treatment, cure, or institutional care DSEx does not provide.",
+        "Accessibility/power: actor=maintainer; action=frames operations as care and administration; access=docs and Mix task vocabulary; cost=possible pronunciation split and medical confusion; unavailable=clinical safety review or user-care institution."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=affirmative; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Post-freeze overlap: candidate_id=cand-b8b6bf33efcb9144 normalized=cura matched registry surface Cura in run-09-boundaries-limits-care ordinal 85.",
+        "Transliteration system: Latin alphabet; macron not represented in surface.",
+        "Embodiment: current=DSEx has operations docs, redaction, telemetry, gates, save/load, and release discipline; horizon=could care for artifact lineages technically, conditional only.",
+        "Code projections: hex=cura; otp=:cura; alias=Cura; mix task prefix=cura; config prefix=:cura; telemetry prefix=[:cura].",
+        "Role grammar: master=possible; category descriptor=careful LM program operation; Elixir library=Cura for Elixir; research/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "Métron",
+      "pronunciation": "MEH-tron; Ancient Greek eta-like long e not represented exactly",
+      "grammar": "Ancient Greek neuter second-declension noun μέτρον, genitive μέτρου; English product grammar would be proper noun or attributive noun. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; ambivalent/current. It names measurement and standards, fitting DSEx evaluation, but Greek prestige and metric-objectivity risk are both high.",
+      "etymology": "Source language=Ancient Greek; Greek=μέτρον; meaning=that by which anything is measured, measure, rule; morphology=neuter second-declension noun; source=Logeion/LSJ entry, https://logeion.uchicago.edu/%CE%BC%CE%AD%CF%84%CF%81%CE%BF%CE%BD; review_status=unreviewed by Hellenist.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: classical Greek naming can read as prestige theater and can overstate objectivity of metrics.",
+        "Accessibility/power: actor=eval engineer; action=names metric-bearing evaluation as measurement; access=metric modules and benchmark reports; cost=diacritic and spelling burden; unavailable=proof that metrics capture public harm or all quality dimensions."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=ambivalent; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: ISO-style/academic Greek transliteration; code projection drops accent as metron.",
+        "Embodiment: current=DSEx owns metrics, evaluation rows, traces, benchmark truth, and dashboards; horizon=could measure artifact campaigns but must preserve uncertainty and cost.",
+        "Code projections: hex=metron; otp=:metron; alias=Metron; mix task prefix=metron; config prefix=:metron; telemetry prefix=[:metron].",
+        "Role grammar: master=possible but classical; category descriptor=measured LM programs risks objectivity overclaim; Elixir library=Metron for Elixir; protocol/company/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "Genba",
+      "pronunciation": "GEN-bah; Hepburn genba",
+      "grammar": "Japanese noun 現場; English product grammar would be a proper noun or attributive noun, as in Genba trace. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; ambivalent/current. It points to observing real execution sites rather than abstract prompts, but lean-management baggage and Japanese borrowing risk are material.",
+      "etymology": "Source language=Japanese; Japanese=現場; meaning=actual spot, scene, site, on the ground, job site; morphology=compound of 現 'present/actual' and 場 'place'; source=JapanDict/JMdict entry, https://www.japandict.com/%E7%8F%BE%E5%A0%B4; review_status=unreviewed by Japanese speaker.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: genba/gemba is common in lean management; use may import factory supervision and workplace surveillance connotations.",
+        "Accessibility/power: actor=platform team; action=observes actual run traces and tool events; access=telemetry, reports, and logs; cost=monitoring labor and privacy risk; unavailable=worker consent process or surveillance impact review."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=ambivalent; scope=current; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: Hepburn romanization; code projection uses genba.",
+        "Embodiment: current=DSEx has telemetry, traces, local integration gates, and runtime observability; horizon=could observe artifact optimization where work actually occurs, conditional only.",
+        "Code projections: hex=genba; otp=:genba; alias=Genba; mix task prefix=genba; config prefix=:genba; telemetry prefix=[:genba].",
+        "Role grammar: master=possible but culturally loaded; category descriptor=observed LM programs; Elixir library=Genba for Elixir; company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Shiori",
+      "pronunciation": "shee-OH-ree; Hepburn shiori",
+      "grammar": "Japanese noun 栞/しおり; English product grammar would be proper noun or attributive noun. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; affirmative/horizon. Bookmark and guidebook meanings fit durable artifact lineages and playbook navigation, but the form may read like a personal name.",
+      "etymology": "Source language=Japanese; Japanese=栞, 枝折り, しおり; meaning=bookmark, guidebook; morphology=Japanese noun; kanji 栞 historically tied to branch-marking/guide senses; source=Nihongo Master/JMdict-derived entry, https://www.nihongomaster.com/japanese/dictionary/word/54665/shiori-%E6%A0%9E-%E6%9E%9D%E6%8A%98%E3%82%8A-%E6%9E%9D%E6%8A%98-%E3%81%97%E3%81%8A%E3%82%8A; review_status=unreviewed by Japanese speaker.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: ordinary Japanese word and personal-name overlap; may be mistaken for a person or decorative borrowing.",
+        "Accessibility/power: actor=future maintainer; action=marks artifact lineage and guides return to a checkpoint; access=save/load artifact and report index; cost=spelling/pronunciation support and name ambiguity; unavailable=review by Japanese speakers or guarantee of durable rollback."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=affirmative; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: Hepburn romanization; code projection uses shiori.",
+        "Embodiment: current=DSEx saves and loads programs and writes reports; horizon=could bookmark artifact candidates, playbooks, schemas, and code fragments for inspection and promotion.",
+        "Code projections: hex=shiori; otp=:shiori; alias=Shiori; mix task prefix=shiori; config prefix=:shiori; telemetry prefix=[:shiori].",
+        "Role grammar: master=possible but name-like; category descriptor=bookmarked LM artifacts; Elixir library=Shiori for Elixir; community/company/protocol/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "Mīzān",
+      "pronunciation": "mee-ZAAN; long ī and ā in Arabic transliteration",
+      "grammar": "Arabic noun ميزان; English product grammar would be proper noun or attributive noun. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; adverse/both wildcard. Balance and scale fit evaluation, but the term carries Arabic, Islamic, legal, and moral weight that a software library should not appropriate casually.",
+      "etymology": "Source language=Arabic; Arabic=ميزان; meaning=balance, scale, measure; morphology=instrument noun pattern mif'āl from root w-z-n 'to weigh'; source=Lane's Arabic-English Lexicon overview and online editions, https://arabiclexicon.hawramani.com/william-edward-lane-arabic-english-lexicon/ and https://www.arabic-english-dictionary.com/; review_status=unreviewed by Arabic speaker or Islamic studies reviewer.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: mīzān can evoke moral, legal, and religious balance; using it for metrics risks claiming just judgment.",
+        "Accessibility/power: actor=metric designer; action=frames scoring as balance or weighing; access=evaluation modules and reports; cost=diacritics, pronunciation, and possible religious/cultural offense; unavailable=Arabic-language reviewer, religious-context review, or proof of just outcomes."
+      ],
+      "wildcard": true,
+      "notes": [
+        "cell=8; stance=adverse; scope=both; wildcard=true; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: ALA-LC/academic-style long vowels; code projection drops diacritics as mizan.",
+        "Embodiment: current=DSEx has metrics and evidence reports but not justice, fairness, or legal balancing authority; horizon=could weigh artifact candidates technically but cannot claim moral balance.",
+        "Code projections: hex=mizan; otp=:mizan; alias=Mizan; mix task prefix=mizan; config prefix=:mizan; telemetry prefix=[:mizan].",
+        "Role grammar: master=adverse; category descriptor=balanced LM programs overclaims; Elixir library=Mizan for Elixir technically viable; protocol/company/community/hosted product/product family unavailable."
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "Silsila",
+      "pronunciation": "sil-si-lah; three light syllables",
+      "grammar": "Arabic noun سلسلة; English product grammar would be proper noun or attributive noun. Verb and command use unavailable.",
+      "rationale": "Cell 8 source-language stewardship test; ambivalent/horizon. Chain or lineage meaning fits optimizer parentage and artifact history, but it may imply religious transmission lineage or authority.",
+      "etymology": "Source language=Arabic; Arabic=سلسلة; meaning=chain, series, sequence; morphology=quadriliteral/reduplicative s-l-s-l form used as a noun; source=Lane's Arabic-English Lexicon overview and online editions, https://arabiclexicon.hawramani.com/william-edward-lane-arabic-english-lexicon/ and https://www.arabic-english-dictionary.com/; review_status=unreviewed by Arabic speaker.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Cultural context: silsila can be used for chains of transmission, including religious or scholarly lineages; software lineage is narrower.",
+        "Accessibility/power: actor=optimizer maintainer; action=records parentage and sequence of candidates; access=checkpoint, archive, and report files; cost=pronunciation/spelling support and lineage-review labor; unavailable=scholarly/religious authority review or guarantee that lineage records establish accountability."
+      ],
+      "wildcard": false,
+      "notes": [
+        "cell=8; stance=ambivalent; scope=horizon; wildcard=false; provenance=independent Codex generation under form-correction prompt.",
+        "Transliteration system: simplified Arabic romanization; code projection uses silsila.",
+        "Embodiment: current=DSEx records optimizer lineage, reports, checkpoints, and artifacts; horizon=could name artifact-optimization chains for demos, schemas, retrieval policies, and code fragments.",
+        "Code projections: hex=silsila; otp=:silsila; alias=Silsila; mix task prefix=silsila; config prefix=:silsila; telemetry prefix=[:silsila].",
+        "Role grammar: master=possible but culturally loaded; category descriptor=lineaged LM artifacts; Elixir library=Silsila for Elixir; community/company/protocol/hosted product/product family unavailable."
+      ]
+    }
+  ]
+}
