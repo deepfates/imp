@@ -5,7 +5,7 @@ defmodule DSEx.Optimizer.GEPA do
   The optimizer exposes every predictor through `DSEx.ProgramParameters`,
   evaluates named candidate maps through a trace-rich adapter, applies strict
   minibatch improvement before validation, and maintains the source-shaped
-  per-instance Pareto archive in `DSEx.Optimizer.GEPA.Engine`.
+  per-instance Pareto archive in its internal optimization engine.
 
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of `DSEx.Optimizer.GEPA.Callback`. Hooks are

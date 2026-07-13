@@ -9,7 +9,7 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
   """
 
   defmodule State do
-    @moduledoc false
+    @moduledoc "Explicit checkpointable state for a composed stopping policy."
 
     defstruct nodes: %{}
 

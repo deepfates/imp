@@ -1,5 +1,11 @@
 defmodule DSEx.ProgramParameters do
-  @moduledoc false
+  @moduledoc """
+  Named predictor access and functional updates for optimizable programs.
+
+  Built-in DSEx programs expose their primary predictor as `:main`. Custom
+  programs can implement `optimizer_predictors/1` and
+  `update_optimizer_predictor/3` to expose additional named predictors.
+  """
 
   alias DSEx.Predict.{
     Assertions,

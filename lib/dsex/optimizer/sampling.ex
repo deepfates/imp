@@ -1,5 +1,10 @@
 defmodule DSEx.Optimizer.Sampling do
-  @moduledoc false
+  @moduledoc """
+  Deterministic sampling helpers for optimizers.
+
+  Every sampling operation accepts and returns explicit `:rand` state so
+  optimizer runs remain reproducible without process-global random state.
+  """
 
   @type state :: :rand.state()
 

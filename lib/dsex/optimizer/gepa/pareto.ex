@@ -1,5 +1,5 @@
 defmodule DSEx.Optimizer.GEPA.Pareto do
-  @moduledoc false
+  @moduledoc "Winner-set mapping, pruning, and sampling for GEPA frontiers."
 
   @type candidate_id :: term()
   @type frontier_key :: term()

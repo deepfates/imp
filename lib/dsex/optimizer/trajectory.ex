@@ -1009,7 +1009,12 @@ defmodule DSEx.Optimizer.Trajectory do
 end
 
 defmodule DSEx.Optimizer.TrajectoryRunner do
-  @moduledoc false
+  @moduledoc """
+  Evaluates examples into ordered, provider-neutral optimizer trajectories.
+
+  Program and metric failures are captured in the returned trajectories so a
+  failed example does not discard the rest of a bounded-concurrency batch.
+  """
 
   alias DSEx.Optimizer.{Trace, Trajectory}
 

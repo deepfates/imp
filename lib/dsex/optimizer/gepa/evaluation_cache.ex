@@ -17,7 +17,7 @@ defmodule DSEx.Optimizer.GEPA.EvaluationCache do
   alias DSEx.Optimizer.GEPA.{Candidate, Result}
 
   defmodule Entry do
-    @moduledoc false
+    @moduledoc "A cached output and its scalar and optional objective scores."
     @enforce_keys [:output, :score]
     defstruct [:output, :score, :objective_scores]
 
