@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "scope": "authoritative acquisition identities; not a T3 execution claim",
+  "paper": "arXiv:2512.24601v3",
+  "selection_seed": 251224601,
+  "families": {
+    "s_niah": {
+      "status": "blocked_unpublished_paper_instances",
+      "source": "https://github.com/NVIDIA/RULER",
+      "revision": "ab17b7853df4e0a30b78cd5d2b463ac7dff6ee13",
+      "license": "Apache-2.0",
+      "license_sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+      "generator": {
+        "path": "scripts/data/synthetic/niah.py",
+        "sha256": "e9cada0a7660d274fe73a1338a90a7087e17b630169f1aaf14a8d3221c6805b5"
+      },
+      "task_config": {
+        "path": "scripts/synthetic.yaml",
+        "sha256": "34bc71dcacdc41a829a170f04b528fbf48d62c616338005ab4991680fbf8cb0b"
+      },
+      "blocker": "The RLM paper does not identify the RULER niah_single variant, tokenizer artifact/revision, package environment, generation seed, insertion depths, or the 50 generated instances used at each plotted length. The author confirmed in alexzhang13/rlm issue 28 that the benchmark/experiment repository was unavailable."
+    },
+    "browsecomp_plus": {
+      "status": "blocked_unpublished_paper_sampling",
+      "license": "MIT",
+      "queries": {
+        "source": "https://huggingface.co/datasets/Tevatron/browsecomp-plus",
+        "revision": "144cff8e35b5eaef7e526346aa60774a9deb941f",
+        "rows": 830
+      },
+      "corpus": {
+        "source": "https://huggingface.co/datasets/Tevatron/browsecomp-plus-corpus",
+        "revision": "b27b02bc3e45511b8b82a13e6f90ce761df726f6",
+        "documents": 100195
+      },
+      "official_code": {
+        "source": "https://github.com/texttron/BrowseComp-Plus",
+        "revision": "046949032b0328319cc9a02663a759ec601d9402",
+        "license_sha256": "a580afd0716e99a1c43fb297a950620a55980305aae9fcd236141101a7e21803",
+        "answer_scorer_path": "scripts_evaluation/evaluate_run.py",
+        "answer_scorer_sha256": "1a21233937c377ab6323c98ff9af67742756a57fbacab4ebf9bc30852eae530a",
+        "evidence_qrels_sha256": "a6f594975be57339de9e4e9f67f13c044f647feda77c0b84c45a1581e3041bd1",
+        "gold_qrels_sha256": "b875af4a745712bee7a94f464ed989232f8c77977c31824428470e11dcb28c73"
+      },
+      "operator_query_selection": {
+        "authority": "official qrel query-ID union",
+        "algorithm": "sort all 830 IDs by SHA256(UTF8(decimal_seed + NUL + query_id)), query_id; take first 150",
+        "ids_sha256": "37a5b58175cfdfb24c5296e93b0e9a7e04c67af7a8c72a259002b61000195f5b",
+        "paper_author_selection": false
+      },
+      "required_validation": "exactly 1000 unique document IDs; every official gold/evidence qrel ID present exactly once",
+      "official_metrics": "answer correctness by the pinned LLM-judge scorer; retrieval recall/nDCG by trec_eval against evidence and gold qrels",
+      "blocker": "The paper does not publish its 150 query IDs, document RNG, corpus order, evidence-selection behavior, or per-query ordered 1,000-document IDs. The public Query-74 trajectory contains no document manifest; the cited FoldAgent 150-row set is a different selection."
+    },
+    "oolong": {
+      "status": "complete",
+      "source": "https://huggingface.co/datasets/oolongbench/oolong-synth",
+      "revision": "49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "license": "not declared by source repository",
+      "source_file": "data/validation-00005-of-00007.parquet",
+      "source_file_sha256": "8c0d27a796b471b93cd9323646f80a1b1216f88e16612cfb67df1bbe33dbae4b",
+      "selection": "all 50 validation rows where dataset=trec_coarse and context_len=131072, sorted by integer id",
+      "normalized_sha256": "83db2f7ce18566c2d42a660480adaf509f46759c9ebc5ab51e79975442ac478b",
+      "official_metric": "numeric score 0.75^abs(gold-prediction); non-numeric exact match, per the OOLONG/RLM papers"
+    },
+    "oolong_pairs": {
+      "status": "inputs_and_gold_complete_operator_scorer_only",
+      "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs",
+      "revision": "d1e1522b86ac0c169bbc890b0471408aaa29e8fa",
+      "license": "MIT",
+      "questions_sha256": "9d147c25ce727d09d35470ef267db59b3877132429b8b0269a46d941f252cada",
+      "gold_sha256_by_context": {
+        "1024": "375d70294a8bd4d4c88d7ac589870713eb731d8815d75f79fac13a770a29073a",
+        "2048": "962eda3c679d77fe9fc27babc38d090ec81508f5904a25952f0bd9505b306ff9",
+        "4096": "1c7ab88bbb7e2ab43fe9c72ebc5f9fa6a07578b5f75bd26d6c17bcc93ea2c148",
+        "8192": "e14baad4ff09f327287e2a583c207b68e824761f84dd1d9b351fb654e61b3fcf",
+        "16384": "355db1522b4231026ff48ac424d3013735e3d8dc5b9b5c4f7cfb48fa25e38b3e",
+        "32768": "22842670c332bd357eabcacde621e1807d0d8c832bd90b3f29eb4b8578f61cb6",
+        "65536": "f16257e2254f28415b6764f0c8e2515c4173ea954a3e718985f2acf242f5f3fc",
+        "131072": "12ef36ddda61aa9f6268a1d35399d6dd88df0141d9a9bca864f3c3941dbf89e5",
+        "262144": "7d2fb2f287ae5f830e48abdeabbefb295df12711eae3e14d4d8ebc255595a1ca",
+        "524288": "aa5ee1d0022f996c80c9297a9fcb5b06b5aa12099372ae986f839026408fd48b",
+        "1048576": "584fef670a06b16f5c9cc4dd0a6f733decac8ba5706c0afcd97994f193a14785"
+      },
+      "context_source": "oolongbench/oolong-synth validation trec_coarse at revision 49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "operator_metric": "versioned set precision/recall/F1 parser over normalized unordered user-ID pairs",
+      "scorer_authority": "operator-defined; the paper-promised run_all.py pair scorer is not public, and the public OOLONG eval_helpers.py is not a pair scorer",
+      "blocker": "Each context length has a different gold set, while the current normalized row contract permits only one scalar answer reused at all lengths. Exact paper scoring remains unavailable even after the schema is repaired."
+    },
+    "longbench_v2_codeqa": {
+      "status": "complete",
+      "source": "https://huggingface.co/datasets/zai-org/LongBench-v2",
+      "revision": "2b48e494f2c7a2f0af81aae178e05c7e1dde0fe9",
+      "license": "Apache-2.0",
+      "source_file": "data.json",
+      "source_file_sha256": "15d61c22d92c96900b3c4948b6aeea218d3214b676a65df48e7b8555604c7fe2",
+      "selection": "all 50 rows where domain=Code Repository Understanding and sub_domain=Code repo QA, preserving official order",
+      "normalized_sha256": "df1765c62e72cf5817d8ecfbf163dc72fe6e41642bae8b6e6adadb340d5ef030",
+      "official_metric": "multiple-choice accuracy"
+    }
+  }
+}
