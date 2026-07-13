@@ -124,6 +124,8 @@ defmodule DSEx.IdentityCollisionTest do
     assert old["id"] != new["id"]
     assert old["attempt"] == 1
     assert new["attempt"] == 2
+    assert old["supersedes"] == nil
+    assert new["supersedes"] == old["id"]
     assert new["status"] == "collision"
     assert refreshed.stats.new_checks == 1
     assert length(refreshed.flags) == 1

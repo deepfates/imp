@@ -176,12 +176,14 @@ defmodule DSEx.IdentityCollision do
         else
           state = maybe_delay(state, item.checkable?, delay_ms, sleeper)
           attempt = length(previous) + 1
+          supersedes = latest_attempt_id(previous)
 
           {check, network_attempts} =
             observe(item, attempt, checked_at,
               fetcher: fetcher,
               sleep: sleeper,
-              max_retry_after_ms: max_retry_after_ms
+              max_retry_after_ms: max_retry_after_ms,
+              supersedes: supersedes
             )
 
           %{
@@ -335,7 +337,8 @@ defmodule DSEx.IdentityCollision do
       "checked_at" => checked_at,
       "source" => item.source,
       "query" => item.query,
-      "url" => if(is_binary(item.query), do: url_for(item.source, item.query), else: nil)
+      "url" => if(is_binary(item.query), do: url_for(item.source, item.query), else: nil),
+      "supersedes" => Keyword.get(opts, :supersedes)
     }
 
     if item.checkable? do
@@ -463,6 +466,14 @@ defmodule DSEx.IdentityCollision do
   end
 
   defp check_id(check_key, attempt), do: stable_id("package-check", "#{check_key}:#{attempt}")
+
+  defp latest_attempt_id([]), do: nil
+
+  defp latest_attempt_id(attempts) do
+    attempts
+    |> Enum.max_by(& &1["attempt"])
+    |> Map.fetch!("id")
+  end
 
   defp record_check_key(record) do
     check_key(record["candidate_id"], record["source"], record["query"])
