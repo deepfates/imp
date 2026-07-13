@@ -167,9 +167,6 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
             contains_training_instance?(strategy, request.rows) ->
               {:error, :strategy_copied_training_instance, usage}
 
-            not algorithmic_strategy?(strategy) ->
-              {:error, :strategy_lacks_exhaustive_verified_search, usage}
-
             true ->
               provenance = %Provenance{
                 source_ids: Enum.map(request.rows, & &1["source_id"]),
@@ -367,17 +364,6 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       String.contains?(normalized, String.downcase(row["input"])) or
         String.contains?(normalized, String.downcase(row["expected"]))
     end)
-  end
-
-  defp algorithmic_strategy?(strategy) do
-    normalized = String.downcase(strategy)
-
-    Enum.any?(
-      ["enumerat", "cartesian", "all operator", "every operator"],
-      &String.contains?(normalized, &1)
-    ) and
-      String.contains?(normalized, "precedence") and
-      Enum.any?(["verify", "exact"], &String.contains?(normalized, &1))
   end
 
   defp input_numbers(input) do
