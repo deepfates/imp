@@ -298,25 +298,27 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
           nil ->
             report_progress(reporter, %{event: :seed_start, family: family, seed: seed})
             progress = checkpoint_progress(checkpoint, seed)
+            {:ok, progress_agent} = Agent.start_link(fn -> progress end)
 
             progress_fn = fn seed_progress ->
+              Agent.update(progress_agent, fn _current -> seed_progress end)
+
               updated =
                 put_in(checkpoint, ["in_progress", Integer.to_string(seed)], seed_progress)
 
               write_checkpoint!(checkpoint_path, updated)
 
               candidates = get_in(seed_progress, ["optimizer_state", "candidates"]) || []
+              baseline = Map.get(seed_progress, "baseline", %{})
 
               report_progress(reporter, %{
                 event: :seed_checkpoint,
                 family: family,
                 seed: seed,
                 phase: if(candidates == [], do: :baseline, else: :optimizer),
-                baseline_splits:
-                  seed_progress
-                  |> Map.get("baseline", %{})
-                  |> Map.keys()
-                  |> Enum.sort(),
+                baseline_splits: completed_baseline_splits(baseline),
+                baseline_prefixes: baseline_prefixes(baseline),
+                baseline_in_flight: baseline_in_flight(baseline),
                 completed_generations: max(length(candidates) - 1, 0)
               })
 
@@ -326,30 +328,35 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
             initial_usage = Map.get(progress, "usage", empty_usage())
 
             persist_usage = fn usage ->
-              progress
+              progress_agent
+              |> Agent.get(& &1)
               |> Map.put("usage", usage)
               |> progress_fn.()
             end
 
             {wall_us, result, usage} =
-              measure_req_llm_usage(
-                initial_usage,
-                fn usage_fn ->
-                  :timer.tc(fn ->
-                    run_seed(
-                      seed_context,
-                      seed,
-                      progress,
-                      fn seed_progress ->
-                        seed_progress
-                        |> Map.put("usage", usage_fn.())
-                        |> progress_fn.()
-                      end
-                    )
-                  end)
-                end,
-                persist_usage
-              )
+              try do
+                measure_req_llm_usage(
+                  initial_usage,
+                  fn usage_fn ->
+                    :timer.tc(fn ->
+                      run_seed(
+                        seed_context,
+                        seed,
+                        progress,
+                        fn seed_progress ->
+                          seed_progress
+                          |> Map.put("usage", usage_fn.())
+                          |> progress_fn.()
+                        end
+                      )
+                    end)
+                  end,
+                  persist_usage
+                )
+              after
+                Agent.stop(progress_agent)
+              end
 
             report_progress(reporter, %{
               event: :seed_done,
@@ -472,6 +479,32 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     _ -> :ok
   catch
     _, _ -> :ok
+  end
+
+  defp completed_baseline_splits(baseline) do
+    baseline
+    |> Enum.filter(fn {_split, value} -> numeric?(value) end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.sort()
+  end
+
+  defp baseline_prefixes(baseline) do
+    Map.new(baseline, fn
+      {split, %{"committed_count" => count}} -> {split, count}
+      {split, _score} -> {split, :complete}
+    end)
+  end
+
+  defp baseline_in_flight(baseline) do
+    baseline
+    |> Enum.flat_map(fn
+      {split, %{"dispatch_intent" => intent}} ->
+        [%{split: split, start: intent["start"], count: intent["count"]}]
+
+      {_split, _progress} ->
+        []
+    end)
+    |> Enum.sort_by(&{&1.split, &1.start})
   end
 
   defp maybe_put_papillon_judge(
@@ -862,17 +895,67 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   defp valid_baseline_scores?(_baseline), do: false
 
   defp valid_baseline_progress?(baseline) when is_map(baseline) do
-    keys = baseline |> Map.keys() |> MapSet.new()
+    ordered_splits = ["train", "dev", "test"]
+    keys = Map.keys(baseline)
 
-    keys in [
-      MapSet.new(["train"]),
-      MapSet.new(["train", "dev"]),
-      MapSet.new(["train", "dev", "test"])
-    ] and
-      Enum.all?(baseline, fn {_split, score} -> numeric?(score) and score >= 0 and score <= 1 end)
+    prefix? =
+      Enum.any?(1..length(ordered_splits), fn count ->
+        MapSet.new(keys) == MapSet.new(Enum.take(ordered_splits, count))
+      end)
+
+    row_prefixes = Enum.filter(keys, &is_map(baseline[&1]))
+
+    prefix? and length(row_prefixes) <= 1 and
+      Enum.all?(baseline, fn {_split, value} -> valid_baseline_value?(value) end) and
+      case row_prefixes do
+        [] ->
+          true
+
+        [split] ->
+          split == List.last(Enum.filter(ordered_splits, &Map.has_key?(baseline, &1)))
+      end
   end
 
   defp valid_baseline_progress?(_baseline), do: false
+
+  defp valid_baseline_value?(score) when is_integer(score) or is_float(score),
+    do: numeric?(score) and score >= 0 and score <= 1
+
+  defp valid_baseline_value?(
+         %{
+           "schema_version" => 1,
+           "row_count" => row_count,
+           "committed_count" => committed_count,
+           "score_sum" => score_sum
+         } = prefix
+       ) do
+    allowed_keys =
+      MapSet.new([
+        "schema_version",
+        "row_count",
+        "committed_count",
+        "score_sum",
+        "dispatch_intent"
+      ])
+
+    MapSet.subset?(MapSet.new(Map.keys(prefix)), allowed_keys) and
+      non_negative_integer?(row_count) and
+      non_negative_integer?(committed_count) and committed_count <= row_count and
+      numeric?(score_sum) and score_sum >= 0 and score_sum <= committed_count and
+      case Map.fetch(prefix, "dispatch_intent") do
+        :error ->
+          true
+
+        {:ok, %{"start" => start, "count" => count}} ->
+          start == committed_count and non_negative_integer?(count) and count > 0 and
+            start + count <= row_count
+
+        {:ok, _invalid} ->
+          false
+      end
+  end
+
+  defp valid_baseline_value?(_value), do: false
 
   defp valid_seed_result?(result) do
     Enum.all?(
@@ -922,10 +1005,6 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
 
   defp stringify_scores(scores) do
     %{"train" => scores.train, "dev" => scores.dev, "test" => scores.test}
-  end
-
-  defp stringify_partial_scores(scores) do
-    Map.new(scores, fn {key, value} -> {Atom.to_string(key), value} end)
   end
 
   defp atomize_seed_result(result) do
@@ -1110,23 +1189,139 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   end
 
   defp baseline_scores(program, splits, metric, max_concurrency, progress, progress_fn) do
-    Enum.reduce(splits, %{}, fn {split, examples}, scores ->
-      key = Atom.to_string(split)
+    {scores, _progress} =
+      Enum.reduce(splits, {%{}, progress}, fn {split, examples}, {scores, progress} ->
+        {value, progress} =
+          baseline_split_score(
+            program,
+            split,
+            examples,
+            metric,
+            max_concurrency,
+            progress,
+            progress_fn
+          )
 
-      value =
-        case get_in(progress, ["baseline", key]) do
-          nil ->
-            value = score(program, examples, metric, max_concurrency)
-            baseline = scores |> Map.put(split, value) |> stringify_partial_scores()
-            progress_fn.(Map.put(progress, "baseline", baseline))
-            value
+        {Map.put(scores, split, value), progress}
+      end)
 
-          checkpointed ->
-            checkpointed
-        end
+    scores
+  end
 
-      Map.put(scores, split, value)
-    end)
+  defp baseline_split_score(
+         program,
+         split,
+         examples,
+         metric,
+         max_concurrency,
+         progress,
+         progress_fn
+       ) do
+    key = Atom.to_string(split)
+
+    case get_in(progress, ["baseline", key]) do
+      checkpointed when is_number(checkpointed) ->
+        {checkpointed, progress}
+
+      checkpointed when is_map(checkpointed) ->
+        resume_baseline_prefix!(
+          program,
+          key,
+          examples,
+          metric,
+          max_concurrency,
+          progress,
+          checkpointed,
+          progress_fn
+        )
+
+      nil ->
+        prefix = baseline_prefix(length(examples))
+
+        resume_baseline_prefix!(
+          program,
+          key,
+          examples,
+          metric,
+          max_concurrency,
+          progress,
+          prefix,
+          progress_fn
+        )
+    end
+  end
+
+  defp resume_baseline_prefix!(
+         program,
+         split,
+         examples,
+         metric,
+         max_concurrency,
+         progress,
+         prefix,
+         progress_fn
+       ) do
+    row_count = length(examples)
+
+    unless prefix["row_count"] == row_count do
+      raise ArgumentError,
+            "GEPA baseline checkpoint row count mismatch for #{split}: expected #{row_count}, got #{inspect(prefix["row_count"])}"
+    end
+
+    if Map.has_key?(prefix, "dispatch_intent") do
+      intent = prefix["dispatch_intent"]
+
+      raise ArgumentError,
+            "cannot safely resume GEPA baseline: durable dispatch intent for #{split} rows #{intent["start"]}..#{intent["start"] + intent["count"] - 1} has an ambiguous outcome; requests may have been sent or completed, so replay is refused"
+    end
+
+    batch_size = max(max_concurrency, 1)
+
+    {prefix, progress} =
+      examples
+      |> Enum.drop(prefix["committed_count"])
+      |> Enum.chunk_every(batch_size)
+      |> Enum.reduce({prefix, progress}, fn batch, {prefix, progress} ->
+        start = prefix["committed_count"]
+
+        dispatch_intent =
+          Map.put(prefix, "dispatch_intent", %{"start" => start, "count" => length(batch)})
+
+        progress = persist_baseline_prefix(progress, split, dispatch_intent, progress_fn)
+
+        batch_score = score(program, batch, metric, max_concurrency)
+
+        committed =
+          dispatch_intent
+          |> Map.delete("dispatch_intent")
+          |> Map.put("committed_count", start + length(batch))
+          |> Map.update!("score_sum", &(&1 + batch_score * length(batch)))
+
+        progress = persist_baseline_prefix(progress, split, committed, progress_fn)
+        {committed, progress}
+      end)
+
+    value = if row_count == 0, do: 0.0, else: prefix["score_sum"] / row_count
+    baseline = progress |> Map.get("baseline", %{}) |> Map.put(split, value)
+    progress = Map.put(progress, "baseline", baseline)
+    progress_fn.(progress)
+    {value, progress}
+  end
+
+  defp baseline_prefix(row_count) do
+    %{
+      "schema_version" => 1,
+      "row_count" => row_count,
+      "committed_count" => 0,
+      "score_sum" => 0.0
+    }
+  end
+
+  defp persist_baseline_prefix(progress, split, prefix, progress_fn) do
+    baseline = progress |> Map.get("baseline", %{}) |> Map.put(split, prefix)
+    progress = Map.put(progress, "baseline", baseline)
+    progress_fn.(progress)
+    progress
   end
 
   defp split_paths(dataset_root, family) do

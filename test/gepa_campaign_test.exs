@@ -351,7 +351,7 @@ defmodule GepaCampaignTest do
     File.write!(checkpoint_path, Jason.encode!(checkpoint))
     GepaCampaign.run(Keyword.put(base_opts, :reporter, &send(events, &1)))
 
-    refute_received %{event: :seed_checkpoint, baseline_splits: ["train"]}
+    refute_received %{event: :seed_checkpoint, baseline_prefixes: %{"train" => 1}}
 
     assert_received %{
       event: :seed_checkpoint,
@@ -364,6 +364,179 @@ defmodule GepaCampaignTest do
       phase: :baseline,
       baseline_splits: ["dev", "test", "train"]
     }
+  end
+
+  test "DSEx GEPA campaign resumes a committed baseline row prefix without replay or usage loss" do
+    dataset_root = tmp_dir("gepa-campaign-row-prefix-data")
+    rows_dir = tmp_dir("gepa-campaign-row-prefix-rows")
+    write_dataset_root!(dataset_root)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+    receiver = self()
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, handler_opts ->
+        Agent.update(calls, &(&1 + 1))
+
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{total_cost: 0.001, tokens: %{input_tokens: 10, output_tokens: 5}},
+          %{}
+        )
+
+        static_gold_handler(messages, handler_opts)
+      end)
+
+    reporter = fn
+      %{
+        phase: :baseline,
+        baseline_prefixes: %{"train" => 1},
+        baseline_in_flight: []
+      } ->
+        [path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+        send(receiver, {:committed_row_checkpoint, path |> File.read!() |> Jason.decode!()})
+
+      _event ->
+        :ok
+    end
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-row-prefix",
+        lm: lm,
+        reporter: reporter
+      )
+
+    first = GepaCampaign.run(opts)
+    assert_receive {:committed_row_checkpoint, committed_checkpoint}
+
+    assert %{
+             "in_progress" => %{
+               "0" => %{
+                 "baseline" => %{
+                   "train" => %{
+                     "schema_version" => 1,
+                     "row_count" => 2,
+                     "committed_count" => 1,
+                     "score_sum" => 1.0
+                   }
+                 },
+                 "usage" => %{"input_tokens" => 10, "output_tokens" => 5}
+               }
+             }
+           } = committed_checkpoint
+
+    refute Map.has_key?(
+             get_in(committed_checkpoint, ["in_progress", "0", "baseline", "train"]),
+             "dispatch_intent"
+           )
+
+    full_calls = Agent.get(calls, & &1)
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    File.write!(checkpoint_path, Jason.encode!(committed_checkpoint, pretty: true))
+    Agent.update(calls, fn _count -> 0 end)
+
+    resumed = GepaCampaign.run(Keyword.delete(opts, :reporter))
+
+    assert Agent.get(calls, & &1) == full_calls - 1
+
+    assert get_in(resumed.report, ["rows", Access.at(0), "results"]) ==
+             get_in(first.report, ["rows", Access.at(0), "results"])
+
+    assert get_in(resumed.report, ["rows", Access.at(0), "train_dev_test_gap"]) ==
+             get_in(first.report, ["rows", Access.at(0), "train_dev_test_gap"])
+
+    first_cost = get_in(first.report, ["rows", Access.at(0), "token_cost"])
+    resumed_cost = get_in(resumed.report, ["rows", Access.at(0), "token_cost"])
+    assert resumed_cost["input_tokens"] == first_cost["input_tokens"]
+    assert resumed_cost["output_tokens"] == first_cost["output_tokens"]
+    assert_in_delta resumed_cost["usd"], first_cost["usd"], 1.0e-12
+  end
+
+  test "DSEx GEPA campaign refuses to replay an ambiguously dispatched baseline row" do
+    dataset_root = tmp_dir("gepa-campaign-ambiguous-row-data")
+    rows_dir = tmp_dir("gepa-campaign-ambiguous-row-rows")
+    write_dataset_root!(dataset_root)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+    receiver = self()
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, handler_opts ->
+        call_index = Agent.get_and_update(calls, fn count -> {count, count + 1} end)
+
+        if call_index == 0 do
+          [path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+          send(receiver, {:ambiguous_row_checkpoint, path |> File.read!() |> Jason.decode!()})
+        end
+
+        static_gold_handler(messages, handler_opts)
+      end)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-ambiguous-row",
+        lm: lm,
+        max_concurrency: 2
+      )
+
+    GepaCampaign.run(opts)
+    assert_receive {:ambiguous_row_checkpoint, ambiguous_checkpoint}
+
+    assert get_in(ambiguous_checkpoint, ["in_progress", "0", "baseline", "train"]) == %{
+             "schema_version" => 1,
+             "row_count" => 2,
+             "committed_count" => 0,
+             "score_sum" => 0.0,
+             "dispatch_intent" => %{"start" => 0, "count" => 2}
+           }
+
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    File.write!(checkpoint_path, Jason.encode!(ambiguous_checkpoint, pretty: true))
+    Agent.update(calls, fn _count -> 0 end)
+
+    assert_raise ArgumentError,
+                 ~r/durable dispatch intent for train rows 0\.\.1 has an ambiguous outcome; requests may have been sent or completed, so replay is refused/,
+                 fn -> GepaCampaign.run(opts) end
+
+    assert Agent.get(calls, & &1) == 0
+  end
+
+  test "baseline prefix checkpoints preserve configured evaluation concurrency" do
+    dataset_root = tmp_dir("gepa-campaign-prefix-concurrency-data")
+    rows_dir = tmp_dir("gepa-campaign-prefix-concurrency-rows")
+    write_dataset_root!(dataset_root)
+    {:ok, concurrency} = Agent.start_link(fn -> %{active: 0, maximum: 0} end)
+    receiver = self()
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn messages, handler_opts ->
+        maximum =
+          Agent.get_and_update(concurrency, fn state ->
+            active = state.active + 1
+            maximum = max(state.maximum, active)
+            {maximum, %{active: active, maximum: maximum}}
+          end)
+
+        if maximum == 2, do: send(receiver, :baseline_calls_concurrent)
+        Process.sleep(25)
+        response = static_gold_handler(messages, handler_opts)
+        Agent.update(concurrency, &%{&1 | active: &1.active - 1})
+        response
+      end)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-prefix-concurrency",
+        lm: lm,
+        max_concurrency: 2
+      )
+
+    GepaCampaign.run(opts)
+
+    assert_received :baseline_calls_concurrent
+    assert Agent.get(concurrency, & &1.maximum) == 2
   end
 
   test "DSEx GEPA campaign consumes and clears persisted optimizer generation state" do
