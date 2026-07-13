@@ -378,6 +378,37 @@ defmodule DSEx.IdentityAssessmentTest do
     assert completed["event_type"] == "identity_assessment_run_completed"
   end
 
+  test "checkpoints completed batches before starting later work" do
+    {:ok, state} = Agent.start_link(fn -> %{calls: 0, checkpointed_records: 0} end)
+
+    assessor = fn _profile, request ->
+      call = Agent.get_and_update(state, &{&1.calls + 1, %{&1 | calls: &1.calls + 1}})
+
+      if call == 2 do
+        assert Agent.get(state, & &1.checkpointed_records) == 1
+      end
+
+      {:ok, valid_response(request)}
+    end
+
+    checkpoint = fn records, _events ->
+      Agent.update(state, &%{&1 | checkpointed_records: length(records)})
+    end
+
+    result =
+      IdentityAssessment.run(input(2),
+        profiles: [profile("streaming", "openai:gpt-5.6-terra")],
+        assessor: assessor,
+        checkpoint: checkpoint,
+        batch_size: 1,
+        concurrency: 1,
+        checkpoint_every: 1
+      )
+
+    assert result["summary"]["succeeded_records"] == 2
+    assert Agent.get(state, & &1.checkpointed_records) == 2
+  end
+
   defp valid_response(request) do
     payload = request.messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
 

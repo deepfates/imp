@@ -147,8 +147,8 @@ defmodule DSEx.IdentityAssessment do
 
     state =
       work
-      |> Enum.zip(stream)
-      |> Enum.with_index(1)
+      |> Stream.zip(stream)
+      |> Stream.with_index(1)
       |> Enum.reduce(state, fn {{unit, result}, index}, acc ->
         next = consume_result(acc, unit, result, run_id)
 
