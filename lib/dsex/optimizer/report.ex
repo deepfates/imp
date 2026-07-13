@@ -1,6 +1,16 @@
 defmodule DSEx.Optimizer.Report do
   @moduledoc "Optimizer candidate history and diagnostic metadata."
 
+  @image_schema_version 1
+  @image_tag_keys MapSet.new([
+                    "__dsex_type__",
+                    "schema_version",
+                    "url",
+                    "data",
+                    "mime_type",
+                    "metadata"
+                  ])
+
   defstruct optimizer: nil,
             best_score: nil,
             candidate_count: 0,
@@ -84,8 +94,25 @@ defmodule DSEx.Optimizer.Report do
     }
   end
 
+  defp dump_value(%DSEx.Adapters.Types.Image{} = image) do
+    %{
+      "__dsex_type__" => "image",
+      "schema_version" => @image_schema_version,
+      "url" => image.url,
+      "data" => image.data,
+      "mime_type" => image.mime_type,
+      "metadata" => dump_value(image.metadata)
+    }
+  end
+
   defp dump_value(%__MODULE__{} = report) do
     Map.put(dump(report), "__dsex_type__", "optimizer_report")
+  end
+
+  defp dump_value(value) when is_struct(value) do
+    value
+    |> Map.from_struct()
+    |> dump_value()
   end
 
   defp dump_value(map) when is_map(map),
@@ -124,6 +151,19 @@ defmodule DSEx.Optimizer.Report do
     |> maybe_with_demos(load_value(Map.get(state, "demos", [])))
   end
 
+  defp load_value(%{"__dsex_type__" => "image"} = state) do
+    if valid_image_state?(state) do
+      %DSEx.Adapters.Types.Image{
+        url: state["url"],
+        data: state["data"],
+        mime_type: state["mime_type"],
+        metadata: load_value(state["metadata"])
+      }
+    else
+      raise ArgumentError, "malformed DSEx image JSON tag"
+    end
+  end
+
   defp load_value(%{"__dsex_type__" => "tuple", "items" => items}) when is_list(items) do
     items |> Enum.map(&load_value/1) |> List.to_tuple()
   end
@@ -160,4 +200,15 @@ defmodule DSEx.Optimizer.Report do
   rescue
     ArgumentError -> value
   end
+
+  defp valid_image_state?(state) do
+    MapSet.new(Map.keys(state)) == @image_tag_keys and
+      state["schema_version"] == @image_schema_version and
+      optional_binary?(state["url"]) and
+      optional_binary?(state["data"]) and
+      optional_binary?(state["mime_type"]) and
+      is_map(state["metadata"])
+  end
+
+  defp optional_binary?(value), do: is_nil(value) or is_binary(value)
 end

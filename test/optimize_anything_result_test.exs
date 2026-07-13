@@ -15,6 +15,7 @@ defmodule DSEx.Optimize.Anything.ResultTest do
       },
       rng_state: :rand.seed_s(:exsss, {1, 2, 3}),
       frontier_type: :hybrid,
+      best_outputs_valset: %{heldout_a: [{1, %{answer: "better"}}]},
       stop_reason: :max_iterations,
       candidates: [
         entry(0, %{current_candidate: "base"}, [], [0.0, 1.0], 2),
@@ -43,6 +44,7 @@ defmodule DSEx.Optimize.Anything.ResultTest do
     assert result.total_metric_calls == 7
     assert result.full_evaluations == 2
     assert result.reflection_calls == 1
+    assert result.best_outputs_valset == %{heldout_a: [{1, %{answer: "better"}}]}
     assert result.checkpoint["schema_version"] == 1
   end
 
@@ -50,6 +52,7 @@ defmodule DSEx.Optimize.Anything.ResultTest do
     state = %Engine.State{
       budget: Budget.new(),
       rng_state: :rand.seed_s(:exsss, {1, 2, 3}),
+      best_outputs_valset: %{only: [{0, "base output"}]},
       candidates: [entry(0, %{main: "base"}, [], [1.0], 1)]
     }
 
@@ -61,6 +64,7 @@ defmodule DSEx.Optimize.Anything.ResultTest do
     assert restored.validation_scores == [1.0]
     assert restored.total_metric_calls == 0
     assert restored.mode == :single_task
+    assert restored.best_outputs_valset == %{only: [{0, "base output"}]}
     assert restored.checkpoint.schema_version == 1
   end
 

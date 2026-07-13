@@ -8,7 +8,7 @@ defmodule DSEx.Optimize.Anything.Config do
   """
 
   alias DSEx.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
-  alias DSEx.Optimizer.GEPA.{Callback, Stopper}
+  alias DSEx.Optimizer.GEPA.{Callback, CandidateSelector, Stopper}
 
   defmodule Persistence do
     @moduledoc false
@@ -169,15 +169,7 @@ defmodule DSEx.Optimize.Anything.Config do
       do: map |> Persistence.options!("#{inspect(__MODULE__)}.from_map/1", @enum_fields) |> new()
 
     defp validate_strategies!(config) do
-      unless config.candidate_selection_strategy in [
-               :pareto,
-               :current_best,
-               :epsilon_greedy,
-               :top_k_pareto
-             ] or is_atom(config.candidate_selection_strategy) do
-        raise ArgumentError,
-              "candidate_selection_strategy must be a released strategy name or selector module"
-      end
+      CandidateSelector.validate!(config.candidate_selection_strategy)
 
       unless config.val_evaluation_policy in [:full_eval, :full] or
                is_atom(config.val_evaluation_policy) do
@@ -430,8 +422,12 @@ defmodule DSEx.Optimize.Anything.Config do
       max_full_evaluations: engine.max_full_evaluations || :infinity,
       frontier_type: engine.frontier_type,
       cache_evaluation: engine.cache_evaluation,
+      candidate_selection_strategy: engine.candidate_selection_strategy,
+      track_best_outputs: engine.track_best_outputs,
       evaluation_policy: evaluation_policy(engine.val_evaluation_policy),
       minibatch_size: reflection.reflection_minibatch_size,
+      skip_perfect_score: reflection.skip_perfect_score,
+      perfect_score: reflection.perfect_score,
       stopper: config.stopper,
       callbacks: config.callbacks
     ]
@@ -499,12 +495,20 @@ defmodule DSEx.Optimize.Anything.Config do
 
   defp validate_runtime!(config) do
     validate_stopper!(config.stopper)
+    validate_perfect_score!(config.reflection)
 
     case Callback.validate(config.callbacks) do
       {:ok, _callbacks} -> :ok
       {:error, message} -> raise ArgumentError, "callbacks #{message}"
     end
   end
+
+  defp validate_perfect_score!(%{skip_perfect_score: true, perfect_score: score})
+       when not is_number(score) do
+    raise ArgumentError, "perfect_score must be numeric when skip_perfect_score is true"
+  end
+
+  defp validate_perfect_score!(_reflection), do: :ok
 
   defp validate_stopper!(nil), do: :ok
 

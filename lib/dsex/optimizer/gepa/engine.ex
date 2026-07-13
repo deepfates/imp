@@ -7,6 +7,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     Budget,
     Callback,
     Candidate,
+    CandidateSelector,
     Evaluation,
     EvaluationCache,
     EvaluationPolicy,
@@ -38,6 +39,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
               last_iteration_found_candidate: false,
               frontier_type: :instance,
               evaluation_policy: EvaluationPolicy.Full,
+              best_outputs_valset: nil,
               stopper_state: nil,
               stop_reason: nil
   end
@@ -153,6 +155,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       "last_iteration_found_candidate" => state.last_iteration_found_candidate,
       "frontier_type" => state.frontier_type,
       "evaluation_policy" => Atom.to_string(state.evaluation_policy),
+      "best_outputs_valset" => dump_best_outputs(state.best_outputs_valset),
       "stopper_state" => dump_stopper_state(state.stopper_state),
       "stop_reason" => DSEx.Optimizer.Report.json_safe(state.stop_reason)
     }
@@ -169,6 +172,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
       evaluation_policy:
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
+      best_outputs_valset: if(Keyword.get(opts, :track_best_outputs, false), do: %{}),
       stopper_state: new_stopper_state(opts)
     }
 
@@ -181,7 +185,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           discovered_at: state.budget.metric_calls
         }
 
-        state = %{state | candidates: [entry]}
+        state = state |> track_validation_outputs(entry) |> Map.put(:candidates, [entry])
         notify_valset_evaluated(opts, state, entry, valset, 0)
         checkpoint!(state, opts)
         state
@@ -215,7 +219,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     state = %{state | rng_state: rng_state}
 
     {parent, rng_state} =
-      sample_parent(state.candidates, state.frontier_type, state.rng_state)
+      opts
+      |> Keyword.get(:candidate_selection_strategy, :pareto)
+      |> CandidateSelector.select(state)
 
     state = %{state | rng_state: rng_state}
     {component, next_component} = select_component(parent)
@@ -240,6 +246,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              parent_ids: parent.parent_ids,
              is_seed_candidate: parent.id == 0
            }),
+         :ok <- maybe_skip_perfect(parent_result, parent, iteration, state, opts),
          reflective_dataset <-
            Adapter.make_reflective_dataset(
              adapter,
@@ -329,6 +336,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
            )}
       end
     else
+      {:skip, state} ->
+        {:ok, %{state | iteration: iteration}}
+
       {:error, {:budget_exhausted, _, _, _} = reason, state} ->
         {:stop, reason, state}
 
@@ -503,6 +513,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           validation_score: validation.aggregate_score
         }
 
+        state = track_validation_outputs(state, entry)
+
         state = %{
           state
           | iteration: iteration,
@@ -633,6 +645,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           validation_score: validation.aggregate_score
         }
 
+        state = track_validation_outputs(state, entry)
+
         state = %{
           state
           | iteration: iteration,
@@ -722,6 +736,73 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       error ->
         error
     end
+  end
+
+  defp maybe_skip_perfect(result, parent, iteration, state, opts) do
+    if Keyword.get(opts, :skip_perfect_score, false) and
+         Enum.all?(result.scores, &(&1 >= Keyword.fetch!(opts, :perfect_score))) do
+      notify(opts, :on_evaluation_skipped, %{
+        iteration: iteration,
+        candidate_idx: parent.id,
+        reason: :all_scores_perfect,
+        scores: result.scores,
+        is_seed_candidate: parent.id == 0
+      })
+
+      {:skip, state}
+    else
+      :ok
+    end
+  end
+
+  defp track_validation_outputs(%State{best_outputs_valset: nil} = state, _entry), do: state
+
+  defp track_validation_outputs(%State{} = state, %Entry{} = entry) do
+    ids = result_validation_ids(entry.validation)
+
+    best_outputs =
+      [ids, entry.validation.scores, entry.validation.outputs]
+      |> Enum.zip()
+      |> Enum.reduce(state.best_outputs_valset, fn
+        {_validation_id, _score, nil}, best_outputs ->
+          best_outputs
+
+        {validation_id, score, output}, best_outputs ->
+          previous = best_validation_score(state.candidates, validation_id)
+          update_best_output(best_outputs, validation_id, entry.id, output, score, previous)
+      end)
+
+    %{state | best_outputs_valset: best_outputs}
+  end
+
+  defp update_best_output(outputs, validation_id, candidate_id, output, _score, :none),
+    do: Map.put(outputs, validation_id, [{candidate_id, output}])
+
+  defp update_best_output(outputs, validation_id, candidate_id, output, score, previous)
+       when score > previous,
+       do: Map.put(outputs, validation_id, [{candidate_id, output}])
+
+  defp update_best_output(outputs, validation_id, candidate_id, output, score, score) do
+    Map.update(outputs, validation_id, [{candidate_id, output}], fn existing ->
+      existing ++ [{candidate_id, output}]
+    end)
+  end
+
+  defp update_best_output(outputs, _validation_id, _candidate_id, _output, _score, _previous),
+    do: outputs
+
+  defp best_validation_score(candidates, validation_id) do
+    candidates
+    |> Enum.flat_map(fn entry ->
+      entry.validation
+      |> result_validation_ids()
+      |> Enum.zip(entry.validation.scores)
+    end)
+    |> Enum.reduce(:none, fn
+      {^validation_id, score}, :none -> score
+      {^validation_id, score}, best -> max(score, best)
+      {_other_id, _score}, best -> best
+    end)
   end
 
   defp evaluate(adapter, batch, candidate, capture_traces, kind, state, opts, event) do
@@ -893,15 +974,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   defp select_component(%Entry{candidate: candidate, next_component: cursor}) do
     components = candidate |> Map.keys() |> Enum.sort_by(&inspect/1)
     {Enum.at(components, rem(cursor, length(components))), cursor + 1}
-  end
-
-  defp sample_parent(candidates, frontier_type, rng_state) do
-    {id, rng_state} =
-      candidates
-      |> frontier_candidates()
-      |> Frontier.sample(frontier_type, rng_state)
-
-    {Enum.find(candidates, &(&1.id == id)), rng_state}
   end
 
   defp frontier_candidates(candidates),
@@ -1094,6 +1166,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       seed: Keyword.get(opts, :seed, 0),
       use_merge: Keyword.get(opts, :use_merge, false),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
+      candidate_selection_strategy: Keyword.get(opts, :candidate_selection_strategy, :pareto),
+      skip_perfect_score: Keyword.get(opts, :skip_perfect_score, false),
+      perfect_score: Keyword.get(opts, :perfect_score),
+      track_best_outputs: Keyword.get(opts, :track_best_outputs, false),
       cache_evaluation: Keyword.get(opts, :cache_evaluation, true),
       max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
       max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity)
@@ -1120,6 +1196,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       last_iteration_found_candidate: Map.get(dumped, "last_iteration_found_candidate", false),
       frontier_type: dumped |> Map.get("frontier_type", :instance) |> normalize_frontier_type!(),
       evaluation_policy: load_evaluation_policy(dumped, opts),
+      best_outputs_valset: dumped |> Map.get("best_outputs_valset") |> load_best_outputs!(),
       stopper_state: dumped |> Map.get("stopper_state") |> load_stopper_state(opts),
       stop_reason: restore(Map.get(dumped, "stop_reason"))
     }
@@ -1281,6 +1358,44 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       side_information: result |> Map.fetch!("side_information") |> restore(),
       metadata: result |> Map.fetch!("metadata") |> restore()
     }
+  end
+
+  defp dump_best_outputs(nil), do: nil
+
+  defp dump_best_outputs(best_outputs) do
+    best_outputs
+    |> Enum.sort_by(fn {validation_id, _outputs} -> inspect(validation_id) end)
+    |> Enum.map(fn {validation_id, outputs} ->
+      %{
+        "validation_id" => dump_runtime_term(validation_id),
+        "outputs" =>
+          Enum.map(outputs, fn {candidate_id, output} ->
+            %{"candidate_id" => candidate_id, "output" => dump_runtime_term(output)}
+          end)
+      }
+    end)
+  end
+
+  defp load_best_outputs!(nil), do: nil
+
+  defp load_best_outputs!(entries) when is_list(entries) do
+    Map.new(entries, fn entry ->
+      validation_id = entry |> Map.fetch!("validation_id") |> load_runtime_term()
+
+      outputs =
+        entry
+        |> Map.fetch!("outputs")
+        |> Enum.map(fn output ->
+          {Map.fetch!(output, "candidate_id"),
+           output |> Map.fetch!("output") |> load_runtime_term()}
+        end)
+
+      {validation_id, outputs}
+    end)
+  end
+
+  defp load_best_outputs!(value) do
+    raise ArgumentError, "invalid GEPA best validation outputs: #{inspect(value)}"
   end
 
   defp dump_cache(cache) do
@@ -1469,6 +1584,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     merge_subsample_size = Keyword.get(opts, :merge_subsample_size, 5)
     frontier_type = Keyword.get(opts, :frontier_type, :instance)
     cache_evaluation = Keyword.get(opts, :cache_evaluation, true)
+    skip_perfect_score = Keyword.get(opts, :skip_perfect_score, false)
+    perfect_score = Keyword.get(opts, :perfect_score)
+    track_best_outputs = Keyword.get(opts, :track_best_outputs, false)
     acceptance_policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
 
     merge_acceptance_policy =
@@ -1480,11 +1598,14 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     end
 
     EvaluationPolicy.resolve!(Keyword.get(opts, :evaluation_policy, :full))
+    CandidateSelector.validate!(Keyword.get(opts, :candidate_selection_strategy, :pareto))
 
     unless is_boolean(use_merge), do: raise(ArgumentError, ":use_merge must be a boolean")
 
     unless is_boolean(cache_evaluation),
       do: raise(ArgumentError, ":cache_evaluation must be a boolean")
+
+    validate_policy_options!(skip_perfect_score, perfect_score, track_best_outputs)
 
     unless is_integer(max_merge_invocations) and max_merge_invocations >= 0,
       do: raise(ArgumentError, ":max_merge_invocations must be a non-negative integer")
@@ -1504,6 +1625,20 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
     validate_acceptance_policy!(acceptance_policy, :acceptance_policy)
     validate_acceptance_policy!(merge_acceptance_policy, :merge_acceptance_policy)
+  end
+
+  defp validate_policy_options!(skip_perfect_score, perfect_score, track_best_outputs) do
+    unless is_boolean(skip_perfect_score),
+      do: raise(ArgumentError, ":skip_perfect_score must be a boolean")
+
+    unless is_boolean(track_best_outputs),
+      do: raise(ArgumentError, ":track_best_outputs must be a boolean")
+
+    unless is_nil(perfect_score) or is_number(perfect_score),
+      do: raise(ArgumentError, ":perfect_score must be nil or a number")
+
+    if skip_perfect_score and not is_number(perfect_score),
+      do: raise(ArgumentError, ":perfect_score must be numeric when :skip_perfect_score is true")
   end
 
   defp validate_acceptance_policy!(policy, _name)

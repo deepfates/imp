@@ -318,6 +318,107 @@ defmodule DSEx.Optimize.Anything.AdapterTest do
     assert [%{error: "[REDACTED]"}] = result.trajectories.main
   end
 
+  test "captures evaluator IO as stdout and preserves evaluator stdout collisions" do
+    adapter =
+      Adapter.new(
+        fn _candidate, example ->
+          IO.write("captured #{example}")
+
+          case example do
+            :plain -> {1.0, %{detail: "plain"}}
+            :collision -> {1.0, %{"stdout" => "evaluator-owned"}}
+            :atom_collision -> {1.0, %{stdout: "evaluator-owned atom"}}
+          end
+        end,
+        :multi_task,
+        capture_stdio: true
+      )
+
+    result =
+      Evaluation.evaluate(adapter, [:plain, :collision, :atom_collision], %{main: "x"})
+
+    assert [plain, collision, atom_collision] = result.side_information.main
+    assert plain["stdout"] == "captured plain"
+    assert collision["stdout"] == "evaluator-owned"
+    assert collision["_gepa_stdout"] == "captured collision"
+    assert atom_collision.stdout == "evaluator-owned atom"
+    assert atom_collision["_gepa_stdout"] == "captured atom_collision"
+  end
+
+  test "preserves captured stdout when evaluator exceptions become diagnostics" do
+    parent = self()
+
+    adapter =
+      Adapter.new(
+        fn _candidate ->
+          send(parent, {:capture_device, Process.group_leader()})
+          IO.write("context before failure")
+          raise "failed evaluation"
+        end,
+        :single_task,
+        capture_stdio: true,
+        raise_on_exception: false
+      )
+
+    result = Evaluation.evaluate(adapter, [:sentinel], %{main: "x"}, capture_traces: true)
+
+    assert result.scores == [0.0]
+
+    assert result.side_information.main == [
+             %{"error" => "failed evaluation", "stdout" => "context before failure"}
+           ]
+
+    assert [%{feedback: %{"stdout" => "context before failure"}}] = result.trajectories.main
+    assert_receive {:capture_device, capture_device}
+    refute Process.alive?(capture_device)
+  end
+
+  test "isolates concurrent evaluator captures and closes each temporary group leader" do
+    parent = self()
+
+    adapter =
+      Adapter.new(
+        fn _candidate, example ->
+          capture_device = Process.group_leader()
+          send(parent, {:capture_device, capture_device})
+          IO.write("start-#{example}|")
+          Process.sleep((5 - example) * 5)
+          IO.write("end-#{example}")
+          {example, %{example: example}}
+        end,
+        :multi_task,
+        capture_stdio: true,
+        max_concurrency: 4
+      )
+
+    result = Evaluation.evaluate(adapter, [1, 2, 3, 4], %{main: "x"})
+
+    assert Enum.map(result.side_information.main, & &1["stdout"]) == [
+             "start-1|end-1",
+             "start-2|end-2",
+             "start-3|end-3",
+             "start-4|end-4"
+           ]
+
+    capture_devices =
+      for _index <- 1..4 do
+        assert_receive {:capture_device, capture_device}
+        capture_device
+      end
+
+    assert capture_devices |> Enum.uniq() |> length() == 4
+    refute Enum.any?(capture_devices, &Process.alive?/1)
+  end
+
+  test "defaults capture_stdio to false and validates explicit values" do
+    adapter = Adapter.new(fn _candidate -> 1 end, :single_task)
+    refute adapter.capture_stdio
+
+    assert_raise ArgumentError, ~r/capture_stdio must be a boolean/, fn ->
+      Adapter.new(fn _candidate -> 1 end, :single_task, capture_stdio: :yes)
+    end
+  end
+
   test "bounds parallel evaluation while preserving batch order" do
     tracker = start_supervised!({Agent, fn -> %{active: 0, peak: 0} end})
 

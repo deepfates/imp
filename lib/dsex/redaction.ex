@@ -84,6 +84,10 @@ defmodule DSEx.Redaction do
   """
   def redact(value, keys \\ @default_redact_keys)
 
+  def redact(%DSEx.Adapters.Types.Image{} = image, keys) do
+    %{image | metadata: redact(image.metadata, keys)}
+  end
+
   def redact(value, keys) when is_struct(value) do
     value
     |> Map.from_struct()

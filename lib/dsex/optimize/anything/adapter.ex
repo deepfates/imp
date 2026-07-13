@@ -4,6 +4,7 @@ defmodule DSEx.Optimize.Anything.Adapter do
   @behaviour DSEx.Optimizer.GEPA.Adapter
 
   alias DSEx.Optimize.Anything
+  alias DSEx.Optimize.Anything.{Refiner, StdioCapture}
   alias DSEx.Optimizer.GEPA.{Candidate, Result}
   alias DSEx.Optimizer.Trajectory
 
@@ -31,7 +32,9 @@ defmodule DSEx.Optimize.Anything.Adapter do
     evaluator_contract: :standard,
     optimization_state: nil,
     optimization_state_store: nil,
+    refiner: nil,
     best_example_evals_k: @default_best_example_evals_k,
+    capture_stdio: false,
     raise_on_exception: true,
     max_concurrency: 1,
     timeout: 30_000
@@ -48,7 +51,9 @@ defmodule DSEx.Optimize.Anything.Adapter do
           evaluator_contract: evaluator_contract(),
           optimization_state: OptimizationState.t() | (term() -> OptimizationState.t()),
           optimization_state_store: pid(),
+          refiner: keyword() | nil,
           best_example_evals_k: non_neg_integer(),
+          capture_stdio: boolean(),
           raise_on_exception: boolean(),
           max_concurrency: pos_integer(),
           timeout: timeout()
@@ -80,8 +85,10 @@ defmodule DSEx.Optimize.Anything.Adapter do
       candidate_key: Keyword.get(opts, :candidate_key, @default_candidate_key),
       evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
       optimization_state: Keyword.get(opts, :optimization_state, %OptimizationState{}),
+      refiner: Keyword.get(opts, :refiner),
       best_example_evals_k:
         Keyword.get(opts, :best_example_evals_k, @default_best_example_evals_k),
+      capture_stdio: Keyword.get(opts, :capture_stdio, false),
       raise_on_exception: Keyword.get(opts, :raise_on_exception, true),
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       timeout: Keyword.get(opts, :timeout, 30_000)
@@ -154,19 +161,66 @@ defmodule DSEx.Optimize.Anything.Adapter do
   end
 
   defp evaluate_one(adapter, candidate, example, index, state_source) do
-    eval_candidate = evaluator_candidate(candidate, adapter)
     state = optimization_state(adapter, state_source, example)
 
     try do
-      raw = call_evaluator(adapter, eval_candidate, example, state)
-      evaluation = normalized_evaluation(raw, candidate, example, index)
-      update_optimization_state(adapter, example, evaluation.score, evaluation.side_info)
-      evaluation
+      case call_evaluator_with_stdio(adapter, candidate, example, state) do
+        {:ok, raw, captured_stdout} ->
+          evaluation =
+            normalized_evaluation(raw, candidate, example, index, captured_stdout)
+
+          unless refined_result?(raw) do
+            update_optimization_state(adapter, example, evaluation.score, evaluation.side_info)
+          end
+
+          evaluation
+
+        {:raised, kind, reason, stacktrace, captured_stdout} ->
+          {:raised, kind, reason, stacktrace, candidate, example, index, captured_stdout}
+      end
     rescue
       exception -> {:raised, :error, exception, __STACKTRACE__, candidate, example, index}
     catch
       kind, reason -> {:raised, kind, reason, __STACKTRACE__, candidate, example, index}
     end
+  end
+
+  defp call_evaluator_with_stdio(%{capture_stdio: false} = adapter, candidate, example, state) do
+    {:ok, evaluate_candidate(adapter, candidate, example, state), ""}
+  end
+
+  defp call_evaluator_with_stdio(%{capture_stdio: true} = adapter, candidate, example, state) do
+    case StdioCapture.capture(fn -> evaluate_candidate(adapter, candidate, example, state) end) do
+      {{:ok, raw}, captured_stdout} ->
+        {:ok, raw, captured_stdout}
+
+      {{:raised, kind, reason, stacktrace}, captured_stdout} ->
+        {:raised, kind, reason, stacktrace, captured_stdout}
+    end
+  end
+
+  defp evaluate_candidate(%{refiner: nil} = adapter, candidate, example, state) do
+    call_evaluator(adapter, evaluator_candidate(candidate, adapter), example, state)
+  end
+
+  defp evaluate_candidate(%{refiner: refiner} = adapter, candidate, example, state) do
+    evaluator = fn refined_candidate ->
+      call_evaluator(adapter, evaluator_candidate(refined_candidate, adapter), example, state)
+    end
+
+    result =
+      Refiner.execute(
+        Keyword.merge(refiner,
+          candidate: candidate,
+          example: example,
+          evaluator: evaluator,
+          on_evaluation: fn evaluation ->
+            update_optimization_state(adapter, example, evaluation.score, evaluation.asi)
+          end
+        )
+      )
+
+    {:dsex_refined, result}
   end
 
   defp call_evaluator(
@@ -196,14 +250,15 @@ defmodule DSEx.Optimize.Anything.Adapter do
        ),
        do: adapter.evaluator.(candidate, example, state)
 
-  defp normalized_evaluation(raw, candidate, example, index) do
+  defp normalized_evaluation(raw, candidate, example, index, captured_stdout) do
+    {raw, evaluated_candidate} = unwrap_internal_result(raw, candidate)
     {score, side_info} = normalize_result!(raw)
     validate_score!(score)
     validate_side_info!(side_info)
 
-    side_info = DSEx.Redaction.redact(side_info)
+    side_info = side_info |> merge_captured_stdout(captured_stdout) |> DSEx.Redaction.redact()
     objective_scores = objective_scores!(side_info, Map.keys(candidate))
-    output = {score, DSEx.Redaction.redact(candidate), side_info}
+    output = {score, DSEx.Redaction.redact(evaluated_candidate), side_info}
 
     %{
       score: score,
@@ -212,6 +267,26 @@ defmodule DSEx.Optimize.Anything.Adapter do
       objective_scores: objective_scores,
       trajectory: trajectory(index, example, candidate, score, side_info, objective_scores, nil)
     }
+  end
+
+  defp unwrap_internal_result({:dsex_refined, %Refiner.Result{} = result}, _candidate) do
+    {%{score: result.score, asi: result.asi}, result.candidate}
+  end
+
+  defp unwrap_internal_result(raw, candidate), do: {raw, candidate}
+
+  defp refined_result?({:dsex_refined, %Refiner.Result{}}), do: true
+  defp refined_result?(_raw), do: false
+
+  defp merge_captured_stdout(side_info, ""), do: side_info
+
+  defp merge_captured_stdout(side_info, captured_stdout) do
+    key = if has_string_key?(side_info, "stdout"), do: "_gepa_stdout", else: "stdout"
+    Map.put(side_info, key, captured_stdout)
+  end
+
+  defp has_string_key?(map, expected) do
+    Enum.any?(map, fn {key, _value} -> to_string(key) == expected end)
   end
 
   defp normalize_result!(score) when is_number(score), do: {score, %{}}
@@ -360,10 +435,36 @@ defmodule DSEx.Optimize.Anything.Adapter do
   end
 
   defp resolve_task_result(
+         {:ok, {:raised, kind, reason, stacktrace, candidate, example, index, _captured_stdout}},
+         true
+       ) do
+    _ = {candidate, example, index}
+    :erlang.raise(kind, reason, stacktrace)
+  end
+
+  defp resolve_task_result(
          {:ok, {:raised, _kind, reason, _stacktrace, candidate, example, index}},
          false
        ) do
     diagnostic = %{"error" => redact_error(reason)}
+
+    %{
+      score: 0.0,
+      output: nil,
+      side_info: diagnostic,
+      objective_scores: %{},
+      trajectory: trajectory(index, example, candidate, 0.0, diagnostic, %{}, diagnostic["error"])
+    }
+  end
+
+  defp resolve_task_result(
+         {:ok, {:raised, _kind, reason, _stacktrace, candidate, example, index, captured_stdout}},
+         false
+       ) do
+    diagnostic =
+      %{"error" => redact_error(reason)}
+      |> merge_captured_stdout(captured_stdout)
+      |> DSEx.Redaction.redact()
 
     %{
       score: 0.0,
@@ -534,10 +635,15 @@ defmodule DSEx.Optimize.Anything.Adapter do
     validate_member!(:evaluator_contract, adapter.evaluator_contract, @contracts)
     validate_candidate_key!(adapter.candidate_key)
     validate_state_source!(adapter.optimization_state)
+    validate_refiner!(adapter.refiner)
     validate_best_example_evals_k!(adapter.best_example_evals_k)
 
     unless is_boolean(adapter.raise_on_exception) do
       raise ArgumentError, ":raise_on_exception must be a boolean"
+    end
+
+    unless is_boolean(adapter.capture_stdio) do
+      raise ArgumentError, ":capture_stdio must be a boolean"
     end
 
     unless is_integer(adapter.max_concurrency) and adapter.max_concurrency > 0 do
@@ -577,7 +683,9 @@ defmodule DSEx.Optimize.Anything.Adapter do
       :candidate_key,
       :evaluator_contract,
       :optimization_state,
+      :refiner,
       :best_example_evals_k,
+      :capture_stdio,
       :raise_on_exception,
       :max_concurrency,
       :timeout
@@ -596,6 +704,19 @@ defmodule DSEx.Optimize.Anything.Adapter do
 
   defp validate_candidate_key!(key) do
     raise ArgumentError, ":candidate_key must be an atom or string, got: #{inspect(key)}"
+  end
+
+  defp validate_refiner!(nil), do: :ok
+
+  defp validate_refiner!(refiner) when is_list(refiner) and refiner != [] do
+    if Keyword.keyword?(refiner),
+      do: :ok,
+      else: raise(ArgumentError, ":refiner must be a keyword list")
+  end
+
+  defp validate_refiner!(refiner) do
+    raise ArgumentError,
+          ":refiner must be nil or a non-empty keyword list, got: #{inspect(refiner)}"
   end
 
   defp validate_best_example_evals_k!(value) when is_integer(value) and value >= 0, do: :ok

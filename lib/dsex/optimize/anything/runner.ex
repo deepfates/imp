@@ -1,11 +1,30 @@
 defmodule DSEx.Optimize.Anything.Runner do
   @moduledoc false
 
-  alias DSEx.Optimize.Anything.{Adapter, Config, Result}
+  alias DSEx.Optimize.Anything.{Adapter, Config, Multimodal, Progress, Result}
   alias DSEx.Optimizer.GEPA.{Candidate, Engine}
 
   @string_candidate_key :current_candidate
   @single_instance :__dsex_optimize_anything_single_instance__
+  @default_refiner_prompt """
+  You are a refinement agent improving candidates in an optimization loop.
+
+  ## What We're Optimizing For
+  The overall optimization objective is:
+  <objective>
+
+  This tells you what "better" means - use it to guide your improvements.
+
+  ## Domain Knowledge
+  <background>
+
+  ## Your Task
+  Given a candidate and its evaluation feedback:
+  1. Understand why it scored the way it did
+  2. Fix any errors (errors = zero score)
+  3. Make improvements that move toward the objective
+  4. Return the complete improved candidate
+  """
   @option_keys [
     :background,
     :checkpoint_fn,
@@ -31,6 +50,8 @@ defmodule DSEx.Optimize.Anything.Runner do
     {candidate, candidate_format, string_key} =
       normalize_seed(seed_candidate, config, opts, trainset)
 
+    candidate = inject_refiner_prompt(candidate, config, opts)
+
     adapter_opts =
       [
         candidate_format: candidate_format,
@@ -38,6 +59,8 @@ defmodule DSEx.Optimize.Anything.Runner do
         evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
         raise_on_exception: config.engine.raise_on_exception,
         best_example_evals_k: config.engine.best_example_evals_k,
+        capture_stdio: config.engine.capture_stdio,
+        refiner: refiner_options(config),
         max_concurrency: max_concurrency(config),
         timeout: Keyword.get(opts, :timeout, 30_000)
       ]
@@ -48,6 +71,7 @@ defmodule DSEx.Optimize.Anything.Runner do
     engine_opts =
       config
       |> Config.to_engine_options()
+      |> Keyword.update!(:callbacks, &(runtime_callbacks(config) ++ &1))
       |> Keyword.merge(
         resume_state: resume_state(config, Keyword.get(opts, :resume_state)),
         checkpoint_fn: checkpoint_callback(config, Keyword.get(opts, :checkpoint_fn))
@@ -199,18 +223,20 @@ defmodule DSEx.Optimize.Anything.Runner do
     end
 
     fn candidate, component, records, iteration ->
+      {side_information, images} = Multimodal.render(records)
+
       prompt =
         render_reflection_prompt(template, %{
           objective: objective,
           background: background,
           component: component,
           current_parameter: Map.fetch!(candidate, component),
-          side_information: records,
+          side_information: side_information,
           iteration: iteration
         })
 
       lm
-      |> DSEx.LM.generate([%{role: :user, content: prompt}], [])
+      |> DSEx.LM.generate([%{role: :user, content: Multimodal.content(prompt, images)}], [])
       |> lm_text!()
       |> extract_fenced_text()
     end
@@ -233,7 +259,7 @@ defmodule DSEx.Optimize.Anything.Runner do
     ```
 
     Actionable side information:
-    #{inspect(context.side_information, pretty: true, limit: :infinity)}
+    #{context.side_information}
 
     Return only a complete drop-in replacement inside a fenced code block.
     """
@@ -242,7 +268,7 @@ defmodule DSEx.Optimize.Anything.Runner do
   defp render_reflection_prompt(template, context) when is_binary(template) do
     template
     |> String.replace("<curr_param>", context.current_parameter)
-    |> String.replace("<side_info>", inspect(context.side_information, pretty: true))
+    |> String.replace("<side_info>", context.side_information)
   end
 
   defp render_reflection_prompt(templates, context) when is_map(templates) do
@@ -282,18 +308,10 @@ defmodule DSEx.Optimize.Anything.Runner do
   end
 
   defp validate_runtime_support!(config, opts) do
-    unless config.engine.candidate_selection_strategy == :pareto do
-      raise ArgumentError,
-            "Optimize Anything candidate selector #{inspect(config.engine.candidate_selection_strategy)} is not wired yet"
-    end
-
     unless config.reflection.module_selector == :round_robin do
       raise ArgumentError,
             "Optimize Anything module selector #{inspect(config.reflection.module_selector)} is not wired yet"
     end
-
-    if config.refiner,
-      do: raise(ArgumentError, "Optimize Anything refiner execution is not wired yet")
 
     if config.tracking.use_wandb or config.tracking.use_mlflow,
       do: raise(ArgumentError, "Optimize Anything external experiment tracking is not wired yet")
@@ -302,6 +320,41 @@ defmodule DSEx.Optimize.Anything.Runner do
       raise ArgumentError,
             "Optimize Anything requires max_metric_calls, max_candidate_proposals, a stopper, or a run_dir"
     end
+  end
+
+  defp inject_refiner_prompt(candidate, %{refiner: nil}, _opts), do: candidate
+
+  defp inject_refiner_prompt(candidate, _config, opts) do
+    if Enum.any?(Map.keys(candidate), &(to_string(&1) == "refiner_prompt")) do
+      candidate
+    else
+      objective = Keyword.get(opts, :objective) || "Maximize the score"
+      background = Keyword.get(opts, :background) || "No additional background provided."
+
+      prompt =
+        @default_refiner_prompt
+        |> String.replace("<objective>", objective)
+        |> String.replace("<background>", background)
+
+      Map.put(candidate, :refiner_prompt, prompt)
+    end
+  end
+
+  defp refiner_options(%{refiner: nil}), do: nil
+
+  defp refiner_options(config) do
+    lm = config.refiner.refiner_lm || config.reflection.reflection_lm
+
+    if is_nil(lm) do
+      raise ArgumentError, "Optimize Anything refiner requires refiner_lm or reflection_lm"
+    end
+
+    [
+      refiner_lm: lm,
+      refiner_prompt: :refiner_prompt,
+      refiner_prompt_component: :refiner_prompt,
+      max_refinements: config.refiner.max_refinements
+    ]
   end
 
   defp stopping_condition?(config, opts) do
@@ -366,6 +419,28 @@ defmodule DSEx.Optimize.Anything.Runner do
   defp max_concurrency(%{engine: %{parallel: false}}), do: 1
   defp max_concurrency(%{engine: %{max_workers: nil}}), do: System.schedulers_online()
   defp max_concurrency(%{engine: %{max_workers: workers}}), do: workers
+
+  defp runtime_callbacks(%{engine: %{display_progress_bar: false}}), do: []
+
+  defp runtime_callbacks(%{engine: engine, stopper: stopper}) do
+    total = minimum_limit(engine.max_metric_calls, stopper_metric_limit(stopper))
+    [Progress.callback(total: total)]
+  end
+
+  defp stopper_metric_limit({:max_metric_calls, limit}), do: limit
+
+  defp stopper_metric_limit({kind, policies}) when kind in [:any, :all] do
+    policies
+    |> Enum.map(&stopper_metric_limit/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  defp stopper_metric_limit(_policy), do: nil
+
+  defp minimum_limit(nil, right), do: right
+  defp minimum_limit(left, nil), do: left
+  defp minimum_limit(left, right), do: min(left, right)
 
   defp resume_state(_config, state) when not is_nil(state), do: state
   defp resume_state(%{engine: %{run_dir: nil}}, nil), do: nil

@@ -1,6 +1,7 @@
 defmodule DSEx.Optimize.Anything.RunnerTest do
   use ExUnit.Case, async: true
 
+  alias DSEx.Adapters.Types.Image
   alias DSEx.Optimize.Anything
   alias DSEx.Optimize.Anything.{Config, Result}
 
@@ -142,6 +143,93 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
              {:objective, :quality} => [0],
              {:objective, :safety} => [0]
            }
+  end
+
+  test "reflection sends nested ASI images to the LM in deterministic depth-first order" do
+    receiver = self()
+    first = %Image{url: "https://example.test/first.png"}
+    second = %Image{data: "c2Vjb25k", mime_type: "image/png"}
+
+    reflection_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn [%{content: content}], _opts ->
+          send(receiver, {:reflection_content, content})
+          "```text\nbase\n```"
+        end
+      ]
+    }
+
+    result =
+      Anything.optimize(
+        "base",
+        fn _candidate, _example ->
+          {0.0, %{a: %{visual: first}, z: [second]}}
+        end,
+        dataset: [:task],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [reflection_lm: reflection_lm]
+          )
+      )
+
+    assert %Result{} = result
+    assert_receive {:reflection_content, [prompt, ^first, ^second]}
+    assert prompt =~ "[IMAGE-1 - see visual content]"
+    assert prompt =~ "[IMAGE-2 - see visual content]"
+  end
+
+  test "capture_stdio preserves evaluator output as actionable side information" do
+    result =
+      Anything.optimize(
+        "base",
+        fn _candidate ->
+          IO.write("diagnostic output")
+          1.0
+        end,
+        config: Config.new(engine: [max_candidate_proposals: 0, capture_stdio: true]),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component)
+        end
+      )
+
+    assert [%{current_candidate: [%{"stdout" => "diagnostic output"}]}] =
+             result.candidate_side_information
+  end
+
+  test "refiner boosts evaluation and exposes co-evolved prompt history" do
+    refiner_lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> ~s({"current_candidate":"better"}) end]
+    }
+
+    result =
+      Anything.optimize(
+        "base",
+        fn candidate -> if(candidate == "better", do: 1.0, else: 0.0) end,
+        objective: "Produce the better candidate",
+        background: "Use exact words",
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 0, track_best_outputs: true],
+            refiner: [refiner_lm: refiner_lm, max_refinements: 1]
+          ),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component)
+        end
+      )
+
+    assert result.validation_scores == [1.0]
+    assert Result.best_candidate(result) == "base"
+    assert Result.best_refiner_prompt(result) =~ "Produce the better candidate"
+
+    assert [%{refiner_prompt: [%{"Attempts" => attempts}]}] =
+             result.candidate_side_information
+
+    assert Enum.map(attempts, & &1["score"]) == [0.0, 1.0]
+    assert [{0, {1.0, refined_candidate, _side_info}}] = result.best_outputs_valset[0]
+    assert refined_candidate.current_candidate == "better"
   end
 
   test "rejects dataset and valset combinations outside the three public modes" do

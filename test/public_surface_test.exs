@@ -95,6 +95,7 @@ defmodule PublicSurfaceTest do
     DSEx.Optimizer.GEPA.Acceptance,
     DSEx.Optimizer.GEPA.Callback,
     DSEx.Optimizer.GEPA.Candidate,
+    DSEx.Optimizer.GEPA.CandidateSelector,
     DSEx.Optimizer.GEPA.Evaluation,
     DSEx.Optimizer.GEPA.EvaluationCache,
     DSEx.Optimizer.GEPA.EvaluationPolicy,

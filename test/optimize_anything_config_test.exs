@@ -28,7 +28,7 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
     configured =
       Config.new(
         engine: [max_metric_calls: 120, cache_evaluation: true, max_workers: 4],
-        reflection: [reflection_minibatch_size: 3, skip_perfect_score: true],
+        reflection: [reflection_minibatch_size: 3, skip_perfect_score: true, perfect_score: 1.0],
         merge: [max_merge_invocations: 7],
         refiner: [max_refinements: 2],
         tracking: [use_wandb: true]
@@ -79,6 +79,10 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
     assert opts[:max_iterations] == 12
     assert opts[:frontier_type] == :cartesian
     assert opts[:cache_evaluation] == false
+    assert opts[:candidate_selection_strategy] == :pareto
+    assert opts[:track_best_outputs] == false
+    assert opts[:skip_perfect_score] == false
+    assert opts[:perfect_score] == nil
     assert opts[:evaluation_policy] == :full
     assert opts[:minibatch_size] == 2
     assert opts[:stopper] == stopper
@@ -93,6 +97,10 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
 
     assert_raise ArgumentError, ~r/positive integer/, fn ->
       Reflection.new(reflection_minibatch_size: 0)
+    end
+
+    assert_raise ArgumentError, ~r/perfect_score must be numeric/, fn ->
+      Config.new(reflection: [skip_perfect_score: true])
     end
 
     assert_raise ArgumentError, ~r/non negative integer/, fn ->
