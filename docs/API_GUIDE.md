@@ -50,6 +50,79 @@ For a runnable real-provider walkthrough, open
 `livebooks/01_real_lm_front_door.livemd`. It is the best first stop after this
 guide when you want the "this is actually an LM program" moment.
 
+### Run A Resumable Provider Batch
+
+Use `DSEx.Clients.ReqLLMBatch` when a collection of independent provider calls
+must survive process or host restarts. Each request needs a stable, unique ID
+and a JSON-safe payload. The callback is provider-neutral and reports an
+explicit outcome so retry policy does not depend on provider-specific structs:
+
+```elixir
+alias DSEx.Clients.ReqLLMBatch
+
+requests = [
+  %{id: "question-001", payload: %{question: "Capital of France?"}},
+  %{id: "question-002", payload: %{question: "Capital of Italy?"}}
+]
+
+dispatch = fn request, _context ->
+  case MyProvider.complete(request.payload, idempotency_key: request.id) do
+    {:ok, output} -> {:ok, output}
+    {:error, :rate_limited} -> {:transient, :rate_limited}
+    {:error, :unauthorized} -> {:terminal, :unauthorized}
+    {:error, reason} -> {:malformed, reason}
+  end
+end
+
+{:ok, summary} =
+  ReqLLMBatch.run(requests, dispatch,
+    checkpoint: "var/question-batch.json",
+    max_concurrency: 4,
+    max_attempts: 3
+  )
+```
+
+Only `:transient` outcomes retry, and every dispatch consumes an attempt. A
+callback exception, throw, task exit, or timeout is recorded as transient.
+`:terminal` and `:malformed` outcomes do not retry. `validate_output:` can turn
+an otherwise successful return into a malformed outcome at the commit boundary.
+
+The checkpoint records append-only request, dispatch-intent, outcome, and
+resume-reconciliation events. Each update is written to a synced temporary file
+and atomically renamed. Resume uses the persisted request order, attempt counts,
+and retry limit:
+
+```elixir
+{:ok, summary} =
+  ReqLLMBatch.resume("var/question-batch.json", dispatch,
+    max_concurrency: 4
+  )
+```
+
+A committed success is never replayed. If a checkpoint contains a dispatch
+intent without a committed outcome, resume marks that request `:ambiguous` and
+does not send it again. Resolve that state using provider-side idempotency or
+reconciliation before starting a new request; DSEx deliberately cannot infer
+whether the remote provider accepted an interrupted call.
+
+For ReqLLM, the included adapter works with any model spec supported by the
+client. Its default classification treats ReqLLM errors as transient; use a
+custom callback when application knowledge can classify errors more narrowly.
+
+```elixir
+client = DSEx.Clients.ReqLLM.new("gemini:gemini-2.5-flash", api_key: api_key)
+dispatch = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
+
+requests = [
+  %{
+    id: "question-001",
+    payload: %{messages: [%{role: :user, content: "Capital of France?"}]}
+  }
+]
+
+ReqLLMBatch.run(requests, dispatch, checkpoint: "var/req-llm-batch.json")
+```
+
 ## Basic Predict
 
 ```elixir
