@@ -84,8 +84,44 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceAdapter do
         |> Keyword.merge(openai_logprobs: true, openai_top_logprobs: top_logprobs)
 
       config = Keyword.put(predictor.config, :provider_options, provider_options)
-      %{predictor | config: config}
+      %{predictor | config: config, lm: openai_chat_lm!(predictor.lm)}
     end)
+  end
+
+  defp openai_chat_lm!(%DSEx.Clients.ReqLLM{} = lm) do
+    case ReqLLM.model(lm.model) do
+      {:ok, %LLMDB.Model{provider: :openai} = model} ->
+        extra = put_wire_protocol(model.extra || %{}, "openai_chat")
+        %{lm | model: %{model | extra: extra}}
+
+      {:ok, %LLMDB.Model{provider: provider}} ->
+        raise ArgumentError,
+              "GEPA confidence adapter requires an OpenAI Chat ReqLLM model, got provider: #{inspect(provider)}"
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "GEPA confidence adapter could not resolve its ReqLLM model: #{inspect(reason)}"
+    end
+  end
+
+  defp openai_chat_lm!(other) do
+    raise ArgumentError,
+          "GEPA confidence adapter requires an explicit DSEx.Clients.ReqLLM OpenAI model, got: #{inspect(other)}"
+  end
+
+  defp put_wire_protocol(extra, protocol) do
+    cond do
+      Map.has_key?(extra, :wire) ->
+        wire = if is_map(extra[:wire]), do: extra[:wire], else: %{}
+        Map.put(extra, :wire, Map.put(wire, :protocol, protocol))
+
+      Map.has_key?(extra, "wire") ->
+        wire = if is_map(extra["wire"]), do: extra["wire"], else: %{}
+        Map.put(extra, "wire", Map.put(wire, "protocol", protocol))
+
+      true ->
+        Map.put(extra, :wire, %{protocol: protocol})
+    end
   end
 
   defp confidence_option_keys do

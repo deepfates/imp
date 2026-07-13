@@ -217,6 +217,22 @@ defmodule ReqLLMClientTest do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
 
+  defmodule InlineModelStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:inline_model_generate, model, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_inline",
+         model: model[:provider_model_id] || model[:id],
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(~s({"answer":"pong"})),
+         object: %{"answer" => "pong"},
+         provider_meta: %{"api_type" => "chat_completions"}
+       }}
+    end
+  end
+
   test "ReqLLM constructor validates DSEx-owned options while preserving provider passthrough" do
     lm =
       DSEx.Clients.ReqLLM.new("openai:gpt-test",
@@ -368,6 +384,48 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(opts, :max_tokens)
     refute Keyword.has_key?(opts, :temperature)
     refute Keyword.has_key?(opts, :top_p)
+  end
+
+  test "ReqLLM client supports inline model descriptors without losing provider profiles" do
+    chat_model = %{
+      provider: :openai,
+      id: "gpt-4o-mini",
+      provider_model_id: "gpt-4o-mini",
+      extra: %{wire: %{protocol: "openai_chat"}}
+    }
+
+    chat_lm =
+      DSEx.req_llm(chat_model,
+        test_pid: self(),
+        req_module: InlineModelStub,
+        temperature: 0,
+        max_tokens: 80
+      )
+
+    assert {:ok, _output} =
+             DSEx.Clients.ReqLLM.generate(chat_lm, [%{role: :user, content: "pong?"}], [])
+
+    assert_received {:inline_model_generate, ^chat_model, chat_opts}
+    assert Keyword.fetch!(chat_opts, :max_tokens) == 80
+    assert Keyword.fetch!(chat_opts, :temperature) == 0
+
+    reasoning_model = %{provider: :openai, id: "gpt-5.4-mini"}
+
+    reasoning_lm =
+      DSEx.req_llm(reasoning_model,
+        test_pid: self(),
+        req_module: InlineModelStub,
+        temperature: 0,
+        max_tokens: 80
+      )
+
+    assert {:ok, _output} =
+             DSEx.Clients.ReqLLM.generate(reasoning_lm, [%{role: :user, content: "pong?"}], [])
+
+    assert_received {:inline_model_generate, ^reasoning_model, reasoning_opts}
+    assert Keyword.fetch!(reasoning_opts, :max_completion_tokens) == 80
+    refute Keyword.has_key?(reasoning_opts, :max_tokens)
+    refute Keyword.has_key?(reasoning_opts, :temperature)
   end
 
   test "ReqLLM client preserves provider-native reasoning in prediction metadata" do

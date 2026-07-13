@@ -511,22 +511,60 @@ defmodule DSEx.Clients.ReqLLM do
   end
 
   defp openai_reasoning_model?(model) do
-    model
-    |> to_string()
-    |> String.downcase()
-    |> String.replace_prefix("openai:", "")
-    |> then(fn model ->
-      String.match?(model, ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/) or
-        String.contains?(model, "reasoning")
-    end)
+    id = model |> model_id() |> String.downcase()
+
+    model_provider(model) == :openai and
+      (String.match?(id, ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/) or
+         String.contains?(id, "reasoning"))
   end
 
   defp anthropic_model?(model) do
-    model
-    |> to_string()
-    |> String.downcase()
-    |> String.starts_with?("anthropic:")
+    model_provider(model) == :anthropic
   end
+
+  defp model_provider(%{provider: provider}), do: normalize_provider(provider)
+  defp model_provider(%{"provider" => provider}), do: normalize_provider(provider)
+  defp model_provider({provider, _model}) when is_atom(provider), do: provider
+  defp model_provider({provider, _model, _opts}) when is_atom(provider), do: provider
+
+  defp model_provider(model) when is_binary(model) do
+    model
+    |> String.split(":", parts: 2)
+    |> List.first()
+    |> normalize_provider()
+  end
+
+  defp model_provider(_model), do: nil
+
+  defp model_id(%{provider_model_id: id}) when is_binary(id), do: id
+  defp model_id(%{"provider_model_id" => id}) when is_binary(id), do: id
+  defp model_id(%{id: id}) when is_binary(id), do: id
+  defp model_id(%{"id" => id}) when is_binary(id), do: id
+  defp model_id(%{model: id}) when is_binary(id), do: id
+  defp model_id(%{"model" => id}) when is_binary(id), do: id
+  defp model_id({_provider, id}) when is_binary(id), do: id
+  defp model_id({_provider, id, _opts}) when is_binary(id), do: id
+
+  defp model_id(model) when is_binary(model) do
+    case String.split(model, ":", parts: 2) do
+      [_provider, id] -> id
+      [id] -> id
+    end
+  end
+
+  defp model_id(_model), do: ""
+
+  defp normalize_provider(provider) when is_atom(provider), do: provider
+
+  defp normalize_provider(provider) when is_binary(provider) do
+    case String.downcase(provider) do
+      "openai" -> :openai
+      "anthropic" -> :anthropic
+      _other -> nil
+    end
+  end
+
+  defp normalize_provider(_provider), do: nil
 
   defp normalize_tool(%ReqLLM.Tool{} = tool), do: tool
 

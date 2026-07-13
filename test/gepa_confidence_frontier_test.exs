@@ -33,7 +33,7 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
       {:ok,
        %ReqLLM.Response{
          id: "chatcmpl_gepa_fixture",
-         model: to_string(model),
+         model: model.provider_model_id || model.id,
          context: ReqLLM.Context.new(messages),
          message: ReqLLM.Context.assistant(content),
          object: %{"category" => label},
@@ -57,7 +57,7 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
 
   test "confidence objectives flow through ProgramAdapter into the GEPA frontier" do
     lm =
-      DSEx.Clients.ReqLLM.new("openai:gpt-fixture",
+      DSEx.Clients.ReqLLM.new(%{provider: :openai, id: "gpt-fixture"},
         req_module: OpenAIChatFixture,
         test_pid: self()
       )
@@ -102,12 +102,25 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
     provider_options = Keyword.fetch!(opts, :provider_options)
     assert Keyword.fetch!(provider_options, :openai_logprobs)
     assert Keyword.fetch!(provider_options, :openai_top_logprobs) == 5
+
+    assert %LLMDB.Model{provider: :openai, extra: extra} =
+             adapter.program_adapter.program.lm.model
+
+    assert get_in(extra, [Access.key(:wire, %{}), :protocol]) == "openai_chat"
   end
 
   test "confidence adapter rejects programs with more than one component" do
     program = %MultiComponentProgram{}
 
     assert_raise ArgumentError, ~r/requires exactly one optimizable component, got: 2/, fn ->
+      ConfidenceAdapter.new(program, field: :category, enum: ["Food", "Drinks"])
+    end
+  end
+
+  test "confidence adapter rejects unsupported LM transports before evaluation" do
+    program = DSEx.predict("input -> category", lm: DSEx.LM.Static)
+
+    assert_raise ArgumentError, ~r/requires an explicit DSEx.Clients.ReqLLM OpenAI model/, fn ->
       ConfidenceAdapter.new(program, field: :category, enum: ["Food", "Drinks"])
     end
   end
