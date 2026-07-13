@@ -84,6 +84,7 @@ defmodule PublicSurfaceTest do
     DSEx.Optimize.GEPA,
     DSEx.Optimize.GEPA.Candidate,
     DSEx.Optimize.GEPA.Report,
+    DSEx.Optimizer.Artifact,
     DSEx.Optimizer.BetterTogether,
     DSEx.Optimizer.BootstrapFewShot,
     DSEx.Optimizer.BootstrapFewShotWithRandomSearch,

@@ -22,3 +22,12 @@ to 5000 milliseconds.
 
 During source development, set `DSEX_PATH` to the DSEx checkout. Published
 applications omit it and resolve the Hex dependency.
+
+## Optimizer Artifacts
+
+`DSEx.Optimizer.Artifact` stores checksummed champion and challenger parameter
+states without runtime credentials or callback functions. Load an artifact and
+apply its champion to an already configured live program with
+`DSExDeployment.OptimizerArtifacts.load_apply_and_preserve/3`. Promotion and
+rollback update the artifact atomically while preserving the previous champion
+in revision history.
