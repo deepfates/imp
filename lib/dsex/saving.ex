@@ -15,6 +15,7 @@ defmodule DSEx.Saving do
   @artifact_type "dsex_program_artifact"
   @artifact_schema_version 1
   @registry_context_key {__MODULE__, :registry}
+  @sensitive_keys ~w(api_key authorization token password secret access_token client_secret private_key x_api_key)
 
   def save!(program, path, opts \\ []) do
     directory = Path.dirname(path)
@@ -51,6 +52,12 @@ defmodule DSEx.Saving do
     with_registry(opts, fn -> dump(program) end)
   end
 
+  def dump(program) do
+    program
+    |> dump_state()
+    |> redact_dump()
+  end
+
   def load(state, opts) do
     with_registry(opts, fn -> load(state) end)
   end
@@ -79,10 +86,14 @@ defmodule DSEx.Saving do
 
   defp load_artifact!(state), do: load(state)
 
-  def dump(%DSEx.Predict.Predict{} = program),
-    do: Map.put(DSEx.Predict.Predict.dump(program), "type", "predict")
+  defp dump_state(%DSEx.Predict.Predict{} = program) do
+    program
+    |> DSEx.Predict.Predict.dump()
+    |> Map.update!("config", &dump_portable_config!(&1, "Predict config"))
+    |> Map.put("type", "predict")
+  end
 
-  def dump(%DSEx.Playbook.WithContext{} = wrapper) do
+  defp dump_state(%DSEx.Playbook.WithContext{} = wrapper) do
     %{
       "type" => "with_playbook",
       "program" => dump(wrapper.program),
@@ -90,11 +101,11 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.ChainOfThought{predict: predict}) do
+  defp dump_state(%DSEx.Predict.ChainOfThought{predict: predict}) do
     predict |> dump() |> Map.put("type", "chain_of_thought")
   end
 
-  def dump(%DSEx.Predict.RAG{} = rag) do
+  defp dump_state(%DSEx.Predict.RAG{} = rag) do
     %{
       "type" => "rag",
       "program" => dump(rag.program),
@@ -106,7 +117,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.ProgramOfThought{} = pot) do
+  defp dump_state(%DSEx.Predict.ProgramOfThought{} = pot) do
     %{
       "type" => "program_of_thought",
       "signature" => DSEx.Signature.dump(pot.signature),
@@ -115,7 +126,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.MultiChainComparison{} = comparison) do
+  defp dump_state(%DSEx.Predict.MultiChainComparison{} = comparison) do
     %{
       "type" => "multi_chain_comparison",
       "predict" => dump(comparison.predict),
@@ -124,7 +135,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.KNN{} = knn) do
+  defp dump_state(%DSEx.Predict.KNN{} = knn) do
     %{
       "type" => "knn",
       "examples" => DSEx.Optimizer.Report.json_safe(knn.retriever.examples),
@@ -133,7 +144,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.Avatar{} = avatar) do
+  defp dump_state(%DSEx.Predict.Avatar{} = avatar) do
     state = %{
       "type" => "avatar",
       "signature" => dump_portable_signature!(avatar.signature, "Avatar signature"),
@@ -148,7 +159,7 @@ defmodule DSEx.Saving do
     require_portable_json!(state, "Avatar")
   end
 
-  def dump(%DSEx.Predict.BestOfN{} = best) do
+  defp dump_state(%DSEx.Predict.BestOfN{} = best) do
     %{
       "type" => "best_of_n",
       "program" => dump(best.program),
@@ -159,7 +170,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.Refine{} = refine) do
+  defp dump_state(%DSEx.Predict.Refine{} = refine) do
     %{
       "type" => "refine",
       "program" => dump(refine.program),
@@ -170,7 +181,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.Assertions{} = assertions) do
+  defp dump_state(%DSEx.Predict.Assertions{} = assertions) do
     %{
       "type" => "assertions",
       "program" => dump(assertions.program),
@@ -187,7 +198,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.ReAct{} = react) do
+  defp dump_state(%DSEx.Predict.ReAct{} = react) do
     %{
       "type" => "react",
       "signature" => DSEx.Signature.dump(react.signature),
@@ -199,7 +210,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.ReActV2{} = react) do
+  defp dump_state(%DSEx.Predict.ReActV2{} = react) do
     %{
       "type" => "react_v2",
       "signature" => DSEx.Signature.dump(react.signature),
@@ -210,7 +221,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.CodeAct{} = code_act) do
+  defp dump_state(%DSEx.Predict.CodeAct{} = code_act) do
     %{
       "type" => "code_act",
       "program_of_thought" => dump(code_act.program_of_thought),
@@ -220,7 +231,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Predict.RLM{} = rlm) do
+  defp dump_state(%DSEx.Predict.RLM{} = rlm) do
     %{
       "type" => "rlm",
       "signature" => DSEx.Signature.dump(rlm.signature),
@@ -244,15 +255,15 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Evaluate.SemanticF1{} = evaluator) do
+  defp dump_state(%DSEx.Evaluate.SemanticF1{} = evaluator) do
     %{"type" => "semantic_f1", "predict" => dump(evaluator.predict)}
   end
 
-  def dump(%DSEx.Evaluate.CompleteAndGrounded{} = evaluator) do
+  defp dump_state(%DSEx.Evaluate.CompleteAndGrounded{} = evaluator) do
     %{"type" => "complete_and_grounded", "predict" => dump(evaluator.predict)}
   end
 
-  def dump(%DSEx.Optimizer.KNNFewShot.Program{} = program) do
+  defp dump_state(%DSEx.Optimizer.KNNFewShot.Program{} = program) do
     %{
       "type" => "knn_few_shot_program",
       "student" => dump(program.student),
@@ -261,7 +272,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%DSEx.Optimizer.Ensemble.Program{} = program) do
+  defp dump_state(%DSEx.Optimizer.Ensemble.Program{} = program) do
     %{
       "type" => "ensemble_program",
       "programs" => Enum.map(program.programs, &dump/1),
@@ -271,9 +282,9 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(%Trajectory{} = trajectory), do: Trajectory.dump(trajectory)
+  defp dump_state(%Trajectory{} = trajectory), do: Trajectory.dump(trajectory)
 
-  def dump(%DSEx.Agent{} = agent) do
+  defp dump_state(%DSEx.Agent{} = agent) do
     %{
       "type" => "agent",
       "name" => DSEx.Optimizer.Report.json_safe(agent.name),
@@ -286,7 +297,7 @@ defmodule DSEx.Saving do
     }
   end
 
-  def dump(program) do
+  defp dump_state(program) do
     raise ArgumentError,
           "unsupported DSEx program for saving: #{inspect(program_name(program))}; " <>
             "portable saving supports data-only program graphs; callback-bearing programs require named registries"
@@ -749,7 +760,12 @@ defmodule DSEx.Saving do
     Enum.map(entries, fn
       [key, value] ->
         value = redact_config_entries(value)
-        redacted = DSEx.Redaction.redact(%{key => value})
+        redacted = redact_dump(%{key => value})
+        [key, Map.fetch!(redacted, key)]
+
+      {key, value} ->
+        value = redact_config_entries(value)
+        redacted = redact_dump(%{key => value})
         [key, Map.fetch!(redacted, key)]
 
       value ->
@@ -757,13 +773,41 @@ defmodule DSEx.Saving do
     end)
   end
 
-  defp redact_config_entries(value), do: DSEx.Redaction.redact(value)
+  defp redact_config_entries(value), do: redact_dump(value)
 
   defp dump_portable_value!(value, context) do
     value
     |> DSEx.Optimizer.Report.json_safe()
-    |> DSEx.Redaction.redact()
+    |> redact_dump()
     |> require_portable_json!(context)
+  end
+
+  defp redact_dump(value) when is_struct(value) do
+    value
+    |> Map.from_struct()
+    |> redact_dump()
+  end
+
+  defp redact_dump(value) when is_map(value) do
+    Map.new(value, fn {key, nested} ->
+      cond do
+        to_string(key) == "schema" -> {key, DSEx.Redaction.redact(nested, [])}
+        sensitive_key?(key) -> {key, "[REDACTED]"}
+        true -> {key, redact_dump(nested)}
+      end
+    end)
+  end
+
+  defp redact_dump(value) when is_list(value), do: Enum.map(value, &redact_dump/1)
+  defp redact_dump(value) when is_binary(value), do: DSEx.Redaction.redact(value, [])
+  defp redact_dump(value), do: value
+
+  defp sensitive_key?(key) do
+    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
+
+    Enum.any?(@sensitive_keys, fn sensitive ->
+      normalized == sensitive or String.ends_with?(normalized, "_#{sensitive}")
+    end)
   end
 
   defp dump_portable_signature!(signature, context) do

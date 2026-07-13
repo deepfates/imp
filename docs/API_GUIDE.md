@@ -1063,6 +1063,17 @@ The deploying application must provide every referenced callback with the
 expected arity. Unknown names and malformed or tampered artifacts fail before a
 program is returned.
 
+DSPy 3.3.0b1 has two persistence modes. `module.save("state.json")` plus
+`module.load("state.json")` applies parameter state to an existing Python
+program; the DSEx-native data boundary is `DSEx.dump/1` and `DSEx.load/1`, or
+their checksummed file equivalents `DSEx.save!/2` and `DSEx.load!/1`. DSPy's
+`module.save(path, save_program: true)` plus `dspy.load(path, allow_pickle:
+true)` serializes executable Python with `cloudpickle`. DSEx intentionally has
+no executable-code artifact mode: it saves allowlisted program architecture as
+JSON, stores callback names through `DSEx.Saving.Registry`, and requires the
+deploying application to rebind callbacks, tools, LMs, and credentials from
+trusted runtime code.
+
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
 credentials. Rebind a freshly configured LM explicitly before live use:
 
@@ -1077,9 +1088,11 @@ loaded = DSEx.with_lm(loaded, lm)
 DSEx.call(loaded, %{question: "What changed?"})
 ```
 
-Portable saving supports `Predict`, `ChainOfThought`, `ProgramOfThought`, and
-RAG programs backed by `DSEx.memory/2`. Programs that hold functions, external
-service clients, or live tool closures should be rebuilt by application code.
+Portable saving supports the program types accepted by `DSEx.Saving`, including
+compiled few-shot and ensemble graphs, callback wrappers, agents, and RAG
+programs backed by `DSEx.memory/2`. External service clients remain host-owned.
+Functions and tool closures must have stable names in a supplied registry; an
+unregistered closure fails during dumping instead of entering the artifact.
 
 ## Streaming
 
