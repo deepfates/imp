@@ -565,6 +565,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         seed: seed,
         generations: generations,
         max_concurrency: max_concurrency,
+        timeout: get_in(execution, ["lm", "optimizer_timeout_ms"]) || 30_000,
         reflection_lm: reflection_lm,
         max_metric_calls: budget,
         callbacks: optimizer_callbacks,

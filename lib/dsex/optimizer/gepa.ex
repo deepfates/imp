@@ -27,6 +27,7 @@ defmodule DSEx.Optimizer.GEPA do
     feedback_fn: nil,
     generations: 4,
     max_concurrency: 1,
+    timeout: 30_000,
     minibatch_size: nil,
     seed: 0,
     use_merge: false,
@@ -47,6 +48,7 @@ defmodule DSEx.Optimizer.GEPA do
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4],
     max_concurrency: [type: :pos_integer, default: 1],
+    timeout: [type: :timeout, default: 30_000],
     minibatch_size: [type: {:or, [nil, :pos_integer]}, default: nil],
     seed: [type: :non_neg_integer, default: 0],
     use_merge: [type: :boolean, default: false],
@@ -84,6 +86,7 @@ defmodule DSEx.Optimizer.GEPA do
       feedback_fn: opts[:feedback_fn],
       generations: opts[:generations],
       max_concurrency: opts[:max_concurrency],
+      timeout: opts[:timeout],
       minibatch_size: opts[:minibatch_size],
       seed: opts[:seed],
       use_merge: opts[:use_merge],
@@ -116,6 +119,7 @@ defmodule DSEx.Optimizer.GEPA do
     adapter =
       ProgramAdapter.new(program, optimizer.metric,
         max_concurrency: optimizer.max_concurrency,
+        timeout: optimizer.timeout,
         component_feedback: optimizer.component_feedback
       )
 
@@ -166,6 +170,7 @@ defmodule DSEx.Optimizer.GEPA do
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
           generations: optimizer.generations,
           max_concurrency: optimizer.max_concurrency,
+          timeout: optimizer.timeout,
           implementation: DSEx.Optimize.GEPA,
           engine: Engine,
           frontier_size: length(Engine.frontier(state)),

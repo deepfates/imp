@@ -8,6 +8,7 @@ defmodule GepaCampaignTest do
              temperature: 1.0,
              max_tokens: 16_384,
              max_concurrency: 32,
+             optimizer_timeout_ms: 300_000,
              max_retries: 0
            }
   end

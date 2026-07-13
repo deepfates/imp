@@ -38,6 +38,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   @upstream_max_tokens 16_384
   @upstream_max_concurrency 32
   @upstream_max_retries 0
+  @default_optimizer_timeout_ms 300_000
 
   @doc false
   def research_defaults do
@@ -45,6 +46,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       temperature: 1.0,
       max_tokens: @upstream_max_tokens,
       max_concurrency: @upstream_max_concurrency,
+      optimizer_timeout_ms: @default_optimizer_timeout_ms,
       max_retries: @upstream_max_retries
     }
   end
@@ -73,6 +75,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
           temperature: :float,
           max_concurrency: :integer,
           max_tokens: :integer,
+          optimizer_timeout_ms: :integer,
           dspy_source: :string,
           gepa_artifact_source: :string
         ]
@@ -181,6 +184,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         "provider" => "req_llm",
         "temperature" => Keyword.get(opts, :temperature, research_defaults().temperature),
         "max_tokens" => Keyword.get(opts, :max_tokens, research_defaults().max_tokens),
+        "optimizer_timeout_ms" =>
+          Keyword.get(
+            opts,
+            :optimizer_timeout_ms,
+            research_defaults().optimizer_timeout_ms
+          ),
         "max_retries" => research_defaults().max_retries
       },
       "retrieval" => %{
