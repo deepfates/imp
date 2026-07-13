@@ -70,7 +70,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       optimizer =
         PlaybookOptimizer.new(
           proposer: proposer(proposer_lm, budget, config, dataset),
-          evaluator: evaluator(budget, config),
+          evaluator: evaluator(budget, config, evaluator_lm),
           reservations: reservations(config),
           budget: usage_limit(limits, config.model),
           min_lift: config.min_lift,
@@ -194,11 +194,14 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
     end
   end
 
-  defp evaluator(budget, config) do
+  defp evaluator(budget, config, evaluator_lm) do
     fn program, rows, context ->
       program =
         if context.stage in [:baseline_audit, :candidate_audit] do
-          program |> DSEx.Saving.dump() |> DSEx.Saving.load()
+          program
+          |> DSEx.Saving.dump()
+          |> DSEx.Saving.load()
+          |> rebind_lm(evaluator_lm)
         else
           program
         end
@@ -302,6 +305,12 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       )
 
     %BudgetedLM{inner: inner, budget: budget}
+  end
+
+  defp rebind_lm(program, lm) do
+    Enum.reduce(DSEx.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+      DSEx.ProgramParameters.update_predictor(acc, name, &DSEx.Predict.Predict.with_lm(&1, lm))
+    end)
   end
 
   defp baseline_playbook(dataset) do
