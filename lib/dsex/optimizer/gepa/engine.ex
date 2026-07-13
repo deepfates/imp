@@ -104,7 +104,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       config: callback_config(opts)
     })
 
-    if combee_policy.batch_controller do
+    if combee_policy.batch_controller &&
+         combee_policy.batch_controller.mode == :offline_measurements do
       notify(opts, :on_combee_batch_selected, %{
         policy_identity: combee_policy.identity,
         report: combee_policy.batch_controller
@@ -123,6 +124,18 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       |> ensure_combee_policy!(combee_policy)
 
     max_iterations = Keyword.get(opts, :max_iterations, 10)
+
+    {state, opts, minibatch_size} =
+      run_combee_profile(
+        adapter,
+        trainset,
+        valset,
+        proposer,
+        requested_minibatch_size,
+        max_iterations,
+        state,
+        opts
+      )
 
     state =
       if proposal_policy.resolved == 1 and not combee_policy.enabled do
@@ -164,6 +177,179 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     })
 
     state
+  end
+
+  defp run_combee_profile(
+         adapter,
+         trainset,
+         valset,
+         proposer,
+         fallback_batch_size,
+         max_iterations,
+         state,
+         opts
+       ) do
+    case state.combee_policy.batch_controller do
+      %ComBee.BatchController.Report{mode: :runtime, status: :started} ->
+        raise ArgumentError,
+              "GEPA resume contains a started ComBee profiling trial with ambiguous external effects"
+
+      %ComBee.BatchController.Report{mode: :runtime, status: status}
+      when status in [:pending, :profiling] ->
+        profile_runtime_trials(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          max_iterations,
+          state,
+          opts
+        )
+
+      %ComBee.BatchController.Report{mode: :runtime} = report ->
+        {state, Keyword.put(opts, :combee_policy, state.combee_policy),
+         selected_profile_batch(report, fallback_batch_size)}
+
+      _ ->
+        {state, opts, state.combee_policy.effective_batch_size || fallback_batch_size}
+    end
+  end
+
+  defp profile_runtime_trials(
+         adapter,
+         trainset,
+         valset,
+         proposer,
+         max_iterations,
+         state,
+         opts
+       ) do
+    report = state.combee_policy.batch_controller
+
+    cond do
+      state.stop_reason != nil ->
+        profile_stopped(state, opts, report, state.stop_reason)
+
+      is_nil(ComBee.BatchController.next_batch_size(report)) ->
+        finish_profile(state, opts)
+
+      state.iteration >= max_iterations ->
+        profile_stopped(state, opts, report, :max_iterations)
+
+      true ->
+        batch_size = ComBee.BatchController.next_batch_size(report)
+        iteration = state.iteration + 1
+        started_report = ComBee.BatchController.start_trial(report, iteration)
+
+        state = put_profile_report(state, started_report)
+        checkpoint!(state, opts)
+
+        before_budget = state.budget
+        started_at = System.monotonic_time(:microsecond)
+        deadline = profile_deadline(started_report)
+        trial_opts = Keyword.put(opts, :combee_policy, state.combee_policy)
+
+        result =
+          Coordinator.run([:trial], {:deadline, deadline}, 1, fn :trial ->
+            run_parallel_loop(
+              adapter,
+              trainset,
+              valset,
+              proposer,
+              batch_size,
+              iteration,
+              state,
+              trial_opts
+            )
+          end)
+          |> hd()
+
+        case result do
+          {:ok, %State{} = trial_state} ->
+            delay_ms = (System.monotonic_time(:microsecond) - started_at) / 1_000
+
+            if trial_state.iteration == iteration and is_nil(trial_state.stop_reason) do
+              completed =
+                ComBee.BatchController.complete_trial(
+                  started_report,
+                  delay_ms,
+                  trial_state.budget.metric_calls - before_budget.metric_calls,
+                  trial_state.budget.reflection_calls - before_budget.reflection_calls
+                )
+
+              trial_state = put_profile_report(trial_state, completed)
+              checkpoint!(trial_state, trial_opts)
+
+              profile_runtime_trials(
+                adapter,
+                trainset,
+                valset,
+                proposer,
+                max_iterations,
+                trial_state,
+                Keyword.put(trial_opts, :combee_policy, trial_state.combee_policy)
+              )
+            else
+              reason =
+                trial_state.stop_reason || {:profiling_iteration_incomplete, iteration}
+
+              delay_ms = (System.monotonic_time(:microsecond) - started_at) / 1_000
+
+              aborted =
+                ComBee.BatchController.abort_trial(
+                  started_report,
+                  delay_ms,
+                  trial_state.budget.metric_calls - before_budget.metric_calls,
+                  trial_state.budget.reflection_calls - before_budget.reflection_calls,
+                  reason
+                )
+
+              state = trial_state |> put_profile_report(aborted) |> Map.put(:stop_reason, reason)
+              checkpoint!(state, trial_opts)
+
+              {state, Keyword.put(trial_opts, :combee_policy, state.combee_policy),
+               aborted.selected_batch_size}
+            end
+
+          {:error, reason} ->
+            raise RuntimeError,
+                  "ComBee profiling trial #{iteration} interrupted with ambiguous provider effects: " <>
+                    inspect(reason)
+        end
+    end
+  end
+
+  defp finish_profile(state, opts) do
+    report = state.combee_policy.batch_controller
+
+    notify(opts, :on_combee_batch_selected, %{
+      policy_identity: state.combee_policy.identity,
+      report: report
+    })
+
+    {state, Keyword.put(opts, :combee_policy, state.combee_policy), report.selected_batch_size}
+  end
+
+  defp profile_stopped(state, opts, report, reason) do
+    report = ComBee.BatchController.stop(report, reason)
+    state = state |> put_profile_report(report) |> Map.put(:stop_reason, reason)
+    checkpoint!(state, opts)
+    {state, Keyword.put(opts, :combee_policy, state.combee_policy), report.selected_batch_size}
+  end
+
+  defp put_profile_report(state, report) do
+    %{state | combee_policy: ComBee.put_batch_controller_report(state.combee_policy, report)}
+  end
+
+  defp selected_profile_batch(report, fallback),
+    do: if(report.status in [:ok, :degenerate], do: report.selected_batch_size, else: fallback)
+
+  defp profile_deadline(%ComBee.BatchController.Report{profiling_timeout: :infinity}),
+    do: :infinity
+
+  defp profile_deadline(report) do
+    remaining = max(report.profiling_timeout - ceil(report.elapsed_ms), 0)
+    Coordinator.deadline(remaining)
   end
 
   defp run_sequential_loop(
@@ -997,7 +1183,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   defp load_proposal_policy(_dumped, 1, requested), do: requested
 
   defp load_proposal_policy(dumped, schema_version, _requested)
-       when schema_version in [3, 4] do
+       when schema_version in [3, 4, 5] do
     stored = Map.fetch!(dumped, "proposal_policy")
 
     %{
@@ -1015,7 +1201,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     requested
   end
 
-  defp load_combee_policy(dumped, 4, _requested) do
+  defp load_combee_policy(dumped, schema_version, _requested) when schema_version in [4, 5] do
     dumped |> Map.fetch!("combee_policy") |> ComBee.load_policy!()
   end
 
@@ -1079,7 +1265,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     :ok
   end
 
-  defp validate_checkpoint_integrity!(dumped, 4) do
+  defp validate_checkpoint_integrity!(dumped, schema_version) when schema_version in [4, 5] do
     expected =
       Proposal.checkpoint_integrity(
         Map.get(dumped, "pending_proposal_batch"),
@@ -2358,7 +2544,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          seed_candidate,
          opts
        )
-       when schema_version in [1, 3, 4] do
+       when schema_version in [1, 3, 4, 5] do
     budget = dumped |> Map.fetch!("budget") |> Budget.load!()
 
     budget =

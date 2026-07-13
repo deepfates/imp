@@ -51,15 +51,24 @@ level. It does not apply a record-count truncation. When a configured reflection
 LM returns an error or an invalid response, proposal generation fails closed;
 DSEx does not silently substitute the fallback.
 
-## Offline delay-curve fit
+## Runtime batch controller
 
-The paper's dynamic controller runs synchronized trial iterations at several
-candidate batch sizes, measures their end-to-end delays, and accounts for those
-iterations as real work. DSEx does not currently implement that trial pipeline.
-`DSEx.Optimizer.GEPA.ComBee.BatchController` is therefore only an offline fitter
-for caller-supplied `{batch_size, delay}` pairs. It must not be described as
-source-faithful runtime profiling. Enabling it without explicit measurements
-fails closed. For trainset size `N`, the offline fit computes:
+The paper's controller runs one synchronized trial iteration at each candidate
+batch size, measures end-to-end delay, converts it to epoch time, fits a power
+law, and selects the plateau where marginal improvement reaches 1.6% of the
+peak slope. DSEx now executes those trials as ordinary GEPA iterations through
+the staged parent, reflection, and child pipeline. Trial candidates can be
+accepted or rejected, iteration numbers advance, callbacks fire, and metric and
+reflection calls are reserved and charged to the same budgets as later work.
+
+The v1 source does not publish its default candidate values. DSEx therefore
+uses the explicit `:candidate_batch_sizes` list when supplied. Otherwise it uses
+the documented DSEx adaptation `[min, 2 * min, 4 * min]`, deduplicated after
+clamping to the configured maximum and trainset size. The source contains a
+commented 200 upper-bound expression rather than a normative constant; DSEx
+retains 200 as a tested safety policy, not an upstream parity claim.
+
+For trainset size `N`, both runtime and offline modes compute:
 
 ```text
 T_epoch(batch_size) = delay * N / batch_size
@@ -73,12 +82,26 @@ is `tau = 0.016 * peak_slope`; the plateau is:
 plateau_batch_size = (alpha * A / tau)^(1 / (alpha + 1))
 ```
 
-The integer selection is floored and clamped to the configured range, the
-trainset size, and DSEx's tested hard cap of 200. The hard cap is a DSEx safety
-policy, not a demonstrated upstream constant. Fewer than two measurements,
-duplicate batch sizes, invalid range coverage, a non-positive `alpha`, or a
-non-finite fit returns `status: :degenerate` and selects the smallest safe
-batch. It never guesses a larger batch after a degenerate fit.
+The integer selection is floored and clamped to the configured range, trainset
+size, and DSEx safety cap. Fewer than two successful trials, duplicate batch
+sizes, invalid range coverage, a non-positive `alpha`, or a non-finite fit
+returns `status: :degenerate` and selects the smallest safe batch. It never
+guesses a larger batch after a degenerate fit.
+
+Runtime trials are strictly ordered and never overlap. `:profiling_timeout` is
+one absolute monotonic deadline shared by all candidates and every nested GEPA
+phase. Completed-trial elapsed time is carried across resume. Before each trial,
+DSEx checkpoints controller status `:started`; the normal GEPA phase checkpoints
+then persist reservations before dispatch. A clean budget refusal records a
+failed trial and all observed call deltas but does not admit its delay to the
+fit. Timeout, caller death, crash, or resume from `:started` fails closed because
+provider effects are ambiguous.
+
+## Offline measurement mode
+
+Externally collected measurements remain available under the separate
+`:offline_measurements` mode. They perform no optimizer work and report
+`measurement_source: :caller_supplied`:
 
 ## Runtime policy
 
@@ -95,9 +118,29 @@ DSEx.Optimizer.GEPA.new(metric,
     max_concurrency: :auto,
     timeout: 60_000,
     batch_controller: [
+      mode: :offline_measurements,
       measurements: [{4, 8_200}, {8, 5_100}, {16, 3_400}],
       min_batch_size: 4,
       max_batch_size: 64
+    ]
+  ]
+)
+```
+
+Runtime profiling example:
+
+```elixir
+DSEx.Optimizer.GEPA.new(metric,
+  generations: 5,
+  max_metric_calls: 100,
+  max_reflection_calls: 40,
+  combee: [
+    max_concurrency: 4,
+    batch_controller: [
+      mode: :runtime,
+      candidate_batch_sizes: [2, 4, 8],
+      max_batch_size: 8,
+      profiling_timeout: 120_000
     ]
   ]
 )
@@ -124,14 +167,17 @@ DSEx.Optimizer.GEPA.new(metric,
   that worker allowance are rejected before optimization.
 - Callback effects and aggregation reports are applied in proposal-slot and
   component order, regardless of worker completion order.
-- Checkpoint schema 4 stores a ComBee policy identity, offline-fit report,
-  pending aggregation reports, and budget reservations. Resume rejects drift in
-  seed, duplication, timeout, concurrency, effective batch, or controller
-  measurements. A checkpoint marked `started` remains non-resumable because
-  provider effects are ambiguous.
+- Checkpoint schema 4 stores the ComBee configuration identity, an independently
+  identity-bound runtime/offline report, pending aggregation reports, and budget
+  reservations. Resume rejects drift in seed, duplication, timeout,
+  concurrency, candidate schedule, safety range, fit threshold, profiling
+  timeout, or offline measurements. A profiling or proposal checkpoint marked
+  `started` remains non-resumable because provider effects are ambiguous.
 
-`on_combee_batch_selected` exposes the offline-fit report, whose
-`measurement_source` is `:caller_supplied`.
+`on_combee_batch_selected` fires after a runtime fit completes or immediately
+for an offline fit. Runtime reports use `measurement_source: :runtime_trials`
+and include ordered trial iteration, batch, delay, metric calls, reflection
+calls, status, and failure reason.
 `on_combee_aggregation` exposes `DSEx.Optimizer.GEPA.ComBee.Report`, including
 group sizes, source-copy assignments, call counts, status, and deterministic
 failure identity. The optimizer report includes resolved policy and ordered
@@ -149,7 +195,7 @@ budget reservations. Resume rejects started work because provider effects are
 ambiguous. If an enclosing proposal is interrupted after the started
 checkpoint, the full reservation is the conservative spend bound.
 
-## Provider-free harness
+## Matched natural-data preflight
 
 Run:
 
@@ -157,9 +203,24 @@ Run:
 mix run benchmarks/gepa_combee.exs
 ```
 
-The harness compares one naive large-batch reduction with ComBee using the same
-simulated, capacity-limited reducer. It reports monotonic wall time, retained
-unique record IDs, and reducer calls. This proves only structural concurrency
-and information-retention behavior in the simulation. It is not a paper
-replication and makes no quality or speed parity claim without the official
-Formula/FiNER datasets, prompts, models, and provider environment.
+The default fixture mode compares small-batch aggregation, one naive large
+batch, and ComBee on the same first eight rows of DSEx's checked-in GSM8K data.
+It reports exact-answer quality/retention, monotonic latency, reducer calls,
+fixture token estimates, and provider-free cost. The deterministic fixture run
+on 2026-07-13 retained 8/8, 4/8, and 6/8 records respectively with 4, 1, and 3
+calls.
+
+Live mode is gated by `COMBEE_PREFLIGHT_MODE=live` and
+`COMBEE_LIVE_PROVIDER=1`. The bounded run used pinned
+`openai:gpt-4.1-mini-2025-04-14` and is stored at
+`benchmarks/results/gepa-combee-preflight-live-20260713T231824Z.json`. All arms
+retained 8/8 correct answers. Naive large-batch took 2.62 seconds, 1 call, 755
+tokens, and $0.000450; ComBee took 4.25 seconds, 3 calls, 1,909 tokens, and
+$0.001228; small-batch took 6.75 seconds, 4 calls, 1,266 tokens, and $0.000841.
+Usage and cost came from ReqLLM telemetry.
+
+This is negative quality evidence at the tested scale: eight short records do
+not overload the pinned model, so ComBee has no quality deficit to recover and
+is slower and more expensive than naive aggregation. The run validates matched
+data flow, live calls, and accounting only. It is not a paper replication and
+does not support Formula/FiNER quality or speed parity claims.

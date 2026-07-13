@@ -139,7 +139,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     proposer = fn _candidate, _component, _records, _iteration, metadata ->
       send(owner, {:deadline_call, metadata.phase, metadata[:group_index]})
-      Process.sleep(15)
+      Process.sleep(if(metadata.group_index == 0, do: 1, else: 50))
       "update-#{metadata[:group_index]}"
     end
 
@@ -149,7 +149,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
              ComBee.aggregate(proposer, %{main: "current"}, :main, records, 1, policy)
 
     elapsed = System.monotonic_time(:millisecond) - started
-    assert elapsed < 60
+    assert elapsed < 75
     assert report.first_level_calls == 2
     assert report.final_calls == 0
     assert report.reflection_calls == 2
@@ -384,13 +384,12 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       BatchController.options!(max_batch_size: 201)
     end
 
-    assert_raise ArgumentError, ~r/runtime batch profiling is unavailable/, fn ->
+    assert_raise ArgumentError, ~r/offline measurement fitting requires/, fn ->
       BatchController.select([], 100)
     end
 
-    assert_raise ArgumentError, ~r/runtime trial profiling is not implemented/, fn ->
-      ComBee.Options.new!(batch_controller: true)
-    end
+    assert %BatchController.Options{mode: :runtime} =
+             ComBee.Options.new!(batch_controller: true).batch_controller
   end
 
   test "checkpoint identity rejects ComBee policy and controller drift" do
@@ -442,6 +441,30 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
         resume_state: checkpoint
       )
     end
+
+    legacy_policy =
+      checkpoint["combee_policy"]
+      |> update_in(["batch_controller_options"], fn options ->
+        Map.drop(options, ["mode", "candidate_batch_sizes", "profiling_timeout"])
+      end)
+      |> update_in(["batch_controller"], fn report ->
+        Map.drop(report, [
+          "mode",
+          "candidate_batch_sizes",
+          "trials",
+          "current_trial",
+          "elapsed_ms",
+          "metric_calls",
+          "reflection_calls",
+          "profiling_timeout",
+          "identity"
+        ])
+      end)
+
+    migrated = ComBee.load_policy!(legacy_policy)
+    assert migrated.identity == checkpoint["combee_policy"]["identity"]
+    assert migrated.batch_controller.mode == :offline_measurements
+    assert is_binary(migrated.batch_controller.identity)
   end
 
   test "ComBee composes with bounded speculative proposals and rejects oversubscription" do
@@ -518,6 +541,159 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     assert_receive {:aggregation_callback, 1, :main, %ComBee.Report{status: :ok}}
   end
 
+  test "runtime controller executes synchronized trials as budgeted GEPA iterations" do
+    owner = self()
+
+    state =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        Enum.to_list(0..7),
+        [:validation],
+        fn _candidate, _component, _records, iteration, metadata ->
+          send(owner, {:runtime_trial_call, iteration, metadata.phase, metadata[:source_count]})
+          Process.sleep(2)
+
+          if metadata.phase == :final,
+            do: "improved-#{iteration}",
+            else: "local-#{iteration}-#{metadata.group_index}"
+        end,
+        max_iterations: 2,
+        minibatch_size: 1,
+        candidate_selection_strategy: :current_best,
+        acceptance_policy: :equal_or_better,
+        combee: [
+          max_concurrency: 2,
+          batch_controller: [
+            mode: :runtime,
+            candidate_batch_sizes: [2, 4],
+            max_batch_size: 4,
+            profiling_timeout: 2_000
+          ]
+        ],
+        max_reflection_calls: 5
+      )
+
+    report = state.combee_policy.batch_controller
+    assert state.iteration == 2
+    assert report.status in [:ok, :degenerate], inspect(report, limit: :infinity)
+    assert report.measurement_source == :runtime_trials
+
+    assert Enum.map(report.trials, &{&1.index, &1.iteration, &1.batch_size, &1.status}) == [
+             {0, 1, 2, :ok},
+             {1, 2, 4, :ok}
+           ]
+
+    assert Enum.map(report.measurements, &elem(&1, 0)) == [2, 4]
+    assert report.reflection_calls == 5
+    assert report.metric_calls == state.budget.metric_calls - 1
+    assert state.budget.reflection_calls == 5
+
+    calls = receive_runtime_trial_calls([])
+    assert calls |> Enum.map(&elem(&1, 1)) |> Enum.uniq() == [1, 2]
+    assert Enum.all?(Enum.filter(calls, &(elem(&1, 1) == 1)), &(elem(&1, 3) == 2))
+    assert Enum.all?(Enum.filter(calls, &(elem(&1, 1) == 2)), &(elem(&1, 3) == 4))
+  end
+
+  test "runtime profiling records clean budget refusal and never fits the failed trial" do
+    state =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        Enum.to_list(0..7),
+        [:validation],
+        fn _candidate, _component, _records, iteration, metadata ->
+          if metadata.phase == :final,
+            do: "improved-#{iteration}",
+            else: "local-#{metadata.group_index}"
+        end,
+        max_iterations: 2,
+        candidate_selection_strategy: :current_best,
+        acceptance_policy: :equal_or_better,
+        combee: [
+          max_concurrency: 2,
+          batch_controller: [candidate_batch_sizes: [2, 4], max_batch_size: 4]
+        ],
+        max_reflection_calls: 4
+      )
+
+    report = state.combee_policy.batch_controller
+    assert report.status == :incomplete
+    assert report.reason == {:budget_exhausted, :reflection_calls, 5, 4}
+    assert Enum.map(report.trials, & &1.status) == [:ok, :error]
+    assert Enum.map(report.measurements, &elem(&1, 0)) == [2]
+    assert report.metric_calls == state.budget.metric_calls - 1
+    assert report.reflection_calls == state.budget.reflection_calls
+    assert report.selected_batch_size == 1
+  end
+
+  test "started profiling checkpoints are identity-bound and fail closed on resume" do
+    owner = self()
+
+    assert_raise RuntimeError, ~r/ambiguous provider effects/, fn ->
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        Enum.to_list(0..3),
+        [:validation],
+        fn _candidate, _component, _records, _iteration, _metadata ->
+          Process.sleep(:infinity)
+        end,
+        max_iterations: 2,
+        combee: [
+          max_concurrency: 1,
+          batch_controller: [
+            candidate_batch_sizes: [2, 4],
+            max_batch_size: 4,
+            profiling_timeout: 25
+          ]
+        ],
+        checkpoint_fn: fn checkpoint ->
+          send(owner, {:runtime_checkpoint, checkpoint})
+          :ok
+        end
+      )
+    end
+
+    checkpoints = receive_runtime_checkpoints([])
+
+    started =
+      Enum.find(checkpoints, fn checkpoint ->
+        get_in(checkpoint, ["combee_policy", "batch_controller", "status"]) ==
+          %{"__dsex_type__" => "atom", "value" => "started"} and
+          checkpoint["budget_ledger"] != [] and
+          get_in(checkpoint, ["pending_proposal_batch", "status"]) == "started"
+      end)
+
+    assert started
+
+    assert_raise ArgumentError, ~r/started ComBee profiling trial/, fn ->
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        Enum.to_list(0..3),
+        [:validation],
+        fn _, _, _, _, _ -> flunk("resume must not dispatch provider work") end,
+        max_iterations: 2,
+        combee: [
+          max_concurrency: 1,
+          batch_controller: [
+            candidate_batch_sizes: [2, 4],
+            max_batch_size: 4,
+            profiling_timeout: 25
+          ]
+        ],
+        resume_state: json_round_trip(started)
+      )
+    end
+
+    tampered = put_in(started, ["combee_policy", "batch_controller", "elapsed_ms"], 99.0)
+
+    assert_raise ArgumentError, ~r/report identity mismatch/, fn ->
+      tampered |> json_round_trip() |> Map.fetch!("combee_policy") |> ComBee.load_policy!()
+    end
+  end
+
   defp policy(trainset_size, overrides) do
     seed = Keyword.get(overrides, :seed, 1)
     options = Keyword.drop(overrides, [:seed])
@@ -571,6 +747,24 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
         receive_proposal_deadline_calls([{component, phase} | calls])
     after
       25 -> Enum.reverse(calls)
+    end
+  end
+
+  defp receive_runtime_trial_calls(calls) do
+    receive do
+      {:runtime_trial_call, _, _, _} = call ->
+        receive_runtime_trial_calls(calls ++ [call])
+    after
+      25 -> calls
+    end
+  end
+
+  defp receive_runtime_checkpoints(checkpoints) do
+    receive do
+      {:runtime_checkpoint, checkpoint} ->
+        receive_runtime_checkpoints(checkpoints ++ [checkpoint])
+    after
+      25 -> checkpoints
     end
   end
 

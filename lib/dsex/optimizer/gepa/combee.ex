@@ -88,11 +88,19 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
 
       %Options{} = options ->
         batch_report =
-          if options.batch_controller,
-            do: BatchController.select(options.batch_controller, trainset_size)
+          case options.batch_controller do
+            %BatchController.Options{mode: :offline_measurements} = controller ->
+              BatchController.select(controller, trainset_size)
+
+            %BatchController.Options{mode: :runtime} = controller ->
+              BatchController.new_profile(controller, trainset_size)
+
+            nil ->
+              nil
+          end
 
         effective_batch_size =
-          if batch_report,
+          if batch_report && batch_report.status in [:ok, :degenerate],
             do: batch_report.selected_batch_size,
             else: requested_batch_size
 
@@ -360,6 +368,18 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   end
 
   @doc false
+  def put_batch_controller_report(%Policy{} = policy, %BatchController.Report{} = report) do
+    report = BatchController.validate_report!(report)
+
+    effective_batch_size =
+      if report.status in [:ok, :degenerate],
+        do: report.selected_batch_size,
+        else: policy.effective_batch_size
+
+    %{policy | batch_controller: report, effective_batch_size: effective_batch_size}
+  end
+
+  @doc false
   def dump_policy(%Policy{} = policy) do
     %{
       "enabled" => policy.enabled,
@@ -565,7 +585,7 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   end
 
   defp policy_identity_payload(%Policy{} = policy) do
-    %{
+    payload = %{
       enabled: true,
       duplication_factor: policy.duplication_factor,
       max_concurrency_requested: policy.max_concurrency_requested,
@@ -575,8 +595,13 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
       seed: policy.seed,
       trainset_size: policy.trainset_size,
       effective_batch_size: policy.effective_batch_size,
-      batch_controller_options: dump_batch_options(policy.batch_controller_options)
+      batch_controller_options: batch_options_identity(policy.batch_controller_options)
     }
+
+    case policy.batch_controller_options do
+      %BatchController.Options{mode: :runtime} -> Map.delete(payload, :effective_batch_size)
+      _ -> payload
+    end
   end
 
   defp minimum_timeout(:infinity, timeout), do: timeout
@@ -607,10 +632,13 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
 
   defp dump_batch_options(%BatchController.Options{} = options) do
     %{
+      "mode" => Atom.to_string(options.mode),
       "measurements" => Enum.map(options.measurements, &Tuple.to_list/1),
+      "candidate_batch_sizes" => options.candidate_batch_sizes,
       "min_batch_size" => options.min_batch_size,
       "max_batch_size" => options.max_batch_size,
-      "slope_threshold_ratio" => options.slope_threshold_ratio
+      "slope_threshold_ratio" => options.slope_threshold_ratio,
+      "profiling_timeout" => dump_special(options.profiling_timeout)
     }
   end
 
@@ -618,12 +646,29 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
 
   defp load_batch_options(options) do
     BatchController.options!(
+      mode: options |> Map.get("mode", "offline_measurements") |> String.to_existing_atom(),
       measurements: Enum.map(options["measurements"], &List.to_tuple/1),
+      candidate_batch_sizes: Map.get(options, "candidate_batch_sizes"),
       min_batch_size: options["min_batch_size"],
       max_batch_size: options["max_batch_size"],
-      slope_threshold_ratio: options["slope_threshold_ratio"]
+      slope_threshold_ratio: options["slope_threshold_ratio"],
+      profiling_timeout: options |> Map.get("profiling_timeout", "infinity") |> load_special()
     )
   end
+
+  defp batch_options_identity(nil), do: nil
+
+  defp batch_options_identity(%BatchController.Options{mode: :offline_measurements} = options) do
+    %{
+      "measurements" => Enum.map(options.measurements, &Tuple.to_list/1),
+      "min_batch_size" => options.min_batch_size,
+      "max_batch_size" => options.max_batch_size,
+      "slope_threshold_ratio" => options.slope_threshold_ratio
+    }
+  end
+
+  defp batch_options_identity(%BatchController.Options{mode: :runtime} = options),
+    do: dump_batch_options(options)
 
   defp dump_batch_report(nil), do: nil
 
@@ -643,7 +688,17 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
         {String.to_existing_atom(key), DSEx.Optimizer.Report.restore_json_safe(value)}
       end)
 
-    struct!(BatchController.Report, values)
+    values =
+      Map.update(values, :trials, [], fn trials ->
+        Enum.map(trials, fn
+          %BatchController.Trial{} = trial -> trial
+          trial when is_map(trial) -> struct!(BatchController.Trial, trial)
+        end)
+      end)
+
+    values
+    |> then(&struct!(BatchController.Report, &1))
+    |> BatchController.load_report!()
   end
 
   defp dump_special(:auto), do: "auto"
