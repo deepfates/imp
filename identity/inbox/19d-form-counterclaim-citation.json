@@ -1,0 +1,910 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-19d-form-counterclaim-citation",
+    "generated_at": "2026-07-13T19:00:00Z",
+    "generator": {
+      "kind": "model",
+      "name": "form saturation generator B counterclaim/citation",
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "reasoning_effort": "high",
+      "agent_id": null
+    },
+    "method": "baseline-blind adversarial anti-brand grammar and citation-stewardship repertory grid",
+    "brief": "Complete task: Create run id run-19d-form-counterclaim-citation. Generator: kind model, name \"form saturation generator B counterclaim/citation\", provider openai, model gpt-5.5, reasoning_effort high, agent_id null. Method: \"baseline-blind adversarial anti-brand grammar and citation-stewardship repertory grid\". parent_run_ids []. Run notes must include \"challenge_wave: form-saturation-b\", \"independent baseline-blind generation\", \"cell 8: counter-claims\", and \"cell 10: eponym-citation-architecture\". Read only identity/atlas.json, identity/schema/portfolio.schema.json, README.md, docs/DSEX_PHILOSOPHY.md, and docs/RESEARCH_LANDSCAPE.md. Do NOT read identity/inbox/*, identity/reports/*, registry/enrichments/assessments, candidate lists, leaders, scores, or favorites. Do not browse, search availability, rank, filter, deduplicate, or suppress adverse or malformed conceptual output. Product boundary: this is a pre-release Elixir/OTP library for declared, callable, measurable, optimizable LM programs, with a credible runtime-contracted textual/artifact optimization horizon spanning instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, and configuration. It is not an official DSPy port, static proof system, universal agent OS, provider SDK, guaranteed autonomous self-improvement engine, safety product, standards body, institute, or universal platform. Create a valid schema_version 1, atlas_version 1 portfolio with exactly 20 candidates and contiguous ordinals 1..20. Ordinals 1..10 are challenge_cell: counter-claims. Ordinals 11..20 are challenge_cell: eponym-citation-architecture. Each cell has exactly two wildcard true. Every candidate must have non-null pronunciation and grammar, honest etymology or explicit coined/no-source text, substantive rationale, nonempty valid territories, strategies, audience_lenses, and architecture_lenses, known_concerns, and notes. Every notes array must contain separate strings for challenge_wave: form-saturation-b, challenge_cell, form_mechanism, stance, scope, code_projection, current_embodiment, and horizon_embodiment. Every eponym/citation candidate must additionally have citation_stewardship. code_projection must truthfully show hex, otp, module, mix, config, and telemetry forms using conventional valid Elixir/Hex lowercase identifiers where possible; if a surface cannot produce one honestly, use null and explain it in concerns rather than inventing invalid code. For each 10-candidate cell, exact stance counts are 5 affirmative, 3 ambivalent, 2 adverse. For each cell, exact scope counts are 4 current, 4 horizon, 2 both. Pair every hostile false assurance, institutional overclaim, conquest/control posture, or uncited prestige borrowing with an affirmative alternative in the same cell and record the paired ordinal in notes. Counter-claims must explore real grammatical mechanisms that challenge what a software identity is allowed to promise: imperatives, questions, bounded declarations, refusal/abstention, negation with scope, hedges, inversion, anti-slogans, role/category grammar, and deliberately hostile false assurances. Affirmative entries must remain usable identities, not only critiques. They must not let a name warrant safety, privacy, fairness, consent, proof, correctness, reliability, accessibility, healing, or improvement. Eponym/citation architecture must explore accurate attributed names, non-eponymic controls, citation-bearing research-series structures, historical objects or practices with documented attribution duties, deliberately adverse prestige borrowing, and role/system architecture. Do not fabricate relationships, permissions, endorsements, Indigenous/sacred provenance, or historical claims. Every citation_stewardship note must state the attribution duty, likely ambiguity or harm, and whether the form is viable without the person's name. Prefer public historical figures or clearly documented terms; avoid living-person endorsement implications. At least four entries in this cell must be non-eponymic controls or architectures that carry citations without turning a person into the product master brand. Use only atlas IDs. Include current and horizon embodiments even when one is intentionally unavailable. Keep architecture implications truthful. Validate JSON shape, atlas ID membership, exact candidate/ordinal/wildcard/stance/scope counts, required notes, code projections, and citation stewardship with jq before reporting. Do not run a global checkpoint while other files are in progress.",
+    "prompt_path": null,
+    "prompt_sha256": null,
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "declaration-contract",
+      "measurement-evidence",
+      "limits-refusal-silence",
+      "persistence-provenance",
+      "boundary-translation"
+    ],
+    "intended_strategies": [
+      "phrase-imperative",
+      "descriptive-category",
+      "technical-borrowing",
+      "proper-mythic-historical",
+      "namespace-led"
+    ],
+    "intended_audiences": [
+      "elixir-maintainers",
+      "dspy-gepa-researchers",
+      "applied-lm-engineers",
+      "security-legal-procurement",
+      "affected-publics"
+    ],
+    "notes": [
+      "challenge_wave: form-saturation-b",
+      "independent baseline-blind generation",
+      "cell 8: counter-claims",
+      "cell 10: eponym-citation-architecture"
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Call What You Can Measure",
+      "pronunciation": "kawl wuht yoo kan MEH-zher",
+      "grammar": "Imperative phrase that tells builders to restrict action to evaluated program boundaries.",
+      "rationale": "This is a usable identity because it makes the library's call boundary and metric discipline memorable without claiming correctness or guaranteed improvement. It can name a project, manual section, or campaign architecture for DSEx-style programs that are declared, called, evaluated, and optimized only where evidence is available.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "measurement-evidence",
+        "declaration-contract",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "applied-lm-engineers",
+        "eval-research-ops",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Long as a master brand and stronger as a campaign or doctrine identity.",
+        "The imperative could sound prescriptive if isolated from examples and limits."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: imperative",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=call_measure; otp=:call_measure; module=CallMeasure; mix=mix call_measure.eval; config=:call_measure; telemetry=[:call_measure, :program, :stop]",
+        "current_embodiment: A current DSEx identity for declared programs whose calls, predictions, metrics, and traces are explicit.",
+        "horizon_embodiment: Extends to artifact optimization only where instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, or configuration have measurable evaluation boundaries.",
+        "paired_adverse_ordinal: 9"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Not a Proof",
+      "pronunciation": "naht uh proof",
+      "grammar": "Negated noun phrase with scoped denial of formal verification claims.",
+      "rationale": "The surface is stark but usable for a technical identity that wins trust by refusing an inflated warranty. It protects the product boundary around runtime contracts, tests, examples, traces, and metrics while leaving room for rigorous evaluation and optimizer lineage.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "limits-refusal-silence",
+        "mathematics-logic",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "security-legal-procurement",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Negative affect may reduce approachability for newcomers.",
+        "Needs an affirmative descriptor nearby so the project is not defined only by refusal."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: negation with scope",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=not_a_proof; otp=:not_a_proof; module=NotAProof; mix=mix not_a_proof.check; config=:not_a_proof; telemetry=[:not_a_proof, :eval, :stop]",
+        "current_embodiment: A current boundary identity for DSEx as callable and measurable Elixir code rather than a static proof system.",
+        "horizon_embodiment: Can remain a warning label for optimizer campaigns over arbitrary textual artifacts, especially when promotion gates are empirical rather than formal.",
+        "paired_adverse_ordinal: 10"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "When It Should Abstain",
+      "pronunciation": "when it shuud ab-STAYN",
+      "grammar": "Subordinate question-like clause that foregrounds refusal and non-action as part of program behavior.",
+      "rationale": "This name makes abstention a first-class program capability without promising safety, consent, or moral correctness. It fits DSEx because signatures, adapters, metrics, and tools can encode when a program returns no answer, asks for more context, or declines an action.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "limits-refusal-silence",
+        "action-agency",
+        "declaration-contract"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "agent-tool-builders",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "umbrella-named-subsystems"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Sounds like a policy module unless paired with program examples.",
+        "Abstention can be overread as safety assurance; copy must keep it behavioral and testable."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: question and abstention",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=abstain_when; otp=:abstain_when; module=AbstainWhen; mix=mix abstain_when.eval; config=:abstain_when; telemetry=[:abstain_when, :decision, :stop]",
+        "current_embodiment: Current DSEx programs can model refusal or missing-output cases through signatures, adapters, metrics, and tool boundaries.",
+        "horizon_embodiment: Horizon artifact optimization can include refusal policies and playbooks as optimizable text parameters only after they are evaluated against explicit examples.",
+        "paired_adverse_ordinal: 7"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Only the Program",
+      "pronunciation": "OHN-lee thuh PROH-gram",
+      "grammar": "Bounded declaration that narrows the referent to program objects and their runtime contracts.",
+      "rationale": "The name resists platform inflation while still giving a crisp identity to an Elixir library for signatures, programs, predictions, metrics, and optimizers. It can sit on current DSEx APIs and later on artifact-parameter campaigns without implying a universal agent OS.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "declaration-contract",
+        "program-compilation",
+        "boundary-translation"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "elixir-maintainers",
+        "backend-product-engineers",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "single-branded-house"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May underplay evaluation, optimization, and operations unless supported by descriptors.",
+        "Could be too generic for search without a distinctive package name."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: bounded declaration",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=only_program; otp=:only_program; module=OnlyProgram; mix=mix only_program.run; config=:only_program; telemetry=[:only_program, :call, :stop]",
+        "current_embodiment: Current embodiment is a library identity that keeps claims attached to declared callable programs.",
+        "horizon_embodiment: Horizon embodiment keeps artifact optimization inside program-like contracts rather than expanding into a universal platform claim."
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Maybe Better, Measured",
+      "pronunciation": "MAY-beh BET-er MEH-zherd",
+      "grammar": "Hedged comparative plus evidentiary modifier.",
+      "rationale": "This identity names optimizer humility: a DSEx campaign may improve a program, fail to improve it, or trade off dimensions, so the result must be measured. It is affirmative because it gives teams a responsible way to talk about optimization without guaranteeing autonomous improvement.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "learning-adaptation",
+        "measurement-evidence",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The hedge may weaken commercial force.",
+        "Needs careful grammar so 'better' is always tied to a metric and comparison set."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: hedge",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=maybe_measured; otp=:maybe_measured; module=MaybeMeasured; mix=mix maybe_measured.promote; config=:maybe_measured; telemetry=[:maybe_measured, :optimizer, :stop]",
+        "current_embodiment: Current embodiment can label evaluation and optimizer examples that report scores instead of promises.",
+        "horizon_embodiment: Horizon embodiment can govern artifact optimization campaigns where promotion requires evidence, uncertainty, and held-out checks."
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "The Program, Not the Promise",
+      "pronunciation": "thuh PROH-gram naht thuh PRAH-mis",
+      "grammar": "Inversion and contrastive negation that puts executable structure before marketing promise.",
+      "rationale": "This is an ambivalent but valuable master-line candidate: it is memorable and truthful, yet slightly defensive. It challenges identity grammar by making the product's warrant come from declared structures, traces, and metrics rather than from a reassuring name.",
+      "etymology": "Plain English contrast phrase; coined here with no external source claim.",
+      "territories": [
+        "declaration-contract",
+        "limits-refusal-silence",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "compound-portmanteau"
+      ],
+      "audience_lenses": [
+        "oss-contributors",
+        "buyers-founders",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "single-branded-house",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Defensive tone may become tiring as a primary identity.",
+        "The word promise still introduces warranty associations that copy must carefully narrow."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: inversion",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex=program_not_promise; otp=:program_not_promise; module=ProgramNotPromise; mix=mix program_not_promise.audit; config=:program_not_promise; telemetry=[:program_not_promise, :trace, :stop]",
+        "current_embodiment: Current embodiment is a slogan-like identity for DSEx APIs where program values and tests carry the claim.",
+        "horizon_embodiment: Horizon embodiment can still fit broader artifact parameters, but only if the artifact remains inside versioned program contracts."
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Command the Model",
+      "pronunciation": "kuh-MAND thuh MAH-dul",
+      "grammar": "Conquest imperative with command/control posture.",
+      "rationale": "This hostile-form candidate is intentionally ambivalent because it is legible to automation buyers but distorts DSEx into domination over stochastic model behavior. It is useful only as a warning against names that make runtime uncertainty sound conquered.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "feedback-control",
+        "action-agency",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "buyers-founders",
+        "agent-tool-builders",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "oss-commercial-split",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Overstates control over model behavior and may imply guarantees the library cannot make.",
+        "Conquest grammar conflicts with bounded tools, evaluation, and refusal."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: conquest imperative",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=command_model; otp=:command_model; module=CommandModel; mix=mix command_model.run; config=:command_model; telemetry=[:command_model, :control, :stop]",
+        "current_embodiment: Current embodiment is intentionally compromised because DSEx can call and evaluate programs but cannot command model behavior into reliability.",
+        "horizon_embodiment: Horizon embodiment remains risky for artifact optimization because it frames search and feedback as control rather than measured selection.",
+        "paired_affirmative_ordinal: 3"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Program With a Brake",
+      "pronunciation": "PROH-gram with uh brayk",
+      "grammar": "Role/category grammar using a concrete limit object as modifier.",
+      "rationale": "The phrase is ambivalent because the brake metaphor is accessible but could oversimplify runtime limits. It keeps the software identity honest by requiring call boundaries, evaluation stops, timeouts, and promotion gates to be part of the name's grammar.",
+      "etymology": "Plain English phrase; coined here with no external source claim.",
+      "territories": [
+        "limits-refusal-silence",
+        "feedback-control",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "ordinary-object",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "sre-platform",
+        "backend-product-engineers",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Mechanical metaphor may imply deterministic stopping across all external systems.",
+        "Better as a subsystem or operations doctrine than a master brand."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: role/category grammar",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex=program_brake; otp=:program_brake; module=ProgramBrake; mix=mix program_brake.check; config=:program_brake; telemetry=[:program_brake, :gate, :stop]",
+        "current_embodiment: Current embodiment maps to deterministic tests, explicit runtime configuration, and gates around calls.",
+        "horizon_embodiment: Horizon embodiment maps to optimizer stop policies, rollback, and promotion gates for textual artifacts."
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Always Safe Answers",
+      "pronunciation": "AWL-wayz sayf AN-serz",
+      "grammar": "Deliberately hostile false assurance using universal quantifier plus safety warrant.",
+      "rationale": "This adverse candidate documents a forbidden identity form: the name asserts safety and answer quality before any product, evaluator, or deployment context can support it. It is useful as negative coverage for the grammar that DSEx must not adopt.",
+      "etymology": "Plain English phrase; coined here as an adverse no-source anti-pattern.",
+      "territories": [
+        "limits-refusal-silence",
+        "care-stewardship-repair",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "descriptive-category"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "security-legal-procurement",
+        "buyers-founders"
+      ],
+      "architecture_lenses": [
+        "company-product-split",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "False safety assurance; should not be used as product identity.",
+        "The code form is mechanically valid, but using it would create an unsupported warranty and safety-product implication."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: deliberately hostile false assurance",
+        "stance: adverse",
+        "scope: current",
+        "code_projection: hex=always_safe_answers; otp=:always_safe_answers; module=AlwaysSafeAnswers; mix=mix always_safe_answers.run; config=:always_safe_answers; telemetry=[:always_safe_answers, :answer, :stop]",
+        "current_embodiment: Current embodiment is unavailable as an honest DSEx identity because the library cannot warrant safe answers.",
+        "horizon_embodiment: Horizon embodiment is unavailable because artifact optimization cannot make universal safety guarantees.",
+        "paired_affirmative_ordinal: 1"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Proves Every Prompt",
+      "pronunciation": "proovz EV-ree prahmpt",
+      "grammar": "Deliberately hostile false assurance using proof verb and universal quantifier.",
+      "rationale": "This adverse candidate captures the exact identity trap around formal-sounding software names. DSEx can validate schemas, run tests, evaluate metrics, and compare optimizer outputs, but it is not a proof system and should not use grammar that says it proves prompts.",
+      "etymology": "Plain English phrase; coined here as an adverse no-source anti-pattern.",
+      "territories": [
+        "mathematics-logic",
+        "program-compilation",
+        "limits-refusal-silence"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "phrase-imperative"
+      ],
+      "audience_lenses": [
+        "pl-researchers",
+        "security-legal-procurement",
+        "dspy-gepa-researchers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "False proof claim and prompt-centric scope distortion.",
+        "The valid code form would still encode an invalid product promise and should remain a negative example."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: counter-claims",
+        "form_mechanism: deliberately hostile false assurance",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex=proves_every_prompt; otp=:proves_every_prompt; module=ProvesEveryPrompt; mix=mix proves_every_prompt.check; config=:proves_every_prompt; telemetry=[:proves_every_prompt, :proof, :stop]",
+        "current_embodiment: Current embodiment is unavailable because DSEx does not prove prompts or programs.",
+        "horizon_embodiment: Horizon embodiment is unavailable because broader artifact optimization still relies on empirical contracts, not universal proof.",
+        "paired_affirmative_ordinal: 2"
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "Pareto Trace",
+      "pronunciation": "pah-REH-toh trays",
+      "grammar": "Eponymic technical compound naming traceable multi-objective selection rather than a product master.",
+      "rationale": "Pareto is a public historical attribution widely used in optimization vocabulary, and the word trace keeps the identity tied to recorded candidate lineage rather than prestige. It can name a DSEx optimizer report or research-series component without implying Pareto endorsed the project.",
+      "etymology": "Uses the established Pareto term associated with Vilfredo Pareto and later optimization usage; coined compound for this portfolio.",
+      "territories": [
+        "measurement-evidence",
+        "persistence-provenance",
+        "uncertainty-probability"
+      ],
+      "strategies": [
+        "proper-mythic-historical",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "ml-researchers",
+        "eval-research-ops"
+      ],
+      "architecture_lenses": [
+        "umbrella-named-subsystems",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Pareto can be overused as a rigor signal when no true frontier or trade-off analysis is present.",
+        "Should not become the master brand because the product is broader than Pareto selection."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: accurate attributed eponym",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=pareto_trace; otp=:pareto_trace; module=ParetoTrace; mix=mix pareto_trace.report; config=:pareto_trace; telemetry=[:pareto_trace, :frontier, :stop]",
+        "current_embodiment: Current embodiment can label optimizer reports that record candidates, scores, and non-dominated comparisons.",
+        "horizon_embodiment: Horizon embodiment can label artifact-optimization archive views when multiple metrics and rejected alternatives are retained.",
+        "citation_stewardship: Attribution duty is to cite Pareto only for the established frontier or efficiency concept when that concept is actually used; ambiguity or harm is prestige inflation and historical simplification; viable without the person's name as frontier_trace.",
+        "paired_adverse_ordinal: 19"
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "Tukey Ledger",
+      "pronunciation": "TOO-kee LEH-jer",
+      "grammar": "Eponymic compound connecting exploratory data analysis lineage to accountable record keeping.",
+      "rationale": "The name can support evaluation culture without saying DSEx inherits or is endorsed by John Tukey. It points toward exploratory analysis, residual inspection, and recorded evidence, which are truthful practices for optimizer reports and eval campaigns.",
+      "etymology": "References John W. Tukey, a public historical statistician associated with exploratory data analysis; coined compound for this portfolio.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "persistence-provenance"
+      ],
+      "strategies": [
+        "proper-mythic-historical",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "eval-research-ops",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May feel too statistics-specific for the master identity.",
+        "Requires citations and context when used in docs so it does not become decorative erudition."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: accurate attributed eponym",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=tukey_ledger; otp=:tukey_ledger; module=TukeyLedger; mix=mix tukey_ledger.audit; config=:tukey_ledger; telemetry=[:tukey_ledger, :eval, :stop]",
+        "current_embodiment: Current embodiment can name evaluation notebooks or reports that keep examples, scores, and residual notes visible.",
+        "horizon_embodiment: Horizon embodiment can carry artifact-campaign ledgers with exploratory diagnostics and promotion evidence.",
+        "citation_stewardship: Attribution duty is to cite Tukey only for relevant exploratory data analysis influence, not for DSEx design endorsement; ambiguity or harm is implying a broad statistical warrant; viable without the person's name as exploratory_ledger.",
+        "paired_adverse_ordinal: 20"
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "References-First Runtime",
+      "pronunciation": "REF-er-uhn-siz furst RUN-tym",
+      "grammar": "Non-eponymic citation-bearing architecture with priority modifier.",
+      "rationale": "This control avoids turning any person into the product brand while making source pins, papers, repository commits, and authority policies part of the architecture. It is compatible with DSEx's need to distinguish inspiration, parity, and effectiveness claims.",
+      "etymology": "Plain English compound; coined here with no person-source claim.",
+      "territories": [
+        "persistence-provenance",
+        "measurement-evidence",
+        "distributed-runtime"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "namespace-led"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "oss-contributors",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May sound process-heavy if used as the only public identity.",
+        "Citation architecture can become performative unless every claim has a real source policy."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: non-eponymic citation-bearing control",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex=references_first; otp=:references_first; module=ReferencesFirst; mix=mix references_first.check; config=:references_first; telemetry=[:references_first, :source, :stop]",
+        "current_embodiment: Current embodiment fits docs and gates that pin authority versions before claiming parity or behavior.",
+        "horizon_embodiment: Horizon embodiment fits artifact optimization where every promoted component records evidence, source, and claim type.",
+        "citation_stewardship: Attribution duty is to cite papers, repositories, versions, and commits directly instead of borrowing person or institution prestige; ambiguity or harm is bureaucracy without evidence; viable without any person's name as references_first."
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "Apparatus Runtime",
+      "pronunciation": "ap-uh-RA-tus RUN-tym",
+      "grammar": "Historical scholarly-object architecture used as a non-eponymic citation system.",
+      "rationale": "An apparatus criticus records textual variants and sources, making it a strong metaphor for optimizer candidates, traces, rejected edits, and promotion decisions. The name carries citation discipline without making a historical person the master brand.",
+      "etymology": "From scholarly apparatus and apparatus criticus, documented practices for recording textual variants and sources; coined software compound here.",
+      "territories": [
+        "writing-editing-publishing",
+        "persistence-provenance",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "eval-research-ops",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "umbrella-named-subsystems"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Latin-derived term may feel academic and less approachable.",
+        "Must not imply DSEx is a textual scholarship tool only."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: historical object with attribution duties",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=apparatus_runtime; otp=:apparatus_runtime; module=ApparatusRuntime; mix=mix apparatus_runtime.trace; config=:apparatus_runtime; telemetry=[:apparatus_runtime, :variant, :stop]",
+        "current_embodiment: Current embodiment can label DSEx trace and evaluation artifacts but is broader than the current public API.",
+        "horizon_embodiment: Horizon embodiment fits artifact optimization across instructions, demos, schemas, and code fragments by recording variants, witnesses, and selected readings.",
+        "citation_stewardship: Attribution duty is to explain the scholarly apparatus practice and cite sources for the practice when used pedagogically; ambiguity or harm is academic gatekeeping or narrowing to prose; viable without any person's name as apparatus_runtime."
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Pinned Lineage",
+      "pronunciation": "pind LIN-ee-ij",
+      "grammar": "Non-eponymic provenance architecture using participial modifier plus abstract noun.",
+      "rationale": "This identity makes commit pins, paper revisions, source hashes, and optimizer parentage central without borrowing individual prestige. It is affirmative because it names a durable behavior DSEx needs now and more strongly at the artifact-optimization horizon.",
+      "etymology": "Plain English compound; coined here with no external source claim.",
+      "territories": [
+        "persistence-provenance",
+        "time-recovery-inheritance",
+        "measurement-evidence"
+      ],
+      "strategies": [
+        "descriptive-category",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "future-maintainers",
+        "dspy-gepa-researchers",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "federated-compatibility"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Lineage language can sound dynastic if applied to people instead of artifacts.",
+        "Needs operational follow-through in reports and saved program metadata."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: non-eponymic citation-bearing architecture",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex=pinned_lineage; otp=:pinned_lineage; module=PinnedLineage; mix=mix pinned_lineage.verify; config=:pinned_lineage; telemetry=[:pinned_lineage, :artifact, :stop]",
+        "current_embodiment: Current embodiment fits docs that distinguish pinned authorities from moving snapshots.",
+        "horizon_embodiment: Horizon embodiment fits optimizer artifacts with parentage, content hashes, rejected edits, checkpoints, and migration records.",
+        "citation_stewardship: Attribution duty is to cite exact paper versions, repository commits, source hashes, and artifact parents; ambiguity or harm is treating lineage as legitimacy by itself; viable without any person's name as pinned_lineage."
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "Errata Loop",
+      "pronunciation": "eh-RAH-tuh loop",
+      "grammar": "Non-eponymic citation practice plus feedback-loop architecture.",
+      "rationale": "Errata foreground correction rather than triumph, which suits a system that evaluates, revises, and records optimizer outcomes. It is ambivalent because the tone is humble but potentially negative; still, it carries a useful citation discipline without person-branding.",
+      "etymology": "From errata, the publishing practice of listing corrections; coined software compound here.",
+      "territories": [
+        "care-stewardship-repair",
+        "feedback-control",
+        "writing-editing-publishing"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "educators-writers",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Negative repair tone may not work as a master brand.",
+        "Loop language can imply automatic improvement unless paired with metrics and human review."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: historical citation practice and feedback architecture",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex=errata_loop; otp=:errata_loop; module=ErrataLoop; mix=mix errata_loop.review; config=:errata_loop; telemetry=[:errata_loop, :correction, :stop]",
+        "current_embodiment: Current embodiment can name eval feedback and documentation correction workflows around DSEx examples.",
+        "horizon_embodiment: Horizon embodiment can name artifact repair campaigns while avoiding any claim that repair is automatic or complete.",
+        "citation_stewardship: Attribution duty is to document corrections, versions, and affected claims rather than attach prestige names; ambiguity or harm is making correction sound like guaranteed healing; viable without any person's name as errata_loop."
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "The Scholium Layer",
+      "pronunciation": "thuh SKOH-lee-um LAY-er",
+      "grammar": "Historical annotation object plus role/system architecture.",
+      "rationale": "A scholium is an explanatory note, so the form can name a citation-bearing layer around optimizer artifacts, examples, and design decisions. It is ambivalent because it is elegant but scholarly; its strongest use is architecture, not mass-market identity.",
+      "etymology": "From scholium, a marginal or explanatory note in scholarly traditions; coined software architecture phrase here.",
+      "territories": [
+        "writing-editing-publishing",
+        "persistence-provenance",
+        "pedagogy-apprenticeship"
+      ],
+      "strategies": [
+        "technical-borrowing",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "educators-writers",
+        "pl-researchers",
+        "future-maintainers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "umbrella-named-subsystems"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Specialist word may reduce accessibility.",
+        "Layer metaphor could imply a separate platform if not tied to library artifacts."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: role/system architecture with citation-bearing historical practice",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex=scholium_layer; otp=:scholium_layer; module=ScholiumLayer; mix=mix scholium_layer.annotate; config=:scholium_layer; telemetry=[:scholium_layer, :note, :stop]",
+        "current_embodiment: Current embodiment is limited to documentation and reports, not a separate runtime layer.",
+        "horizon_embodiment: Horizon embodiment can annotate optimized artifacts with sources, rejected alternatives, evaluator comments, and claim scope.",
+        "citation_stewardship: Attribution duty is to explain scholium as a general annotation practice and cite historical usage when invoked; ambiguity or harm is scholarly exclusivity; viable without any person's name as annotation_layer."
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Bayes-Adjacency",
+      "pronunciation": "bayz uh-JAY-sen-see",
+      "grammar": "Eponymic hyphen compound that signals proximity to probabilistic reasoning without claiming Bayesian correctness.",
+      "rationale": "This is intentionally ambivalent: it could help discuss uncertainty and evidence, but it risks implying formal Bayesian inference where DSEx may only be scoring and comparing outputs. Its value is as a disciplined near-miss that requires explicit citation and scope limits.",
+      "etymology": "References Thomas Bayes through the established Bayesian term; coined compound for this portfolio.",
+      "territories": [
+        "uncertainty-probability",
+        "measurement-evidence",
+        "mathematics-logic"
+      ],
+      "strategies": [
+        "proper-mythic-historical",
+        "technical-borrowing"
+      ],
+      "audience_lenses": [
+        "ml-researchers",
+        "pl-researchers",
+        "security-legal-procurement"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "High risk of overstating probabilistic formalism.",
+        "Hyphenated brand is awkward in code and better translated to bayes_adjacency for implementation."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: scoped eponymic adjacency",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex=bayes_adjacency; otp=:bayes_adjacency; module=BayesAdjacency; mix=mix bayes_adjacency.eval; config=:bayes_adjacency; telemetry=[:bayes_adjacency, :uncertainty, :stop]",
+        "current_embodiment: Current embodiment is limited to discussions of uncertainty-aware evaluation and should not imply Bayesian algorithms.",
+        "horizon_embodiment: Horizon embodiment could name a research track only if artifact selection actually uses probabilistic models or clearly states adjacency.",
+        "citation_stewardship: Attribution duty is to cite Bayesian methods only when actual Bayesian machinery is present and to avoid implying Bayes authored DSEx concepts; ambiguity or harm is false mathematical rigor; viable without the person's name as uncertainty_adjacency."
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "Stanford Certified Optimizer",
+      "pronunciation": "STAN-ferd SUR-tuh-fyde AHP-tuh-my-zer",
+      "grammar": "Deliberately adverse institutional overclaim and prestige borrowing.",
+      "rationale": "This negative candidate records a tempting but invalid citation architecture: DSEx can cite DSPy lineage and pinned Stanford NLP-related sources, but it cannot imply certification, institutional permission, or official status. It must be rejected as a product identity.",
+      "etymology": "Plain English adverse phrase using an institutional name as a no-source prestige borrowing; no certification or endorsement is claimed.",
+      "territories": [
+        "science-experiment",
+        "measurement-evidence",
+        "civic-governance"
+      ],
+      "strategies": [
+        "institutional-community",
+        "proper-mythic-historical"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "security-legal-procurement",
+        "oss-contributors"
+      ],
+      "architecture_lenses": [
+        "endorsed-family",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "False institutional certification and likely trademark or affiliation confusion.",
+        "The code form is technically valid but should not be used because the product is not official or certified by Stanford."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: deliberately adverse prestige borrowing",
+        "stance: adverse",
+        "scope: current",
+        "code_projection: hex=stanford_certified_optimizer; otp=:stanford_certified_optimizer; module=StanfordCertifiedOptimizer; mix=mix stanford_certified_optimizer.run; config=:stanford_certified_optimizer; telemetry=[:stanford_certified_optimizer, :claim, :stop]",
+        "current_embodiment: Current embodiment is unavailable because DSEx is not certified, official, or endorsed by Stanford.",
+        "horizon_embodiment: Horizon embodiment is unavailable because future optimizer parity or research work would still not create certification.",
+        "citation_stewardship: Attribution duty is to cite DSPy, papers, repositories, and authors accurately without implying institutional certification; ambiguity or harm is endorsement confusion and borrowed authority; viable without the institution name as pinned_optimizer_trace.",
+        "paired_affirmative_ordinal: 11"
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "Khattab Inside",
+      "pronunciation": "kuh-TAHB in-SYD",
+      "grammar": "Deliberately adverse living-person prestige borrowing using endorsement-style product grammar.",
+      "rationale": "This negative candidate is included to make the boundary explicit: DSEx can cite Omar Khattab's public research line where relevant, but it must not turn a living researcher into a product warrant or imply permission, authorship, or endorsement. The form is therefore rejected.",
+      "etymology": "Adverse phrase using a living researcher's name as a no-source endorsement-style borrowing; no permission, authorship, or endorsement is claimed.",
+      "territories": [
+        "science-experiment",
+        "persistence-provenance",
+        "civic-governance"
+      ],
+      "strategies": [
+        "proper-mythic-historical",
+        "institutional-community"
+      ],
+      "audience_lenses": [
+        "dspy-gepa-researchers",
+        "security-legal-procurement",
+        "affected-publics"
+      ],
+      "architecture_lenses": [
+        "endorsed-family",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Inappropriate living-person endorsement implication.",
+        "The code form is mechanically possible but should not be used because it converts citation lineage into personal branding."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: eponym-citation-architecture",
+        "form_mechanism: deliberately adverse living-person prestige borrowing",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex=khattab_inside; otp=:khattab_inside; module=KhattabInside; mix=mix khattab_inside.run; config=:khattab_inside; telemetry=[:khattab_inside, :claim, :stop]",
+        "current_embodiment: Current embodiment is unavailable because DSEx is not authored, endorsed, or warranted by Khattab.",
+        "horizon_embodiment: Horizon embodiment is unavailable because even future DSPy or GEPA parity must cite sources rather than borrow a living person's name.",
+        "citation_stewardship: Attribution duty is to cite Khattab's relevant public papers and repositories only for specific lineage claims; ambiguity or harm is false endorsement and personal appropriation; viable without the person's name as dspy_lineage_notes.",
+        "paired_affirmative_ordinal: 12"
+      ]
+    }
+  ]
+}

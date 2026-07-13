@@ -1,0 +1,961 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-21d-form-conversion-language",
+    "generated_at": "2026-07-13T20:15:14Z",
+    "generator": {
+      "kind": "agent",
+      "name": "Codex",
+      "provider": "OpenAI",
+      "model": "GPT-5 Codex",
+      "reasoning_effort": null,
+      "agent_id": null
+    },
+    "method": "Isolated corrective generation for form-saturation-c cells 4 and 8: first froze 20 surfaces from the assigned mechanism cells, then planned a mechanical normalized-ID comparison against the accepted registry without changing surfaces.",
+    "brief": "Create exactly 20 raw identity observations for Cell 4 Conversion and grammar and Cell 8 Source-language stewardship, preserving adverse and weak forms while recording grammar, role, code projections, product truth, accessibility, power, refusal, cost, and post-freeze overlap status.",
+    "prompt_path": "identity/prompts/form-correction.md",
+    "prompt_sha256": "5f4216d1b7ad963055aa36d2e9cc41181e53ae1a3d8fc54b70d3f9590f640c9d",
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "action-agency",
+      "care-stewardship-repair",
+      "language-semantics",
+      "civic-governance"
+    ],
+    "intended_strategies": [
+      "ordinary-verb",
+      "ordinary-object",
+      "phrase-imperative",
+      "archaic-cross-language"
+    ],
+    "intended_audiences": [
+      "affected-publics",
+      "backend-product-engineers",
+      "international-users",
+      "educators-writers"
+    ],
+    "notes": [
+      "challenge_wave: form-saturation-c.",
+      "exact assigned cells: Cell 4 ordinals 1-10 Conversion and grammar; Cell 8 ordinals 11-20 Source-language stewardship.",
+      "isolation: before freezing surfaces, did not read identity/inbox candidate files, identity/registry.jsonl, enrichments, scores, or another corrective portfolio; the explicitly required saturation audit was read even though it contains prior example surfaces, so this limitation is recorded.",
+      "post-freeze overlap method: normalize each frozen surface by case-folding and removing non-alphanumeric characters, compare mechanically against accepted registry normalized IDs, expose only matches, and do not change any surface after comparison.",
+      "audit_path: identity/reports/saturation-form-audit.md; audit_sha256: 06831eef17c05a5faffcc1cb0376a5da838bd3fb5a5db907b7fd398ce2814ef7.",
+      "prompt_path: identity/prompts/form-correction.md; prompt_sha256: 5f4216d1b7ad963055aa36d2e9cc41181e53ae1a3d8fc54b70d3f9590f640c9d.",
+      "agent_id: unavailable in environment.",
+      "quota plan: each ten-entry cell has ordinals contiguous, exactly two wildcards, stance split five affirmative, three ambivalent, two adverse, and scope split four current, four horizon, two both."
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Mend",
+      "pronunciation": "mend",
+      "grammar": "English verb, noun, and command; adjective reading is unavailable except awkward attributive use.",
+      "rationale": "Mend gives the conversion cell a small repair verb that can also name a repair pass or command without implying autonomous healing.",
+      "etymology": "Ordinary English word; no special coined source used beyond contemporary English conversion grammar.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "single-branded-house"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May over-suggest repair for affected people rather than repair of program artifacts.",
+        "Could be heard as 'meant' in noisy dictation."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: grammatical conversion, ordinary verb to noun and command.",
+        "stance: affirmative.",
+        "scope: current.",
+        "spoken/dictation behavior: one syllable, plain ASCII, likely recoverable when spelled once; noisy calls may confuse it with 'meant'.",
+        "code projections: hex_package=mend; otp_app=:mend; module_root=Mend; mix_task_prefix=mend; config_prefix=:mend; telemetry_prefix=[:mend].",
+        "role in docs and code: docs can say 'mend a program' and code can use Mend/mend as library root; adjective role should not be used.",
+        "product truth: current DSEx supports developer-run evaluation, optimization, tests, and gates, but it does not ship user redress, durable rollback, or autonomous repair.",
+        "current/horizon embodiment: current embodiment is maintainer-initiated evaluation and optimizer iteration; horizon embodiment could conditionally mend instructions, demos, tool descriptions, schemas, or configuration after measured feedback.",
+        "accessibility: screen readers should speak the common word; support docs should spell M-E-N-D on first mention.",
+        "architecture-role availability: available as master brand, Elixir library, or product family root; unavailable as public governance body or legal remedy.",
+        "power/refusal/cost: backend maintainer can refuse a bad optimizer promotion and rerun evals; cost is extra examples, tokens, CI time, and maintainer attention.",
+        "post-freeze overlap status: accepted-registry normalized match found for mend: occ-2eaf1896d7edb06b in run-03-adaptive-dynamics, occ-2a875309e5044292 in run-05-performance-making, and occ-5dc834e8d0e923f9 in run-09-boundaries-limits-care."
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Guard",
+      "pronunciation": "gard",
+      "grammar": "English verb, noun, command, and attributive adjective as in guard clause or guard rail.",
+      "rationale": "Guard tests a bounded action identity: it can mean the act of protecting a call boundary, the boundary itself, or a command to stop unsafe use.",
+      "etymology": "Ordinary English word; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can imply security guarantees that DSEx does not provide.",
+        "Elixir developers may hear language guard clauses rather than LM program boundaries."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: ordinary object and verb conversion with attributive adjective reading.",
+        "stance: affirmative.",
+        "scope: current.",
+        "spoken/dictation behavior: common one-syllable word; dictation may choose 'gard' only for non-native speakers, so spelling once is useful.",
+        "code projections: hex_package=guard; otp_app=:guard; module_root=Guard; mix_task_prefix=guard; config_prefix=:guard; telemetry_prefix=[:guard].",
+        "role in docs and code: docs can use guard as noun/verb for explicit boundaries; code can use Guard/guard but must explain it is not Elixir guard syntax.",
+        "product truth: current DSEx has explicit runtime boundaries, adapters, tools, redaction, and quality gates, not a universal secure sandbox.",
+        "current/horizon embodiment: current embodiment is caller-owned boundaries around LM calls and tools; horizon embodiment could conditionally cover artifact promotion policies after evidence.",
+        "accessibility: short ASCII form is screen-reader friendly; docs should avoid relying on color or icon-only guard metaphors.",
+        "architecture-role availability: available for Elixir library and operational edition naming; unavailable for legal compliance, safety certification, or public-interest governance.",
+        "power/refusal/cost: application operator can refuse a tool call or promotion by configuration and tests; cost is false negatives, delayed releases, and extra review time.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Backstop",
+      "pronunciation": "BAK-stop",
+      "grammar": "English noun, verb, command, and attributive adjective as in backstop policy.",
+      "rationale": "Backstop names a last accountable boundary without claiming the system can automatically undo harm.",
+      "etymology": "Ordinary English compound word used as object and verb; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May imply rollback, guarantees, or institutional recourse that do not ship.",
+        "Sports metaphor may not travel evenly."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: ordinary object converted to verb and command.",
+        "stance: affirmative.",
+        "scope: horizon.",
+        "spoken/dictation behavior: clear two-beat word; support callers may ask whether it is one word or two.",
+        "code projections: hex_package=backstop; otp_app=:backstop; module_root=Backstop; mix_task_prefix=backstop; config_prefix=:backstop; telemetry_prefix=[:backstop].",
+        "role in docs and code: docs can use it for a boundary or fallback role; code can use Backstop/backstop only if documentation denies automatic rollback.",
+        "product truth: current DSEx does not provide durable rollback, public appeal, or external redress; it provides explicit program values, gates, and developer-visible results.",
+        "current/horizon embodiment: current use would be metaphorical only; horizon use could conditionally name artifact promotion backstops for instructions, demos, retrieval policies, and config.",
+        "accessibility: ASCII and pronounceable; docs should avoid unlabeled stop-sign imagery.",
+        "architecture-role availability: available as product-family or policy-plane name; unavailable as governance institution, regulator, or guarantee.",
+        "power/refusal/cost: product owner can route low-confidence results to manual review; cost is queue latency, staff time, and reduced automation.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Steady",
+      "pronunciation": "STED-ee",
+      "grammar": "English adjective, verb, noun in limited technical use, and command.",
+      "rationale": "Steady exercises the adjective-first conversion route: it suggests controlled motion and restraint, but also risks promising stable behavior.",
+      "etymology": "Ordinary English word; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can imply reliability or automatic stabilization beyond evidence.",
+        "Adjective-led code roots can feel generic."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: adjective-led conversion to verb and command.",
+        "stance: ambivalent.",
+        "scope: horizon.",
+        "spoken/dictation behavior: common two-syllable word; dictation is likely reliable, though 'steady' may be interpreted as an instruction rather than a name.",
+        "code projections: hex_package=steady; otp_app=:steady; module_root=Steady; mix_task_prefix=steady; config_prefix=:steady; telemetry_prefix=[:steady].",
+        "role in docs and code: docs can use adjective and command readings; code can use Steady/steady only as an artifact-control identity, not as a stability claim.",
+        "product truth: current DSEx has bounded tests and gates but does not prove stability or guarantee optimizer lift.",
+        "current/horizon embodiment: current embodiment is weak and descriptive; horizon embodiment could conditionally name promotion policies that keep artifact updates bounded.",
+        "accessibility: screen readers handle it as a normal word; docs should disambiguate name versus imperative in headings.",
+        "architecture-role availability: available as lifecycle plane or hosted product feature name; unavailable as a proof, safety, or uptime guarantee.",
+        "power/refusal/cost: SRE or release owner can hold a promotion after eval regression; cost is delayed improvement and continued token spend on old artifacts.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Trim",
+      "pronunciation": "trim",
+      "grammar": "English verb, noun, adjective, and command.",
+      "rationale": "Trim makes cost and scope visible through an ordinary action word: a maintainer can trim artifacts, traces, or search spaces without claiming perfect efficiency.",
+      "etymology": "Ordinary English word; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "lifecycle-planes",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can sound like cost-cutting rather than care.",
+        "Could imply carbon or cost accounting that is not shipped."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: ordinary verb with noun, adjective, and command readings.",
+        "stance: affirmative.",
+        "scope: horizon.",
+        "spoken/dictation behavior: short ASCII word; may be heard as 'trimm' only in spelling contexts.",
+        "code projections: hex_package=trim; otp_app=:trim; module_root=Trim; mix_task_prefix=trim; config_prefix=:trim; telemetry_prefix=[:trim].",
+        "role in docs and code: docs can use trim as verb/command for narrowing work; code can use Trim/trim for a scoped optimizer or artifact policy if cost claims remain measured.",
+        "product truth: current DSEx records usage and supports bounded workflows, but does not ship carbon accounting or automatic cost governance.",
+        "current/horizon embodiment: current embodiment is descriptive around developer choices; horizon embodiment could conditionally trim instructions, examples, tools, schemas, or retrieval policies based on evals and explicit budgets.",
+        "accessibility: pronounceable and screen-reader friendly; documentation should not rely on scissors or purely visual trimming metaphors.",
+        "architecture-role availability: available as feature, package root, or hosted product module; unavailable as public sustainability or procurement proof.",
+        "power/refusal/cost: evaluation owner can refuse expansive optimizer campaigns and cap candidates; cost is lower search coverage and possible missed lift.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "Answer For",
+      "pronunciation": "AN-ser for",
+      "grammar": "English phrase imperative and verb phrase; noun and adjective readings are unavailable.",
+      "rationale": "Answer For is a deliberate non-code accountability phrase that asks who remains responsible when DSEx-built systems affect people.",
+      "etymology": "Ordinary English phrase; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "oss-commercial-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Too slogan-like for code.",
+        "May imply legal accountability mechanisms that the project cannot provide."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: phrase imperative and accountability counter-role inside conversion cell.",
+        "stance: ambivalent.",
+        "scope: both.",
+        "spoken/dictation behavior: clear as a phrase, but capitalization and spacing must be dictated; unsuitable as a bare package name.",
+        "non-code role: documentation principle, governance checklist heading, or incident review prompt; no conventional Hex, OTP, module, Mix, config, or telemetry projection should be used for this surface.",
+        "role in docs and code: docs-only phrase for responsibility assignment; code should use a separate implementation identity.",
+        "product truth: current DSEx gives developers traces, evals, and explicit calls, but it does not create legal duty, councils, public redress, or institutional appeals.",
+        "current/horizon embodiment: current embodiment is a documentation question for operators; horizon embodiment could conditionally apply to artifact-optimization reviews without claiming governance exists.",
+        "accessibility: phrase is screen-reader safe; documentation should keep it as text, not an icon badge.",
+        "architecture-role availability: available as stewardship or docs identity; unavailable as master brand, package, company, protocol, or official complaint channel.",
+        "power/refusal/cost: deployer or support lead must name the accountable human team and refuse automation blame-shifting; cost is escalation labor, audit writing, and slower incident closure.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Brake",
+      "pronunciation": "brayk",
+      "grammar": "English noun, verb, command, and attributive adjective as in brake policy.",
+      "rationale": "Brake is an adverse conversion test: it is operationally vivid, but it can falsely imply a universal safety stop.",
+      "etymology": "Ordinary English word; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Homophone with 'break' creates dictation and negative-failure ambiguity.",
+        "Suggests safety-critical emergency stop mechanisms that DSEx does not ship."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: ordinary object converted to command and verb, preserved as adverse wildcard.",
+        "stance: adverse.",
+        "scope: current.",
+        "spoken/dictation behavior: pronounced like 'break'; support calls would require 'brake as in stopping, B-R-A-K-E'.",
+        "code projections: hex_package=brake; otp_app=:brake; module_root=Brake; mix_task_prefix=brake; config_prefix=:brake; telemetry_prefix=[:brake].",
+        "role in docs and code: docs could use it only for a bounded stop action; code projection is technically viable but semantically risky.",
+        "product truth: current DSEx has bounded runtime calls, tool definitions, and gates, but not a universal kill switch, safety certification, or durable rollback.",
+        "current/horizon embodiment: current embodiment is caller refusal to execute or promote; horizon embodiment should remain conditional and policy-specific.",
+        "accessibility: homophone makes voice input fragile; docs must spell it and avoid relying on red visual stop cues alone.",
+        "architecture-role availability: available only as a limited operational feature label; unavailable as master brand, safety claim, public remedy, or governance institution.",
+        "power/refusal/cost: application operator can stop a tool invocation, disable a workflow, or refuse a promotion; cost is lost automation, delayed service, and manual fallback work.",
+        "post-freeze overlap status: accepted-registry normalized match found for brake: occ-520382f941a6b3bd in run-03-adaptive-dynamics."
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Make Good",
+      "pronunciation": "mayk good",
+      "grammar": "English phrase imperative and verb phrase; noun reading is idiomatic; adjective reading is unavailable.",
+      "rationale": "Make Good stresses repair and responsibility after a bad LM outcome while keeping the absence of shipped redress mechanisms visible.",
+      "etymology": "Ordinary English phrase; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "endorsed-family"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Can sound moralistic or legally remedial.",
+        "May overstate ability to compensate affected people."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: phrase imperative with verb phrase conversion.",
+        "stance: affirmative.",
+        "scope: horizon.",
+        "spoken/dictation behavior: ordinary phrase; voice input may omit capitalization, so code normalization must be explicit.",
+        "code projections: hex_package=make_good; otp_app=:make_good; module_root=MakeGood; mix_task_prefix=make_good; config_prefix=:make_good; telemetry_prefix=[:make_good].",
+        "role in docs and code: docs can use it as repair imperative; code can use MakeGood/make_good only if the role is artifact repair, not public compensation.",
+        "product truth: current DSEx does not ship redress, refunds, councils, or durable rollback; it can expose traces, errors, metrics, and optimized variants.",
+        "current/horizon embodiment: current embodiment is mostly documentation; horizon embodiment could conditionally apply to repairing instructions, demos, schemas, tool descriptions, or config after measured failure.",
+        "accessibility: phrase is plain English; docs should include the snake_case code form when relevant for screen-reader and dictation users.",
+        "architecture-role availability: available as research or feature-plane phrase; unavailable as company promise, legal warranty, or public redress system.",
+        "power/refusal/cost: support lead or maintainer can open a repair issue and refuse deployment until evals pass; cost is incident labor, extra model calls, and slower delivery.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Own the Call",
+      "pronunciation": "ohn the kawl",
+      "grammar": "English phrase imperative; verb phrase only; noun and adjective readings are unavailable.",
+      "rationale": "Own the Call attacks automation blame by making the human decision point explicit, but it is too phrase-like for package identity.",
+      "etymology": "Ordinary English phrase; no coined source.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "phrase-imperative",
+        "ordinary-verb"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "company-product-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Managerial tone may alienate contributors.",
+        "Not viable as a conventional package or module identity."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: phrase imperative focused on accountability grammar.",
+        "stance: ambivalent.",
+        "scope: both.",
+        "spoken/dictation behavior: easy to say, but dictation loses capitalization and may write 'phone call' connotations.",
+        "non-code role: documentation maxim, incident checklist label, or support script sentence; no conventional Hex, OTP, module, Mix, config, or telemetry projection should be used for this surface.",
+        "role in docs and code: docs-only accountability phrase; code should use a separate ordinary identifier.",
+        "product truth: DSEx can make LM calls explicit and traceable, but it does not make a social actor accountable by itself.",
+        "current/horizon embodiment: current embodiment is human review of DSEx.call and promotion decisions; horizon embodiment could conditionally label artifact approval checkpoints.",
+        "accessibility: works as text; avoid using a phone icon or audio-only cue to explain it.",
+        "architecture-role availability: available as docs, training, or stewardship language; unavailable as package, protocol, company, or community name.",
+        "power/refusal/cost: incident commander or product owner must accept responsibility for using or refusing an LM result; cost is audit burden, support time, and possibly slower automation.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Triage",
+      "pronunciation": "TREE-ahzh",
+      "grammar": "English noun, verb, command, and attributive adjective as in triage queue.",
+      "rationale": "Triage keeps the uncomfortable rationing side of repair visible: evaluation can sort failures, but sorting is not the same as helping everyone.",
+      "etymology": "Ordinary English borrowing now conventional in technical work; no coined source used for this observation.",
+      "territories": [
+        "action-agency",
+        "care-stewardship-repair"
+      ],
+      "strategies": [
+        "ordinary-verb",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "affected-publics",
+        "backend-product-engineers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Medical and emergency associations can be exploitative or too severe.",
+        "Implies rationing and may normalize leaving some affected cases unresolved."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 4 Conversion and grammar.",
+        "mechanism subtype: ordinary technical borrowing with noun, verb, adjective, and command readings.",
+        "stance: adverse.",
+        "scope: current.",
+        "spoken/dictation behavior: pronunciation and spelling are not transparent; likely needs spelling in support calls.",
+        "code projections: hex_package=triage; otp_app=:triage; module_root=Triage; mix_task_prefix=triage; config_prefix=:triage; telemetry_prefix=[:triage].",
+        "role in docs and code: docs can use it for issue sorting; code can use Triage/triage only for maintainer workflow, not for affected-public remedy.",
+        "product truth: current DSEx can evaluate examples and surface failures, but it does not provide case management, medical priority logic, or public repair.",
+        "current/horizon embodiment: current embodiment is sorting failed tests, examples, traces, or optimizer candidates; horizon embodiment could conditionally sort artifact repair work.",
+        "accessibility: non-obvious spelling and final sound need pronunciation hints; avoid color-only priority queues.",
+        "architecture-role availability: available as maintainer tool or internal workflow label; unavailable as master brand, public help channel, or governance process.",
+        "power/refusal/cost: maintainer can defer low-severity failures and refuse release on high-severity failures; cost is that some affected cases wait or remain unfixed.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "Sema",
+      "pronunciation": "SEE-mah",
+      "grammar": "Borrowed proper/common noun candidate; docs role is source-language name, code role is lowercase romanized root.",
+      "rationale": "Sema tests whether a compact sign or token word can name meaning-bearing program artifacts without claiming a new language or formal semantics.",
+      "etymology": "Source language: Ancient Greek; meaning: sign, mark, token; morphology: neuter noun; transliteration: ALA-LC Greek romanization simplified to ASCII without diacritics; source: Logeion, 'sema', citing Liddell-Scott-Jones Greek-English Lexicon, https://logeion.uchicago.edu/%CF%83%E1%BF%86%CE%BC%CE%B1; community-review status: unreviewed by a classicist; cultural context: ancient literary and religious uses make sign language more loaded than a neutral software token.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Could imply formal semiotics or language theory that DSEx does not establish.",
+        "Short form may collide with existing technical names."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: historically documented Ancient Greek borrowing, no relay hybrid.",
+        "stance: affirmative.",
+        "scope: current.",
+        "spoken/dictation behavior: two syllables and ASCII, but support calls should spell S-E-M-A to avoid 'seema' or 'schema'.",
+        "code projections: hex_package=sema; otp_app=:sema; module_root=Sema; mix_task_prefix=sema; config_prefix=:sema; telemetry_prefix=[:sema].",
+        "role in docs and code: docs can state a sign/mark metaphor; code can use Sema/sema as a romanized root.",
+        "product truth: current DSEx has signatures, fields, traces, and program values, but it does not define a new semantic calculus.",
+        "current/horizon embodiment: current embodiment is meaning-bearing signatures and traces; horizon embodiment could conditionally extend to typed artifact parameters.",
+        "accessibility: romanized ASCII avoids Greek-script input burden; etymology docs should not require reading Greek.",
+        "architecture-role availability: available as master brand or research/library identity; unavailable as standard, protocol authority, or linguistic claim.",
+        "power/refusal/cost: educator or maintainer can refuse over-semiotic explanations and use plain descriptors; cost is less mystique and more explanatory prose.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "Lex",
+      "pronunciation": "leks",
+      "grammar": "Latin noun candidate used as short English-like noun; docs role is law/rule metaphor, code role is lowercase romanized root.",
+      "rationale": "Lex puts rule and language together in a compact source-language form while exposing the danger of legal overclaim.",
+      "etymology": "Source language: Latin; meaning: law, statute, rule; morphology: feminine noun, nominative singular; transliteration: not applicable because the source uses Latin alphabet; source: Logeion, 'lex', citing Lewis and Short, A Latin Dictionary, https://logeion.uchicago.edu/lex; community-review status: unreviewed by a Latinist; cultural context: Roman legal language can sound institutional and authoritarian.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "spec-implementations"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Legal semantics can imply compliance guarantees.",
+        "Short software names are collision-prone."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Latin borrowing with rule/governance semantics, no relay hybrid.",
+        "stance: affirmative.",
+        "scope: current.",
+        "spoken/dictation behavior: short and clear, but dictation may write 'lex' lowercase or hear 'legs'.",
+        "code projections: hex_package=lex; otp_app=:lex; module_root=Lex; mix_task_prefix=lex; config_prefix=:lex; telemetry_prefix=[:lex].",
+        "role in docs and code: docs can use it as rule metaphor; code can use Lex/lex only with explicit denial of legal or standards authority.",
+        "product truth: current DSEx declares task contracts and validation constraints but does not create laws, compliance regimes, or official standards.",
+        "current/horizon embodiment: current embodiment is signatures and constraints; horizon embodiment could conditionally name artifact policies if they remain project-local.",
+        "accessibility: three-letter ASCII form is easy to type but ambiguous in speech; spell once in audio docs.",
+        "architecture-role availability: available as code root or library name; unavailable as civic institution, legal compliance mark, or public standard.",
+        "power/refusal/cost: security or legal reviewer can refuse compliance-sounding copy; cost is renaming docs and using longer descriptors.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "Agora",
+      "pronunciation": "AG-uh-rah",
+      "grammar": "Borrowed noun candidate; docs role is public meeting metaphor, code role is lowercase romanized root.",
+      "rationale": "Agora tests a civic and language place-name as a future community or artifact-discussion identity, while making governance overclaim visible.",
+      "etymology": "Source language: Ancient Greek; meaning: assembly place, marketplace; morphology: feminine noun; transliteration: ALA-LC Greek romanization simplified to ASCII; source: Logeion, 'agora', citing Liddell-Scott-Jones Greek-English Lexicon, https://logeion.uchicago.edu/%E1%BC%80%CE%B3%CE%BF%CF%81%CE%AC; community-review status: unreviewed by a classicist; cultural context: classical public-space metaphors can universalize one civic tradition.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "federated-compatibility"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Could imply a public forum or governance community that does not yet exist.",
+        "Classical civic imagery may feel exclusionary."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Ancient Greek civic-place borrowing, no relay hybrid.",
+        "stance: affirmative.",
+        "scope: horizon.",
+        "spoken/dictation behavior: pronounceable but stress varies; dictation may write 'a gora'.",
+        "code projections: hex_package=agora; otp_app=:agora; module_root=Agora; mix_task_prefix=agora; config_prefix=:agora; telemetry_prefix=[:agora].",
+        "role in docs and code: docs can use it for a future discussion or artifact-exchange plane; code can use Agora/agora only if not claiming public governance.",
+        "product truth: current DSEx has no public governance forum, council, standards body, or community mandate.",
+        "current/horizon embodiment: current embodiment is not shipped; horizon embodiment could conditionally name community review or artifact exchange if those mechanisms are built.",
+        "accessibility: ASCII romanization is usable; docs should not depend on Greek historical knowledge.",
+        "architecture-role availability: available as future community or hosted product plane; unavailable as current library truth, government metaphor, or standard.",
+        "power/refusal/cost: community steward could refuse to call a discussion space an agora until moderation and participation rules exist; cost is slower community branding.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "Tabula",
+      "pronunciation": "TAB-yoo-lah",
+      "grammar": "Latin noun candidate; docs role is tablet or record metaphor, code role is lowercase romanized root.",
+      "rationale": "Tabula gives the cell an ordinary object with record-keeping resonance for signatures, examples, and saved program artifacts.",
+      "etymology": "Source language: Latin; meaning: board, tablet, writing tablet, table; morphology: feminine noun, nominative singular; transliteration: not applicable because the source uses Latin alphabet; source: Logeion, 'tabula', citing Lewis and Short, A Latin Dictionary, https://logeion.uchicago.edu/tabula; community-review status: unreviewed by a Latinist; cultural context: classical writing-object metaphor should not erase non-Latin writing traditions.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "beam-master",
+        "lifecycle-planes"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May evoke 'tabula rasa' and imply a blank-slate model.",
+        "Can narrow perception to tables or documents."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Latin ordinary-object borrowing, no relay hybrid.",
+        "stance: affirmative.",
+        "scope: current.",
+        "spoken/dictation behavior: clear four-syllable form; may be misspelled 'taboola' or confused with the advertising company.",
+        "code projections: hex_package=tabula; otp_app=:tabula; module_root=Tabula; mix_task_prefix=tabula; config_prefix=:tabula; telemetry_prefix=[:tabula].",
+        "role in docs and code: docs can use tablet/record metaphor; code can use Tabula/tabula for artifact tables or registry-like records.",
+        "product truth: current DSEx has examples, traces, metrics, and saved program values, but not a public ledger or universal registry.",
+        "current/horizon embodiment: current embodiment is artifact record keeping in evaluation and save/load paths; horizon embodiment could conditionally cover typed artifact parameters.",
+        "accessibility: ASCII form is typeable; docs should avoid assuming readers know Latin declension.",
+        "architecture-role availability: available as library, artifact store, or lifecycle plane; unavailable as ledger, audit institution, or public record guarantee.",
+        "power/refusal/cost: maintainer can refuse claims that records prove fairness or truth; cost is longer documentation about what traces do and do not show.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "Koinon",
+      "pronunciation": "KOY-non",
+      "grammar": "Borrowed noun/adjective candidate from a neuter/common form; docs role is common or shared concern, code role is lowercase romanized root.",
+      "rationale": "Koinon explores a shared-interest identity for artifact ecosystems without asserting that DSEx already hosts a commons.",
+      "etymology": "Source language: Ancient Greek; meaning: common thing, public matter, community or commonwealth in context; morphology: neuter singular of koinos used substantively; transliteration: ALA-LC Greek romanization simplified to ASCII; source: Logeion, 'koinon', citing Liddell-Scott-Jones Greek-English Lexicon, https://logeion.uchicago.edu/%CE%BA%CE%BF%CE%B9%CE%BD%CF%8C%CE%BD; community-review status: unreviewed by a classicist; cultural context: commonwealth language carries political-theory baggage.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "federated-compatibility",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Opaque to most users and easy to mispronounce.",
+        "Can imply commons governance that is not present."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Ancient Greek substantivized adjective borrowing, no relay hybrid.",
+        "stance: affirmative.",
+        "scope: horizon.",
+        "spoken/dictation behavior: likely needs pronunciation and spelling; dictation may write 'coin on'.",
+        "code projections: hex_package=koinon; otp_app=:koinon; module_root=Koinon; mix_task_prefix=koinon; config_prefix=:koinon; telemetry_prefix=[:koinon].",
+        "role in docs and code: docs can use it as a shared-artifact or ecosystem metaphor; code can use Koinon/koinon if supported by plain descriptor.",
+        "product truth: current DSEx does not have a commons, community governance, or neutral ecosystem protocol.",
+        "current/horizon embodiment: current embodiment is not shipped; horizon embodiment could conditionally name shared artifact planes if review, permissions, and maintenance exist.",
+        "accessibility: unusual spelling burdens dictation users; first-use pronunciation and spelling are required.",
+        "architecture-role availability: available as future community or product-family name; unavailable as current package truth or public institution.",
+        "power/refusal/cost: community steward can refuse commons language until contribution and moderation rules are explicit; cost is delayed community positioning.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "Moot",
+      "pronunciation": "moot",
+      "grammar": "Historical noun candidate with modern English adjective/noun interference; code role is lowercase English form.",
+      "rationale": "Moot tests a historically documented assembly word whose modern English meaning can invert the intended civic force.",
+      "etymology": "Source language: Old English; meaning: meeting, assembly, council; morphology: neuter noun recorded as ge-mot; transliteration: normalized Old English spelling simplified to ASCII surface; source: Bosworth-Toller Anglo-Saxon Dictionary Online, 'ge-mot', https://bosworthtoller.com/15291; community-review status: unreviewed by Old English specialist; cultural context: Anglo-Saxon legal assembly terms carry English institutional history and are not neutral global civic vocabulary.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "research-stable-split",
+        "community-commercial-steward"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Modern English often means debatable or irrelevant.",
+        "Historical English governance language may feel parochial."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Old English historical civic borrowing, no relay hybrid.",
+        "stance: ambivalent.",
+        "scope: current.",
+        "spoken/dictation behavior: easy to say and spell, but hearers may infer 'moot point' irrelevance.",
+        "code projections: hex_package=moot; otp_app=:moot; module_root=Moot; mix_task_prefix=moot; config_prefix=:moot; telemetry_prefix=[:moot].",
+        "role in docs and code: docs can use it only with a historical note; code can use Moot/moot but modern false-friend risk is high.",
+        "product truth: current DSEx can support maintainer discussions and eval decisions, but no assembly or governance mechanism ships.",
+        "current/horizon embodiment: current embodiment is weak as discussion label; horizon embodiment could conditionally name deliberation around artifact promotion.",
+        "accessibility: screen readers handle it, but docs must address the false friend directly.",
+        "architecture-role availability: available as docs or research discussion name; unavailable as current governance body or public forum.",
+        "power/refusal/cost: maintainer can refuse to imply democratic process where there is only maintainer discretion; cost is less civic resonance.",
+        "post-freeze overlap status: accepted-registry normalized match found for moot: occ-4a933b105d95006d in run-08-civic-play-learning."
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "Kotoba",
+      "pronunciation": "koh-toh-bah",
+      "grammar": "Japanese noun candidate in romanized form; docs role is language/word metaphor, code role is Hepburn romanized lowercase root.",
+      "rationale": "Kotoba is a living-language stewardship test for word and language semantics; it is appealing but cannot count as validated without Japanese-language review.",
+      "etymology": "Source language: Japanese; meaning: language, word, phrase, expression, speech; morphology: common noun; transliteration: Modified Hepburn romanization, kotoba; source: JapanDict/JMdict entry 'kotoba', https://www.japandict.com/%E8%A8%80%E8%91%89; community-review status: unverified and not reviewed by Japanese speakers for naming suitability; cultural context: living-language borrowing risks exoticizing ordinary vocabulary.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "neutral-master-beam-implementation",
+        "research-stable-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Unverified living-language borrowing.",
+        "Can exoticize a basic Japanese word and may miscue pronunciation."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: living-language borrowing in named Modified Hepburn romanization, no relay hybrid.",
+        "stance: ambivalent.",
+        "scope: horizon.",
+        "spoken/dictation behavior: pronounceable once taught; dictation may write 'cotoba' or split syllables.",
+        "code projections: hex_package=kotoba; otp_app=:kotoba; module_root=Kotoba; mix_task_prefix=kotoba; config_prefix=:kotoba; telemetry_prefix=[:kotoba].",
+        "role in docs and code: docs can only use it as an unverified stewardship observation; code can use Kotoba/kotoba technically but should not until reviewed.",
+        "product truth: current DSEx works with language-model text artifacts, but does not provide language stewardship or Japanese localization.",
+        "current/horizon embodiment: current embodiment is not justified; horizon embodiment could conditionally name language-artifact work only after community review.",
+        "accessibility: ASCII romanization helps typing but harms correct Japanese reading; include pronunciation and original-source context in docs.",
+        "architecture-role availability: unavailable for current master brand without review; possibly available as research note after speaker review; unavailable as governance or localization claim.",
+        "power/refusal/cost: Japanese-speaking reviewer or community steward should be able to refuse the borrowing; cost is paid review, possible rejection, and replacement work.",
+        "post-freeze overlap status: accepted-registry normalized match found for kotoba: occ-17842d6d4831cdff in run-11-cross-cultural-semiotics."
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "Ordnung",
+      "pronunciation": "ORD-noong",
+      "grammar": "German noun candidate; docs role is order or regulation metaphor, code role is lowercase German root.",
+      "rationale": "Ordnung tests a living major-language civic term whose orderliness fits program structure but whose discipline and public-order connotations are heavy.",
+      "etymology": "Source language: German; meaning: order, ordered state, arrangement, public order, regulation depending on sense; morphology: feminine noun; transliteration: not applicable because the source uses Latin alphabet; source: Duden Online, 'Ordnung, die', https://www.duden.de/rechtschreibung/Ordnung; community-review status: unverified by German speakers for naming suitability; cultural context: order and discipline language can sound bureaucratic or authoritarian.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "spec-implementations",
+        "edition-architecture"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Heavy order, discipline, and public-order connotations.",
+        "Difficult final consonant cluster for some speakers."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: living-language civic noun borrowing, no relay hybrid.",
+        "stance: ambivalent.",
+        "scope: horizon.",
+        "spoken/dictation behavior: non-English final sound is fragile; dictation may write 'ord noon' or 'ordering'.",
+        "code projections: hex_package=ordnung; otp_app=:ordnung; module_root=Ordnung; mix_task_prefix=ordnung; config_prefix=:ordnung; telemetry_prefix=[:ordnung].",
+        "role in docs and code: docs can use it only with caution around order/regulation; code can use Ordnung/ordnung technically but pronunciation support is needed.",
+        "product truth: current DSEx has structure, constraints, and gates, but no public-order function or regulatory authority.",
+        "current/horizon embodiment: current embodiment is too institutionally heavy; horizon embodiment could conditionally name artifact-policy structure if governance claims are avoided.",
+        "accessibility: ASCII spelling is typeable, but pronunciation guide is required for screen-reader and voice support.",
+        "architecture-role availability: available at most as internal policy or spec-like plane; unavailable as community, public governance, or compliance identity.",
+        "power/refusal/cost: legal or community reviewer can refuse authoritarian order language; cost is losing a memorable civic term and revising architecture copy.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "Thing",
+      "pronunciation": "thing",
+      "grammar": "Old Norse-derived civic noun colliding with ordinary English object noun; code role is lowercase English form if used at all.",
+      "rationale": "Thing is an adverse stewardship test: historically it can mean assembly, but in English it collapses into a vague object and risks Nordic institutional appropriation.",
+      "etymology": "Source language: Old Norse; meaning: assembly, meeting, council in the source term thing/thorn form; morphology: neuter noun; transliteration: scholarly Old Norse romanization rendered with ASCII 'th' for thorn; source: Cleasby and Vigfusson, An Icelandic-English Dictionary, 'Thing/thing' entry via https://old-norse.net/html/th.php; community-review status: unreviewed by Old Norse or Nordic-language specialist; cultural context: still visible in Nordic parliamentary vocabulary, so casual reuse can be culturally and politically clumsy.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "federated-compatibility"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "English meaning is too vague for a technical identity.",
+        "Nordic assembly meaning risks appropriation and political overclaim."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: Old Norse civic borrowing preserved as adverse wildcard, no relay hybrid.",
+        "stance: adverse.",
+        "scope: both.",
+        "spoken/dictation behavior: easy English word, but listeners will not recover the assembly sense without explanation.",
+        "code projections: hex_package=thing; otp_app=:thing; module_root=Thing; mix_task_prefix=thing; config_prefix=:thing; telemetry_prefix=[:thing].",
+        "role in docs and code: docs can only use it as a cautionary stewardship example; code projection is technically viable but semantically too vague.",
+        "product truth: DSEx is not a civic assembly, parliament, standards body, or public forum.",
+        "current/horizon embodiment: current embodiment fails as too generic; horizon embodiment would require actual governance mechanisms and cultural review before use.",
+        "accessibility: spelling and screen-reader behavior are easy, but semantic accessibility is poor because the intended source meaning is hidden.",
+        "architecture-role availability: unavailable as master brand, package, community, protocol, or governance identity; available only as an adverse test record.",
+        "power/refusal/cost: Nordic-language reviewer or community steward should be able to refuse the borrowing; cost is discarding a short word and documenting why.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "Majlis",
+      "pronunciation": "MAJ-liss",
+      "grammar": "Arabic noun candidate in romanized form; docs role is council or sitting-place metaphor, code role is lowercase romanized root only if reviewed.",
+      "rationale": "Majlis is a living-language stewardship stress test: it has strong council and gathering semantics, but the cultural, religious, and political context makes unreviewed adoption adverse.",
+      "etymology": "Source language: Arabic; meaning: sitting place, session, council, assembly in broad use; morphology: noun of place/session associated with the j-l-s root 'to sit'; transliteration: ALA-LC Arabic romanization simplified to ASCII without diacritics; source: Lane, An Arabic-English Lexicon, j-l-s root, Quranic Research edition, https://lexicon.quranic-research.net/; community-review status: unverified by Arabic speakers and not validated coverage; cultural context: living Arabic term used in domestic, religious, and governmental settings across Muslim-majority contexts.",
+      "territories": [
+        "language-semantics",
+        "civic-governance"
+      ],
+      "strategies": [
+        "archaic-cross-language",
+        "ordinary-object"
+      ],
+      "audience_lenses": [
+        "international-users",
+        "affected-publics",
+        "educators-writers"
+      ],
+      "architecture_lenses": [
+        "community-commercial-steward",
+        "oss-commercial-split"
+      ],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Unverified living-language borrowing from a culturally and religiously significant term.",
+        "Can falsely imply council governance or community representation."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_cell: Cell 8 Source-language stewardship.",
+        "mechanism subtype: living Arabic civic borrowing preserved as adverse wildcard, no relay hybrid.",
+        "stance: adverse.",
+        "scope: both.",
+        "spoken/dictation behavior: pronunciation and spelling vary; dictation may write 'majlis', 'majles', or 'mejlis'.",
+        "code projections: hex_package=majlis; otp_app=:majlis; module_root=Majlis; mix_task_prefix=majlis; config_prefix=:majlis; telemetry_prefix=[:majlis].",
+        "role in docs and code: docs can only use it as a stewardship caution unless Arabic-speaker review supports use; code can use Majlis/majlis technically but should not before review.",
+        "product truth: current DSEx has no council, public governance, representative process, or cultural review board.",
+        "current/horizon embodiment: current embodiment is inappropriate beyond an adverse observation; horizon embodiment would require actual community governance and Arabic-language review.",
+        "accessibility: ASCII romanization is typeable but variant spellings hurt search and voice input; include pronunciation and spelling if retained as a test.",
+        "architecture-role availability: unavailable as current master brand, package, community, or company identity; possible only as reviewed governance term if real mechanisms exist.",
+        "power/refusal/cost: Arabic-speaking reviewer or affected community steward can refuse adoption; cost is paid review, potential rejection, and avoiding a concise council metaphor.",
+        "post-freeze overlap status: no accepted-registry normalized match found by post-freeze method."
+      ]
+    }
+  ]
+}

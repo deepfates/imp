@@ -1,0 +1,962 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "run-19b-form-blends-compact-language",
+    "generated_at": "2026-07-13T12:00:00-07:00",
+    "generator": {
+      "kind": "model",
+      "name": "form saturation generator E",
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "reasoning_effort": "high",
+      "agent_id": null
+    },
+    "method": "stem-recovery and expansion-ambiguity adversary: blends, compact forms, language stewardship",
+    "brief": "Create a valid schema_version 1 identity portfolio for DSEx with run id run-19b-form-blends-compact-language, atlas_version 1, generator kind model/name form saturation generator E/provider openai/model gpt-5.4/reasoning_effort high/agent_id null, method stem-recovery and expansion-ambiguity adversary: blends, compact forms, language stewardship, parent_run_ids [], and run notes including challenge_wave: form-saturation-b, independent baseline-blind generation, and the three challenge cells. Respect the product boundary of a pre-release Elixir/OTP library for declared, callable, measurable, optimizable LM programs with a credible artifact horizon spanning instructions, demonstrations, tool descriptions, retrieval policies, playbooks, schemas, code fragments, and configuration, while avoiding claims that it is an official DSPy port, static proof system, universal agent OS, provider SDK, guaranteed autonomous self-improvement system, safety product, standards body, institute, or universal platform. Generate exactly 30 candidates with contiguous ordinals and preserve every output: 1-10 true-blends across composition-modularity and writing-editing-publishing using compound-portmanteau and/or coined-category-noun for backend-product-engineers and educators-writers with recoverable stems and explicit distinction among overlap blend, compound, affixation, and typo; 11-20 compact-forms across persistence-provenance and measurement-evidence using acronym-initialism and/or technical-borrowing for eval-research-ops, pl-researchers, and international-users while testing abbreviation, initialism, pronounceable acronym, wordlike acronym, dual reading, and deliberately contestable backronym and stating whether expansion is recoverable; 21-30 source-language-stewardship across language-semantics and civic-governance using archaic-cross-language and/or ordinary-object for international-users, affected-publics, and educators-writers with one named source language each, no fabricated relay hybrids, and recorded source uncertainty, transliteration, pronunciation, social context, and not-verified reviewer status, never claiming permission or acceptance. Make every candidate include non-null pronunciation and grammar, honest etymology or coined/no-source text, nonempty valid audience_lenses and architecture_lenses, rationale, concerns, and notes. Ensure notes include separate challenge_wave, challenge_cell, form_mechanism, stance, scope, code_projection, current_embodiment, and horizon_embodiment strings. code_projection must give all six forms or a precise non-code role plus viable linked implementation. Use exactly 6 wildcard true, exactly 2 per cell. Make each cell exactly 5 affirmative; true-blends and source-language-stewardship each with 3 ambivalent and 2 adverse, compact-forms with 2 ambivalent and 3 adverse. Make each cell exactly 4 current, 4 horizon, and 2 both. Use only valid atlas IDs.",
+    "atlas_version": 1,
+    "parent_run_ids": [],
+    "intended_territories": [
+      "composition-modularity",
+      "writing-editing-publishing",
+      "persistence-provenance",
+      "measurement-evidence",
+      "language-semantics",
+      "civic-governance"
+    ],
+    "intended_strategies": [
+      "compound-portmanteau",
+      "coined-category-noun",
+      "acronym-initialism",
+      "technical-borrowing",
+      "archaic-cross-language",
+      "ordinary-object"
+    ],
+    "intended_audiences": [
+      "backend-product-engineers",
+      "educators-writers",
+      "eval-research-ops",
+      "pl-researchers",
+      "international-users",
+      "affected-publics"
+    ],
+    "notes": [
+      "challenge_wave: form-saturation-b",
+      "independent baseline-blind generation",
+      "challenge_cell: true-blends",
+      "challenge_cell: compact-forms",
+      "challenge_cell: source-language-stewardship"
+    ]
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "surface": "Draftmesh",
+      "pronunciation": "DRAFT-mesh",
+      "grammar": "singular count noun",
+      "rationale": "Draftmesh frames DSEx as a system that joins discrete authored parts into a runnable text program. It fits the current library because signatures, demos, instructions, and tool descriptions already behave like composable editorial units without overstating autonomy or formal proof.",
+      "etymology": "Coined from draft + mesh; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["beam-master", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Mesh language may sound infrastructure-heavy to some BEAM developers.",
+        "Draft narrows attention toward authored text more than executable measurement."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk low",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex draftmesh; otp_app :draftmesh; root DSEx.Draftmesh; mix dsex.draftmesh; config :draftmesh; telemetry [:dsex, :draftmesh]",
+        "current_embodiment: clean fit for the present library where instructions, examples, and traces are edited as explicit units",
+        "horizon_embodiment: can extend to broader artifact sets, but mesh slightly underplays optimization and provenance breadth"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "surface": "Scriptfold",
+      "pronunciation": "SCRIPT-fold",
+      "grammar": "singular count noun",
+      "rationale": "Scriptfold suggests layered authored components that collapse into one callable program surface. It works for DSEx because it keeps emphasis on textual assembly and runtime execution rather than claiming a separate language or universal platform.",
+      "etymology": "Coined from script + fold; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["beam-master", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Fold can imply reduction or list-processing more than editorial revision.",
+        "Script can be misread as imperative scripting rather than declared Elixir programs."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk low",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex scriptfold; otp_app :scriptfold; root DSEx.Scriptfold; mix dsex.scriptfold; config :scriptfold; telemetry [:dsex, :scriptfold]",
+        "current_embodiment: good present-tense fit for stacked signatures, demos, and adapters becoming one call boundary",
+        "horizon_embodiment: could carry forward to playbooks and schemas, though fold does not naturally signal measurement campaigns"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "surface": "Modulogue",
+      "pronunciation": "MOD-yoo-log",
+      "grammar": "singular count noun",
+      "rationale": "Modulogue gives a coined category noun for composed program parts that still sound authored and revisable. It reaches both today's Elixir modules and the longer horizon of artifact families, while staying clear of official-port or proof-system claims.",
+      "etymology": "Coined as an overlap blend of module + dialogue/monologue; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau", "coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "endorsed-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The spoken form may be heard as monologue, which can imply one-way output rather than measured iteration.",
+        "The overlap blend adds spelling burden compared with plainer compounds."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: overlap blend; not a plain compound; light affixation via -logue; typo risk medium",
+        "stance: affirmative",
+        "scope: both",
+        "code_projection: hex modulogue; otp_app :modulogue; root DSEx.Modulogue; mix dsex.modulogue; config :modulogue; telemetry [:dsex, :modulogue]",
+        "current_embodiment: aligns with the present module-centered Elixir surface and editorially shaped signatures",
+        "horizon_embodiment: scales to future artifact programs where demonstrations, tool specs, retrieval policies, and schemas remain narratable units"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "surface": "Foliochain",
+      "pronunciation": "FOH-lee-oh-chain",
+      "grammar": "singular count noun",
+      "rationale": "Foliochain names a sequence of authored leaves or artifacts without implying blockchain claims. It is strongest for the horizon where DSEx may optimize multiple connected artifacts with lineage, though it still remains grounded in publishing and modular assembly.",
+      "etymology": "Coined from folio + chain; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau", "coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Chain invites accidental association with blockchains or agent chains.",
+        "Folio sounds more archival than operational for some engineers."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk low",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex foliochain; otp_app :foliochain; root DSEx.Foliochain; mix dsex.foliochain; config :foliochain; telemetry [:dsex, :foliochain]",
+        "current_embodiment: usable for present save/load and trace flows, but somewhat larger than the released library surface",
+        "horizon_embodiment: well matched to multi-artifact optimization with explicit parentage across instructions, demos, and configuration"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "surface": "Reviscript",
+      "pronunciation": "REV-ih-script",
+      "grammar": "singular count noun",
+      "rationale": "Reviscript foregrounds revision as a first-class act on script-like program artifacts. It is affirmative because DSEx already measures and improves instruction-bearing programs, yet the name remains honest about text-centered origins rather than claiming universal agent scope.",
+      "etymology": "Coined as a recoverable blend of revise/revision + script; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau", "coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["beam-master", "research-stable-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Script again risks drift toward scripting-language expectations.",
+        "Revision language may bias perception toward optimizer workflows rather than ordinary calling."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: overlap blend; partly compound-like; no extra affixation; typo risk low",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex reviscript; otp_app :reviscript; root DSEx.Reviscript; mix dsex.reviscript; config :reviscript; telemetry [:dsex, :reviscript]",
+        "current_embodiment: strong for the current loop of declare, call, evaluate, and improve",
+        "horizon_embodiment: remains serviceable for future playbooks and tool descriptions, though it keeps editorial revision in the foreground"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "surface": "Textlattice",
+      "pronunciation": "TEXT-lat-iss",
+      "grammar": "singular count noun",
+      "rationale": "Textlattice signals a structured arrangement of text-bearing artifacts and compositional supports. It is ambivalent because the architecture metaphor is credible for the horizon, but the surface leans researchy and may not feel like an approachable Elixir library name.",
+      "etymology": "Coined from text + lattice; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau", "coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "research-stable-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Lattice evokes formal methods and may invite proof-style expectations.",
+        "The term is less conversational for teachers and writers."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk low",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex textlattice; otp_app :textlattice; root DSEx.Textlattice; mix dsex.textlattice; config :textlattice; telemetry [:dsex, :textlattice]",
+        "current_embodiment: the current library can support the concept, but the surface reads more abstract than the API actually is",
+        "horizon_embodiment: strong if DSEx becomes a broader typed artifact substrate with lineage and structured optimization"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "surface": "Editome",
+      "pronunciation": "ED-ih-tohm",
+      "grammar": "singular count noun",
+      "rationale": "Editome behaves like a coined category noun for the editable whole of a program artifact set. It is ambivalent because it spans present and horizon use, but the -ome ending borrows scientific baggage that can feel inflated for a pre-release library.",
+      "etymology": "Coined from edit + -ome; no source-language claim and affixation is deliberate rather than inherited.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "endorsed-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Scientific suffix baggage can overpromise scope or rigor.",
+        "Some users may hear genome echoes and find the coinage forced."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: affixation-led coined noun; not a clean compound; not an overlap blend; typo risk medium",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex editome; otp_app :editome; root DSEx.Editome; mix dsex.editome; config :editome; telemetry [:dsex, :editome]",
+        "current_embodiment: can name the present editable instruction-and-demo bundle without breaking code ergonomics",
+        "horizon_embodiment: extends cleanly to broader artifact families, but the scientific tone may distort community expectations"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "surface": "Copyloom",
+      "pronunciation": "KOP-ee-loom",
+      "grammar": "singular count noun",
+      "rationale": "Copyloom makes the writing and assembly metaphor vivid, with separate strands woven into one usable program. It is ambivalent because the image is memorable and horizon-friendly, but it risks sounding like a content tool before it sounds like a measurable Elixir system.",
+      "etymology": "Coined from copy + loom; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau", "coined-category-noun"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "endorsed-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Copy can read as marketing copy rather than structured program text.",
+        "Loom is evocative but may feel artisanal relative to operational runtime concerns."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk low",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex copyloom; otp_app :copyloom; root DSEx.Copyloom; mix dsex.copyloom; config :copyloom; telemetry [:dsex, :copyloom]",
+        "current_embodiment: only partial fit for the current library because it sounds more editorial than evaluative",
+        "horizon_embodiment: stronger when the system spans instructions, tool descriptions, playbooks, and schemas as woven artifacts"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "surface": "Texture",
+      "pronunciation": "TEKS-chur",
+      "grammar": "singular count noun",
+      "rationale": "Texture is attractive as a sound-shift from text + structure, but it is adverse here because the common English word overwhelms the intended recoverable stems and makes the candidate look like an unrelated design or graphics product.",
+      "etymology": "Presented honestly as a typo-proximate overlap of text + structure that collapses onto the existing English word texture.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "single-branded-house"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Severe semantic collision with the existing English word and many software products.",
+        "Recoverable stems are weak once spoken aloud, which harms teaching and code search."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: overlap blend that lands on an existing word; no extra affixation; typo risk high",
+        "stance: adverse",
+        "scope: current",
+        "code_projection: hex texture; otp_app :texture; root DSEx.Texture; mix dsex.texture; config :texture; telemetry [:dsex, :texture]",
+        "current_embodiment: the present library could technically wear it, but the collision cost is too high for practical adoption",
+        "horizon_embodiment: the horizon would only amplify search and category ambiguity"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "surface": "Editrack",
+      "pronunciation": "ED-ih-track",
+      "grammar": "singular count noun",
+      "rationale": "Editrack tries to combine revision and operational tracking, but the result reads like a plugin or issue tracker rather than a master identity. It is adverse because it compresses the writing side too hard and undersells the artifact horizon beyond present workflow tooling.",
+      "etymology": "Coined from edit + track; no external source language claim.",
+      "territories": ["composition-modularity", "writing-editing-publishing"],
+      "strategies": ["compound-portmanteau"],
+      "audience_lenses": ["backend-product-engineers", "educators-writers"],
+      "architecture_lenses": ["beam-master", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Sounds like a feature module instead of a durable identity.",
+        "Track language can tilt toward surveillance or workflow software."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: true-blends",
+        "form_mechanism: compound; no overlap blend; no affixation; typo risk medium because speech can collapse to edit-trak variants",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex editrack; otp_app :editrack; root DSEx.Editrack; mix dsex.editrack; config :editrack; telemetry [:dsex, :editrack]",
+        "current_embodiment: can describe a narrow revision-trace subsystem, but not the broader product honestly",
+        "horizon_embodiment: too tool-like to carry future multi-artifact optimization without shrinkage"
+      ]
+    },
+    {
+      "ordinal": 11,
+      "surface": "APR",
+      "pronunciation": "A-P-R",
+      "grammar": "all-caps initialism used as a singular count noun",
+      "rationale": "APR is compact and operationally credible for provenance-bearing program artifacts. It is affirmative because Artifact Provenance Record is recoverable with explanation and aligns with DSEx's evidence and save/load discipline, though it would need support from a fuller descriptor in public-facing material.",
+      "etymology": "Initialism proposed as Artifact Provenance Record; no source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism", "technical-borrowing"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["lifecycle-planes", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "APR has heavy collision with finance and mechanical terms.",
+        "The expansion is not self-evident without first exposure."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: abbreviation/initialism; not pronounceable as a word; no backronym intent",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex apr; otp_app :apr; root DSEx.APR; mix dsex.apr; config :apr; telemetry [:dsex, :apr]",
+        "current_embodiment: fits current artifact save/load, run evidence, and promotion records",
+        "horizon_embodiment: could extend to a broader artifact lineage system, though collisions would grow outside engineering contexts",
+        "expansion: Artifact Provenance Record",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 12,
+      "surface": "PROV",
+      "pronunciation": "prohv",
+      "grammar": "uppercase abbreviation used as a singular count noun",
+      "rationale": "PROV borrows a real technical abbreviation for provenance and therefore lands quickly with research and operations audiences. It is affirmative for the current product because DSEx already tracks traces, reports, and optimizer lineage, and the borrowing stays honest about what is measured rather than inventing a grander platform claim.",
+      "etymology": "Technical borrowing from established shorthand for provenance; expansion need not be forced.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["technical-borrowing", "acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["research-stable-split", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "High collision with existing provenance standards and projects.",
+        "Borrowing a generic technical token limits distinctiveness and ownability."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: technical abbreviation; wordlike only in speech; not a backronym",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex prov; otp_app :prov; root DSEx.PROV; mix dsex.prov; config :prov; telemetry [:dsex, :prov]",
+        "current_embodiment: directly maps to present lineage, trace, and result persistence",
+        "horizon_embodiment: still credible if DSEx broadens artifact coverage, but generic provenance language may become too broad",
+        "expansion: provenance borrowing rather than forced expansion",
+        "expansion_recoverability: high"
+      ]
+    },
+    {
+      "ordinal": 13,
+      "surface": "PAVE",
+      "pronunciation": "payv",
+      "grammar": "uppercase pronounceable acronym used as a singular count noun",
+      "rationale": "PAVE gives a memorable compact form for persistence plus audit-grade evidence without sounding like a standards body. It works across current and horizon use because Program Artifact Verification Evidence can point to today's evaluation outputs and tomorrow's wider artifact optimization substrate.",
+      "etymology": "Pronounceable acronym proposed as Program Artifact Verification Evidence; no external source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "endorsed-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Verification can invite stronger certainty claims than DSEx should make.",
+        "Pave as an English verb may imply smoothing over complexity."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: pronounceable acronym; not an initialism; no backronym intent",
+        "stance: affirmative",
+        "scope: both",
+        "code_projection: hex pave; otp_app :pave; root DSEx.PAVE; mix dsex.pave; config :pave; telemetry [:dsex, :pave]",
+        "current_embodiment: can name present evaluation records and saved optimizer outputs",
+        "horizon_embodiment: can also hold future artifact families if evidence remains explicit and bounded",
+        "expansion: Program Artifact Verification Evidence",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 14,
+      "surface": "TRACE",
+      "pronunciation": "trayss",
+      "grammar": "uppercase dual-reading acronym used as a singular count noun",
+      "rationale": "TRACE benefits from an existing systems meaning while also supporting an explicit expansion. It is affirmative for the horizon because typed trajectories, measured feedback, and artifact lineage are central to DSEx's credible next layer, and the dual reading is useful rather than deceptive here.",
+      "etymology": "Dual reading of the existing word trace and the proposed acronym Typed Run Artifact Comparison Evidence.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism", "technical-borrowing"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["lifecycle-planes", "neutral-master-beam-implementation"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Trace is already a dense technical term and may be too generic.",
+        "The acronym expansion may feel retrospective rather than native."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: dual reading word/acronym; pronounceable; technical borrowing adjacent",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex trace; otp_app :trace; root DSEx.TRACE; mix dsex.trace; config :trace; telemetry [:dsex, :trace]",
+        "current_embodiment: DSEx already emits traces, but the candidate is larger than the present package identity",
+        "horizon_embodiment: especially strong if trajectories and promotion evidence become the reusable substrate",
+        "expansion: Typed Run Artifact Comparison Evidence",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 15,
+      "surface": "METR",
+      "pronunciation": "MEH-ter",
+      "grammar": "uppercase wordlike acronym used as a singular count noun",
+      "rationale": "METR is terse, code-friendly, and squarely aligned with measurable LM programs. It is affirmative because Measured Evidence and Test Records describes a horizon-facing artifact system without pretending to be a standards regime or provider abstraction.",
+      "etymology": "Wordlike acronym proposed as Measured Evidence and Test Records; no source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["research-stable-split", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "May be heard as a misspelling of meter or metric.",
+        "The dropped vowel improves compactness but slightly harms expansion recovery."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: wordlike acronym; not a pure initialism; no backronym intent",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex metr; otp_app :metr; root DSEx.METR; mix dsex.metr; config :metr; telemetry [:dsex, :metr]",
+        "current_embodiment: usable for present metrics and reports, though slightly abstract for the release surface",
+        "horizon_embodiment: strong if DSEx formalizes durable evidence registries across many artifact kinds",
+        "expansion: Measured Evidence and Test Records",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 16,
+      "surface": "OID",
+      "pronunciation": "oh-eye-dee",
+      "grammar": "all-caps initialism used as a singular count noun",
+      "rationale": "OID pushes toward precise identifiers and immutable records, which is relevant to DSEx. It is ambivalent because Object Identifier is recoverable and technically serious, but the term is already overloaded in other systems and could make the library sound lower-level than it is.",
+      "etymology": "Technical borrowing and initialism from object identifier terminology.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["technical-borrowing", "acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["spec-implementations", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Strong collision with existing database and standards terminology.",
+        "Identifier emphasis obscures instruction, demo, and evaluator content."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: initialism and technical borrowing; not pronounceable as a word; no backronym intent",
+        "stance: ambivalent",
+        "scope: current",
+        "code_projection: hex oid; otp_app :oid; root DSEx.OID; mix dsex.oid; config :oid; telemetry [:dsex, :oid]",
+        "current_embodiment: present artifact storage and hash identity make the concept understandable now",
+        "horizon_embodiment: future scope could still use it, but the name would keep dragging attention toward identifiers over programs",
+        "expansion: Object Identifier",
+        "expansion_recoverability: high"
+      ]
+    },
+    {
+      "ordinal": 17,
+      "surface": "EVIQ",
+      "pronunciation": "EE-vik",
+      "grammar": "uppercase wordlike acronym used as a singular count noun",
+      "rationale": "EVIQ tries to compress evidence and quality into a pronounceable unit. It is ambivalent because the compactness is appealing across current and horizon use, but the expansion feels somewhat engineered and may not stay recoverable after first contact.",
+      "etymology": "Wordlike acronym proposed as Evidence and Validation Index of Quality; no external source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism", "technical-borrowing"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "edition-architecture"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Quality language can drift toward score absolutism.",
+        "The Q ending slightly strains expansion recall and pronunciation consistency."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: wordlike acronym; borderline engineered; not a deliberate backronym",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex eviq; otp_app :eviq; root DSEx.EVIQ; mix dsex.eviq; config :eviq; telemetry [:dsex, :eviq]",
+        "current_embodiment: can support today's evaluation and report artifacts without breaking code ergonomics",
+        "horizon_embodiment: can stretch to broader artifact governance, but semantic recall remains fragile",
+        "expansion: Evidence and Validation Index of Quality",
+        "expansion_recoverability: low"
+      ]
+    },
+    {
+      "ordinal": 18,
+      "surface": "RAIL",
+      "pronunciation": "rayl",
+      "grammar": "uppercase pronounceable acronym used as a singular count noun",
+      "rationale": "RAIL offers a memorable metaphor for ordered records, but it bends DSEx toward infrastructure and transport language more than necessary. It is adverse because Run Audit and Inheritance Ledger feels plausible yet narrows the system toward operational logging instead of programmable artifacts.",
+      "etymology": "Pronounceable acronym proposed as Run Audit and Inheritance Ledger; no source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["lifecycle-planes", "company-product-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Rail is crowded across software ecosystems and generic infrastructure metaphors.",
+        "Ledger can imply finance or immutable guarantees DSEx should avoid."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: pronounceable acronym; not an initialism; no backronym intent",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex rail; otp_app :rail; root DSEx.RAIL; mix dsex.rail; config :rail; telemetry [:dsex, :rail]",
+        "current_embodiment: today's library has audit traces, but rail miscategorizes the product as a transport or platform layer",
+        "horizon_embodiment: future artifact lineage still would not justify the finance and infra echoes",
+        "expansion: Run Audit and Inheritance Ledger",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 19,
+      "surface": "MEP",
+      "pronunciation": "M-E-P",
+      "grammar": "all-caps initialism used as a singular count noun",
+      "rationale": "MEP is short and orderly, but it is adverse because Measured Evidence Plan sounds like one subsystem or campaign artifact rather than the identity of a declared LM program library. The form is recoverable, yet too generic and collision-prone for a durable portfolio lead.",
+      "etymology": "Initialism proposed as Measured Evidence Plan; no external source-language claim.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["shared-prefix-family", "lifecycle-planes"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Severe collision with other institutional abbreviations.",
+        "Plan wording sounds managerial and temporary rather than executable."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: initialism; not pronounceable as a word; no backronym intent",
+        "stance: adverse",
+        "scope: current",
+        "code_projection: hex mep; otp_app :mep; root DSEx.MEP; mix dsex.mep; config :mep; telemetry [:dsex, :mep]",
+        "current_embodiment: can label a present evaluation campaign, but not the product honestly",
+        "horizon_embodiment: future breadth would only worsen the mismatch between plan and executable artifact system",
+        "expansion: Measured Evidence Plan",
+        "expansion_recoverability: partial"
+      ]
+    },
+    {
+      "ordinal": 20,
+      "surface": "SORP",
+      "pronunciation": "sorp",
+      "grammar": "uppercase contestable acronym used as a singular count noun",
+      "rationale": "SORP is included as a deliberately contestable backronym test. It is adverse because the compact form has little native semantic pull, and any expansion that makes it meaningful will feel retrofitted rather than honestly recoverable.",
+      "etymology": "Deliberately contestable backronym candidate; expansion is imposed after the surface rather than discovered from it.",
+      "territories": ["persistence-provenance", "measurement-evidence"],
+      "strategies": ["acronym-initialism"],
+      "audience_lenses": ["eval-research-ops", "pl-researchers", "international-users"],
+      "architecture_lenses": ["single-branded-house", "shared-prefix-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Low mnemonic value without training.",
+        "Backronym feel undermines trust with research and operations audiences."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: compact-forms",
+        "form_mechanism: deliberately contestable backronym; wordlike only by force; recoverability intentionally weak",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex sorp; otp_app :sorp; root DSEx.SORP; mix dsex.sorp; config :sorp; telemetry [:dsex, :sorp]",
+        "current_embodiment: not credible for the present library beyond a temporary experiment label",
+        "horizon_embodiment: also weak for the broader artifact horizon because the semantic center never stabilizes",
+        "expansion: Source Origin Run Proof",
+        "expansion_recoverability: low"
+      ]
+    },
+    {
+      "ordinal": 21,
+      "surface": "Shura",
+      "pronunciation": "SHOO-rah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Shura points to consultative decision-making and therefore fits the civic-governance side of DSEx without implying a formal standards body. It is affirmative for the current library if handled carefully as a metaphor for explicit review and bounded promotion rather than as a claim of cultural authority or permission.",
+      "etymology": "Borrowed from Arabic shura for consultation or deliberation; exact vocalization and nuance were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "neutral-master-beam-implementation"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "The term carries living political and religious context beyond software metaphor.",
+        "Borrowing without specialist review risks flattening regional nuance."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; not a fabricated relay hybrid; ordinary governance term rather than blend",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex shura; otp_app :shura; root DSEx.Shura; mix dsex.shura; config :shura; telemetry [:dsex, :shura]",
+        "current_embodiment: present promotion gates, evaluator feedback, and explicit approval steps make the consultative metaphor legible now",
+        "horizon_embodiment: can extend to wider artifact stewardship, but only with disciplined explanation and non-appropriative framing",
+        "source_language: Arabic",
+        "source_uncertainty: medium",
+        "transliteration: shura",
+        "social_context: living term with political, administrative, and religious associations; not culturally neutral",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 22,
+      "surface": "Baraza",
+      "pronunciation": "bah-RAH-zah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Baraza evokes a council or public forum and can support the horizon where DSEx manages more visible review and governance of evolving artifacts. It is affirmative but horizon-leaning because the current library only hints at that social layer through explicit gates and evidence-bearing decisions.",
+      "etymology": "Borrowed from Swahili baraza for council or assembly; the exact usage range was not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "endorsed-family"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Council framing may over-institutionalize a library identity.",
+        "Borrowing from a living language without local review can feel extractive."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; civic noun with public-assembly semantics",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex baraza; otp_app :baraza; root DSEx.Baraza; mix dsex.baraza; config :baraza; telemetry [:dsex, :baraza]",
+        "current_embodiment: current DSEx can support the idea only indirectly through review artifacts and explicit gates",
+        "horizon_embodiment: stronger if artifact optimization campaigns gain more participatory governance and public-facing accountability",
+        "source_language: Swahili",
+        "source_uncertainty: medium",
+        "transliteration: baraza",
+        "social_context: common civic and community meeting term in East African contexts; meaning is socially situated",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 23,
+      "surface": "Kotoba",
+      "pronunciation": "koh-toh-bah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Kotoba foregrounds words and meaning directly, which suits DSEx as a system that turns language-bearing artifacts into explicit programs. It is affirmative across both current and horizon use because it bridges present text contracts and future artifact families, while still requiring careful explanation and zero claims of acceptance.",
+      "etymology": "Borrowed from Japanese kotoba for words or language; nuance and register were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "research-stable-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Semantic focus is strong, but governance implications are indirect unless explained.",
+        "Borrowing from a living language may read as aestheticization if not stewarded carefully."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; language-centered common noun",
+        "stance: affirmative",
+        "scope: both",
+        "code_projection: hex kotoba; otp_app :kotoba; root DSEx.Kotoba; mix dsex.kotoba; config :kotoba; telemetry [:dsex, :kotoba]",
+        "current_embodiment: good fit for today's signatures, instructions, and examples as explicit language artifacts",
+        "horizon_embodiment: remains useful if DSEx broadens into playbooks, schemas, tool descriptions, and other meaning-bearing artifacts",
+        "source_language: Japanese",
+        "source_uncertainty: medium",
+        "transliteration: kotoba",
+        "social_context: everyday word for words or language with cultural and literary depth beyond software naming",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 24,
+      "surface": "Sana",
+      "pronunciation": "SAH-nah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Sana is brief, speakable, and centered on words, which helps educators and international users. It is affirmative for the current product because it can hold declared language artifacts cleanly, though its compactness also increases collision risk and reduces immediate governance signaling.",
+      "etymology": "Borrowed from Finnish sana for word; exact connotation and usage range were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["single-branded-house", "neutral-master-beam-implementation"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Short form increases search and collision pressure.",
+        "The semantic fit is strong, but civic-governance resonance is relatively thin."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; ordinary language noun",
+        "stance: affirmative",
+        "scope: current",
+        "code_projection: hex sana; otp_app :sana; root DSEx.Sana; mix dsex.sana; config :sana; telemetry [:dsex, :sana]",
+        "current_embodiment: fits the present signature-and-program surface where words are bounded, typed, and tested",
+        "horizon_embodiment: can extend, but shortness and weak governance signal make future category work harder",
+        "source_language: Finnish",
+        "source_uncertainty: medium",
+        "transliteration: sana",
+        "social_context: ordinary everyday word from a living language; borrowing should avoid flattening local context into mere style",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 25,
+      "surface": "Ayni",
+      "pronunciation": "EYE-nee",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Ayni carries reciprocity and mutual obligation, which maps well to evaluation loops and accountable improvement without promising autonomy. It is affirmative for the horizon because DSEx may grow toward broader stewardship of artifacts and feedback relationships, but the borrowing demands unusual care and modesty.",
+      "etymology": "Borrowed from Quechua ayni, commonly glossed as reciprocity or mutual aid; nuance and regional variation were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "edition-architecture"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Borrowing a socially embedded Indigenous concept for software naming risks appropriation.",
+        "The public-interest framing may outrun the current release surface."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; socially embedded civic term",
+        "stance: affirmative",
+        "scope: horizon",
+        "code_projection: hex ayni; otp_app :ayni; root DSEx.Ayni; mix dsex.ayni; config :ayni; telemetry [:dsex, :ayni]",
+        "current_embodiment: present DSEx only partially supports the reciprocity frame through evaluator feedback and bounded optimization",
+        "horizon_embodiment: stronger if artifact improvement is framed as accountable exchange among maintainers, users, and affected publics",
+        "source_language: Quechua",
+        "source_uncertainty: medium",
+        "transliteration: ayni",
+        "social_context: socially embedded concept with Indigenous context; not a neutral generic token",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 26,
+      "surface": "Gemot",
+      "pronunciation": "geh-MOHT",
+      "grammar": "singular count noun used as a borrowed archaic noun",
+      "rationale": "Gemot has genuine civic history and a compact sound that could support governance-related naming. It is ambivalent because the archaic source gives some distance from living-language borrowing pressures, but the form is obscure enough that explanation load is high and current product fit is weak.",
+      "etymology": "Borrowed from Old English gemot for assembly or meeting; exact historical nuance was not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["research-stable-split", "community-commercial-steward"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Obscure archaic form imposes high explanation cost.",
+        "The assembly metaphor can make a library sound institutional."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: archaic borrowing; no relay hybrid; governance noun with historical distance",
+        "stance: ambivalent",
+        "scope: horizon",
+        "code_projection: hex gemot; otp_app :gemot; root DSEx.Gemot; mix dsex.gemot; config :gemot; telemetry [:dsex, :gemot]",
+        "current_embodiment: current APIs do not naturally surface assembly language strongly enough to justify the name",
+        "horizon_embodiment: could fit a future governance layer around artifact review, but obscurity remains a major drag",
+        "source_language: Old English",
+        "source_uncertainty: medium",
+        "transliteration: gemot",
+        "social_context: historical governance vocabulary rather than a living community self-description",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 27,
+      "surface": "Tlatolli",
+      "pronunciation": "tlah-TOHL-lee",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Tlatolli is included as a stewardship stress test because it directly concerns speech or utterance and thus maps semantically to DSEx. It is ambivalent across both current and horizon use because the semantic fit is real, but pronunciation, orthography, and cultural distance make the burden of careful explanation substantially higher.",
+      "etymology": "Borrowed from Classical Nahuatl tlatolli or related orthographic variants for speech or word; spelling and pronunciation were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["neutral-master-beam-implementation", "community-commercial-steward"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "High pronunciation and transliteration uncertainty for non-specialists.",
+        "Borrowing from an Indigenous language without direct review raises serious stewardship concerns."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing with orthographic uncertainty; no relay hybrid",
+        "stance: ambivalent",
+        "scope: both",
+        "code_projection: hex tlatolli; otp_app :tlatolli; root DSEx.Tlatolli; mix dsex.tlatolli; config :tlatolli; telemetry [:dsex, :tlatolli]",
+        "current_embodiment: present text-bearing programs make the semantic relation visible, but usability and stewardship costs are high",
+        "horizon_embodiment: future broader artifact scope would still need strong justification and community-sensitive review",
+        "source_language: Classical Nahuatl",
+        "source_uncertainty: high",
+        "transliteration: tlatolli",
+        "social_context: Indigenous language with living descendant communities and nontrivial orthographic history",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 28,
+      "surface": "Kaitiaki",
+      "pronunciation": "KYE-tee-ah-kee",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Kaitiaki brings stewardship and guardianship into the foreground, which can support explicit limits and responsible maintenance. It is ambivalent because that social meaning is powerful for affected publics, yet the term is culturally specific and may make a pre-release library sound like a safety or oversight product that it is not.",
+      "etymology": "Borrowed from Maori kaitiaki for guardian or steward; nuance and appropriate use were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "company-product-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "High risk of overclaiming care or guardianship beyond the product boundary.",
+        "Borrowing a culturally specific living term without review can be inappropriate."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; stewardship noun with strong social specificity",
+        "stance: ambivalent",
+        "scope: current",
+        "code_projection: hex kaitiaki; otp_app :kaitiaki; root DSEx.Kaitiaki; mix dsex.kaitiaki; config :kaitiaki; telemetry [:dsex, :kaitiaki]",
+        "current_embodiment: explicit limits and review gates create some present fit, but the safety-product misread is substantial",
+        "horizon_embodiment: future governance breadth might improve semantic fit, though stewardship and appropriateness risks remain central",
+        "source_language: Maori",
+        "source_uncertainty: medium",
+        "transliteration: kaitiaki",
+        "social_context: culturally specific living term tied to stewardship responsibilities, not a free-floating software metaphor",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 29,
+      "surface": "Agora",
+      "pronunciation": "AG-or-ah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Agora has familiar civic resonance, but it is adverse here because the term is already saturated across products and public institutions. It would pull DSEx toward platform or forum expectations and away from the honest boundary of an Elixir library for declared and measured LM programs.",
+      "etymology": "Borrowed from Ancient Greek agora for gathering place or marketplace; exact historical nuance was not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language", "ordinary-object"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "company-product-split"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Extremely high collision with existing products and institutions.",
+        "Forum and marketplace associations overstate the social scope of the current product."
+      ],
+      "wildcard": false,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: archaic borrowing; no relay hybrid; civic place/object term",
+        "stance: adverse",
+        "scope: current",
+        "code_projection: hex agora; otp_app :agora; root DSEx.Agora; mix dsex.agora; config :agora; telemetry [:dsex, :agora]",
+        "current_embodiment: the present library is too bounded and technical for a public-square identity",
+        "horizon_embodiment: even with broader artifact governance, saturation and overbreadth remain serious liabilities",
+        "source_language: Ancient Greek",
+        "source_uncertainty: low",
+        "transliteration: agora",
+        "social_context: historically civic and commercial place term with broad modern reuse",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    },
+    {
+      "ordinal": 30,
+      "surface": "Sabha",
+      "pronunciation": "SAH-bhah",
+      "grammar": "singular count noun used as a borrowed common noun",
+      "rationale": "Sabha is semantically relevant as an assembly or council term, but it is adverse because the institutional signal is stronger than the actual product and the borrowing would require review DSEx does not have. The candidate is useful as a boundary test for governance language rather than a recommended identity.",
+      "etymology": "Borrowed from Sanskrit sabha for assembly or council, with modern use across South Asian contexts; precise register and contemporary nuance were not independently verified for this review.",
+      "territories": ["language-semantics", "civic-governance"],
+      "strategies": ["archaic-cross-language"],
+      "audience_lenses": ["international-users", "affected-publics", "educators-writers"],
+      "architecture_lenses": ["community-commercial-steward", "edition-architecture"],
+      "parent_surfaces": [],
+      "known_concerns": [
+        "Institutional and political associations can substantially overstate the product boundary.",
+        "Living regional use makes unreviewed borrowing especially risky."
+      ],
+      "wildcard": true,
+      "notes": [
+        "challenge_wave: form-saturation-b",
+        "challenge_cell: source-language-stewardship",
+        "form_mechanism: cross-language borrowing; no relay hybrid; assembly noun with strong institutional loading",
+        "stance: adverse",
+        "scope: horizon",
+        "code_projection: hex sabha; otp_app :sabha; root DSEx.Sabha; mix dsex.sabha; config :sabha; telemetry [:dsex, :sabha]",
+        "current_embodiment: current DSEx is much smaller and more technical than the social breadth this term suggests",
+        "horizon_embodiment: even with a broader artifact-governance horizon, the cultural and institutional loading stays heavy",
+        "source_language: Sanskrit",
+        "source_uncertainty: medium",
+        "transliteration: sabha",
+        "social_context: historically rooted term with broad modern civic and political use in South Asian contexts",
+        "reviewer_status: not verified by a native or specialist reviewer"
+      ]
+    }
+  ]
+}
