@@ -176,6 +176,23 @@ defmodule DSEx.Confidence.CalibrationTest do
     assert Jason.encode!(left) == Jason.encode!(right)
   end
 
+  test "Brier comparison reports improvement, regression, and rejects split mismatch" do
+    raw = %{sample_count: 20, brier_score: 0.24}
+    improved = Calibration.compare_brier(raw, %{sample_count: 20, brier_score: 0.18})
+    regressed = Calibration.compare_brier(raw, %{sample_count: 20, brier_score: 0.31})
+
+    assert improved.improved?
+    assert improved.outcome == "improved"
+    assert_in_delta improved.raw_minus_calibrated, 0.06, 1.0e-12
+    refute regressed.improved?
+    assert regressed.outcome == "regressed"
+    assert_in_delta regressed.calibrated_minus_raw, 0.07, 1.0e-12
+
+    assert_raise ArgumentError, ~r/same non-empty held-out sample/, fn ->
+      Calibration.compare_brier(raw, %{sample_count: 19, brier_score: 0.18})
+    end
+  end
+
   test "invalid evidence fails closed" do
     assert_raise ArgumentError, ~r/must not be empty/, fn -> Calibration.report([]) end
 

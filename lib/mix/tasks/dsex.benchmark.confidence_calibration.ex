@@ -11,6 +11,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.ConfidenceCalibration do
       OptionParser.parse(args,
         strict: [
           data: :string,
+          provenance: :string,
           model: :string,
           out: :string,
           max_concurrency: :integer,
@@ -23,12 +24,15 @@ defmodule Mix.Tasks.Dsex.Benchmark.ConfidenceCalibration do
 
     artifact =
       DSEx.BenchmarkTruth.ConfidenceCalibration.run(
-        data: opts[:data] || "benchmarks/data/confidence-calibration.jsonl",
-        model: opts[:model] || "openai:gpt-4o-mini",
+        data: opts[:data] || "benchmarks/data/confidence-calibration-trec-fine.jsonl",
+        provenance:
+          opts[:provenance] ||
+            "benchmarks/data/confidence-calibration-trec-fine.provenance.json",
+        model: opts[:model] || "openai:gpt-4.1-mini-2025-04-14",
         api_key: api_key,
-        max_concurrency: opts[:max_concurrency] || 2,
-        bins: opts[:bins] || 5,
-        min_bin_size: opts[:min_bin_size] || 2
+        max_concurrency: opts[:max_concurrency] || 4,
+        bins: opts[:bins] || 10,
+        min_bin_size: opts[:min_bin_size] || 5
       )
 
     out = opts[:out] || "benchmarks/results"

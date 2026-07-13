@@ -60,6 +60,43 @@ defmodule DSEx.Confidence.Calibration do
     }
   end
 
+  @doc "Compares raw and calibrated Brier score on the same held-out records."
+  def compare_brier(
+        %{sample_count: sample_count, brier_score: raw},
+        %{sample_count: sample_count, brier_score: calibrated}
+      )
+      when is_integer(sample_count) and sample_count > 0 and is_number(raw) and
+             is_number(calibrated) do
+    change = calibrated - raw
+
+    outcome =
+      cond do
+        change < 0 -> "improved"
+        change > 0 -> "regressed"
+        true -> "tied"
+      end
+
+    %{
+      metric: "Brier score",
+      definition: "mean((predicted probability of correctness - correctness indicator)^2)",
+      range: [0.0, 1.0],
+      direction: "lower_is_better",
+      sample_count: sample_count,
+      raw: raw,
+      calibrated: calibrated,
+      calibrated_minus_raw: change,
+      raw_minus_calibrated: -change,
+      improved?: change < 0,
+      outcome: outcome
+    }
+  end
+
+  def compare_brier(raw_report, calibrated_report) do
+    raise ArgumentError,
+          "Brier comparison requires reports for the same non-empty held-out sample: " <>
+            inspect({raw_report, calibrated_report})
+  end
+
   @doc "Fits fixed-width histogram calibration on uniquely identified sources."
   def fit_histogram(records, opts \\ []) when is_list(records) do
     bins = positive_integer!(Keyword.get(opts, :bins, 10), :bins)
