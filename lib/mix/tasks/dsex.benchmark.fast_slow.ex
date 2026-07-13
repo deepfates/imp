@@ -275,7 +275,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
 
   defp counts(context) do
     Map.merge(
-      %{"prefetch" => 0, "gepa" => 0, "rollout" => 0, "slow_update" => 0},
+      %{
+        "prefetch" => 0,
+        "gepa" => 0,
+        "rollout" => 0,
+        "slow_update" => 0,
+        "trainer_step" => 0
+      },
       context["counts"]
     )
   end
@@ -350,11 +356,21 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
 
     @doc false
     def context(mode) do
+      session =
+        DSEx.Clients.ReinforcementSession.new(%{
+          id: "fast-slow-protocol-session",
+          provider: "deterministic_protocol",
+          model: "theta-0",
+          current_model: "theta-0",
+          pending_batch_ids: []
+        })
+
       %{
         "mode" => mode,
         "events" => [],
         "counts" => %{},
-        "failed_once" => false
+        "failed_once" => false,
+        "session" => Config.json_safe!(Map.from_struct(session))
       }
     end
 
@@ -509,11 +525,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
         {:error, {:planned_definitive_failure, 1}, Map.put(context, "failed_once", true)}
       else
         theta = current_theta(state)
+        {artifact, context} = apply_slow_update(context, groups, intent, theta)
         bias = if context["mode"] == "prompt_only", do: theta["bias"], else: theta["bias"] + 1
 
         payload = %{
           "bias" => bias,
-          "artifact" => "#{context["mode"]}-theta-#{state.slow_step + 1}",
+          "artifact" => artifact,
           "parent_theta_id" => state.current_theta_id,
           "training_batch" => batch["id"]
         }
@@ -529,6 +546,34 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
     @impl true
     def replay_safe?(intent, context) do
       intent.kind == "fast_slow.slow_update" and context["failed_once"] == true
+    end
+
+    defp apply_slow_update(%{"mode" => "prompt_only"} = context, _groups, _intent, theta),
+      do: {theta["artifact"], context}
+
+    defp apply_slow_update(context, groups, intent, _theta) do
+      session = DSEx.Clients.ReinforcementSession.new(context["session"])
+
+      provider_groups =
+        Enum.map(groups, fn group ->
+          %{"batch_id" => group.id, "group" => group.members}
+        end)
+
+      {:ok, updated} =
+        DSEx.Clients.Trainer.reinforcement_step(
+          Mix.Tasks.Dsex.Benchmark.FastSlow.Backend.ProtocolTrainer,
+          session,
+          provider_groups,
+          objective: :cispo,
+          operation_id: intent.id
+        )
+
+      context =
+        context
+        |> Map.put("session", Config.json_safe!(Map.from_struct(updated)))
+        |> update_in(["counts", "trainer_step"], &((&1 || 0) + 1))
+
+      {updated.current_model, context}
     end
 
     defp candidates("slow_only"), do: ["first_feature", "second_feature"]
@@ -550,6 +595,32 @@ defmodule Mix.Tasks.Dsex.Benchmark.FastSlow do
       update_in(context, ["events"], fn events ->
         List.update_at(events, -1, &Map.put(&1, key, value))
       end)
+    end
+
+    defmodule ProtocolTrainer do
+      @moduledoc false
+      @behaviour DSEx.Clients.Trainer
+
+      @impl true
+      def supported_methods, do: [:grpo]
+
+      @impl true
+      def reinforcement_step(session, groups, opts) do
+        operation_id = Keyword.fetch!(opts, :operation_id)
+        objective = Keyword.fetch!(opts, :objective)
+        step = length(session.fulfilled_batch_ids) + 1
+
+        {:ok,
+         %{
+           session
+           | current_model: "protocol-cispo-theta-#{step}",
+             metadata: %{
+               "last_operation_id" => operation_id,
+               "objective" => Atom.to_string(objective),
+               "group_count" => length(groups)
+             }
+         }}
+      end
     end
   end
 end

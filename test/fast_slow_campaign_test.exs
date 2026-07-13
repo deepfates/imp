@@ -82,6 +82,17 @@ defmodule DSEx.FastSlowCampaignTest do
       assert row["operation_counts"]["slow_update"] == 3
       assert row["cost"]["external_provider_cost"] == 0.0
 
+      expected_trainer_steps = if row["mode"] == "prompt_only", do: 0, else: 2
+      assert row["operation_counts"]["trainer_step"] == expected_trainer_steps
+
+      final_theta = List.last(row["theta_lineage"])["payload"]
+
+      if row["mode"] == "prompt_only" do
+        assert final_theta["artifact"] == "theta-0"
+      else
+        assert final_theta["artifact"] == "protocol-cispo-theta-2"
+      end
+
       assert row["quality"]["label"] == "synthetic_protocol_behavior"
       refute row["quality"]["optimizer_received_held_out_examples"]
       refute row["quality"]["evaluation_uses_training_callback_reward"]
