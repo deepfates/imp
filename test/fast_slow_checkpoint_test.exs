@@ -10,7 +10,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     decoded = checkpoint |> Jason.encode!() |> Jason.decode!()
 
     assert decoded["type"] == "dsex_fast_slow_training"
-    assert decoded["schema_version"] == 1
+    assert decoded["schema_version"] == 2
     assert byte_size(decoded["payload_sha256"]) == 64
     assert Checkpoint.load!(decoded, config) == state
   end
@@ -56,6 +56,12 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
       )
 
     assert_raise ArgumentError, ~r/credentials/, fn -> Checkpoint.dump(config, unsafe) end
+  end
+
+  test "legacy schema with incorrect t semantics is rejected explicitly" do
+    assert_raise ArgumentError, ~r/schema 1 encoded t as a cycle horizon/, fn ->
+      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 1}, config())
+    end
   end
 
   test "valid-checksum adversarial payloads cannot forge lineage, intents, or enum atoms" do
@@ -110,7 +116,13 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
   end
 
   defp populated_state(config) do
-    state = State.new!(config, %{"weights" => [0.0]}, ["p0", "p1"]) |> State.set_stage(:fast)
+    state =
+      config
+      |> State.new!(%{"weights" => [0.0]}, ["seed"])
+      |> State.set_stage(:fast)
+      |> State.revise_prompts(["p0", "p1"])
+      |> State.set_stage(:slow)
+
     intent = OperationIntent.new!("provider-operation", 0, %{"job" => "job-1"})
     state = State.put_intent(state, intent)
 
@@ -123,7 +135,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
         member_index: 0,
         prompt_index: 0,
         theta_id: state.current_theta_id,
-        prompt_revision: 0,
+        prompt_revision: state.prompt_population.revision,
         dataset_indices: [3],
         input_digest: Config.digest(%{"input" => 3}),
         behavior_policy_id: "behavior-v1",
@@ -149,6 +161,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
       t: 2,
       k: 2,
       g: 4,
+      max_cycles: 2,
       optimizer_config: %{"algorithm" => "adam"},
       provider_config: %{"region" => "test"},
       sampling_config: %{"temperature" => 0.7}

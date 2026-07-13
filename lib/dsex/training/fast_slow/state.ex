@@ -201,8 +201,10 @@ defmodule DSEx.Training.FastSlow.State do
     :t,
     :k,
     :g,
+    :max_cycles,
     :stage,
     :cycle,
+    :slow_step,
     :theta_lineage,
     :current_theta_id,
     :prompt_population,
@@ -218,8 +220,10 @@ defmodule DSEx.Training.FastSlow.State do
           t: pos_integer(),
           k: pos_integer(),
           g: pos_integer(),
+          max_cycles: pos_integer(),
           stage: :initialized | :fast | :slow | :terminal,
           cycle: non_neg_integer(),
+          slow_step: non_neg_integer(),
           theta_lineage: [Theta.t()],
           current_theta_id: String.t(),
           prompt_population: PromptPopulation.t(),
@@ -233,8 +237,8 @@ defmodule DSEx.Training.FastSlow.State do
 
   @spec new!(Config.t(), term(), [term()], keyword()) :: t()
   def new!(%Config{} = config, theta_payload, prompt_candidates, options \\ []) do
-    unless length(prompt_candidates) == config.k,
-      do: raise(ArgumentError, "active prompt population must contain exactly k candidates")
+    unless length(prompt_candidates) in 1..config.k,
+      do: raise(ArgumentError, "seed prompt population must contain between one and k candidates")
 
     theta = Theta.new!(0, theta_payload)
     dataset = DatasetState.new!(0, 0, Keyword.get(options, :rng, %{"seed" => 0}))
@@ -246,8 +250,10 @@ defmodule DSEx.Training.FastSlow.State do
       t: config.t,
       k: config.k,
       g: config.g,
+      max_cycles: config.max_cycles,
       stage: :initialized,
       cycle: 0,
+      slow_step: 0,
       theta_lineage: [theta],
       current_theta_id: theta.id,
       prompt_population: PromptPopulation.new!(0, prompt_candidates),
@@ -258,45 +264,67 @@ defmodule DSEx.Training.FastSlow.State do
 
   @spec set_stage(t(), :fast | :slow) :: t()
   def set_stage(%__MODULE__{stage: stage} = state, next) when next in [:fast, :slow] do
-    allowed = {stage, next} in [{:initialized, :fast}, {:fast, :slow}, {:slow, :fast}]
+    allowed = {stage, next} in [{:initialized, :fast}, {:fast, :slow}]
 
     unless allowed,
       do: raise(ArgumentError, "invalid Fast-Slow stage transition #{stage} -> #{next}")
+
+    if next == :slow and
+         (length(state.prompt_population.candidates) != state.k or
+            state.prompt_population.revision != state.cycle + 1) do
+      raise ArgumentError,
+            "slow stage requires a current-cycle GEPA population of exactly k candidates"
+    end
 
     %{state | stage: next}
   end
 
   @spec next_cycle(t(), DatasetState.t()) :: t()
   def next_cycle(%__MODULE__{stage: :slow, terminal: nil} = state, %DatasetState{} = dataset) do
-    unless state.cycle + 1 < state.t,
+    unless state.slow_step == state.t,
+      do: raise(ArgumentError, "configured Fast-Slow cycle has incomplete slow updates")
+
+    unless state.cycle + 1 < state.max_cycles,
       do: raise(ArgumentError, "configured Fast-Slow cycle horizon is exhausted")
 
-    %{state | stage: :fast, cycle: state.cycle + 1, dataset: dataset}
+    %{state | stage: :fast, cycle: state.cycle + 1, slow_step: 0, dataset: dataset}
   end
 
   def next_cycle(%__MODULE__{}, %DatasetState{}),
     do: raise(ArgumentError, "a new cycle may only follow the slow stage")
 
-  @spec append_theta(t(), term()) :: t()
-  def append_theta(%__MODULE__{stage: :slow, terminal: nil} = state, payload) do
+  @spec complete_slow_step(t(), term()) :: t()
+  def complete_slow_step(%__MODULE__{stage: :slow, terminal: nil} = state, payload) do
+    unless state.slow_step < state.t,
+      do: raise(ArgumentError, "configured Fast-Slow cycle already has t slow updates")
+
     theta = Theta.new!(state.cycle, payload, state.current_theta_id)
-    %{state | theta_lineage: state.theta_lineage ++ [theta], current_theta_id: theta.id}
+
+    %{
+      state
+      | theta_lineage: state.theta_lineage ++ [theta],
+        current_theta_id: theta.id,
+        slow_step: state.slow_step + 1
+    }
   end
 
-  def append_theta(%__MODULE__{}, _payload),
-    do: raise(ArgumentError, "theta may only advance during the slow stage")
+  def complete_slow_step(%__MODULE__{}, _payload),
+    do: raise(ArgumentError, "a slow update may only complete during the slow stage")
 
   @spec revise_prompts(t(), [term()]) :: t()
-  def revise_prompts(%__MODULE__{stage: :slow, terminal: nil} = state, candidates) do
+  def revise_prompts(%__MODULE__{stage: :fast, terminal: nil} = state, candidates) do
     unless length(candidates) == state.k,
       do: raise(ArgumentError, "active prompt population must contain exactly k candidates")
+
+    unless state.prompt_population.revision == state.cycle,
+      do: raise(ArgumentError, "GEPA prompt population was already revised for this cycle")
 
     revision = state.prompt_population.revision + 1
     %{state | prompt_population: PromptPopulation.new!(revision, candidates)}
   end
 
   def revise_prompts(%__MODULE__{}, _candidates),
-    do: raise(ArgumentError, "prompts may only be revised during the slow stage")
+    do: raise(ArgumentError, "prompts may only be revised during the fast stage")
 
   @spec put_dataset(t(), DatasetState.t()) :: t()
   def put_dataset(%__MODULE__{terminal: nil} = state, %DatasetState{} = dataset),
@@ -338,7 +366,7 @@ defmodule DSEx.Training.FastSlow.State do
   end
 
   @spec put_rollout(t(), Rollout.t()) :: t()
-  def put_rollout(%__MODULE__{stage: :fast, terminal: nil} = state, %Rollout{} = rollout) do
+  def put_rollout(%__MODULE__{stage: :slow, terminal: nil} = state, %Rollout{} = rollout) do
     Rollout.validate!(rollout)
 
     unless rollout.cycle == state.cycle and rollout.theta_id == state.current_theta_id and
@@ -356,7 +384,7 @@ defmodule DSEx.Training.FastSlow.State do
   end
 
   @spec claim_rollout(t(), String.t(), String.t()) :: {:ok, t()} | {:error, atom()}
-  def claim_rollout(%__MODULE__{stage: :fast, terminal: nil} = state, rollout_id, claim_id) do
+  def claim_rollout(%__MODULE__{stage: :slow, terminal: nil} = state, rollout_id, claim_id) do
     with %Rollout{cycle: cycle} = rollout when cycle == state.cycle <-
            Map.get(state.rollout_ledger, rollout_id),
          {:ok, claimed} <- Rollout.claim(rollout, claim_id) do
@@ -405,7 +433,31 @@ defmodule DSEx.Training.FastSlow.State do
   end
 
   @spec terminate(t(), atom(), term()) :: t()
-  def terminate(%__MODULE__{terminal: nil} = state, reason, details \\ %{}) do
+  def terminate(state, reason, details \\ %{})
+
+  def terminate(
+        %__MODULE__{
+          stage: :slow,
+          terminal: nil,
+          slow_step: t,
+          t: t,
+          cycle: cycle,
+          max_cycles: max_cycles
+        } = state,
+        :completed,
+        details
+      )
+      when cycle + 1 == max_cycles do
+    terminal = Terminal.new!(:completed, state.cycle, details)
+    %{state | stage: :terminal, terminal: terminal}
+  end
+
+  def terminate(%__MODULE__{}, :completed, _details) do
+    raise ArgumentError,
+          "Fast-Slow training may complete only after t slow updates in the final cycle"
+  end
+
+  def terminate(%__MODULE__{terminal: nil} = state, reason, details) do
     terminal = Terminal.new!(reason, state.cycle, details)
     %{state | stage: :terminal, terminal: terminal}
   end
@@ -428,11 +480,14 @@ defmodule DSEx.Training.FastSlow.State do
 
     valid =
       state.stage in @stages and is_integer(state.cycle) and state.cycle >= 0 and
-        is_integer(state.t) and state.t > 0 and state.cycle < state.t and
+        is_integer(state.t) and state.t > 0 and is_integer(state.max_cycles) and
+        state.max_cycles > 0 and state.cycle < state.max_cycles and
+        is_integer(state.slow_step) and state.slow_step in 0..state.t and
         is_integer(state.k) and state.k > 0 and is_integer(state.g) and state.g > 0 and
-        rem(state.g, state.k) == 0 and length(state.prompt_population.candidates) == state.k and
+        rem(state.g, state.k) == 0 and valid_population?(state) and
         digest?(state.sampling_config_digest) and
         valid_lineage?(state.theta_lineage, state.current_theta_id, state.cycle) and
+        length(state.theta_lineage) == state.cycle * state.t + state.slow_step + 1 and
         valid_dataset?(state.dataset) and valid_events?(state.events, state.cycle) and
         valid_terminal?(state.stage, state.terminal, state.cycle) and
         Enum.all?(state.pending_operations, fn {_id, intent} -> intent.cycle == state.cycle end)
@@ -451,6 +506,24 @@ defmodule DSEx.Training.FastSlow.State do
   end
 
   defp valid_lineage?(_, _current_id, _cycle), do: false
+
+  defp valid_population?(%__MODULE__{stage: stage} = state)
+       when stage in [:initialized, :fast] do
+    length(state.prompt_population.candidates) in 1..state.k and
+      state.prompt_population.revision == state.cycle
+  end
+
+  defp valid_population?(%__MODULE__{stage: :terminal} = state) do
+    (length(state.prompt_population.candidates) in 1..state.k and
+       state.prompt_population.revision == state.cycle) or
+      (length(state.prompt_population.candidates) == state.k and
+         state.prompt_population.revision == state.cycle + 1)
+  end
+
+  defp valid_population?(%__MODULE__{} = state) do
+    length(state.prompt_population.candidates) == state.k and
+      state.prompt_population.revision == state.cycle + 1
+  end
 
   defp valid_dataset?(%DatasetState{cursor: cursor, epoch: epoch})
        when cursor >= 0 and epoch >= 0,

@@ -21,8 +21,8 @@ defmodule DSEx.Training.FastSlow.StateTest do
     state =
       State.new!(config, %{"weights" => [0.0]}, ["prompt-a", "prompt-b"], rng: %{"seed" => 7})
 
-    assert_raise ArgumentError, ~r/exactly k/, fn ->
-      State.new!(config, %{}, ["only-one"])
+    assert_raise ArgumentError, ~r/between one and k/, fn ->
+      State.new!(config, %{}, [])
     end
 
     intent = OperationIntent.new!("train", 0, %{"theta" => state.current_theta_id})
@@ -34,9 +34,15 @@ defmodule DSEx.Training.FastSlow.StateTest do
 
     state = State.reconcile_intent(state, intent.id, :confirmed, %{"job" => "done"})
     state = State.set_stage(state, :fast)
-    state = State.set_stage(state, :slow)
-    state = State.append_theta(state, %{"weights" => [0.1]})
     state = State.revise_prompts(state, ["prompt-c", "prompt-d"])
+    state = State.set_stage(state, :slow)
+    state = State.complete_slow_step(state, %{"weights" => [0.1]})
+
+    assert_raise ArgumentError, ~r/incomplete slow updates/, fn ->
+      State.next_cycle(state, DatasetState.new!(8, 1, %{"seed" => 9}))
+    end
+
+    state = State.complete_slow_step(state, %{"weights" => [0.2]})
     state = State.next_cycle(state, DatasetState.new!(8, 1, %{"seed" => 9}))
     {:ok, state} = State.charge_budget(state, :operations, 3)
 
@@ -45,10 +51,22 @@ defmodule DSEx.Training.FastSlow.StateTest do
     assert state.prompt_population.revision == 1
     assert state.dataset.cursor == 8
     assert state.budgets.used["operations"] == 3
-    assert Enum.map(state.theta_lineage, & &1.parent_id) == [nil, hd(state.theta_lineage).id]
+    assert length(state.theta_lineage) == 3
+
+    assert Enum.map(state.theta_lineage, & &1.parent_id) == [
+             nil,
+             hd(state.theta_lineage).id,
+             Enum.at(state.theta_lineage, 1).id
+           ]
+
     assert State.validate!(state) == state
 
-    exhausted = State.set_stage(state, :slow)
+    exhausted =
+      state
+      |> State.revise_prompts(["prompt-e", "prompt-f"])
+      |> State.set_stage(:slow)
+      |> State.complete_slow_step(%{"weights" => [0.3]})
+      |> State.complete_slow_step(%{"weights" => [0.4]})
 
     assert_raise ArgumentError, ~r/horizon is exhausted/, fn ->
       State.next_cycle(exhausted, DatasetState.new!(9, 1, %{"seed" => 10}))
@@ -62,7 +80,14 @@ defmodule DSEx.Training.FastSlow.StateTest do
 
   test "rollouts are single-claim, policy-bound, current-cycle reusable, and group-complete" do
     config = config()
-    state = State.new!(config, %{"weights" => []}, ["a", "b"]) |> State.set_stage(:fast)
+
+    state =
+      config
+      |> State.new!(%{"weights" => []}, ["seed"])
+      |> State.set_stage(:fast)
+      |> State.revise_prompts(["a", "b"])
+      |> State.set_stage(:slow)
+
     rollout = rollout(state, 0)
     state = State.put_rollout(state, rollout)
 
@@ -122,6 +147,7 @@ defmodule DSEx.Training.FastSlow.StateTest do
       t: 2,
       k: 2,
       g: 4,
+      max_cycles: 2,
       optimizer_config: %{"learning_rate" => 0.1},
       provider_config: %{"region" => "test"},
       sampling_config: %{"temperature" => 0.7}

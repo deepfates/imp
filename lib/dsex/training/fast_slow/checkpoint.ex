@@ -15,7 +15,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   }
 
   @type_name "dsex_fast_slow_training"
-  @schema_version 1
+  @schema_version 2
 
   @spec dump(Config.t(), State.t()) :: map()
   def dump(%Config{} = config, %State{} = state) do
@@ -23,6 +23,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
 
     unless state.config_fingerprint == Config.fingerprint(config) and state.t == config.t and
              state.k == config.k and state.g == config.g and
+             state.max_cycles == config.max_cycles and
              state.sampling_config_digest == Config.digest(config.sampling_config),
            do: raise(ArgumentError, "Fast-Slow state does not match the supplied configuration")
 
@@ -44,6 +45,11 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   end
 
   @spec load!(map(), Config.t()) :: State.t()
+  def load!(%{"type" => @type_name, "schema_version" => 1}, %Config{}) do
+    raise ArgumentError,
+          "Fast-Slow checkpoint schema 1 encoded t as a cycle horizon and cannot be resumed faithfully"
+  end
+
   def load!(checkpoint, %Config{} = config) when is_map(checkpoint) do
     with %{
            "type" => @type_name,
@@ -62,6 +68,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
 
       unless state.config_fingerprint == Config.fingerprint(config) and state.t == config.t and
                state.k == config.k and state.g == config.g and
+               state.max_cycles == config.max_cycles and
                state.sampling_config_digest == Config.digest(config.sampling_config),
              do: raise(ArgumentError, "Fast-Slow checkpoint state fingerprint is inconsistent")
 
@@ -127,8 +134,10 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       "t" => state.t,
       "k" => state.k,
       "g" => state.g,
+      "max_cycles" => state.max_cycles,
       "stage" => Atom.to_string(state.stage),
       "cycle" => state.cycle,
+      "slow_step" => state.slow_step,
       "theta_lineage" => Enum.map(state.theta_lineage, &dump_theta/1),
       "current_theta_id" => state.current_theta_id,
       "prompt_population" => dump_population(state.prompt_population),
@@ -232,6 +241,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       t: positive!(data, "t"),
       k: positive!(data, "k"),
       g: positive!(data, "g"),
+      max_cycles: positive!(data, "max_cycles"),
       stage:
         enum!(data, "stage",
           initialized: :initialized,
@@ -240,6 +250,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
           terminal: :terminal
         ),
       cycle: non_negative!(data, "cycle"),
+      slow_step: non_negative!(data, "slow_step"),
       theta_lineage: list!(data, "theta_lineage", &load_theta!/1),
       current_theta_id: string!(data, "current_theta_id"),
       prompt_population: data |> Map.fetch!("prompt_population") |> load_population!(),

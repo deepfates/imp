@@ -9,7 +9,8 @@ defmodule DSEx.Training.FastSlow.Config do
     :adapter_version,
     :t,
     :k,
-    :g
+    :g,
+    :max_cycles
   ]
   defstruct @enforce_keys ++
               [optimizer_config: %{}, provider_config: %{}, sampling_config: %{}]
@@ -25,6 +26,7 @@ defmodule DSEx.Training.FastSlow.Config do
           t: pos_integer(),
           k: pos_integer(),
           g: pos_integer(),
+          max_cycles: pos_integer(),
           optimizer_config: json_value(),
           provider_config: json_value(),
           sampling_config: json_value()
@@ -46,6 +48,7 @@ defmodule DSEx.Training.FastSlow.Config do
     validate_positive!(config.t, :t)
     validate_positive!(config.k, :k)
     validate_positive!(config.g, :g)
+    validate_positive!(config.max_cycles, :max_cycles)
 
     unless rem(config.g, config.k) == 0,
       do: raise(ArgumentError, "g must be divisible by k")
@@ -80,6 +83,7 @@ defmodule DSEx.Training.FastSlow.Config do
       "t" => config.t,
       "k" => config.k,
       "g" => config.g,
+      "max_cycles" => config.max_cycles,
       "optimizer_config" => config.optimizer_config,
       "provider_config" => config.provider_config,
       "sampling_config" => config.sampling_config
