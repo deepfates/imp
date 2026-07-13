@@ -32,8 +32,11 @@ One word does not have to perform all four jobs.
 - `inbox/*.json` preserves each raw generation portfolio exactly as accepted.
 - `registry.jsonl` is the derived append-only event corpus. Every raw occurrence
   receives its own occurrence ID, including duplicates.
-- `assessments.jsonl`, `flags.jsonl`, and `dissent.jsonl` add evidence without
-  mutating candidate observations.
+- `enrichments.jsonl`, `assessments.jsonl`, `flags.jsonl`, and `dissent.jsonl`
+  add embodiments, evidence, interpretations, and disagreement without mutating
+  candidate observations.
+- `scenarios.json` contains provisional, visible decision weights and tier
+  thresholds. It defines several views and no universal winner.
 - `reports/` contains reproducible views. Reports are projections, never the
   authority for whether a candidate exists.
 
