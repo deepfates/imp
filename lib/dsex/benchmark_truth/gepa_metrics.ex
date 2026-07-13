@@ -29,6 +29,19 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     end
   end
 
+  @doc false
+  def metric_with_feedback(spec, opts \\ [])
+
+  def metric_with_feedback(%{"upstream_metric" => "IFBench.ifbench_metric.metric"}, opts) do
+    fn example, prediction ->
+      ifbench_instruction_following_with_feedback(example, prediction, opts)
+    end
+  end
+
+  def metric_with_feedback(spec, opts) do
+    metric(spec, opts)
+  end
+
   defp aime_integer_exact(example, prediction) do
     with {gold, ""} <- example |> DSEx.Example.get(:answer) |> to_string() |> Integer.parse(),
          {predicted, ""} <-
@@ -79,6 +92,46 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
   defp retrieved_title(_other), do: nil
 
   defp ifbench_instruction_following(example, prediction) do
+    example
+    |> ifbench_outcomes(prediction)
+    |> then(fn outcomes ->
+      case outcomes do
+        [] -> 0.0
+        outcomes -> Enum.count(outcomes, & &1.following?) / length(outcomes)
+      end
+    end)
+  end
+
+  defp ifbench_instruction_following_with_feedback(example, prediction, opts) do
+    outcomes = ifbench_outcomes(example, prediction)
+    correct = Enum.filter(outcomes, & &1.following?)
+    incorrect = Enum.reject(outcomes, & &1.following?)
+    descriptions = ifbench_descriptions(outcomes, DSEx.Example.get(example, :prompt, ""), opts)
+
+    feedback =
+      [
+        instruction_feedback(
+          correct,
+          descriptions,
+          "Your response correctly followed the following instructions:"
+        ),
+        instruction_feedback(
+          incorrect,
+          descriptions,
+          if(correct == [],
+            do: "Your response did not follow the following instructions properly:",
+            else: "However, your response did not follow the following instructions properly:"
+          )
+        )
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join("\n")
+
+    score = if(outcomes == [], do: 0.0, else: length(correct) / length(outcomes))
+    %{score: score, feedback: feedback}
+  end
+
+  defp ifbench_outcomes(example, prediction) do
     response = prediction |> DSEx.Prediction.get(:response) |> to_string()
     variants = response_variants(response)
 
@@ -86,22 +139,120 @@ defmodule DSEx.BenchmarkTruth.GepaMetrics do
     kwargs = DSEx.Example.get(example, :kwargs, [])
     prompt = DSEx.Example.get(example, :prompt, "")
 
-    instruction_scores =
-      instructions
-      |> Enum.with_index()
-      |> Enum.map(fn {instruction_id, index} ->
-        args = Enum.at(kwargs, index, %{}) |> strip_nil_values()
+    instructions
+    |> Enum.with_index()
+    |> Enum.map(fn {instruction_id, index} ->
+      args = Enum.at(kwargs, index, %{}) |> strip_nil_values()
 
+      following? =
         Enum.any?(variants, fn variant ->
           String.trim(variant) != "" and ifbench_following?(instruction_id, args, prompt, variant)
         end)
+
+      %{index: index, instruction_id: instruction_id, args: args, following?: following?}
+    end)
+  end
+
+  defp instruction_feedback([], _descriptions, _heading), do: nil
+
+  defp instruction_feedback(outcomes, descriptions, heading) do
+    descriptions =
+      Enum.map_join(outcomes, "\n", fn outcome ->
+        Map.fetch!(descriptions, outcome.index)
       end)
 
-    case instruction_scores do
-      [] -> 0.0
-      scores -> Enum.count(scores, & &1) / length(scores)
+    heading <> "\n" <> descriptions
+  end
+
+  defp ifbench_descriptions(outcomes, prompt, opts) do
+    if Keyword.get(opts, :upstream_descriptions, false) do
+      upstream_ifbench_descriptions!(outcomes, prompt, opts)
+    else
+      Map.new(outcomes, fn outcome ->
+        {outcome.index, "#{outcome.instruction_id} #{Jason.encode!(outcome.args)}"}
+      end)
     end
   end
+
+  defp upstream_ifbench_descriptions!(outcomes, prompt, opts) do
+    artifact_root = Keyword.fetch!(opts, :gepa_root)
+    python = opts |> Keyword.get(:python, "python3") |> resolve_executable()
+    bridge = Keyword.get(opts, :ifbench_description_bridge, default_ifbench_description_bridge())
+
+    unless is_binary(artifact_root) and File.dir?(artifact_root) do
+      raise ArgumentError, "IFBench upstream descriptions require an existing GEPA artifact root"
+    end
+
+    unless executable_available?(python) do
+      raise ArgumentError, "IFBench upstream descriptions require an available Python executable"
+    end
+
+    payload = %{
+      "instructions" =>
+        Enum.map(outcomes, fn outcome ->
+          %{
+            "instruction_id" => outcome.instruction_id,
+            "args" => outcome.args,
+            "prompt" => prompt
+          }
+        end)
+    }
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-ifbench-descriptions-#{System.unique_integer([:positive])}.json"
+      )
+
+    try do
+      File.write!(path, Jason.encode!(payload))
+
+      case System.cmd(
+             python,
+             [bridge, "--artifact-root", artifact_root, "--payload", path],
+             stderr_to_stdout: true
+           ) do
+        {output, 0} ->
+          descriptions = output |> Jason.decode!() |> Map.fetch!("descriptions")
+
+          unless length(descriptions) == length(outcomes) and
+                   Enum.all?(descriptions, &(is_binary(&1) and String.trim(&1) != "")) do
+            raise ArgumentError,
+                  "IFBench upstream description bridge returned invalid descriptions"
+          end
+
+          outcomes
+          |> Enum.zip(descriptions)
+          |> Map.new(fn {outcome, description} -> {outcome.index, description} end)
+
+        {output, status} ->
+          raise RuntimeError,
+                "IFBench upstream description bridge failed with status #{status}: #{String.trim(output)}"
+      end
+    after
+      File.rm(path)
+    end
+  end
+
+  defp default_ifbench_description_bridge do
+    Path.expand("../../../scripts/ifbench_upstream_describe.py", __DIR__)
+  end
+
+  defp executable_available?(executable) when is_binary(executable) do
+    if Path.type(executable) == :absolute or String.contains?(executable, "/"),
+      do: executable |> Path.expand() |> File.regular?(),
+      else: not is_nil(System.find_executable(executable))
+  end
+
+  defp executable_available?(_executable), do: false
+
+  defp resolve_executable(executable) when is_binary(executable) do
+    if Path.type(executable) == :absolute or String.contains?(executable, "/"),
+      do: Path.expand(executable),
+      else: System.find_executable(executable) || executable
+  end
+
+  defp resolve_executable(executable), do: executable
 
   defp response_variants(response) do
     lines = String.split(response, "\n")

@@ -3,6 +3,9 @@ defmodule GepaReplicationArtifactTest do
 
   import ExUnit.CaptureIO
 
+  alias DSEx.BenchmarkTruth.GepaReplicationContract
+  alias Mix.Tasks.Dsex.Benchmark.GepaReplication, as: GepaReplicationTask
+
   test "GEPA replication task validates required paper-family fields and writes artifact" do
     out_dir = tmp_dir("gepa-replication")
     input_path = write_rows!("complete-gepa", full_rows())
@@ -10,7 +13,7 @@ defmodule GepaReplicationArtifactTest do
     capture_io(fn ->
       Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+      GepaReplicationTask.run([
         "--input",
         input_path,
         "--out",
@@ -66,7 +69,7 @@ defmodule GepaReplicationArtifactTest do
       capture_io(fn ->
         Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-        Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        GepaReplicationTask.run([
           "--input",
           input_path,
           "--out",
@@ -92,13 +95,13 @@ defmodule GepaReplicationArtifactTest do
     unknown = rows ++ [Map.put(hd(rows), "family", "UnknownBench")]
 
     duplicate_validation =
-      DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(duplicate)
+      GepaReplicationContract.validate_rows(duplicate)
 
     refute duplicate_validation.passing
     assert duplicate_validation.duplicate_families == ["AIMEBench"]
     assert duplicate_validation.unknown_families == []
 
-    unknown_validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(unknown)
+    unknown_validation = GepaReplicationContract.validate_rows(unknown)
     refute unknown_validation.passing
     assert unknown_validation.unknown_families == ["UnknownBench"]
   end
@@ -111,13 +114,13 @@ defmodule GepaReplicationArtifactTest do
         |> Map.put("metric_calls", get_in(row, ["optimizer_budgets", "dsex_gepa"]))
       end)
 
-    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+    validation = GepaReplicationContract.validate_rows(rows)
 
     refute validation.passing
 
     assert %{"family" => "AIMEBench", "field" => "metric_call_evidence"} in validation.missing_fields
 
-    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(full_artifact(rows))
+    refute GepaReplicationContract.full_artifact?(full_artifact(rows))
   end
 
   test "GEPA research evidence rejects non-observed call bases and unenforced counts" do
@@ -131,7 +134,7 @@ defmodule GepaReplicationArtifactTest do
       |> put_in(["metric_call_evidence", "enforced_limits", "dsex_gepa"], false)
 
     rows = [configured, unenforced | rest]
-    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+    validation = GepaReplicationContract.validate_rows(rows)
 
     refute validation.passing
 
@@ -149,11 +152,25 @@ defmodule GepaReplicationArtifactTest do
         |> put_in(["seed_selection", "dsex_gepa", "test_scores_used"], true)
       end)
 
-    validation = DSEx.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
+    validation = GepaReplicationContract.validate_rows(rows)
 
     refute validation.passing
     assert %{"family" => "AIMEBench", "field" => "seed_selection"} in validation.missing_fields
-    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(full_artifact(rows))
+    refute GepaReplicationContract.full_artifact?(full_artifact(rows))
+  end
+
+  test "GEPA research evidence requires exact retrieval for both executed retrieval families" do
+    for family <- ["HotpotQABench", "hoverBench"] do
+      rows =
+        Enum.map(full_rows(), fn
+          %{"family" => ^family} = row -> put_in(row, ["dataset", "retrieval"], nil)
+          row -> row
+        end)
+
+      validation = GepaReplicationContract.validate_rows(rows)
+      refute validation.passing
+      assert %{"family" => family, "field" => "dataset"} in validation.missing_fields
+    end
   end
 
   test "GEPA replication task rejects Papillon research rows without judge metadata" do
@@ -172,7 +189,7 @@ defmodule GepaReplicationArtifactTest do
       capture_io(fn ->
         Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-        Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        GepaReplicationTask.run([
           "--input",
           input_path,
           "--out",
@@ -206,7 +223,7 @@ defmodule GepaReplicationArtifactTest do
       capture_io(fn ->
         Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-        Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+        GepaReplicationTask.run([
           "--input",
           input_path,
           "--out",
@@ -229,16 +246,20 @@ defmodule GepaReplicationArtifactTest do
     artifact_dir = tmp_dir("gepa-artifact-output")
     out_dir = tmp_dir("gepa-artifact-converted")
     write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
-    dsex_input = write_rows!("dsex-gepa-rows", full_rows())
+    dsex_rows = converter_dsex_rows("gpt-41-mini", "gepa-conversion-test")
+    dsex_input = write_rows!("dsex-gepa-rows", dsex_rows)
+    evidence_path = write_upstream_evidence!(artifact_dir, "gpt-41-mini")
 
     capture_io(fn ->
       Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+      GepaReplicationTask.run([
         "--from-gepa-artifact",
         artifact_dir,
         "--dsex-input",
         dsex_input,
+        "--upstream-evidence",
+        evidence_path,
         "--campaign-id",
         "gepa-conversion-test",
         "--artifact-model",
@@ -254,13 +275,82 @@ defmodule GepaReplicationArtifactTest do
     assert artifact["summary"]["full_gepa_replication"]
     assert artifact["source"]["input"] == artifact_dir
 
-    assert Enum.all?(artifact["rows"], fn row ->
+    assert Enum.zip(artifact["rows"], dsex_rows)
+           |> Enum.all?(fn {row, dsex} ->
              get_in(row, ["results", "baseline", "source"]) =~ "gepa-artifact Baseline" and
                get_in(row, ["results", "dspy_gepa", "source"]) =~ "gepa-artifact GEPA" and
                get_in(row, ["results", "mipro_v2", "source"]) =~
                  "gepa-artifact MIPROv2-Heavy" and
-               get_in(row, ["results", "dsex_gepa", "source"]) == "DSEx GEPA runner artifact"
+               row["metric_calls"] == dsex["metric_calls"] and
+               get_in(row, ["results", "dsex_gepa"]) ==
+                 get_in(dsex, ["results", "dsex_gepa"]) and
+               get_in(row, ["metric_call_evidence", "observed", "dsex_gepa"]) ==
+                 get_in(dsex, ["metric_call_evidence", "observed", "dsex_gepa"]) and
+               get_in(row, ["seed_selection", "dsex_gepa"]) ==
+                 get_in(dsex, ["seed_selection", "dsex_gepa"])
            end)
+  end
+
+  test "upstream conversion requires explicit machine-readable evidence" do
+    artifact_dir = tmp_dir("gepa-artifact-no-evidence")
+    write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
+
+    assert_raise Mix.Error, ~r/requires --upstream-evidence/, fn ->
+      run_upstream_conversion!(artifact_dir, nil)
+    end
+  end
+
+  test "upstream conversion rejects configured-only metric-call evidence" do
+    artifact_dir = tmp_dir("gepa-artifact-configured-only")
+    write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
+
+    evidence_path =
+      write_upstream_evidence!(artifact_dir, "gpt-41-mini", fn evidence ->
+        update_in(evidence, ["runs", Access.at(0), "metric_call_evidence"], fn metric ->
+          metric
+          |> Map.put("basis", "configured_budget")
+          |> Map.delete("observed")
+        end)
+      end)
+
+    assert_raise Mix.Error, ~r/configured budgets alone are not evidence/, fn ->
+      run_upstream_conversion!(artifact_dir, evidence_path)
+    end
+  end
+
+  test "upstream conversion rejects test-selected comparator evidence" do
+    artifact_dir = tmp_dir("gepa-artifact-test-selected")
+    write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
+
+    evidence_path =
+      write_upstream_evidence!(artifact_dir, "gpt-41-mini", fn evidence ->
+        update_in(evidence, ["runs", Access.at(0), "seed_selection"], fn selection ->
+          selection
+          |> Map.put("method", "best_test")
+          |> Map.put("selection_split", "test")
+          |> Map.put("test_scores_used", true)
+        end)
+      end)
+
+    assert_raise Mix.Error, ~r/non-test seed selection/, fn ->
+      run_upstream_conversion!(artifact_dir, evidence_path)
+    end
+  end
+
+  test "upstream conversion rejects observed calls above the enforced budget" do
+    artifact_dir = tmp_dir("gepa-artifact-over-budget")
+    write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
+
+    evidence_path =
+      write_upstream_evidence!(artifact_dir, "gpt-41-mini", fn evidence ->
+        update_in(evidence, ["runs", Access.at(0), "metric_call_evidence"], fn metric ->
+          Map.put(metric, "observed", metric["configured_limit"] + 1)
+        end)
+      end)
+
+    assert_raise Mix.Error, ~r/within-budget metric calls/, fn ->
+      run_upstream_conversion!(artifact_dir, evidence_path)
+    end
   end
 
   test "GEPA replication smoke runner exercises DSEx GEPA without authorizing research claims" do
@@ -269,7 +359,7 @@ defmodule GepaReplicationArtifactTest do
     capture_io(fn ->
       Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+      GepaReplicationTask.run([
         "--smoke",
         "--out",
         out_dir
@@ -362,6 +452,118 @@ defmodule GepaReplicationArtifactTest do
     end)
   end
 
+  defp converter_dsex_rows(model, campaign_id) do
+    Enum.map(full_rows(), fn row ->
+      row
+      |> Map.put("model", model)
+      |> Map.put("campaign_id", campaign_id)
+      |> update_in(["optimizer_budgets"], &Map.take(&1, ["dsex_gepa"]))
+      |> update_in(["metric_call_evidence", "observed"], &Map.take(&1, ["dsex_gepa"]))
+      |> update_in(
+        ["metric_call_evidence", "enforced_limits"],
+        &Map.take(&1, ["dsex_gepa"])
+      )
+      |> update_in(["seed_selection"], &Map.take(&1, ["dsex_gepa"]))
+      |> update_in(["results"], &Map.take(&1, ["dsex_gepa", "simba"]))
+    end)
+  end
+
+  defp write_upstream_evidence!(artifact_dir, model, transform \\ &Function.identity/1) do
+    runs =
+      Enum.flat_map(full_rows(), fn row ->
+        family = row["family"]
+        program = row["program"]
+        limit = row["metric_calls"]
+
+        [
+          {"Baseline", 0.5},
+          {"GEPA", 0.6},
+          {"MIPROv2-Heavy", 0.55}
+        ]
+        |> Enum.map(fn {optimizer, score} ->
+          result_path =
+            Path.join([
+              artifact_dir,
+              "experiment_runs",
+              "seed_0",
+              "#{family}_#{program}_#{optimizer}_#{model}",
+              "evaluation_results",
+              "evaluation_result.txt"
+            ])
+
+          %{
+            "family" => family,
+            "program" => program,
+            "optimizer" => optimizer,
+            "model" => model,
+            "seed" => 0,
+            "metric_call_evidence" => %{
+              "basis" => "observed_metric_callback_count",
+              "observed" => limit - 1,
+              "configured_limit" => limit,
+              "enforced" => true,
+              "source" => "fixture runtime metric callback log and enforced limit record"
+            },
+            "seed_selection" => seed_selection("predeclared", nil, 0),
+            "evaluation" => %{
+              "split" => "test",
+              "score" => score,
+              "result_sha256" => sha256(result_path),
+              "test_scores_used_for_selection" => false,
+              "source" => "fixture final evaluator test-set manifest"
+            }
+          }
+        end)
+      end)
+
+    evidence =
+      transform.(%{
+        "schema_version" => 1,
+        "kind" => "gepa_upstream_evidence",
+        "source" => %{
+          "archive_sha256" => String.duplicate("a", 64),
+          "upstream_commit" => "gepa-ai/gepa-artifact@abcdef1"
+        },
+        "runs" => runs
+      })
+
+    path = Path.join(tmp_dir("upstream-evidence"), "evidence.json")
+    File.write!(path, Jason.encode!(evidence, pretty: true))
+    path
+  end
+
+  defp run_upstream_conversion!(artifact_dir, evidence_path) do
+    args = [
+      "--from-gepa-artifact",
+      artifact_dir,
+      "--dsex-input",
+      write_rows!(
+        "dsex-gepa-adversarial",
+        converter_dsex_rows("gpt-41-mini", "gepa-adversarial-test")
+      ),
+      "--campaign-id",
+      "gepa-adversarial-test",
+      "--artifact-model",
+      "gpt-41-mini",
+      "--out",
+      tmp_dir("gepa-adversarial-output")
+    ]
+
+    args = if evidence_path, do: args ++ ["--upstream-evidence", evidence_path], else: args
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+      GepaReplicationTask.run(args)
+    end)
+  end
+
+  defp sha256(path) do
+    path
+    |> File.read!()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
   defp full_row(family, program, budget) do
     row = %{
       "family" => family,
@@ -448,7 +650,7 @@ defmodule GepaReplicationArtifactTest do
     }
 
     row =
-      if family == "hoverBench" do
+      if family in ["HotpotQABench", "hoverBench"] do
         put_in(row, ["dataset", "retrieval"], %{
           "verified" => true,
           "implementation" => "upstream_python_bm25s",

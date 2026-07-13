@@ -27,6 +27,21 @@ def install_spacy_stub_if_needed():
         sys.modules["spacy.cli"] = cli
 
 
+def install_optional_import_stubs():
+    try:
+        import nltk  # type: ignore
+
+        nltk.download = lambda *_args, **_kwargs: None
+    except ModuleNotFoundError:
+        nltk = types.ModuleType("nltk")
+        nltk.download = lambda *_args, **_kwargs: None
+        sys.modules["nltk"] = nltk
+
+    for module_name in ("emoji", "syllapy"):
+        if importlib.util.find_spec(module_name) is None:
+            sys.modules[module_name] = types.ModuleType(module_name)
+
+
 def load_fixtures(path):
     fixtures = []
     with open(path, "r", encoding="utf-8") as handle:
@@ -46,16 +61,10 @@ def import_registry(artifact_root):
         category=UserWarning,
     )
     install_spacy_stub_if_needed()
+    install_optional_import_stubs()
     dspy = sys.modules.setdefault("dspy", types.ModuleType("dspy"))
     dspy.Module = getattr(dspy, "Module", object)
     dspy.Example = getattr(dspy, "Example", object)
-
-    try:
-        import nltk  # type: ignore
-
-        nltk.download = lambda *_args, **_kwargs: None
-    except ModuleNotFoundError:
-        pass
 
     utils_dir = os.path.join(
         artifact_root,

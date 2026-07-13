@@ -199,7 +199,10 @@ def instantiate_benchmark(module_name: str, family: str):
 
 
 def family_extra_metadata(gepa_root: Path, family: str) -> Dict[str, Any]:
-    if family != "hoverBench":
+    # HotpotMultiHop imports and executes hover.hover_program.search. Although
+    # its module configures a ColBERT client, that client is not on the executed
+    # program path in the artifact.
+    if family not in {"HotpotQABench", "hoverBench"}:
         return {}
 
     hover_dir = gepa_root / "gepa_artifact" / "benchmarks" / "hover"

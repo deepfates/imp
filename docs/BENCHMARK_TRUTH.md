@@ -287,6 +287,35 @@ dev score, and exports the optimizer report’s observed metric calls plus the
 enforced limit for each seed. Comparator-side evidence must be added by the
 upstream artifact converter before strict full-artifact validation.
 
+### Source-Shaped Program and Feedback Contract
+
+A full campaign conversion accepts exactly these six upstream family/program
+shapes. The two `CoT` rows share a program name but retain their own source
+signature, instructions, metric, splits, and budget; they are not
+interchangeable rows.
+
+| Family | Program | Source signature | Scored output |
+| --- | --- | --- | --- |
+| `AIMEBench` | `CoT` | `problem -> answer` | integer exact match |
+| `HotpotQABench` | `HotpotMultiHop` | `question -> answer` | answer exact match |
+| `hoverBench` | `HoverMultiHop` | `claim -> retrieved_docs` | supporting-title retrieval |
+| `IFBench` | `IFBenchCoT2StageProgram` | `prompt -> response` | instruction constraints |
+| `LiveBenchMathBench` | `CoT` | `question -> answer` | task-specific math score |
+| `Papillon` | `PAPILLON` | `user_query -> llm_request, llm_response, response` | quality/leakage judge |
+
+`HotpotMultiHop`, `HoverMultiHop`, and `IFBenchCoT2StageProgram` install
+strict, named component-feedback maps. HotPot covers `summarize1`,
+`create_query_hop2`, `summarize2`, and `final_answer`; HoVer covers
+`summarize1`, `create_query_hop2`, `summarize2`, and `create_query_hop3`; and
+IFBench covers `generate_response_module` and `ensure_correct_response_module`.
+The map must cover the program graph exactly. Each callback receives the named
+predictor input/output, full example, program output, metric result, and trace,
+and must yield non-empty feedback text. Invalid callback output, a callback
+failure, or a graph mismatch stops the optimization run. `AIMEBench`,
+`LiveBenchMathBench`, and `Papillon` currently use metric-level feedback rather
+than a custom component map. Campaign rows record the component-feedback
+identity so reviewers can distinguish these contracts.
+
 When upstream GEPA artifact experiments have been run, convert their
 `experiment_runs_data` output into DSEx dashboard rows with:
 
@@ -311,6 +340,7 @@ mix dsex.benchmark.gepa_campaign \
 
 mix dsex.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
+  --upstream-evidence benchmarks/results/gepa-upstream-evidence.json \
   --dsex-input benchmarks/results/dsex-gepa-rows-*.json \
   --campaign-id gepa-full-YYYYMMDD \
   --artifact-model gpt-41-mini
@@ -342,6 +372,29 @@ rows. It refuses missing families, missing comparator outputs, ambiguous
 artifact models, and rows that do not satisfy the full-evidence contract after
 merge.
 
+The upstream evidence sidecar is mandatory for conversion. Generate it from
+the immutable upstream experiment archive and the matching upstream checkout:
+
+```sh
+python3 scripts/extract_gepa_upstream_evidence.py \
+  path/to/experiment_runs_data.tar.gz \
+  --upstream-repo path/to/gepa-artifact \
+  --model gpt-41-mini \
+  --out benchmarks/results/gepa-upstream-evidence.json
+```
+
+The extractor requires the six family/program pairs above and the `Baseline`,
+`GEPA`, and `MIPROv2-Heavy` seed-0 runs. It records the archive SHA-256 and
+upstream commit; reads upstream `config.json`, metric JSONL, and
+`evaluation_result.txt`; derives observed optimizer callbacks by subtracting
+the matching Baseline final-test callbacks; and reads the configured comparator
+budget from the upstream source. The replication task accepts only a sidecar
+whose exact family/program/optimizer keys match the required comparator set,
+whose reported test score and result SHA-256 match the archive result, and
+whose evidence proves observed, enforced, within-budget calls and non-test seed
+selection. It will not infer this evidence from `evaluation_result.txt` or
+configured budgets alone.
+
 Campaign or converted rows that still expose only configured call budgets or
 select their reported seed by test score are useful operator artifacts, but they
 do not satisfy the full GEPA contract. They must remain red until the producer
@@ -356,25 +409,24 @@ scoring, the deterministic LiveBenchMath AMC/AIME parser paths, and
 LiveBenchMath `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
 HoVer uses the upstream `HoverMultiHop` output contract (`claim ->
 retrieved_docs`); the metric scores retrieved document titles against
-`supporting_facts`, not the entailment label. Source-exact HoVer campaign rows
-must include `dataset.retrieval` provenance for the upstream
+`supporting_facts`, not the entailment label. Both `HotpotQABench` and
+`hoverBench` require `dataset.retrieval` provenance for the same upstream
 `wiki.abstracts.2017` BM25 corpus and index, including corpus and index
-checksums; the DSEx campaign runner rejects HoVer research rows without that
-provenance and uses a native BM25 corpus retriever for HoVer rows instead of
-asking the LM to invent `retrieved_docs`. That native retriever is a deliberate
-approximation: it does not reproduce the upstream English stopword tokenizer or
-PyStemmer stemming and is not valid for source-exact ranking claims. The pinned
-Python adapter uses upstream commit
+checksums. For either family, the campaign command requires
+`DSEX_HOVER_UPSTREAM_BM25=1`; it then executes retrieval through the pinned
+upstream Python BM25S index. The native Elixir BM25 retriever is an explicitly
+labeled approximation, not a source-exact campaign substitute: it does not
+reproduce the upstream English stopword tokenizer or PyStemmer stemming. The
+pinned Python adapter uses upstream commit
 `cbefbc1aa0f43dd39874ec4bf42211365dbda42e`, `bm25s==0.2.12`, and
 `pystemmer==2.2.0.3`; its fixed top-k title order is validated with
 `DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`. For
 campaign rows over the full upstream corpus, set `DSEX_HOVER_UPSTREAM_BM25=1`,
-`DSEX_GEPA_ROOT`, and `DSEX_GEPA_PYTHON` so HoVer retrieval runs through the
-upstream Python BM25 index instead of loading the full wiki corpus into the
-BEAM. HoVer campaign rows use LM-generated multi-hop search queries and report
-ReqLLM usage telemetry. Full GEPA research artifacts remain blocked until those
-rows are produced from an uncapped dataset root and merged with upstream
-comparator outputs.
+`DSEX_GEPA_ROOT`, and `DSEX_GEPA_PYTHON` for both families. Their multi-hop
+queries are generated by the LM and the resulting rows report ReqLLM usage
+telemetry. These rows do not support a full GEPA research claim until uncapped
+results are merged with matching upstream comparator outputs and sidecar
+evidence.
 IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages
@@ -386,13 +438,22 @@ The registry differential covers all 83 active merged-registry instruction ids
 and matches the pinned GEPA artifact fixtures, including language detection and
 the four NLP-backed checks. Reproduce it with:
 
+Full IFBench GEPA campaigns also set
+`DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1`, `DSEX_GEPA_ROOT`, and
+`DSEX_GEPA_PYTHON`. Scoring remains in the Elixir registry port; reflective
+feedback renders the corresponding human instruction descriptions through
+`scripts/ifbench_upstream_describe.py` from the pinned upstream registry. The
+campaign records that description source and fails closed if the bridge is
+missing or returns an invalid description set.
+
 ```sh
 python3 -m venv tmp/ifbench-parity-venv
 tmp/ifbench-parity-venv/bin/python -m pip install \
   -r benchmarks/requirements-ifbench-parity.txt
 tmp/ifbench-parity-venv/bin/python -m nltk.downloader \
   -d tmp/ifbench-parity-venv/nltk_data \
-  stopwords averaged_perceptron_tagger_eng
+  stopwords averaged_perceptron_tagger_eng punkt_tab
+NLTK_DATA="$PWD/tmp/ifbench-parity-venv/nltk_data" \
 DSEX_IFBENCH_UPSTREAM_PARITY=1 \
 DSEX_IFBENCH_UPSTREAM_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
   mix test test/gepa_metrics_test.exs

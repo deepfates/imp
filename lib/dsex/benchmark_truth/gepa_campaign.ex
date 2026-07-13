@@ -1,6 +1,20 @@
 defmodule DSEx.BenchmarkTruth.GepaCampaign do
   @moduledoc false
 
+  alias DSEx.Adapter.Chat
+
+  alias DSEx.BenchmarkTruth.{
+    GepaComponentFeedback,
+    GepaMetrics,
+    HotpotMultiHop,
+    HoverBM25,
+    HoverMultiHop,
+    IFBenchTwoStage,
+    Papillon
+  }
+
+  alias DSEx.Optimizer.GEPA
+
   @required_families DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
 
   def run(opts) do
@@ -155,12 +169,12 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
               "DSEx GEPA campaign row missing research metadata for #{row["family"]}"
       end
 
-      if row["family"] == "hoverBench" do
+      if row["family"] in ["HotpotQABench", "hoverBench"] do
         retrieval = get_in(row, ["dataset", "retrieval"])
 
         unless hover_retrieval_provenance?(retrieval) do
           raise ArgumentError,
-                "DSEx GEPA hoverBench row requires source-exact BM25/wiki retrieval provenance"
+                "DSEx GEPA #{row["family"]} row requires source-exact BM25/wiki retrieval provenance"
         end
       end
     end)
@@ -410,7 +424,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "metadata" => %{
         "signature" => signature,
         "instructions" => spec["instructions"],
-        "output_key" => spec["output_key"]
+        "output_key" => spec["output_key"],
+        "component_feedback" => best.component_feedback
       }
     }
     |> maybe_put_papillon_judge(spec, judge_model)
@@ -479,8 +494,19 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       optimizer_callbacks: optimizer_callbacks
     } = context
 
-    metric = DSEx.BenchmarkTruth.GepaMetrics.metric(spec, judge_lm: judge_lm)
+    metric = GepaMetrics.metric(spec, judge_lm: judge_lm)
     program = program_for(spec, lm, execution)
+
+    feedback_metric =
+      GepaMetrics.metric_with_feedback(spec,
+        judge_lm: judge_lm,
+        upstream_descriptions: get_in(execution, ["ifbench", "upstream_descriptions"]) == true,
+        gepa_root: get_in(execution, ["retrieval", "gepa_root"]),
+        python: get_in(execution, ["retrieval", "python"]) || "python3"
+      )
+
+    component_feedback =
+      GepaComponentFeedback.callbacks!(spec, program, feedback_metric)
 
     baseline =
       case progress["baseline"] do
@@ -506,18 +532,19 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     end
 
     {compiled, report} =
-      DSEx.Optimizer.GEPA.new(metric,
+      GEPA.new(metric,
         seed: seed,
         generations: generations,
         max_concurrency: max_concurrency,
         reflection_lm: reflection_lm,
         max_metric_calls: budget,
         callbacks: optimizer_callbacks,
+        component_feedback: component_feedback,
         feedback_fn: fn _trainset ->
           "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
         end
       )
-      |> DSEx.Optimizer.GEPA.compile_with_report(program, trainset, devset,
+      |> GEPA.compile_with_report(program, trainset, devset,
         resume_state: progress["optimizer_state"],
         checkpoint_fn: optimizer_checkpoint_fn
       )
@@ -547,9 +574,30 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       frontier_size: Map.get(report.metadata, :frontier_size, 0),
       optimizer_metric_calls: metric_calls,
       optimizer_metric_call_limit: metric_call_limit,
-      optimizer_stop_reason: normalize_stop_reason(stop_reason)
+      optimizer_stop_reason: normalize_stop_reason(stop_reason),
+      component_feedback:
+        component_feedback
+        |> GepaComponentFeedback.identity()
+        |> maybe_mark_upstream_ifbench_feedback(spec, execution)
     }
   end
+
+  defp maybe_mark_upstream_ifbench_feedback(
+         identity,
+         %{"program" => "IFBenchCoT2StageProgram"},
+         execution
+       ) do
+    Map.put(
+      identity,
+      "description_source",
+      if(get_in(execution, ["ifbench", "upstream_descriptions"]) == true,
+        do: "pinned_upstream_python_registry",
+        else: "native_instruction_identity"
+      )
+    )
+  end
+
+  defp maybe_mark_upstream_ifbench_feedback(identity, _spec, _execution), do: identity
 
   defp judge_config!(opts, lm, model) do
     case Keyword.fetch(opts, :judge_lm) do
@@ -588,22 +636,56 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     retrieval = Map.fetch!(spec, "retrieval")
 
     if get_in(execution, ["retrieval", "hover_upstream_bm25"]) == true do
-      DSEx.BenchmarkTruth.HoverMultiHop.new(lm, retrieval, upstream_python: true)
+      HoverMultiHop.new(lm, retrieval, upstream_python: true)
     else
-      DSEx.BenchmarkTruth.HoverMultiHop.new(lm, retrieval)
+      HoverMultiHop.new(lm, retrieval)
     end
   end
 
-  defp program_for(spec, lm, _execution) do
+  defp program_for(%{"program" => "HotpotMultiHop"} = spec, lm, execution) do
+    retrieval = Map.fetch!(spec, "retrieval")
+
+    if get_in(execution, ["retrieval", "hover_upstream_bm25"]) == true do
+      python = get_in(execution, ["retrieval", "python"]) || "python3"
+      HotpotMultiHop.integration(lm, retrieval, python: python)
+    else
+      retriever = HoverBM25.new(retrieval, k: 7)
+      HotpotMultiHop.new(lm, retriever)
+    end
+  end
+
+  defp program_for(%{"program" => "IFBenchCoT2StageProgram"}, lm, _execution) do
+    IFBenchTwoStage.new(lm, adapter: Chat)
+  end
+
+  defp program_for(%{"program" => "PAPILLON"}, lm, _execution) do
+    Papillon.new(lm, lm: lm, adapter: Chat)
+  end
+
+  defp program_for(%{"program" => "CoT"} = spec, lm, _execution) do
     spec["signature"]
     |> DSEx.signature(spec["instructions"])
-    |> DSEx.predict(lm: lm, adapter: DSEx.Adapter.Chat)
+    |> DSEx.chain_of_thought(lm: lm, adapter: Chat)
+  end
+
+  defp program_for(spec, _lm, _execution) do
+    raise ArgumentError,
+          "unsupported GEPA campaign program #{inspect(spec["program"])} for #{inspect(spec["family"])}"
   end
 
   defp validate_family_spec!(%{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec) do
     unless hover_retrieval_provenance?(spec["retrieval"]) do
       raise ArgumentError,
             "DSEx GEPA hoverBench row requires source-exact BM25/wiki retrieval provenance"
+    end
+
+    DSEx.BenchmarkTruth.HoverBM25.verify_source!(spec["retrieval"])
+  end
+
+  defp validate_family_spec!(%{"program" => "HotpotMultiHop"} = spec) do
+    unless hover_retrieval_provenance?(spec["retrieval"]) do
+      raise ArgumentError,
+            "DSEx GEPA HotpotQABench row requires source-exact BM25/wiki retrieval provenance"
     end
 
     DSEx.BenchmarkTruth.HoverBM25.verify_source!(spec["retrieval"])
@@ -737,8 +819,21 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       non_negative_integer?(result["frontier_size"]) and
       non_negative_integer?(result["optimizer_metric_calls"]) and
       positive_integer?(result["optimizer_metric_call_limit"]) and
-      result["optimizer_metric_calls"] <= result["optimizer_metric_call_limit"]
+      result["optimizer_metric_calls"] <= result["optimizer_metric_call_limit"] and
+      valid_component_feedback?(result["component_feedback"])
   end
+
+  defp valid_component_feedback?(%{
+         "contract" => "DSEx.Optimizer.GEPA.ComponentFeedback/v1",
+         "components" => components,
+         "strict" => true
+       })
+       when is_list(components) do
+    components == Enum.sort(Enum.uniq(components)) and
+      Enum.all?(components, &(is_binary(&1) and String.trim(&1) != ""))
+  end
+
+  defp valid_component_feedback?(_feedback), do: false
 
   defp valid_usage?(usage) when is_map(usage) do
     numeric?(usage["usd"]) and usage["usd"] >= 0 and
@@ -779,7 +874,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       baseline_test: Map.fetch!(result, "baseline_test"),
       optimizer_metric_calls: Map.fetch!(result, "optimizer_metric_calls"),
       optimizer_metric_call_limit: Map.fetch!(result, "optimizer_metric_call_limit"),
-      optimizer_stop_reason: Map.get(result, "optimizer_stop_reason")
+      optimizer_stop_reason: Map.get(result, "optimizer_stop_reason"),
+      component_feedback: Map.fetch!(result, "component_feedback")
     }
   end
 

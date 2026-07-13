@@ -47,6 +47,13 @@ defmodule GepaDatasetExportTest do
     assert papillon["signature"] == "user_query -> llm_request, response"
     assert papillon["output_key"] == "response"
 
+    hotpot = Enum.find(families["families"], &(&1["family"] == "HotpotQABench"))
+    assert hotpot["retrieval"]["kind"] == "bm25s_wiki_abstracts_2017"
+    assert hotpot["retrieval"]["corpus_checksum"] =~ "sha256:"
+
+    assert hotpot["retrieval"] ==
+             Enum.find(families["families"], &(&1["family"] == "hoverBench"))["retrieval"]
+
     hover = Enum.find(families["families"], &(&1["family"] == "hoverBench"))
     assert hover["signature"] == "claim -> retrieved_docs"
     assert hover["output_key"] == "retrieved_docs"

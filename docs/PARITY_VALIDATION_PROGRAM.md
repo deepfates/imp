@@ -275,8 +275,30 @@ accepted only as engineering proof runs and are rejected for full research
 claims. SIMBA is optional extra comparator evidence, not a required optimizer
 in the upstream GEPA artifact.
 
+A full campaign conversion is source-shaped, not a generic six-task harness.
+Required rows are `AIMEBench/CoT` (`problem -> answer`),
+`HotpotQABench/HotpotMultiHop` (`question -> answer`),
+`hoverBench/HoverMultiHop` (`claim -> retrieved_docs`),
+`IFBench/IFBenchCoT2StageProgram` (`prompt -> response`),
+`LiveBenchMathBench/CoT` (`question -> answer`), and
+`Papillon/PAPILLON` (`user_query -> llm_request, llm_response, response`). The two `CoT`
+rows remain separate family contracts with their own metrics, splits,
+instructions, and budgets.
+
+HotPot, HoVer, and IFBench use strict component-specific GEPA feedback.
+HotPot's map covers `summarize1`, `create_query_hop2`, `summarize2`, and
+`final_answer`; HoVer's covers `summarize1`, `create_query_hop2`,
+`summarize2`, and `create_query_hop3`; IFBench's covers
+`generate_response_module` and `ensure_correct_response_module`. Each map must
+exactly match the program predictor graph. A callback receives the selected
+predictor invocation plus example, program result, metric result, and trace,
+and must return non-empty feedback text; a mismatch or callback failure stops
+optimization. The AIME, LiveBenchMath, and Papillon rows currently rely on
+metric-level feedback rather than a custom component map. Campaign metadata
+records the installed component-feedback identity.
+
 For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
---from-gepa-artifact ... --dsex-input ...` to convert upstream GEPA artifact
+--from-gepa-artifact ... --upstream-evidence ... --dsex-input ...` to convert upstream GEPA artifact
 `Baseline`, `GEPA`, and `MIPROv2-Heavy` outputs into dashboard rows. The
 `--dsex-input` file must come from DSEx's own GEPA run and provide the
 `dsex_gepa` result plus provenance fields; the converter does not synthesize
@@ -300,14 +322,14 @@ DSEx ports AIME integer exact match, HotPotQA answer exact match, HoVer
 supporting-title retrieval, IFBench IFEval-style constraints, Papillon LLM-judge
 quality/leakage scoring, and the deterministic LiveBenchMath AMC/AIME parser
 paths plus `imo`/`usamo` proof-rearrangement edit-distance scoring. GEPA
-HoVer rows must carry `dataset.retrieval` provenance for the upstream
-`wiki.abstracts.2017` BM25 corpus/index checksums; generic `retrieved_docs`
-predictions without that provenance are rejected for research campaign rows, and
-DSEx uses LM-generated multi-hop queries for those rows. The native Elixir BM25
-retriever is an explicitly labeled approximation because it does not reproduce
-the upstream English stopword tokenizer or PyStemmer stemming. Source-exact
-campaigns use the pinned upstream Python BM25S index. Validate its fixed top-k
-title fixtures in a GEPA source checkout at commit
+HotPot and HoVer rows must carry provenance for the same upstream
+`wiki.abstracts.2017` BM25 corpus/index checksums. The campaign task requires
+`DSEX_HOVER_UPSTREAM_BM25=1` for either family and executes both through the
+pinned upstream Python BM25S index; generic retrieved-document outputs or the
+native Elixir BM25 approximation cannot satisfy source-exact campaign evidence.
+The native implementation does not reproduce the upstream English stopword
+tokenizer or PyStemmer stemming. Validate fixed top-k title fixtures in a GEPA
+source checkout at commit
 `cbefbc1aa0f43dd39874ec4bf42211365dbda42e` with
 `DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs` after
 setting `DSEX_GEPA_PYTHON` to an environment with `bm25s==0.2.12` and
@@ -317,11 +339,25 @@ checks in Elixir and keeps unknown ids fail-closed. Four IFBench NLP-dependent
 checks have native deterministic fallbacks plus a source-exact Python bridge for
 research campaigns. The source-checkout differential covers all 83 active
 merged-registry ids and passes against the pinned GEPA artifact, including
-language detection and NLP-backed checks. Papillon campaigns must pass a judge
-LM and include `metric_judge` provenance in research rows.
+language detection and NLP-backed checks. Full IFBench GEPA runs additionally
+require `DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1`, `DSEX_GEPA_ROOT`, and
+`DSEX_GEPA_PYTHON`; the Elixir scorer remains native while reflective feedback
+uses the pinned upstream registry's exact human descriptions. Papillon campaigns
+must pass a judge LM and include `metric_judge` provenance in research rows.
 LiveBenchMath `amps_hard` is guarded by the SymPy/Lark symbolic bridge and must
 be validated in the research campaign Python environment before claiming
 AMPS_Hard parity.
+
+Upstream comparator evidence is an archive-derived sidecar, not a manually
+completed dashboard field. Run `scripts/extract_gepa_upstream_evidence.py` with
+the immutable `experiment_runs_data` archive, the matching GEPA artifact
+checkout, selected model, and an output path. The extractor requires all six
+family/program pairs and `Baseline`, `GEPA`, and `MIPROv2-Heavy` seed-0 runs;
+records archive and source identities; reads run configuration, metric JSONL,
+and `evaluation_result.txt`; and derives observed optimizer callbacks by
+subtracting Baseline final-test callbacks. The replication converter requires
+that sidecar, validates its exact key set and the result-file score/SHA-256, and
+rejects configured-only budgets, missing enforcement, and test-selected seeds.
 
 Pass condition:
 

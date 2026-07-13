@@ -97,6 +97,45 @@ defmodule GepaMetricsTest do
     assert metric.(example, DSEx.prediction(response: "alpha beta [name]\n* one\ndone")) == 0.6
   end
 
+  test "IFBench reflective metric uses pinned upstream instruction descriptions" do
+    bridge =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-ifbench-description-#{System.unique_integer([:positive])}.sh"
+      )
+
+    File.write!(
+      bridge,
+      "#!/bin/sh\nprintf '%s\\n' '{\"descriptions\":[\"Include alpha.\",\"Do not use commas.\"]}'\n"
+    )
+
+    on_exit(fn -> File.rm(bridge) end)
+
+    metric =
+      DSEx.BenchmarkTruth.GepaMetrics.metric_with_feedback(
+        %{"upstream_metric" => "IFBench.ifbench_metric.metric"},
+        upstream_descriptions: true,
+        gepa_root: System.tmp_dir!(),
+        python: "sh",
+        ifbench_description_bridge: bridge
+      )
+
+    example =
+      DSEx.example(
+        prompt: "Use alpha without commas.",
+        instruction_id_list: ["keywords:existence", "punctuation:no_comma"],
+        kwargs: [%{"keywords" => ["alpha"]}, %{}]
+      )
+      |> DSEx.with_inputs(:prompt)
+
+    result = metric.(example, DSEx.prediction(response: "alpha"))
+
+    assert result.score == 1.0
+    assert result.feedback =~ "Include alpha."
+    assert result.feedback =~ "Do not use commas."
+    refute result.feedback =~ "keywords:existence"
+  end
+
   test "IFBench metric applies upstream response variants before checking constraints" do
     metric =
       DSEx.BenchmarkTruth.GepaMetrics.metric(%{

@@ -10,15 +10,20 @@ defmodule DSEx.Optimizer.GEPA do
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of `DSEx.Optimizer.GEPA.Callback`. Hooks are
   synchronous and observational; failures are isolated from optimization.
+
+  `:component_feedback` maps predictor names to strict arity-one callbacks.
+  These callbacks shape reflective minibatches and are part of optimization;
+  invalid names, invalid output, and callback failures stop the run.
   """
 
-  alias DSEx.Optimizer.GEPA.{Callback, Candidate, Engine, ProgramAdapter}
+  alias DSEx.Optimizer.GEPA.{Callback, Candidate, ComponentFeedback, Engine, ProgramAdapter}
   alias DSEx.Optimizer.Report
 
   defstruct [
     :metric,
     :reflection_lm,
     callbacks: [],
+    component_feedback: %{},
     feedback_fn: nil,
     generations: 4,
     max_concurrency: 1,
@@ -38,6 +43,7 @@ defmodule DSEx.Optimizer.GEPA do
 
   @option_schema [
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
+    component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4],
     max_concurrency: [type: :pos_integer, default: 1],
@@ -74,6 +80,7 @@ defmodule DSEx.Optimizer.GEPA do
     %__MODULE__{
       metric: metric,
       callbacks: opts[:callbacks],
+      component_feedback: opts[:component_feedback],
       feedback_fn: opts[:feedback_fn],
       generations: opts[:generations],
       max_concurrency: opts[:max_concurrency],
@@ -107,7 +114,10 @@ defmodule DSEx.Optimizer.GEPA do
     seed_candidate = Candidate.from_program(program)
 
     adapter =
-      ProgramAdapter.new(program, optimizer.metric, max_concurrency: optimizer.max_concurrency)
+      ProgramAdapter.new(program, optimizer.metric,
+        max_concurrency: optimizer.max_concurrency,
+        component_feedback: optimizer.component_feedback
+      )
 
     engine_opts =
       [
@@ -153,6 +163,7 @@ defmodule DSEx.Optimizer.GEPA do
         errors: errors,
         metadata: %{
           feedback: feedback,
+          component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
           generations: optimizer.generations,
           max_concurrency: optimizer.max_concurrency,
           implementation: DSEx.Optimize.GEPA,

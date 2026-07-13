@@ -198,7 +198,8 @@ defmodule DSEx.BenchmarkTruth.GepaReplicationContract do
 
   defp present_field?(row, field, _mode), do: concrete_source?(row[field])
 
-  defp research_retrieval_valid?(%{"family" => "hoverBench"}, dataset) do
+  defp research_retrieval_valid?(%{"family" => family}, dataset)
+       when family in ["HotpotQABench", "hoverBench"] do
     retrieval = dataset["retrieval"]
 
     is_map(retrieval) and retrieval["verified"] == true and

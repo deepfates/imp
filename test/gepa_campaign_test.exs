@@ -1,7 +1,7 @@
 defmodule GepaCampaignTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.{GepaCampaign, GepaReplicationContract}
+  alias DSEx.BenchmarkTruth.{GepaCampaign, GepaReplicationContract, HoverBM25}
 
   defmodule OptimizerConfigCallback do
     @behaviour DSEx.Optimizer.GEPA.Callback
@@ -22,7 +22,7 @@ defmodule GepaCampaignTest do
     write_upstream_gepa_results!(upstream_dir, "gpt-41-mini")
 
     result =
-      DSEx.BenchmarkTruth.GepaCampaign.run(
+      GepaCampaign.run(
         dataset_root: dataset_root,
         campaign_id: "gepa-campaign-test",
         model: "openai:gpt-4.1-mini-2025-04-14",
@@ -59,6 +59,10 @@ defmodule GepaCampaignTest do
            end)
 
     hover = Enum.find(rows, &(&1["family"] == "hoverBench"))
+    hotpot = Enum.find(rows, &(&1["family"] == "HotpotQABench"))
+    assert get_in(hotpot, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
+    assert get_in(hotpot, ["dataset", "retrieval", "verified"]) == true
+    assert get_in(hotpot, ["dataset", "retrieval", "implementation"]) == "dsex_local_bm25"
     assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
     assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
     assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
@@ -66,9 +70,30 @@ defmodule GepaCampaignTest do
     assert get_in(hover, ["dataset", "retrieval", "implementation"]) == "dsex_local_bm25"
     assert get_in(hover, ["results", "dsex_gepa", "score"]) == 1.0
 
+    assert get_in(hotpot, ["metadata", "component_feedback", "components"]) == [
+             "create_query_hop2",
+             "final_answer",
+             "summarize1",
+             "summarize2"
+           ]
+
+    assert get_in(hover, ["metadata", "component_feedback", "components"]) == [
+             "create_query_hop2",
+             "create_query_hop3",
+             "summarize1",
+             "summarize2"
+           ]
+
+    ifbench = Enum.find(rows, &(&1["family"] == "IFBench"))
+
+    assert get_in(ifbench, ["metadata", "component_feedback", "components"]) == [
+             "ensure_correct_response_module",
+             "generate_response_module"
+           ]
+
     Mix.Task.reenable("dsex.benchmark.gepa_replication")
 
-    assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
+    assert_raise Mix.Error, ~r/requires --upstream-evidence/, fn ->
       Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
         "--from-gepa-artifact",
         upstream_dir,
@@ -83,11 +108,7 @@ defmodule GepaCampaignTest do
       ])
     end
 
-    [path] = Path.wildcard(Path.join(final_dir, "gepa-replication-*.json"))
-    artifact = path |> File.read!() |> Jason.decode!()
-
-    refute artifact["summary"]["full_gepa_replication"]
-    refute DSEx.BenchmarkTruth.GepaReplicationContract.full_artifact?(artifact)
+    assert Path.wildcard(Path.join(final_dir, "gepa-replication-*.json")) == []
   end
 
   test "DSEx GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
@@ -113,7 +134,7 @@ defmodule GepaCampaignTest do
     assert_raise ArgumentError,
                  ~r/hoverBench row requires source-exact BM25\/wiki retrieval provenance/,
                  fn ->
-                   DSEx.BenchmarkTruth.GepaCampaign.run(
+                   GepaCampaign.run(
                      dataset_root: dataset_root,
                      campaign_id: "gepa-campaign-hover-missing-retrieval",
                      model: "openai:gpt-4.1-mini-2025-04-14",
@@ -140,7 +161,7 @@ defmodule GepaCampaignTest do
     write_dataset_root!(dataset_root)
 
     result =
-      DSEx.BenchmarkTruth.GepaCampaign.run(
+      GepaCampaign.run(
         dataset_root: dataset_root,
         campaign_id: "gepa-campaign-partial-test",
         model: "openai:gpt-4.1-mini-2025-04-14",
@@ -184,7 +205,7 @@ defmodule GepaCampaignTest do
       )
 
     assert_raise ArgumentError, ~r/require token_cost keyed by family and seed/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+      GepaCampaign.run(opts)
     end
   end
 
@@ -194,7 +215,7 @@ defmodule GepaCampaignTest do
     write_dataset_root!(dataset_root)
 
     assert_raise ArgumentError, ~r/unknown DSEx GEPA campaign families: MissingBench/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(
+      GepaCampaign.run(
         dataset_root: dataset_root,
         campaign_id: "gepa-campaign-unknown-family-test",
         model: "openai:gpt-4.1-mini-2025-04-14",
@@ -236,11 +257,11 @@ defmodule GepaCampaignTest do
         reporter: &send(events, &1)
       )
 
-    first = DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    first = GepaCampaign.run(opts)
     first_calls = Agent.get(calls, & &1)
     assert first_calls > 0
 
-    second = DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    second = GepaCampaign.run(opts)
     assert Agent.get(calls, & &1) == first_calls
     assert first.report["rows"] == second.report["rows"]
     assert_received %{event: :seed_resumed, family: "AIMEBench", seed: 0}
@@ -262,7 +283,7 @@ defmodule GepaCampaignTest do
         generations: 2
       )
 
-    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    GepaCampaign.run(opts)
 
     [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
     checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
@@ -336,7 +357,7 @@ defmodule GepaCampaignTest do
         static_gold_handler(messages, handler_opts)
       end)
 
-    result = opts |> Keyword.put(:lm, usage_lm) |> DSEx.BenchmarkTruth.GepaCampaign.run()
+    result = opts |> Keyword.put(:lm, usage_lm) |> GepaCampaign.run()
 
     assert [
              %{
@@ -362,16 +383,14 @@ defmodule GepaCampaignTest do
     write_dataset_root!(dataset_root)
 
     opts = campaign_opts(dataset_root, rows_dir, campaign_id: "gepa-checkpoint-identity")
-    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    GepaCampaign.run(opts)
 
     assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(Keyword.put(opts, :generations, 2))
+      GepaCampaign.run(Keyword.put(opts, :generations, 2))
     end
 
     assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(
-        Keyword.put(opts, :execution, %{"lm" => %{"max_tokens" => 512}})
-      )
+      GepaCampaign.run(Keyword.put(opts, :execution, %{"lm" => %{"max_tokens" => 512}}))
     end
 
     [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
@@ -385,7 +404,18 @@ defmodule GepaCampaignTest do
     File.write!(checkpoint_path, Jason.encode!(malformed))
 
     assert_raise ArgumentError, ~r/duplicate seed entries in GEPA checkpoint/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+      GepaCampaign.run(opts)
+    end
+
+    missing_feedback =
+      update_in(checkpoint, ["completed", Access.at(0), "result"], fn result ->
+        Map.delete(result, "component_feedback")
+      end)
+
+    File.write!(checkpoint_path, Jason.encode!(missing_feedback))
+
+    assert_raise ArgumentError, ~r/invalid seed entry in GEPA checkpoint/, fn ->
+      GepaCampaign.run(opts)
     end
 
     File.write!(checkpoint_path, Jason.encode!(checkpoint))
@@ -396,7 +426,7 @@ defmodule GepaCampaignTest do
     )
 
     assert_raise ArgumentError, ~r/checkpoint configuration or dataset identity mismatch/, fn ->
-      DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+      GepaCampaign.run(opts)
     end
   end
 
@@ -472,7 +502,7 @@ defmodule GepaCampaignTest do
         token_cost: explicit_costs(["AIMEBench"], [10, 20])
       )
 
-    DSEx.BenchmarkTruth.GepaCampaign.run(opts)
+    GepaCampaign.run(opts)
     [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
 
     checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
@@ -490,7 +520,7 @@ defmodule GepaCampaignTest do
 
     File.write!(checkpoint_path, Jason.encode!(%{checkpoint | "completed" => completed}))
 
-    [row] = DSEx.BenchmarkTruth.GepaCampaign.run(opts).report["rows"]
+    [row] = GepaCampaign.run(opts).report["rows"]
 
     assert get_in(row, ["results", "dsex_gepa", "seed"]) == 10
     assert get_in(row, ["results", "dsex_gepa", "score"]) == 0.1
@@ -518,7 +548,7 @@ defmodule GepaCampaignTest do
     rows =
       Enum.map(GepaReplicationContract.required_families(), fn family ->
         dataset =
-          if family == "hoverBench" do
+          if family in ["HotpotQABench", "hoverBench"] do
             put_in(dsex_row["dataset"], ["retrieval"], %{
               "verified" => true,
               "implementation" => "upstream_python_bm25s",
@@ -559,14 +589,19 @@ defmodule GepaCampaignTest do
   defp static_gold_handler(messages, _opts) do
     prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
 
-    cond do
-      prompt =~ "num_pii_leaked" -> %{reasoning: "No PII leaked.", num_pii_leaked: 0}
-      prompt =~ "judgment" -> %{reasoning: "Response A is good enough.", judgment: true}
-      prompt =~ "llm_request" -> %{llm_request: "redacted request", response: "gold"}
-      prompt =~ "retrieved_docs" -> %{retrieved_docs: ["gold | supporting document"]}
-      prompt =~ "response" -> %{response: "gold"}
-      true -> %{answer: "42"}
-    end
+    [
+      {"num_pii_leaked", %{reasoning: "No PII leaked.", num_pii_leaked: 0}},
+      {"judgment", %{reasoning: "Response A is good enough.", judgment: true}},
+      {"llm_request", %{llm_request: "redacted request", response: "gold"}},
+      {"retrieved_docs", %{retrieved_docs: ["gold | supporting document"]}},
+      {"[[ ## summary ## ]]", %{reasoning: "Summarized.", summary: "gold evidence"}},
+      {"[[ ## query ## ]]", %{reasoning: "Find the gold evidence.", query: "gold"}},
+      {"[[ ## answer ## ]]", %{reasoning: "Solved.", answer: "42"}},
+      {"response", %{response: "gold"}}
+    ]
+    |> Enum.find_value(%{reasoning: "Completed.", answer: "42"}, fn {marker, response} ->
+      if String.contains?(prompt, marker), do: response
+    end)
   end
 
   defp campaign_opts(dataset_root, rows_dir, overrides) do
@@ -714,7 +749,12 @@ defmodule GepaCampaignTest do
   end
 
   defp campaign_record("HotpotQABench", split, index) do
-    Jason.encode!(%{question: "HotpotQABench #{split} question #{index}", answer: "42"})
+    Jason.encode!(%{
+      question: "HotpotQABench #{split} question #{index}",
+      answer: "42",
+      supporting_facts: %{title: ["gold"], sent_id: [0]},
+      context: %{title: ["gold"], sentences: [["supporting document"]]}
+    })
   end
 
   defp campaign_record("IFBench", split, index) do
@@ -752,16 +792,47 @@ defmodule GepaCampaignTest do
     }
   end
 
-  defp campaign_contract("HotpotQABench", _family_dir) do
+  defp campaign_contract("HotpotQABench", family_dir) do
     %{
       signature: "question -> answer",
       input_keys: ["question"],
       output_key: "answer",
-      upstream_metric: "dspy.evaluate.answer_exact_match"
+      upstream_metric: "dspy.evaluate.answer_exact_match",
+      retrieval: write_retrieval_fixture!(family_dir)
     }
   end
 
   defp campaign_contract("hoverBench", family_dir) do
+    retrieval = write_retrieval_fixture!(family_dir)
+
+    %{
+      signature: "claim -> retrieved_docs",
+      input_keys: ["claim"],
+      output_key: "retrieved_docs",
+      upstream_metric: "hover_utils.discrete_retrieval_eval",
+      retrieval: retrieval
+    }
+  end
+
+  defp campaign_contract("IFBench", _family_dir) do
+    %{
+      signature: "prompt -> response",
+      input_keys: ["prompt"],
+      output_key: "response",
+      upstream_metric: "IFBench.ifbench_metric.metric"
+    }
+  end
+
+  defp campaign_contract("LiveBenchMathBench", _family_dir) do
+    %{
+      signature: "question -> answer",
+      input_keys: ["question"],
+      output_key: "answer",
+      upstream_metric: "livebench_math.calculate_livebench_score"
+    }
+  end
+
+  defp write_retrieval_fixture!(family_dir) do
     corpus_path = Path.join(family_dir, "wiki.abstracts.2017.jsonl")
     index_dir = Path.join(family_dir, "bm25s_retriever")
     File.mkdir_p!(index_dir)
@@ -781,39 +852,13 @@ defmodule GepaCampaignTest do
     File.write!(Path.join(index_dir, "params.json"), Jason.encode!(%{k1: 0.9, b: 0.4}))
 
     %{
-      signature: "claim -> retrieved_docs",
-      input_keys: ["claim"],
-      output_key: "retrieved_docs",
-      upstream_metric: "hover_utils.discrete_retrieval_eval",
-      retrieval: %{
-        "kind" => "bm25s_wiki_abstracts_2017",
-        "status" => "present",
-        "source_url" =>
-          "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
-        "corpus_path" => corpus_path,
-        "index_path" => index_dir,
-        "corpus_checksum" =>
-          "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(corpus_path),
-        "index_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(index_dir)
-      }
-    }
-  end
-
-  defp campaign_contract("IFBench", _family_dir) do
-    %{
-      signature: "prompt -> response",
-      input_keys: ["prompt"],
-      output_key: "response",
-      upstream_metric: "IFBench.ifbench_metric.metric"
-    }
-  end
-
-  defp campaign_contract("LiveBenchMathBench", _family_dir) do
-    %{
-      signature: "question -> answer",
-      input_keys: ["question"],
-      output_key: "answer",
-      upstream_metric: "livebench_math.calculate_livebench_score"
+      "kind" => "bm25s_wiki_abstracts_2017",
+      "status" => "present",
+      "source_url" => "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
+      "corpus_path" => corpus_path,
+      "index_path" => index_dir,
+      "corpus_checksum" => "sha256:" <> HoverBM25.checksum_path(corpus_path),
+      "index_checksum" => "sha256:" <> HoverBM25.checksum_path(index_dir)
     }
   end
 

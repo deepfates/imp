@@ -79,7 +79,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       )
 
     families = parse_families(Keyword.get(opts, :families))
-    require_upstream_hover!(families)
+    require_upstream_bm25!(families)
+    require_upstream_ifbench_descriptions!(families)
 
     result =
       DSEx.BenchmarkTruth.GepaCampaign.run(
@@ -163,16 +164,40 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         "hover_upstream_bm25" => truthy_env?("DSEX_HOVER_UPSTREAM_BM25"),
         "python" => System.get_env("DSEX_GEPA_PYTHON"),
         "gepa_root" => System.get_env("DSEX_GEPA_ROOT")
+      },
+      "ifbench" => %{
+        "upstream_descriptions" => truthy_env?("DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS")
       }
     }
   end
 
   defp truthy_env?(name), do: System.get_env(name) in ["1", "true", "TRUE", "yes"]
 
-  defp require_upstream_hover!(families) do
-    if "hoverBench" in families and not truthy_env?("DSEX_HOVER_UPSTREAM_BM25") do
+  defp require_upstream_bm25!(families) do
+    retrieval_families = Enum.filter(families, &(&1 in ["HotpotQABench", "hoverBench"]))
+
+    if retrieval_families != [] and not truthy_env?("DSEX_HOVER_UPSTREAM_BM25") do
       Mix.raise(
-        "full HoVer GEPA campaigns require DSEX_HOVER_UPSTREAM_BM25=1 for source-exact upstream BM25S retrieval"
+        "HotPotQA and HoVer GEPA campaigns require DSEX_HOVER_UPSTREAM_BM25=1 for source-exact upstream BM25S retrieval"
+      )
+    end
+  end
+
+  defp require_upstream_ifbench_descriptions!(families) do
+    if "IFBench" in families and
+         not truthy_env?("DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS") do
+      Mix.raise(
+        "IFBench GEPA campaigns require DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1 for source-exact reflective feedback"
+      )
+    end
+
+    if "IFBench" in families and not File.dir?(System.get_env("DSEX_GEPA_ROOT") || "") do
+      Mix.raise("IFBench GEPA campaigns require DSEX_GEPA_ROOT to name the pinned checkout")
+    end
+
+    if "IFBench" in families and is_nil(System.get_env("DSEX_GEPA_PYTHON")) do
+      Mix.raise(
+        "IFBench GEPA campaigns require DSEX_GEPA_PYTHON to name the pinned research interpreter"
       )
     end
   end

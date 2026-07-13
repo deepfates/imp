@@ -3,24 +3,31 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
 
   @behaviour DSEx.Optimizer.GEPA.Adapter
 
-  alias DSEx.Optimizer.GEPA.{Candidate, Result}
+  alias DSEx.Optimizer.GEPA.{Candidate, ComponentFeedback, Result}
   alias DSEx.Optimizer.TrajectoryRunner
 
   @enforce_keys [:program, :metric]
-  defstruct [:program, :metric, max_concurrency: 1, timeout: 30_000]
+  defstruct [:program, :metric, component_feedback: %{}, max_concurrency: 1, timeout: 30_000]
 
   @type t :: %__MODULE__{
           program: struct(),
           metric: function(),
+          component_feedback: %{optional(atom()) => ComponentFeedback.callback()},
           max_concurrency: pos_integer(),
           timeout: timeout()
         }
 
   @spec new(struct(), function(), keyword()) :: t()
   def new(program, metric, opts \\ []) do
+    component_feedback =
+      opts
+      |> Keyword.get(:component_feedback)
+      |> validate_component_feedback!(program)
+
     %__MODULE__{
       program: program,
       metric: metric,
+      component_feedback: component_feedback,
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       timeout: Keyword.get(opts, :timeout, 30_000)
     }
@@ -49,7 +56,13 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
 
     Result.new(outputs, scores,
       trajectories: component_trajectories,
-      side_information: side_information(trajectories, components),
+      side_information:
+        side_information(
+          trajectories,
+          components,
+          adapter.component_feedback,
+          Keyword.get(opts, :capture_traces, false)
+        ),
       metadata: %{
         metric_calls: length(trajectories),
         failures: Enum.count(trajectories, &(not is_nil(&1.error)))
@@ -77,7 +90,7 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
     end)
   end
 
-  defp side_information(trajectories, components) do
+  defp side_information(trajectories, components, callbacks, capture_traces?) do
     single_component? = length(components) == 1
 
     Map.new(components, fn component ->
@@ -88,7 +101,12 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
               trajectory.error
 
             single_component? or component_visited?(trajectory, component) ->
-              trajectory.feedback || metric_feedback(trajectory)
+              component_feedback(
+                trajectory,
+                component,
+                callbacks,
+                capture_traces?
+              )
 
             true ->
               nil
@@ -108,8 +126,57 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
 
   defp component_visited?(_trajectory, _component), do: false
 
+  defp component_feedback(trajectory, component, callbacks, true) do
+    case Map.fetch(callbacks, component) do
+      {:ok, callback} ->
+        step = fetch_component_step!(trajectory.trace, component)
+
+        ComponentFeedback.feedback!(callback, %ComponentFeedback{
+          component: component,
+          predictor_inputs: step.inputs,
+          predictor_output: step.outputs,
+          example: trajectory.example,
+          program_output: trajectory.prediction,
+          trace: trajectory.trace,
+          score: trajectory.score,
+          metric_feedback: trajectory.feedback,
+          metric_metadata: trajectory.metric_metadata
+        })
+
+      :error ->
+        trajectory.feedback || metric_feedback(trajectory)
+    end
+  end
+
+  defp component_feedback(trajectory, _component, _callbacks, _capture_traces?),
+    do: trajectory.feedback || metric_feedback(trajectory)
+
+  defp fetch_component_step!(trace, component) do
+    Enum.find(trace, &match?(%{predictor: ^component}, &1)) ||
+      raise RuntimeError,
+            "GEPA component feedback trace is missing predictor #{inspect(component)}"
+  end
+
   defp metric_feedback(%{score: score}) when score > 0, do: :successful
   defp metric_feedback(_trajectory), do: :improve
+
+  defp validate_component_feedback!(callbacks, program) do
+    case ComponentFeedback.validate(callbacks) do
+      {:ok, callbacks} ->
+        known = program |> DSEx.ProgramParameters.predictors() |> MapSet.new(& &1.name)
+        unknown = callbacks |> Map.keys() |> Enum.reject(&MapSet.member?(known, &1))
+
+        if unknown == [] do
+          callbacks
+        else
+          raise ArgumentError,
+                "GEPA component feedback names unknown predictors: #{inspect(unknown)}"
+        end
+
+      {:error, message} ->
+        raise ArgumentError, "invalid GEPA component feedback: #{message}"
+    end
+  end
 
   defp reflection_record(trajectory, feedback) do
     %{
