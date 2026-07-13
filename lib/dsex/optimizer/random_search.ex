@@ -6,7 +6,9 @@ defmodule DSEx.Optimizer.RandomSearch do
   about: sample candidate demo sets from the train set, evaluate each candidate
   on the dev set, and attach a report to the best program. The original
   program is always evaluated as a baseline so random sampling cannot silently
-  regress a working program.
+  regress a working program. Sampling uses explicit optimizer-local RNG state;
+  `:seed` defaults to `0`, and the final replayable policy checkpoint is stored
+  in the optimizer report.
 
   ## Example
 
@@ -38,11 +40,15 @@ defmodule DSEx.Optimizer.RandomSearch do
   search loop.
   """
 
-  defstruct [:metric, candidates: 8, demos_per_candidate: 4]
+  alias DSEx.Optimizer.SearchPolicy
+  alias DSEx.Optimizer.SearchPolicy.Sampling
+
+  defstruct [:metric, candidates: 8, demos_per_candidate: 4, seed: 0]
 
   @option_schema [
     candidates: [type: :non_neg_integer, default: 8],
-    demos_per_candidate: [type: :non_neg_integer, default: 4]
+    demos_per_candidate: [type: :non_neg_integer, default: 4],
+    seed: [type: :integer, default: 0]
   ]
 
   def new(metric, opts \\ []) do
@@ -58,23 +64,33 @@ defmodule DSEx.Optimizer.RandomSearch do
     %__MODULE__{
       metric: metric,
       candidates: opts[:candidates],
-      demos_per_candidate: opts[:demos_per_candidate]
+      demos_per_candidate: opts[:demos_per_candidate],
+      seed: opts[:seed]
     }
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    {sampled_results, baseline_result} =
+    policy = SearchPolicy.new(Sampling, seed: optimizer.seed)
+
+    {sampled_results, baseline_result, policy} =
       case new_evaluator(devset, optimizer.metric) do
         {:ok, evaluator} ->
-          sampled_results =
+          {sampled_results, policy} =
             optimizer.candidates
             |> candidate_indices()
-            |> Enum.map(
-              &build_and_evaluate_candidate(&1, evaluator, program, trainset, optimizer)
-            )
+            |> Enum.map_reduce(policy, fn index, policy ->
+              build_and_evaluate_candidate(
+                index,
+                evaluator,
+                program,
+                trainset,
+                optimizer,
+                policy
+              )
+            end)
 
           {sampled_results,
-           evaluate_candidate(evaluator, program, %{index: :baseline, demos: []})}
+           evaluate_candidate(evaluator, program, %{index: :baseline, demos: []}), policy}
 
         {:error, error} ->
           sampled_results =
@@ -82,11 +98,20 @@ defmodule DSEx.Optimizer.RandomSearch do
             |> candidate_indices()
             |> Enum.map(fn index -> {:error, error, %{index: index, demos: []}} end)
 
-          {sampled_results, {:error, error, %{index: :baseline, demos: []}}}
+          {sampled_results, {:error, error, %{index: :baseline, demos: []}}, policy}
       end
 
     {best_score, best, report_candidates, errors, metadata} =
       summarize(sampled_results ++ [baseline_result], program)
+
+    policy_dump = SearchPolicy.dump(policy)
+
+    metadata =
+      Map.merge(metadata, %{
+        search_policy_id: policy_dump["policy"],
+        seed: optimizer.seed,
+        search_policy: policy_dump
+      })
 
     best
     |> DSEx.Optimizer.Report.attach(
@@ -109,8 +134,16 @@ defmodule DSEx.Optimizer.RandomSearch do
     kind, reason -> {:error, {kind, reason}}
   end
 
-  defp build_and_evaluate_candidate(index, evaluator, program, trainset, optimizer) do
-    demos = trainset |> Enum.shuffle() |> Enum.take(optimizer.demos_per_candidate)
+  defp build_and_evaluate_candidate(
+         index,
+         evaluator,
+         program,
+         trainset,
+         optimizer,
+         policy
+       ) do
+    {shuffled, policy} = SearchPolicy.suggest(policy, {:shuffle, Enum.to_list(trainset)})
+    demos = Enum.take(shuffled, optimizer.demos_per_candidate)
 
     candidate =
       DSEx.Optimizer.LabeledFewShot.compile(
@@ -119,11 +152,11 @@ defmodule DSEx.Optimizer.RandomSearch do
         demos
       )
 
-    evaluate_candidate(evaluator, candidate, %{index: index, demos: demos})
+    {evaluate_candidate(evaluator, candidate, %{index: index, demos: demos}), policy}
   rescue
-    error -> {:error, error, %{index: index, demos: []}}
+    error -> {{:error, error, %{index: index, demos: []}}, policy}
   catch
-    kind, reason -> {:error, {kind, reason}, %{index: index, demos: []}}
+    kind, reason -> {{:error, {kind, reason}, %{index: index, demos: []}}, policy}
   end
 
   defp evaluate_candidate(evaluator, candidate, metadata) do
