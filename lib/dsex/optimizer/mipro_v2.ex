@@ -143,6 +143,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
 
     {demo_candidates, bootstrap_metadata} =
       DemoCandidates.build(program, config.trainset, optimizer.metric,
+        runtime: :mipro_v2,
         candidate_count: config.num_fewshot_candidates,
         max_bootstrapped_demos: bootstrap_demo_limit(config),
         max_labeled_demos: config.max_labeled_demos,

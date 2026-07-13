@@ -415,6 +415,7 @@ defmodule DSEx.Optimize.Anything.Adapter do
 
   defp trajectory(index, example, candidate, score, side_info, objectives, error) do
     %Trajectory{
+      runtime: :optimize_anything,
       index: index,
       example: DSEx.Redaction.redact(example),
       prediction: DSEx.Redaction.redact(candidate),

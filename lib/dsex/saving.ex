@@ -7,6 +7,8 @@ defmodule DSEx.Saving do
   credentials from disk.
   """
 
+  alias DSEx.Optimizer.Trajectory
+
   @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
   @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k"]
   @program_of_thought_required_keys ["type", "signature", "predict", "output_field"]
@@ -242,6 +244,8 @@ defmodule DSEx.Saving do
       "deterministic" => program.ensemble.deterministic
     }
   end
+
+  def dump(%Trajectory{} = trajectory), do: Trajectory.dump(trajectory)
 
   def dump(%DSEx.Agent{} = agent) do
     %{
@@ -576,6 +580,9 @@ defmodule DSEx.Saving do
       tool_policy: load_tool_policy!(state["tool_policy"], "agent #{name} tool policy")
     )
   end
+
+  def load(%{"type" => "dsex_optimizer_trajectory"} = state),
+    do: Trajectory.load!(state)
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved DSEx program type: #{inspect(type)}"

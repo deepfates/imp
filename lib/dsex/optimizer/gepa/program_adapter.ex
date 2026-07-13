@@ -34,6 +34,7 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
       TrajectoryRunner.run(program, batch, adapter.metric,
         max_concurrency: adapter.max_concurrency,
         timeout: adapter.timeout,
+        runtime: :gepa,
         program_id: candidate_id(candidate)
       )
 

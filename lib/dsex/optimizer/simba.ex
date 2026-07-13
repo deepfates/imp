@@ -207,7 +207,8 @@ defmodule DSEx.Optimizer.SIMBA do
         trajectories =
           TrajectoryRunner.run(finalist, final_set, optimizer.metric,
             max_concurrency: optimizer.max_concurrency,
-            timeout: optimizer.timeout
+            timeout: optimizer.timeout,
+            runtime: :simba
           )
 
         scored = %{
@@ -362,6 +363,7 @@ defmodule DSEx.Optimizer.SIMBA do
             TrajectoryRunner.run(job.program, [job.example], optimizer.metric,
               max_concurrency: 1,
               timeout: optimizer.timeout,
+              runtime: :simba,
               program_id: job.source_id,
               rollout_id: job.rollout_id
             )
@@ -451,7 +453,8 @@ defmodule DSEx.Optimizer.SIMBA do
       trajectories =
         TrajectoryRunner.run(candidate.program, examples, optimizer.metric,
           max_concurrency: optimizer.max_concurrency,
-          timeout: optimizer.timeout
+          timeout: optimizer.timeout,
+          runtime: :simba
         )
 
       scores = Enum.map(trajectories, & &1.score)

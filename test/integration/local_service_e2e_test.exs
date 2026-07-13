@@ -161,7 +161,11 @@ defmodule LocalServiceE2ETest do
   end
 
   test "stdio MCP client discovers and calls a trusted local executable" do
-    script = Path.join(System.tmp_dir!(), "dsex-mcp-#{System.unique_integer([:positive])}.exs")
+    script =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-mcp-#{System.unique_integer([:positive, :monotonic])}-#{System.system_time(:nanosecond)}.exs"
+      )
 
     File.write!(script, """
     Enum.each(IO.stream(:stdio, :line), fn line ->
@@ -185,8 +189,11 @@ defmodule LocalServiceE2ETest do
     on_exit(fn -> File.rm(script) end)
 
     [tool] =
-      System.find_executable("mix")
-      |> DSEx.MCP.StdioClient.new(args: ["run", script], timeout: 15_000)
+      System.find_executable("elixir")
+      |> DSEx.MCP.StdioClient.new(
+        args: ["-pa", Path.join([Mix.Project.build_path(), "lib", "jason", "ebin"]), script],
+        timeout: 15_000
+      )
       |> DSEx.MCP.import_tools()
 
     assert tool.name == :echo

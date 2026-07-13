@@ -19,6 +19,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   }
 
   alias DSEx.Optimizer.GEPA.EvaluationCache.Disk, as: DiskEvaluationCache
+  alias DSEx.Optimizer.Trajectory
 
   defmodule Entry do
     @moduledoc false
@@ -1590,14 +1591,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     }
   end
 
-  defp dump_runtime_term(%DSEx.Optimizer.Trajectory{} = trajectory) do
+  defp dump_runtime_term(%Trajectory{} = trajectory) do
     %{
       "__gepa_type__" => "trajectory",
-      "state" =>
-        trajectory
-        |> Map.from_struct()
-        |> Map.update!(:prediction, &dump_runtime_term/1)
-        |> DSEx.Optimizer.Report.json_safe()
+      "state" => Trajectory.dump(trajectory)
     }
   end
 
@@ -1612,9 +1609,13 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp load_runtime_term(%{"__gepa_type__" => "trajectory", "state" => state}) do
-    state = restore(state)
-    state = Map.update!(state, :prediction, &load_runtime_term/1)
-    struct!(DSEx.Optimizer.Trajectory, state)
+    if state["type"] == "dsex_optimizer_trajectory" do
+      Trajectory.load!(state)
+    else
+      state = restore(state)
+      state = Map.update!(state, :prediction, &load_runtime_term/1)
+      struct!(Trajectory, state)
+    end
   end
 
   defp load_runtime_term(term), do: restore(term)

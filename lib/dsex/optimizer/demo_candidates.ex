@@ -24,6 +24,7 @@ defmodule DSEx.Optimizer.DemoCandidates do
           TrajectoryRunner.run(round_teacher, round_trainset, metric,
             max_concurrency: Keyword.get(opts, :max_concurrency, 1),
             timeout: Keyword.get(opts, :timeout, 5_000),
+            runtime: Keyword.get(opts, :runtime, :evaluation),
             rollout_id: index
           )
 

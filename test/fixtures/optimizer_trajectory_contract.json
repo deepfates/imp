@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "runtime": "gepa",
+      "trace": [{"predictor": "answer", "inputs": {"question": "France?"}, "outputs": {"answer": "Paris"}}],
+      "event_kinds": ["module"]
+    },
+    {
+      "runtime": "mipro_v2",
+      "trace": [{"predictor": "instruction", "inputs": {"question": "France?"}, "outputs": {"answer": "Paris"}}],
+      "event_kinds": ["module"]
+    },
+    {
+      "runtime": "simba",
+      "trace": [{"predictor": "main", "inputs": {"question": "France?"}, "outputs": {"reasoning": "geography", "answer": "Paris"}}],
+      "event_kinds": ["module"]
+    },
+    {
+      "runtime": "rlm",
+      "trace": [{"iteration": 0, "action": "run", "input": {"reasoning": "look up", "code": "submit(%{answer: \"Paris\"})"}, "output": {"answer": "Paris"}}],
+      "event_kinds": ["run"]
+    },
+    {
+      "runtime": "react",
+      "trace": [
+        {"tool_call": {"id": "call-1", "name": "lookup", "arguments": {"city": "Paris"}}},
+        {"tool_result": {"id": "call-1", "name": "lookup", "result": "France"}}
+      ],
+      "event_kinds": ["tool_call", "tool_result"]
+    },
+    {
+      "runtime": "agent",
+      "trace": [{"action": "handoff", "component": "researcher", "input": {"question": "France?"}, "output": {"answer": "Paris"}}],
+      "event_kinds": ["handoff"]
+    },
+    {
+      "runtime": "evaluation",
+      "trace": [],
+      "event_kinds": []
+    },
+    {
+      "runtime": "optimize_anything",
+      "trace": [{"action": "evaluate", "input": {"candidate": "v2"}, "output": {"score": 0.75}}],
+      "event_kinds": ["evaluate"]
+    }
+  ]
+}
