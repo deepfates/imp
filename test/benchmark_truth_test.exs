@@ -31,6 +31,18 @@ defmodule BenchmarkTruthTest do
     end
   end
 
+  test "parity runner detects first-side API errors before paired dispatch" do
+    clean = %{"tasks" => [%{"task" => "gsm8k", "errors" => []}]}
+    counted = %{"tasks" => [%{"task" => "gsm8k", "errors" => 2}]}
+    listed = %{"tasks" => [%{"task" => "hotpotqa", "errors" => [%{"reason" => "400"}]}]}
+
+    refute Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(clean)
+    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(counted)
+    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(listed)
+    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(%{"tasks" => [%{"errors" => :bad}]})
+    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(:invalid_report)
+  end
+
   test "fetcher normalizes HuggingFace rows and writes manifests" do
     out_dir = tmp_dir("fetch")
 

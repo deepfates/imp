@@ -103,6 +103,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               out_dir
             )
 
+          ensure_runner_clean!(dsex.report, "DSEx", dsex.out_path)
+
           dspy_path =
             run_dspy!(
               python(opts),
@@ -133,6 +135,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
               campaign_id,
               out_dir
             )
+
+          dspy_report = dspy_path |> File.read!() |> Jason.decode!()
+          ensure_runner_clean!(dspy_report, "DSPy", dspy_path)
 
           dsex =
             run_dsex!(
@@ -168,6 +173,29 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity do
     Mix.shell().info("runner order: #{runner_order}")
     Mix.shell().info("aggregate score delta: #{report["aggregate"]["score_delta"]}")
   end
+
+  @doc false
+  def runner_errors?(report) when is_map(report) do
+    report
+    |> Map.get("tasks", [])
+    |> Enum.any?(fn task -> positive_error_count?(task["errors"]) end)
+  end
+
+  def runner_errors?(_report), do: true
+
+  defp ensure_runner_clean!(report, runtime, path) do
+    if runner_errors?(report) do
+      Mix.raise(
+        "#{runtime} runner produced API/execution errors; skipping the paired runtime. Inspect #{path}"
+      )
+    end
+  end
+
+  defp positive_error_count?(count) when is_integer(count), do: count > 0
+  defp positive_error_count?([_head | _tail]), do: true
+  defp positive_error_count?([]), do: false
+  defp positive_error_count?(nil), do: false
+  defp positive_error_count?(_other), do: true
 
   defp run_dsex!(
          opts,
