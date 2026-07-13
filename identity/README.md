@@ -126,8 +126,8 @@ calling providers. The production model lanes are declared explicitly rather
 than inherited from mutable defaults:
 
 ```text
---profile terra=openai:gpt-5.6-terra
---profile sonnet=anthropic:claude-sonnet-5
+--profile terra=openai_codex:gpt-5.6-terra
+--profile sonnet=openrouter:anthropic/claude-sonnet-5
 --profile flash=openrouter:google/gemini-3.5-flash
 ```
 

@@ -3,12 +3,12 @@ defmodule Mix.Tasks.Dsex.Identity.Assess do
   Run resumable, provider-plural model assessments over identity candidates.
 
       mix dsex.identity.assess \
-        --profile terra=openai:gpt-5.6-terra \
-        --profile sonnet=anthropic:claude-sonnet-5 \
+        --profile terra=openai_codex:gpt-5.6-terra \
+        --profile sonnet=openrouter:anthropic/claude-sonnet-5 \
         --profile flash=openrouter:google/gemini-3.5-flash \
         --env-file .env
 
-      mix dsex.identity.assess --profile pilot=openai:gpt-5.6-terra \
+      mix dsex.identity.assess --profile pilot=openai_codex:gpt-5.6-terra \
         --limit 24 --batch-size 6 --concurrency 2 --plan
 
   Outputs are explicitly model assessments, not user research. Credentials are
