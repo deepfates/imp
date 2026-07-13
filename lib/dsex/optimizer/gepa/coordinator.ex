@@ -30,6 +30,7 @@ defmodule DSEx.Optimizer.GEPA.Coordinator do
   end
 
   defp guarded(owner, snapshot, fun) do
+    Process.flag(:trap_exit, true)
     guardian = self()
     owner_monitor = Process.monitor(owner)
     result_ref = make_ref()

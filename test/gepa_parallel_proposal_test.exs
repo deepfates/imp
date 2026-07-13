@@ -1,7 +1,7 @@
 defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Engine, Result}
+  alias DSEx.Optimizer.GEPA.{Adapter, Coordinator, Engine, Result}
 
   defmodule FixtureAdapter do
     @behaviour Adapter
@@ -138,6 +138,23 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
                MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline and
                DSEx.Tasks.admission_status() == %{active: 0, queued: 0}
            end)
+  end
+
+  test "untrappable worker death is returned without killing the coordinator" do
+    owner = self()
+
+    task =
+      Task.async(fn ->
+        Coordinator.run([:work], 1_000, fn :work ->
+          send(owner, {:coordinator_worker, self()})
+          Process.sleep(:infinity)
+        end)
+      end)
+
+    assert_receive {:coordinator_worker, worker}
+    Process.exit(worker, :kill)
+
+    assert Task.await(task) == [{:error, {:worker_exit, :killed}}]
   end
 
   test "schema 3 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
