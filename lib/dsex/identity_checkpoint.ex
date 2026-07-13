@@ -3,6 +3,11 @@ defmodule DSEx.IdentityCheckpoint do
 
   @atlas_path "identity/atlas.json"
   @inbox_glob "identity/inbox/*.json"
+  @portfolio_keys ~w(schema_version run candidates)
+  @run_keys ~w(id generated_at generator method brief prompt_path prompt_sha256 atlas_version parent_run_ids intended_territories intended_strategies intended_audiences notes)
+  @generator_keys ~w(kind name provider model reasoning_effort agent_id)
+  @candidate_keys ~w(ordinal surface pronunciation grammar rationale etymology territories strategies audience_lenses architecture_lenses parent_surfaces known_concerns wildcard notes)
+  @generator_kinds ~w(human agent model algorithm corpus)
 
   @type portfolio_entry :: %{
           path: String.t(),
@@ -53,11 +58,16 @@ defmodule DSEx.IdentityCheckpoint do
 
   @spec normalize_surface(String.t()) :: String.t()
   def normalize_surface(surface) when is_binary(surface) do
-    surface
-    |> String.normalize(:nfkc)
-    |> String.trim()
-    |> String.downcase()
-    |> String.replace(~r/[^\p{L}\p{N}]+/u, "")
+    normalized =
+      surface
+      |> String.normalize(:nfkc)
+      |> String.trim()
+      |> String.downcase()
+
+    case String.replace(normalized, ~r/[^\p{L}\p{N}]+/u, "") do
+      "" -> normalized
+      alphanumeric -> alphanumeric
+    end
   end
 
   @spec candidate_id(String.t()) :: String.t()
@@ -139,6 +149,8 @@ defmodule DSEx.IdentityCheckpoint do
     candidates = Map.get(data, "candidates")
 
     []
+    |> validate_keys(data, @portfolio_keys, path)
+    |> validate_keys(run, @run_keys, "#{path}: run")
     |> require_equal(Map.get(data, "schema_version"), 1, "#{path}: schema_version")
     |> require_nonempty(Map.get(run, "id"), "#{path}: run.id")
     |> require_datetime(Map.get(run, "generated_at"), "#{path}: run.generated_at")
@@ -186,6 +198,7 @@ defmodule DSEx.IdentityCheckpoint do
       prefix = "#{path}: candidate #{inspect(Map.get(candidate, "ordinal"))}"
 
       acc
+      |> validate_keys(candidate, @candidate_keys, prefix)
       |> require_nonempty(Map.get(candidate, "surface"), "#{prefix}.surface")
       |> require_nonempty(Map.get(candidate, "rationale"), "#{prefix}.rationale")
       |> validate_ids(
@@ -210,13 +223,25 @@ defmodule DSEx.IdentityCheckpoint do
         context.architecture_ids,
         "#{prefix}.architecture_lenses"
       )
+      |> validate_optional_boolean(Map.get(candidate, "wildcard"), "#{prefix}.wildcard")
+      |> validate_string_array(
+        Map.get(candidate, "parent_surfaces", []),
+        "#{prefix}.parent_surfaces"
+      )
+      |> validate_string_array(
+        Map.get(candidate, "known_concerns", []),
+        "#{prefix}.known_concerns"
+      )
+      |> validate_string_array(Map.get(candidate, "notes", []), "#{prefix}.notes")
     end)
   end
 
   defp require_generator(errors, generator, label) when is_map(generator) do
     errors
+    |> validate_keys(generator, @generator_keys, label)
     |> require_nonempty(Map.get(generator, "kind"), "#{label}.kind")
     |> require_nonempty(Map.get(generator, "name"), "#{label}.name")
+    |> require_member(Map.get(generator, "kind"), @generator_kinds, "#{label}.kind")
   end
 
   defp require_generator(errors, _generator, label),
@@ -226,6 +251,12 @@ defmodule DSEx.IdentityCheckpoint do
 
   defp require_nonempty(errors, _value, label),
     do: ["#{label} must be a non-empty string" | errors]
+
+  defp require_member(errors, value, allowed, label) do
+    if value in allowed,
+      do: errors,
+      else: ["#{label} must be one of: #{Enum.join(allowed, ", ")}" | errors]
+  end
 
   defp require_equal(errors, value, value, _label), do: errors
 
@@ -259,6 +290,38 @@ defmodule DSEx.IdentityCheckpoint do
   end
 
   defp validate_ids(errors, _values, _allowed, label, _opts),
+    do: ["#{label} must be an array" | errors]
+
+  defp validate_keys(errors, value, allowed, label) when is_map(value) do
+    unknown =
+      value
+      |> Map.keys()
+      |> MapSet.new()
+      |> MapSet.difference(MapSet.new(allowed))
+      |> MapSet.to_list()
+      |> Enum.sort()
+
+    if unknown == [],
+      do: errors,
+      else: ["#{label} contains unknown keys: #{Enum.join(unknown, ", ")}" | errors]
+  end
+
+  defp validate_keys(errors, _value, _allowed, label),
+    do: ["#{label} must be an object" | errors]
+
+  defp validate_optional_boolean(errors, nil, _label), do: errors
+  defp validate_optional_boolean(errors, value, _label) when is_boolean(value), do: errors
+
+  defp validate_optional_boolean(errors, _value, label),
+    do: ["#{label} must be a boolean" | errors]
+
+  defp validate_string_array(errors, values, label) when is_list(values) do
+    if Enum.all?(values, &is_binary/1),
+      do: errors,
+      else: ["#{label} must contain only strings" | errors]
+  end
+
+  defp validate_string_array(errors, _values, label),
     do: ["#{label} must be an array" | errors]
 
   defp portfolio_events(%{path: path, sha256: file_sha, data: data}) do

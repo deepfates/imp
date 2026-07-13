@@ -55,6 +55,22 @@ defmodule DSEx.IdentityCheckpointTest do
     assert Jason.decode!(line) == hd(events)
   end
 
+  test "compile rejects unknown fields without discarding symbolic surfaces" do
+    atlas = IdentityCheckpoint.load_atlas!(@atlas_path)
+
+    bad_candidate =
+      candidate(1, "---")
+      |> Map.put("silent_extra", "must not disappear")
+
+    portfolio = portfolio_entry("run-strict-shape", [bad_candidate])
+
+    assert {:error, errors} = IdentityCheckpoint.compile(atlas, [portfolio])
+    assert Enum.any?(errors, &String.contains?(&1, "silent_extra"))
+
+    symbolic_portfolio = portfolio_entry("run-symbolic-shape", [candidate(1, "->")])
+    assert {:ok, _result} = IdentityCheckpoint.compile(atlas, [symbolic_portfolio])
+  end
+
   defp portfolio_entry(run_id, candidates) do
     data = %{
       "schema_version" => 1,
