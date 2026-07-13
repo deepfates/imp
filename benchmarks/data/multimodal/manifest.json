@@ -32,7 +32,7 @@
         "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
       }
     },
-    "campaign_id": "dsex-multimodal-quality-google-gemini-2.5-flash-v2",
+    "campaign_id": "dsex-multimodal-quality-google-gemini-2.5-flash-v3",
     "claim_policy": {
       "document_family": "native_document",
       "image_family": "image",
@@ -57,6 +57,7 @@
         "native_pdf": true
       },
       "credential_env": "GEMINI_API_KEY",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       "generation": {
         "max_tokens": 128,
         "seed": 7,
@@ -64,19 +65,30 @@
         "timeout_ms": 60000,
         "top_p": 1
       },
-      "identity_evidence": "adapter_audit_or_response_metadata",
+      "identity_evidence": "serialized_request_and_provider_id_if_available",
       "model": "gemini-2.5-flash",
       "name": "google",
       "pricing": {
         "as_of": "2026-07-13",
+        "cached_input_nano_usd_per_token": 30,
+        "cached_input_usd_per_1m": "0.03",
         "currency": "USD",
         "input_nano_usd_per_token": 300,
         "input_usd_per_1m": "0.30",
         "output_nano_usd_per_token": 2500,
         "output_usd_per_1m": "2.50",
+        "pricing_basis": "standard_text_image_video",
         "source": "https://ai.google.dev/gemini-api/docs/pricing"
       },
       "profile": "google-gemini-2.5-flash-generate-content",
+      "req_llm_dependency": {
+        "package": "req_llm",
+        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+        "repository": "https://github.com/agentjido/req_llm",
+        "source": "hexpm",
+        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+        "version": "1.17.1"
+      },
       "req_llm_model": "google:gemini-2.5-flash"
     },
     "samples": [
@@ -147,7 +159,7 @@
         "prompt": "Use both pages of the attached synthetic PDF. Among projects with review code R7 on page 2, which owner on page 1 has the highest Units value? Return exactly one JSON object with one field and no markdown: {\"answer\": \"owner\"}"
       }
     ],
-    "schema_version": 1,
+    "schema_version": 2,
     "scoring": {
       "family_thresholds": {
         "image": 0.75,
@@ -168,5 +180,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "71229758499e5fab0af16563648c4a6e96d075638b183b3fdf419d6edcbf8f1e"
+  "payload_sha256": "4b4c80497789d74dec60b2b26236f6eee2f1f9b29046f07ef95b3fa3faf8e50f"
 }

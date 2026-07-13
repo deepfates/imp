@@ -1,0 +1,1139 @@
+{
+  "artifact_schema": "dsex.multimodal_quality.v2",
+  "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+  "checkpoint": {
+    "authentication": "hmac-sha256-sidecar",
+    "path": "benchmarks/results/multimodal-checkpoints/openai-responses-v3-20260713T224355Z.json"
+  },
+  "claim_gate": {
+    "eligible": true,
+    "rejections": [],
+    "required_evidence": [
+      "exact_manifest_row_set",
+      "post_serialization_request_audit",
+      "unique_req_llm_dispatch_id",
+      "provider_endpoint_model_api",
+      "provider_reported_cache_classification",
+      "recomputed_exact_cost",
+      "provider_response_id_when_profile_requires_it",
+      "hmac_authenticated_checkpoint_campaign"
+    ]
+  },
+  "claims": {
+    "audio": {
+      "claimed": false,
+      "status": "unsupported_unproven"
+    },
+    "document_quality": true,
+    "image_quality": true,
+    "multimodal_quality": true,
+    "native_file_support": true,
+    "rendered_document_images": {
+      "claimed_as_native_file_support": false,
+      "executed": false
+    }
+  },
+  "families": {
+    "image": {
+      "passed": 4,
+      "passing": true,
+      "score": 1.0,
+      "threshold": 0.75,
+      "total": 4
+    },
+    "native_document": {
+      "passed": 2,
+      "passing": true,
+      "score": 1.0,
+      "threshold": 1.0,
+      "total": 2
+    }
+  },
+  "generated_at": "2026-07-13T22:44:02.771013Z",
+  "input_evidence": {
+    "claim_authorizing_boundary": "post-serialization Req request step immediately before transport",
+    "pre_dispatch_intents": [
+      {
+        "asset_id": "shape_board",
+        "bytes": 26387,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sample_id": "image_shape_count_blue_circles",
+        "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
+      },
+      {
+        "asset_id": "shape_board",
+        "bytes": 26387,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sample_id": "image_shape_spatial_relation",
+        "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
+      },
+      {
+        "asset_id": "inspection_card",
+        "bytes": 25618,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sample_id": "image_ocr_batch_code",
+        "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff"
+      },
+      {
+        "asset_id": "inspection_card",
+        "bytes": 25618,
+        "dsex_type": "DSEx.Adapters.Types.Image",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "image/png",
+        "req_llm_content_part": "image_url",
+        "sample_id": "image_ocr_bin",
+        "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff"
+      },
+      {
+        "asset_id": "project_register_pdf",
+        "bytes": 3097,
+        "dsex_type": "DSEx.Adapters.Types.File",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "application/pdf",
+        "req_llm_content_part": "file",
+        "sample_id": "native_pdf_september_subtotal",
+        "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d"
+      },
+      {
+        "asset_id": "project_register_pdf",
+        "bytes": 3097,
+        "dsex_type": "DSEx.Adapters.Types.File",
+        "evidence_level": "pre_dispatch_intent_only",
+        "mime_type": "application/pdf",
+        "req_llm_content_part": "file",
+        "sample_id": "native_pdf_cross_page_join",
+        "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d"
+      }
+    ],
+    "pre_dispatch_intents_authorize_claims": false
+  },
+  "limitations": [
+    "This small synthetic campaign measures six preregistered exact-answer tasks; it is not a broad multimodal leaderboard.",
+    "Native document quality means the PDF was sent as a typed DSEx File through ReqLLM's OpenAI Responses input_file.file_data path.",
+    "Rendered PDF page PNGs are included for inspection but are not executed and never count as native file support.",
+    "Audio is unsupported and unproven in this campaign.",
+    "A plan or dry run validates wiring and assets only and cannot authorize any quality claim.",
+    "The checkpoint HMAC prevents edits without the owner-only sidecar, but a local principal able to read both files can forge it.",
+    "Provider request IDs are recorded only when exposed in response headers; missing IDs are explicit row limitations and are not described as response-metadata proof."
+  ],
+  "manifest": {
+    "path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/benchmarks/data/multimodal/openai-responses-manifest.json",
+    "payload_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+    "signature": {
+      "input": "instruction: string, attachment: DSEx.Adapters.Types.Image | DSEx.Adapters.Types.File",
+      "output": "answer: string | integer",
+      "output_schema": {
+        "answer": "string_or_integer"
+      },
+      "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
+    }
+  },
+  "mode": "live",
+  "provider": {
+    "api": "responses",
+    "capabilities": {
+      "audio": false,
+      "image_input": true,
+      "native_pdf": true
+    },
+    "endpoint": "https://api.openai.com/v1/responses",
+    "generation": {
+      "max_tokens": 128,
+      "temperature": 0,
+      "timeout_ms": 60000
+    },
+    "identity_evidence": "serialized_request_and_provider_response_id_required",
+    "model": "gpt-4.1-mini-2025-04-14",
+    "name": "openai",
+    "pricing": {
+      "as_of": "2026-07-13",
+      "cached_input_nano_usd_per_token": 100,
+      "cached_input_usd_per_1m": "0.10",
+      "currency": "USD",
+      "input_nano_usd_per_token": 400,
+      "input_usd_per_1m": "0.40",
+      "output_nano_usd_per_token": 1600,
+      "output_usd_per_1m": "1.60",
+      "pricing_basis": "standard",
+      "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+    },
+    "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+    "req_llm_dependency": {
+      "package": "req_llm",
+      "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+      "repository": "https://github.com/agentjido/req_llm",
+      "source": "hexpm",
+      "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+      "version": "1.17.1"
+    },
+    "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+  },
+  "rows": [
+    {
+      "answer": 3,
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "75bfc378ffdefb9fa7e6796c386d37aa0747f7d18993ffc78512a7cab37ca9d4",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:55.491973Z",
+          "ordered_part_types": [
+            "input_image",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 26387,
+              "content_sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e",
+              "mime_type": "image/png",
+              "type": "input_image"
+            },
+            {
+              "bytes": 157,
+              "content_sha256": "e3440d4d6e7f17cf578dfdb464a05324e8d3a14a7cacf059e159a6179880762f",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "2",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:43:57.367000Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_0cd3aed4b7f4416f873591c6dfd205e7",
+          "provider_response_id": "resp_085a97f11576a6b4006a556a2be53081979736f6ca6671f11f",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 1578,
+            "output_tokens": 7,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 1585
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 11200,
+        "total_nano_usd": 642400,
+        "total_usd": "0.000642400",
+        "uncached_input_nano_usd": 631200
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "2",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 1904344,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "shape_board",
+            "bytes": 26387,
+            "mime_type": "image/png",
+            "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
+          }
+        ],
+        "delivery": "typed_image_data_uri",
+        "expected_capability": "image_input",
+        "expected_output": 3,
+        "family": "image",
+        "prompt_bytes": 157,
+        "prompt_sha256": "e3440d4d6e7f17cf578dfdb464a05324e8d3a14a7cacf059e159a6179880762f",
+        "sample_id": "image_shape_count_blue_circles",
+        "sample_sha256": "98961f4991fc9e2b02d9514d1d505822dfff99520ddeb3c5d6b8cb9e33d9c8db"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_0cd3aed4b7f4416f873591c6dfd205e7",
+        "provider_response_id": "resp_085a97f11576a6b4006a556a2be53081979736f6ca6671f11f"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 1578,
+        "output_tokens": 7,
+        "total_tokens": 1585,
+        "uncached_input_tokens": 1578
+      }
+    },
+    {
+      "answer": "left",
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "6beffc6072d21934b641b2e1fc54172be7b05319e8a50fb47d6584bba636e1a6",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:55.491973Z",
+          "ordered_part_types": [
+            "input_image",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 26387,
+              "content_sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e",
+              "mime_type": "image/png",
+              "type": "input_image"
+            },
+            {
+              "bytes": 183,
+              "content_sha256": "26e7f62882e02f7b04813a86fcf21d5a2981899fb8b18c967b3a993ff68a7f8a",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "3",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:43:57.519636Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_64b2fc468d914f379c12dab9679894aa",
+          "provider_response_id": "resp_0b0b96ba49c9a8ce006a556a2bf0f4819398c82d8482baf957",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 1585,
+            "output_tokens": 7,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 1592
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 11200,
+        "total_nano_usd": 645200,
+        "total_usd": "0.000645200",
+        "uncached_input_nano_usd": 634000
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "3",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 2055070,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "shape_board",
+            "bytes": 26387,
+            "mime_type": "image/png",
+            "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
+          }
+        ],
+        "delivery": "typed_image_data_uri",
+        "expected_capability": "image_input",
+        "expected_output": "left",
+        "family": "image",
+        "prompt_bytes": 183,
+        "prompt_sha256": "26e7f62882e02f7b04813a86fcf21d5a2981899fb8b18c967b3a993ff68a7f8a",
+        "sample_id": "image_shape_spatial_relation",
+        "sample_sha256": "7cabc0806be270fc10a30c89dda78a022c39862a2f1e2be63286172e5d4b00ec"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_64b2fc468d914f379c12dab9679894aa",
+        "provider_response_id": "resp_0b0b96ba49c9a8ce006a556a2bf0f4819398c82d8482baf957"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 1585,
+        "output_tokens": 7,
+        "total_tokens": 1592,
+        "uncached_input_tokens": 1585
+      }
+    },
+    {
+      "answer": "MINT-47",
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "25b224c21385c0b07a30accdbc7df5a3f0faab5833a35e2c5a7f5376a9ea075a",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:57.529443Z",
+          "ordered_part_types": [
+            "input_image",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 25618,
+              "content_sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff",
+              "mime_type": "image/png",
+              "type": "input_image"
+            },
+            {
+              "bytes": 150,
+              "content_sha256": "a9b09a539f73d93d8e14edf63f6a5158ed772e05c791e525bb9d3c2ccb5ad937",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "4",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:43:58.823151Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_5b1cbe5b1dec4327831e8babd123cf40",
+          "provider_response_id": "resp_07e8f974f487839f006a556a2dbf148194b578bc830a575a33",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 1013,
+            "output_tokens": 10,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 1023
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 16000,
+        "total_nano_usd": 421200,
+        "total_usd": "0.000421200",
+        "uncached_input_nano_usd": 405200
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "4",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 1296756,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "inspection_card",
+            "bytes": 25618,
+            "mime_type": "image/png",
+            "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff"
+          }
+        ],
+        "delivery": "typed_image_data_uri",
+        "expected_capability": "image_input",
+        "expected_output": "MINT-47",
+        "family": "image",
+        "prompt_bytes": 150,
+        "prompt_sha256": "a9b09a539f73d93d8e14edf63f6a5158ed772e05c791e525bb9d3c2ccb5ad937",
+        "sample_id": "image_ocr_batch_code",
+        "sample_sha256": "804d536af31f2459dec7c59aa392b1c5c12000ac06eefa8211f8f220362be8dc"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_5b1cbe5b1dec4327831e8babd123cf40",
+        "provider_response_id": "resp_07e8f974f487839f006a556a2dbf148194b578bc830a575a33"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 1013,
+        "output_tokens": 10,
+        "total_tokens": 1023,
+        "uncached_input_tokens": 1013
+      }
+    },
+    {
+      "answer": "C-12",
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "a0ee5877020b5f6b1135c7543d296a4fe6a3bb2c92b2bfa3a4e67815480c7ae0",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:57.529427Z",
+          "ordered_part_types": [
+            "input_image",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 25618,
+              "content_sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff",
+              "mime_type": "image/png",
+              "type": "input_image"
+            },
+            {
+              "bytes": 150,
+              "content_sha256": "bc2ead65ca5915ffd8ed0cf91c9a49451ff5b3b73f478572235ff82c198ab668",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "5",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:43:59.131160Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_2ab2b0e767e74822ae9077dd0cacd9d1",
+          "provider_response_id": "resp_01f7d2bf846d30d2006a556a2da8808190886812fa63573495",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 1012,
+            "output_tokens": 9,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 1021
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 14400,
+        "total_nano_usd": 419200,
+        "total_usd": "0.000419200",
+        "uncached_input_nano_usd": 404800
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "5",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 1604647,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "inspection_card",
+            "bytes": 25618,
+            "mime_type": "image/png",
+            "sha256": "6033f665e8e696f4ae53de6d15e047352a1a2328ab871b55f6d33180b7f6f8ff"
+          }
+        ],
+        "delivery": "typed_image_data_uri",
+        "expected_capability": "image_input",
+        "expected_output": "C-12",
+        "family": "image",
+        "prompt_bytes": 150,
+        "prompt_sha256": "bc2ead65ca5915ffd8ed0cf91c9a49451ff5b3b73f478572235ff82c198ab668",
+        "sample_id": "image_ocr_bin",
+        "sample_sha256": "2fd82e023ec50444e3a81c36ac14880fd93a040f4012263799dff37255c94a6a"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_2ab2b0e767e74822ae9077dd0cacd9d1",
+        "provider_response_id": "resp_01f7d2bf846d30d2006a556a2da8808190886812fa63573495"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 1012,
+        "output_tokens": 9,
+        "total_tokens": 1021,
+        "uncached_input_tokens": 1012
+      }
+    },
+    {
+      "answer": 35,
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "49d045591c9d46b795d84c22fe63dfb5ec6ec4008eca479382689cb60c346b05",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:59.145946Z",
+          "ordered_part_types": [
+            "input_file",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 3097,
+              "content_sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d",
+              "mime_type": "application/pdf",
+              "type": "input_file"
+            },
+            {
+              "bytes": 254,
+              "content_sha256": "8f057bd6ad38cc0661766986cd4f388906549ff6a19d42b09437847fdf9f9796",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "7",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:44:02.758319Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_e71044c6b02048c78b835f558b8cf4a3",
+          "provider_response_id": "resp_0c897c74dd28ade8006a556a2f55ec81958e59b9e41462a667",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 267,
+            "output_tokens": 6,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 273
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 9600,
+        "total_nano_usd": 116400,
+        "total_usd": "0.000116400",
+        "uncached_input_nano_usd": 106800
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "7",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 3615492,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "project_register_pdf",
+            "bytes": 3097,
+            "mime_type": "application/pdf",
+            "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d"
+          }
+        ],
+        "delivery": "typed_native_file",
+        "expected_capability": "native_pdf",
+        "expected_output": 35,
+        "family": "native_document",
+        "prompt_bytes": 254,
+        "prompt_sha256": "8f057bd6ad38cc0661766986cd4f388906549ff6a19d42b09437847fdf9f9796",
+        "sample_id": "native_pdf_september_subtotal",
+        "sample_sha256": "cfd483c1b3734e9ae58c6bcce94104614622ad539f66fc94f2ba6c581c2ef215"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_e71044c6b02048c78b835f558b8cf4a3",
+        "provider_response_id": "resp_0c897c74dd28ade8006a556a2f55ec81958e59b9e41462a667"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 267,
+        "output_tokens": 6,
+        "total_tokens": 273,
+        "uncached_input_tokens": 267
+      }
+    },
+    {
+      "answer": "Priya",
+      "audit": {
+        "request": {
+          "api": "responses",
+          "body_sha256": "9bb4a20334a1a08a7012244cd9fe585c7db823fe5fa60cfae1a76ee1fd2b57de",
+          "dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "endpoint": "https://api.openai.com/v1/responses",
+          "http_method": "POST",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "observed_at": "2026-07-13T22:43:59.145946Z",
+          "ordered_part_types": [
+            "input_file",
+            "input_text"
+          ],
+          "parts": [
+            {
+              "bytes": 3097,
+              "content_sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d",
+              "mime_type": "application/pdf",
+              "type": "input_file"
+            },
+            {
+              "bytes": 225,
+              "content_sha256": "183eda0012a002412940126bf2a51c24aafd3a2047a2020770e065ba015ab69f",
+              "mime_type": "text/plain; charset=utf-8",
+              "type": "input_text"
+            }
+          ],
+          "req_llm_request_id": "6",
+          "serialization_boundary": "Req request step after ReqLLM provider encode_body and before transport",
+          "transport": "finch"
+        },
+        "response": {
+          "http_status": 200,
+          "observed_at": "2026-07-13T22:44:02.657134Z",
+          "provider_id_limitations": [],
+          "provider_request_id": "req_71925f5156544108959be9271f22c461",
+          "provider_response_id": "resp_03644aef43ac9957006a556a2f52ac8195b93aaca2875cb650",
+          "usage": {
+            "cache_classification": "provider_reported",
+            "cached_input_tokens": 0,
+            "input_tokens": 261,
+            "output_tokens": 8,
+            "source": "response.usage.input_tokens_details.cached_tokens",
+            "total_tokens": 269
+          }
+        }
+      },
+      "checkpoint_campaign_identity": {
+        "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
+        "checkpoint_schema_version": 2,
+        "generation": {
+          "max_tokens": 128,
+          "temperature": 0,
+          "timeout_ms": 60000
+        },
+        "manifest_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8",
+        "provider": {
+          "api": "responses",
+          "endpoint": "https://api.openai.com/v1/responses",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "name": "openai",
+          "pricing": {
+            "as_of": "2026-07-13",
+            "cached_input_nano_usd_per_token": 100,
+            "cached_input_usd_per_1m": "0.10",
+            "currency": "USD",
+            "input_nano_usd_per_token": 400,
+            "input_usd_per_1m": "0.40",
+            "output_nano_usd_per_token": 1600,
+            "output_usd_per_1m": "1.60",
+            "pricing_basis": "standard",
+            "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+          },
+          "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+          "req_llm_dependency": {
+            "package": "req_llm",
+            "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "repository": "https://github.com/agentjido/req_llm",
+            "source": "hexpm",
+            "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+            "version": "1.17.1"
+          },
+          "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
+        },
+        "sample_set_sha256": "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
+      },
+      "cost": {
+        "cached_input_nano_usd": 0,
+        "classification": "exact_from_provider_usage",
+        "exact": true,
+        "output_nano_usd": 12800,
+        "total_nano_usd": 117200,
+        "total_usd": "0.000117200",
+        "uncached_input_nano_usd": 104400
+      },
+      "dispatch": {
+        "count": 1,
+        "evidence": "post_serialization_req_request_step",
+        "req_llm_request_id": "6",
+        "transport": "finch"
+      },
+      "failure": null,
+      "latency_us": 3514410,
+      "manifest_sample": {
+        "assets": [
+          {
+            "asset_id": "project_register_pdf",
+            "bytes": 3097,
+            "mime_type": "application/pdf",
+            "sha256": "11374319c1f851869f26639f376979ae990c5bd03997687b7fdd5550e4e97f5d"
+          }
+        ],
+        "delivery": "typed_native_file",
+        "expected_capability": "native_pdf",
+        "expected_output": "Priya",
+        "family": "native_document",
+        "prompt_bytes": 225,
+        "prompt_sha256": "183eda0012a002412940126bf2a51c24aafd3a2047a2020770e065ba015ab69f",
+        "sample_id": "native_pdf_cross_page_join",
+        "sample_sha256": "49904b2cfa2eae8971355962aaa9ffa317f22d41b48492e3bbfa0bd7707f81fd"
+      },
+      "outcome": "passed",
+      "provider": {
+        "api": "responses",
+        "api_evidence": "post_serialization_endpoint",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "model_evidence": [
+          "post_serialization_request_body",
+          "decoded_provider_response"
+        ],
+        "name": "openai",
+        "provider_id_limitation": null,
+        "provider_request_id": "req_71925f5156544108959be9271f22c461",
+        "provider_response_id": "resp_03644aef43ac9957006a556a2f52ac8195b93aaca2875cb650"
+      },
+      "score": 1.0,
+      "usage": {
+        "cache_classification": "provider_reported",
+        "cached_input_tokens": 0,
+        "input_tokens": 261,
+        "output_tokens": 8,
+        "total_tokens": 269,
+        "uncached_input_tokens": 261
+      }
+    }
+  ],
+  "runner": {
+    "dispatch": "DSEx.Clients.ReqLLM.generate/3",
+    "max_concurrency": 2,
+    "request_audit": "Req request step after provider serialization and before transport",
+    "resumable": true
+  },
+  "summary": {
+    "complete": true,
+    "dispatched": 6,
+    "failed": 0,
+    "passed": 6,
+    "resumed": 0,
+    "rows": 6,
+    "samples": 6,
+    "written": 6
+  },
+  "usage": {
+    "cache_classification": "provider_reported",
+    "cached_input_tokens": 0,
+    "cost": {
+      "cached_input_nano_usd": 0,
+      "classification": "exact_from_provider_usage",
+      "exact": true,
+      "output_nano_usd": 75200,
+      "total_nano_usd": 2361600,
+      "total_usd": "0.002361600",
+      "uncached_input_nano_usd": 2286400
+    },
+    "input_tokens": 5716,
+    "output_tokens": 47,
+    "total_tokens": 5763,
+    "uncached_input_tokens": 5716
+  }
+}

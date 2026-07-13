@@ -2,33 +2,71 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
   @moduledoc false
 
   @payload_keys ~w(assets campaign_id claim_policy created_at limitations provider samples schema_version scoring signature)
-  @provider_keys ~w(api capabilities credential_env generation identity_evidence model name pricing profile req_llm_model)
+  @provider_keys ~w(api capabilities credential_env endpoint generation identity_evidence model name pricing profile req_llm_dependency req_llm_model)
   @required_generation_keys ~w(max_tokens timeout_ms)
   @optional_generation_keys ~w(seed temperature top_p)
-  @pricing_keys ~w(as_of currency input_nano_usd_per_token input_usd_per_1m output_nano_usd_per_token output_usd_per_1m source)
+  @pricing_keys ~w(as_of cached_input_nano_usd_per_token cached_input_usd_per_1m currency input_nano_usd_per_token input_usd_per_1m output_nano_usd_per_token output_usd_per_1m pricing_basis source)
+  @req_llm_dependency_keys ~w(package package_sha256 repository source source_revision version)
   @signature_keys ~w(input output output_schema prompt_contract)
   @scoring_keys ~w(family_thresholds normalization scorer)
   @claim_keys ~w(document_family image_family required_families)
   @asset_keys ~w(bytes mime_type path sha256)
   @sample_keys ~w(asset_ids delivery expected_capability family gold id prompt)
   @deliveries ~w(typed_image_data_uri typed_native_file)
+  @req_llm_dependency %{
+    "package" => "req_llm",
+    "package_sha256" => "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+    "repository" => "https://github.com/agentjido/req_llm",
+    "source" => "hexpm",
+    "source_revision" => "33840077c2f1332eb6dff2d268dff02393014da4",
+    "version" => "1.17.1"
+  }
   @provider_profiles %{
     "google-gemini-2.5-flash-generate-content" => %{
       "api" => "generateContent",
       "capabilities" => %{"audio" => false, "image_input" => true, "native_pdf" => true},
       "credential_env" => "GEMINI_API_KEY",
-      "identity_evidence" => "adapter_audit_or_response_metadata",
+      "endpoint" =>
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "identity_evidence" => "serialized_request_and_provider_id_if_available",
       "model" => "gemini-2.5-flash",
       "name" => "google",
+      "pricing" => %{
+        "as_of" => "2026-07-13",
+        "cached_input_nano_usd_per_token" => 30,
+        "cached_input_usd_per_1m" => "0.03",
+        "currency" => "USD",
+        "input_nano_usd_per_token" => 300,
+        "input_usd_per_1m" => "0.30",
+        "output_nano_usd_per_token" => 2500,
+        "output_usd_per_1m" => "2.50",
+        "pricing_basis" => "standard_text_image_video",
+        "source" => "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      "req_llm_dependency" => @req_llm_dependency,
       "req_llm_model" => "google:gemini-2.5-flash"
     },
     "openai-gpt-4.1-mini-2025-04-14-responses" => %{
       "api" => "responses",
       "capabilities" => %{"audio" => false, "image_input" => true, "native_pdf" => true},
       "credential_env" => "OPENAI_API_KEY",
-      "identity_evidence" => "response_metadata_required",
+      "endpoint" => "https://api.openai.com/v1/responses",
+      "identity_evidence" => "serialized_request_and_provider_response_id_required",
       "model" => "gpt-4.1-mini-2025-04-14",
       "name" => "openai",
+      "pricing" => %{
+        "as_of" => "2026-07-13",
+        "cached_input_nano_usd_per_token" => 100,
+        "cached_input_usd_per_1m" => "0.10",
+        "currency" => "USD",
+        "input_nano_usd_per_token" => 400,
+        "input_usd_per_1m" => "0.40",
+        "output_nano_usd_per_token" => 1600,
+        "output_usd_per_1m" => "1.60",
+        "pricing_basis" => "standard",
+        "source" => "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+      },
+      "req_llm_dependency" => @req_llm_dependency,
       "req_llm_model" => "openai:gpt-4.1-mini-2025-04-14"
     }
   }
@@ -55,7 +93,7 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
     root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
     exact_keys!(payload, @payload_keys, "manifest payload")
 
-    require_equal!(payload["schema_version"], 1, "schema_version")
+    require_equal!(payload["schema_version"], 2, "schema_version")
     require_string!(payload["campaign_id"], "campaign_id")
     require_string!(payload["created_at"], "created_at")
 
@@ -75,6 +113,49 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
   end
 
   def payload_sha256(payload), do: sha256(Jason.encode!(payload))
+
+  def sample_bindings(payload) when is_map(payload) do
+    Map.new(payload["samples"], fn sample ->
+      assets =
+        Enum.map(sample["asset_ids"], fn asset_id ->
+          asset = Map.fetch!(payload["assets"], asset_id)
+
+          %{
+            "asset_id" => asset_id,
+            "bytes" => asset["bytes"],
+            "mime_type" => asset["mime_type"],
+            "sha256" => asset["sha256"]
+          }
+        end)
+
+      binding = %{
+        "assets" => assets,
+        "delivery" => sample["delivery"],
+        "expected_capability" => sample["expected_capability"],
+        "expected_output" => sample["gold"],
+        "family" => sample["family"],
+        "prompt_bytes" => byte_size(sample["prompt"]),
+        "prompt_sha256" => sha256(sample["prompt"]),
+        "sample_id" => sample["id"],
+        "sample_sha256" => sha256(Jason.encode!(sample))
+      }
+
+      {sample["id"], binding}
+    end)
+  end
+
+  def runtime_dependency!(payload) when is_map(payload) do
+    dependency = payload["provider"]["req_llm_dependency"]
+
+    runtime_version =
+      case Application.spec(:req_llm, :vsn) do
+        nil -> raise ArgumentError, "ReqLLM runtime dependency is not loaded"
+        version -> to_string(version)
+      end
+
+    require_equal!(runtime_version, dependency["version"], "ReqLLM runtime version")
+    dependency
+  end
 
   def profiles, do: Map.keys(@provider_profiles) |> Enum.sort()
 
@@ -122,11 +203,23 @@ defmodule DSEx.BenchmarkTruth.MultimodalManifest do
     pricing = provider["pricing"]
     require_equal!(pricing["currency"], "USD", "pricing.currency")
     require_positive_integer!(pricing["input_nano_usd_per_token"], "input token price")
+
+    require_positive_integer!(
+      pricing["cached_input_nano_usd_per_token"],
+      "cached input token price"
+    )
+
     require_positive_integer!(pricing["output_nano_usd_per_token"], "output token price")
 
-    Enum.each(~w(input_usd_per_1m output_usd_per_1m source as_of), fn key ->
-      require_string!(pricing[key], "pricing.#{key}")
-    end)
+    Enum.each(
+      ~w(input_usd_per_1m cached_input_usd_per_1m output_usd_per_1m pricing_basis source as_of),
+      fn key ->
+        require_string!(pricing[key], "pricing.#{key}")
+      end
+    )
+
+    exact_keys!(provider["req_llm_dependency"], @req_llm_dependency_keys, "req_llm_dependency")
+    require_equal!(provider["req_llm_dependency"], @req_llm_dependency, "req_llm_dependency")
   end
 
   defp validate_signature!(signature) do

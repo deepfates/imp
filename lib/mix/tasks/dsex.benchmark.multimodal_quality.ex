@@ -66,9 +66,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.MultimodalQuality do
 
     Mix.shell().info("multimodal quality report: #{path}")
 
-    Mix.shell().info(
-      "provider calls: #{if(mode == :live, do: artifact["summary"]["total"], else: 0)}"
-    )
+    Mix.shell().info("provider dispatches this run: #{artifact["summary"]["dispatched"]}")
+    Mix.shell().info("checkpoint rows resumed: #{artifact["summary"]["resumed"]}")
 
     Mix.shell().info("quality claim: #{artifact["claims"]["multimodal_quality"]}")
 

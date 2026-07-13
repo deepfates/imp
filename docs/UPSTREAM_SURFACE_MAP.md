@@ -182,7 +182,8 @@ Executable evidence:
 - task: `mix dsex.benchmark.multimodal_quality --plan|--live`
 - manifest: `benchmarks/data/multimodal/manifest.json`
 - manifest: `benchmarks/data/multimodal/openai-responses-manifest.json`
-- live proof: `benchmarks/results/multimodal-quality-live-20260713T215119Z.json` (6/6)
+- live proof: `benchmarks/results/multimodal-quality-live-20260713T224355Z.json`
+  (6/6; six dispatched, zero resumed; serialized request and provider ID audit)
 - docs: `docs/MULTIMODAL_FIDELITY.md`
 
 Missing evidence or behavior:

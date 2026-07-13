@@ -1,56 +1,138 @@
 # Multimodal Fidelity
 
-This document defines the evidence boundary for DSEx image and document quality.
-Typed value encoding by itself is not a model-quality result. The quality claim
-is authorized only by a complete live artifact from the provider-backed campaign.
+This document defines the evidence boundary for DSEx image and native-document
+quality. Typed value construction and pre-dispatch content shapes do not prove
+that ReqLLM serialized those values, that a provider received them, or that a
+model answered correctly.
 
-## Audited Lane
+## Current Evidence
 
-The provider-profile manifests are
-`benchmarks/data/multimodal/manifest.json` for Google and
-`benchmarks/data/multimodal/openai-responses-manifest.json` for OpenAI. Their
-checksum envelopes and strict schema pin:
+The claim-authorizing artifact is
+`benchmarks/results/multimodal-quality-live-20260713T224355Z.json` (SHA-256
+`02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e`). It was
+generated on 2026-07-13 from OpenAI manifest payload SHA-256
+`04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8`.
 
-- every sample ID, asset byte count, and SHA-256 hash;
-- the exact prompts, signature, gold answers, normalization, and thresholds;
-- provider, API, exact model, credential environment name, identity-evidence
-  policy, supported generation options, and USD token prices;
-- expected image and native PDF capabilities.
+The run used the pinned OpenAI Responses endpoint and model:
 
-All assets are synthetic and repository-owned. The image family covers shape
-counting, spatial relation, and text reading. The native-document family sends a
-two-page PDF and covers a table subtotal plus a cross-page join. Rendered page
-PNGs are committed for inspection, but the runner does not execute them or count
-them as native file support.
+- endpoint: `https://api.openai.com/v1/responses`
+- API: `responses`
+- model: `gpt-4.1-mini-2025-04-14`
+- ReqLLM: Hex package `req_llm` 1.17.1, package SHA-256
+  `266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914`,
+  upstream revision `33840077c2f1332eb6dff2d268dff02393014da4`
 
-DSEx sends image bytes as a typed `DSEx.Adapters.Types.Image` data URI through a
-ReqLLM `image_url` content part. It sends the PDF path as a typed
-`DSEx.Adapters.Types.File`, which ReqLLM reads into a binary `file` content part
-and the selected ReqLLM adapter maps to inline PDF data. OpenAI Responses uses
-`input_file.file_data`; its image path uses `input_image.image_url`. Reports retain only the
-type, MIME type, byte count, hash, and transport label. They never retain the
-data URI, binary file, base64 payload, or API key.
+It records six dispatches in this run, zero resumed rows, six durable rows, and
+6/6 exact-answer passes. Four image samples and two native-PDF samples passed.
+All rows have distinct ReqLLM request IDs, OpenAI request IDs, and OpenAI
+Responses IDs. The claim gate has no rejections.
 
-The retained live proof is
-`benchmarks/results/multimodal-quality-live-20260713T215119Z.json`, generated
-2026-07-13 with manifest SHA-256
-`45c632a0806d279a749cce9904b002ec243f16e5ee65fa0081e47b10eb1fd4a3`.
-It records 6/6 passing samples, exact effective model
-`gpt-4.1-mini-2025-04-14`, API `responses`, 5,716 input tokens, 47 output
-tokens, and calculated cost `$0.002361600`. Four image tasks and both native-PDF
-tasks passed. This authorizes only the narrow claims defined below.
+`benchmarks/results/multimodal-quality-live-20260713T215119Z.json` is
+invalidated and removed. Its checkpoint schema and pre-dispatch shape evidence
+did not exclude forged minimal rows, so its result must not be used as proof.
 
-## Commands
+## Manifest Contract
 
-Validate the manifest, assets, dispatch plan, and report shape without loading a
-credential or contacting Google:
+The provider manifests are:
+
+- `benchmarks/data/multimodal/manifest.json` for Google
+- `benchmarks/data/multimodal/openai-responses-manifest.json` for OpenAI
+
+Their strict, checksummed schema pins every sample ID, prompt, expected output,
+family, delivery mode, asset byte count, MIME type, asset SHA-256, provider,
+endpoint, API, exact model, generation options, ReqLLM dependency, and pricing.
+Runtime ReqLLM version drift fails before dispatch.
+
+All assets are synthetic and repository-owned. Images cover shape counting,
+spatial relation, and OCR. The native-document family sends the original
+two-page PDF and tests a table subtotal and a cross-page join. Rendered page
+PNGs are inspection aids only; they are not executed and cannot establish
+native file support.
+
+## Serialized Audit
+
+The runner installs a Req request step after ReqLLM provider `encode_body` and
+before transport. This is the claim-authorizing request boundary. For every
+request, the persisted redacted audit contains:
+
+- sanitized endpoint, API, HTTP method, serialized model, and body SHA-256;
+- ordered serialized part types;
+- each part's MIME type, decoded byte count, and content SHA-256;
+- ReqLLM package source, version, package hash, repository, and source revision;
+- ReqLLM request ID and detected transport.
+
+The audit never persists data URIs, base64 payloads, file bytes, prompt text, or
+credentials. Pre-dispatch DSEx and ReqLLM content-part intentions remain in the
+artifact for diagnostics but explicitly cannot authorize claims.
+
+The response audit records HTTP status, raw provider token usage, OpenAI request
+ID headers when exposed, and provider response body IDs when exposed. The fresh
+run exposes both IDs on all six rows. When an ID is absent, the row records that
+limitation and does not describe the missing value as response-metadata proof.
+
+## Checkpoint Gate
+
+Checkpoint schema v2 binds every completed row to the complete campaign
+identity and canonical manifest sample binding. A passing row must include the
+expected answer, successful outcome and score, exact provider/model/API,
+post-serialization request and response audits, a nonzero dispatch record,
+consistent provider usage, and recomputed cost.
+
+Checkpoint envelopes retain an unkeyed payload SHA-256 for diagnostics and add
+an HMAC-SHA256 tag backed by a separate 32-byte `0600` sidecar. A recomputed
+unkeyed hash is insufficient to resume. Unknown/minimal rows, wrong answers,
+cross-manifest checkpoints, duplicate sample/dispatch/response IDs, ambiguous
+in-progress intents, and authenticated internal inconsistencies fail closed.
+
+The HMAC protects against checkpoint edits by a process that cannot read the
+sidecar. It is not protection against the same local principal reading both the
+checkpoint and key. Checkpoint files and keys remain ignored local runtime
+state; the committed artifact contains no key material.
+
+The report separates rows dispatched in the current run from rows resumed from
+the checkpoint. The CLI prints `provider dispatches this run` and `checkpoint
+rows resumed`; it never labels total sample rows as provider calls.
+
+## Usage And Cost
+
+Pricing is code-pinned to the official GPT-4.1 mini standard rates current on
+2026-07-13: $0.40 per million uncached input tokens, $0.10 per million cached
+input tokens, and $1.60 per million output tokens.
+
+The fresh provider response explicitly reports zero cached input tokens. The
+artifact therefore records 5,716 uncached input tokens, 0 cached input tokens,
+47 output tokens, and exact cost `$0.002361600`. Cached and uncached input are
+priced separately for every row. If the provider omits cache classification,
+cached and uncached counts and all cost amounts become unavailable, `exact` is
+false, the row cannot pass, and no exact-cost claim is emitted.
+
+## Verification
+
+Provider-free tests execute the real ReqLLM OpenAI Responses serializer against
+a local HTTP fixture. That fixture proves redacted image and PDF serialization
+behavior without authorizing a provider claim because its endpoint differs
+from OpenAI. The suite also covers:
+
+- six authenticated rows containing only family and score;
+- unkeyed-SHA tampering and authenticated wrong answers;
+- duplicate ReqLLM dispatch IDs and duplicate provider response IDs;
+- cross-manifest resume attempts;
+- missing provider cache classification;
+- durable crash/resume dispatch accounting;
+- credential and payload redaction.
+
+Run the provider-free plan and tests with:
 
 ```sh
 mix dsex.benchmark.multimodal_quality --profile openai-responses \
   --plan --out tmp/multimodal-plan
+mix test test/multimodal_quality_benchmark_test.exs \
+  test/multimodal_adapter_test.exs \
+  test/optimizer_report_multimodal_test.exs \
+  test/optimize_anything_multimodal_test.exs
 ```
 
-`--dry-run` is an alias for `--plan`. Execute or resume the pinned live campaign:
+Execute a clean or resumable paid campaign with:
 
 ```sh
 mix dsex.benchmark.multimodal_quality \
@@ -59,45 +141,12 @@ mix dsex.benchmark.multimodal_quality \
   --out benchmarks/results
 ```
 
-The task reads the key only from the current process environment and passes it
-to `DSEx.Clients.ReqLLM`; it does not put the key in application configuration,
-the checkpoint, or the report. Each concurrency wave writes durable row intents
-before dispatch and durable outcomes after completion. Completed rows resume
-without another provider call. An unresolved intent is ambiguous because the
-provider may have accepted the request, so resume fails closed instead of
-silently retrying and double-billing it.
+The task reads `OPENAI_API_KEY` only from the task process. A live run exits
+nonzero if the claim gate rejects any required evidence.
 
-The repository's current `GEMINI_API_KEY` returned Google HTTP 400 invalid-key
-responses on 2026-07-13, so it provides no Google quality evidence. Provider
-failures are retained as bounded structured maps with category, exception,
-HTTP status, provider code, request ID, and redacted message when available.
-Exception structs are converted before redaction so malformed nested fields
-cannot turn a provider failure into a runner error.
+## Scope
 
-## Claim Gate
-
-The image threshold is `0.75` across four samples. The native-document threshold
-is `1.0` across two samples. Both `image_quality` and `document_quality` remain
-false unless all samples have durable outcomes, both required families meet
-their preregistered thresholds, usage contains exact integer input/output token
-counts, and model/API identity matches the manifest. A provider capability
-error, malformed JSON, malformed usage, wrong answer, missing row, plan run, or
-identity mismatch prevents every quality claim.
-
-The artifact reports per-row score, failure, latency, token usage, exact
-nano-USD cost, effective model/API, content-part shape, family summaries, and
-limitations. The task exits nonzero when a live run does not authorize the
-claim, while preserving its checkpoint for diagnosis.
-
-## Boundaries
-
-- This campaign proves a small pinned image and native-PDF lane, not general
-  multimodal superiority or broad benchmark coverage.
-- The PDF evidence is native file input. Rendered page images are inspection
-  aids and cannot substitute for that claim in this manifest.
-- `DSEx.Adapters.Types.Document` is text content, not native document vision.
-- Audio is explicitly unsupported and unproven. No audio claim is permitted by
-  this lane.
-- Provider behavior, model availability, and pricing can drift. Any change
-  requires a new manifest identity and fresh live evidence; editing the current
-  payload without updating its checksum fails validation.
+This campaign proves only the pinned six-sample image and native-PDF lane. It is
+not a broad multimodal leaderboard. `DSEx.Adapters.Types.Document` remains text
+content, not document vision. Audio is unsupported and unproven. Provider or
+pricing drift requires a new campaign identity and fresh live evidence.

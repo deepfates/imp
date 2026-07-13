@@ -32,7 +32,7 @@
         "sha256": "d6eb339a975408ee49740b1e6e0538be38e80e0dc12185ad4f4fcf78fe7c565e"
       }
     },
-    "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v2",
+    "campaign_id": "dsex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3",
     "claim_policy": {
       "document_family": "native_document",
       "image_family": "image",
@@ -57,24 +57,36 @@
         "native_pdf": true
       },
       "credential_env": "OPENAI_API_KEY",
+      "endpoint": "https://api.openai.com/v1/responses",
       "generation": {
         "max_tokens": 128,
         "temperature": 0,
         "timeout_ms": 60000
       },
-      "identity_evidence": "response_metadata_required",
+      "identity_evidence": "serialized_request_and_provider_response_id_required",
       "model": "gpt-4.1-mini-2025-04-14",
       "name": "openai",
       "pricing": {
         "as_of": "2026-07-13",
+        "cached_input_nano_usd_per_token": 100,
+        "cached_input_usd_per_1m": "0.10",
         "currency": "USD",
         "input_nano_usd_per_token": 400,
         "input_usd_per_1m": "0.40",
         "output_nano_usd_per_token": 1600,
         "output_usd_per_1m": "1.60",
-        "source": "https://openai.com/index/gpt-4-1/"
+        "pricing_basis": "standard",
+        "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
       },
       "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
+      "req_llm_dependency": {
+        "package": "req_llm",
+        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+        "repository": "https://github.com/agentjido/req_llm",
+        "source": "hexpm",
+        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
+        "version": "1.17.1"
+      },
       "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
     },
     "samples": [
@@ -145,7 +157,7 @@
         "prompt": "Use both pages of the attached synthetic PDF. Among projects with review code R7 on page 2, which owner on page 1 has the highest Units value? Return exactly one JSON object with one field and no markdown: {\"answer\": \"owner\"}"
       }
     ],
-    "schema_version": 1,
+    "schema_version": 2,
     "scoring": {
       "family_thresholds": {
         "image": 0.75,
@@ -166,5 +178,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "45c632a0806d279a749cce9904b002ec243f16e5ee65fa0081e47b10eb1fd4a3"
+  "payload_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8"
 }
