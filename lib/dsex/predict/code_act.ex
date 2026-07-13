@@ -102,12 +102,20 @@ defmodule DSEx.Predict.CodeAct do
         is_binary(program) ->
           case DSEx.Sandbox.eval(program, inputs) do
             {:ok, value} ->
-              prediction =
-                prediction
-                |> DSEx.Prediction.put(code_act.program_of_thought.output_field, value)
-                |> put_trace(trace_event(trace, iteration, :program, program, {:ok, value}))
+              with {:ok, prediction} <-
+                     DSEx.Predict.ProgramOfThought.project_outputs(
+                       code_act.program_of_thought,
+                       prediction,
+                       value
+                     ) do
+                prediction =
+                  put_trace(
+                    prediction,
+                    trace_event(trace, iteration, :program, program, {:ok, value})
+                  )
 
-              {:ok, prediction}
+                {:ok, prediction}
+              end
 
             {:error, reason} ->
               trace = trace_event(trace, iteration, :program, program, {:error, reason})

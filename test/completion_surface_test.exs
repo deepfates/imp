@@ -58,6 +58,20 @@ defmodule CompletionSurfaceTest do
     assert {:ok, 7} =
              DSEx.Sandbox.eval("if enabled do\n  7\nelse\n  0\nend", %{"enabled" => true})
 
+    map_key = "sandbox_map_key_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(map_key) end
+
+    assert {:ok, %{"answer" => 7, ^map_key => %{"items" => [3, 4]}}} =
+             DSEx.Sandbox.eval(
+               ~s(%{"#{map_key}" => %{items: [x, x + 1]}, answer: x * 2 + 1}),
+               %{"x" => 3}
+             )
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(map_key) end
+
+    assert {:error, {:unsafe_ast, _}} =
+             DSEx.Sandbox.eval("%{existing | answer: 7}", %{existing: %{}})
+
     assert {:error, {:unsafe_ast, _}} =
              DSEx.Sandbox.eval("System.cmd(\"rm\", [\"-rf\", \"/\"])")
 
@@ -94,6 +108,20 @@ defmodule CompletionSurfaceTest do
 
     assert {:error, {:invalid_generated_program, %{not: "source"}}} =
              DSEx.Predict.ProgramOfThought.call(program, %{x: 3})
+  end
+
+  test "ProgramOfThought projects and validates typed multi-output map results" do
+    assert_multi_output_contract(fn source ->
+      lm = static_program_lm(source)
+      DSEx.Predict.ProgramOfThought.new("x: int -> doubled: int, label: string", lm: lm)
+    end)
+  end
+
+  test "CodeAct projects and validates typed multi-output map results" do
+    assert_multi_output_contract(fn source ->
+      lm = static_program_lm(source)
+      DSEx.Predict.CodeAct.new("x: int -> doubled: int, label: string", [], lm: lm)
+    end)
   end
 
   test "CodeAct loops through tool observations before evaluating a program" do
@@ -297,6 +325,38 @@ defmodule CompletionSurfaceTest do
 
     assert {:error, {:invalid_code_act_inputs, "expected inputs as {key, value} pairs"}} =
              DSEx.Predict.CodeAct.call(code_act, [:not_a_pair])
+  end
+
+  defp assert_multi_output_contract(build_program) do
+    valid = build_program.(~s(%{"doubled" => x * 2, label: "six"}))
+    assert {:ok, prediction} = DSEx.call(valid, %{x: 3})
+    assert DSEx.Prediction.get(prediction, :doubled) == 6
+    assert DSEx.Prediction.get(prediction, :label) == "six"
+
+    missing = build_program.(~s(%{doubled: x * 2}))
+    assert {:error, {:missing_output_fields, [:label]}} = DSEx.call(missing, %{x: 3})
+
+    unknown = build_program.(~s(%{doubled: x * 2, label: "six", extra: true}))
+    assert {:error, {:unknown_output_fields, ["extra"]}} = DSEx.call(unknown, %{x: 3})
+
+    invalid = build_program.(~s(%{doubled: "six", label: "six"}))
+
+    assert {:error,
+            {:invalid_output_fields,
+             [%{field: :doubled, rule: :type, message: "expected integer"}]}} =
+             DSEx.call(invalid, %{x: 3})
+
+    scalar = build_program.("x * 2")
+
+    assert {:error, {:invalid_program_outputs, {:expected_map, [:doubled, :label], 6}}} =
+             DSEx.call(scalar, %{x: 3})
+  end
+
+  defp static_program_lm(source) do
+    %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{program: source} end]
+    }
   end
 
   test "streaming exposes predictions as an enumerable" do

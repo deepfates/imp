@@ -49,6 +49,21 @@ defmodule DSEx.Sandbox do
     end)
   end
 
+  defp eval_ast({:%{}, _meta, pairs}, vars) when is_list(pairs) do
+    Enum.reduce_while(pairs, {:ok, %{}}, fn
+      {key_ast, value_ast}, {:ok, acc} ->
+        with {:ok, key} <- eval_ast(key_ast, vars),
+             {:ok, value} <- eval_ast(value_ast, vars) do
+          {:cont, {:ok, Map.put(acc, key, value)}}
+        else
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+
+      invalid_pair, {:ok, _acc} ->
+        {:halt, {:error, {:unsafe_ast, invalid_pair}}}
+    end)
+  end
+
   defp eval_ast({name, _meta, nil}, vars) when is_atom(name) do
     case Map.fetch(vars, name) do
       {:ok, value} -> {:ok, value}

@@ -68,8 +68,9 @@ defmodule DSEx.Predict.ProgramOfThought do
   def call(%__MODULE__{} = pot, inputs) do
     with {:ok, prediction} <- predict_step(pot, inputs),
          program when is_binary(program) <- DSEx.Prediction.get(prediction, :program),
-         {:ok, value} <- DSEx.Sandbox.eval(program, inputs) do
-      {:ok, prediction |> DSEx.Prediction.put(pot.output_field, value)}
+         {:ok, value} <- DSEx.Sandbox.eval(program, inputs),
+         {:ok, prediction} <- project_outputs(pot, prediction, value) do
+      {:ok, prediction}
     else
       nil -> {:error, :missing_program}
       {:error, reason} -> {:error, reason}
@@ -81,6 +82,79 @@ defmodule DSEx.Predict.ProgramOfThought do
   def predict_step(%__MODULE__{} = pot, inputs) do
     DSEx.Predict.Predict.call(pot.predict, inputs)
   end
+
+  @doc false
+  def project_outputs(
+        %__MODULE__{signature: %{outputs: [_field]}, output_field: output_field},
+        %DSEx.Prediction{} = prediction,
+        value
+      ) do
+    {:ok, DSEx.Prediction.put(prediction, output_field, value)}
+  end
+
+  def project_outputs(
+        %__MODULE__{signature: %{outputs: outputs}},
+        %DSEx.Prediction{} = prediction,
+        value
+      )
+      when is_map(value) do
+    with {:ok, fields} <- normalize_output_fields(outputs, value),
+         :ok <- validate_output_fields(outputs, fields) do
+      prediction =
+        Enum.reduce(outputs, prediction, fn field, acc ->
+          DSEx.Prediction.put(acc, field.name, Map.fetch!(fields, field.name))
+        end)
+
+      {:ok, prediction}
+    end
+  end
+
+  def project_outputs(%__MODULE__{signature: signature}, %DSEx.Prediction{}, value) do
+    {:error,
+     {:invalid_program_outputs, {:expected_map, DSEx.Signature.output_names(signature), value}}}
+  end
+
+  defp normalize_output_fields(outputs, value) do
+    {fields, unknown, duplicates} =
+      Enum.reduce(value, {%{}, [], []}, fn {key, field_value}, {fields, unknown, duplicates} ->
+        case declared_output_name(outputs, key) do
+          nil ->
+            {fields, [key | unknown], duplicates}
+
+          name when is_map_key(fields, name) ->
+            {fields, unknown, [name | duplicates]}
+
+          name ->
+            {Map.put(fields, name, field_value), unknown, duplicates}
+        end
+      end)
+
+    missing = outputs |> Enum.map(& &1.name) |> Enum.reject(&Map.has_key?(fields, &1))
+
+    cond do
+      unknown != [] -> {:error, {:unknown_output_fields, stable_keys(unknown)}}
+      duplicates != [] -> {:error, {:duplicate_output_fields, stable_keys(duplicates)}}
+      missing != [] -> {:error, {:missing_output_fields, missing}}
+      true -> {:ok, fields}
+    end
+  end
+
+  defp declared_output_name(outputs, key) when is_atom(key) or is_binary(key) do
+    Enum.find_value(outputs, fn field ->
+      if field.name == key or to_string(field.name) == to_string(key), do: field.name
+    end)
+  end
+
+  defp declared_output_name(_outputs, _key), do: nil
+
+  defp validate_output_fields(outputs, fields) do
+    case DSEx.Schema.validate_fields(outputs, fields) do
+      :ok -> :ok
+      {:error, errors} -> {:error, {:invalid_output_fields, errors}}
+    end
+  end
+
+  defp stable_keys(keys), do: keys |> Enum.uniq() |> Enum.sort_by(&inspect/1)
 
   defp resolve_output_field!(signature, nil) do
     signature
