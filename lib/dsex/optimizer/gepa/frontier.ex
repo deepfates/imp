@@ -98,6 +98,8 @@ defmodule DSEx.Optimizer.GEPA.Frontier do
   defp indexes(0), do: []
   defp indexes(size), do: Enum.to_list(0..(size - 1))
 
+  defp objective_dimensions(%Result{objective_scores: nil}), do: %{}
+
   defp objective_dimensions(%Result{objective_scores: objective_scores}) do
     objective_scores
     |> Enum.reduce(%{}, &merge_objective_scores/2)
@@ -132,8 +134,12 @@ defmodule DSEx.Optimizer.GEPA.Frontier do
     validate_unique_ids!(candidates)
     validate_score_alignment!(candidates)
 
-    if policy in [:objective, :hybrid, :cartesian] do
+    if policy in [:objective, :cartesian] do
       Enum.each(candidates, &validate_objectives!/1)
+    end
+
+    if policy == :hybrid do
+      Enum.each(candidates, &validate_optional_objectives!/1)
     end
   end
 
@@ -201,6 +207,22 @@ defmodule DSEx.Optimizer.GEPA.Frontier do
     if Enum.all?(objective_scores, &(map_size(&1) == 0)) do
       raise ArgumentError,
             "GEPA frontier candidate #{inspect(candidate_id)} must report at least one objective"
+    end
+  end
+
+  defp validate_optional_objectives!({_candidate_id, %Result{objective_scores: nil}}), do: :ok
+
+  defp validate_optional_objectives!({candidate_id, %Result{} = result}) do
+    objective_scores = result.objective_scores
+
+    unless is_list(objective_scores) and length(objective_scores) == length(result.scores) do
+      raise ArgumentError,
+            "GEPA frontier candidate #{inspect(candidate_id)} objective scores must align with its scores"
+    end
+
+    unless Enum.all?(objective_scores, &valid_objective_scores?/1) do
+      raise ArgumentError,
+            "GEPA hybrid frontier candidate #{inspect(candidate_id)} objective scores must be nil or aligned maps"
     end
   end
 

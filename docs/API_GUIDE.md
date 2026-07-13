@@ -503,21 +503,41 @@ provider wire contracts locally.
 
 ## Optimize Arbitrary Artifacts
 
-```elixir
-artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
+The primary surface accepts a string, a named map of text components, or `nil`
+for objective-driven seed generation. With no dataset it runs one evaluator
+call per candidate. A `dataset:` selects multi-task optimization; adding a
+non-empty `valset:` selects held-out generalization.
 
-report =
-  DSEx.Optimize.Anything.optimize(
-    artifact,
-    fn artifact, _examples ->
-      if artifact.text =~ "mode=fast", do: 1.0, else: 0.0
-    end,
-    trials: 1,
-    mutation_fn: fn _artifact, _trial, _seed -> "mode=fast" end
+```elixir
+alias DSEx.Optimize.Anything
+alias DSEx.Optimize.Anything.{Config, Result}
+
+config =
+  Config.new(
+    engine: [max_candidate_proposals: 4, max_metric_calls: 20],
+    reflection: [reflection_lm: reflection_lm]
   )
 
-report.best.score
+result =
+  Anything.optimize(
+    %{planner: "Plan directly.", writer: "Answer clearly."},
+    fn candidate, example ->
+      score = evaluator.(candidate, example)
+      {score, %{feedback: example.feedback, scores: %{quality: score}}}
+    end,
+    dataset: training_examples,
+    valset: held_out_examples,
+    objective: "Produce correct, concise answers.",
+    config: config
+  )
+
+Result.best_candidate(result)
 ```
+
+`Result` retains candidate lineage, per-example validation scores, Pareto
+frontiers, measured budgets, rejected proposals, history, and a resumable
+engine checkpoint. The older `new_artifact/3` API remains supported for callers
+that need its aggregate evaluator and `Report` schema.
 
 ## GEPA-Style Reflection
 

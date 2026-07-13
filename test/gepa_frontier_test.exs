@@ -64,6 +64,18 @@ defmodule DSEx.Optimizer.GEPA.FrontierTest do
     assert Frontier.candidate_ids(candidates, :hybrid) == [:objective, :primary]
   end
 
+  test "hybrid policy keeps instance winners when optional objectives are absent" do
+    candidates = [
+      {:left, result([1.0, 0.0])},
+      {:right, result([0.0, 1.0])}
+    ]
+
+    assert Frontier.mapping(candidates, :hybrid) == %{
+             {:instance, 0} => MapSet.new([:left]),
+             {:instance, 1} => MapSet.new([:right])
+           }
+  end
+
   test "cartesian policy preserves per-example objective specialists" do
     candidates = [
       {:specialist, result([0.0, 0.0], [%{quality: 1.0}, %{quality: 0.0}])},

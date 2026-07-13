@@ -1,0 +1,629 @@
+defmodule DSEx.Optimize.Anything.Adapter do
+  @moduledoc false
+
+  @behaviour DSEx.Optimizer.GEPA.Adapter
+
+  alias DSEx.Optimize.Anything
+  alias DSEx.Optimizer.GEPA.{Candidate, Result}
+  alias DSEx.Optimizer.Trajectory
+
+  @modes [:single_task, :multi_task, :generalization]
+  @contracts [:standard, :with_optimization_state]
+  @candidate_formats [:named, :string]
+  @default_candidate_key :current_candidate
+  @default_best_example_evals_k 30
+
+  defmodule OptimizationState do
+    @moduledoc false
+
+    defstruct best_example_evals: []
+
+    @type evaluation :: %{required(:score) => number(), required(:side_info) => map()}
+    @type t :: %__MODULE__{best_example_evals: [evaluation()]}
+  end
+
+  @enforce_keys [:evaluator, :mode]
+  defstruct [
+    :evaluator,
+    :mode,
+    candidate_format: :named,
+    candidate_key: @default_candidate_key,
+    evaluator_contract: :standard,
+    optimization_state: nil,
+    optimization_state_store: nil,
+    best_example_evals_k: @default_best_example_evals_k,
+    raise_on_exception: true,
+    max_concurrency: 1,
+    timeout: 30_000
+  ]
+
+  @type mode :: :single_task | :multi_task | :generalization
+  @type evaluator_contract :: :standard | :with_optimization_state
+  @type candidate_format :: :named | :string
+  @type t :: %__MODULE__{
+          evaluator: function(),
+          mode: mode(),
+          candidate_format: candidate_format(),
+          candidate_key: atom() | String.t(),
+          evaluator_contract: evaluator_contract(),
+          optimization_state: OptimizationState.t() | (term() -> OptimizationState.t()),
+          optimization_state_store: pid(),
+          best_example_evals_k: non_neg_integer(),
+          raise_on_exception: boolean(),
+          max_concurrency: pos_integer(),
+          timeout: timeout()
+        }
+
+  @spec new(function(), mode()) :: t()
+  def new(evaluator, mode) when mode in @modes, do: new(evaluator, mode, [])
+
+  @spec new(function(), keyword()) :: t()
+  def new(evaluator, opts) when is_list(opts) do
+    {mode, opts} = Keyword.pop(opts, :mode)
+
+    if is_nil(mode) do
+      raise ArgumentError, "Optimize Anything adapter requires an explicit :mode option"
+    end
+
+    new(evaluator, mode, opts)
+  end
+
+  @spec new(function(), mode(), keyword()) :: t()
+  def new(evaluator, mode, opts) when is_list(opts) do
+    validate_mode!(mode)
+    validate_options!(opts)
+
+    adapter = %__MODULE__{
+      evaluator: evaluator,
+      mode: mode,
+      candidate_format: Keyword.get(opts, :candidate_format, :named),
+      candidate_key: Keyword.get(opts, :candidate_key, @default_candidate_key),
+      evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
+      optimization_state: Keyword.get(opts, :optimization_state, %OptimizationState{}),
+      best_example_evals_k:
+        Keyword.get(opts, :best_example_evals_k, @default_best_example_evals_k),
+      raise_on_exception: Keyword.get(opts, :raise_on_exception, true),
+      max_concurrency: Keyword.get(opts, :max_concurrency, 1),
+      timeout: Keyword.get(opts, :timeout, 30_000)
+    }
+
+    adapter = validate_adapter!(adapter)
+    store = start_optimization_state_store()
+    %{adapter | optimization_state_store: store}
+  end
+
+  @doc false
+  @spec close(t()) :: :ok
+  def close(%__MODULE__{optimization_state_store: store}) when is_pid(store) do
+    if Process.alive?(store), do: Agent.stop(store, :normal)
+    :ok
+  catch
+    :exit, _reason -> :ok
+  end
+
+  @impl true
+  def evaluate(%__MODULE__{} = adapter, batch, candidate, opts) when is_list(batch) do
+    Candidate.validate!(candidate)
+    validate_batch!(adapter.mode, batch)
+
+    capture_traces = Keyword.get(opts, :capture_traces, false)
+    state_source = Keyword.get(opts, :optimization_state, adapter.optimization_state)
+
+    evaluations =
+      batch
+      |> Enum.with_index()
+      |> DSEx.Tasks.async_stream(
+        fn {example, index} -> evaluate_one(adapter, candidate, example, index, state_source) end,
+        ordered: true,
+        max_concurrency: min(adapter.max_concurrency, max(length(batch), 1)),
+        timeout: adapter.timeout,
+        on_timeout: :kill_task,
+        zip_input_on_exit: true
+      )
+      |> Enum.map(&resolve_task_result(&1, adapter.raise_on_exception))
+
+    outputs = Enum.map(evaluations, & &1.output)
+    scores = Enum.map(evaluations, & &1.score)
+    objectives = Enum.map(evaluations, & &1.objective_scores)
+    components = Map.keys(candidate)
+    trajectories = Enum.map(evaluations, & &1.trajectory)
+
+    Result.new(outputs, scores,
+      objective_scores: objectives,
+      trajectories: component_trajectories(components, trajectories, capture_traces),
+      side_information: component_side_information(components, evaluations),
+      metadata: %{
+        failures: Enum.count(evaluations, &(not is_nil(&1.trajectory.error))),
+        mode: adapter.mode
+      }
+    )
+  end
+
+  @impl true
+  def make_reflective_dataset(%__MODULE__{}, candidate, result, components_to_update) do
+    Candidate.validate!(candidate)
+
+    Map.new(components_to_update, fn component ->
+      records =
+        result
+        |> raw_side_information(component)
+        |> Enum.map(&reflection_record(&1, component))
+
+      {component, records}
+    end)
+  end
+
+  defp evaluate_one(adapter, candidate, example, index, state_source) do
+    eval_candidate = evaluator_candidate(candidate, adapter)
+    state = optimization_state(adapter, state_source, example)
+
+    try do
+      raw = call_evaluator(adapter, eval_candidate, example, state)
+      evaluation = normalized_evaluation(raw, candidate, example, index)
+      update_optimization_state(adapter, example, evaluation.score, evaluation.side_info)
+      evaluation
+    rescue
+      exception -> {:raised, :error, exception, __STACKTRACE__, candidate, example, index}
+    catch
+      kind, reason -> {:raised, kind, reason, __STACKTRACE__, candidate, example, index}
+    end
+  end
+
+  defp call_evaluator(
+         %{mode: :single_task, evaluator_contract: :standard} = adapter,
+         candidate,
+         _,
+         _
+       ),
+       do: adapter.evaluator.(candidate)
+
+  defp call_evaluator(
+         %{mode: :single_task, evaluator_contract: :with_optimization_state} = adapter,
+         candidate,
+         _,
+         state
+       ),
+       do: adapter.evaluator.(candidate, state)
+
+  defp call_evaluator(%{evaluator_contract: :standard} = adapter, candidate, example, _),
+    do: adapter.evaluator.(candidate, example)
+
+  defp call_evaluator(
+         %{evaluator_contract: :with_optimization_state} = adapter,
+         candidate,
+         example,
+         state
+       ),
+       do: adapter.evaluator.(candidate, example, state)
+
+  defp normalized_evaluation(raw, candidate, example, index) do
+    {score, side_info} = normalize_result!(raw)
+    validate_score!(score)
+    validate_side_info!(side_info)
+
+    side_info = DSEx.Redaction.redact(side_info)
+    objective_scores = objective_scores!(side_info, Map.keys(candidate))
+    output = {score, DSEx.Redaction.redact(candidate), side_info}
+
+    %{
+      score: score,
+      output: output,
+      side_info: side_info,
+      objective_scores: objective_scores,
+      trajectory: trajectory(index, example, candidate, score, side_info, objective_scores, nil)
+    }
+  end
+
+  defp normalize_result!(score) when is_number(score), do: {score, %{}}
+  defp normalize_result!({score, side_info}), do: {score, side_info}
+
+  defp normalize_result!(%Anything.Evaluation{} = evaluation) do
+    {evaluation.score,
+     %{
+       "diagnostics" => evaluation.diagnostics,
+       "metadata" => evaluation.metadata
+     }}
+  end
+
+  defp normalize_result!(%{score: score} = evaluation) do
+    side_info =
+      Map.get(evaluation, :side_info, Map.get(evaluation, :asi, Map.drop(evaluation, [:score])))
+
+    {score, side_info}
+  end
+
+  defp normalize_result!(%{"score" => score} = evaluation) do
+    side_info =
+      Map.get(
+        evaluation,
+        "side_info",
+        Map.get(evaluation, "asi", Map.drop(evaluation, ["score"]))
+      )
+
+    {score, side_info}
+  end
+
+  defp normalize_result!(result) do
+    raise ArgumentError,
+          "Optimize Anything evaluator must return a numeric score, {score, side_info}, or an Evaluation-like map; got: #{inspect(result)}"
+  end
+
+  defp validate_score!(score) when is_number(score), do: :ok
+
+  defp validate_score!(score) do
+    raise ArgumentError,
+          "Optimize Anything evaluator score must be numeric, got: #{inspect(score)}"
+  end
+
+  defp validate_side_info!(side_info) when is_map(side_info), do: :ok
+
+  defp validate_side_info!(side_info) do
+    raise ArgumentError,
+          "Optimize Anything evaluator side_info must be a map, got: #{inspect(side_info)}"
+  end
+
+  defp objective_scores!(side_info, components) do
+    top_level = fetch_scores!(side_info, "scores", "top-level")
+
+    Enum.reduce(components, top_level, &merge_component_objectives(&1, &2, side_info))
+  end
+
+  defp merge_component_objectives(component, scores, side_info) do
+    case fetch_by_string(side_info, "#{component}_specific_info") do
+      :error ->
+        scores
+
+      {:ok, specific_info} when is_map(specific_info) ->
+        specific_info
+        |> fetch_scores!("scores", "#{component}_specific_info")
+        |> Map.new(fn {name, score} -> {"#{component}::#{name}", score} end)
+        |> Map.merge(scores)
+
+      {:ok, specific_info} ->
+        raise ArgumentError,
+              "Optimize Anything #{component}_specific_info must be a map, got: #{inspect(specific_info)}"
+    end
+  end
+
+  defp fetch_scores!(container, key, context) do
+    case fetch_by_string(container, key) do
+      :error ->
+        %{}
+
+      {:ok, scores} when is_map(scores) ->
+        unless Enum.all?(scores, &valid_objective_entry?/1) do
+          raise ArgumentError,
+                "Optimize Anything #{context} scores must be a map with numeric values"
+        end
+
+        scores
+
+      {:ok, scores} ->
+        raise ArgumentError,
+              "Optimize Anything #{context} scores must be a map, got: #{inspect(scores)}"
+    end
+  end
+
+  defp valid_objective_entry?({name, score}),
+    do: (is_atom(name) or is_binary(name)) and is_number(score)
+
+  defp component_side_information(components, evaluations) do
+    Map.new(components, fn component ->
+      information = Enum.map(evaluations, &component_information(&1.side_info, component))
+      {component, information}
+    end)
+  end
+
+  defp component_information(side_info, component) do
+    Enum.reduce(side_info, %{}, fn {key, value}, information ->
+      key_string = to_string(key)
+
+      cond do
+        String.ends_with?(key_string, "_specific_info") and
+          key_string == "#{component}_specific_info" and is_map(value) ->
+          Map.merge(information, value)
+
+        String.ends_with?(key_string, "_specific_info") ->
+          information
+
+        true ->
+          Map.put(information, key, value)
+      end
+    end)
+  end
+
+  defp component_trajectories(_components, _trajectories, false), do: %{}
+
+  defp component_trajectories(components, trajectories, true) do
+    Map.new(components, &{&1, trajectories})
+  end
+
+  defp trajectory(index, example, candidate, score, side_info, objectives, error) do
+    %Trajectory{
+      index: index,
+      example: DSEx.Redaction.redact(example),
+      prediction: DSEx.Redaction.redact(candidate),
+      trace: [],
+      score: score,
+      feedback: side_info,
+      metric_metadata: %{objective_scores: objectives},
+      error: error
+    }
+  end
+
+  defp resolve_task_result(
+         {:ok, {:raised, kind, reason, stacktrace, candidate, example, index}},
+         true
+       ) do
+    _ = {candidate, example, index}
+    :erlang.raise(kind, reason, stacktrace)
+  end
+
+  defp resolve_task_result(
+         {:ok, {:raised, _kind, reason, _stacktrace, candidate, example, index}},
+         false
+       ) do
+    diagnostic = %{"error" => redact_error(reason)}
+
+    %{
+      score: 0.0,
+      output: nil,
+      side_info: diagnostic,
+      objective_scores: %{},
+      trajectory: trajectory(index, example, candidate, 0.0, diagnostic, %{}, diagnostic["error"])
+    }
+  end
+
+  defp resolve_task_result({:ok, evaluation}, _raise_on_exception), do: evaluation
+
+  defp resolve_task_result({:exit, reason}, true) do
+    raise RuntimeError, "Optimize Anything evaluator task exited: #{redact_error(reason)}"
+  end
+
+  defp resolve_task_result({:exit, {{example, index}, reason}}, false) do
+    task_exit_evaluation(example, index, reason)
+  end
+
+  defp resolve_task_result({:exit, reason}, false), do: task_exit_evaluation(nil, -1, reason)
+
+  defp task_exit_evaluation(example, index, reason) do
+    diagnostic = %{"error" => "evaluator task exited: #{redact_error(reason)}"}
+
+    %{
+      score: 0.0,
+      output: nil,
+      side_info: diagnostic,
+      objective_scores: %{},
+      trajectory: trajectory(index, example, nil, 0.0, diagnostic, %{}, diagnostic["error"])
+    }
+  end
+
+  defp raw_side_information(result, component) do
+    case Map.get(result.trajectories, component) do
+      trajectories when is_list(trajectories) and trajectories != [] ->
+        Enum.map(trajectories, fn
+          %Trajectory{feedback: feedback} when is_map(feedback) -> feedback
+          _trajectory -> %{}
+        end)
+
+      _other ->
+        Map.get(result.side_information, component, [])
+    end
+  end
+
+  defp reflection_record(side_info, component) do
+    side_info
+    |> Enum.reduce(%{}, fn {key, value}, record ->
+      key_string = to_string(key)
+
+      cond do
+        key_string == "scores" ->
+          Map.put(record, "Scores (Higher is Better)", value)
+
+        key_string == "#{component}_specific_info" and is_map(value) ->
+          Map.merge(record, stringify_keys(value))
+
+        String.ends_with?(key_string, "_specific_info") ->
+          record
+
+        true ->
+          Map.put(record, key_string, value)
+      end
+    end)
+    |> DSEx.Redaction.redact()
+  end
+
+  defp stringify_keys(map), do: Map.new(map, fn {key, value} -> {to_string(key), value} end)
+
+  defp evaluator_candidate(candidate, %{candidate_format: :named}), do: candidate
+
+  defp evaluator_candidate(candidate, %{candidate_format: :string, candidate_key: key}) do
+    case fetch_candidate_component(candidate, key) do
+      {:ok, value} ->
+        value
+
+      :error when map_size(candidate) == 1 ->
+        candidate |> Map.values() |> hd()
+
+      :error ->
+        raise ArgumentError,
+              "string candidate format requires component #{inspect(key)}, got: #{inspect(Map.keys(candidate))}"
+    end
+  end
+
+  defp fetch_candidate_component(candidate, key) do
+    case Map.fetch(candidate, key) do
+      {:ok, _value} = found -> found
+      :error -> fetch_by_string(candidate, to_string(key))
+    end
+  end
+
+  defp fetch_by_string(map, expected) do
+    Enum.find_value(map, :error, fn {key, value} ->
+      if to_string(key) == expected, do: {:ok, value}, else: false
+    end)
+  end
+
+  defp optimization_state(%__MODULE__{} = adapter, state_source, example) do
+    state = initial_optimization_state(state_source, example)
+    initial_evaluations = top_evaluations(state.best_example_evals, adapter.best_example_evals_k)
+
+    Agent.get_and_update(adapter.optimization_state_store, fn states ->
+      case Map.fetch(states, example) do
+        {:ok, best_example_evals} ->
+          {%OptimizationState{best_example_evals: best_example_evals}, states}
+
+        :error ->
+          {%OptimizationState{best_example_evals: initial_evaluations},
+           Map.put(states, example, initial_evaluations)}
+      end
+    end)
+  end
+
+  defp initial_optimization_state(%OptimizationState{} = state, _example), do: state
+
+  defp initial_optimization_state(provider, example) when is_function(provider, 1) do
+    case provider.(example) do
+      %OptimizationState{} = state -> state
+      state -> raise ArgumentError, "optimization state provider returned: #{inspect(state)}"
+    end
+  end
+
+  defp update_optimization_state(adapter, example, score, side_info) do
+    record = %{score: score, side_info: side_info}
+
+    Agent.update(adapter.optimization_state_store, fn states ->
+      Map.update(states, example, [record], fn evaluations ->
+        top_evaluations([record | evaluations], adapter.best_example_evals_k)
+      end)
+    end)
+  end
+
+  defp top_evaluations(evaluations, limit) do
+    evaluations
+    |> Enum.sort_by(& &1.score, :desc)
+    |> Enum.take(limit)
+  end
+
+  defp start_optimization_state_store do
+    owner = self()
+    {:ok, store} = Agent.start(fn -> %{} end)
+    ready = make_ref()
+
+    spawn(fn ->
+      owner_monitor = Process.monitor(owner)
+      store_monitor = Process.monitor(store)
+      send(owner, {ready, :optimization_state_store_monitoring})
+
+      receive do
+        {:DOWN, ^owner_monitor, :process, ^owner, _reason} ->
+          Process.exit(store, :shutdown)
+
+        {:DOWN, ^store_monitor, :process, ^store, _reason} ->
+          :ok
+      end
+    end)
+
+    receive do
+      {^ready, :optimization_state_store_monitoring} -> store
+    end
+  end
+
+  defp validate_adapter!(adapter) do
+    validate_member!(:candidate_format, adapter.candidate_format, @candidate_formats)
+    validate_member!(:evaluator_contract, adapter.evaluator_contract, @contracts)
+    validate_candidate_key!(adapter.candidate_key)
+    validate_state_source!(adapter.optimization_state)
+    validate_best_example_evals_k!(adapter.best_example_evals_k)
+
+    unless is_boolean(adapter.raise_on_exception) do
+      raise ArgumentError, ":raise_on_exception must be a boolean"
+    end
+
+    unless is_integer(adapter.max_concurrency) and adapter.max_concurrency > 0 do
+      raise ArgumentError, ":max_concurrency must be a positive integer"
+    end
+
+    unless adapter.timeout == :infinity or (is_integer(adapter.timeout) and adapter.timeout > 0) do
+      raise ArgumentError, ":timeout must be :infinity or a positive integer"
+    end
+
+    expected_arity = expected_arity(adapter.mode, adapter.evaluator_contract)
+
+    unless is_function(adapter.evaluator, expected_arity) do
+      raise ArgumentError,
+            "#{adapter.mode} evaluator with #{adapter.evaluator_contract} contract must have arity #{expected_arity}"
+    end
+
+    adapter
+  end
+
+  defp expected_arity(:single_task, :standard), do: 1
+  defp expected_arity(:single_task, :with_optimization_state), do: 2
+  defp expected_arity(_mode, :standard), do: 2
+  defp expected_arity(_mode, :with_optimization_state), do: 3
+
+  defp validate_mode!(mode), do: validate_member!(:mode, mode, @modes)
+
+  defp validate_member!(name, value, allowed) do
+    unless value in allowed do
+      raise ArgumentError, "#{name} must be one of #{inspect(allowed)}, got: #{inspect(value)}"
+    end
+  end
+
+  defp validate_options!(opts) do
+    allowed = [
+      :candidate_format,
+      :candidate_key,
+      :evaluator_contract,
+      :optimization_state,
+      :best_example_evals_k,
+      :raise_on_exception,
+      :max_concurrency,
+      :timeout
+    ]
+
+    case Keyword.keys(opts) -- allowed do
+      [] ->
+        :ok
+
+      unknown ->
+        raise ArgumentError, "unknown Optimize Anything adapter options: #{inspect(unknown)}"
+    end
+  end
+
+  defp validate_candidate_key!(key) when is_atom(key) or is_binary(key), do: :ok
+
+  defp validate_candidate_key!(key) do
+    raise ArgumentError, ":candidate_key must be an atom or string, got: #{inspect(key)}"
+  end
+
+  defp validate_best_example_evals_k!(value) when is_integer(value) and value >= 0, do: :ok
+
+  defp validate_best_example_evals_k!(_value) do
+    raise ArgumentError, ":best_example_evals_k must be a non-negative integer"
+  end
+
+  defp validate_state_source!(%OptimizationState{}), do: :ok
+  defp validate_state_source!(provider) when is_function(provider, 1), do: :ok
+
+  defp validate_state_source!(source) do
+    raise ArgumentError,
+          ":optimization_state must be an OptimizationState or an arity-1 provider, got: #{inspect(source)}"
+  end
+
+  defp validate_batch!(:single_task, [_single]), do: :ok
+  defp validate_batch!(:single_task, batch), do: raise_single_task_batch!(batch)
+  defp validate_batch!(_mode, _batch), do: :ok
+
+  defp raise_single_task_batch!(batch) do
+    raise ArgumentError,
+          "single_task evaluation requires exactly one sentinel example, got: #{length(batch)}"
+  end
+
+  defp redact_error(%{__exception__: true} = exception) do
+    exception |> Exception.message() |> DSEx.Redaction.redact()
+  end
+
+  defp redact_error(reason), do: reason |> inspect() |> DSEx.Redaction.redact()
+end

@@ -725,10 +725,15 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp evaluate(adapter, batch, candidate, capture_traces, kind, state, opts, event) do
-    if capture_traces do
-      evaluate_fresh(adapter, batch, candidate, true, kind, state, opts, event)
-    else
-      evaluate_cached(adapter, batch, candidate, kind, state, opts, event)
+    cond do
+      capture_traces ->
+        evaluate_fresh(adapter, batch, candidate, true, kind, state, opts, event)
+
+      Keyword.get(opts, :cache_evaluation, true) ->
+        evaluate_cached(adapter, batch, candidate, kind, state, opts, event)
+
+      true ->
+        evaluate_fresh(adapter, batch, candidate, false, kind, state, opts, event)
     end
   end
 
@@ -790,7 +795,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
       case Budget.record_evaluation(state.budget, actual_calls, kind) do
         {:ok, budget} ->
-          cache = EvaluationCache.put(state.cache, candidate, batch, result)
+          cache_result = capture_traces or Keyword.get(opts, :cache_evaluation, true)
+          cache = maybe_cache_result(state.cache, candidate, batch, result, cache_result)
           notify_budget_updated(opts, state, budget, actual_calls, event.iteration)
           notify_evaluation_end(opts, result, event)
           {:ok, result, %{state | budget: budget, cache: cache}}
@@ -802,6 +808,11 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       {:error, reason} -> {:error, reason, state}
     end
   end
+
+  defp maybe_cache_result(cache, candidate, batch, result, true),
+    do: EvaluationCache.put(cache, candidate, batch, result)
+
+  defp maybe_cache_result(cache, _candidate, _batch, _result, false), do: cache
 
   defp notify_evaluation_start(opts, batch, capture_traces, event) do
     notify(opts, :on_evaluation_start, %{
@@ -1083,6 +1094,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       seed: Keyword.get(opts, :seed, 0),
       use_merge: Keyword.get(opts, :use_merge, false),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
+      cache_evaluation: Keyword.get(opts, :cache_evaluation, true),
       max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
       max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity)
     })
@@ -1456,6 +1468,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     merge_val_overlap_floor = Keyword.get(opts, :merge_val_overlap_floor, 5)
     merge_subsample_size = Keyword.get(opts, :merge_subsample_size, 5)
     frontier_type = Keyword.get(opts, :frontier_type, :instance)
+    cache_evaluation = Keyword.get(opts, :cache_evaluation, true)
     acceptance_policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
 
     merge_acceptance_policy =
@@ -1469,6 +1482,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     EvaluationPolicy.resolve!(Keyword.get(opts, :evaluation_policy, :full))
 
     unless is_boolean(use_merge), do: raise(ArgumentError, ":use_merge must be a boolean")
+
+    unless is_boolean(cache_evaluation),
+      do: raise(ArgumentError, ":cache_evaluation must be a boolean")
 
     unless is_integer(max_merge_invocations) and max_merge_invocations >= 0,
       do: raise(ArgumentError, ":max_merge_invocations must be a non-negative integer")
