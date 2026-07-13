@@ -125,13 +125,29 @@ defmodule DSEx.Saving do
     }
   end
 
+  def dump(%DSEx.Predict.Avatar{} = avatar) do
+    state = %{
+      "type" => "avatar",
+      "signature" => dump_portable_signature!(avatar.signature, "Avatar signature"),
+      "actor" => dump_avatar_predict(avatar.actor, "Avatar actor"),
+      "finisher" => dump_avatar_predict(avatar.finisher, "Avatar finisher"),
+      "tools" => dump_avatar_tools(avatar.tools),
+      "max_iters" => avatar.max_iters,
+      "tool_policy" => dump_tool_policy(avatar.tool_policy, "Avatar tool policy"),
+      "metadata" => dump_portable_value!(avatar.metadata, "Avatar metadata")
+    }
+
+    require_portable_json!(state, "Avatar")
+  end
+
   def dump(%DSEx.Predict.BestOfN{} = best) do
     %{
       "type" => "best_of_n",
       "program" => dump(best.program),
       "metric" => dump_callback!(best.metric, "BestOfN metric"),
       "feedback" => dump_optional_callback(best.feedback_fn, "BestOfN feedback"),
-      "n" => best.n
+      "n" => best.n,
+      "threshold" => best.threshold
     }
   end
 
@@ -141,7 +157,8 @@ defmodule DSEx.Saving do
       "program" => dump(refine.program),
       "metric" => dump_callback!(refine.metric, "Refine metric"),
       "feedback" => dump_optional_callback(refine.feedback_fn, "Refine feedback"),
-      "max_attempts" => refine.max_attempts
+      "max_attempts" => refine.max_attempts,
+      "threshold" => refine.threshold
     }
   end
 
@@ -169,6 +186,7 @@ defmodule DSEx.Saving do
       "react" => dump(react.react),
       "tools" => dump_tools(Map.delete(react.tools, :submit), "ReAct"),
       "max_iters" => react.max_iters,
+      "mode" => dump_react_mode!(react.mode),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReAct tool policy")
     }
   end
@@ -342,13 +360,53 @@ defmodule DSEx.Saving do
     %DSEx.Predict.KNN{retriever: retriever, field: field}
   end
 
+  def load(%{"type" => "avatar"} = state) do
+    state = require_portable_json!(state, "saved Avatar")
+
+    require_keys!(state, [
+      "type",
+      "signature",
+      "actor",
+      "finisher",
+      "tools",
+      "max_iters",
+      "tool_policy"
+    ])
+
+    signature = DSEx.Signature.load(state["signature"])
+    actor = require_predict!(load(state["actor"]), "Avatar actor")
+    finisher = require_predict!(load(state["finisher"]), "Avatar finisher")
+    tools = load_tools!(state["tools"], "Avatar")
+    max_iters = require_non_negative_integer!(state["max_iters"], "Avatar max_iters")
+    tool_policy = load_tool_policy!(state["tool_policy"], "Avatar tool policy")
+
+    metadata =
+      state
+      |> Map.get("metadata", %{})
+      |> DSEx.Optimizer.Report.restore_json_safe()
+      |> require_map_value!("Avatar metadata")
+
+    validate_avatar_predicts!(signature, actor, finisher)
+
+    %DSEx.Predict.Avatar{
+      signature: signature,
+      actor: actor,
+      finisher: finisher,
+      tools: tools,
+      max_iters: max_iters,
+      tool_policy: tool_policy,
+      metadata: metadata
+    }
+  end
+
   def load(%{"type" => "best_of_n"} = state) do
     require_keys!(state, ["type", "program", "metric", "feedback", "n"])
 
     DSEx.Predict.BestOfN.new(
       load(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "BestOfN metric"),
-      n: Map.fetch!(state, "n"),
+      n: require_non_negative_integer!(Map.fetch!(state, "n"), "BestOfN n"),
+      threshold: require_threshold!(Map.get(state, "threshold", 1.0), "BestOfN threshold"),
       feedback_fn: load_optional_callback(state["feedback"], 1, "BestOfN feedback")
     )
   end
@@ -359,7 +417,9 @@ defmodule DSEx.Saving do
     DSEx.Predict.Refine.new(
       load(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "Refine metric"),
-      max_attempts: Map.fetch!(state, "max_attempts"),
+      max_attempts:
+        require_non_negative_integer!(Map.fetch!(state, "max_attempts"), "Refine max_attempts"),
+      threshold: require_threshold!(Map.get(state, "threshold", 1.0), "Refine threshold"),
       feedback_fn: load_optional_callback(state["feedback"], 1, "Refine feedback")
     )
   end
@@ -389,14 +449,16 @@ defmodule DSEx.Saving do
   def load(%{"type" => "react"} = state) do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReAct")
-    submit = DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
+    mode = load_react_mode!(Map.get(state, "mode", "provider_native"))
+    submit = load_react_submit_tool(mode)
 
     %DSEx.Predict.ReAct{
       signature: DSEx.Signature.load(state["signature"]),
       react: require_predict!(load(state["react"]), "ReAct"),
       tools: Map.put(tools, :submit, submit),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReAct max_iters"),
-      tool_policy: load_tool_policy!(state["tool_policy"], "ReAct tool policy")
+      tool_policy: load_tool_policy!(state["tool_policy"], "ReAct tool policy"),
+      mode: mode
     }
   end
 
@@ -645,6 +707,75 @@ defmodule DSEx.Saving do
   defp load_optional_callback(name, arities, context),
     do: load_callback!(name, arities, context)
 
+  defp dump_avatar_predict(%DSEx.Predict.Predict{} = predict, context) do
+    predict
+    |> dump()
+    |> Map.put("signature", dump_portable_signature!(predict.signature, "#{context} signature"))
+    |> Map.put("demos", dump_portable_value!(predict.demos, "#{context} demos"))
+    |> Map.update!("config", &dump_portable_config!(&1, "#{context} config"))
+    |> Map.put("metadata", dump_portable_value!(predict.metadata, "#{context} metadata"))
+    |> require_portable_json!(context)
+  end
+
+  defp dump_avatar_predict(predict, context) do
+    raise ArgumentError,
+          "#{context} must be a Predict program, got: #{inspect(program_name(predict))}"
+  end
+
+  defp dump_portable_config!(config, context) do
+    config
+    |> redact_config_entries()
+    |> require_portable_json!(context)
+  end
+
+  defp redact_config_entries(entries) when is_list(entries) do
+    Enum.map(entries, fn
+      [key, value] ->
+        value = redact_config_entries(value)
+        redacted = DSEx.Redaction.redact(%{key => value})
+        [key, Map.fetch!(redacted, key)]
+
+      value ->
+        redact_config_entries(value)
+    end)
+  end
+
+  defp redact_config_entries(value), do: DSEx.Redaction.redact(value)
+
+  defp dump_portable_value!(value, context) do
+    value
+    |> DSEx.Optimizer.Report.json_safe()
+    |> DSEx.Redaction.redact()
+    |> require_portable_json!(context)
+  end
+
+  defp dump_portable_signature!(signature, context) do
+    signature
+    |> DSEx.Signature.dump()
+    |> DSEx.Redaction.redact([])
+    |> require_portable_json!(context)
+  end
+
+  defp dump_avatar_tools(tools) do
+    tools
+    |> dump_tools("Avatar")
+    |> Enum.map(fn tool ->
+      tool
+      |> Map.update!("description", &DSEx.Redaction.redact(&1, []))
+      |> Map.update!("schema", &DSEx.Redaction.redact(&1, []))
+    end)
+  end
+
+  defp require_portable_json!(value, context) do
+    value
+    |> Jason.encode!()
+    |> Jason.decode!()
+  rescue
+    _error ->
+      raise ArgumentError,
+            "#{context} must contain only portable JSON data; functions and runtime references are not supported"
+  end
+
   defp dump_tools(tools, context) when is_map(tools) do
     tools
     |> Map.values()
@@ -697,6 +828,31 @@ defmodule DSEx.Saving do
     end
   end
 
+  defp dump_react_mode!(:provider_native), do: "provider_native"
+  defp dump_react_mode!(:dspy_3_2_1), do: "dspy_3_2_1"
+
+  defp dump_react_mode!(mode) do
+    raise ArgumentError, "unsupported ReAct mode for persistence: #{inspect(mode)}"
+  end
+
+  defp load_react_mode!("provider_native"), do: :provider_native
+  defp load_react_mode!("dspy_3_2_1"), do: :dspy_3_2_1
+
+  defp load_react_mode!(mode) do
+    raise ArgumentError, "invalid saved ReAct mode: #{inspect(mode)}"
+  end
+
+  defp load_react_submit_tool(:provider_native),
+    do: DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
+
+  defp load_react_submit_tool(:dspy_3_2_1),
+    do:
+      DSEx.Tool.new(
+        :submit,
+        "Mark the task complete so the collected information can be extracted",
+        fn _args -> "Completed." end
+      )
+
   defp dump_portable_lm(nil, true, _context), do: nil
 
   defp dump_portable_lm(%DSEx.Clients.ReqLLM{} = lm, _dynamic?, _context),
@@ -721,6 +877,28 @@ defmodule DSEx.Saving do
         ArgumentError,
         "saved #{context} nested program must be Predict, got: #{inspect(program_name(program))}"
       )
+
+  defp validate_avatar_predicts!(signature, actor, finisher) do
+    expected = DSEx.Predict.Avatar.new(signature, [])
+    actor_signature = actor.signature
+    expected_actor = %{expected.actor.signature | instructions: actor_signature.instructions}
+
+    unless is_binary(actor_signature.instructions) and
+             signatures_equivalent?(actor_signature, expected_actor) do
+      raise ArgumentError, "saved Avatar actor signature does not match the task signature"
+    end
+
+    unless signatures_equivalent?(finisher.signature, expected.finisher.signature) do
+      raise ArgumentError, "saved Avatar finisher signature does not match the task signature"
+    end
+
+    :ok
+  end
+
+  defp signatures_equivalent?(left, right) do
+    left |> DSEx.Signature.dump() |> json_normalize!() ==
+      right |> DSEx.Signature.dump() |> json_normalize!()
+  end
 
   defp require_program_of_thought!(%DSEx.Predict.ProgramOfThought{} = program), do: program
 
@@ -762,6 +940,19 @@ defmodule DSEx.Saving do
 
   defp require_optional_non_negative_integer!(value, context),
     do: require_non_negative_integer!(value, context)
+
+  defp require_map_value!(value, _context) when is_map(value), do: value
+
+  defp require_map_value!(value, context),
+    do: raise(ArgumentError, "saved #{context} must be a map, got: #{inspect(value)}")
+
+  defp require_threshold!(nil, _context), do: nil
+  defp require_threshold!(value, _context) when is_integer(value) or is_float(value), do: value
+
+  defp require_threshold!(value, context) do
+    raise ArgumentError,
+          "saved #{context} must be a number or nil, got: #{inspect(value)}"
+  end
 
   defp json_normalize!(value), do: value |> Jason.encode!() |> Jason.decode!()
 
