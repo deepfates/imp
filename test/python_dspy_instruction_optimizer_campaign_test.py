@@ -31,6 +31,7 @@ class FakeRuntime:
             "commit": campaign.EXPECTED_COMMIT,
             "source_hashes": dict(campaign.AUTHORITY["source_hashes"]),
         }
+        self.dependency_identity = {"optuna": campaign.EXPECTED_OPTUNA_VERSION}
 
     def activate_arm(self, arm, ledger):
         self.ledger = ledger
@@ -107,6 +108,7 @@ class CampaignTest(unittest.TestCase):
             "schema_version": 1,
             "campaign_id": "unit-aime",
             "source_identity": {"version": campaign.EXPECTED_VERSION, "commit": campaign.EXPECTED_COMMIT},
+            "dependency_identity": {"optuna": campaign.EXPECTED_OPTUNA_VERSION},
             "dataset": split_specs,
             "provider": {
                 "model": "fake/unit",
@@ -329,6 +331,11 @@ class CampaignTest(unittest.TestCase):
     def test_source_identity_config_mismatch_fails_closed(self):
         self.config["source_identity"]["commit"] = "0" * 40
         with self.assertRaisesRegex(campaign.IdentityError, "source_identity"):
+            self.runner()
+
+    def test_optuna_dependency_identity_mismatch_fails_closed(self):
+        self.config["dependency_identity"]["optuna"] = "4.8.0"
+        with self.assertRaisesRegex(campaign.IdentityError, "optuna 4.9.0"):
             self.runner()
 
     def test_pinned_source_hash_drift_is_rejected_offline(self):

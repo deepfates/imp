@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib
+import importlib.metadata
 import inspect
 import json
 import math
@@ -36,6 +37,7 @@ CONTRACT_ID = "t1_instruction_optimizer_differential_contract"
 _, AUTHORITY = load_registry_authority(CONTRACT_ID)
 EXPECTED_VERSION = AUTHORITY["version"]
 EXPECTED_COMMIT = AUTHORITY["commit"]
+EXPECTED_OPTUNA_VERSION = "4.9.0"
 SUPPORTED_ARMS = ("baseline", "BootstrapFewShot", "MIPROv2", "SIMBA")
 CHECKPOINT_SCHEMA = 1
 REPORT_SCHEMA = 1
@@ -419,6 +421,12 @@ class DSPyRuntime:
             "dspy/teleprompt/utils.py": utils,
         }
         self.source_identity = validate_dspy_sources(dspy, modules)
+        optuna_version = importlib.metadata.version("optuna")
+        if optuna_version != EXPECTED_OPTUNA_VERSION:
+            raise IdentityError(
+                f"pinned Optuna validation failed: expected {EXPECTED_OPTUNA_VERSION}, got {optuna_version}"
+            )
+        self.dependency_identity = {"optuna": optuna_version}
         self.provider = deepcopy(config["provider"])
         self.provider_kwargs = deepcopy(self.provider.get("kwargs", {}))
         api_key_env = self.provider.get("api_key_env")
@@ -583,7 +591,15 @@ def load_config(path: Path) -> dict[str, Any]:
 def validate_config(config: Any) -> None:
     if not isinstance(config, dict) or config.get("schema_version") != 1:
         raise CampaignError("config schema_version must be 1")
-    required = {"campaign_id", "dataset", "provider", "budget_scope", "per_arm_ceilings", "arms"}
+    required = {
+        "campaign_id",
+        "dataset",
+        "provider",
+        "budget_scope",
+        "per_arm_ceilings",
+        "dependency_identity",
+        "arms",
+    }
     missing = sorted(required - set(config))
     if missing:
         raise CampaignError(f"config is missing required fields: {', '.join(missing)}")
@@ -591,6 +607,10 @@ def validate_config(config: Any) -> None:
         raise CampaignError("campaign_id must be a non-empty string")
     if config["budget_scope"] != "per_arm":
         raise CampaignError("budget_scope must be per_arm for matched evidence")
+    if config["dependency_identity"] != {"optuna": EXPECTED_OPTUNA_VERSION}:
+        raise IdentityError(
+            f"dependency_identity must pin optuna {EXPECTED_OPTUNA_VERSION}"
+        )
     dataset = config["dataset"]
     if not isinstance(dataset, dict) or set(dataset) != {"train", "dev", "test"}:
         raise CampaignError("dataset must contain exactly train, dev, and test")
@@ -747,6 +767,7 @@ class Campaign:
             "config_sha256": self.config_digest,
             "dataset": self.dataset_identity,
             "source_identity": self.runtime.source_identity,
+            "dependency_identity": self.runtime.dependency_identity,
             "created_at": utc_now(),
             "updated_at": utc_now(),
             "usage_by_arm": self._usage_by_arm(),
@@ -777,6 +798,11 @@ class Campaign:
             (state.get("config_sha256"), self.config_digest, "config"),
             (state.get("dataset"), self.dataset_identity, "dataset identity"),
             (state.get("source_identity"), self.runtime.source_identity, "source identity"),
+            (
+                state.get("dependency_identity"),
+                self.runtime.dependency_identity,
+                "dependency identity",
+            ),
         )
         for actual, expected, label in checks:
             if actual != expected:
@@ -997,6 +1023,7 @@ class Campaign:
                 ),
             },
             "source_identity": self.state["source_identity"],
+            "dependency_identity": self.state["dependency_identity"],
             "dataset": self.state["dataset"],
             "config": _sanitized_config(self.config),
             "config_sha256": self.config_digest,
