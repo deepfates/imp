@@ -207,11 +207,11 @@ def provider_cost(usage: dict[str, Any]) -> tuple[float | None, str | None]:
         value = float(value)
         if not math.isfinite(value) or value < 0:
             return None, f"invalid provider {key}"
-        if value > 0:
-            observed.append(value)
+        observed.append(value)
     if observed and not all(math.isclose(observed[0], value) for value in observed[1:]):
         return None, "inconsistent provider cost fields"
-    return (observed[0] if observed else None), None
+    reported = observed[0] if observed else None
+    return (reported if reported is not None and reported > 0 else None), None
 
 
 def cost_audit(

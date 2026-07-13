@@ -237,6 +237,24 @@ class BudgetLMTest(unittest.TestCase):
         self.assertEqual(raised.exception.usage["output_tokens"], 34)
         self.assertEqual(raised.exception.usage["cost_authority"], "unavailable")
 
+    def test_conflicting_zero_and_positive_provider_cost_aliases_are_rejected(self):
+        inner = FakeReasoningLM(
+            {
+                "input_tokens": 12,
+                "output_tokens": 34,
+                "total_cost": 0.0,
+                "cost": 0.25,
+            }
+        )
+        lm = wrapped(inner)
+
+        with self.assertRaisesRegex(campaign.CampaignError, "inconsistent provider cost") as raised:
+            lm("hello")
+
+        self.assertEqual(raised.exception.usage["input_tokens"], 12)
+        self.assertEqual(raised.exception.usage["output_tokens"], 34)
+        self.assertEqual(raised.exception.usage["cost_authority"], "unavailable")
+
     def test_active_reservations_prevent_cross_lm_overcommit(self):
         blocking = BlockingReasoningLM()
         ledger = empty_ledger()

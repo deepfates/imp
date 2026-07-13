@@ -332,6 +332,87 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert_in_delta snapshot["usage"]["usd"], 0.000009, 1.0e-12
   end
 
+  test "metered LM charges but rejects token-incomplete provider success" do
+    rates = UsageFixture.rates()
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{
+          "requests" => 2,
+          "input_tokens" => 10_000,
+          "output_tokens" => 100,
+          "usd" => 1.0
+        },
+        pricing: rates,
+        default_max_output_tokens: 10
+      )
+
+    {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
+
+    inner = fn _messages, _opts ->
+      {:ok, %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}}}
+    end
+
+    lm = %RLMRuntime.MeteredLM{
+      inner: inner,
+      budget: budget,
+      usage: usage_agent,
+      max_tokens: 10,
+      role: "root",
+      pricing: rates
+    }
+
+    assert {:error, :provider_success_usage_incomplete} =
+             RLMRuntime.MeteredLM.generate(lm, [%{role: :user, content: "charged"}], [])
+
+    usage = Agent.get(usage_agent, & &1)
+    assert usage["requests"] == 1
+    assert usage["input_tokens"] == 9
+    assert usage["output_tokens"] == 0
+    assert usage["cost_authority"] == "pricing_derived"
+    assert_in_delta usage["usd"], 0.000009, 1.0e-12
+  end
+
+  test "metered LM rejects conflicting zero and positive provider cost aliases" do
+    rates = UsageFixture.rates()
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{
+          "requests" => 2,
+          "input_tokens" => 10_000,
+          "output_tokens" => 100,
+          "usd" => 1.0
+        },
+        pricing: rates,
+        default_max_output_tokens: 10
+      )
+
+    {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
+
+    inner = fn _messages, _opts ->
+      {:ok, %{usage: %{input_tokens: 9, output_tokens: 2, total_cost: 0.0, cost: 0.25}}}
+    end
+
+    lm = %RLMRuntime.MeteredLM{
+      inner: inner,
+      budget: budget,
+      usage: usage_agent,
+      max_tokens: 10,
+      role: "root",
+      pricing: rates
+    }
+
+    assert {:error, :provider_cost_unauditable} =
+             RLMRuntime.MeteredLM.generate(lm, [%{role: :user, content: "conflict"}], [])
+
+    usage = Agent.get(usage_agent, & &1)
+    assert usage["requests"] == 1
+    assert usage["input_tokens"] == 9
+    assert usage["output_tokens"] == 2
+    assert usage["cost_authority"] == "unavailable"
+  end
+
   test "checkpoint payload tamper is rejected" do
     root = tmp_dir("checkpoint")
     path = Path.join(root, "checkpoint.json")
@@ -426,6 +507,27 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     gate = RLMProtocol.evaluate(%{"manifest" => manifest, "datasets" => datasets})
     refute Enum.find(gate["checks"], &(&1["id"] == "dataset_authority"))["passing"]
     refute gate["paper_protocol_complete"]
+  end
+
+  test "paper authority labels cannot self-attest unpublished dataset identities" do
+    manifest = %{
+      "paper_protocol" => %{
+        "dataset_selection" => %{
+          "s_niah" => "published_paper_frozen_instances",
+          "browsecomp_plus" => "published_paper_frozen_ids_and_document_lists",
+          "oolong_pairs" => "published_paper_gold_and_scorer"
+        }
+      }
+    }
+
+    datasets = %{
+      "s_niah" => %{"selection_authority" => "paper_published"},
+      "browsecomp_plus" => %{"selection_authority" => "paper_published"},
+      "oolong_pairs" => %{"scorer_authority" => "paper_published"}
+    }
+
+    gate = RLMProtocol.evaluate(%{"manifest" => manifest, "datasets" => datasets})
+    refute Enum.find(gate["checks"], &(&1["id"] == "dataset_authority"))["passing"]
   end
 
   test "cost gate permits explicit free authority and rejects zero or inconsistent unaudited cost" do

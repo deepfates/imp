@@ -20,6 +20,7 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
     "claude_opus_4_1" => ~w(claude_code claude_code_context_offloading)
   }
   @paper_runtimes ~w(dsex standalone_rlm)
+  @published_pairs_scorer_sha256 nil
   @sha256 ~r/\A[0-9a-f]{64}\z/
 
   def evaluate(artifact) do
@@ -107,18 +108,7 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
     }
   end
 
-  defp dataset_authority?(manifest, datasets) do
-    selections = get_in(manifest, ["paper_protocol", "dataset_selection"]) || %{}
-
-    selections == %{
-      "s_niah" => "published_paper_frozen_instances",
-      "browsecomp_plus" => "published_paper_frozen_ids_and_document_lists",
-      "oolong_pairs" => "published_paper_gold_and_scorer"
-    } and
-      get_in(datasets, ["s_niah", "selection_authority"]) == "paper_published" and
-      get_in(datasets, ["browsecomp_plus", "selection_authority"]) == "paper_published" and
-      get_in(datasets, ["oolong_pairs", "scorer_authority"]) == "paper_published"
-  end
+  defp dataset_authority?(_manifest, _datasets), do: false
 
   defp official_scorers?(artifact, rows) do
     scorers = artifact["official_scorers"] || %{}
@@ -133,7 +123,8 @@ defmodule DSEx.BenchmarkTruth.RLMProtocol do
       oolong["contract"] == "numeric_0.75_abs_error_else_exact" and
       pairs["contract"] == "normalized_unordered_pair_set_f1" and
       pairs["authority"] == "paper_published_run_all.py" and
-      is_binary(pairs["source_sha256"]) and Regex.match?(@sha256, pairs["source_sha256"]) and
+      is_binary(@published_pairs_scorer_sha256) and
+      pairs["source_sha256"] == @published_pairs_scorer_sha256 and
       rows
       |> Enum.filter(&(&1["family"] == "browsecomp_plus"))
       |> then(&(&1 != [] and Enum.all?(&1, fn row -> valid_browse_scorer?(row, browse) end)))

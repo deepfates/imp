@@ -350,6 +350,13 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
            ) and is_number(usage["usd"]) and usage["usd"] >= 0,
            do: raise(ArgumentError, "malformed RLM runtime usage")
 
+    unless usage["requests"] > 0 and usage["input_tokens"] > 0 and usage["output_tokens"] > 0,
+      do:
+        raise(
+          ArgumentError,
+          "successful RLM runtime usage must include positive calls and tokens"
+        )
+
     unless valid_cost_usage?(usage),
       do: raise(ArgumentError, "unaudited or inconsistent RLM runtime cost")
 

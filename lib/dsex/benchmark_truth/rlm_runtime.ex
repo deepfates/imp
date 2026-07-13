@@ -31,9 +31,16 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
           DSEx.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
           Agent.update(lm.usage, &sum(&1, usage, lm.role))
 
-          if usage.cost_authority == "unavailable",
-            do: {:error, :provider_cost_unauditable},
-            else: result
+          cond do
+            usage.cost_authority == "unavailable" ->
+              {:error, :provider_cost_unauditable}
+
+            usage.input_tokens <= 0 or usage.output_tokens <= 0 ->
+              {:error, :provider_success_usage_incomplete}
+
+            true ->
+              result
+          end
 
         nil ->
           {:error, :provider_usage_missing}
@@ -129,13 +136,16 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         Enum.any?(values, &(not is_number(&1) or &1 < 0)) ->
           :invalid
 
-        reported = Enum.filter(values, &(&1 > 0)) ->
-          case reported do
-            [] ->
-              :absent
+        values == [] ->
+          :absent
 
-            [first | rest] ->
-              if(Enum.all?(rest, &close?(&1, first)), do: {:ok, first}, else: :invalid)
+        true ->
+          [first | rest] = values
+
+          if Enum.all?(rest, &close?(&1, first)) do
+            if first > 0, do: {:ok, first}, else: :absent
+          else
+            :invalid
           end
       end
     end
