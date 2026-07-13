@@ -8,10 +8,14 @@ defmodule MCPImportTest do
     @behaviour DSEx.HTTP
 
     @impl true
-    def post(url, headers, body, _opts) do
+    def post(url, headers, body, opts) do
       decoded = Jason.decode!(body)
       request = %{url: url, headers: headers, body: decoded}
-      Process.put(:mcp_requests, Process.get(:mcp_requests, []) ++ [request])
+
+      case Keyword.get(opts, :test_pid) do
+        nil -> :ok
+        pid -> send(pid, {:mcp_request, request})
+      end
 
       case decoded do
         %{"method" => "initialize", "jsonrpc" => "2.0", "id" => _id} ->
@@ -290,15 +294,18 @@ defmodule MCPImportTest do
   test "HTTP MCP client discovers tools through injectable transport" do
     ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :mcp, :http, :start]])
 
-    client = MCP.HTTPClient.new("https://mcp.example/tools", transport: MCPTransport)
+    client =
+      MCP.HTTPClient.new("https://mcp.example/tools",
+        transport: MCPTransport,
+        transport_opts: [test_pid: self()]
+      )
 
     [tool] = MCP.import_tools(client)
 
     assert tool.name == "remote_lookup"
     assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
 
-    assert [init_request, initialized_request, list_request, call_request] =
-             Process.get(:mcp_requests)
+    assert [init_request, initialized_request, list_request, call_request] = receive_requests(4)
 
     assert init_request.body["method"] == "initialize"
     assert initialized_request.body["method"] == "notifications/initialized"
@@ -309,8 +316,6 @@ defmodule MCPImportTest do
     assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "initialize"}}
     assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "tools/list"}}
     assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "tools/call"}}
-  after
-    Process.delete(:mcp_requests)
   end
 
   test "HTTP MCP client returns JSON-RPC errors as tool errors" do
@@ -391,7 +396,8 @@ defmodule MCPImportTest do
     client =
       MCP.StreamableHTTPClient.new("https://mcp.example/stream",
         transport: MCPSSETransport,
-        session_id: "session-1"
+        session_id: "session-1",
+        transport_opts: [test_pid: self()]
       )
 
     [tool] = MCP.import_tools(client)
@@ -399,12 +405,10 @@ defmodule MCPImportTest do
     assert tool.name == "remote_lookup"
     assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
 
-    assert [init_request, list_request, call_request] = Process.get(:mcp_requests)
+    assert [init_request, list_request, call_request] = receive_requests(3)
     assert {"mcp-session-id", "session-1"} in init_request.headers
     assert {"accept", "application/json, text/event-stream"} in list_request.headers
     assert call_request.body["method"] == "tools/call"
-  after
-    Process.delete(:mcp_requests)
   end
 
   test "streamable HTTP MCP client returns JSON-RPC errors as tool errors" do
@@ -418,4 +422,11 @@ defmodule MCPImportTest do
   end
 
   defp agent_ref, do: Process.get(:agent_ref)
+
+  defp receive_requests(count) do
+    Enum.map(1..count, fn _ ->
+      assert_receive {:mcp_request, request}
+      request
+    end)
+  end
 end

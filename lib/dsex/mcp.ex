@@ -28,6 +28,276 @@ defmodule DSEx.MCP do
   def json_rpc_result(%{result: result}), do: {:ok, result}
   def json_rpc_result(other), do: {:ok, other}
 
+  defmodule HTTPRecovery do
+    @moduledoc false
+
+    @transient_statuses [408, 429, 500, 502, 503, 504]
+
+    def option_schema do
+      [
+        max_attempts: [type: :pos_integer],
+        timeout: [type: :pos_integer],
+        retry_delay: [type: :non_neg_integer],
+        max_retry_after: [type: :non_neg_integer],
+        idempotency_key: [type: {:custom, __MODULE__, :validate_idempotency_key, []}],
+        transport_opts: [type: :keyword_list]
+      ]
+    end
+
+    def defaults do
+      [
+        max_attempts: 3,
+        timeout: 5_000,
+        retry_delay: 100,
+        max_retry_after: 1_000,
+        idempotency_key: nil,
+        transport_opts: []
+      ]
+    end
+
+    def validate_idempotency_key(nil), do: {:ok, nil}
+
+    def validate_idempotency_key(callback) when is_function(callback, 2),
+      do: {:ok, callback}
+
+    def validate_idempotency_key(_callback),
+      do: {:error, "expected nil or an arity-2 function"}
+
+    def request(client, event_prefix, method, params, headers) do
+      id = System.unique_integer([:positive])
+
+      body =
+        Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params})
+
+      with {:ok, replay} <- replay_contract(client, method, params) do
+        headers = add_idempotency_header(headers, replay)
+        max_attempts = effective_max_attempts(client, replay)
+
+        DSEx.Telemetry.span(event_prefix, span_metadata(method, id, max_attempts, replay), fn ->
+          attempt(client, event_prefix, method, id, body, headers, replay, 1, max_attempts)
+        end)
+      end
+    end
+
+    def notification(client, event_prefix, method, params, headers) do
+      body = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})
+      metadata = span_metadata(method, nil, 1, :never)
+
+      DSEx.Telemetry.span(event_prefix, metadata, fn ->
+        run_attempt(client, event_prefix, method, nil, body, headers, :never, 1, 1)
+      end)
+    end
+
+    defp attempt(
+           client,
+           event_prefix,
+           method,
+           id,
+           body,
+           headers,
+           replay,
+           attempt,
+           max_attempts
+         ) do
+      result =
+        run_attempt(
+          client,
+          event_prefix,
+          method,
+          id,
+          body,
+          headers,
+          replay,
+          attempt,
+          max_attempts
+        )
+
+      if retry?(result, replay, attempt, max_attempts) do
+        Process.sleep(retry_delay(result, attempt, client))
+
+        attempt(
+          client,
+          event_prefix,
+          method,
+          id,
+          body,
+          headers,
+          replay,
+          attempt + 1,
+          max_attempts
+        )
+      else
+        result
+      end
+    end
+
+    defp run_attempt(
+           client,
+           event_prefix,
+           method,
+           id,
+           body,
+           headers,
+           replay,
+           attempt,
+           max_attempts
+         ) do
+      started = System.monotonic_time()
+
+      task =
+        Task.async(fn ->
+          opts =
+            client.transport_opts
+            |> Keyword.put(:timeout, client.timeout)
+            |> Keyword.put(:receive_timeout, client.timeout)
+            |> Keyword.put(:retry, false)
+
+          DSEx.HTTP.post(client.transport, client.url, headers, body, opts)
+        end)
+
+      result =
+        case Task.yield(task, client.timeout) do
+          {:ok, result} ->
+            result
+
+          {:exit, reason} ->
+            {:error, {:transport_exit, reason}}
+
+          nil ->
+            Task.shutdown(task, :brutal_kill)
+            {:error, :timeout}
+        end
+
+      DSEx.Telemetry.execute(
+        event_prefix ++ [:attempt],
+        %{duration: System.monotonic_time() - started},
+        %{
+          transport: :http,
+          method: method,
+          request_id: id,
+          attempt: attempt,
+          max_attempts: max_attempts,
+          replay: replay_kind(replay),
+          outcome: outcome(result)
+        }
+      )
+
+      result
+    end
+
+    defp replay_contract(_client, "tools/list", _params),
+      do: {:ok, :idempotent}
+
+    defp replay_contract(%{idempotency_key: nil}, _method, _params), do: {:ok, :never}
+
+    defp replay_contract(%{idempotency_key: callback}, method, params) do
+      case callback.(method, params) do
+        key when is_binary(key) and byte_size(key) > 0 -> {:ok, {:idempotency_key, key}}
+        nil -> {:ok, :never}
+        other -> {:error, {:invalid_idempotency_key, other}}
+      end
+    end
+
+    defp add_idempotency_header(headers, {:idempotency_key, key}) do
+      headers =
+        Enum.reject(headers, fn {name, _value} ->
+          name |> to_string() |> String.downcase() == "idempotency-key"
+        end)
+
+      [{"idempotency-key", key} | headers]
+    end
+
+    defp add_idempotency_header(headers, _replay), do: headers
+
+    defp effective_max_attempts(_client, :never), do: 1
+    defp effective_max_attempts(client, _replay), do: client.max_attempts
+
+    defp retry?(_result, :never, _attempt, _max_attempts), do: false
+    defp retry?(_result, _replay, attempt, max_attempts) when attempt >= max_attempts, do: false
+
+    defp retry?({:ok, %{status: status}}, _replay, _attempt, _max),
+      do: status in @transient_statuses
+
+    defp retry?({:error, reason}, _replay, _attempt, _max), do: transient_transport?(reason)
+    defp retry?(_result, _replay, _attempt, _max), do: false
+
+    defp transient_transport?(reason)
+         when reason in [
+                :timeout,
+                :econnrefused,
+                :closed,
+                :enetunreach,
+                :ehostunreach,
+                :pool_not_available,
+                :unprocessed
+              ],
+         do: true
+
+    defp transient_transport?({:http_transport_failed, _transport, reason}),
+      do: transient_transport?(reason)
+
+    defp transient_transport?({:failed_connect, details}) when is_list(details) do
+      Enum.any?(details, &transient_detail?/1)
+    end
+
+    defp transient_transport?(%Req.TransportError{reason: reason}),
+      do: transient_transport?(reason)
+
+    defp transient_transport?(_reason), do: false
+
+    defp transient_detail?(detail) when is_tuple(detail),
+      do: detail |> Tuple.to_list() |> Enum.any?(&transient_detail?/1)
+
+    defp transient_detail?(detail) when is_list(detail),
+      do: Enum.any?(detail, &transient_detail?/1)
+
+    defp transient_detail?(detail), do: transient_transport?(detail)
+
+    defp retry_delay({:ok, %{status: status, headers: headers}}, attempt, client)
+         when status in [429, 503] do
+      case req_retry_after(headers) do
+        delay when is_integer(delay) -> min(delay, client.max_retry_after)
+        nil -> backoff(client.retry_delay, client.max_retry_after, attempt - 1)
+      end
+    end
+
+    defp retry_delay(_result, attempt, client),
+      do: backoff(client.retry_delay, client.max_retry_after, attempt - 1)
+
+    defp req_retry_after(headers) do
+      headers =
+        Enum.map(headers, fn {name, value} ->
+          {name |> to_string() |> String.downcase(), to_string(value)}
+        end)
+
+      [headers: headers]
+      |> Req.Response.new()
+      |> Req.Response.get_retry_after()
+    rescue
+      _error -> nil
+    end
+
+    defp backoff(base, cap, exponent), do: min(base * Integer.pow(2, exponent), cap)
+
+    defp span_metadata(method, id, max_attempts, replay) do
+      %{
+        transport: :http,
+        method: method,
+        request_id: id,
+        max_attempts: max_attempts,
+        replay: replay_kind(replay)
+      }
+    end
+
+    defp replay_kind({:idempotency_key, _key}), do: :idempotency_key
+    defp replay_kind(replay), do: replay
+
+    defp outcome({:ok, %{status: status}}), do: {:http, status}
+    defp outcome({:error, reason}) when reason in [:timeout, :econnrefused, :closed], do: reason
+    defp outcome({:error, _reason}), do: :transport_error
+    defp outcome(_other), do: :invalid_transport_response
+  end
+
   defmodule HTTPClient do
     @moduledoc "JSON-RPC 2.0 transport-backed MCP-style catalog client."
 
@@ -35,25 +305,36 @@ defmodule DSEx.MCP do
       :url,
       transport: DSEx.HTTP.Hackneyless,
       headers: [],
-      protocol_version: "2025-03-26"
+      protocol_version: "2025-03-26",
+      max_attempts: 3,
+      timeout: 5_000,
+      retry_delay: 100,
+      max_retry_after: 1_000,
+      idempotency_key: nil,
+      transport_opts: []
     ]
 
-    @option_schema [
-      transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
-      headers: [type: {:list, {:tuple, [:any, :any]}}],
-      protocol_version: [type: :string]
-    ]
+    @option_schema Keyword.merge(
+                     [
+                       transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
+                       headers: [type: {:list, {:tuple, [:any, :any]}}],
+                       protocol_version: [type: :string]
+                     ],
+                     DSEx.MCP.HTTPRecovery.option_schema()
+                   )
 
     def new(url, opts \\ []) do
       validate_url!(url)
       opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
-      %__MODULE__{
-        url: url,
-        transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
-        headers: Keyword.get(opts, :headers, []),
-        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26")
-      }
+      struct!(
+        __MODULE__,
+        Keyword.merge(
+          DSEx.MCP.HTTPRecovery.defaults(),
+          opts
+        )
+        |> Keyword.put(:url, url)
+      )
     end
 
     def list_tools(%__MODULE__{} = client) do
@@ -108,19 +389,17 @@ defmodule DSEx.MCP do
     end
 
     defp post_json(client, method, params) do
-      body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
-
-      DSEx.Telemetry.span([:dsex, :mcp, :http], %{url: client.url, method: method}, fn ->
-        DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
-      end)
+      DSEx.MCP.HTTPRecovery.request(client, [:dsex, :mcp, :http], method, params, headers(client))
     end
 
     defp post_notification(client, method, params) do
-      body = %{"jsonrpc" => "2.0", "method" => method, "params" => params}
-
-      DSEx.Telemetry.span([:dsex, :mcp, :http], %{url: client.url, method: method}, fn ->
-        DSEx.HTTP.post(client.transport, client.url, headers(client), Jason.encode!(body), [])
-      end)
+      DSEx.MCP.HTTPRecovery.notification(
+        client,
+        [:dsex, :mcp, :http],
+        method,
+        params,
+        headers(client)
+      )
     end
 
     defp headers(client),
@@ -129,8 +408,6 @@ defmodule DSEx.MCP do
         {"mcp-protocol-version", client.protocol_version}
         | client.headers
       ]
-
-    defp next_id, do: System.unique_integer([:positive])
 
     defp validate_url!(url) when is_binary(url), do: :ok
 
@@ -311,27 +588,37 @@ defmodule DSEx.MCP do
       :session_id,
       transport: DSEx.HTTP.Hackneyless,
       headers: [],
-      protocol_version: "2025-03-26"
+      protocol_version: "2025-03-26",
+      max_attempts: 3,
+      timeout: 5_000,
+      retry_delay: 100,
+      max_retry_after: 1_000,
+      idempotency_key: nil,
+      transport_opts: []
     ]
 
-    @option_schema [
-      transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
-      headers: [type: {:list, {:tuple, [:any, :any]}}],
-      session_id: [type: {:or, [:string, nil]}],
-      protocol_version: [type: :string]
-    ]
+    @option_schema Keyword.merge(
+                     [
+                       transport: [type: {:custom, DSEx.HTTP, :validate_transport, []}],
+                       headers: [type: {:list, {:tuple, [:any, :any]}}],
+                       session_id: [type: {:or, [:string, nil]}],
+                       protocol_version: [type: :string]
+                     ],
+                     DSEx.MCP.HTTPRecovery.option_schema()
+                   )
 
     def new(url, opts \\ []) do
       validate_url!(url)
       opts = DSEx.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
 
-      %__MODULE__{
-        url: url,
-        transport: Keyword.get(opts, :transport, DSEx.HTTP.Hackneyless),
-        headers: Keyword.get(opts, :headers, []),
-        session_id: Keyword.get(opts, :session_id),
-        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26")
-      }
+      struct!(
+        __MODULE__,
+        Keyword.merge(
+          DSEx.MCP.HTTPRecovery.defaults(),
+          opts
+        )
+        |> Keyword.put(:url, url)
+      )
     end
 
     def list_tools(%__MODULE__{} = client) do
@@ -368,28 +655,20 @@ defmodule DSEx.MCP do
     end
 
     defp rpc(client, method, params) do
-      body = %{"jsonrpc" => "2.0", "id" => next_id(), "method" => method, "params" => params}
-
-      DSEx.Telemetry.span(
-        [:dsex, :mcp, :streamable_http],
-        %{url: client.url, method: method},
-        fn ->
-          with {:ok, %{status: status, body: response}} when status in 200..299 <-
-                 DSEx.HTTP.post(
-                   client.transport,
-                   client.url,
-                   headers(client),
-                   Jason.encode!(body),
-                   []
-                 ),
-               {:ok, decoded} <- decode_body(response) do
-            {:ok, decoded}
-          else
-            {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-            {:error, reason} -> {:error, reason}
-          end
-        end
-      )
+      with {:ok, %{status: status, body: response}} when status in 200..299 <-
+             DSEx.MCP.HTTPRecovery.request(
+               client,
+               [:dsex, :mcp, :streamable_http],
+               method,
+               params,
+               headers(client)
+             ),
+           {:ok, decoded} <- decode_body(response) do
+        {:ok, decoded}
+      else
+        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
+        {:error, reason} -> {:error, reason}
+      end
     end
 
     defp decode_body(body) do
@@ -412,8 +691,6 @@ defmodule DSEx.MCP do
     defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
     defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
     defp decode_tools(other), do: {:error, {:missing_tools, other}}
-
-    defp next_id, do: System.unique_integer([:positive])
 
     defp validate_url!(url) when is_binary(url), do: :ok
 
