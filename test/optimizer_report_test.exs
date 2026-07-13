@@ -429,11 +429,9 @@ defmodule OptimizerReportTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.BootstrapFewShot\.new\/2 expects a metric function with arity 2/,
+                 ~r/DSEx\.Optimizer\.BootstrapFewShot\.new\/2 expects a metric function with arity 2 or 3/,
                  fn ->
-                   DSEx.Optimizer.BootstrapFewShot.new(fn _example, _prediction, _trace ->
-                     true
-                   end)
+                   DSEx.Optimizer.BootstrapFewShot.new(fn _example -> true end)
                  end
   end
 

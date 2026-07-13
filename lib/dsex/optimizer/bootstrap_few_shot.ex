@@ -3,8 +3,9 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   Compile a predictor by selecting successful demonstrations from a trainset.
 
   `BootstrapFewShot` runs the current program over each training example and
-  keeps examples whose predictions pass the metric. The selected examples become
-  demos for the compiled program.
+  keeps trajectories whose predictions pass the metric. Generated outputs from
+  those trajectories become demos for each named predictor in the compiled
+  program.
 
   Compilation also attaches a `DSEx.Optimizer.Report` so you can inspect which
   examples were selected, which were rejected, and which failed because of a
@@ -18,7 +19,13 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   ]
 
   def new(metric, opts \\ []) do
-    DSEx.FunctionContract.validate!(metric, 2, "DSEx.Optimizer.BootstrapFewShot.new/2", "metric")
+    DSEx.FunctionContract.validate!(
+      metric,
+      [2, 3],
+      "DSEx.Optimizer.BootstrapFewShot.new/2",
+      "metric"
+    )
+
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BootstrapFewShot.new/2")
 
     %__MODULE__{
@@ -28,40 +35,29 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
-    {demos, candidates, errors} =
-      case indexed_trainset(trainset) do
-        {:ok, indexed} ->
-          Enum.reduce(indexed, {[], [], []}, fn {example, index}, {demos, candidates, errors} ->
-            selected? = length(demos) < optimizer.max_bootstrapped_demos
-            result = evaluate_example(optimizer, program, example, index, selected?)
+    {demos_by_name, selected_count, candidates, errors} =
+      case materialize_trainset(trainset) do
+        {:ok, examples} ->
+          trajectories =
+            DSEx.Optimizer.TrajectoryRunner.run(program, examples, optimizer.metric,
+              runtime: :evaluation
+            )
 
-            demos =
-              if result.selected? do
-                [example | demos]
-              else
-                demos
-              end
+          {selected, candidates} =
+            select_trajectories(trajectories, optimizer.max_bootstrapped_demos)
 
-            errors =
-              case result.error do
-                nil -> errors
-                error -> [error | errors]
-              end
+          names = Enum.map(DSEx.ProgramParameters.predictors(program), & &1.name)
+          demos_by_name = DSEx.Optimizer.DemoCandidates.extract_bootstrapped(selected, names)
 
-            {demos, [Map.delete(result, :error) | candidates], errors}
-          end)
+          {demos_by_name, length(selected), candidates, trajectory_errors(trajectories)}
 
         {:error, error} ->
-          {[], [], [%{stage: :trainset, reason: error_message(error)}]}
+          {%{}, 0, [], [%{stage: :trainset, reason: error_message(error)}]}
       end
 
-    demos = Enum.reverse(demos)
-    candidates = Enum.reverse(candidates)
-    errors = Enum.reverse(errors)
-    compiled = if trainset_error?(errors), do: program, else: put_demos(program, demos)
+    compiled = if trainset_error?(errors), do: program, else: put_demos(program, demos_by_name)
 
-    compiled
-    |> DSEx.Optimizer.Report.attach(
+    report =
       DSEx.Optimizer.Report.new(%{
         optimizer: :bootstrap_few_shot,
         best_score: average_score(candidates),
@@ -69,97 +65,85 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
         candidates: candidates,
         errors: errors,
         metadata: %{
-          selected_count: length(demos),
+          selected_count: selected_count,
+          predictor_demo_counts:
+            Map.new(demos_by_name, fn {name, demos} -> {name, length(demos)} end),
           max_bootstrapped_demos: optimizer.max_bootstrapped_demos,
           trainset_size: length(candidates),
+          trajectory_substrate: DSEx.Optimizer.Trajectory,
           status: report_status(errors)
         }
       })
-    )
+
+    attach_report(compiled, report)
   end
 
-  defp indexed_trainset(trainset) do
-    {:ok, Enum.with_index(trainset)}
+  defp materialize_trainset(trainset) do
+    {:ok, Enum.to_list(trainset)}
   rescue
     error -> {:error, error}
   catch
     kind, reason -> {:error, {kind, reason}}
   end
 
-  defp evaluate_example(optimizer, program, example, index, can_select?) do
-    inputs = example |> DSEx.Example.inputs() |> DSEx.Example.to_map()
+  defp select_trajectories(trajectories, limit) do
+    {selected, candidates, _count} =
+      Enum.reduce(trajectories, {[], [], 0}, fn trajectory, {selected, candidates, count} ->
+        passed? = is_nil(trajectory.error) and trajectory.score != 0
+        selected? = passed? and count < limit
 
-    case safe_call(program, inputs) do
-      {:ok, prediction} ->
-        metric_result = safe_metric(optimizer.metric, example, prediction)
-        selected? = can_select? and metric_result.passed?
-
-        %{
-          index: index,
-          score: metric_result.score,
-          passed?: metric_result.passed?,
+        candidate = %{
+          index: trajectory.index,
+          score: trajectory.score,
+          passed?: passed?,
           selected?: selected?,
-          feedback: metric_result.feedback,
-          error: metric_error(index, metric_result)
+          feedback: trajectory.feedback
         }
 
-      {:error, reason} ->
-        %{
-          index: index,
-          score: 0.0,
-          passed?: false,
-          selected?: false,
-          feedback: nil,
-          error: %{index: index, stage: :program_call, reason: error_message(reason)}
-        }
-    end
+        if selected? do
+          {[trajectory | selected], [candidate | candidates], count + 1}
+        else
+          {selected, [candidate | candidates], count}
+        end
+      end)
+
+    {Enum.reverse(selected), Enum.reverse(candidates)}
   end
 
-  defp safe_call(program, inputs) do
-    DSEx.Module.call(program, inputs)
-  rescue
-    error -> {:error, error}
-  catch
-    kind, reason -> {:error, {kind, reason}}
-  end
+  defp trajectory_errors(trajectories) do
+    trajectories
+    |> Enum.reject(&is_nil(&1.error))
+    |> Enum.map(fn
+      %{index: index, error: {:metric_error, reason}} ->
+        %{index: index, stage: :metric, reason: error_message(reason)}
 
-  defp safe_metric(metric, example, prediction) do
-    metric
-    |> apply([example, prediction])
-    |> DSEx.Metrics.normalize_result()
-  rescue
-    error ->
-      %DSEx.Metrics.Result{
-        score: 0.0,
-        passed?: false,
-        feedback: {:metric_error, error_message(error)},
-        metadata: %{error: error}
-      }
-  catch
-    kind, reason ->
-      %DSEx.Metrics.Result{
-        score: 0.0,
-        passed?: false,
-        feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{error: {kind, reason}}
-      }
+      %{index: index, error: reason} ->
+        %{index: index, stage: :program_call, reason: error_message(reason)}
+    end)
   end
-
-  defp metric_error(index, %DSEx.Metrics.Result{metadata: %{error: error}}) do
-    %{index: index, stage: :metric, reason: error_message(error)}
-  end
-
-  defp metric_error(_index, _result), do: nil
 
   defp report_status([]), do: :ok
   defp report_status(errors) when is_list(errors), do: :with_errors
 
   defp trainset_error?(errors), do: Enum.any?(errors, &(&1.stage == :trainset))
 
-  defp put_demos(program, demos) do
+  defp put_demos(program, demos_by_name) do
+    Enum.reduce(demos_by_name, program, fn {name, demos}, compiled ->
+      DSEx.ProgramParameters.put_demos(compiled, name, demos)
+    end)
+  end
+
+  defp attach_report(program, report) do
     case DSEx.ProgramAccess.predict(program) do
-      nil -> program
-      _predict -> DSEx.with_demos(program, demos)
+      nil ->
+        Enum.reduce(DSEx.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+          DSEx.ProgramParameters.update_predictor(acc, name, fn predictor ->
+            DSEx.Optimizer.Report.attach(predictor, report)
+          end)
+        end)
+
+      _predictor ->
+        DSEx.Optimizer.Report.attach(program, report)
     end
   end
 
@@ -173,5 +157,6 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
   end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
+  defp error_message(error) when is_binary(error), do: error
   defp error_message(error), do: inspect(error)
 end

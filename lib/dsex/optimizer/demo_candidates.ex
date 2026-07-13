@@ -111,7 +111,8 @@ defmodule DSEx.Optimizer.DemoCandidates do
   defp accepted?(trajectory, threshold),
     do: trajectory.error == nil and trajectory.score >= threshold
 
-  defp extract_bootstrapped(trajectories, names) do
+  @doc false
+  def extract_bootstrapped(trajectories, names) do
     Enum.reduce(trajectories, Map.new(names, &{&1, []}), fn trajectory, acc ->
       trace_demos = trace_demos(trajectory.trace)
 
