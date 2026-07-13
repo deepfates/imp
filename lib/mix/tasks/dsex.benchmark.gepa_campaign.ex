@@ -228,6 +228,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     )
   end
 
+  defp report_progress(%{event: :seed_checkpoint, phase: :baseline} = event) do
+    Mix.shell().info(
+      "[GEPA] #{event.family} seed=#{event.seed} baseline checkpoint splits=#{Enum.join(event.baseline_splits, ",")}"
+    )
+  end
+
   defp report_progress(%{event: :seed_resumed} = event) do
     Mix.shell().info("[GEPA] #{event.family} seed=#{event.seed} resumed from checkpoint")
   end

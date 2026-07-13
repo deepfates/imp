@@ -308,6 +308,48 @@ defmodule GepaCampaignTest do
     assert Enum.map(completed, & &1["seed"]) == [0, 1]
   end
 
+  test "DSEx GEPA campaign checkpoints and resumes individual baseline splits" do
+    dataset_root = tmp_dir("gepa-campaign-split-resume-data")
+    rows_dir = tmp_dir("gepa-campaign-split-resume-rows")
+    write_dataset_root!(dataset_root)
+    events = self()
+
+    base_opts =
+      campaign_opts(dataset_root, rows_dir, campaign_id: "gepa-campaign-split-resume-test")
+
+    GepaCampaign.run(base_opts)
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    [completed] = checkpoint["completed"]
+
+    partial = %{
+      "baseline" => %{"train" => get_in(completed, ["result", "baseline_train"])},
+      "usage" => %{"usd" => 0.0, "input_tokens" => 0, "output_tokens" => 0}
+    }
+
+    checkpoint =
+      checkpoint
+      |> Map.put("completed", [])
+      |> Map.put("in_progress", %{"0" => partial})
+
+    File.write!(checkpoint_path, Jason.encode!(checkpoint))
+    GepaCampaign.run(Keyword.put(base_opts, :reporter, &send(events, &1)))
+
+    refute_received %{event: :seed_checkpoint, baseline_splits: ["train"]}
+
+    assert_received %{
+      event: :seed_checkpoint,
+      phase: :baseline,
+      baseline_splits: ["dev", "train"]
+    }
+
+    assert_received %{
+      event: :seed_checkpoint,
+      phase: :baseline,
+      baseline_splits: ["dev", "test", "train"]
+    }
+  end
+
   test "DSEx GEPA campaign consumes and clears persisted optimizer generation state" do
     dataset_root = tmp_dir("gepa-campaign-generation-resume-data")
     rows_dir = tmp_dir("gepa-campaign-generation-resume-rows")

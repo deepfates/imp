@@ -295,6 +295,11 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
                 family: family,
                 seed: seed,
                 phase: if(candidates == [], do: :baseline, else: :optimizer),
+                baseline_splits:
+                  seed_progress
+                  |> Map.get("baseline", %{})
+                  |> Map.keys()
+                  |> Enum.sort(),
                 completed_generations: max(length(candidates) - 1, 0)
               })
 
@@ -517,20 +522,14 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       GepaComponentFeedback.callbacks!(spec, program, feedback_metric)
 
     baseline =
-      case progress["baseline"] do
-        %{"train" => train, "dev" => dev, "test" => test} ->
-          %{train: train, dev: dev, test: test}
-
-        nil ->
-          baseline = %{
-            train: score(program, trainset, metric, max_concurrency),
-            dev: score(program, devset, metric, max_concurrency),
-            test: score(program, testset, metric, max_concurrency)
-          }
-
-          progress_fn.(Map.put(progress, "baseline", stringify_scores(baseline)))
-          baseline
-      end
+      baseline_scores(
+        program,
+        [train: trainset, dev: devset, test: testset],
+        metric,
+        max_concurrency,
+        progress,
+        progress_fn
+      )
 
     optimizer_checkpoint_fn = fn optimizer_state ->
       progress
@@ -803,7 +802,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     optimizer_state = progress["optimizer_state"]
     usage = progress["usage"]
 
-    (is_nil(baseline) or valid_baseline_scores?(baseline)) and
+    (is_nil(baseline) or valid_baseline_progress?(baseline)) and
       (is_nil(optimizer_state) or
          (valid_baseline_scores?(baseline) and is_map(optimizer_state))) and
       (is_nil(usage) or valid_usage?(usage))
@@ -818,6 +817,19 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   end
 
   defp valid_baseline_scores?(_baseline), do: false
+
+  defp valid_baseline_progress?(baseline) when is_map(baseline) do
+    keys = baseline |> Map.keys() |> MapSet.new()
+
+    keys in [
+      MapSet.new(["train"]),
+      MapSet.new(["train", "dev"]),
+      MapSet.new(["train", "dev", "test"])
+    ] and
+      Enum.all?(baseline, fn {_split, score} -> numeric?(score) and score >= 0 and score <= 1 end)
+  end
+
+  defp valid_baseline_progress?(_baseline), do: false
 
   defp valid_seed_result?(result) do
     Enum.all?(
@@ -867,6 +879,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
 
   defp stringify_scores(scores) do
     %{"train" => scores.train, "dev" => scores.dev, "test" => scores.test}
+  end
+
+  defp stringify_partial_scores(scores) do
+    Map.new(scores, fn {key, value} -> {Atom.to_string(key), value} end)
   end
 
   defp atomize_seed_result(result) do
@@ -1048,6 +1064,26 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       ),
       program
     ).score
+  end
+
+  defp baseline_scores(program, splits, metric, max_concurrency, progress, progress_fn) do
+    Enum.reduce(splits, %{}, fn {split, examples}, scores ->
+      key = Atom.to_string(split)
+
+      value =
+        case get_in(progress, ["baseline", key]) do
+          nil ->
+            value = score(program, examples, metric, max_concurrency)
+            baseline = scores |> Map.put(split, value) |> stringify_partial_scores()
+            progress_fn.(Map.put(progress, "baseline", baseline))
+            value
+
+          checkpointed ->
+            checkpointed
+        end
+
+      Map.put(scores, split, value)
+    end)
   end
 
   defp split_paths(dataset_root, family) do
