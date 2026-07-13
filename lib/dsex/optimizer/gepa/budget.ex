@@ -1,9 +1,10 @@
 defmodule DSEx.Optimizer.GEPA.Budget do
   @moduledoc false
 
-  @enforce_keys [:max_metric_calls, :max_full_evaluations]
+  @enforce_keys [:max_metric_calls, :max_full_evaluations, :max_reflection_calls]
   defstruct max_metric_calls: :infinity,
             max_full_evaluations: :infinity,
+            max_reflection_calls: :infinity,
             metric_calls: 0,
             full_evaluations: 0,
             reflection_calls: 0
@@ -12,13 +13,15 @@ defmodule DSEx.Optimizer.GEPA.Budget do
   @type t :: %__MODULE__{
           max_metric_calls: limit(),
           max_full_evaluations: limit(),
+          max_reflection_calls: limit(),
           metric_calls: non_neg_integer(),
           full_evaluations: non_neg_integer(),
           reflection_calls: non_neg_integer()
         }
 
   @type exhaustion ::
-          {:budget_exhausted, :metric_calls | :full_evaluations, non_neg_integer(), limit()}
+          {:budget_exhausted, :metric_calls | :full_evaluations | :reflection_calls,
+           non_neg_integer(), limit()}
 
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
@@ -26,7 +29,9 @@ defmodule DSEx.Optimizer.GEPA.Budget do
       max_metric_calls:
         limit!(Keyword.get(opts, :max_metric_calls, :infinity), :max_metric_calls),
       max_full_evaluations:
-        limit!(Keyword.get(opts, :max_full_evaluations, :infinity), :max_full_evaluations)
+        limit!(Keyword.get(opts, :max_full_evaluations, :infinity), :max_full_evaluations),
+      max_reflection_calls:
+        limit!(Keyword.get(opts, :max_reflection_calls, :infinity), :max_reflection_calls)
     }
   end
 
@@ -74,11 +79,41 @@ defmodule DSEx.Optimizer.GEPA.Budget do
     %{budget | reflection_calls: budget.reflection_calls + 1}
   end
 
+  @doc false
+  def commit_reserved(%__MODULE__{} = budget, metric_calls, full_evaluations, reflection_calls)
+      when is_integer(metric_calls) and metric_calls >= 0 and
+             is_integer(full_evaluations) and full_evaluations >= 0 and
+             is_integer(reflection_calls) and reflection_calls >= 0 do
+    projected = %{
+      budget
+      | metric_calls: budget.metric_calls + metric_calls,
+        full_evaluations: budget.full_evaluations + full_evaluations,
+        reflection_calls: budget.reflection_calls + reflection_calls
+    }
+
+    ensure_within_limit!(projected.metric_calls, projected.max_metric_calls, :metric_calls)
+
+    ensure_within_limit!(
+      projected.full_evaluations,
+      projected.max_full_evaluations,
+      :full_evaluations
+    )
+
+    ensure_within_limit!(
+      projected.reflection_calls,
+      projected.max_reflection_calls,
+      :reflection_calls
+    )
+
+    projected
+  end
+
   @spec dump(t()) :: map()
   def dump(%__MODULE__{} = budget) do
     %{
       "max_metric_calls" => dump_limit(budget.max_metric_calls),
       "max_full_evaluations" => dump_limit(budget.max_full_evaluations),
+      "max_reflection_calls" => dump_limit(budget.max_reflection_calls),
       "metric_calls" => budget.metric_calls,
       "full_evaluations" => budget.full_evaluations,
       "reflection_calls" => budget.reflection_calls
@@ -91,6 +126,10 @@ defmodule DSEx.Optimizer.GEPA.Budget do
       max_metric_calls: state |> fetch!("max_metric_calls") |> load_limit!(:max_metric_calls),
       max_full_evaluations:
         state |> fetch!("max_full_evaluations") |> load_limit!(:max_full_evaluations),
+      max_reflection_calls:
+        state
+        |> Map.get("max_reflection_calls", "infinity")
+        |> load_limit!(:max_reflection_calls),
       metric_calls: state |> fetch!("metric_calls") |> count!(:metric_calls),
       full_evaluations: state |> fetch!("full_evaluations") |> count!(:full_evaluations),
       reflection_calls: state |> fetch!("reflection_calls") |> count!(:reflection_calls)
@@ -98,6 +137,7 @@ defmodule DSEx.Optimizer.GEPA.Budget do
 
     ensure_within_limit!(budget.metric_calls, budget.max_metric_calls, :metric_calls)
     ensure_within_limit!(budget.full_evaluations, budget.max_full_evaluations, :full_evaluations)
+    ensure_within_limit!(budget.reflection_calls, budget.max_reflection_calls, :reflection_calls)
     budget
   end
 

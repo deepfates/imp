@@ -5,15 +5,19 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     Acceptance,
     Adapter,
     Budget,
+    BudgetLedger,
     Callback,
     Candidate,
     CandidateSelector,
+    Coordinator,
     Evaluation,
     EvaluationCache,
     EvaluationPolicy,
     Frontier,
     Merge,
     ModuleSelector,
+    Proposal,
+    Reflection,
     Result,
     Stopper
   }
@@ -45,6 +49,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
               evaluation_policy: EvaluationPolicy.Full,
               best_outputs_valset: nil,
               stopper_state: nil,
+              budget_ledger: %BudgetLedger{},
+              pending_proposal_batch: nil,
+              proposal_policy: %{requested: 1, resolved: 1, timeout: :infinity},
               stop_reason: nil
   end
 
@@ -56,6 +63,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       when is_list(trainset) and is_list(valset) and is_function(proposer, 4) and is_list(opts) do
     seed_candidate = Candidate.validate!(seed_candidate)
     validate_inputs!(seed_candidate, trainset, valset, opts)
+    minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
+    proposal_policy = proposal_policy(opts, minibatch_size)
+    opts = Keyword.put(opts, :proposal_policy, proposal_policy)
 
     notify(opts, :on_optimization_start, %{
       seed_candidate: seed_candidate,
@@ -70,31 +80,33 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         resume_state -> load_state!(resume_state, seed_candidate, opts)
       end
 
+    state = ensure_proposal_policy!(state, proposal_policy)
     max_iterations = Keyword.get(opts, :max_iterations, 10)
-    minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
 
     state =
-      Enum.reduce_while(iteration_range(state.iteration + 1, max_iterations), state, fn iteration,
-                                                                                        state ->
-        case check_stopper(state, opts) do
-          {:continue, state} ->
-            run_iteration(
-              adapter,
-              trainset,
-              valset,
-              proposer,
-              minibatch_size,
-              iteration,
-              state,
-              opts
-            )
-
-          {:stop, reason, state} ->
-            state = %{state | stop_reason: reason}
-            checkpoint!(state, opts)
-            {:halt, state}
-        end
-      end)
+      if proposal_policy.resolved == 1 do
+        run_sequential_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
+      else
+        run_parallel_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
+      end
 
     state =
       if state.iteration >= max_iterations and is_nil(state.stop_reason),
@@ -111,6 +123,880 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     })
 
     state
+  end
+
+  defp run_sequential_loop(
+         adapter,
+         trainset,
+         valset,
+         proposer,
+         minibatch_size,
+         max_iterations,
+         state,
+         opts
+       ) do
+    Enum.reduce_while(iteration_range(state.iteration + 1, max_iterations), state, fn iteration,
+                                                                                      state ->
+      case check_stopper(state, opts) do
+        {:continue, state} ->
+          run_iteration(
+            adapter,
+            trainset,
+            valset,
+            proposer,
+            minibatch_size,
+            iteration,
+            state,
+            opts
+          )
+
+        {:stop, reason, state} ->
+          state = %{state | stop_reason: reason}
+          checkpoint!(state, opts)
+          {:halt, state}
+      end
+    end)
+  end
+
+  defp run_parallel_loop(
+         adapter,
+         trainset,
+         valset,
+         proposer,
+         minibatch_size,
+         max_iterations,
+         state,
+         opts
+       ) do
+    cond do
+      state.stop_reason != nil or state.iteration >= max_iterations ->
+        state
+
+      match?(%Proposal.Batch{status: :started}, state.pending_proposal_batch) ->
+        raise ArgumentError,
+              "GEPA resume contains a started proposal batch with ambiguous external effects"
+
+      match?(%Proposal.Batch{phase: :parent}, state.pending_proposal_batch) ->
+        state = execute_parent_batch(state, adapter, trainset, opts)
+
+        run_parallel_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
+
+      match?(%Proposal.Batch{phase: :reflection}, state.pending_proposal_batch) ->
+        state = execute_reflection_batch(state, adapter, proposer, trainset, opts)
+
+        run_parallel_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
+
+      match?(%Proposal.Batch{phase: :child}, state.pending_proposal_batch) ->
+        state = execute_child_batch(state, adapter, trainset, valset, opts)
+
+        run_parallel_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
+
+      merge_scheduled?(state, opts) ->
+        case check_stopper(state, opts) do
+          {:continue, state} ->
+            case run_iteration(
+                   adapter,
+                   trainset,
+                   valset,
+                   proposer,
+                   minibatch_size,
+                   state.iteration + 1,
+                   state,
+                   opts
+                 ) do
+              {:cont, state} ->
+                run_parallel_loop(
+                  adapter,
+                  trainset,
+                  valset,
+                  proposer,
+                  minibatch_size,
+                  max_iterations,
+                  state,
+                  opts
+                )
+
+              {:halt, state} ->
+                state
+            end
+
+          {:stop, reason, state} ->
+            state = %{state | stop_reason: reason}
+            checkpoint!(state, opts)
+            state
+        end
+
+      true ->
+        case check_stopper(state, opts) do
+          {:continue, state} ->
+            state =
+              prepare_parent_batch(
+                state,
+                adapter,
+                trainset,
+                minibatch_size,
+                max_iterations,
+                opts
+              )
+
+            run_parallel_loop(
+              adapter,
+              trainset,
+              valset,
+              proposer,
+              minibatch_size,
+              max_iterations,
+              state,
+              opts
+            )
+
+          {:stop, reason, state} ->
+            state = %{state | stop_reason: reason}
+            checkpoint!(state, opts)
+            state
+        end
+    end
+  end
+
+  defp prepare_parent_batch(state, adapter, trainset, minibatch_size, max_iterations, opts) do
+    count = min(state.proposal_policy.resolved, max_iterations - state.iteration)
+
+    {contexts, state, deferred_stop_reason} =
+      Enum.reduce_while(0..(count - 1), {[], state, nil}, fn slot, {contexts, state, _reason} ->
+        iteration = state.iteration + slot + 1
+
+        {batch, minibatch_ids, rng_state} =
+          sample_batch(trainset, minibatch_size, state.rng_state)
+
+        {parent, rng_state} =
+          opts
+          |> Keyword.get(:candidate_selection_strategy, :pareto)
+          |> CandidateSelector.select(%{state | rng_state: rng_state})
+
+        reservation =
+          Adapter.metric_call_reservation(
+            adapter,
+            batch,
+            parent.candidate,
+            capture_traces: true
+          )
+
+        id = reservation_id(:parent, iteration)
+
+        case BudgetLedger.reserve(state.budget_ledger, state.budget, id, %{
+               metric_calls: reservation
+             }) do
+          {:ok, ledger} ->
+            context = %Proposal.Context{
+              slot: slot,
+              iteration: iteration,
+              parent_id: parent.id,
+              minibatch_ids: minibatch_ids
+            }
+
+            {:cont,
+             {contexts ++ [context], %{state | rng_state: rng_state, budget_ledger: ledger}, nil}}
+
+          {:error, reason} ->
+            {:halt, {contexts, state, reason}}
+        end
+      end)
+
+    case contexts do
+      [] ->
+        state = %{state | stop_reason: deferred_stop_reason}
+        checkpoint!(state, opts)
+        state
+
+      contexts ->
+        batch = Proposal.new_batch(:parent, contexts, deferred_stop_reason)
+        state = %{state | pending_proposal_batch: batch}
+        checkpoint!(state, opts)
+        state
+    end
+  end
+
+  defp execute_parent_batch(state, adapter, trainset, opts) do
+    %Proposal.Batch{status: :prepared, contexts: contexts} =
+      batch =
+      state.pending_proposal_batch
+
+    state = mark_batch_started!(state, opts)
+
+    outputs =
+      Coordinator.run(contexts, state.proposal_policy.timeout, fn context ->
+        parent = Enum.fetch!(state.candidates, context.parent_id)
+        examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
+        Evaluation.evaluate(adapter, examples, parent.candidate, capture_traces: true)
+      end)
+
+    {contexts, state, deferred_stop_reason} =
+      contexts
+      |> Enum.zip(outputs)
+      |> Enum.reduce({[], state, batch.deferred_stop_reason}, fn {context, output},
+                                                                 {contexts, state, stop_reason} ->
+        parent = Enum.fetch!(state.candidates, context.parent_id)
+
+        case output do
+          {:ok, %Result{} = result} ->
+            context = %{
+              context
+              | parent_result: result,
+                parent_metric_calls: metric_calls(result, length(context.minibatch_ids))
+            }
+
+            if perfect_result?(result, opts) do
+              {contexts ++ [%{context | action: :skip}], state, stop_reason}
+            else
+              components =
+                apply(ModuleSelector, :select, [
+                  Keyword.get(opts, :module_selector, :round_robin),
+                  state,
+                  result.trajectories,
+                  result.scores,
+                  parent.id,
+                  parent.candidate
+                ])
+
+              next_component = next_component(parent, opts)
+              state = advance_component_cursor(state, parent.id, next_component, opts)
+              reflection_id = reservation_id(:reflection, context.iteration)
+
+              case BudgetLedger.reserve(
+                     state.budget_ledger,
+                     state.budget,
+                     reflection_id,
+                     %{reflection_calls: length(components)}
+                   ) do
+                {:ok, ledger} ->
+                  context = %{
+                    context
+                    | action: :reflect,
+                      components: components,
+                      next_component: next_component
+                  }
+
+                  {contexts ++ [context], %{state | budget_ledger: ledger}, stop_reason}
+
+                {:error, reason} ->
+                  context = %{
+                    context
+                    | action: :budget_stop,
+                      components: components,
+                      error: reason
+                  }
+
+                  {contexts ++ [context], state, stop_reason || reason}
+              end
+            end
+
+          {:error, reason} ->
+            context = %{context | action: :error, error: reason, parent_ambiguous: true}
+            {contexts ++ [context], state, stop_reason}
+        end
+      end)
+
+    next_batch = Proposal.new_batch(:reflection, contexts, deferred_stop_reason)
+    state = %{state | pending_proposal_batch: next_batch}
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp execute_reflection_batch(state, adapter, proposer, trainset, opts) do
+    %Proposal.Batch{status: :prepared, contexts: contexts} =
+      batch =
+      state.pending_proposal_batch
+
+    runnable = Enum.filter(contexts, &(&1.action == :reflect))
+    state = if runnable == [], do: state, else: mark_batch_started!(state, opts)
+
+    outputs =
+      Coordinator.run(runnable, state.proposal_policy.timeout, fn context ->
+        parent = Enum.fetch!(state.candidates, context.parent_id)
+        Reflection.execute(adapter, proposer, parent, context)
+      end)
+      |> then(&Map.new(Enum.zip(Enum.map(runnable, fn context -> context.slot end), &1)))
+
+    {contexts, state, deferred_stop_reason} =
+      Enum.reduce(contexts, {[], state, batch.deferred_stop_reason}, fn context,
+                                                                        {contexts, state,
+                                                                         stop_reason} ->
+        if context.action != :reflect do
+          {contexts ++ [context], state, stop_reason}
+        else
+          case Map.fetch!(outputs, context.slot) do
+            {:ok, %{status: :ok} = output} ->
+              examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
+
+              reservation =
+                Adapter.metric_call_reservation(
+                  adapter,
+                  examples,
+                  output.candidate,
+                  capture_traces: true
+                )
+
+              child_id = reservation_id(:child, context.iteration)
+
+              context = %{
+                context
+                | reflection_calls: output.reflection_calls,
+                  dataset: output.dataset,
+                  replacements: output.replacements,
+                  candidate: output.candidate
+              }
+
+              case BudgetLedger.reserve(state.budget_ledger, state.budget, child_id, %{
+                     metric_calls: reservation
+                   }) do
+                {:ok, ledger} ->
+                  {contexts ++ [%{context | action: :child}], %{state | budget_ledger: ledger},
+                   stop_reason}
+
+                {:error, reason} ->
+                  {contexts ++ [%{context | action: :budget_stop, error: reason}], state,
+                   stop_reason || reason}
+              end
+
+            {:ok, %{status: :error} = output} ->
+              context = %{
+                context
+                | action: :error,
+                  reflection_calls: output.reflection_calls,
+                  dataset: output.dataset,
+                  replacements: output.replacements,
+                  error: output.error
+              }
+
+              {contexts ++ [context], state, stop_reason}
+
+            {:error, reason} ->
+              context = %{
+                context
+                | action: :error,
+                  error: reason,
+                  reflection_ambiguous: true
+              }
+
+              {contexts ++ [context], state, stop_reason}
+          end
+        end
+      end)
+
+    next_batch = Proposal.new_batch(:child, contexts, deferred_stop_reason)
+    state = %{state | pending_proposal_batch: next_batch}
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp execute_child_batch(state, adapter, trainset, valset, opts) do
+    %Proposal.Batch{status: :prepared, contexts: contexts} =
+      batch =
+      state.pending_proposal_batch
+
+    runnable = Enum.filter(contexts, &(&1.action == :child))
+    state = if runnable == [], do: state, else: mark_batch_started!(state, opts)
+
+    outputs =
+      Coordinator.run(runnable, state.proposal_policy.timeout, fn context ->
+        examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
+        Evaluation.evaluate(adapter, examples, context.candidate, capture_traces: true)
+      end)
+      |> then(&Map.new(Enum.zip(Enum.map(runnable, fn context -> context.slot end), &1)))
+
+    contexts =
+      Enum.map(contexts, fn context ->
+        if context.action != :child do
+          context
+        else
+          case Map.fetch!(outputs, context.slot) do
+            {:ok, %Result{} = result} ->
+              %{
+                context
+                | child_result: result,
+                  child_metric_calls: metric_calls(result, length(context.minibatch_ids))
+              }
+
+            {:error, reason} ->
+              %{context | action: :error, error: reason, child_ambiguous: true}
+          end
+        end
+      end)
+
+    state = apply_parallel_contexts(state, contexts, adapter, trainset, valset, opts)
+    stop_reason = state.stop_reason || batch.deferred_stop_reason
+
+    unless BudgetLedger.empty?(state.budget_ledger) do
+      raise "GEPA proposal batch completed with unreleased budget reservations"
+    end
+
+    state = %{
+      state
+      | pending_proposal_batch: nil,
+        budget_ledger: BudgetLedger.new(),
+        stop_reason: stop_reason
+    }
+
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp apply_parallel_contexts(state, contexts, adapter, trainset, valset, opts) do
+    Enum.reduce(contexts, state, fn context, state ->
+      {state, reservation_error} = commit_context_reservations(state, context)
+
+      context =
+        if reservation_error,
+          do: %{context | action: :error, error: reservation_error},
+          else: context
+
+      parent = Enum.fetch!(state.candidates, context.parent_id)
+      candidate_count = length(state.candidates)
+
+      notify(opts, :on_iteration_start, %{iteration: context.iteration, state: state})
+
+      notify(opts, :on_candidate_selected, %{
+        iteration: context.iteration,
+        candidate_idx: parent.id,
+        candidate: parent.candidate,
+        score: parent.validation.aggregate_score
+      })
+
+      notify(opts, :on_minibatch_sampled, %{
+        iteration: context.iteration,
+        minibatch_ids: context.minibatch_ids,
+        trainset_size: length(trainset)
+      })
+
+      state = apply_parent_result(state, context, parent, trainset, opts)
+      state = apply_parallel_action(state, context, parent, adapter, trainset, valset, opts)
+      notify_iteration_end(opts, context.iteration, state, candidate_count)
+      state
+    end)
+  end
+
+  defp apply_parent_result(
+         state,
+         %Proposal.Context{parent_result: nil},
+         _parent,
+         _trainset,
+         _opts
+       ),
+       do: state
+
+  defp apply_parent_result(state, context, parent, trainset, opts) do
+    examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
+
+    event = %{
+      iteration: context.iteration,
+      candidate_idx: parent.id,
+      parent_ids: parent.parent_ids,
+      is_seed_candidate: parent.id == 0
+    }
+
+    notify_evaluation_start(opts, examples, true, event)
+    notify_evaluation_end(opts, context.parent_result, event)
+
+    cache =
+      maybe_cache_result(state.cache, parent.candidate, examples, context.parent_result, true)
+
+    %{state | cache: cache}
+  end
+
+  defp apply_parallel_action(
+         state,
+         %{action: :skip} = context,
+         parent,
+         _adapter,
+         _trainset,
+         _valset,
+         opts
+       ) do
+    notify(opts, :on_evaluation_skipped, %{
+      iteration: context.iteration,
+      candidate_idx: parent.id,
+      reason: :all_scores_perfect,
+      scores: context.parent_result.scores,
+      is_seed_candidate: parent.id == 0
+    })
+
+    %{state | iteration: context.iteration, last_iteration_found_candidate: false}
+  end
+
+  defp apply_parallel_action(
+         state,
+         %{action: :budget_stop} = context,
+         _parent,
+         _adapter,
+         _trainset,
+         _valset,
+         _opts
+       ) do
+    %{state | iteration: context.iteration, stop_reason: state.stop_reason || context.error}
+  end
+
+  defp apply_parallel_action(
+         state,
+         %{action: :error} = context,
+         parent,
+         _adapter,
+         _trainset,
+         _valset,
+         opts
+       ) do
+    maybe_notify_reflection_start(opts, context, parent)
+
+    notify(opts, :on_error, %{
+      iteration: context.iteration,
+      exception: context.error,
+      will_continue: true
+    })
+
+    reject(
+      state,
+      context.iteration,
+      parent,
+      context.components || [],
+      {:proposal_error, context.error},
+      context.parent_result,
+      context.child_result,
+      context.candidate
+    )
+  end
+
+  defp apply_parallel_action(
+         state,
+         %{action: :child, child_result: %Result{}} = context,
+         parent,
+         adapter,
+         trainset,
+         valset,
+         opts
+       ) do
+    maybe_notify_reflection_start(opts, context, parent)
+
+    notify(opts, :on_proposal_end, %{
+      iteration: context.iteration,
+      new_instructions: context.replacements
+    })
+
+    examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
+
+    event = %{
+      iteration: context.iteration,
+      candidate_idx: nil,
+      parent_ids: [parent.id],
+      is_seed_candidate: false
+    }
+
+    notify_evaluation_start(opts, examples, true, event)
+    notify_evaluation_end(opts, context.child_result, event)
+
+    cache =
+      maybe_cache_result(state.cache, context.candidate, examples, context.child_result, true)
+
+    state = %{state | cache: cache, last_iteration_found_candidate: false}
+    policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
+
+    case Acceptance.decide(policy, context.parent_result, context.child_result, %{
+           operation: :mutation,
+           iteration: context.iteration,
+           parent_id: parent.id,
+           component: legacy_component(context.components),
+           components: context.components,
+           candidate: context.candidate
+         }) do
+      {:accept, acceptance} ->
+        case authorize_parallel_validation(
+               adapter,
+               valset,
+               context.candidate,
+               context.iteration,
+               state
+             ) do
+          {:ok, state} ->
+            case accept_candidate(
+                   adapter,
+                   valset,
+                   context.candidate,
+                   parent,
+                   context.components,
+                   context.next_component,
+                   context.parent_result,
+                   context.child_result,
+                   context.iteration,
+                   state,
+                   opts,
+                   acceptance
+                 ) do
+              {:ok, state} ->
+                state
+
+              {:stop, reason, state} ->
+                %{state | stop_reason: reason, iteration: context.iteration}
+            end
+
+          {:error, reason, state} ->
+            %{state | stop_reason: reason, iteration: context.iteration}
+        end
+
+      {:reject, reason} ->
+        notify(opts, :on_candidate_rejected, %{
+          iteration: context.iteration,
+          old_score: context.parent_result.aggregate_score,
+          new_score: context.child_result.aggregate_score,
+          reason: reason,
+          components: context.components
+        })
+
+        reject(
+          state,
+          context.iteration,
+          parent,
+          context.components,
+          reason,
+          context.parent_result,
+          context.child_result,
+          context.candidate
+        )
+    end
+  end
+
+  defp maybe_notify_reflection_start(_opts, %{dataset: nil}, _parent), do: :ok
+
+  defp maybe_notify_reflection_start(opts, context, parent) do
+    notify(opts, :on_reflective_dataset_built, %{
+      iteration: context.iteration,
+      candidate_idx: parent.id,
+      components: context.components,
+      dataset: context.dataset
+    })
+
+    notify(opts, :on_proposal_start, %{
+      iteration: context.iteration,
+      parent_candidate: parent.candidate,
+      components: context.components,
+      reflective_dataset: context.dataset
+    })
+  end
+
+  defp mark_batch_started!(state, opts) do
+    state = %{state | pending_proposal_batch: Proposal.started(state.pending_proposal_batch)}
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp commit_reservation(state, id, actual) do
+    try do
+      {budget, ledger} = BudgetLedger.commit(state.budget_ledger, state.budget, id, actual)
+      {%{state | budget: budget, budget_ledger: ledger}, :ok}
+    rescue
+      error in ArgumentError ->
+        {budget, ledger} =
+          BudgetLedger.commit_ambiguous(state.budget_ledger, state.budget, id)
+
+        {%{state | budget: budget, budget_ledger: ledger},
+         {:error, {:reservation_mismatch, Exception.message(error)}}}
+    end
+  end
+
+  defp commit_context_reservations(state, context) do
+    phases = [
+      {:parent, context.parent_ambiguous, %{metric_calls: context.parent_metric_calls || 0}},
+      {:reflection, context.reflection_ambiguous,
+       %{reflection_calls: context.reflection_calls || 0}},
+      {:child, context.child_ambiguous, %{metric_calls: context.child_metric_calls || 0}}
+    ]
+
+    Enum.reduce(phases, {state, nil}, fn {phase, ambiguous?, actual}, {state, error} ->
+      id = reservation_id(phase, context.iteration)
+
+      if Map.has_key?(state.budget_ledger.reservations, id) do
+        if ambiguous? do
+          {budget, ledger} =
+            BudgetLedger.commit_ambiguous(state.budget_ledger, state.budget, id)
+
+          {%{state | budget: budget, budget_ledger: ledger}, error}
+        else
+          {state, status} = commit_reservation(state, id, actual)
+          next_error = if status == :ok, do: error, else: elem(status, 1)
+          {state, next_error}
+        end
+      else
+        {state, error}
+      end
+    end)
+  end
+
+  defp authorize_parallel_validation(adapter, valset, candidate, iteration, state) do
+    target_id = length(state.candidates)
+
+    ids =
+      EvaluationPolicy.validation_ids(
+        state.evaluation_policy,
+        valset,
+        state,
+        target_id
+      )
+
+    batch = Enum.map(ids, &Enum.fetch!(valset, &1))
+
+    metric_calls =
+      Adapter.metric_call_reservation(adapter, batch, candidate, capture_traces: false)
+
+    id = reservation_id(:validation, iteration)
+
+    case BudgetLedger.reserve(state.budget_ledger, state.budget, id, %{
+           metric_calls: metric_calls,
+           full_evaluations: 1
+         }) do
+      {:ok, ledger} ->
+        {_reservation, ledger} = BudgetLedger.release(ledger, id)
+        {:ok, %{state | budget_ledger: ledger}}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp perfect_result?(result, opts) do
+    Keyword.get(opts, :skip_perfect_score, false) and
+      Enum.all?(result.scores, &(&1 >= Keyword.fetch!(opts, :perfect_score)))
+  end
+
+  defp reservation_id(phase, iteration), do: "#{phase}:#{iteration}"
+
+  defp proposal_policy(opts, minibatch_size) do
+    requested = Keyword.get(opts, :proposal_concurrency, 1)
+    timeout = Keyword.get(opts, :proposal_timeout, :infinity)
+
+    resolved =
+      case requested do
+        :auto ->
+          workers = DSEx.Settings.snapshot() |> Map.fetch!(:async_max_workers)
+          max(1, div(workers, minibatch_size))
+
+        value ->
+          value
+      end
+
+    %{requested: requested, resolved: resolved, timeout: timeout}
+  end
+
+  defp ensure_proposal_policy!(%State{proposal_policy: policy} = state, requested) do
+    if policy == requested do
+      state
+    else
+      raise ArgumentError,
+            "GEPA resume proposal policy mismatch: stored #{inspect(policy)}, requested #{inspect(requested)}"
+    end
+  end
+
+  defp dump_proposal_policy(policy) do
+    %{
+      "requested" => if(policy.requested == :auto, do: "auto", else: policy.requested),
+      "resolved" => policy.resolved,
+      "timeout" => if(policy.timeout == :infinity, do: "infinity", else: policy.timeout)
+    }
+  end
+
+  defp load_proposal_policy(_dumped, 1, requested), do: requested
+
+  defp load_proposal_policy(dumped, 3, _requested) do
+    stored = Map.fetch!(dumped, "proposal_policy")
+
+    %{
+      requested: if(stored["requested"] == "auto", do: :auto, else: stored["requested"]),
+      resolved: Map.fetch!(stored, "resolved"),
+      timeout: if(stored["timeout"] == "infinity", do: :infinity, else: stored["timeout"])
+    }
+  end
+
+  defp validate_pending_ledger!(%State{pending_proposal_batch: nil, budget_ledger: ledger}) do
+    unless BudgetLedger.empty?(ledger) do
+      raise ArgumentError, "GEPA checkpoint has reservations without a pending proposal batch"
+    end
+
+    :ok
+  end
+
+  defp validate_pending_ledger!(%State{pending_proposal_batch: batch, budget_ledger: ledger}) do
+    parent_ids = Enum.map(batch.contexts, &reservation_id(:parent, &1.iteration))
+
+    reflection_ids =
+      if batch.phase in [:reflection, :child] do
+        batch.contexts
+        |> Enum.filter(fn context ->
+          context.action == :reflect or not is_nil(context.reflection_calls) or
+            context.reflection_ambiguous
+        end)
+        |> Enum.map(&reservation_id(:reflection, &1.iteration))
+      else
+        []
+      end
+
+    child_ids =
+      if batch.phase == :child do
+        batch.contexts
+        |> Enum.filter(&(&1.action == :child))
+        |> Enum.map(&reservation_id(:child, &1.iteration))
+      else
+        []
+      end
+
+    expected = Enum.sort(parent_ids ++ reflection_ids ++ child_ids)
+
+    actual = ledger.reservations |> Map.keys() |> Enum.sort()
+
+    unless actual == expected do
+      raise ArgumentError, "GEPA pending proposal reservations do not match the batch"
+    end
+
+    :ok
+  end
+
+  defp validate_checkpoint_integrity!(_dumped, 1), do: :ok
+
+  defp validate_checkpoint_integrity!(dumped, 3) do
+    expected =
+      Proposal.checkpoint_integrity(
+        Map.get(dumped, "pending_proposal_batch"),
+        Map.fetch!(dumped, "budget_ledger"),
+        Map.fetch!(dumped, "proposal_policy")
+      )
+
+    unless Map.get(dumped, "pending_proposal_integrity") == expected do
+      raise ArgumentError, "GEPA pending proposal checkpoint integrity mismatch"
+    end
+
+    :ok
   end
 
   defp run_iteration(adapter, trainset, valset, proposer, minibatch_size, iteration, state, opts) do
@@ -144,8 +1030,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
   @spec dump_state(State.t()) :: map()
   def dump_state(%State{} = state) do
-    %{
-      "schema_version" => 1,
+    ledger = BudgetLedger.dump(state.budget_ledger)
+    pending = Proposal.dump(state.pending_proposal_batch, &dump_result/1)
+    policy = dump_proposal_policy(state.proposal_policy)
+
+    checkpoint = %{
+      "schema_version" => 3,
       "iteration" => state.iteration,
       "candidates" => Enum.map(state.candidates, &dump_entry/1),
       "rejected" => DSEx.Optimizer.Report.json_safe(state.rejected),
@@ -161,8 +1051,17 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       "evaluation_policy" => Atom.to_string(state.evaluation_policy),
       "best_outputs_valset" => dump_best_outputs(state.best_outputs_valset),
       "stopper_state" => dump_stopper_state(state.stopper_state),
+      "budget_ledger" => ledger,
+      "pending_proposal_batch" => pending,
+      "proposal_policy" => policy,
       "stop_reason" => DSEx.Optimizer.Report.json_safe(state.stop_reason)
     }
+
+    Map.put(
+      checkpoint,
+      "pending_proposal_integrity",
+      Proposal.checkpoint_integrity(pending, ledger, policy)
+    )
   end
 
   defp initialize(adapter, seed_candidate, valset, opts) do
@@ -171,14 +1070,16 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       budget:
         Budget.new(
           max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
-          max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity)
+          max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
+          max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)
         ),
       rng_state: seed_rng(Keyword.get(opts, :seed, 0)),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
       evaluation_policy:
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
       best_outputs_valset: if(Keyword.get(opts, :track_best_outputs, false), do: %{}),
-      stopper_state: new_stopper_state(opts)
+      stopper_state: new_stopper_state(opts),
+      proposal_policy: Keyword.fetch!(opts, :proposal_policy)
     }
 
     case evaluate_validation(adapter, valset, seed_candidate, 0, [], 0, state, opts) do
@@ -869,7 +1770,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     else
       missing_batch = Enum.map(missing_indexes, &Enum.fetch!(batch, &1))
 
-      with :ok <- Budget.authorize_evaluation(state.budget, length(missing_batch), kind) do
+      reservation =
+        Adapter.metric_call_reservation(adapter, missing_batch, candidate, capture_traces: false)
+
+      with :ok <- Budget.authorize_evaluation(state.budget, reservation, kind) do
         notify_evaluation_start(opts, batch, false, event)
 
         missing_result =
@@ -878,15 +1782,15 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         result = backend.assemble(batch, hits, missing_indexes, missing_result)
         actual_calls = metric_calls(missing_result, length(missing_batch))
 
-        case Budget.record_evaluation(state.budget, actual_calls, kind) do
+        case record_with_reservation(state.budget, actual_calls, reservation, kind) do
           {:ok, budget} ->
             cache = backend.put(state.cache, candidate, missing_batch, missing_result)
             notify_budget_updated(opts, state, budget, actual_calls, event.iteration)
             notify_evaluation_end(opts, result, event)
             {:ok, result, %{state | budget: budget, cache: cache}}
 
-          {:error, reason, _budget} ->
-            {:error, reason, state}
+          {:error, reason, budget} ->
+            {:error, reason, %{state | budget: budget}}
         end
       else
         {:error, reason} -> {:error, reason, state}
@@ -895,12 +1799,20 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp evaluate_fresh(adapter, batch, candidate, capture_traces, kind, state, opts, event) do
-    with :ok <- Budget.authorize_evaluation(state.budget, length(batch), kind) do
+    reservation =
+      Adapter.metric_call_reservation(
+        adapter,
+        batch,
+        candidate,
+        capture_traces: capture_traces
+      )
+
+    with :ok <- Budget.authorize_evaluation(state.budget, reservation, kind) do
       notify_evaluation_start(opts, batch, capture_traces, event)
       result = Evaluation.evaluate(adapter, batch, candidate, capture_traces: capture_traces)
       actual_calls = metric_calls(result, length(batch))
 
-      case Budget.record_evaluation(state.budget, actual_calls, kind) do
+      case record_with_reservation(state.budget, actual_calls, reservation, kind) do
         {:ok, budget} ->
           cache_result = capture_traces or Keyword.get(opts, :cache_evaluation, true)
           cache = maybe_cache_result(state.cache, candidate, batch, result, cache_result)
@@ -908,8 +1820,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           notify_evaluation_end(opts, result, event)
           {:ok, result, %{state | budget: budget, cache: cache}}
 
-        {:error, reason, _budget} ->
-          {:error, reason, state}
+        {:error, reason, budget} ->
+          {:error, reason, %{state | budget: budget}}
       end
     else
       {:error, reason} -> {:error, reason, state}
@@ -920,6 +1832,16 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     do: evaluation_cache_backend(cache).put(cache, candidate, batch, result)
 
   defp maybe_cache_result(cache, _candidate, _batch, _result, false), do: cache
+
+  defp record_with_reservation(budget, actual_calls, reservation, kind)
+       when actual_calls <= reservation,
+       do: Budget.record_evaluation(budget, actual_calls, kind)
+
+  defp record_with_reservation(budget, actual_calls, reservation, kind) do
+    {:ok, budget} = Budget.record_evaluation(budget, reservation, kind)
+
+    {:error, {:metric_call_report_exceeds_reservation, actual_calls, reservation}, budget}
+  end
 
   defp notify_evaluation_start(opts, batch, capture_traces, event) do
     notify(opts, :on_evaluation_start, %{
@@ -1277,22 +2199,34 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       cache_evaluation_storage: Keyword.get(opts, :cache_evaluation_storage, :memory),
       max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
       max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
-      max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)
+      max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity),
+      proposal_concurrency: Keyword.get(opts, :proposal_concurrency, 1),
+      proposal_timeout: Keyword.get(opts, :proposal_timeout, :infinity)
     })
   end
 
   defp load_state!(
-         %{"schema_version" => 1} = dumped,
+         %{"schema_version" => schema_version} = dumped,
          seed_candidate,
          opts
-       ) do
+       )
+       when schema_version in [1, 3] do
+    budget = dumped |> Map.fetch!("budget") |> Budget.load!()
+
+    budget =
+      if schema_version == 1 do
+        %{budget | max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)}
+      else
+        budget
+      end
+
     state = %State{
       iteration: Map.fetch!(dumped, "iteration"),
       candidates: Enum.map(Map.fetch!(dumped, "candidates"), &load_entry!/1),
       rejected: restore(Map.get(dumped, "rejected", [])),
       history: restore(Map.get(dumped, "history", [])),
       cache: load_evaluation_cache(Map.get(dumped, "cache", []), opts),
-      budget: dumped |> Map.fetch!("budget") |> Budget.load!(),
+      budget: budget,
       rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
       merge_due: Map.get(dumped, "merge_due", 0),
       total_merges_tested: Map.get(dumped, "total_merges_tested", 0),
@@ -1303,6 +2237,13 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       evaluation_policy: load_evaluation_policy(dumped, opts),
       best_outputs_valset: dumped |> Map.get("best_outputs_valset") |> load_best_outputs!(),
       stopper_state: dumped |> Map.get("stopper_state") |> load_stopper_state(opts),
+      budget_ledger: dumped |> Map.get("budget_ledger", []) |> BudgetLedger.load!(),
+      pending_proposal_batch:
+        dumped
+        |> Map.get("pending_proposal_batch")
+        |> Proposal.load!(&load_result!/1),
+      proposal_policy:
+        load_proposal_policy(dumped, schema_version, Keyword.fetch!(opts, :proposal_policy)),
       stop_reason: restore(Map.get(dumped, "stop_reason"))
     }
 
@@ -1315,10 +2256,17 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     requested_full_limit =
       Keyword.get(opts, :max_full_evaluations, state.budget.max_full_evaluations)
 
+    requested_reflection_limit =
+      Keyword.get(opts, :max_reflection_calls, state.budget.max_reflection_calls)
+
     unless requested_metric_limit == state.budget.max_metric_calls and
-             requested_full_limit == state.budget.max_full_evaluations do
+             requested_full_limit == state.budget.max_full_evaluations and
+             requested_reflection_limit == state.budget.max_reflection_calls do
       raise ArgumentError, "GEPA resume budget limits do not match"
     end
+
+    validate_pending_ledger!(state)
+    validate_checkpoint_integrity!(dumped, schema_version)
 
     %{state | stop_reason: nil}
   rescue
@@ -1376,6 +2324,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       Budget.load!(%{
         "max_metric_calls" => checkpoint_limit(metric_limit),
         "max_full_evaluations" => checkpoint_limit(full_limit),
+        "max_reflection_calls" =>
+          checkpoint_limit(Keyword.get(opts, :max_reflection_calls, :infinity)),
         "metric_calls" => metric_calls,
         "full_evaluations" => full_evaluations,
         "reflection_calls" => max(length(candidates) - 1, 0)
@@ -1397,6 +2347,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       evaluation_policy:
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
       stopper_state: new_stopper_state(opts),
+      proposal_policy: Keyword.fetch!(opts, :proposal_policy),
       stop_reason: nil
     }
   rescue
@@ -1714,6 +2665,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     track_best_outputs = Keyword.get(opts, :track_best_outputs, false)
     acceptance_policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
     max_reflection_calls = Keyword.get(opts, :max_reflection_calls, :infinity)
+    proposal_concurrency = Keyword.get(opts, :proposal_concurrency, 1)
+    proposal_timeout = Keyword.get(opts, :proposal_timeout, :infinity)
 
     merge_acceptance_policy =
       Keyword.get(opts, :merge_acceptance_policy, Acceptance.default(:merge))
@@ -1731,6 +2684,16 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              (is_integer(max_reflection_calls) and max_reflection_calls >= 0) do
       raise ArgumentError,
             ":max_reflection_calls must be a non-negative integer or :infinity"
+    end
+
+    unless proposal_concurrency == :auto or
+             (is_integer(proposal_concurrency) and proposal_concurrency > 0) do
+      raise ArgumentError, ":proposal_concurrency must be :auto or a positive integer"
+    end
+
+    unless proposal_timeout == :infinity or
+             (is_integer(proposal_timeout) and proposal_timeout > 0) do
+      raise ArgumentError, ":proposal_timeout must be :infinity or a positive integer"
     end
 
     unless is_boolean(use_merge), do: raise(ArgumentError, ":use_merge must be a boolean")

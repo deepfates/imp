@@ -1,7 +1,7 @@
 defmodule DSEx.Optimizer.GEPA.BudgetTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.Budget
+  alias DSEx.Optimizer.GEPA.{Budget, BudgetLedger}
 
   test "authorizes capacity separately from recording observed metric work" do
     budget = Budget.new(max_metric_calls: 5, max_full_evaluations: 2)
@@ -53,5 +53,36 @@ defmodule DSEx.Optimizer.GEPA.BudgetTest do
     assert_raise ArgumentError, ~r/metric_calls count 2 exceeds configured limit 1/, fn ->
       Budget.load!(state)
     end
+  end
+
+  test "ledger reserves aggregate capacity and commits actual work without overshoot" do
+    budget =
+      Budget.new(
+        max_metric_calls: 4,
+        max_full_evaluations: 1,
+        max_reflection_calls: 2
+      )
+
+    ledger = BudgetLedger.new()
+
+    assert {:ok, ledger} =
+             BudgetLedger.reserve(ledger, budget, "parent:1", %{metric_calls: 2})
+
+    assert {:ok, ledger} =
+             BudgetLedger.reserve(ledger, budget, "reflection:1", %{reflection_calls: 2})
+
+    assert {:error, {:budget_exhausted, :metric_calls, 5, 4}} =
+             BudgetLedger.reserve(ledger, budget, "child:1", %{metric_calls: 3})
+
+    {budget, ledger} =
+      BudgetLedger.commit(ledger, budget, "parent:1", %{metric_calls: 1})
+
+    {budget, ledger} =
+      BudgetLedger.commit(ledger, budget, "reflection:1", %{reflection_calls: 2})
+
+    assert budget.metric_calls == 1
+    assert budget.reflection_calls == 2
+    assert BudgetLedger.empty?(ledger)
+    assert ledger == ledger |> BudgetLedger.dump() |> BudgetLedger.load!()
   end
 end

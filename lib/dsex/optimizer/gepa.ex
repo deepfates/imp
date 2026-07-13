@@ -14,6 +14,12 @@ defmodule DSEx.Optimizer.GEPA do
   `:component_feedback` maps predictor names to strict arity-one callbacks.
   These callbacks shape reflective minibatches and are part of optimization;
   invalid names, invalid output, and callback failures stop the run.
+
+  `:proposal_concurrency` enables first-party GEPA speculative parallel
+  proposals. Contexts are sampled sequentially from one archive and RNG
+  snapshot, expensive proposal phases run concurrently, and all effects are
+  applied by proposal slot. This is separate from ComBee aggregation: it does
+  not combine worker proposals or use map-shuffle-reduce voting.
   """
 
   alias DSEx.Optimizer.GEPA.{Callback, Candidate, ComponentFeedback, Engine, ProgramAdapter}
@@ -26,6 +32,7 @@ defmodule DSEx.Optimizer.GEPA do
     component_feedback: %{},
     feedback_fn: nil,
     generations: 4,
+    proposal_concurrency: 1,
     max_concurrency: 1,
     timeout: 30_000,
     minibatch_size: nil,
@@ -47,6 +54,10 @@ defmodule DSEx.Optimizer.GEPA do
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4],
+    proposal_concurrency: [
+      type: {:custom, __MODULE__, :validate_proposal_concurrency, []},
+      default: 1
+    ],
     max_concurrency: [type: :pos_integer, default: 1],
     timeout: [type: :timeout, default: 30_000],
     minibatch_size: [type: {:or, [nil, :pos_integer]}, default: nil],
@@ -85,6 +96,7 @@ defmodule DSEx.Optimizer.GEPA do
       component_feedback: opts[:component_feedback],
       feedback_fn: opts[:feedback_fn],
       generations: opts[:generations],
+      proposal_concurrency: opts[:proposal_concurrency],
       max_concurrency: opts[:max_concurrency],
       timeout: opts[:timeout],
       minibatch_size: opts[:minibatch_size],
@@ -126,6 +138,7 @@ defmodule DSEx.Optimizer.GEPA do
     engine_opts =
       [
         max_iterations: optimizer.generations,
+        proposal_concurrency: optimizer.proposal_concurrency,
         minibatch_size: optimizer.minibatch_size || min(3, length(trainset)),
         seed: optimizer.seed,
         use_merge: optimizer.use_merge,
@@ -169,6 +182,7 @@ defmodule DSEx.Optimizer.GEPA do
           feedback: feedback,
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
           generations: optimizer.generations,
+          proposal_concurrency: optimizer.proposal_concurrency,
           max_concurrency: optimizer.max_concurrency,
           timeout: optimizer.timeout,
           implementation: DSEx.Optimize.GEPA,
@@ -390,5 +404,14 @@ defmodule DSEx.Optimizer.GEPA do
 
   def validate_feedback_fn(feedback_fn) do
     {:error, "expected nil or an arity-1 function, got: #{inspect(feedback_fn)}"}
+  end
+
+  def validate_proposal_concurrency(:auto), do: {:ok, :auto}
+
+  def validate_proposal_concurrency(value) when is_integer(value) and value > 0,
+    do: {:ok, value}
+
+  def validate_proposal_concurrency(value) do
+    {:error, "expected :auto or a positive integer, got: #{inspect(value)}"}
   end
 end
