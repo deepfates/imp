@@ -40,6 +40,9 @@ Every guide and notebook follows the same product story:
   upstream invariants, evidence tiers, and remaining paper-scale blocker.
 - [Instruction Optimizer Fidelity](INSTRUCTION_OPTIMIZER_FIDELITY.md): pinned
   MIPROv2 and SIMBA algorithms, BEAM-native design, and evidence boundaries.
+- [ComBee-Style GEPA Aggregation Fidelity](COMBEE_FIDELITY.md): hierarchical
+  reflection aggregation, measured batch control, budget and timeout policy,
+  and evidence boundaries.
 
 The source checkout also contains maintainer-only authority, coverage, parity,
 and release ledgers. They are intentionally excluded from the consumer package

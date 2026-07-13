@@ -4,6 +4,18 @@ defmodule DSEx.Optimizer.GEPA.Coordinator do
   @supervisor DSEx.UnlinkedTaskSupervisor
 
   def run(items, timeout, fun) when is_list(items) and is_function(fun, 1) do
+    run(items, timeout, max(length(items), 1), fun)
+  end
+
+  def run(items, timeout, max_concurrency, fun)
+      when is_list(items) and is_integer(max_concurrency) and max_concurrency > 0 and
+             is_function(fun, 1) do
+    items
+    |> Enum.chunk_every(max_concurrency)
+    |> Enum.flat_map(&run_chunk(&1, timeout, fun))
+  end
+
+  defp run_chunk(items, timeout, fun) do
     snapshot = DSEx.Settings.snapshot()
     owner = self()
 

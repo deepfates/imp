@@ -157,9 +157,9 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
     assert Task.await(task) == [{:error, {:worker_exit, :killed}}]
   end
 
-  test "schema 3 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
+  test "schema 4 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
     prepared = interrupt_checkpoint!(:prepared)
-    assert prepared["schema_version"] == 3
+    assert prepared["schema_version"] == 4
     assert prepared["pending_proposal_batch"]["status"] == "prepared"
 
     resumed = run_engine(resume_state: json_round_trip(prepared))
@@ -203,7 +203,7 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
     assert Engine.dump_state(implicit) == Engine.dump_state(explicit)
   end
 
-  test "public validation accepts auto and old native checkpoints migrate to schema 3" do
+  test "public validation accepts auto and old native checkpoints migrate to schema 4" do
     metric = fn _example, _prediction -> 1.0 end
 
     assert %DSEx.Optimizer.GEPA{proposal_concurrency: :auto} =
@@ -221,11 +221,13 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
       |> Map.delete("pending_proposal_batch")
       |> Map.delete("pending_proposal_integrity")
       |> Map.delete("proposal_policy")
+      |> Map.delete("combee_policy")
+      |> Map.delete("combee_reports")
       |> update_in(["budget"], &Map.delete(&1, "max_reflection_calls"))
       |> json_round_trip()
 
     migrated = run_engine(resume_state: legacy)
-    assert Engine.dump_state(migrated)["schema_version"] == 3
+    assert Engine.dump_state(migrated)["schema_version"] == 4
   end
 
   defp interrupt_checkpoint!(status, phase \\ nil) do

@@ -20,9 +20,23 @@ defmodule DSEx.Optimizer.GEPA do
   snapshot, expensive proposal phases run concurrently, and all effects are
   applied by proposal slot. This is separate from ComBee aggregation: it does
   not combine worker proposals or use map-shuffle-reduce voting.
+
+  `:combee` accepts `true` or nested `DSEx.Optimizer.GEPA.ComBee.Options`.
+  ComBee duplicates and deterministically shuffles reflection records, reduces
+  `floor(sqrt(n))` balanced groups concurrently, and performs one ordered final
+  reduction. `:proposal_timeout` bounds reflection work and inherits `:timeout`
+  when omitted; a finite nested ComBee timeout is an additional upper bound.
   """
 
-  alias DSEx.Optimizer.GEPA.{Callback, Candidate, ComponentFeedback, Engine, ProgramAdapter}
+  alias DSEx.Optimizer.GEPA.{
+    Callback,
+    Candidate,
+    ComBee,
+    ComponentFeedback,
+    Engine,
+    ProgramAdapter
+  }
+
   alias DSEx.Optimizer.Report
 
   defstruct [
@@ -32,7 +46,9 @@ defmodule DSEx.Optimizer.GEPA do
     component_feedback: %{},
     feedback_fn: nil,
     generations: 4,
+    combee: false,
     proposal_concurrency: 1,
+    proposal_timeout: 30_000,
     max_concurrency: 1,
     timeout: 30_000,
     minibatch_size: nil,
@@ -46,7 +62,8 @@ defmodule DSEx.Optimizer.GEPA do
     merge_acceptance_policy: :equal_or_better,
     stopper: nil,
     max_metric_calls: :infinity,
-    max_full_evaluations: :infinity
+    max_full_evaluations: :infinity,
+    max_reflection_calls: :infinity
   ]
 
   @option_schema [
@@ -54,10 +71,12 @@ defmodule DSEx.Optimizer.GEPA do
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4],
+    combee: [type: {:custom, ComBee.Options, :validate, []}, default: false],
     proposal_concurrency: [
       type: {:custom, __MODULE__, :validate_proposal_concurrency, []},
       default: 1
     ],
+    proposal_timeout: [type: {:or, [nil, :timeout]}, default: nil],
     max_concurrency: [type: :pos_integer, default: 1],
     timeout: [type: :timeout, default: 30_000],
     minibatch_size: [type: {:or, [nil, :pos_integer]}, default: nil],
@@ -75,7 +94,8 @@ defmodule DSEx.Optimizer.GEPA do
     stopper: [type: :any, default: nil],
     reflection_lm: [type: {:custom, DSEx.LM, :validate_lm, []}, default: nil],
     max_metric_calls: [type: :any, default: :infinity],
-    max_full_evaluations: [type: :any, default: :infinity]
+    max_full_evaluations: [type: :any, default: :infinity],
+    max_reflection_calls: [type: :any, default: :infinity]
   ]
 
   @compile_option_schema [
@@ -96,7 +116,9 @@ defmodule DSEx.Optimizer.GEPA do
       component_feedback: opts[:component_feedback],
       feedback_fn: opts[:feedback_fn],
       generations: opts[:generations],
+      combee: opts[:combee],
       proposal_concurrency: opts[:proposal_concurrency],
+      proposal_timeout: opts[:proposal_timeout] || opts[:timeout],
       max_concurrency: opts[:max_concurrency],
       timeout: opts[:timeout],
       minibatch_size: opts[:minibatch_size],
@@ -111,7 +133,8 @@ defmodule DSEx.Optimizer.GEPA do
       stopper: opts[:stopper],
       reflection_lm: opts[:reflection_lm],
       max_metric_calls: validate_limit!(opts[:max_metric_calls], :max_metric_calls),
-      max_full_evaluations: validate_limit!(opts[:max_full_evaluations], :max_full_evaluations)
+      max_full_evaluations: validate_limit!(opts[:max_full_evaluations], :max_full_evaluations),
+      max_reflection_calls: validate_limit!(opts[:max_reflection_calls], :max_reflection_calls)
     }
   end
 
@@ -138,7 +161,9 @@ defmodule DSEx.Optimizer.GEPA do
     engine_opts =
       [
         max_iterations: optimizer.generations,
+        combee: optimizer.combee,
         proposal_concurrency: optimizer.proposal_concurrency,
+        proposal_timeout: optimizer.proposal_timeout,
         minibatch_size: optimizer.minibatch_size || min(3, length(trainset)),
         seed: optimizer.seed,
         use_merge: optimizer.use_merge,
@@ -152,6 +177,7 @@ defmodule DSEx.Optimizer.GEPA do
         stopper: optimizer.stopper,
         max_metric_calls: optimizer.max_metric_calls,
         max_full_evaluations: optimizer.max_full_evaluations,
+        max_reflection_calls: optimizer.max_reflection_calls,
         resume_state: opts[:resume_state],
         checkpoint_fn: opts[:checkpoint_fn]
       ]
@@ -182,7 +208,9 @@ defmodule DSEx.Optimizer.GEPA do
           feedback: feedback,
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
           generations: optimizer.generations,
+          minibatch_size: state.combee_policy.effective_batch_size,
           proposal_concurrency: optimizer.proposal_concurrency,
+          proposal_timeout: optimizer.proposal_timeout,
           max_concurrency: optimizer.max_concurrency,
           timeout: optimizer.timeout,
           implementation: DSEx.Optimize.GEPA,
@@ -197,11 +225,15 @@ defmodule DSEx.Optimizer.GEPA do
           metric_calls: state.budget.metric_calls,
           max_metric_calls: state.budget.max_metric_calls,
           reflection_calls: state.budget.reflection_calls,
+          max_reflection_calls: state.budget.max_reflection_calls,
           full_evaluations: state.budget.full_evaluations,
           max_full_evaluations: state.budget.max_full_evaluations,
           rejected_candidates: length(state.rejected),
           stop_reason: state.stop_reason,
-          status: if(errors == [], do: :ok, else: :with_errors)
+          status: if(errors == [], do: :ok, else: :with_errors),
+          combee:
+            ComBee.metadata(state.combee_policy)
+            |> Map.put(:aggregations, state.combee_reports)
         }
       })
 
@@ -209,32 +241,70 @@ defmodule DSEx.Optimizer.GEPA do
   end
 
   defp proposer(reflection_lm, feedback) do
-    fn candidate, component, records, generation ->
+    fn candidate, component, records, generation, aggregation ->
       case reflection_lm do
-        nil -> fallback_proposal(candidate, component, records, generation, feedback)
-        lm -> reflection_proposal(lm, candidate, component, records, generation, feedback)
+        nil ->
+          fallback_proposal(candidate, component, records, generation, feedback, aggregation)
+
+        lm ->
+          reflection_proposal(
+            lm,
+            candidate,
+            component,
+            records,
+            generation,
+            feedback,
+            aggregation
+          )
       end
     end
   end
 
-  defp fallback_proposal(candidate, component, records, generation, feedback) do
+  defp fallback_proposal(candidate, component, records, generation, feedback, aggregation) do
     record_feedback =
       records
-      |> Enum.map(&Map.get(&1, "Feedback", inspect(&1)))
+      |> Enum.map(
+        &(Map.get(&1, "ComBeeIntermediateUpdate") || Map.get(&1, "Feedback") || inspect(&1))
+      )
       |> Enum.take(8)
       |> Enum.join("; ")
 
-    [Map.fetch!(candidate, component), feedback, "Reflection #{generation}: #{record_feedback}"]
+    phase = Map.get(aggregation, :phase, :single)
+
+    [
+      Map.fetch!(candidate, component),
+      feedback,
+      "Reflection #{generation} (#{phase}): #{record_feedback}"
+    ]
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n")
   end
 
-  defp reflection_proposal(lm, candidate, component, records, generation, feedback) do
+  defp reflection_proposal(
+         lm,
+         candidate,
+         component,
+         records,
+         generation,
+         feedback,
+         aggregation
+       ) do
+    task =
+      case Map.get(aggregation, :phase) do
+        :first_level ->
+          "Extract a candidate context update for exactly one named program component from this reflection group. Return JSON with an instruction field."
+
+        :final ->
+          "Aggregate the ordered intermediate updates into one final instruction for exactly one named program component. Return JSON with an instruction field."
+
+        _phase ->
+          "Improve exactly one named program component from execution traces and feedback. Return JSON with an instruction field."
+      end
+
     messages = [
       %{
         role: :system,
-        content:
-          "Improve exactly one named program component from execution traces and feedback. Return JSON with an instruction field."
+        content: task
       },
       %{
         role: :user,
@@ -244,17 +314,27 @@ defmodule DSEx.Optimizer.GEPA do
             current_instruction: Map.fetch!(candidate, component),
             generation: generation,
             global_feedback: feedback,
+            aggregation: aggregation,
             reflective_dataset: records
           })
       }
     ]
 
     case DSEx.LM.generate(lm, messages, []) do
-      {:ok, %{"instruction" => instruction}} when is_binary(instruction) -> instruction
-      {:ok, %{instruction: instruction}} when is_binary(instruction) -> instruction
-      {:ok, instruction} when is_binary(instruction) -> instruction
-      {:error, _reason} -> fallback_proposal(candidate, component, records, generation, feedback)
-      {:ok, _other} -> fallback_proposal(candidate, component, records, generation, feedback)
+      {:ok, %{"instruction" => instruction}} when is_binary(instruction) ->
+        instruction
+
+      {:ok, %{instruction: instruction}} when is_binary(instruction) ->
+        instruction
+
+      {:ok, instruction} when is_binary(instruction) ->
+        instruction
+
+      {:error, _reason} ->
+        fallback_proposal(candidate, component, records, generation, feedback, aggregation)
+
+      {:ok, _other} ->
+        fallback_proposal(candidate, component, records, generation, feedback, aggregation)
     end
   end
 

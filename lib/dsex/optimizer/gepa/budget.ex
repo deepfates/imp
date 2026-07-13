@@ -75,8 +75,20 @@ defmodule DSEx.Optimizer.GEPA.Budget do
 
   @doc "Records an observed reflection-model invocation."
   @spec record_reflection(t()) :: t()
-  def record_reflection(%__MODULE__{} = budget) do
-    %{budget | reflection_calls: budget.reflection_calls + 1}
+  def record_reflection(%__MODULE__{} = budget), do: record_reflections(budget, 1)
+
+  @doc "Preauthorizes an exact number of reflection-model invocations."
+  @spec authorize_reflections(t(), non_neg_integer()) :: :ok | {:error, exhaustion()}
+  def authorize_reflections(%__MODULE__{} = budget, calls)
+      when is_integer(calls) and calls >= 0 do
+    available(budget.reflection_calls, calls, budget.max_reflection_calls, :reflection_calls)
+  end
+
+  @doc "Records an observed number of reflection-model invocations."
+  @spec record_reflections(t(), non_neg_integer()) :: t()
+  def record_reflections(%__MODULE__{} = budget, calls)
+      when is_integer(calls) and calls >= 0 do
+    %{budget | reflection_calls: budget.reflection_calls + calls}
   end
 
   @doc false

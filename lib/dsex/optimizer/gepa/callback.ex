@@ -43,6 +43,8 @@ defmodule DSEx.Optimizer.GEPA.Callback do
     :on_evaluation_skipped,
     :on_valset_evaluated,
     :on_reflective_dataset_built,
+    :on_combee_batch_selected,
+    :on_combee_aggregation,
     :on_proposal_start,
     :on_proposal_end,
     :on_candidate_accepted,

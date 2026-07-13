@@ -1,23 +1,31 @@
 defmodule DSEx.Optimizer.GEPA.Reflection do
   @moduledoc false
 
-  alias DSEx.Optimizer.GEPA.Adapter
+  alias DSEx.Optimizer.GEPA.ComBee
 
-  def execute(adapter, proposer, parent, context) do
-    dataset =
-      Adapter.make_reflective_dataset(
-        adapter,
-        parent.candidate,
-        context.parent_result,
-        context.components
-      )
+  def execute(proposer, parent, context, %ComBee.Policy{} = combee_policy) do
+    {status, replacements, reflection_calls, aggregation_reports} =
+      Enum.reduce_while(context.components, {:ok, %{}, 0, []}, fn component,
+                                                                  {:ok, replacements, calls,
+                                                                   reports} ->
+        records = Map.get(context.dataset, component, [])
 
-    {status, replacements, reflection_calls} =
-      Enum.reduce_while(context.components, {:ok, %{}, 0}, fn component,
-                                                              {:ok, replacements, calls} ->
-        case propose(proposer, parent.candidate, component, dataset, context.iteration) do
-          {:ok, text} -> {:cont, {:ok, Map.put(replacements, component, text), calls + 1}}
-          {:error, reason} -> {:halt, {{:error, reason}, replacements, calls + 1}}
+        case ComBee.propose(
+               proposer,
+               parent.candidate,
+               component,
+               records,
+               context.iteration,
+               combee_policy
+             ) do
+          {:ok, text, observed, report} ->
+            {:cont,
+             {:ok, Map.put(replacements, component, text), calls + observed,
+              append_report(reports, report)}}
+
+          {:error, reason, observed, report} ->
+            {:halt,
+             {{:error, reason}, replacements, calls + observed, append_report(reports, report)}}
         end
       end)
 
@@ -25,35 +33,25 @@ defmodule DSEx.Optimizer.GEPA.Reflection do
       :ok ->
         %{
           status: :ok,
-          dataset: dataset,
+          dataset: context.dataset,
           replacements: replacements,
           candidate: Map.merge(parent.candidate, replacements),
-          reflection_calls: reflection_calls
+          reflection_calls: reflection_calls,
+          aggregation_reports: aggregation_reports
         }
 
       {:error, reason} ->
         %{
           status: :error,
-          dataset: dataset,
+          dataset: context.dataset,
           replacements: replacements,
           error: reason,
-          reflection_calls: reflection_calls
+          reflection_calls: reflection_calls,
+          aggregation_reports: aggregation_reports
         }
     end
   end
 
-  defp propose(proposer, candidate, component, dataset, iteration) do
-    records = Map.get(dataset, component, [])
-
-    case proposer.(candidate, component, records, iteration) do
-      {:ok, text} when is_binary(text) -> {:ok, text}
-      text when is_binary(text) -> {:ok, text}
-      {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_proposal, other}}
-    end
-  rescue
-    error -> {:error, {:proposal_exception, Exception.message(error)}}
-  catch
-    kind, reason -> {:error, {:proposal_throw, kind, reason}}
-  end
+  defp append_report(reports, nil), do: reports
+  defp append_report(reports, report), do: reports ++ [report]
 end

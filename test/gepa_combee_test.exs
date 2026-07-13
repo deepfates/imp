@@ -1,0 +1,435 @@
+defmodule DSEx.Optimizer.GEPA.ComBeeTest do
+  use ExUnit.Case, async: false
+
+  alias DSEx.Optimizer.GEPA.{Adapter, ComBee, Engine, Result}
+  alias DSEx.Optimizer.GEPA.ComBee.BatchController
+
+  defmodule FixtureAdapter do
+    @behaviour Adapter
+    defstruct []
+
+    @impl true
+    def evaluate(_adapter, batch, candidate, opts) do
+      score = if candidate.main == "base", do: 0.0, else: 1.0
+
+      trajectories =
+        if Keyword.get(opts, :capture_traces, false),
+          do: %{main: List.duplicate(nil, length(batch))},
+          else: %{}
+
+      Result.new(batch, List.duplicate(score, length(batch)),
+        trajectories: trajectories,
+        side_information: %{main: batch},
+        metadata: %{metric_calls: length(batch)}
+      )
+    end
+
+    @impl true
+    def make_reflective_dataset(_adapter, _candidate, result, components) do
+      Map.new(components, fn component ->
+        {component, Enum.map(result.outputs, &%{id: &1})}
+      end)
+    end
+  end
+
+  defmodule RecordingCallback do
+    @behaviour DSEx.Optimizer.GEPA.Callback
+
+    @impl true
+    def on_combee_aggregation(event, owner),
+      do: send(owner, {:aggregation_callback, event.iteration, event.component, event.report})
+  end
+
+  test "augmented shuffle duplicates every source and builds a deterministic sqrt tree" do
+    records = Enum.map(0..16, &%{id: &1})
+    policy = policy(17, seed: 42, duplication_factor: 2, max_concurrency: 4)
+    plan = ComBee.plan(records, :main, 3, policy)
+
+    assert plan.source_count == 17
+    assert plan.augmented_count == 34
+    assert plan.group_count == 4
+    assert Enum.map(plan.groups, & &1.size) == [9, 9, 8, 8]
+    assert plan == ComBee.plan(records, :main, 3, policy)
+    refute plan == ComBee.plan(records, :main, 4, policy)
+
+    copies =
+      plan.groups
+      |> Enum.flat_map(& &1.entries)
+      |> Enum.group_by(& &1.source_index, & &1.duplicate_index)
+
+    assert Map.keys(copies) == Enum.to_list(0..16)
+    assert Enum.all?(copies, fn {_source, duplicates} -> Enum.sort(duplicates) == [0, 1] end)
+  end
+
+  test "first-level calls overlap while final reduction remains in group order" do
+    owner = self()
+    candidate = %{main: "current", untouched: "keep"}
+    records = Enum.map(0..15, &%{id: &1})
+    policy = policy(16, seed: 9, max_concurrency: 4)
+
+    proposer = fn received_candidate, component, received_records, iteration, metadata ->
+      send(
+        owner,
+        {:call, metadata.phase, metadata[:group_index], received_candidate, component, iteration,
+         received_records, self()}
+      )
+
+      case metadata.phase do
+        :first_level ->
+          Process.sleep((3 - metadata.group_index) * 10)
+          "group-#{metadata.group_index}"
+
+        :final ->
+          Enum.map_join(received_records, "|", & &1["ComBeeIntermediateUpdate"])
+      end
+    end
+
+    assert {:ok, "group-0|group-1|group-2|group-3", report} =
+             ComBee.aggregate(proposer, candidate, :main, records, 7, policy)
+
+    assert report.status == :ok
+    assert report.first_level_calls == 4
+    assert report.final_calls == 1
+    assert report.reflection_calls == 5
+
+    calls = receive_calls(5, [])
+    first_level = Enum.filter(calls, &(elem(&1, 1) == :first_level))
+    final = Enum.find(calls, &(elem(&1, 1) == :final))
+
+    assert first_level |> Enum.map(&elem(&1, 7)) |> Enum.uniq() |> length() == 4
+    assert Enum.all?(calls, &(elem(&1, 3) == candidate))
+    assert Enum.all?(calls, &(elem(&1, 4) == :main))
+    assert elem(final, 6) |> Enum.map(& &1["ComBeeGroupIndex"]) == [0, 1, 2, 3]
+  end
+
+  test "fatal exits and timeouts fail deterministically without task leaks" do
+    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    records = Enum.map(0..8, &%{id: &1})
+    crash_policy = policy(9, max_concurrency: 3, timeout: 100)
+
+    crashing = fn _candidate, _component, _records, _iteration, metadata ->
+      if metadata.phase == :first_level and metadata.group_index == 0,
+        do: Process.exit(self(), :kill),
+        else: "ok-#{metadata[:group_index]}"
+    end
+
+    assert {:error, {:combee_first_level_failed, 0, {:worker_exit, :killed}}, report} =
+             ComBee.aggregate(crashing, %{main: "current"}, :main, records, 1, crash_policy)
+
+    assert report.reflection_calls == 3
+    assert report.final_calls == 0
+
+    timeout_policy = policy(9, max_concurrency: 3, timeout: 15)
+
+    timing_out = fn _candidate, _component, _records, _iteration, metadata ->
+      if metadata.phase == :first_level and metadata.group_index == 0,
+        do: Process.sleep(:infinity),
+        else: "ok-#{metadata[:group_index]}"
+    end
+
+    assert {:error, {:combee_first_level_failed, 0, :timeout}, timeout_report} =
+             ComBee.aggregate(timing_out, %{main: "current"}, :main, records, 1, timeout_policy)
+
+    assert timeout_report.reflection_calls == 3
+
+    assert eventually(fn ->
+             MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+           end)
+  end
+
+  test "caller cancellation terminates nested aggregation workers" do
+    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    owner = self()
+    policy = policy(9, max_concurrency: 3, timeout: :infinity)
+
+    caller =
+      spawn(fn ->
+        proposer = fn _candidate, _component, _records, _iteration, metadata ->
+          if metadata.phase == :first_level do
+            send(owner, {:combee_worker, self()})
+            Process.sleep(:infinity)
+          end
+
+          "unused"
+        end
+
+        ComBee.aggregate(
+          proposer,
+          %{main: "current"},
+          :main,
+          Enum.map(0..8, &%{id: &1}),
+          1,
+          policy
+        )
+      end)
+
+    workers = for _ <- 1..3, do: receive(do: ({:combee_worker, worker} -> worker))
+    Process.exit(caller, :kill)
+
+    assert eventually(fn ->
+             Enum.all?(workers, &(not Process.alive?(&1))) and
+               MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+           end)
+  end
+
+  test "reflection budget preauthorizes the whole tree and stops exactly" do
+    owner = self()
+    proposer = recording_proposer(owner)
+    trainset = Enum.to_list(0..15)
+    combee = [duplication_factor: 2, max_concurrency: 4]
+
+    refused =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        trainset,
+        [:validation],
+        proposer,
+        max_iterations: 1,
+        minibatch_size: 16,
+        combee: combee,
+        max_reflection_calls: 4
+      )
+
+    assert refused.stop_reason == {:budget_exhausted, :reflection_calls, 5, 4}
+    assert refused.budget.reflection_calls == 0
+    refute_receive {:model_call, _, _}
+
+    exact =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        trainset,
+        [:validation],
+        proposer,
+        max_iterations: 1,
+        minibatch_size: 16,
+        combee: combee,
+        max_reflection_calls: 5
+      )
+
+    assert exact.budget.reflection_calls == 5
+    assert length(exact.candidates) == 2
+    assert length(exact.combee_reports) == 1
+    assert exact.combee_reports |> hd() |> Map.fetch!(:reflection_calls) == 5
+
+    assert receive_model_calls(5, []) |> Enum.map(&elem(&1, 1)) |> Enum.sort() == [
+             :final,
+             :first_level,
+             :first_level,
+             :first_level,
+             :first_level
+           ]
+  end
+
+  test "power-law fit uses epoch delay, paper tau ratio, clamp, and fail-closed status" do
+    report =
+      BatchController.select(
+        [
+          measurements: [{1, 10.0}, {4, 20.0}, {9, 30.0}],
+          max_batch_size: 12
+        ],
+        100
+      )
+
+    assert report.status == :ok
+    assert_in_delta report.a, 1000.0, 1.0e-8
+    assert_in_delta report.alpha, 0.5, 1.0e-8
+    assert_in_delta report.tau, report.peak_slope * 0.016, 1.0e-8
+    assert report.plateau_batch_size > 12
+    assert report.selected_batch_size == 12
+
+    degenerate =
+      BatchController.select(
+        [measurements: [{2, 5.0}, {2, 6.0}], min_batch_size: 2, max_batch_size: 20],
+        100
+      )
+
+    assert degenerate.status == :degenerate
+    assert degenerate.reason == :duplicate_batch_sizes
+    assert degenerate.selected_batch_size == 2
+    assert degenerate.a == nil
+
+    assert_raise ArgumentError, ~r/max_batch_size/, fn ->
+      BatchController.options!(max_batch_size: 201)
+    end
+  end
+
+  test "checkpoint identity rejects ComBee policy and controller drift" do
+    base_options = [
+      duplication_factor: 2,
+      max_concurrency: 2,
+      batch_controller: [measurements: [{1, 4.0}, {2, 5.0}], max_batch_size: 2]
+    ]
+
+    checkpoint =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        [0, 1],
+        [:validation],
+        fn _, _, _, _ -> "unused" end,
+        max_iterations: 0,
+        combee: base_options
+      )
+      |> Engine.dump_state()
+      |> json_round_trip()
+
+    assert checkpoint["schema_version"] == 4
+    assert checkpoint["combee_policy"]["effective_batch_size"] == 2
+
+    resumed =
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        [0, 1],
+        [:validation],
+        fn _, _, _, _ -> "unused" end,
+        max_iterations: 0,
+        combee: base_options,
+        resume_state: checkpoint
+      )
+
+    assert resumed.combee_policy.identity == checkpoint["combee_policy"]["identity"]
+
+    assert_raise ArgumentError, ~r/ComBee policy mismatch/, fn ->
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        [0, 1],
+        [:validation],
+        fn _, _, _, _ -> "unused" end,
+        max_iterations: 0,
+        combee: Keyword.put(base_options, :duplication_factor, 3),
+        resume_state: checkpoint
+      )
+    end
+  end
+
+  test "ComBee composes with bounded speculative proposals and rejects oversubscription" do
+    DSEx.Settings.context([async_max_workers: 4], fn ->
+      state =
+        Engine.run(
+          %FixtureAdapter{},
+          %{main: "base"},
+          Enum.to_list(0..7),
+          [:validation],
+          fn _candidate, _component, records, iteration, metadata ->
+            if metadata.phase == :final do
+              "proposal-#{iteration}"
+            else
+              "local-#{metadata.group_index}-#{length(records)}"
+            end
+          end,
+          max_iterations: 2,
+          minibatch_size: 4,
+          proposal_concurrency: 2,
+          candidate_selection_strategy: :current_best,
+          acceptance_policy: :equal_or_better,
+          combee: [max_concurrency: 2],
+          max_reflection_calls: 6
+        )
+
+      assert state.iteration == 2
+      assert state.budget.reflection_calls == 6
+      assert state.combee_policy.max_concurrency == 2
+      assert Enum.map(state.combee_reports, & &1.iteration) == [1, 2]
+
+      assert_raise ArgumentError, ~r/exceeds async_max_workers/, fn ->
+        Engine.run(
+          %FixtureAdapter{},
+          %{main: "base"},
+          Enum.to_list(0..7),
+          [:validation],
+          fn _, _, _, _ -> "unused" end,
+          max_iterations: 0,
+          minibatch_size: 4,
+          proposal_concurrency: 2,
+          combee: [max_concurrency: 3]
+        )
+      end
+    end)
+  end
+
+  test "public options and callback metadata expose ComBee reports" do
+    owner = self()
+
+    metric = fn _example, _prediction -> 1.0 end
+
+    assert %DSEx.Optimizer.GEPA{
+             combee: %ComBee.Options{duplication_factor: 2},
+             max_reflection_calls: 5
+           } =
+             DSEx.Optimizer.GEPA.new(metric,
+               combee: true,
+               max_reflection_calls: 5
+             )
+
+    Engine.run(
+      %FixtureAdapter{},
+      %{main: "base"},
+      Enum.to_list(0..3),
+      [:validation],
+      recording_proposer(owner),
+      max_iterations: 1,
+      minibatch_size: 4,
+      combee: [max_concurrency: 2],
+      callbacks: [{RecordingCallback, owner}]
+    )
+
+    assert_receive {:aggregation_callback, 1, :main, %ComBee.Report{status: :ok}}
+  end
+
+  defp policy(trainset_size, overrides) do
+    seed = Keyword.get(overrides, :seed, 1)
+    options = Keyword.drop(overrides, [:seed])
+
+    options
+    |> ComBee.resolve(trainset_size, trainset_size, seed)
+    |> ComBee.resolve_concurrency(8, 1)
+  end
+
+  defp recording_proposer(owner) do
+    fn _candidate, _component, records, _iteration, metadata ->
+      send(owner, {:model_call, metadata.phase, metadata[:group_index]})
+
+      if metadata.phase == :final,
+        do: "improved",
+        else: "local-#{metadata.group_index}-#{length(records)}"
+    end
+  end
+
+  defp receive_calls(0, calls), do: Enum.reverse(calls)
+
+  defp receive_calls(count, calls) do
+    receive do
+      {:call, _, _, _, _, _, _, _} = call -> receive_calls(count - 1, [call | calls])
+    after
+      1_000 -> flunk("expected #{count} more reducer calls")
+    end
+  end
+
+  defp receive_model_calls(0, calls), do: Enum.reverse(calls)
+
+  defp receive_model_calls(count, calls) do
+    receive do
+      {:model_call, _, _} = call -> receive_model_calls(count - 1, [call | calls])
+    after
+      1_000 -> flunk("expected #{count} more model calls")
+    end
+  end
+
+  defp eventually(fun, attempts \\ 100)
+  defp eventually(_fun, 0), do: false
+
+  defp eventually(fun, attempts) do
+    if fun.() do
+      true
+    else
+      Process.sleep(10)
+      eventually(fun, attempts - 1)
+    end
+  end
+
+  defp json_round_trip(value), do: value |> Jason.encode!() |> Jason.decode!()
+end

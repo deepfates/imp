@@ -22,6 +22,7 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
       :action,
       :error,
       :dataset,
+      :aggregation_reports,
       :replacements,
       :candidate
     ]
@@ -54,6 +55,9 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
   def started(%Batch{} = batch), do: %{batch | status: :started}
 
   def checkpoint_integrity(batch, ledger, policy), do: digest({batch, ledger, policy})
+
+  def checkpoint_integrity(batch, ledger, policy, combee_policy),
+    do: digest({batch, ledger, policy, combee_policy})
 
   def dump(nil, _dump_result), do: nil
 
@@ -128,6 +132,8 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
       "action" => if(context.action, do: Atom.to_string(context.action)),
       "error" => DSEx.Optimizer.Report.json_safe(context.error),
       "dataset" => DSEx.Optimizer.Report.json_safe(context.dataset),
+      "aggregation_reports" =>
+        Enum.map(context.aggregation_reports || [], &DSEx.Optimizer.GEPA.ComBee.dump_report/1),
       "replacements" => DSEx.Optimizer.Report.json_safe(context.replacements),
       "candidate" => DSEx.Optimizer.Report.json_safe(context.candidate)
     }
@@ -166,6 +172,10 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
       action: action,
       error: context |> Map.get("error") |> DSEx.Optimizer.Report.restore_json_safe(),
       dataset: context |> Map.get("dataset") |> DSEx.Optimizer.Report.restore_json_safe(),
+      aggregation_reports:
+        context
+        |> Map.get("aggregation_reports", [])
+        |> Enum.map(&DSEx.Optimizer.GEPA.ComBee.load_report/1),
       replacements:
         context |> Map.get("replacements") |> DSEx.Optimizer.Report.restore_json_safe(),
       candidate: context |> Map.get("candidate") |> DSEx.Optimizer.Report.restore_json_safe()

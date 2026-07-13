@@ -9,6 +9,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     Callback,
     Candidate,
     CandidateSelector,
+    ComBee,
     Coordinator,
     Evaluation,
     EvaluationCache,
@@ -52,20 +53,49 @@ defmodule DSEx.Optimizer.GEPA.Engine do
               budget_ledger: %BudgetLedger{},
               pending_proposal_batch: nil,
               proposal_policy: %{requested: 1, resolved: 1, timeout: :infinity},
+              combee_policy: nil,
+              combee_reports: [],
               stop_reason: nil
   end
 
-  @type proposer :: (Candidate.t(), Candidate.component_name(), [map()], non_neg_integer() ->
-                       String.t() | {:ok, String.t()} | {:error, term()})
+  @type proposer ::
+          (Candidate.t(), Candidate.component_name(), [map()], non_neg_integer() ->
+             String.t() | {:ok, String.t()} | {:error, term()})
+          | (Candidate.t(), Candidate.component_name(), [map()], non_neg_integer(), map() ->
+               String.t() | {:ok, String.t()} | {:error, term()})
 
   @spec run(Adapter.t(), Candidate.t(), [term()], [term()], proposer(), keyword()) :: State.t()
   def run(adapter, seed_candidate, trainset, valset, proposer, opts \\ [])
-      when is_list(trainset) and is_list(valset) and is_function(proposer, 4) and is_list(opts) do
+      when is_list(trainset) and is_list(valset) and
+             (is_function(proposer, 4) or is_function(proposer, 5)) and is_list(opts) do
     seed_candidate = Candidate.validate!(seed_candidate)
     validate_inputs!(seed_candidate, trainset, valset, opts)
-    minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
+    requested_minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
+
+    combee_policy =
+      ComBee.resolve(
+        Keyword.get(opts, :combee, false),
+        length(trainset),
+        requested_minibatch_size,
+        Keyword.get(opts, :seed, 0)
+      )
+
+    minibatch_size = combee_policy.effective_batch_size
     proposal_policy = proposal_policy(opts, minibatch_size)
-    opts = Keyword.put(opts, :proposal_policy, proposal_policy)
+
+    combee_policy =
+      ComBee.resolve_concurrency(
+        combee_policy,
+        DSEx.Settings.snapshot() |> Map.fetch!(:async_max_workers),
+        proposal_policy.resolved
+      )
+      |> ComBee.bound_timeout(proposal_policy.timeout)
+
+    opts =
+      opts
+      |> Keyword.put(:proposal_policy, proposal_policy)
+      |> Keyword.put(:combee_policy, combee_policy)
+      |> Keyword.put(:effective_minibatch_size, minibatch_size)
 
     notify(opts, :on_optimization_start, %{
       seed_candidate: seed_candidate,
@@ -74,13 +104,24 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       config: callback_config(opts)
     })
 
+    if combee_policy.batch_controller do
+      notify(opts, :on_combee_batch_selected, %{
+        policy_identity: combee_policy.identity,
+        report: combee_policy.batch_controller
+      })
+    end
+
     state =
       case Keyword.get(opts, :resume_state) do
         nil -> initialize(adapter, seed_candidate, valset, opts)
         resume_state -> load_state!(resume_state, seed_candidate, opts)
       end
 
-    state = ensure_proposal_policy!(state, proposal_policy)
+    state =
+      state
+      |> ensure_proposal_policy!(proposal_policy)
+      |> ensure_combee_policy!(combee_policy)
+
     max_iterations = Keyword.get(opts, :max_iterations, 10)
 
     state =
@@ -387,33 +428,53 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
               next_component = next_component(parent, opts)
               state = advance_component_cursor(state, parent.id, next_component, opts)
-              reflection_id = reservation_id(:reflection, context.iteration)
 
-              case BudgetLedger.reserve(
-                     state.budget_ledger,
-                     state.budget,
-                     reflection_id,
-                     %{reflection_calls: length(components)}
-                   ) do
-                {:ok, ledger} ->
-                  context = %{
-                    context
-                    | action: :reflect,
-                      components: components,
-                      next_component: next_component
-                  }
+              case build_reflective_dataset(adapter, parent, result, components) do
+                {:ok, dataset} ->
+                  reflection_id = reservation_id(:reflection, context.iteration)
 
-                  {contexts ++ [context], %{state | budget_ledger: ledger}, stop_reason}
+                  reflection_calls =
+                    reflection_call_reservation(components, dataset, state.combee_policy)
+
+                  case BudgetLedger.reserve(
+                         state.budget_ledger,
+                         state.budget,
+                         reflection_id,
+                         %{reflection_calls: reflection_calls}
+                       ) do
+                    {:ok, ledger} ->
+                      context = %{
+                        context
+                        | action: :reflect,
+                          components: components,
+                          next_component: next_component,
+                          dataset: dataset
+                      }
+
+                      {contexts ++ [context], %{state | budget_ledger: ledger}, stop_reason}
+
+                    {:error, reason} ->
+                      context = %{
+                        context
+                        | action: :budget_stop,
+                          components: components,
+                          dataset: dataset,
+                          error: reason
+                      }
+
+                      {contexts ++ [context], state, stop_reason || reason}
+                  end
 
                 {:error, reason} ->
                   context = %{
                     context
-                    | action: :budget_stop,
+                    | action: :error,
                       components: components,
+                      next_component: next_component,
                       error: reason
                   }
 
-                  {contexts ++ [context], state, stop_reason || reason}
+                  {contexts ++ [context], state, stop_reason}
               end
             end
 
@@ -440,7 +501,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     outputs =
       Coordinator.run(runnable, state.proposal_policy.timeout, fn context ->
         parent = Enum.fetch!(state.candidates, context.parent_id)
-        Reflection.execute(adapter, proposer, parent, context)
+        Reflection.execute(proposer, parent, context, state.combee_policy)
       end)
       |> then(&Map.new(Enum.zip(Enum.map(runnable, fn context -> context.slot end), &1)))
 
@@ -469,6 +530,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
                 context
                 | reflection_calls: output.reflection_calls,
                   dataset: output.dataset,
+                  aggregation_reports: output.aggregation_reports,
                   replacements: output.replacements,
                   candidate: output.candidate
               }
@@ -491,6 +553,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
                 | action: :error,
                   reflection_calls: output.reflection_calls,
                   dataset: output.dataset,
+                  aggregation_reports: output.aggregation_reports,
                   replacements: output.replacements,
                   error: output.error
               }
@@ -672,6 +735,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          opts
        ) do
     maybe_notify_reflection_start(opts, context, parent)
+    state = record_combee_reports(state, context.aggregation_reports, opts)
 
     notify(opts, :on_error, %{
       iteration: context.iteration,
@@ -701,10 +765,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          opts
        ) do
     maybe_notify_reflection_start(opts, context, parent)
+    state = record_combee_reports(state, context.aggregation_reports, opts)
 
     notify(opts, :on_proposal_end, %{
       iteration: context.iteration,
-      new_instructions: context.replacements
+      new_instructions: context.replacements,
+      aggregation_reports: context.aggregation_reports || []
     })
 
     examples = Enum.map(context.minibatch_ids, &Enum.fetch!(trainset, &1))
@@ -803,7 +869,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       iteration: context.iteration,
       parent_candidate: parent.candidate,
       components: context.components,
-      reflective_dataset: context.dataset
+      reflective_dataset: context.dataset,
+      aggregation: ComBee.metadata(Keyword.fetch!(opts, :combee_policy))
     })
   end
 
@@ -929,7 +996,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
   defp load_proposal_policy(_dumped, 1, requested), do: requested
 
-  defp load_proposal_policy(dumped, 3, _requested) do
+  defp load_proposal_policy(dumped, schema_version, _requested)
+       when schema_version in [3, 4] do
     stored = Map.fetch!(dumped, "proposal_policy")
 
     %{
@@ -937,6 +1005,18 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       resolved: Map.fetch!(stored, "resolved"),
       timeout: if(stored["timeout"] == "infinity", do: :infinity, else: stored["timeout"])
     }
+  end
+
+  defp load_combee_policy(_dumped, schema_version, requested) when schema_version in [1, 3] do
+    if requested.enabled do
+      raise ArgumentError, "GEPA resume ComBee policy mismatch: legacy checkpoint is disabled"
+    end
+
+    requested
+  end
+
+  defp load_combee_policy(dumped, 4, _requested) do
+    dumped |> Map.fetch!("combee_policy") |> ComBee.load_policy!()
   end
 
   defp validate_pending_ledger!(%State{pending_proposal_batch: nil, budget_ledger: ledger}) do
@@ -999,6 +1079,22 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     :ok
   end
 
+  defp validate_checkpoint_integrity!(dumped, 4) do
+    expected =
+      Proposal.checkpoint_integrity(
+        Map.get(dumped, "pending_proposal_batch"),
+        Map.fetch!(dumped, "budget_ledger"),
+        Map.fetch!(dumped, "proposal_policy"),
+        Map.fetch!(dumped, "combee_policy")
+      )
+
+    unless Map.get(dumped, "pending_proposal_integrity") == expected do
+      raise ArgumentError, "GEPA pending proposal checkpoint integrity mismatch"
+    end
+
+    :ok
+  end
+
   defp run_iteration(adapter, trainset, valset, proposer, minibatch_size, iteration, state, opts) do
     notify(opts, :on_iteration_start, %{iteration: iteration, state: state})
     candidate_count = length(state.candidates)
@@ -1034,8 +1130,16 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     pending = Proposal.dump(state.pending_proposal_batch, &dump_result/1)
     policy = dump_proposal_policy(state.proposal_policy)
 
+    resolved_combee_policy =
+      state.combee_policy ||
+        false
+        |> ComBee.resolve(1, 1, 0)
+        |> ComBee.bound_timeout(:infinity)
+
+    combee_policy = ComBee.dump_policy(resolved_combee_policy)
+
     checkpoint = %{
-      "schema_version" => 3,
+      "schema_version" => 4,
       "iteration" => state.iteration,
       "candidates" => Enum.map(state.candidates, &dump_entry/1),
       "rejected" => DSEx.Optimizer.Report.json_safe(state.rejected),
@@ -1054,13 +1158,15 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       "budget_ledger" => ledger,
       "pending_proposal_batch" => pending,
       "proposal_policy" => policy,
+      "combee_policy" => combee_policy,
+      "combee_reports" => Enum.map(state.combee_reports, &ComBee.dump_report/1),
       "stop_reason" => DSEx.Optimizer.Report.json_safe(state.stop_reason)
     }
 
     Map.put(
       checkpoint,
       "pending_proposal_integrity",
-      Proposal.checkpoint_integrity(pending, ledger, policy)
+      Proposal.checkpoint_integrity(pending, ledger, policy, combee_policy)
     )
   end
 
@@ -1079,7 +1185,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
       best_outputs_valset: if(Keyword.get(opts, :track_best_outputs, false), do: %{}),
       stopper_state: new_stopper_state(opts),
-      proposal_policy: Keyword.fetch!(opts, :proposal_policy)
+      proposal_policy: Keyword.fetch!(opts, :proposal_policy),
+      combee_policy: Keyword.fetch!(opts, :combee_policy)
     }
 
     case evaluate_validation(adapter, valset, seed_candidate, 0, [], 0, state, opts) do
@@ -1182,9 +1289,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              iteration: iteration,
              parent_candidate: parent.candidate,
              components: components,
-             reflective_dataset: reflective_dataset
+             reflective_dataset: reflective_dataset,
+             aggregation: ComBee.metadata(state.combee_policy)
            }),
-         {:ok, replacements, state} <-
+         {:ok, replacements, aggregation_reports, state} <-
            propose_components_with_budget(
              proposer,
              parent.candidate,
@@ -1197,7 +1305,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          :ok <-
            notify(opts, :on_proposal_end, %{
              iteration: iteration,
-             new_instructions: replacements
+             new_instructions: replacements,
+             aggregation_reports: aggregation_reports
            }),
          proposed_candidate = Map.merge(parent.candidate, replacements),
          {:ok, proposed_result, state} <-
@@ -1895,21 +2004,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     })
   end
 
-  defp propose(proposer, candidate, component, dataset, iteration) do
-    records = Map.get(dataset, component, [])
-
-    case proposer.(candidate, component, records, iteration) do
-      {:ok, text} when is_binary(text) -> {:ok, text}
-      text when is_binary(text) -> {:ok, text}
-      {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_proposal, other}}
-    end
-  rescue
-    error -> {:error, {:proposal_exception, Exception.message(error)}}
-  catch
-    kind, reason -> {:error, {:proposal_throw, kind, reason}}
-  end
-
   defp propose_components_with_budget(
          proposer,
          candidate,
@@ -1919,26 +2013,31 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          state,
          opts
        ) do
-    Enum.reduce_while(components, {:ok, %{}, state}, fn component, {:ok, replacements, state} ->
-      case propose_component_with_budget(
-             proposer,
-             candidate,
-             component,
-             dataset,
-             iteration,
-             state,
-             opts
-           ) do
-        {:ok, text, state} ->
-          {:cont, {:ok, Map.put(replacements, component, text), state}}
+    Enum.reduce_while(
+      components,
+      {:ok, %{}, [], state},
+      fn component, {:ok, replacements, reports, state} ->
+        case propose_component_with_budget(
+               proposer,
+               candidate,
+               component,
+               dataset,
+               iteration,
+               state,
+               opts
+             ) do
+          {:ok, text, report, state} ->
+            {:cont,
+             {:ok, Map.put(replacements, component, text), append_report(reports, report), state}}
 
-        {:error, {:budget_exhausted, _, _, _} = reason, state} ->
-          {:halt, {:error, reason, state}}
+          {:error, {:budget_exhausted, _, _, _} = reason, _report, state} ->
+            {:halt, {:error, reason, state}}
 
-        {:error, reason, state} ->
-          {:halt, {:error, {:component_proposal_error, reason, components}, state}}
+          {:error, reason, _report, state} ->
+            {:halt, {:error, {:component_proposal_error, reason, components}, state}}
+        end
       end
-    end)
+    )
   end
 
   defp propose_component_with_budget(
@@ -1950,33 +2049,80 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          state,
          opts
        ) do
-    case authorize_reflection(state, opts) do
+    records = Map.get(dataset, component, [])
+    reservation = ComBee.reflection_call_reservation(records, state.combee_policy)
+
+    case Budget.authorize_reflections(state.budget, reservation) do
       :ok ->
-        state = %{state | budget: Budget.record_reflection(state.budget)}
-        propose_authorized(proposer, candidate, component, dataset, iteration, state)
+        case ComBee.propose(
+               proposer,
+               candidate,
+               component,
+               records,
+               iteration,
+               state.combee_policy
+             ) do
+          {:ok, text, calls, report} ->
+            state = record_reflection_result(state, calls, reservation, report, opts)
+            {:ok, text, report, state}
+
+          {:error, reason, calls, report} ->
+            state = record_reflection_result(state, calls, reservation, report, opts)
+            {:error, reason, report, state}
+        end
 
       {:error, reason} ->
-        {:error, reason, state}
+        {:error, reason, nil, state}
     end
   end
 
-  defp propose_authorized(proposer, candidate, component, dataset, iteration, state) do
-    case propose(proposer, candidate, component, dataset, iteration) do
-      {:ok, text} -> {:ok, text, state}
-      {:error, reason} -> {:error, reason, state}
+  defp record_reflection_result(state, calls, reservation, report, opts) do
+    if calls > reservation do
+      raise ArgumentError,
+            "GEPA reflection report #{calls} exceeds preauthorization #{reservation}"
     end
+
+    state = %{state | budget: Budget.record_reflections(state.budget, calls)}
+    record_combee_reports(state, append_report([], report), opts)
   end
 
-  defp authorize_reflection(state, opts) do
-    case Keyword.get(opts, :max_reflection_calls, :infinity) do
-      :infinity ->
-        :ok
+  defp record_combee_reports(state, reports, opts) do
+    Enum.reduce(reports || [], state, fn report, state ->
+      notify(opts, :on_combee_aggregation, %{
+        iteration: report.iteration,
+        component: report.component,
+        report: report
+      })
 
-      limit when state.budget.reflection_calls < limit ->
-        :ok
+      %{state | combee_reports: state.combee_reports ++ [report]}
+    end)
+  end
 
-      limit ->
-        {:error, {:budget_exhausted, :reflection_calls, state.budget.reflection_calls + 1, limit}}
+  defp append_report(reports, nil), do: reports
+  defp append_report(reports, report), do: reports ++ [report]
+
+  defp reflection_call_reservation(components, dataset, combee_policy) do
+    Enum.reduce(components, 0, fn component, total ->
+      total +
+        ComBee.reflection_call_reservation(Map.get(dataset, component, []), combee_policy)
+    end)
+  end
+
+  defp build_reflective_dataset(adapter, parent, result, components) do
+    {:ok, Adapter.make_reflective_dataset(adapter, parent.candidate, result, components)}
+  rescue
+    error -> {:error, {:reflective_dataset_exception, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:reflective_dataset_throw, kind, reason}}
+  end
+
+  defp ensure_combee_policy!(%State{combee_policy: stored} = state, requested) do
+    if stored.identity == requested.identity do
+      state
+    else
+      raise ArgumentError,
+            "GEPA resume ComBee policy mismatch: stored #{inspect(stored.identity)}, " <>
+              "requested #{inspect(requested.identity)}"
     end
   end
 
@@ -2186,7 +2332,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   defp callback_config(opts) do
     Map.new(%{
       max_iterations: Keyword.get(opts, :max_iterations, 10),
-      minibatch_size: Keyword.get(opts, :minibatch_size),
+      minibatch_size:
+        Keyword.get(opts, :effective_minibatch_size, Keyword.get(opts, :minibatch_size)),
       seed: Keyword.get(opts, :seed, 0),
       use_merge: Keyword.get(opts, :use_merge, false),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
@@ -2201,7 +2348,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
       max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity),
       proposal_concurrency: Keyword.get(opts, :proposal_concurrency, 1),
-      proposal_timeout: Keyword.get(opts, :proposal_timeout, :infinity)
+      proposal_timeout: Keyword.get(opts, :proposal_timeout, :infinity),
+      combee: opts |> Keyword.fetch!(:combee_policy) |> ComBee.metadata()
     })
   end
 
@@ -2210,7 +2358,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          seed_candidate,
          opts
        )
-       when schema_version in [1, 3] do
+       when schema_version in [1, 3, 4] do
     budget = dumped |> Map.fetch!("budget") |> Budget.load!()
 
     budget =
@@ -2244,6 +2392,9 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         |> Proposal.load!(&load_result!/1),
       proposal_policy:
         load_proposal_policy(dumped, schema_version, Keyword.fetch!(opts, :proposal_policy)),
+      combee_policy:
+        load_combee_policy(dumped, schema_version, Keyword.fetch!(opts, :combee_policy)),
+      combee_reports: dumped |> Map.get("combee_reports", []) |> Enum.map(&ComBee.load_report/1),
       stop_reason: restore(Map.get(dumped, "stop_reason"))
     }
 
@@ -2282,6 +2433,10 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          opts
        )
        when is_list(candidates) and candidates != [] do
+    if Keyword.fetch!(opts, :combee_policy).enabled do
+      raise ArgumentError, "GEPA resume ComBee policy mismatch: legacy checkpoint is disabled"
+    end
+
     id_to_index =
       candidates
       |> Enum.with_index()
@@ -2348,6 +2503,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
       stopper_state: new_stopper_state(opts),
       proposal_policy: Keyword.fetch!(opts, :proposal_policy),
+      combee_policy: Keyword.fetch!(opts, :combee_policy),
       stop_reason: nil
     }
   rescue

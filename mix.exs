@@ -155,6 +155,7 @@ defmodule DSEx.MixProject do
       "docs/REACT_V2_FIDELITY.md",
       "docs/RLM_FIDELITY.md",
       "docs/INSTRUCTION_OPTIMIZER_FIDELITY.md",
+      "docs/COMBEE_FIDELITY.md",
       "docs/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
