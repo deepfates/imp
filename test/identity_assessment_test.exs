@@ -134,6 +134,21 @@ defmodule DSEx.IdentityAssessmentTest do
     assert refs == Enum.sort(refs)
   end
 
+  test "accepts a provider response with a JSON-encoded assessments array" do
+    assessor = fn _profile, request ->
+      response = valid_response(request)
+      {:ok, %{"assessments" => Jason.encode!(response["assessments"])}}
+    end
+
+    result =
+      IdentityAssessment.run(input(1),
+        profiles: [profile("nested-json", "anthropic:claude-sonnet-5")],
+        assessor: assessor
+      )
+
+    assert result["summary"]["succeeded_records"] == 1
+  end
+
   test "accepts ReqLLM structured tool-call envelopes" do
     assessor = fn _profile, request ->
       {:ok, %{tool_calls: [%{arguments: valid_response(request)}]}}

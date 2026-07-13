@@ -580,7 +580,7 @@ defmodule DSEx.IdentityAssessment do
   defp unwrap_tool_call(call), do: call
 
   defp decode_response(response) when is_map(response) do
-    {:ok, stringify_keys(response)}
+    {:ok, response |> stringify_keys() |> decode_nested_assessments()}
   end
 
   defp decode_response(response) when is_list(response) do
@@ -605,6 +605,19 @@ defmodule DSEx.IdentityAssessment do
        "message" => "expected a structured object or JSON text, got #{inspect_limited(response)}"
      }}
   end
+
+  defp decode_nested_assessments(%{"assessments" => assessments} = response)
+       when is_binary(assessments) do
+    case Jason.decode(assessments) do
+      {:ok, decoded} when is_list(decoded) ->
+        Map.put(response, "assessments", stringify_keys(decoded))
+
+      _ ->
+        response
+    end
+  end
+
+  defp decode_nested_assessments(response), do: response
 
   defp json_text_candidates(text) do
     trimmed = String.trim(text)
