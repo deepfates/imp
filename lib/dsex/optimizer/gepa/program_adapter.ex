@@ -47,6 +47,7 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
 
     scores = Enum.map(trajectories, & &1.score)
     outputs = Enum.map(trajectories, & &1.prediction)
+    objective_scores = project_objective_scores(trajectories)
     components = Map.keys(candidate)
 
     component_trajectories =
@@ -55,6 +56,7 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
         else: %{}
 
     Result.new(outputs, scores,
+      objective_scores: objective_scores,
       trajectories: component_trajectories,
       side_information:
         side_information(
@@ -159,6 +161,25 @@ defmodule DSEx.Optimizer.GEPA.ProgramAdapter do
 
   defp metric_feedback(%{score: score}) when score > 0, do: :successful
   defp metric_feedback(_trajectory), do: :improve
+
+  defp project_objective_scores(trajectories) do
+    projected = Enum.map(trajectories, &trajectory_objective_scores/1)
+
+    if Enum.all?(projected, &is_nil/1) do
+      nil
+    else
+      Enum.map(projected, &(&1 || %{}))
+    end
+  end
+
+  defp trajectory_objective_scores(%{metric_metadata: metadata}) when is_map(metadata) do
+    case Map.get(metadata, :objective_scores, Map.get(metadata, "objective_scores")) do
+      scores when is_map(scores) -> scores
+      _missing_or_invalid -> nil
+    end
+  end
+
+  defp trajectory_objective_scores(_trajectory), do: nil
 
   defp validate_component_feedback!(callbacks, program) do
     case ComponentFeedback.validate(callbacks) do

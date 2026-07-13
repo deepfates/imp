@@ -110,7 +110,7 @@ defmodule DSEx.Clients.ReqLLM do
   defp do_generate_uncached(lm, messages, opts) do
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
-        {:ok, from_response(response)}
+        {:ok, from_response(response, lm.model)}
 
       {:error, reason} ->
         {:error, reason}
@@ -543,7 +543,7 @@ defmodule DSEx.Clients.ReqLLM do
     )
   end
 
-  defp from_response(%ReqLLM.Response{} = response) do
+  defp from_response(%ReqLLM.Response{} = response, model_spec) do
     raw =
       case ReqLLM.Response.tool_calls(response) do
         [] ->
@@ -553,7 +553,10 @@ defmodule DSEx.Clients.ReqLLM do
           %{tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)}
       end
 
-    metadata = native_reasoning_metadata(response)
+    metadata =
+      response
+      |> native_reasoning_metadata()
+      |> Map.put(:req_llm, response_metadata(response, model_spec))
 
     if metadata == %{} do
       raw
@@ -562,7 +565,120 @@ defmodule DSEx.Clients.ReqLLM do
     end
   end
 
-  defp from_response(other), do: other
+  defp from_response(other, _model_spec), do: other
+
+  defp response_metadata(%ReqLLM.Response{} = response, model_spec) do
+    provider_meta = response.provider_meta || %{}
+    logprobs = sanitize_logprobs(map_value(provider_meta, :logprobs))
+
+    %{
+      provider: provider_name(model_spec),
+      model: response.model,
+      api: map_value(provider_meta, :api_type),
+      finish_reason: response.finish_reason,
+      usage: sanitize_usage(response.usage),
+      content: ReqLLM.Response.text(response) || "",
+      logprobs: logprobs,
+      provider_meta: sanitize_provider_meta(provider_meta, logprobs)
+    }
+  end
+
+  defp provider_name(%{provider: provider}), do: to_string(provider)
+
+  defp provider_name(model_spec) when is_binary(model_spec) do
+    case String.split(model_spec, ":", parts: 2) do
+      [provider, _model] -> provider
+      _other -> nil
+    end
+  end
+
+  defp provider_name(_model_spec), do: nil
+
+  defp sanitize_usage(nil), do: nil
+  defp sanitize_usage(usage) when is_map(usage), do: sanitize_usage_value(usage)
+  defp sanitize_usage(_usage), do: nil
+
+  defp sanitize_provider_meta(provider_meta, logprobs) do
+    provider_meta
+    |> sanitize_usage_value()
+    |> Map.drop([:logprobs, "logprobs"])
+    |> Map.put(:logprobs, logprobs)
+  end
+
+  defp sanitize_usage_value(value) when is_map(value) do
+    Map.new(value, fn {key, nested} ->
+      if sensitive_usage_key?(key),
+        do: {key, "[REDACTED]"},
+        else: {key, sanitize_usage_value(nested)}
+    end)
+  end
+
+  defp sanitize_usage_value(value) when is_list(value),
+    do: Enum.map(value, &sanitize_usage_value/1)
+
+  defp sanitize_usage_value(value) when is_binary(value), do: DSEx.Redaction.redact(value)
+  defp sanitize_usage_value(value), do: value
+
+  defp sensitive_usage_key?(key) do
+    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
+
+    normalized in [
+      "api_key",
+      "authorization",
+      "access_token",
+      "password",
+      "secret",
+      "client_secret",
+      "private_key",
+      "x_api_key"
+    ] or String.ends_with?(normalized, "_api_key") or
+      String.ends_with?(normalized, "_access_token") or
+      String.ends_with?(normalized, "_secret")
+  end
+
+  defp sanitize_logprobs(logprobs) when is_list(logprobs) do
+    logprobs
+    |> Enum.flat_map(fn token ->
+      with true <- is_map(token),
+           token_text when is_binary(token_text) <- map_value(token, :token),
+           logprob when is_number(logprob) <- map_value(token, :logprob) do
+        top_logprobs =
+          token
+          |> map_value(:top_logprobs)
+          |> sanitize_top_logprobs()
+
+        [
+          %{
+            token: DSEx.Redaction.redact(token_text),
+            logprob: logprob,
+            top_logprobs: top_logprobs
+          }
+        ]
+      else
+        _invalid -> []
+      end
+    end)
+  end
+
+  defp sanitize_logprobs(_logprobs), do: []
+
+  defp sanitize_top_logprobs(top_logprobs) when is_list(top_logprobs) do
+    Enum.flat_map(top_logprobs, fn alternative ->
+      with true <- is_map(alternative),
+           token when is_binary(token) <- map_value(alternative, :token),
+           logprob when is_number(logprob) <- map_value(alternative, :logprob) do
+        [%{token: DSEx.Redaction.redact(token), logprob: logprob}]
+      else
+        _invalid -> []
+      end
+    end)
+  end
+
+  defp sanitize_top_logprobs(_top_logprobs), do: []
+
+  defp map_value(map, key) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  end
 
   defp native_reasoning_metadata(%ReqLLM.Response{} = response) do
     thinking = ReqLLM.Response.thinking(response)
