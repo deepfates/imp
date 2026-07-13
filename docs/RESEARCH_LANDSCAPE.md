@@ -92,6 +92,52 @@ standalone SIMBA paper was located. Its released DSPy source, adjacent tests,
 documentation, pull requests, and release history are therefore its behavioral
 authorities. DSEx must not describe source fidelity as SIMBA paper parity.
 
+## Fast-Slow Training
+
+The primary authority is [*Learning, Fast and Slow: Towards LLMs That Adapt
+Continually*, arXiv:2605.12484v2](https://arxiv.org/abs/2605.12484), supplemented
+by the [official GEPA project
+article](https://gepa-ai.github.io/gepa/blog/2026/05/11/learning-fast-and-slow/).
+Algorithm 1 alternates two different adaptation timescales in this order:
+
+1. Prefetch the next `T` slow-learning minibatches from the continual stream.
+2. Hold the current policy parameters and reflection LM fixed while GEPA performs
+   fast prompt adaptation, then retain a `K`-member per-instance Pareto prompt
+   population. The initial population is the singleton seed prompt, not `K`
+   copies of it.
+3. For each question, collect exactly `G` rollouts, allocating `G / K` rollouts
+   to each retained prompt (`K` must divide `G`). Normalize rewards once across
+   the complete cross-prompt group of `G` rollouts; prompt-local normalization
+   would change the learning signal.
+4. Keep that prompt population fixed while applying exactly `T` slow policy
+   updates, one for each prefetched minibatch, and only then begin the next GEPA
+   cycle with the updated policy.
+
+Thus `T` is the number of slow updates per GEPA cycle, `K` is the active Pareto
+prompt-population size after fast adaptation, and `G` is the total rollout group
+size per question, not a per-prompt count. The current policy supplies rollout
+probabilities and is frozen during the fast phase; the reflection LM proposes
+prompt changes and is also frozen. During the slow phase the policy changes,
+but the selected prompts do not.
+
+The paper's rollout reuse optimization does not make trajectories
+interchangeable. A reused GEPA trajectory must remain bound to its cycle,
+behavior-policy identity, problem/input, exact prompt, output and reward, with
+the response token IDs, mask, and behavior-policy token log-probabilities needed
+for the slow update. Reuse is a single-claim operation within that cycle; stale,
+duplicate, or mismatched trajectories must fall back to a fresh rollout rather
+than silently altering the off-policy ratio or advantage group.
+
+DSEx treats this as a paper-faithful Elixir/BEAM orchestration adaptation, not
+source parity: no first-party Fast-Slow implementation was published with the
+paper as of this review. Its explicit immutable cycle state, bounded concurrent
+rollouts, durable operation intent, and checkpoint recovery may exploit the
+BEAM, but those mechanisms must preserve the ordering and statistical groups
+above. This section does not establish end-to-end provider evidence or claim
+that the DSEx implementation is complete. Revisit the design and parity status
+when first-party code, a revised paper, or an official executable artifact is
+released.
+
 ## Repositories And Roles
 
 | System | Role for DSEx | Pin or authority policy |
