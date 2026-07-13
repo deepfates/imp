@@ -539,6 +539,36 @@ defmodule GepaCampaignTest do
     assert Agent.get(concurrency, & &1.maximum) == 2
   end
 
+  test "campaign evaluation timeout bounds baseline and final scoring calls" do
+    dataset_root = tmp_dir("gepa-campaign-evaluation-timeout-data")
+    rows_dir = tmp_dir("gepa-campaign-evaluation-timeout-rows")
+    write_dataset_root!(dataset_root)
+    receiver = self()
+
+    lm =
+      static_gold_lm()
+      |> put_in([:opts, :handler], fn _messages, _handler_opts ->
+        send(receiver, :slow_evaluation_started)
+        Process.sleep(:infinity)
+      end)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-evaluation-timeout",
+        lm: lm,
+        max_concurrency: 2,
+        execution: %{
+          "source" => "test",
+          "lm" => %{"optimizer_timeout_ms" => 25}
+        }
+      )
+
+    task = Task.async(fn -> GepaCampaign.run(opts) end)
+
+    assert_receive :slow_evaluation_started, 1_000
+    assert %{report: %{"rows" => [_row]}} = Task.await(task, 5_000)
+  end
+
   test "DSEx GEPA campaign consumes and clears persisted optimizer generation state" do
     dataset_root = tmp_dir("gepa-campaign-generation-resume-data")
     rows_dir = tmp_dir("gepa-campaign-generation-resume-rows")

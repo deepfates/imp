@@ -493,6 +493,34 @@ defmodule DSExTest do
     assert length(result.rows) == 2
   end
 
+  test "parallel evaluate records timed-out rows without exiting the caller" do
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> Process.sleep(:infinity) end]
+    }
+
+    program = DSEx.predict("question -> answer", lm: lm)
+
+    devset =
+      Enum.map(1..2, fn index ->
+        DSEx.example(question: "blocked #{index}", answer: "never")
+        |> DSEx.Example.with_inputs(:question)
+      end)
+
+    result =
+      devset
+      |> DSEx.Evaluate.new(DSEx.Metrics.exact_match(:answer),
+        max_concurrency: 2,
+        max_errors: :infinity,
+        timeout: 10
+      )
+      |> DSEx.Evaluate.run(program)
+
+    assert result.score == 0.0
+    assert length(result.rows) == 2
+    assert Enum.all?(result.errors, &match?(%{reason: {:evaluation_task_exit, :timeout}}, &1))
+  end
+
   test "bootstrap few-shot selects successful demos" do
     handler = fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)

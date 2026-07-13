@@ -115,7 +115,8 @@ defmodule DSEx.Evaluate do
       fn {example, index} -> evaluate_row(evaluator, program, example, index) end,
       ordered: true,
       max_concurrency: evaluator.max_concurrency,
-      timeout: evaluator.timeout
+      timeout: evaluator.timeout,
+      on_timeout: :kill_task
     )
     |> Enum.reduce_while({[], []}, fn
       {:ok, {row, error}}, {rows, errors} ->

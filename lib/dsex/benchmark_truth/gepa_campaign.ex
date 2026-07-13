@@ -576,12 +576,15 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     component_feedback =
       GepaComponentFeedback.callbacks!(spec, program, feedback_metric)
 
+    evaluation_timeout = get_in(execution, ["lm", "optimizer_timeout_ms"]) || 30_000
+
     baseline =
       baseline_scores(
         program,
         [train: trainset, dev: devset, test: testset],
         metric,
         max_concurrency,
+        evaluation_timeout,
         progress,
         progress_fn
       )
@@ -598,7 +601,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         seed: seed,
         generations: generations,
         max_concurrency: max_concurrency,
-        timeout: get_in(execution, ["lm", "optimizer_timeout_ms"]) || 30_000,
+        timeout: evaluation_timeout,
         reflection_lm: reflection_lm,
         max_metric_calls: budget,
         callbacks: optimizer_callbacks,
@@ -627,9 +630,9 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
 
     %{
       seed: seed,
-      train: score(compiled, trainset, metric, max_concurrency),
-      dev: score(compiled, devset, metric, max_concurrency),
-      test: score(compiled, testset, metric, max_concurrency),
+      train: score(compiled, trainset, metric, max_concurrency, evaluation_timeout),
+      dev: score(compiled, devset, metric, max_concurrency, evaluation_timeout),
+      test: score(compiled, testset, metric, max_concurrency, evaluation_timeout),
       baseline_train: baseline.train,
       baseline_dev: baseline.dev,
       baseline_test: baseline.test,
@@ -1177,18 +1180,26 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     end)
   end
 
-  defp score(program, examples, metric, max_concurrency) do
+  defp score(program, examples, metric, max_concurrency, timeout) do
     DSEx.Evaluate.run(
       DSEx.Evaluate.new(examples, metric,
         max_errors: :infinity,
         max_concurrency: max_concurrency,
-        timeout: :infinity
+        timeout: timeout
       ),
       program
     ).score
   end
 
-  defp baseline_scores(program, splits, metric, max_concurrency, progress, progress_fn) do
+  defp baseline_scores(
+         program,
+         splits,
+         metric,
+         max_concurrency,
+         timeout,
+         progress,
+         progress_fn
+       ) do
     {scores, _progress} =
       Enum.reduce(splits, {%{}, progress}, fn {split, examples}, {scores, progress} ->
         {value, progress} =
@@ -1198,6 +1209,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
             examples,
             metric,
             max_concurrency,
+            timeout,
             progress,
             progress_fn
           )
@@ -1214,6 +1226,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
          examples,
          metric,
          max_concurrency,
+         timeout,
          progress,
          progress_fn
        ) do
@@ -1230,6 +1243,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
           examples,
           metric,
           max_concurrency,
+          timeout,
           progress,
           checkpointed,
           progress_fn
@@ -1244,6 +1258,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
           examples,
           metric,
           max_concurrency,
+          timeout,
           progress,
           prefix,
           progress_fn
@@ -1257,6 +1272,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
          examples,
          metric,
          max_concurrency,
+         timeout,
          progress,
          prefix,
          progress_fn
@@ -1289,7 +1305,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
 
         progress = persist_baseline_prefix(progress, split, dispatch_intent, progress_fn)
 
-        batch_score = score(program, batch, metric, max_concurrency)
+        batch_score = score(program, batch, metric, max_concurrency, timeout)
 
         committed =
           dispatch_intent
