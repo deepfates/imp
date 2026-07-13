@@ -17,7 +17,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   }
 
   @type_name "dsex_fast_slow_training"
-  @schema_version 3
+  @schema_version 4
 
   @spec dump(Config.t(), State.t()) :: map()
   def dump(%Config{} = config, %State{} = state) do
@@ -55,6 +55,11 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
   def load!(%{"type" => @type_name, "schema_version" => 2}, %Config{}) do
     raise ArgumentError,
           "Fast-Slow checkpoint schema 2 omitted durable rollout reuse and token provenance"
+  end
+
+  def load!(%{"type" => @type_name, "schema_version" => 3}, %Config{}) do
+    raise ArgumentError,
+          "Fast-Slow checkpoint schema 3 did not persist the rollout reuse policy"
   end
 
   def load!(checkpoint, %Config{} = config) when is_map(checkpoint) do
@@ -142,6 +147,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       "k" => state.k,
       "g" => state.g,
       "max_cycles" => state.max_cycles,
+      "reuse_rollouts" => state.reuse_rollouts,
       "stage" => Atom.to_string(state.stage),
       "cycle" => state.cycle,
       "slow_step" => state.slow_step,
@@ -273,6 +279,7 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
       k: positive!(data, "k"),
       g: positive!(data, "g"),
       max_cycles: positive!(data, "max_cycles"),
+      reuse_rollouts: boolean!(data, "reuse_rollouts"),
       stage:
         enum!(data, "stage",
           initialized: :initialized,
@@ -488,6 +495,13 @@ defmodule DSEx.Training.FastSlow.Checkpoint do
     case Map.fetch!(data, key) do
       value when is_integer(value) and value > 0 -> value
       _value -> raise ArgumentError, "#{key} must be a positive integer"
+    end
+  end
+
+  defp boolean!(data, key) do
+    case Map.fetch!(data, key) do
+      value when is_boolean(value) -> value
+      _value -> raise ArgumentError, "#{key} must be a boolean"
     end
   end
 

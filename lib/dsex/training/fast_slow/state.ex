@@ -502,6 +502,7 @@ defmodule DSEx.Training.FastSlow.State do
     :k,
     :g,
     :max_cycles,
+    :reuse_rollouts,
     :stage,
     :cycle,
     :slow_step,
@@ -528,6 +529,7 @@ defmodule DSEx.Training.FastSlow.State do
           k: pos_integer(),
           g: pos_integer(),
           max_cycles: pos_integer(),
+          reuse_rollouts: boolean(),
           stage: :initialized | :fast | :slow | :terminal,
           cycle: non_neg_integer(),
           slow_step: non_neg_integer(),
@@ -560,6 +562,7 @@ defmodule DSEx.Training.FastSlow.State do
       k: config.k,
       g: config.g,
       max_cycles: config.max_cycles,
+      reuse_rollouts: config.reuse_rollouts,
       stage: :initialized,
       cycle: 0,
       slow_step: 0,
@@ -634,6 +637,30 @@ defmodule DSEx.Training.FastSlow.State do
 
   def next_cycle(%__MODULE__{}, %DatasetState{}),
     do: raise(ArgumentError, "a new cycle may only follow the slow stage")
+
+  @spec complete(t(), DatasetState.t(), term()) :: t()
+  def complete(state, dataset, details \\ %{})
+
+  def complete(
+        %__MODULE__{
+          stage: :slow,
+          terminal: nil,
+          slow_step: t,
+          t: t,
+          cycle: cycle,
+          max_cycles: max_cycles
+        } = state,
+        %DatasetState{} = dataset,
+        details
+      )
+      when cycle + 1 == max_cycles do
+    state
+    |> Map.put(:dataset, dataset)
+    |> terminate(:completed, details)
+  end
+
+  def complete(%__MODULE__{}, %DatasetState{}, _details),
+    do: raise(ArgumentError, "completion requires t slow updates in the final cycle")
 
   @spec complete_slow_step(t(), term()) :: t()
   def complete_slow_step(%__MODULE__{stage: :slow, terminal: nil} = state, payload) do
@@ -872,6 +899,7 @@ defmodule DSEx.Training.FastSlow.State do
       state.stage in @stages and is_integer(state.cycle) and state.cycle >= 0 and
         is_integer(state.t) and state.t > 0 and is_integer(state.max_cycles) and
         state.max_cycles > 0 and state.cycle < state.max_cycles and
+        is_boolean(state.reuse_rollouts) and
         is_integer(state.slow_step) and state.slow_step in 0..state.t and
         is_integer(state.k) and state.k > 0 and is_integer(state.g) and state.g > 0 and
         rem(state.g, state.k) == 0 and valid_population?(state) and
@@ -921,7 +949,7 @@ defmodule DSEx.Training.FastSlow.State do
          state.prompt_population.revision == state.cycle) or
       (length(state.prompt_population.candidates) == state.k and
          state.prompt_population.revision == state.cycle + 1 and
-         current_population_binding?(state))
+         terminal_population_binding?(state))
   end
 
   defp valid_population?(%__MODULE__{} = state) do
@@ -932,6 +960,13 @@ defmodule DSEx.Training.FastSlow.State do
   defp valid_lookahead?(%__MODULE__{lookahead: nil} = state) do
     state.stage in [:initialized, :fast, :terminal] and state.slow_step == 0 and
       state.prompt_population.revision == state.cycle
+  end
+
+  defp valid_lookahead?(
+         %__MODULE__{stage: :terminal, lookahead: %Lookahead{} = lookahead} = state
+       ) do
+    lookahead.cycle == state.cycle and lookahead.consumed_steps == state.t and
+      length(lookahead.minibatches) == state.t
   end
 
   defp valid_lookahead?(%__MODULE__{} = state) do
@@ -951,6 +986,15 @@ defmodule DSEx.Training.FastSlow.State do
       is_binary(state.prompt_population.parent_digest) and
       is_binary(state.prompt_population.anchor_digest)
   end
+
+  defp terminal_population_binding?(%__MODULE__{lookahead: %Lookahead{} = lookahead} = state) do
+    lookahead.cycle == state.cycle and
+      state.prompt_population.lookahead_digest == lookahead.digest and
+      is_binary(state.prompt_population.parent_digest) and
+      is_binary(state.prompt_population.anchor_digest)
+  end
+
+  defp terminal_population_binding?(%__MODULE__{}), do: false
 
   defp valid_reuse_cache?(state) do
     state.reuse_cache.cycle == state.cycle and

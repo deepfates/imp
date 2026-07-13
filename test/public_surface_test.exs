@@ -204,6 +204,8 @@ defmodule PublicSurfaceTest do
     DSEx.Tracking.WandB,
     DSEx.Tracking.WandB.Backend,
     DSEx.Tracking.WandB.Transport,
+    DSEx.Training.FastSlow.Backend,
+    DSEx.Training.FastSlow.Runner,
     DSEx.Tool
   ]
 

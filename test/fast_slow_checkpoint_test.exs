@@ -18,7 +18,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     decoded = checkpoint |> Jason.encode!() |> Jason.decode!()
 
     assert decoded["type"] == "dsex_fast_slow_training"
-    assert decoded["schema_version"] == 3
+    assert decoded["schema_version"] == 4
     assert byte_size(decoded["payload_sha256"]) == 64
     assert Checkpoint.load!(decoded, config) == state
   end
@@ -76,6 +76,12 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
   test "schema 2 without durable token reuse provenance is rejected explicitly" do
     assert_raise ArgumentError, ~r/schema 2 omitted durable rollout reuse/, fn ->
       Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 2}, config())
+    end
+  end
+
+  test "schema 3 without a persisted reuse policy is rejected explicitly" do
+    assert_raise ArgumentError, ~r/schema 3 did not persist the rollout reuse policy/, fn ->
+      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 3}, config())
     end
   end
 
