@@ -9,7 +9,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
 
   defmodule MeteredLM do
     @moduledoc false
-    defstruct [:inner, :budget, :usage, :max_tokens]
+    defstruct [:inner, :budget, :usage, :max_tokens, :role]
 
     def generate(%__MODULE__{} = lm, messages, opts) do
       opts = Keyword.put_new(opts, :max_tokens, lm.max_tokens)
@@ -29,7 +29,7 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       case usage(value) do
         %{} = usage ->
           DSEx.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
-          Agent.update(lm.usage, &sum(&1, usage))
+          Agent.update(lm.usage, &sum(&1, usage, lm.role))
           result
 
         nil ->
@@ -37,9 +37,17 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       end
     end
 
-    defp record_result(_lm, {:error, reason}) do
-      raise DSEx.BenchmarkTruth.RLMRuntime.AmbiguousExternalCall,
-        message: "provider call returned without auditable usage: #{inspect(reason)}"
+    defp record_result(lm, {:error, reason}) do
+      case usage(reason) do
+        %{} = usage ->
+          DSEx.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
+          Agent.update(lm.usage, &sum(&1, usage, lm.role))
+          {:error, {:provider_error_with_usage, inspect(reason)}}
+
+        nil ->
+          raise DSEx.BenchmarkTruth.RLMRuntime.AmbiguousExternalCall,
+            message: "provider call returned without auditable usage: #{inspect(reason)}"
+      end
     end
 
     defp usage(%{__dsex_lm_metadata__: metadata}),
@@ -47,6 +55,10 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
 
     defp usage(%{"__dsex_lm_metadata__" => metadata}),
       do: normalize(get_in(metadata, ["req_llm", "usage"]))
+
+    defp usage(%{usage: usage}), do: normalize(usage)
+    defp usage(%{"usage" => usage}), do: normalize(usage)
+    defp usage({_, value}), do: usage(value)
 
     defp usage(_), do: nil
 
@@ -63,9 +75,11 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
     defp number(map, key, default \\ 0),
       do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
 
-    defp sum(left, right),
+    defp sum(left, right, role),
       do: %{
         "requests" => left["requests"] + 1,
+        "root_calls" => left["root_calls"] + if(role == "root", do: 1, else: 0),
+        "sub_calls" => left["sub_calls"] + if(role == "root", do: 0, else: 1),
         "input_tokens" => left["input_tokens"] + right.input_tokens,
         "output_tokens" => left["output_tokens"] + right.output_tokens,
         "usd" => left["usd"] + right.usd
@@ -106,14 +120,21 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
              "usage" => measured,
              "trace_shape" => trace_shape,
              "trace" => bounded_trace(trace),
-             "budget_accounted" => true
+             "budget_accounted" => true,
+             "call_semantics" => call_semantics(approach, context, measured, trace)
            }}
 
         {:ok, answer, _shape, _trace} ->
           {:error, {:malformed_output, answer}}
 
         {:error, reason} ->
-          {:error, reason}
+          {:error,
+           %{
+             "reason" => inspect(reason),
+             "usage" => measured,
+             "budget_accounted" => true,
+             "call_semantics" => call_semantics(approach, context, measured, [])
+           }}
       end
     end
 
@@ -220,7 +241,8 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
         inner: inner,
         budget: context["budget"],
         usage: usage,
-        max_tokens: model["max_output_tokens"]
+        max_tokens: model["max_output_tokens"],
+        role: role
       }
     end
 
@@ -288,8 +310,36 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
     defp event_action(%{action: action}), do: to_string(action)
     defp event_action(_event), do: "event"
 
+    defp call_semantics(approach, context, usage, trace) do
+      %{
+        "provider_calls" => usage["requests"],
+        "root_calls" => usage["root_calls"],
+        "sub_calls" => usage["sub_calls"],
+        "max_llm_calls_scope" =>
+          if(approach == "rlm", do: "total_provider_calls", else: "not_applicable"),
+        "configured_max_depth" =>
+          if(approach == "rlm",
+            do: get_in(context, ["approach", "settings", "recursion_depth"]) || 0,
+            else: 0
+          ),
+        "max_observed_depth" =>
+          trace
+          |> List.wrap()
+          |> Enum.map(&Map.get(&1, :depth, Map.get(&1, "depth", 0)))
+          |> Enum.filter(&is_integer/1)
+          |> Enum.max(fn -> 0 end)
+      }
+    end
+
     defp empty_usage,
-      do: %{"requests" => 0, "input_tokens" => 0, "output_tokens" => 0, "usd" => 0.0}
+      do: %{
+        "requests" => 0,
+        "root_calls" => 0,
+        "sub_calls" => 0,
+        "input_tokens" => 0,
+        "output_tokens" => 0,
+        "usd" => 0.0
+      }
   end
 
   defmodule DSPy do
@@ -331,7 +381,8 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
 
         case result do
           {_output, 0} ->
-            {:ok, response |> File.read!() |> Jason.decode!()}
+            decoded = response |> File.read!() |> Jason.decode!()
+            if(decoded["status"] == "error", do: {:error, decoded}, else: {:ok, decoded})
 
           {output, status} ->
             raise DSEx.BenchmarkTruth.RLMRuntime.AmbiguousExternalCall,

@@ -37,6 +37,14 @@ defmodule DSEx.BenchmarkTruth.RLMDataset do
       "evaluated_rows" => length(normalized),
       "sample_ids" => Enum.map(selected, & &1["id"]),
       "sample_ids_sha256" => sha256(Jason.encode!(Enum.map(selected, & &1["id"]))),
+      "evaluated_keys" =>
+        Enum.map(normalized, fn row ->
+          %{
+            "example_id" => row["id"],
+            "query_id" => row["query_id"] || row["id"],
+            "context_size" => row["context_size"]
+          }
+        end),
       "rows" => normalized
     }
   end

@@ -120,7 +120,6 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
           "manifest" => manifest,
           "approach" => manifest["approaches"][job.approach],
           "budget" => budget,
-          "budget_remaining" => CampaignBudget.snapshot(budget),
           "row_timeout_ms" => manifest["execution"]["row_timeout_ms"],
           "work_dir" => Keyword.get(opts, :work_dir, "tmp/rlm-campaign"),
           "python" => Keyword.get(opts, :python, default_python())
@@ -148,16 +147,29 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
 
   defp execute_runtime(runtime, job, context, budget) do
     execute = fn ->
+      # DSPy rows are serialized by budget; take the remaining-budget snapshot
+      # inside that same critical section so concurrent rows cannot use stale limits.
+      context = Map.put(context, "budget_remaining", CampaignBudget.snapshot(budget))
       result = runtime.execute(RLMDataset.prompt_payload(job.row), job.approach, context)
 
       case result do
         {:ok, %{"budget_accounted" => true}} ->
           result
 
-        {:ok, %{"usage" => usage}} ->
+        {:ok, %{"usage" => usage} = outcome} ->
           case account_external_usage(budget, usage) do
             :ok -> result
-            {:error, reason} -> {:error, reason}
+            {:error, reason} -> charged_error(reason, usage, outcome)
+          end
+
+        {:error, %{"usage" => usage} = error} ->
+          if error["budget_accounted"] == true do
+            result
+          else
+            case account_external_usage(budget, usage) do
+              :ok -> result
+              {:error, reason} -> charged_error(reason, usage, error)
+            end
           end
 
         other ->
@@ -189,10 +201,21 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
         {:error, :malformed_runtime_usage}
 
       {:error, dimension, reservations} ->
+        :ok = CampaignBudget.record_usage(budget, usage)
         Enum.each(reservations, &CampaignBudget.release(budget, &1))
         {:error, {:campaign_budget_exhausted, dimension}}
     end
   end
+
+  defp charged_error(reason, usage, source),
+    do:
+      {:error,
+       %{
+         "reason" => inspect(reason),
+         "usage" => usage,
+         "call_semantics" => source["call_semantics"] || empty_call_semantics(),
+         "budget_accounted" => true
+       }}
 
   defp reserve_requests(_budget, 0, reservations), do: {:ok, reservations}
 
@@ -207,44 +230,81 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     outcome_row(key, job, outcome)
   rescue
     error in ArgumentError ->
-      outcome_row(key, job, {:error, {:malformed_runtime_output, Exception.message(error)}})
+      error_row(
+        key,
+        job,
+        inspect({:malformed_runtime_output, Exception.message(error)}),
+        outcome_usage(outcome),
+        outcome_metadata(outcome)
+      )
   end
+
+  defp outcome_usage({_, %{"usage" => usage}}) when is_map(usage), do: usage
+  defp outcome_usage(_), do: empty_usage()
+  defp outcome_metadata({_, metadata}) when is_map(metadata), do: metadata
+  defp outcome_metadata(_), do: %{}
 
   defp outcome_row(key, job, {:ok, outcome}) do
     validate_outcome!(outcome)
 
-    %{
-      "key" => key,
-      "example_id" => job.row["id"],
-      "family" => job.row["family"],
-      "approach" => job.approach,
-      "runtime" => job.runtime,
-      "status" => "ok",
-      "answer" => outcome["answer"],
-      "score" => score(outcome["answer"], job.row["gold"], job.metric),
-      "latency_ms" => outcome["latency_ms"],
-      "usage" => outcome["usage"],
-      "trace_shape" => outcome["trace_shape"],
-      "trace" => outcome["trace"],
-      "error" => nil
-    }
+    case score_result(outcome["answer"], job.row["gold"], job.metric) do
+      {:ok, score} ->
+        %{
+          "key" => key,
+          "example_id" => job.row["id"],
+          "family" => job.row["family"],
+          "model_family" => model_family(job),
+          "approach" => job.approach,
+          "runtime" => job.runtime,
+          "status" => "ok",
+          "answer" => outcome["answer"],
+          "score" => score,
+          "latency_ms" => outcome["latency_ms"],
+          "usage" => outcome["usage"],
+          "query_id" => job.row["query_id"] || job.row["id"],
+          "context_size" => job.row["context_size"],
+          "metric" => job.metric,
+          "scorer_evidence" => scorer_evidence(outcome, job),
+          "trace_shape" => outcome["trace_shape"],
+          "trace" => outcome["trace"],
+          "call_semantics" => outcome["call_semantics"],
+          "provenance" => provenance(job),
+          "error" => nil
+        }
+
+      {:error, reason} ->
+        error_row(key, job, reason, outcome["usage"], outcome)
+    end
   end
 
+  defp outcome_row(key, job, {:error, %{"usage" => usage} = error}),
+    do: error_row(key, job, error["reason"] || error["error"] || "runtime error", usage, error)
+
   defp outcome_row(key, job, {:error, reason}),
+    do: error_row(key, job, inspect(reason), empty_usage(), %{})
+
+  defp error_row(key, job, reason, usage, error),
     do: %{
       "key" => key,
       "example_id" => job.row["id"],
       "family" => job.row["family"],
+      "model_family" => model_family(job),
       "approach" => job.approach,
       "runtime" => job.runtime,
       "status" => "error",
       "answer" => nil,
       "score" => 0.0,
       "latency_ms" => 0.0,
-      "usage" => %{"requests" => 0, "input_tokens" => 0, "output_tokens" => 0, "usd" => 0.0},
+      "usage" => normalize_row_usage(usage),
+      "query_id" => job.row["query_id"] || job.row["id"],
+      "context_size" => job.row["context_size"],
+      "metric" => job.metric,
+      "scorer_evidence" => error["scorer_evidence"],
       "trace_shape" => ["error"],
       "trace" => [],
-      "error" => inspect(reason)
+      "call_semantics" => error["call_semantics"] || empty_call_semantics(),
+      "provenance" => provenance(job),
+      "error" => to_string(reason)
     }
 
   defp validate_outcome!(%{
@@ -252,15 +312,24 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
          "latency_ms" => latency,
          "usage" => usage,
          "trace_shape" => shape,
-         "trace" => trace
+         "trace" => trace,
+         "call_semantics" => semantics
        })
        when is_binary(answer) and answer != "" and is_number(latency) and latency >= 0 and
-              is_map(usage) and is_list(shape) and shape != [] and is_list(trace) do
+              is_map(usage) and is_list(shape) and shape != [] and is_list(trace) and
+              is_map(semantics) do
     unless Enum.all?(
              ~w(requests input_tokens output_tokens),
              &(is_integer(usage[&1]) and usage[&1] >= 0)
            ) and is_number(usage["usd"]) and usage["usd"] >= 0,
            do: raise(ArgumentError, "malformed RLM runtime usage")
+
+    unless semantics["provider_calls"] == usage["requests"] and
+             Enum.all?(
+               ~w(root_calls sub_calls configured_max_depth max_observed_depth),
+               &(is_integer(semantics[&1]) and semantics[&1] >= 0)
+             ) and is_binary(semantics["max_llm_calls_scope"]),
+           do: raise(ArgumentError, "malformed RLM call semantics")
 
     :ok
   end
@@ -278,7 +347,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
         runtime: runtime,
         approach: approach,
         row: row,
-        metric: manifest["datasets"][row["family"]]["metric"]
+        metric: manifest["datasets"][row["family"]]["metric"],
+        dataset_sha256: dataset["sha256"],
+        manifest_sha256: manifest["manifest_sha256"],
+        root_model: manifest["models"]["root"]["logical"]
       }
     end
   end
@@ -295,10 +367,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
           %{"input_per_million" => 1000.0, "output_per_million" => 1000.0}
 
       initial_rows =
-        Enum.filter(
-          existing,
-          &(&1["runtime"] == runtime and &1["approach"] == approach and &1["status"] == "ok")
-        )
+        Enum.filter(existing, &(&1["runtime"] == runtime and &1["approach"] == approach))
 
       initial = %{
         "requests" => Enum.sum(Enum.map(initial_rows, & &1["usage"]["requests"])),
@@ -415,10 +484,67 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
   defp selected_runtimes!(other),
     do: raise(ArgumentError, "runtime must be dsex, dspy, or both; got #{inspect(other)}")
 
-  defp score(answer, gold, "token_f1"), do: token_f1(answer, gold)
+  def score(answer, gold, "token_f1"), do: token_f1(answer, gold)
+  def score(answer, gold, "pair_set_f1"), do: pair_set_f1(answer, gold)
+  def score(answer, gold, "set_f1"), do: pair_set_f1(answer, gold)
+  def score(answer, gold, "oolong_official"), do: oolong_official(answer, gold)
 
-  defp score(answer, gold, _metric),
+  def score(_answer, _gold, "official_llm_judge"),
+    do:
+      raise(
+        ArgumentError,
+        "BrowseComp+ requires the pinned official LLM judge and trec_eval retrieval evidence"
+      )
+
+  def score(answer, gold, _metric),
     do: if(normalize(answer) == normalize(gold), do: 1.0, else: 0.0)
+
+  defp score_result(answer, gold, metric) do
+    {:ok, score(answer, gold, metric)}
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
+  defp oolong_official(answer, gold) do
+    case {strict_number(answer), strict_number(gold)} do
+      {{:ok, predicted}, {:ok, expected}} -> :math.pow(0.75, abs(expected - predicted))
+      {:error, {:ok, _expected}} -> 0.0
+      _ -> if(String.trim(to_string(answer)) == String.trim(to_string(gold)), do: 1.0, else: 0.0)
+    end
+  end
+
+  defp strict_number(value) when is_number(value), do: {:ok, value * 1.0}
+
+  defp strict_number(value) do
+    case Float.parse(String.trim(to_string(value))) do
+      {number, ""} -> {:ok, number}
+      _ -> :error
+    end
+  end
+
+  defp pair_set_f1(answer, gold) do
+    predicted = pair_set(answer)
+    expected = pair_set(gold)
+
+    cond do
+      MapSet.size(predicted) == 0 and MapSet.size(expected) == 0 ->
+        1.0
+
+      MapSet.size(predicted) == 0 or MapSet.size(expected) == 0 ->
+        0.0
+
+      true ->
+        common = predicted |> MapSet.intersection(expected) |> MapSet.size()
+        2 * common / (MapSet.size(predicted) + MapSet.size(expected))
+    end
+  end
+
+  defp pair_set(value) do
+    ~r/\(?\s*([A-Za-z0-9_.:-]+)\s*[,|]\s*([A-Za-z0-9_.:-]+)\s*\)?/
+    |> Regex.scan(to_string(value), capture: :all_but_first)
+    |> Enum.map(fn [left, right] -> if(left <= right, do: {left, right}, else: {right, left}) end)
+    |> MapSet.new()
+  end
 
   defp token_f1(answer, gold) do
     a = String.split(normalize(answer))
@@ -458,6 +584,74 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     }
 
   defp slug(value), do: String.replace(value, ~r/[^a-zA-Z0-9_.-]+/, "-")
+
+  defp provenance(job),
+    do: %{
+      "manifest_sha256" => job.manifest_sha256,
+      "dataset_sha256" => job.dataset_sha256,
+      "dataset_key" => job.row["id"]
+    }
+
+  defp scorer_evidence(%{"scorer_evidence" => evidence}, _job) when is_map(evidence),
+    do: evidence
+
+  defp scorer_evidence(outcome, job) do
+    input =
+      Jason.encode!(%{
+        "answer" => outcome["answer"],
+        "gold" => job.row["gold"],
+        "metric" => job.metric
+      })
+
+    %{
+      "contract" => job.metric,
+      "implementation" => "dsex_rlm_campaign",
+      "input_sha256" => sha256(input)
+    }
+  end
+
+  defp model_family(job) do
+    job.root_model
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/, "_")
+    |> String.trim("_")
+  end
+
+  defp sha256(value),
+    do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
+
+  defp normalize_row_usage(usage) when is_map(usage),
+    do: %{
+      "requests" => usage["requests"] || 0,
+      "root_calls" => usage["root_calls"] || 0,
+      "sub_calls" => usage["sub_calls"] || 0,
+      "input_tokens" => usage["input_tokens"] || 0,
+      "output_tokens" => usage["output_tokens"] || 0,
+      "usd" => usage["usd"] || 0.0
+    }
+
+  defp normalize_row_usage(_), do: empty_usage()
+
+  defp empty_usage,
+    do: %{
+      "requests" => 0,
+      "root_calls" => 0,
+      "sub_calls" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "usd" => 0.0
+    }
+
+  defp empty_call_semantics,
+    do: %{
+      "provider_calls" => 0,
+      "root_calls" => 0,
+      "sub_calls" => 0,
+      "max_llm_calls_scope" => "unknown",
+      "configured_max_depth" => 0,
+      "max_observed_depth" => 0
+    }
+
   defp timestamp_slug, do: DateTime.utc_now() |> Calendar.strftime("%Y%m%dT%H%M%SZ")
 
   defp default_python do

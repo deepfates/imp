@@ -18,11 +18,10 @@ defmodule DSEx.BenchmarkTruth.RLMManifest do
   def validate!(manifest, path, opts \\ [])
 
   def validate!(manifest, path, opts) when is_map(manifest) do
-    require_exact_keys!(
-      manifest,
-      ~w(schema_version campaign_id evidence_tier authorities models approaches execution datasets deviations),
-      "manifest"
-    )
+    base_keys =
+      ~w(schema_version campaign_id evidence_tier authorities models approaches execution datasets deviations)
+
+    require_allowed_exact_keys!(manifest, base_keys, ["paper_protocol"], "manifest")
 
     require!(manifest["schema_version"] == 1, "schema_version must be 1")
     require_string!(manifest["campaign_id"], "campaign_id")
@@ -44,6 +43,7 @@ defmodule DSEx.BenchmarkTruth.RLMManifest do
     )
 
     validate_deviations!(manifest["deviations"])
+    validate_paper_protocol!(manifest["paper_protocol"])
 
     manifest
     |> Map.put("manifest_path", Path.expand(path))
@@ -361,6 +361,19 @@ defmodule DSEx.BenchmarkTruth.RLMManifest do
     end)
   end
 
+  defp validate_paper_protocol!(nil), do: :ok
+
+  defp validate_paper_protocol!(protocol) when is_map(protocol) do
+    require_exact_keys!(
+      protocol,
+      ~w(reference_runtime reference_commit model_method_matrix dataset_selection compaction max_llm_calls_scope provider_call_accounting cache reasoning_profiles runtime_matrix),
+      "paper_protocol"
+    )
+  end
+
+  defp validate_paper_protocol!(_),
+    do: raise(ArgumentError, "invalid RLM manifest: paper_protocol must be an object")
+
   defp require_sha!(value, label),
     do:
       require!(
@@ -387,6 +400,17 @@ defmodule DSEx.BenchmarkTruth.RLMManifest do
 
   defp require_exact_keys!(_map, _keys, label),
     do: raise(ArgumentError, "#{label} must be an object")
+
+  defp require_allowed_exact_keys!(map, required, optional, label) when is_map(map) do
+    actual = Map.keys(map) |> Enum.sort()
+    required = Enum.sort(required)
+    allowed = Enum.sort(required ++ optional)
+
+    require!(
+      actual == required or actual == allowed,
+      "#{label} keys mismatch: expected #{inspect(required)} with optional #{inspect(optional)}, got #{inspect(actual)}"
+    )
+  end
 
   defp require!(true, _message), do: :ok
   defp require!(false, message), do: raise(ArgumentError, "invalid RLM manifest: #{message}")

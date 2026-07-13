@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -15,52 +16,102 @@ import dspy
 
 
 class CampaignError(RuntimeError):
-    pass
+    def __init__(self, message: str, usage: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.usage = usage
 
 
 class BudgetLM:
-    def __init__(self, inner: Any, ledger: dict[str, float], limits: dict[str, float], pricing: dict[str, float]):
+    def __init__(
+        self,
+        inner: Any,
+        ledger: dict[str, float],
+        limits: dict[str, float],
+        pricing: dict[str, float],
+        configured_max_tokens: int,
+        role: str,
+        lock: threading.Lock,
+    ):
         self.inner = inner
         self.ledger = ledger
         self.limits = limits
         self.pricing = pricing
+        self.configured_max_tokens = int(configured_max_tokens)
+        self.role = role
+        self.lock = lock
+
+        for key, value in (("_reserved_input", 0), ("_reserved_output", 0), ("_reserved_usd", 0.0)):
+            self.ledger.setdefault(key, value)
+
+        if self.configured_max_tokens <= 0:
+            raise CampaignError("configured provider output limit must be positive")
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.inner, name)
 
     def __call__(self, prompt: Any = None, **kwargs: Any) -> Any:
-        if self.ledger["requests"] + 1 > self.limits["requests"]:
-            raise CampaignError("request ceiling exhausted before dispatch")
         conservative_input = len(str(prompt).encode("utf-8")) + 256
-        if self.ledger["input_tokens"] + conservative_input > self.limits["input_tokens"]:
-            raise CampaignError("input-token ceiling exhausted before dispatch")
-        configured_max = int(getattr(self.inner, "kwargs", {}).get("max_tokens", 0))
-        output_remaining = int(self.limits["output_tokens"] - self.ledger["output_tokens"])
-        if output_remaining <= 0:
-            raise CampaignError("output-token ceiling exhausted before dispatch")
-        if hasattr(self.inner, "kwargs"):
-            self.inner.kwargs["max_tokens"] = min(configured_max, output_remaining)
-        reserved_usd = (
-            conservative_input / 1_000_000 * float(self.pricing["input_per_million"])
-            + min(configured_max, output_remaining) / 1_000_000 * float(self.pricing["output_per_million"])
+        with self.lock:
+            if self.ledger["requests"] + 1 > self.limits["requests"]:
+                raise CampaignError("request ceiling exhausted before dispatch", auditable_usage(self.ledger))
+            if self.ledger["input_tokens"] + self.ledger["_reserved_input"] + conservative_input > self.limits["input_tokens"]:
+                raise CampaignError("input-token ceiling exhausted before dispatch", auditable_usage(self.ledger))
+            output_remaining = int(
+                self.limits["output_tokens"]
+                - self.ledger["output_tokens"]
+                - self.ledger["_reserved_output"]
+            )
+            if output_remaining <= 0:
+                raise CampaignError("output-token ceiling exhausted before dispatch", auditable_usage(self.ledger))
+            dispatch_max = min(self.configured_max_tokens, output_remaining)
+            reserved_usd = (
+                conservative_input / 1_000_000 * float(self.pricing["input_per_million"])
+                + dispatch_max / 1_000_000 * float(self.pricing["output_per_million"])
+            )
+            if self.ledger["usd"] + self.ledger["_reserved_usd"] + reserved_usd > self.limits["usd"]:
+                raise CampaignError("USD ceiling exhausted before dispatch", auditable_usage(self.ledger))
+            self.ledger["requests"] += 1
+            self.ledger[f"{self.role}_calls"] += 1
+            self.ledger["_reserved_input"] += conservative_input
+            self.ledger["_reserved_output"] += dispatch_max
+            self.ledger["_reserved_usd"] += reserved_usd
+
+        provider_key = (
+            "max_completion_tokens"
+            if "max_completion_tokens" in getattr(self.inner, "kwargs", {})
+            else "max_tokens"
         )
-        if self.ledger["usd"] + reserved_usd > self.limits["usd"]:
-            raise CampaignError("USD ceiling exhausted before dispatch")
-        self.ledger["requests"] += 1
-        result = self.inner(prompt, **kwargs)
+        dispatch_kwargs = {**kwargs, provider_key: dispatch_max, "cache": False}
+        result: Any = None
+        provider_error: BaseException | None = None
+        try:
+            result = self.inner(prompt, **dispatch_kwargs)
+        except BaseException as error:
+            provider_error = error
+
         history = getattr(self.inner, "history", [])
         usage = (history[-1].get("usage") if history else None) or {}
         input_tokens = int(usage.get("input_tokens", usage.get("prompt_tokens", 0)))
         output_tokens = int(usage.get("output_tokens", usage.get("completion_tokens", 0)))
         usd = float(usage.get("total_cost", usage.get("cost", 0.0)))
+
+        with self.lock:
+            self.ledger["_reserved_input"] -= conservative_input
+            self.ledger["_reserved_output"] -= dispatch_max
+            self.ledger["_reserved_usd"] -= reserved_usd
+            if input_tokens > 0 and output_tokens > 0:
+                self.ledger["input_tokens"] += input_tokens
+                self.ledger["output_tokens"] += output_tokens
+                self.ledger["usd"] += usd
+            snapshot = auditable_usage(self.ledger)
+
         if input_tokens <= 0 or output_tokens <= 0:
-            raise CampaignError("provider usage missing; outcome is not auditable")
-        self.ledger["input_tokens"] += input_tokens
-        self.ledger["output_tokens"] += output_tokens
-        self.ledger["usd"] += usd
+            raise CampaignError("provider usage missing; outcome is not auditable", snapshot) from provider_error
         for key in ("input_tokens", "output_tokens", "usd"):
-            if self.ledger[key] > self.limits[key]:
-                raise CampaignError(f"observed {key} ceiling exceeded")
+            if snapshot[key] > self.limits[key]:
+                raise CampaignError(f"observed {key} ceiling exceeded", snapshot)
+        if provider_error is not None:
+            raise CampaignError(f"provider call failed after charging usage: {provider_error}", snapshot) from provider_error
         return result
 
 
@@ -73,6 +124,10 @@ def remaining(snapshot: dict[str, Any]) -> dict[str, float]:
         "output_tokens": int(limits["output_tokens"]) - int(usage["output_tokens"]),
         "usd": float(limits["usd"]) - float(usage["usd"]),
     }
+
+
+def auditable_usage(ledger: dict[str, float]) -> dict[str, float]:
+    return {key: ledger[key] for key in ("requests", "root_calls", "sub_calls", "input_tokens", "output_tokens", "usd")}
 
 
 def context_text(row: dict[str, Any]) -> str:
@@ -114,13 +169,24 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
     settings = manifest["approaches"][approach]["settings"]
     pricing = settings["reservation_pricing"]
     limits = remaining(payload["budget_remaining"])
-    ledger = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "usd": 0.0}
+    ledger = {
+        "requests": 0, "root_calls": 0, "sub_calls": 0,
+        "input_tokens": 0, "output_tokens": 0, "usd": 0.0,
+        "_reserved_input": 0, "_reserved_output": 0, "_reserved_usd": 0.0,
+    }
+    ledger_lock = threading.Lock()
 
     root_cfg = manifest["models"]["root"]
     sub_role = "compaction" if approach == "compaction" else "submodel"
     sub_cfg = manifest["models"][sub_role]
-    root = BudgetLM(dspy.LM(root_cfg["dspy"], temperature=root_cfg["temperature"], max_tokens=root_cfg["max_output_tokens"]), ledger, limits, pricing)
-    sub = BudgetLM(dspy.LM(sub_cfg["dspy"], temperature=sub_cfg["temperature"], max_tokens=sub_cfg["max_output_tokens"]), ledger, limits, pricing)
+    root = BudgetLM(
+        dspy.LM(root_cfg["dspy"], temperature=root_cfg["temperature"], reasoning_effort=root_cfg["reasoning"], max_tokens=root_cfg["max_output_tokens"], cache=False),
+        ledger, limits, pricing, root_cfg["max_output_tokens"], "root", ledger_lock,
+    )
+    sub = BudgetLM(
+        dspy.LM(sub_cfg["dspy"], temperature=sub_cfg["temperature"], reasoning_effort=sub_cfg["reasoning"], max_tokens=sub_cfg["max_output_tokens"], cache=False),
+        ledger, limits, pricing, sub_cfg["max_output_tokens"], "sub", ledger_lock,
+    )
     dspy.configure(lm=root)
     started = time.perf_counter()
 
@@ -150,7 +216,21 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         raise CampaignError(f"unknown approach: {approach}")
 
-    return {"answer": answer, "latency_ms": (time.perf_counter() - started) * 1000.0, "usage": ledger, "trace_shape": shape, "trace": trace}
+    return {
+        "answer": answer,
+        "latency_ms": (time.perf_counter() - started) * 1000.0,
+        "usage": auditable_usage(ledger),
+        "trace_shape": shape,
+        "trace": trace,
+        "call_semantics": {
+            "provider_calls": ledger["requests"],
+            "root_calls": ledger["root_calls"],
+            "sub_calls": ledger["sub_calls"],
+            "max_llm_calls_scope": "subcalls_only" if approach == "rlm" else "not_applicable",
+            "configured_max_depth": int(settings.get("recursion_depth", 0)) if approach == "rlm" else 0,
+            "max_observed_depth": 1 if ledger["sub_calls"] > 0 else 0,
+        },
+    }
 
 
 def main() -> int:
@@ -161,7 +241,25 @@ def main() -> int:
     payload = json.loads(Path(args.request).read_text(encoding="utf-8"))
     if getattr(dspy, "__version__", None) != "3.3.0b1":
         raise CampaignError(f"DSPy 3.3.0b1 required, got {getattr(dspy, '__version__', None)!r}")
-    result = execute(payload)
+    try:
+        result = execute(payload)
+    except CampaignError as error:
+        usage = error.usage or {}
+        approach = payload.get("approach", "")
+        settings = payload.get("manifest", {}).get("approaches", {}).get(approach, {}).get("settings", {})
+        result = {
+            "status": "error",
+            "error": str(error),
+            "usage": usage,
+            "call_semantics": {
+                "provider_calls": usage.get("requests", 0),
+                "root_calls": usage.get("root_calls", 0),
+                "sub_calls": usage.get("sub_calls", 0),
+                "max_llm_calls_scope": "subcalls_only" if approach == "rlm" else "not_applicable",
+                "configured_max_depth": int(settings.get("recursion_depth", 0)) if approach == "rlm" else 0,
+                "max_observed_depth": 1 if usage.get("sub_calls", 0) > 0 else 0,
+            },
+        }
     Path(args.response).write_text(json.dumps(result, sort_keys=True) + "\n", encoding="utf-8")
     return 0
 
