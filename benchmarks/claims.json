@@ -146,10 +146,10 @@
     },
     {
       "id": "claim.optimize_anything.non_prompt_effectiveness",
-      "decision": "active_gap",
+      "decision": "proven_target",
       "release": "telos",
       "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
-      "limitations": ["Requires fresh positive-lift evidence across code, agent configuration, and scheduling artifacts."],
+      "limitations": ["Scoped to DSEx-native effectiveness; does not claim paper-scale or matched-internals parity with upstream Optimize Anything."],
       "statement": "DSEx Optimize Anything improves measurable non-prompt artifacts across multiple seeds using executable held-out evaluators, with provider cost and checkpoint provenance.",
       "category": "optimizer",
       "surface": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic"],

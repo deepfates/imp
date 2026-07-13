@@ -271,7 +271,7 @@
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2605.19633", "revision": "v1", "title": "optimize_anything: A Universal API for Optimizing any Text Parameter"},
       "upstream_tests": {"status": "partial", "references": ["https://github.com/gepa-ai/gepa/tree/b4dbb55b7601dac448cdb836d5a401ca7d9eb920/tests", "https://github.com/gepa-ai/optimize-anything-artifact/tree/58cdf89d856f2fbc174991b89076eccdcf68e4ca"]},
       "dataset_protocol": {"status": "protocol_defined", "references": ["https://github.com/gepa-ai/optimize-anything-artifact/tree/58cdf89d856f2fbc174991b89076eccdcf68e4ca"], "immutable_digests": []},
-      "local_differential": {"status": "partial", "artifacts": ["mix benchmark.optimize_anything.check", "mix dsex.benchmark.optimize_anything --live"]},
+      "local_differential": {"status": "present", "artifacts": ["benchmarks/results/optimize-anything-replication-20260713T092840Z.json", "mix benchmark.optimize_anything.check", "mix dsex.benchmark.optimize_anything --live"]},
       "notes": "Released algorithm authority is GEPA v0.1.1. Unreleased main snapshot 92dadfffbe98c8ecf508179a1cab09c1bb85cd32 is tracked separately for callbacks, custom acceptance, parallel proposals, adapter state, LM/cost controls, ConfidenceAdapter, and LangChain support. The production contract and scoped three-family DSEx-native effectiveness lane are implemented; paper-scale upstream comparison remains open."
     },
     {
