@@ -134,7 +134,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         DSEx.signature(
           "current_strategy, training_evidence -> strategy",
           """
-          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 550 characters in at most three short sentences. It must not contain any example equation, answer, dataset row ID, or copied number sequence. Preserve the original task contract, add only general operator-search and exact-verification guidance, and return strategy text only.
+          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 550 characters in at most three short sentences. It must not contain any example equation, answer, dataset row ID, or copied number sequence. The training failures show that guessing and generic retry advice are insufficient: specify exhaustive Cartesian enumeration of every operator tuple, exact standard-precedence evaluation, and returning only a tuple whose value is verified against the target. Return strategy text only.
           """
         )
 
@@ -166,6 +166,9 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
             contains_training_instance?(strategy, request.rows) ->
               {:error, :strategy_copied_training_instance, usage}
+
+            not algorithmic_strategy?(strategy) ->
+              {:error, :strategy_lacks_exhaustive_verified_search, usage}
 
             true ->
               provenance = %Provenance{
@@ -364,6 +367,17 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
       String.contains?(normalized, String.downcase(row["input"])) or
         String.contains?(normalized, String.downcase(row["expected"]))
     end)
+  end
+
+  defp algorithmic_strategy?(strategy) do
+    normalized = String.downcase(strategy)
+
+    Enum.any?(
+      ["enumerat", "cartesian", "all operator", "every operator"],
+      &String.contains?(normalized, &1)
+    ) and
+      String.contains?(normalized, "precedence") and
+      Enum.any?(["verify", "exact"], &String.contains?(normalized, &1))
   end
 
   defp input_numbers(input) do
