@@ -1393,9 +1393,10 @@ defmodule DSEx.IdentityAssessment do
         started_at,
         context.atlas_digest,
         Enum.map(context.profiles, & &1.digest),
+        Enum.map(context.candidates, & &1["candidate_id"]),
         config.batch_size,
         config.concurrency,
-        System.unique_integer([:positive, :monotonic])
+        :crypto.strong_rand_bytes(16)
       })
 
     "identity-assessment-run-" <> binary_part(digest, 0, 20)
