@@ -9,6 +9,12 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
     assert Keyword.fetch!(derived.dsex_options, :model) == "openai:gpt-test"
 
+    assert Keyword.fetch!(derived.dsex_options, :split_limits) == %{
+             "train" => 1,
+             "dev" => 1,
+             "test" => 1
+           }
+
     assert Keyword.fetch!(derived.dsex_options, :budget) == %{
              "requests" => 40,
              "input_tokens" => 600,
@@ -19,6 +25,9 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     assert derived.python.config["provider"]["model"] == "openai/gpt-test"
     assert derived.python.config["budget_scope"] == "per_arm"
     assert derived.python.config["dependency_identity"] == %{"optuna" => "4.9.0"}
+    assert derived.python.config["split_limits"] == %{"train" => 1, "dev" => 1, "test" => 1}
+    assert derived.plan["network_calls"] == 0
+    assert derived.plan["worst_case_aggregate"]["usd"] == 16.0
 
     assert derived.python.config["per_arm_ceilings"] == %{
              "requests" => 40,
@@ -181,6 +190,18 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     end
   end
 
+  test "plan rejects aggregate exposure before any executor can run" do
+    fixture = fixture!("aggregate-cap")
+    unsafe = put_in(fixture.manifest, ["preflight", "max_aggregate", "usd"], 15.99)
+
+    assert_raise ArgumentError, ~r/planned two-runtime usd exposure 16\.0 exceeds/, fn ->
+      InstructionOptimizerExperiment.plan!(unsafe,
+        manifest_path: fixture.manifest_path,
+        run_context: fixture.context
+      )
+    end
+  end
+
   defp derive(fixture) do
     InstructionOptimizerExperiment.derive!(fixture.manifest,
       manifest_path: fixture.manifest_path,
@@ -261,6 +282,15 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
         "output_tokens" => 400,
         "usd" => 2.0
       },
+      "preflight" => %{
+        "split_limits" => %{"train" => 1, "dev" => 1, "test" => 1},
+        "max_aggregate" => %{
+          "requests" => 320,
+          "input_tokens" => 4_800,
+          "output_tokens" => 3_200,
+          "usd" => 16.0
+        }
+      },
       "max_output_tokens" => 50,
       "temperature" => 1.0,
       "reservation_pricing" => %{"input_per_million" => 1.0, "output_per_million" => 2.0},
@@ -311,6 +341,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
         "seed" => Keyword.fetch!(options, :seed),
         "arms" => arms,
         "arm_configs" => configs,
+        "split_limits" => Keyword.fetch!(options, :split_limits),
         "budget" => options |> Keyword.fetch!(:budget) |> json(),
         "budget_scope" => "per_arm",
         "split_checksums" =>

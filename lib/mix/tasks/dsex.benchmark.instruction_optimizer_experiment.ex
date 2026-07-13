@@ -32,7 +32,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerExperiment do
           repo_root: :string,
           api_key_env: :string,
           dsex_artifact: :string,
-          dspy_artifact: :string
+          dspy_artifact: :string,
+          plan: :boolean
         ]
       )
 
@@ -56,18 +57,31 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerExperiment do
       |> maybe_put(:dsex_artifact, Keyword.get(opts, :dsex_artifact))
       |> maybe_put(:dspy_artifact, Keyword.get(opts, :dspy_artifact))
 
-    result = DSEx.BenchmarkTruth.InstructionOptimizerExperiment.run(experiment_opts)
+    if Keyword.get(opts, :plan, false) do
+      plan =
+        DSEx.BenchmarkTruth.InstructionOptimizerExperiment.plan!(
+          Keyword.fetch!(experiment_opts, :manifest),
+          experiment_opts
+        )
 
-    Mix.shell().info("Experiment identity: #{result.identity["identity_sha256"]}")
+      Mix.shell().info(Jason.encode!(plan, pretty: true))
+      Mix.shell().info("Plan only: no provider calls were made")
+    else
+      result = DSEx.BenchmarkTruth.InstructionOptimizerExperiment.run(experiment_opts)
 
-    Mix.shell().info("DSPy config: #{result.python_config}")
+      Mix.shell().info("Experiment identity: #{result.identity["identity_sha256"]}")
 
-    case result.merged do
-      nil ->
-        Mix.shell().info("Matched report not written: both complete runtime outputs are required")
+      Mix.shell().info("DSPy config: #{result.python_config}")
 
-      %{path: path} ->
-        Mix.shell().info("Matched research preflight: #{path}")
+      case result.merged do
+        nil ->
+          Mix.shell().info(
+            "Matched report not written: both complete runtime outputs are required"
+          )
+
+        %{path: path} ->
+          Mix.shell().info("Matched research preflight: #{path}")
+      end
     end
   rescue
     error in [ArgumentError, File.Error, Jason.DecodeError] -> Mix.raise(Exception.message(error))

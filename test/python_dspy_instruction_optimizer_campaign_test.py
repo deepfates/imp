@@ -126,6 +126,7 @@ class CampaignTest(unittest.TestCase):
                 "output_tokens": 500,
                 "usd": 1.0,
             },
+            "split_limits": {"train": 2, "dev": 2, "test": 2},
             "seed": 7,
             "arms": [
                 {"name": "baseline", "config": {}},
@@ -314,6 +315,15 @@ class CampaignTest(unittest.TestCase):
         self.config["dataset"]["dev"]["sha256"] = digest(dev)
         with self.assertRaisesRegex(campaign.IdentityError, "dataset leakage"):
             self.runner()
+
+    def test_split_limits_are_identity_bound_and_applied_as_prefixes(self):
+        self.config["split_limits"] = {"train": 1, "dev": 1, "test": 1}
+        self.write_config()
+        report = self.runner().run()
+        for split in ("train", "dev", "test"):
+            self.assertEqual(report["dataset"][split]["count"], 1)
+            self.assertEqual(report["dataset"][split]["full_count"], 2)
+            self.assertEqual(report["dataset"][split]["selection"]["indices"], [0])
 
     def test_checkpoint_and_artifact_tamper_are_rejected(self):
         self.runner().run()

@@ -39,6 +39,8 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       "arms" => arms!(raw["arms"]),
       "arm_configs" => arm_configs!(raw),
       "budget" => budget!(raw["per_arm_budget"] || raw["budget"]),
+      "preflight" =>
+        preflight!(raw["preflight"], raw["arms"], raw["per_arm_budget"] || raw["budget"]),
       "provider" => provider!(raw),
       "dataset" => dataset!(raw, path, family),
       "dspy_authority" => authority!(raw, opts),
@@ -85,6 +87,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
     %{
       manifest: manifest,
       identity: identity,
+      plan: plan(manifest, identity),
       run_context: context,
       out_dir: out,
       dsex_options: dsex_options(manifest, sources, context, out, checkpoints),
@@ -120,6 +123,11 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       merged: merged,
       python_config: derived.python.config_path
     }
+  end
+
+  def plan!(source, opts \\ []) do
+    derived = derive!(source, opts)
+    derived.plan
   end
 
   def merge_outputs!(derived, dsex_source, dspy_source, _opts \\ []) do
@@ -272,6 +280,42 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       "input_tokens" => input,
       "output_tokens" => output,
       "usd" => number!(budget["usd"], "budget.usd")
+    }
+  end
+
+  defp preflight!(raw, arms, raw_budget) do
+    value = map!(raw, "preflight")
+    limits = map!(value["split_limits"], "preflight.split_limits")
+    ceiling = budget!(value["max_aggregate"])
+    per_arm = budget!(raw_budget)
+    arm_count = length(arms)
+    runtime_count = 2
+
+    split_limits =
+      Map.new(@splits, fn split ->
+        count = integer!(limits[split], "preflight.split_limits.#{split}")
+        require!(count > 0, "preflight.split_limits.#{split} must be positive")
+        {split, count}
+      end)
+
+    worst_case =
+      Map.new(~w(requests input_tokens output_tokens usd), fn key ->
+        {key, per_arm[key] * arm_count * runtime_count}
+      end)
+
+    Enum.each(worst_case, fn {key, exposure} ->
+      require!(
+        exposure <= ceiling[key],
+        "planned two-runtime #{key} exposure #{exposure} exceeds preflight.max_aggregate #{ceiling[key]}"
+      )
+    end)
+
+    %{
+      "split_limits" => split_limits,
+      "max_aggregate" => ceiling,
+      "planned_runtime_count" => runtime_count,
+      "worst_case" => worst_case,
+      "network_calls" => 0
     }
   end
 
@@ -440,6 +484,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       "arms" => manifest["arms"],
       "budget_scope" => "per_arm",
       "per_arm_budget" => manifest["budget"],
+      "preflight" => manifest["preflight"],
       "dataset" => manifest["dataset"],
       "dspy_authority" => manifest["dspy_authority"],
       "dependency_identity" => manifest["dependency_identity"],
@@ -471,7 +516,8 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       source_commits: sources,
       git_sha: context.code_revision,
       out_dir: Path.join(out, "dsex"),
-      checkpoint_dir: Path.join(checkpoints, "dsex")
+      checkpoint_dir: Path.join(checkpoints, "dsex"),
+      split_limits: manifest["preflight"]["split_limits"]
     ]
   end
 
@@ -492,6 +538,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
         Map.new(manifest["dataset"]["splits"], fn {split, spec} ->
           {split, Map.take(spec, ["path", "sha256"])}
         end),
+      "split_limits" => manifest["preflight"]["split_limits"],
       "provider" => %{
         "model" => manifest["models"]["dspy"],
         "api_key_env" => provider["api_key_env"],
@@ -639,6 +686,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       id["budget_scope"] == "per_arm",
       id["budget"] == expected_budget,
       id["arm_configs"] == d.manifest["arm_configs"],
+      id["split_limits"] == d.manifest["preflight"]["split_limits"],
       id["split_checksums"] == d.manifest["dataset"]["checksums"],
       id["source_commits"] == d.identity["source_commits"],
       Enum.sort(Map.keys(a["results"] || %{})) == Enum.sort(d.identity["arms"])
@@ -664,7 +712,11 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       a["dependency_identity"] == d.identity["dependency_identity"],
       a["config"] == config,
       a["config_sha256"] == digest_raw(d.python.config),
-      dspy_dataset_matches?(a["dataset"], d.manifest["dataset"]),
+      dspy_dataset_matches?(
+        a["dataset"],
+        d.manifest["dataset"],
+        d.manifest["preflight"]["split_limits"]
+      ),
       Enum.sort(names) == Enum.sort(d.identity["arms"])
     ]
 
@@ -710,16 +762,17 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       Enum.find_value(@python_names, fn {common, python} -> if python == name, do: common end) ||
         raise(ArgumentError, "unknown DSPy arm #{inspect(name)}")
 
-  defp dspy_dataset_matches?(actual, expected) when is_map(actual) do
+  defp dspy_dataset_matches?(actual, expected, limits) when is_map(actual) do
     Enum.all?(@splits, fn split ->
       actual[split]["path"] == expected["splits"][split]["path"] and
-        actual[split]["sha256"] == expected["splits"][split]["sha256"]
+        actual[split]["sha256"] == expected["splits"][split]["sha256"] and
+        actual[split]["count"] == limits[split]
     end)
   rescue
     _ -> false
   end
 
-  defp dspy_dataset_matches?(_, _), do: false
+  defp dspy_dataset_matches?(_, _, _), do: false
 
   defp sanitized(config),
     do:
@@ -789,6 +842,25 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperiment do
       "one_seed" => true,
       "not_t3" => true
     }
+
+  defp plan(manifest, identity) do
+    %{
+      "schema_version" => 1,
+      "kind" => "instruction_optimizer_preflight_plan",
+      "campaign_id" => manifest["campaign_id"],
+      "identity_sha256" => identity["identity_sha256"],
+      "model" => manifest["models"]["logical"],
+      "seed" => manifest["seed"],
+      "arms" => manifest["arms"],
+      "split_limits" => manifest["preflight"]["split_limits"],
+      "per_arm_ceiling" => manifest["budget"],
+      "planned_runtime_count" => 2,
+      "worst_case_aggregate" => manifest["preflight"]["worst_case"],
+      "approved_aggregate_ceiling" => manifest["preflight"]["max_aggregate"],
+      "network_calls" => 0,
+      "claim_scope" => "bounded held-out preflight; not T3"
+    }
+  end
 
   defp map!(value, _) when is_map(value), do: value
   defp map!(_, label), do: raise(ArgumentError, "#{label} must be an object")

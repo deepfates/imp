@@ -207,6 +207,24 @@ optimizer quality.
 
 ## Matched Paid Preflight
 
+Always render the deterministic no-network plan before a paid run:
+
+```bash
+mix dsex.benchmark.instruction_optimizer_experiment \
+  --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json \
+  --runtime both \
+  --python tmp/dspy-parity-venv/bin/python \
+  --dspy-pythonpath tmp/dspy-current-target \
+  --out benchmarks/results \
+  --plan
+```
+
+The plan validates the pinned dataset and source identities, prints the exact
+prefix counts, arms, model, seed, per-arm ceilings, and two-runtime worst-case
+aggregate exposure, and records `network_calls: 0`. Manifest validation rejects
+the run before credential lookup when any calculated aggregate dimension
+exceeds `preflight.max_aggregate`.
+
 The one-seed AIME preflight runs both native DSEx and pinned DSPy from one
 manifest:
 
@@ -222,7 +240,12 @@ mix dsex.benchmark.instruction_optimizer_experiment \
 The manifest binds the logical model to the provider-specific ReqLLM and
 LiteLLM identifiers, all three AIME split hashes, seed, arm order, optimizer
 options, DSPy `3.3.0b1`, Optuna `4.9.0`, and independent per-arm request,
-input-token, output-token, and USD ceilings. The orchestrator derives one DSEx
+input-token, output-token, and USD ceilings. The economical manifest pins
+`gpt-4.1-mini-2025-04-14`, official standard pricing of `$0.40/M` input and
+`$1.60/M` output, prefix limits `6/3/3`, and a maximum two-runtime exposure of
+`480` requests and `$3`. See the
+[official model page](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+The orchestrator derives one DSEx
 campaign and one all-arm DSPy campaign and refuses to merge incomplete or
 identity-mismatched artifacts.
 
@@ -233,4 +256,6 @@ DSEx optimizer checkpoints and both runtimes' committed evaluation rows resume.
 Pinned DSPy MIPROv2 and SIMBA do not expose compatible internal compile
 checkpoints; an interrupted upstream compile fails closed and requires a new
 campaign identity. The resulting artifact is costed T2/research-preflight
-evidence, not multi-seed T3 effectiveness or full optimizer parity.
+evidence, not multi-seed T3 effectiveness or full optimizer parity. Runtime
+artifacts include scores, actual request/token/USD usage, phase and row wall
+time, the seed, and explicit failure lists.

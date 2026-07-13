@@ -28,6 +28,15 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     assert get_in(first.artifact, ["results", "baseline", "test"]) == 1.0
     assert get_in(first.artifact, ["results", "baseline", "frozen_test_evaluations"]) == 2
 
+    assert get_in(first.artifact, ["dataset", "split_limits"]) == %{
+             "train" => 1,
+             "dev" => 2,
+             "test" => 2
+           }
+
+    assert get_in(first.artifact, ["results", "baseline", "latency", "dev_wall_seconds"]) >= 0.0
+    assert get_in(first.artifact, ["results", "baseline", "failures"]) == []
+
     assert ["cache", false] in get_in(first.artifact, ["results", "baseline", "program", "config"])
 
     assert Agent.get(calls, & &1) == 4
@@ -169,7 +178,8 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
       source_commits: %{"dspy" => "pinned", "dsex" => "test"},
       git_sha: "test-sha",
       out_dir: Path.join(root, "results"),
-      checkpoint_dir: Path.join(root, "checkpoints")
+      checkpoint_dir: Path.join(root, "checkpoints"),
+      split_limits: %{"train" => 1, "dev" => 2, "test" => 2}
     ]
 
     Keyword.merge(base, extra)

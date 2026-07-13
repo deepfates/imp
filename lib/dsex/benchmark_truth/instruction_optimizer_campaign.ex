@@ -79,9 +79,10 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
       family: family,
       spec: spec,
       paths: paths,
-      trainset: DSEx.Datasets.jsonl(paths.train, input_keys),
-      devset: DSEx.Datasets.jsonl(paths.dev, input_keys),
-      testset: DSEx.Datasets.jsonl(paths.test, input_keys),
+      trainset: limited_split(paths.train, input_keys, opts, "train"),
+      devset: limited_split(paths.dev, input_keys, opts, "dev"),
+      testset: limited_split(paths.test, input_keys, opts, "test"),
+      split_limits: Keyword.fetch!(opts, :split_limits),
       seed: seed,
       model: model,
       lm: Keyword.fetch!(opts, :lm),
@@ -114,11 +115,14 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
       "max_output_tokens" => context.max_output_tokens,
       "source_commits" => context.source_commits,
       "git_sha" => context.git_sha,
-      "split_checksums" => split_checksums(context.paths)
+      "split_checksums" => split_checksums(context.paths),
+      "split_limits" => context.split_limits
     }
   end
 
   defp run_dsex_arm(arm, context, {progress, persist}) do
+    arm_started = monotonic_time()
+
     {:ok, budget} =
       CampaignBudget.start_link(
         limits: context.budget,
@@ -167,6 +171,13 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
         "test_scores_used_for_selection" => false,
         "frozen_test_evaluations" => length(progress["test_rows"] || []),
         "budget" => CampaignBudget.snapshot(budget),
+        "latency" => %{
+          "compile_wall_seconds" => progress["compile_wall_seconds"] || 0.0,
+          "dev_wall_seconds" => rows_wall_seconds(progress["dev_rows"] || []),
+          "test_wall_seconds" => rows_wall_seconds(progress["test_rows"] || []),
+          "invocation_wall_seconds" => elapsed_seconds(arm_started)
+        },
+        "failures" => [],
         "optimizer_report" => report && Report.dump(report),
         "program" => progress["program"],
         "scope" => "research_preflight_not_t3"
@@ -179,6 +190,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
   defp compiled_program(arm, context, metric, budgeted_lm, progress, persist) do
     case progress["program"] do
       nil ->
+        compile_started = monotonic_time()
         base = program(context.spec, budgeted_lm)
         optimizer_state = progress["optimizer_state"]
 
@@ -198,6 +210,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
           progress
           |> Map.put("phase", "dev")
           |> Map.put("program", portable)
+          |> Map.put("compile_wall_seconds", elapsed_seconds(compile_started))
           |> Map.delete("optimizer_state")
 
         persist.(progress)
@@ -274,13 +287,16 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
         |> Map.put(intent_key, intent)
         |> persist.()
 
+        row_started = monotonic_time()
+
         [trajectory] =
           TrajectoryRunner.run(program, [example], metric, max_concurrency: 1, timeout: :infinity)
 
         row = %{
           "index" => length(rows),
           "score" => trajectory.score,
-          "error" => Report.json_safe(trajectory.error)
+          "error" => Report.json_safe(trajectory.error),
+          "wall_seconds" => elapsed_seconds(row_started)
         }
 
         updated = rows ++ [row]
@@ -350,10 +366,12 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
           "dev" => length(context.devset),
           "test" => length(context.testset)
         },
+        "split_limits" => context.split_limits,
         "split_checksums" => split_checksums(context.paths)
       },
       "results" => results,
       "budget_scope" => "per_arm",
+      "failures" => [],
       "summary" => %{
         "arms_completed" => Map.keys(results) |> Enum.sort(),
         "all_requested_arms_completed" => map_size(results) == length(context.arms),
@@ -397,6 +415,31 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp split_checksums(paths) do
     Map.new(paths, fn {name, path} -> {Atom.to_string(name), "sha256:" <> file_sha256(path)} end)
+  end
+
+  defp limited_split(path, input_keys, opts, split) do
+    limits = Keyword.fetch!(opts, :split_limits)
+    limit = Map.get(limits, split, Map.get(limits, String.to_existing_atom(split)))
+    rows = DSEx.Datasets.jsonl(path, input_keys)
+
+    if not is_integer(limit) or limit <= 0 or limit > length(rows) do
+      raise ArgumentError,
+            "instruction optimizer split limit #{split}=#{inspect(limit)} must be within 1..#{length(rows)}"
+    end
+
+    Enum.take(rows, limit)
+  end
+
+  defp rows_wall_seconds(rows),
+    do: rows |> Enum.map(&(&1["wall_seconds"] || 0.0)) |> Enum.sum()
+
+  defp monotonic_time, do: System.monotonic_time()
+
+  defp elapsed_seconds(started) do
+    System.monotonic_time()
+    |> Kernel.-(started)
+    |> System.convert_time_unit(:native, :microsecond)
+    |> Kernel./(1_000_000)
   end
 
   defp file_sha256(path),

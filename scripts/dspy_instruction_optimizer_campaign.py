@@ -599,6 +599,7 @@ def validate_config(config: Any) -> None:
         "per_arm_ceilings",
         "dependency_identity",
         "arms",
+        "split_limits",
     }
     missing = sorted(required - set(config))
     if missing:
@@ -619,6 +620,12 @@ def validate_config(config: Any) -> None:
             raise CampaignError(f"dataset.{split} must contain exactly path and sha256")
         if not re.fullmatch(r"[0-9a-f]{64}", str(spec["sha256"])):
             raise CampaignError(f"dataset.{split}.sha256 is invalid")
+    split_limits = config["split_limits"]
+    if not isinstance(split_limits, dict) or set(split_limits) != {"train", "dev", "test"}:
+        raise CampaignError("split_limits must contain exactly train, dev, and test")
+    for split, limit in split_limits.items():
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            raise CampaignError(f"split_limits.{split} must be a positive integer")
     provider = config["provider"]
     if not isinstance(provider, dict) or not isinstance(provider.get("model"), str) or not provider["model"]:
         raise CampaignError("provider.model must be a non-empty DSPy model identifier")
@@ -671,6 +678,7 @@ def validate_config(config: Any) -> None:
 def load_dataset(config: Mapping[str, Any], config_dir: Path) -> tuple[dict[str, list[dict[str, str]]], dict[str, Any]]:
     datasets = {}
     identity = {}
+    full_problem_sets = {}
     seen_paths = set()
     for split in ("train", "dev", "test"):
         spec = config["dataset"][split]
@@ -704,11 +712,22 @@ def load_dataset(config: Mapping[str, Any], config_dir: Path) -> tuple[dict[str,
             rows.append({"problem": problem, "answer": str(parse_integer(answer))})
         if not rows:
             raise CampaignError(f"dataset split {split} is empty")
-        datasets[split] = rows
-        identity[split] = {"path": str(path), "sha256": actual, "count": len(rows)}
-    problem_sets = {split: {row["problem"] for row in rows} for split, rows in datasets.items()}
+        full_problem_sets[split] = {row["problem"] for row in rows}
+        limit = config["split_limits"][split]
+        if limit > len(rows):
+            raise CampaignError(
+                f"split_limits.{split}={limit} exceeds pinned split count {len(rows)}"
+            )
+        datasets[split] = rows[:limit]
+        identity[split] = {
+            "path": str(path),
+            "sha256": actual,
+            "count": limit,
+            "full_count": len(rows),
+            "selection": {"method": "prefix", "indices": list(range(limit))},
+        }
     for left, right in (("train", "dev"), ("train", "test"), ("dev", "test")):
-        overlap = problem_sets[left] & problem_sets[right]
+        overlap = full_problem_sets[left] & full_problem_sets[right]
         if overlap:
             raise IdentityError(f"dataset leakage: {left} and {right} share {len(overlap)} problem(s)")
     return datasets, identity
