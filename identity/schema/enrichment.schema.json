@@ -94,7 +94,7 @@
       "additionalProperties": false,
       "required": ["kind", "name"],
       "properties": {
-        "kind": {"enum": ["human", "agent", "model", "research", "test"]},
+        "kind": {"enum": ["human", "agent", "model", "algorithm", "research", "test"]},
         "name": {"type": "string", "minLength": 1}
       }
     }
