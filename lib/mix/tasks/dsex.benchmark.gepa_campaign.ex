@@ -98,7 +98,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         families: families,
         max_concurrency: Keyword.get(opts, :max_concurrency, 1),
         seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
-        generations: Keyword.get(opts, :generations, 1),
+        generations: Keyword.get(opts, :generations, :metric_budget),
         pricing_source: fetch!(opts, :pricing_source),
         token_cost: token_cost(opts),
         run_context: run_context,

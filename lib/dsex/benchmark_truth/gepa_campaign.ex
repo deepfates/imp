@@ -26,7 +26,11 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     reflection_model = Keyword.fetch!(opts, :reflection_model)
     out_dir = Keyword.get(opts, :out_dir, "benchmarks/results")
     seeds = Keyword.get(opts, :seeds, [0, 1])
-    generations = Keyword.get(opts, :generations, 1)
+
+    generation_policy =
+      validate_generation_policy!(Keyword.get(opts, :generations, :metric_budget))
+
+    generation_identity = generation_identity(generation_policy)
     pricing_source = Keyword.fetch!(opts, :pricing_source)
     token_cost = Keyword.get(opts, :token_cost)
 
@@ -59,7 +63,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       model: model,
       reflection_model: reflection_model,
       seeds: seeds,
-      generations: generations,
+      generations: generation_policy,
       lm: lm,
       reflection_lm: reflection_lm,
       judge_lm: judge_lm,
@@ -90,7 +94,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "reflection_model" => reflection_model,
       "judge_model" => judge_model,
       "seeds" => seeds,
-      "generations" => generations,
+      "generations" => generation_identity,
       "max_concurrency" => max_concurrency,
       "pricing_source" => pricing_source,
       "token_cost_schedule_sha256" => term_sha256(token_cost),
@@ -105,11 +109,12 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         "total" => length(rows),
         "families" => Enum.map(rows, & &1["family"]),
         "partial" => partial?,
+        "preflight" => Enum.any?(rows, &(&1["evidence_level"] == "research_preflight")),
         "campaign_id" => campaign_id,
         "model" => model,
         "reflection_model" => reflection_model,
         "seeds" => seeds,
-        "generations" => generations,
+        "generations" => generation_identity,
         "max_concurrency" => max_concurrency,
         "execution" => execution,
         "campaign_contract" => campaign_contract
@@ -181,8 +186,9 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
               "DSEx GEPA campaign row missing results.dsex_gepa for #{row["family"]}"
       end
 
-      unless row["evidence_level"] == "research_campaign" and is_map(row["dataset"]) and
-               is_map(row["token_cost"]) and is_map(row["source_commits"]) do
+      unless row["evidence_level"] in ["research_campaign", "research_preflight"] and
+               is_map(row["dataset"]) and is_map(row["token_cost"]) and
+               is_map(row["source_commits"]) do
         raise ArgumentError,
               "DSEx GEPA campaign row missing research metadata for #{row["family"]}"
       end
@@ -207,7 +213,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       model: model,
       reflection_model: reflection_model,
       seeds: seeds,
-      generations: generations,
+      generations: generation_policy,
       lm: lm,
       reflection_lm: reflection_lm,
       judge_lm: judge_lm,
@@ -226,6 +232,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     signature = spec["signature"]
     input_keys = spec["input_keys"]
     budget = spec["metric_calls"]
+    generations = generation_limit(generation_policy, budget)
     paths = split_paths(dataset_root, family)
 
     trainset = DSEx.Datasets.jsonl(paths.train, input_keys)
@@ -381,6 +388,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     usage = Enum.reduce(entries, empty_usage(), &sum_usage(&2, &1["usage"]))
 
     best = Enum.max_by(seed_results, &{&1.dev, -&1.seed})
+    budget_complete? = Enum.all?(seed_results, &(&1.optimizer_stop_reason == "max_metric_calls"))
 
     report_progress(reporter, %{
       event: :family_done,
@@ -398,7 +406,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "model" => model,
       "reflection_model" => reflection_model,
       "execution" => execution,
-      "evidence_level" => "research_campaign",
+      "evidence_level" =>
+        if(budget_complete?, do: "research_campaign", else: "research_preflight"),
       "metric_calls" => budget,
       "token_cost" => token_cost!(usage, token_cost, pricing_source, family),
       "optimizer_budgets" => %{
@@ -445,6 +454,9 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         }
       },
       "metadata" => %{
+        "budget_complete" => budget_complete?,
+        "generation_policy" => generation_identity(generation_policy),
+        "max_iterations" => generations,
         "signature" => signature,
         "instructions" => spec["instructions"],
         "output_key" => spec["output_key"],
@@ -641,9 +653,29 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     }
   end
 
+  defp normalize_stop_reason({:budget_exhausted, :metric_calls, _requested, _limit}),
+    do: "max_metric_calls"
+
   defp normalize_stop_reason(nil), do: nil
   defp normalize_stop_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp normalize_stop_reason(reason), do: inspect(reason)
+
+  defp validate_generation_policy!(:metric_budget), do: :metric_budget
+
+  defp validate_generation_policy!(generations)
+       when is_integer(generations) and generations > 0,
+       do: generations
+
+  defp validate_generation_policy!(generations) do
+    raise ArgumentError,
+          "generations must be a positive integer or :metric_budget, got: #{inspect(generations)}"
+  end
+
+  defp generation_identity(:metric_budget), do: "metric_budget"
+  defp generation_identity(generations), do: generations
+
+  defp generation_limit(:metric_budget, metric_budget), do: metric_budget
+  defp generation_limit(generations, _metric_budget), do: generations
 
   defp program_for(
          %{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec,

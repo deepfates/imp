@@ -192,6 +192,8 @@ defmodule GepaCampaignTest do
     assert summary["max_concurrency"] == 1
 
     [row] = result.report["rows"]
+    assert row["evidence_level"] == "research_preflight"
+    refute row["metadata"]["budget_complete"]
     assert row["token_cost"]["usd"] == 0.02
     assert row["token_cost"]["input_tokens"] == 200
     assert Enum.map(row["token_cost"]["breakdown"], & &1["seed"]) == [0, 1]
@@ -614,17 +616,21 @@ defmodule GepaCampaignTest do
     dataset_root = tmp_dir("gepa-campaign-contract-data")
     rows_dir = tmp_dir("gepa-campaign-contract-rows")
     write_dataset_root!(dataset_root)
+    set_family_budget!(dataset_root, "AIMEBench", 4)
 
     [dsex_row] =
       campaign_opts(dataset_root, rows_dir,
         campaign_id: "gepa-campaign-contract",
         seeds: [3, 5],
+        generations: :metric_budget,
         token_cost: explicit_costs(["AIMEBench"], [3, 5])
       )
       |> GepaCampaign.run()
       |> get_in([:report, "rows"])
 
     selection = get_in(dsex_row, ["seed_selection", "dsex_gepa"])
+    assert dsex_row["evidence_level"] == "research_campaign"
+    assert dsex_row["metadata"]["budget_complete"]
     observed_dsex = get_in(dsex_row, ["metric_call_evidence", "observed", "dsex_gepa"])
 
     rows =
