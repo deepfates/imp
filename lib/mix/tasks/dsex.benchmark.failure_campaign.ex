@@ -20,6 +20,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.FailureCampaign do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
+    run_context = DSEx.BenchmarkTruth.RunContext.capture_git!()
+
     artifact =
       DSEx.BenchmarkTruth.FailureCampaign.run(
         iterations: Keyword.get(opts, :iterations, 10),
@@ -29,7 +31,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.FailureCampaign do
     out_dir = Keyword.get(opts, :out, "benchmarks/results")
     File.mkdir_p!(out_dir)
     path = Path.join(out_dir, "failure-campaign-#{timestamp_slug()}.json")
-    File.write!(path, Jason.encode!(artifact, pretty: true) <> "\n")
+
+    %{artifact: artifact, path: path} =
+      DSEx.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, run_context)
+
     Mix.shell().info("failure campaign report: #{path}")
 
     unless artifact["summary"]["local_complete"] and artifact["runtime"]["leak_free"] do

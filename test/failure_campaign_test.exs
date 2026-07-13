@@ -3,22 +3,95 @@ defmodule DSEx.FailureCampaignTest do
 
   import ExUnit.CaptureIO
 
-  test "records repeated normalized recovery outcomes and honest remaining live lanes" do
+  @required_iterations 10
+
+  test "records ten clean deterministic iterations without claiming live completion" do
     artifact =
-      DSEx.BenchmarkTruth.FailureCampaign.run(iterations: 3, max_concurrency: 2)
+      DSEx.BenchmarkTruth.FailureCampaign.run(
+        iterations: @required_iterations,
+        max_concurrency: 2
+      )
+
+    assert artifact["schema_version"] == 2
+    assert artifact["runner"] == "dsex-failure-campaign"
+    refute Map.has_key?(artifact, "generated_at")
 
     assert artifact["summary"] == %{
-             "local_cases" => 4,
-             "local_passing" => 4,
+             "deterministic_lanes" => 7,
+             "deterministic_passing" => 7,
+             "all_requested_iterations_pass" => true,
+             "flake_sample_complete" => true,
+             "deterministic_complete" => true,
+             "local_cases" => 7,
+             "local_passing" => 7,
              "local_complete" => true,
+             "live_complete" => false,
              "release_complete" => false,
              "remaining_live_lanes" => 2
            }
 
     assert artifact["runtime"]["leak_free"]
+
+    assert artifact["runtime"]["leaks"] == %{
+             "admission_active" => 0,
+             "admission_queued" => 0,
+             "added_linked_tasks" => 0,
+             "added_unlinked_tasks" => 0
+           }
+
+    assert artifact["evidence_policy"]["payloads_included"] == false
     assert Enum.all?(artifact["cases"], &(&1["flake_rate"] == 0.0))
-    assert Enum.all?(artifact["cases"], &(&1["iterations"] == 3))
-    assert Enum.all?(artifact["remaining"], &(&1["status"] == "blocked_on_live_probe"))
+    assert Enum.all?(artifact["cases"], &(&1["iterations"] == @required_iterations))
+    assert Enum.all?(artifact["remaining"], &(&1["required"] == true))
+    assert Enum.all?(artifact["remaining"], &(&1["status"] =~ "requires_live_"))
+    refute contains_key?(artifact, "payload")
+
+    timeout = case_by_id(artifact, "task_timeout_is_explicit_and_terminal")
+    assert Enum.all?(timeout["outcomes"], &(get_in(&1, ["evidence", "outcome"]) == "timeout"))
+
+    retry = case_by_id(artifact, "training_retry_and_idempotency_are_bounded")
+
+    assert Enum.all?(retry["outcomes"], fn outcome ->
+             evidence = outcome["evidence"]
+
+             evidence["attempts"] == 3 and evidence["max_attempts"] == 3 and
+               evidence["deterministic_key_stable"] and evidence["idempotency_header_stable"]
+           end)
+
+    assert_optimizer_evidence(
+      artifact,
+      "mipro_v2_durable_resume_and_tamper",
+      "mipro_v2",
+      "dsex_mipro_v2_run"
+    )
+
+    assert_optimizer_evidence(
+      artifact,
+      "simba_durable_resume_and_tamper",
+      "simba",
+      "dsex_simba_run"
+    )
+  end
+
+  test "distinguishes requested success from the ten-iteration flake sample" do
+    artifact =
+      DSEx.BenchmarkTruth.FailureCampaign.run(
+        iterations: 2,
+        max_concurrency: 2,
+        iteration_timeout_ms: 15_000
+      )
+
+    assert artifact["summary"]["all_requested_iterations_pass"]
+    assert artifact["summary"]["local_complete"]
+    refute artifact["summary"]["flake_sample_complete"]
+    refute artifact["summary"]["deterministic_complete"]
+    refute artifact["summary"]["release_complete"]
+  end
+
+  test "validates the per-iteration wall-clock bound" do
+    assert_raise ArgumentError, ~r/iteration_timeout_ms must be a positive integer/, fn ->
+      DSEx.BenchmarkTruth.FailureCampaign.run(iteration_timeout_ms: 0)
+    end
   end
 
   test "mix task writes the deterministic artifact" do
@@ -28,7 +101,7 @@ defmodule DSEx.FailureCampaignTest do
     capture_io(fn ->
       Mix.Tasks.Dsex.Benchmark.FailureCampaign.run([
         "--iterations",
-        "2",
+        Integer.to_string(@required_iterations),
         "--max-concurrency",
         "2",
         "--out",
@@ -38,7 +111,32 @@ defmodule DSEx.FailureCampaignTest do
 
     [path] = Path.wildcard(Path.join(out, "failure-campaign-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
+    assert DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path) == artifact
+    assert artifact["summary"]["deterministic_complete"]
     assert artifact["summary"]["local_complete"]
+    refute artifact["summary"]["live_complete"]
     refute artifact["summary"]["release_complete"]
+    refute contains_key?(artifact, "payload")
   end
+
+  defp case_by_id(artifact, id), do: Enum.find(artifact["cases"], &(&1["id"] == id))
+
+  defp assert_optimizer_evidence(artifact, lane, optimizer, checkpoint_type) do
+    campaign_case = case_by_id(artifact, lane)
+
+    assert Enum.all?(campaign_case["outcomes"], fn outcome ->
+             evidence = outcome["evidence"]
+
+             evidence["optimizer"] == optimizer and evidence["checkpoint_type"] == checkpoint_type and
+               evidence["checkpoint_schema_version"] == 1 and evidence["exact_resume"] and
+               evidence["tamper_rejected"] and evidence["checkpoint_payload_included"] == false
+           end)
+  end
+
+  defp contains_key?(%{} = map, key) do
+    Map.has_key?(map, key) or Enum.any?(Map.values(map), &contains_key?(&1, key))
+  end
+
+  defp contains_key?(list, key) when is_list(list), do: Enum.any?(list, &contains_key?(&1, key))
+  defp contains_key?(_value, _key), do: false
 end

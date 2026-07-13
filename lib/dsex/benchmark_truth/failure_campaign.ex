@@ -1,82 +1,122 @@
 defmodule DSEx.BenchmarkTruth.FailureCampaign do
   @moduledoc false
 
+  alias DSEx.Optimizer.{MIPROv2, Report, SIMBA}
   alias DSEx.Streaming.Messages.{StatusMessage, StreamListener, StreamResponse}
 
-  @local_cases [
-    "task_cancellation_releases_admission",
-    "async_concurrency_is_bounded",
-    "partial_stream_failure_is_terminal",
-    "optimizer_checkpoint_round_trip_and_tamper"
+  @required_flake_iterations 10
+  @default_iteration_timeout_ms 15_000
+
+  @deterministic_lanes [
+    {"task_cancellation_releases_admission", :cancellation},
+    {"task_timeout_is_explicit_and_terminal", :timeout},
+    {"async_concurrency_is_bounded", :concurrency},
+    {"partial_stream_failure_is_terminal", :partial_stream},
+    {"training_retry_and_idempotency_are_bounded", :training_retry},
+    {"mipro_v2_durable_resume_and_tamper", :mipro_v2},
+    {"simba_durable_resume_and_tamper", :simba}
+  ]
+
+  @live_requirements [
+    %{
+      "id" => "provider_retry_timeout_idempotency_live",
+      "status" => "requires_live_provider_evidence",
+      "required" => true,
+      "deterministic_coverage" => "training_http_and_task_runtime_only"
+    },
+    %{
+      "id" => "training_retrieval_tool_agent_recovery_live",
+      "status" => "requires_live_integration_evidence",
+      "required" => true,
+      "deterministic_coverage" => "not_claimed"
+    }
   ]
 
   def run(opts \\ []) do
-    iterations = Keyword.get(opts, :iterations, 10)
+    iterations = Keyword.get(opts, :iterations, @required_flake_iterations)
     max_concurrency = Keyword.get(opts, :max_concurrency, 4)
+    iteration_timeout_ms = Keyword.get(opts, :iteration_timeout_ms, @default_iteration_timeout_ms)
     validate_positive!(:iterations, iterations)
     validate_positive!(:max_concurrency, max_concurrency)
+    validate_positive!(:iteration_timeout_ms, iteration_timeout_ms)
     baseline = runtime_snapshot()
 
-    cases = [
-      repeat("task_cancellation_releases_admission", iterations, &cancellation_iteration/0),
-      repeat("async_concurrency_is_bounded", iterations, fn ->
-        concurrency_iteration(max_concurrency)
-      end),
-      repeat("partial_stream_failure_is_terminal", iterations, &partial_stream_iteration/0),
-      repeat(
-        "optimizer_checkpoint_round_trip_and_tamper",
-        iterations,
-        &checkpoint_iteration/0
-      )
-    ]
+    cases =
+      Enum.map(@deterministic_lanes, fn
+        {id, :concurrency} ->
+          repeat(id, iterations, iteration_timeout_ms, fn ->
+            concurrency_iteration(max_concurrency)
+          end)
 
-    settle_runtime()
+        {id, handler} ->
+          repeat(id, iterations, iteration_timeout_ms, fn -> run_lane(handler) end)
+      end)
+
+    settle_runtime(baseline)
     final = runtime_snapshot()
-    local_complete? = Enum.all?(cases, & &1["passing"])
+    leak_accounting = leak_accounting(baseline, final)
+    all_iterations_pass? = Enum.all?(cases, & &1["passing"])
+    flake_sample_complete? = iterations >= @required_flake_iterations
+
+    deterministic_complete? =
+      all_iterations_pass? and flake_sample_complete? and leak_accounting["leak_free"]
+
+    live_complete? = Enum.all?(@live_requirements, &(&1["status"] == "complete"))
 
     %{
-      "schema_version" => 1,
+      "schema_version" => 2,
+      "runner" => "dsex-failure-campaign",
       "evidence_tier" => "t0_deterministic_failure_recovery",
-      "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "configuration" => %{
         "iterations" => iterations,
-        "max_concurrency" => max_concurrency
+        "required_flake_iterations" => @required_flake_iterations,
+        "max_concurrency" => max_concurrency,
+        "iteration_timeout_ms" => iteration_timeout_ms
       },
       "summary" => %{
+        "deterministic_lanes" => length(cases),
+        "deterministic_passing" => Enum.count(cases, & &1["passing"]),
+        "all_requested_iterations_pass" => all_iterations_pass?,
+        "flake_sample_complete" => flake_sample_complete?,
+        "deterministic_complete" => deterministic_complete?,
         "local_cases" => length(cases),
         "local_passing" => Enum.count(cases, & &1["passing"]),
-        "local_complete" => local_complete?,
-        "release_complete" => false,
-        "remaining_live_lanes" => 2
+        "local_complete" => all_iterations_pass?,
+        "live_complete" => live_complete?,
+        "release_complete" => deterministic_complete? and live_complete?,
+        "remaining_live_lanes" => Enum.count(@live_requirements, &(&1["status"] != "complete"))
       },
       "runtime" => %{
-        "before" => baseline,
-        "after" => final,
-        "leak_free" => leak_free?(baseline, final)
+        "before" => public_runtime_snapshot(baseline),
+        "after" => public_runtime_snapshot(final),
+        "leaks" => leak_accounting["leaks"],
+        "leak_free" => leak_accounting["leak_free"]
+      },
+      "evidence_policy" => %{
+        "payloads_included" => false,
+        "flake_rate" => "failing_iterations / iterations",
+        "completion_requires_zero_flakes" => true
       },
       "cases" => cases,
-      "remaining" => [
-        %{
-          "id" => "provider_retry_timeout_idempotency_live",
-          "status" => "blocked_on_live_probe",
-          "required" => true
-        },
-        %{
-          "id" => "training_retrieval_tool_agent_recovery_live",
-          "status" => "blocked_on_live_probe",
-          "required" => true
-        }
-      ],
-      "scope" => @local_cases
+      "remaining" => @live_requirements,
+      "scope" => Enum.map(@deterministic_lanes, &elem(&1, 0))
     }
   end
 
-  defp repeat(id, iterations, fun) do
-    outcomes = Enum.map(1..iterations, fn iteration -> normalize(fun, iteration) end)
+  defp run_lane(:cancellation), do: cancellation_iteration()
+  defp run_lane(:timeout), do: timeout_iteration()
+  defp run_lane(:partial_stream), do: partial_stream_iteration()
+  defp run_lane(:training_retry), do: training_retry_iteration()
+  defp run_lane(:mipro_v2), do: mipro_v2_iteration()
+  defp run_lane(:simba), do: simba_iteration()
+
+  defp repeat(id, iterations, timeout_ms, fun) do
+    outcomes = Enum.map(1..iterations, &normalize(fun, &1, timeout_ms))
     passing = Enum.count(outcomes, & &1["passing"])
 
     %{
       "id" => id,
+      "evidence_kind" => "deterministic",
       "iterations" => iterations,
       "passing_iterations" => passing,
       "failing_iterations" => iterations - passing,
@@ -86,28 +126,34 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     }
   end
 
-  defp normalize(fun, iteration) do
-    started = System.monotonic_time()
+  defp normalize(fun, iteration, timeout_ms) do
+    started = System.monotonic_time(:millisecond)
 
-    result =
-      try do
-        case fun.() do
-          {:ok, evidence} -> {true, evidence}
-          {:error, reason} -> {false, %{reason: inspect(reason)}}
-          other -> {false, %{reason: "invalid campaign result", result: inspect(other)}}
+    task =
+      Task.async(fn ->
+        try do
+          case fun.() do
+            {:ok, evidence} -> {true, evidence}
+            {:error, reason} -> {false, %{reason_category: failure_category(reason)}}
+            _other -> {false, %{reason_category: "invalid_campaign_result"}}
+          end
+        rescue
+          error -> {false, %{exception_type: error.__struct__}}
+        catch
+          kind, _reason -> {false, %{caught_kind: kind}}
         end
-      rescue
-        error -> {false, %{exception: Exception.message(error)}}
-      catch
-        kind, reason -> {false, %{caught: inspect({kind, reason})}}
-      end
+      end)
 
-    {passing?, evidence} = result
+    {passing?, evidence} =
+      case Task.yield(task, timeout_ms) || Task.shutdown(task, :brutal_kill) do
+        {:ok, result} -> result
+        _ -> {false, %{outcome: :campaign_iteration_timeout, timeout_ms: timeout_ms}}
+      end
 
     %{
       "iteration" => iteration,
       "passing" => passing?,
-      "duration_native" => System.monotonic_time() - started,
+      "duration_ms" => System.monotonic_time(:millisecond) - started,
       "evidence" => json_safe(evidence)
     }
   end
@@ -128,13 +174,33 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     end
 
     _ = DSEx.Tasks.cancel(task, 100)
-    settle_runtime()
+    settle_admission()
     status = DSEx.Tasks.admission_status()
 
     if not Process.alive?(task.pid) and status == %{active: 0, queued: 0} do
-      {:ok, %{admission: status, task_alive: false}}
+      {:ok, %{admission: status, task_alive: false, cancellation: :terminal}}
     else
       {:error, %{admission: status, task_alive: Process.alive?(task.pid)}}
+    end
+  end
+
+  defp timeout_iteration do
+    result =
+      [:blocked]
+      |> DSEx.Tasks.async_stream(fn _ -> Process.sleep(:infinity) end,
+        max_concurrency: 1,
+        timeout: 20,
+        on_timeout: :kill_task
+      )
+      |> Enum.to_list()
+
+    settle_admission()
+    status = DSEx.Tasks.admission_status()
+
+    if result == [exit: :timeout] and status == %{active: 0, queued: 0} do
+      {:ok, %{outcome: :timeout, worker_terminated: true, admission: status}}
+    else
+      {:error, %{outcome: result, admission: status}}
     end
   end
 
@@ -142,24 +208,28 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
     {:ok, tracker} = Agent.start_link(fn -> %{active: 0, peak: 0} end)
 
     results =
-      DSEx.context([async_max_workers: max_concurrency], fn ->
-        1..(max_concurrency * 3)
-        |> DSEx.Tasks.async_stream(
-          fn value ->
-            Agent.update(tracker, fn state ->
-              active = state.active + 1
-              %{active: active, peak: max(state.peak, active)}
-            end)
+      try do
+        DSEx.context([async_max_workers: max_concurrency], fn ->
+          1..(max_concurrency * 3)
+          |> DSEx.Tasks.async_stream(
+            fn value ->
+              Agent.update(tracker, fn state ->
+                active = state.active + 1
+                %{active: active, peak: max(state.peak, active)}
+              end)
 
-            Process.sleep(2)
-            Agent.update(tracker, &%{&1 | active: &1.active - 1})
-            value
-          end,
-          max_concurrency: max_concurrency,
-          timeout: 1_000
-        )
-        |> Enum.to_list()
-      end)
+              Process.sleep(2)
+              Agent.update(tracker, &%{&1 | active: &1.active - 1})
+              value
+            end,
+            max_concurrency: max_concurrency,
+            timeout: 1_000
+          )
+          |> Enum.to_list()
+        end)
+      after
+        :ok
+      end
 
     state = Agent.get(tracker, & &1)
     Agent.stop(tracker)
@@ -197,48 +267,336 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
         _ -> false
       end)
 
-    statuses =
-      for {:campaign_status, %StatusMessage{status: status}} <- messages, do: status
+    statuses = for {:campaign_status, %StatusMessage{status: status}} <- messages, do: status
 
     if terminal_errors == 1 and statuses == [:started, :error] do
-      {:ok, %{terminal_errors: terminal_errors, statuses: statuses}}
+      {:ok,
+       %{terminal_errors: terminal_errors, statuses: statuses, partial_payload_included: false}}
     else
       {:error, %{terminal_errors: terminal_errors, statuses: statuses}}
     end
   end
 
-  defp checkpoint_iteration do
+  defp training_retry_iteration do
+    {:ok, attempts} = Agent.start_link(fn -> [] end)
+    body = Jason.encode!(%{operation: "failure-campaign"})
+    {:ok, key} = DSEx.Clients.TrainingHTTP.idempotency_key(:deterministic, "static", body, nil)
+
+    {:ok, repeated_key} =
+      DSEx.Clients.TrainingHTTP.idempotency_key(:deterministic, "static", body, nil)
+
+    headers = DSEx.Clients.TrainingHTTP.put_header([], "idempotency-key", key)
+
+    transport = fn _url, request_headers, _request_body, _opts ->
+      attempt =
+        Agent.get_and_update(attempts, fn seen -> {length(seen) + 1, [request_headers | seen]} end)
+
+      case attempt do
+        1 -> {:error, :closed}
+        2 -> {:ok, %{status: 503, headers: [], body: ""}}
+        3 -> {:ok, %{status: 200, headers: [], body: "{}"}}
+      end
+    end
+
+    result =
+      DSEx.Clients.TrainingHTTP.request(
+        transport,
+        "https://deterministic.invalid/training",
+        headers,
+        body,
+        [timeout: 100],
+        3,
+        0
+      )
+
+    seen = Agent.get(attempts, &Enum.reverse/1)
+    Agent.stop(attempts)
+
+    stable_header? =
+      Enum.all?(seen, fn request_headers ->
+        Enum.any?(request_headers, fn {name, value} ->
+          String.downcase(to_string(name)) == "idempotency-key" and value == key
+        end)
+      end)
+
+    if match?({:ok, %{status: 200}}, result) and length(seen) == 3 and key == repeated_key and
+         stable_header? do
+      {:ok,
+       %{
+         attempts: length(seen),
+         max_attempts: 3,
+         terminal_status: 200,
+         deterministic_key_stable: true,
+         idempotency_header_stable: true,
+         request_payload_included: false
+       }}
+    else
+      {:error,
+       %{attempts: length(seen), stable_key: key == repeated_key, stable_header: stable_header?}}
+    end
+  end
+
+  defp mipro_v2_iteration do
+    {:ok, state} = Agent.start_link(fn -> %{proposal_calls: 0} end)
+    {program, optimizer, trainset, valset} = mipro_fixture(state)
+
+    try do
+      uninterrupted = optimizer |> MIPROv2.compile(program, trainset, valset) |> Report.fetch()
+      Agent.update(state, fn _ -> %{proposal_calls: 0} end)
+
+      paused =
+        optimizer
+        |> MIPROv2.compile(program, trainset, valset, max_trials: 1)
+        |> Report.fetch()
+
+      calls_after_pause = Agent.get(state, & &1.proposal_calls)
+
+      {checkpoint, tampered} =
+        durable_checkpoints(paused.metadata.resume_state, "evaluation_calls")
+
+      resumed =
+        optimizer
+        |> MIPROv2.compile(program, trainset, valset, resume_state: checkpoint)
+        |> Report.fetch()
+
+      calls_after_resume = Agent.get(state, & &1.proposal_calls)
+
+      tamper_rejected? =
+        rejects_tamper?(fn ->
+          MIPROv2.compile(optimizer, program, trainset, valset, resume_state: tampered)
+        end)
+
+      exact_resume? =
+        resumed.candidates == uninterrupted.candidates and
+          resumed.best_score == uninterrupted.best_score and
+          resumed.metadata.evaluation_calls == uninterrupted.metadata.evaluation_calls
+
+      if paused.metadata.run_status == :paused and resumed.metadata.run_status == :complete and
+           resumed.metadata.resumed and calls_after_resume == calls_after_pause and exact_resume? and
+           tamper_rejected? do
+        {:ok,
+         %{
+           optimizer: :mipro_v2,
+           checkpoint_type: checkpoint["type"],
+           checkpoint_schema_version: checkpoint["schema_version"],
+           paused_trials: paused.metadata.completed_trials,
+           resumed_trials: resumed.metadata.completed_trials,
+           setup_replayed: false,
+           exact_resume: true,
+           tamper_rejected: true,
+           checkpoint_payload_included: false
+         }}
+      else
+        {:error,
+         %{
+           paused: paused.metadata.run_status,
+           resumed: resumed.metadata.run_status,
+           setup_replayed: calls_after_resume != calls_after_pause,
+           exact_resume: exact_resume?,
+           tamper_rejected: tamper_rejected?
+         }}
+      end
+    after
+      Agent.stop(state)
+    end
+  end
+
+  defp simba_iteration do
+    {:ok, uninterrupted_state} = Agent.start_link(fn -> simba_counters() end)
+    {:ok, resumed_state} = Agent.start_link(fn -> simba_counters() end)
+    {program, optimizer, trainset, final_set} = simba_fixture(uninterrupted_state)
+
+    {resume_program, resume_optimizer, resume_trainset, resume_final_set} =
+      simba_fixture(resumed_state)
+
+    try do
+      uninterrupted = optimizer |> SIMBA.compile(program, trainset, final_set) |> Report.fetch()
+
+      paused =
+        resume_optimizer
+        |> SIMBA.compile(resume_program, resume_trainset, resume_final_set, max_steps: 1)
+        |> Report.fetch()
+
+      calls_after_pause = Agent.get(resumed_state, & &1.task_calls)
+
+      {checkpoint, tampered} =
+        durable_checkpoints(paused.metadata.resume_state, "trajectory_calls")
+
+      resumed =
+        resume_optimizer
+        |> SIMBA.compile(resume_program, resume_trainset, resume_final_set,
+          resume_state: checkpoint
+        )
+        |> Report.fetch()
+
+      calls_after_resume = Agent.get(resumed_state, & &1.task_calls)
+
+      tamper_rejected? =
+        rejects_tamper?(fn ->
+          SIMBA.compile(resume_optimizer, resume_program, resume_trainset, resume_final_set,
+            resume_state: tampered
+          )
+        end)
+
+      exact_resume? =
+        resumed.candidates == uninterrupted.candidates and
+          resumed.best_score == uninterrupted.best_score and
+          resumed.errors == uninterrupted.errors and
+          resumed.metadata.trial_logs == uninterrupted.metadata.trial_logs and
+          resumed.metadata.final_candidates == uninterrupted.metadata.final_candidates and
+          resumed.metadata.trajectory_calls == uninterrupted.metadata.trajectory_calls and
+          resumed.metadata.candidate_evaluation_calls ==
+            uninterrupted.metadata.candidate_evaluation_calls and
+          resumed.metadata.final_evaluation_calls == uninterrupted.metadata.final_evaluation_calls
+
+      if paused.metadata.run_status == :paused and resumed.metadata.run_status == :complete and
+           resumed.metadata.resumed and calls_after_resume > calls_after_pause and exact_resume? and
+           tamper_rejected? do
+        {:ok,
+         %{
+           optimizer: :simba,
+           checkpoint_type: checkpoint["type"],
+           checkpoint_schema_version: checkpoint["schema_version"],
+           paused_steps: paused.metadata.completed_steps,
+           resumed_steps: resumed.metadata.completed_steps,
+           exact_resume: true,
+           tamper_rejected: true,
+           checkpoint_payload_included: false
+         }}
+      else
+        {:error,
+         %{
+           paused: paused.metadata.run_status,
+           resumed: resumed.metadata.run_status,
+           continued_work: calls_after_resume > calls_after_pause,
+           exact_resume: exact_resume?,
+           tamper_rejected: tamper_rejected?
+         }}
+      end
+    after
+      Agent.stop(uninterrupted_state)
+      Agent.stop(resumed_state)
+    end
+  end
+
+  defp mipro_fixture(state) do
+    task_lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+
+    prompt_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _, _ ->
+          Agent.update(state, &Map.update!(&1, :proposal_calls, fn count -> count + 1 end))
+          ["Answer consistently.", "Return yes."]
+        end
+      ]
+    }
+
+    program = DSEx.predict("question -> answer", lm: task_lm)
+    trainset = examples("train", 2)
+    valset = examples("validation", 1)
+
+    optimizer =
+      MIPROv2.new(DSEx.Metrics.exact_match(:answer),
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 2,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 1,
+        minibatch: true,
+        minibatch_size: 1,
+        minibatch_full_eval_steps: 2,
+        prompt_lm: prompt_lm,
+        startup_trials: 1,
+        seed: 31
+      )
+
+    {program, optimizer, trainset, valset}
+  end
+
+  defp simba_fixture(state) do
+    task_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, opts ->
+          Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+          rollout_id = Keyword.get(opts, :rollout_id, 0)
+
+          if prompt =~ "Answer yes." or rem(rollout_id, 2) == 0,
+            do: %{answer: "yes"},
+            else: %{answer: "no"}
+        end
+      ]
+    }
+
+    prompt_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _, _ ->
+          Agent.update(state, &Map.update!(&1, :prompt_calls, fn count -> count + 1 end))
+
+          %{
+            discussion: "Prefer the successful trajectory.",
+            module_advice: %{main: "Answer yes."}
+          }
+        end
+      ]
+    }
+
+    initial_demo = DSEx.example(question: "seed", answer: "yes") |> DSEx.with_inputs(:question)
+    program = DSEx.predict("question -> answer", lm: task_lm, demos: [initial_demo])
+    trainset = examples("train", 2)
+    final_set = examples("final", 1)
+
+    optimizer =
+      SIMBA.new(DSEx.Metrics.exact_match(:answer),
+        bsize: 2,
+        num_candidates: 2,
+        max_steps: 2,
+        max_demos: 0,
+        prompt_lm: prompt_lm,
+        max_concurrency: 1,
+        seed: 41
+      )
+
+    {program, optimizer, trainset, final_set}
+  end
+
+  defp examples(prefix, count) do
+    for index <- 1..count do
+      DSEx.example(question: "#{prefix} #{index}", answer: "yes") |> DSEx.with_inputs(:question)
+    end
+  end
+
+  defp simba_counters, do: %{task_calls: 0, prompt_calls: 0}
+
+  defp rejects_tamper?(fun) do
+    try do
+      fun.()
+      false
+    rescue
+      error in ArgumentError -> String.contains?(Exception.message(error), "checksum")
+    end
+  end
+
+  defp failure_category(reason) when is_atom(reason), do: to_string(reason)
+  defp failure_category({category, _detail}) when is_atom(category), do: to_string(category)
+  defp failure_category(_reason), do: "lane_assertion_failed"
+
+  defp durable_checkpoints(checkpoint, tamper_key) do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-failure-campaign-#{System.unique_integer([:positive, :monotonic])}.json"
+        "dsex-failure-checkpoint-#{System.unique_integer([:positive, :monotonic])}.json"
       )
 
-    program = DSEx.predict("question -> answer", config: [temperature: 0.2])
-    candidate = DSEx.Optimizer.Artifact.candidate("champion", program, score: 1.0)
-    artifact = DSEx.Optimizer.Artifact.new(candidate, [], provenance: %{campaign: true})
-
     try do
-      :ok = DSEx.Optimizer.Artifact.write!(artifact, path)
-      restored = DSEx.Optimizer.Artifact.read!(path)
-      summary = DSEx.Optimizer.Artifact.inspect(restored)
-      encoded = File.read!(path)
-      tampered = String.replace(encoded, "0.2", "0.3", global: false)
-      File.write!(path, tampered)
-
-      tamper_rejected? =
-        try do
-          DSEx.Optimizer.Artifact.read!(path)
-          false
-        rescue
-          _error -> true
-        end
-
-      if summary.champion_id == "champion" and summary.revision == 1 and tamper_rejected? do
-        {:ok, %{champion_id: summary.champion_id, revision: 1, tamper_rejected: true}}
-      else
-        {:error, %{summary: summary, tamper_rejected: tamper_rejected?}}
-      end
+      File.write!(path, Jason.encode!(checkpoint), [:sync])
+      restored = path |> File.read!() |> Jason.decode!()
+      tampered = put_in(restored, ["payload", "state", tamper_key], 99_999)
+      File.write!(path, Jason.encode!(tampered), [:sync])
+      {restored, path |> File.read!() |> Jason.decode!()}
     after
       File.rm(path)
     end
@@ -255,31 +613,68 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
 
   defp runtime_snapshot do
     %{
-      "admission" => json_safe(DSEx.Tasks.admission_status()),
-      "linked_tasks" => active_children(DSEx.Tasks.supervisor()),
-      "unlinked_tasks" => active_children(DSEx.Tasks.unlinked_supervisor())
+      admission: DSEx.Tasks.admission_status(),
+      linked_tasks: active_children(DSEx.Tasks.supervisor()),
+      unlinked_tasks: active_children(DSEx.Tasks.unlinked_supervisor())
     }
   end
 
   defp active_children(supervisor) do
-    supervisor |> Task.Supervisor.children() |> Enum.count(&Process.alive?/1)
+    supervisor
+    |> Task.Supervisor.children()
+    |> Enum.filter(&Process.alive?/1)
+    |> MapSet.new()
   end
 
-  defp settle_runtime do
-    Enum.reduce_while(1..50, nil, fn _, _ ->
+  defp public_runtime_snapshot(snapshot) do
+    %{
+      "admission" => json_safe(snapshot.admission),
+      "linked_tasks" => MapSet.size(snapshot.linked_tasks),
+      "unlinked_tasks" => MapSet.size(snapshot.unlinked_tasks)
+    }
+  end
+
+  defp settle_admission do
+    Enum.reduce_while(1..100, :timeout, fn _, _ ->
       if DSEx.Tasks.admission_status() == %{active: 0, queued: 0} do
         {:halt, :ok}
       else
         Process.sleep(2)
-        {:cont, nil}
+        {:cont, :timeout}
       end
     end)
   end
 
-  defp leak_free?(before, after_snapshot) do
-    after_snapshot["admission"] == %{"active" => 0, "queued" => 0} and
-      after_snapshot["linked_tasks"] <= before["linked_tasks"] and
-      after_snapshot["unlinked_tasks"] <= before["unlinked_tasks"]
+  defp settle_runtime(baseline) do
+    Enum.reduce_while(1..100, :timeout, fn _, _ ->
+      snapshot = runtime_snapshot()
+
+      if snapshot.admission == %{active: 0, queued: 0} and
+           MapSet.subset?(snapshot.linked_tasks, baseline.linked_tasks) and
+           MapSet.subset?(snapshot.unlinked_tasks, baseline.unlinked_tasks) do
+        {:halt, :ok}
+      else
+        Process.sleep(2)
+        {:cont, :timeout}
+      end
+    end)
+  end
+
+  defp leak_accounting(before, after_snapshot) do
+    added_linked = MapSet.difference(after_snapshot.linked_tasks, before.linked_tasks)
+    added_unlinked = MapSet.difference(after_snapshot.unlinked_tasks, before.unlinked_tasks)
+
+    leaks = %{
+      "admission_active" => after_snapshot.admission.active,
+      "admission_queued" => after_snapshot.admission.queued,
+      "added_linked_tasks" => MapSet.size(added_linked),
+      "added_unlinked_tasks" => MapSet.size(added_unlinked)
+    }
+
+    %{
+      "leaks" => leaks,
+      "leak_free" => Enum.all?(Map.values(leaks), &(&1 == 0))
+    }
   end
 
   defp validate_positive!(_name, value) when is_integer(value) and value > 0, do: :ok
@@ -293,6 +688,7 @@ defmodule DSEx.BenchmarkTruth.FailureCampaign do
 
   defp json_safe(list) when is_list(list), do: Enum.map(list, &json_safe/1)
   defp json_safe(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> json_safe()
+  defp json_safe(value) when is_boolean(value) or is_nil(value), do: value
   defp json_safe(value) when is_atom(value), do: to_string(value)
   defp json_safe(value), do: value
 end
