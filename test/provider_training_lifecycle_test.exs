@@ -74,9 +74,36 @@ defmodule ProviderTrainingLifecycleTest do
     def supported_methods(%__MODULE__{}), do: [:grpo]
 
     @impl true
-    def finetune(%__MODULE__{}, trainer_lm, enriched, opts) do
-      send(self(), {:grpo_finetune, trainer_lm, enriched, opts})
-      {:ok, DSEx.Clients.TrainingJob.new(%{id: "job_grpo", provider: :test})}
+    def start_reinforcement(%__MODULE__{}, trainer_lm, opts) do
+      send(self(), {:grpo_started, trainer_lm, opts})
+
+      {:ok,
+       DSEx.Clients.ReinforcementSession.new(%{
+         id: "job_grpo",
+         provider: :test,
+         model: trainer_lm,
+         pending_batch_ids: [1]
+       })}
+    end
+
+    @impl true
+    def reinforcement_status(%__MODULE__{}, session), do: {:ok, session}
+
+    @impl true
+    def reinforcement_step(%__MODULE__{}, session, groups, _opts) do
+      send(self(), {:grpo_step, groups})
+      {:ok, session}
+    end
+
+    @impl true
+    def terminate_reinforcement(%__MODULE__{}, session) do
+      send(self(), :grpo_terminated)
+      {:ok, %{session | status: :succeeded}}
+    end
+
+    @impl true
+    def final_model_artifact(%__MODULE__{}, _session) do
+      {:ok, "grpo-model"}
     end
   end
 
@@ -838,7 +865,7 @@ defmodule ProviderTrainingLifecycleTest do
     Process.delete(:previous_training_openai_api_key)
   end
 
-  test "Databricks trainer executes submit refresh cancel and artifact lifecycle" do
+  test "Databricks trainer executes SFT submit refresh cancel and artifact lifecycle" do
     lm = DSEx.req_llm("databricks-meta-llama")
 
     trainer =
@@ -849,10 +876,7 @@ defmodule ProviderTrainingLifecycleTest do
       )
 
     assert {:ok, job} =
-             DSEx.Clients.Trainer.finetune(trainer, lm, examples(),
-               method: :grpo,
-               learning_rate: 1.0e-5
-             )
+             DSEx.Clients.Trainer.finetune(trainer, lm, examples(), learning_rate: 1.0e-5)
 
     assert %DSEx.Clients.TrainingJob{id: "dbx_1", provider: :databricks, status: :pending} =
              job
@@ -862,7 +886,7 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {"authorization", "Bearer dbc-token"} in headers
     assert payload["base_model"] == "databricks-meta-llama"
-    assert payload["task_type"] == "grpo"
+    assert payload["task_type"] == "sft"
     assert payload["config"] == %{"learning_rate" => 1.0e-5}
     assert [%{"question" => "2+2?", "answer" => "4"}] = payload["train_data"]
 
@@ -984,9 +1008,9 @@ defmodule ProviderTrainingLifecycleTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.GRPO\.new\/2 expects a reward function with arity 1/,
+                 ~r/DSEx\.Optimizer\.GRPO\.new\/2 expects a reward function with arity 1, 2, or 3/,
                  fn ->
-                   DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end)
+                   DSEx.Optimizer.GRPO.new(fn _example, _prediction, _trace, _extra -> 1.0 end)
                  end
   end
 
@@ -1066,12 +1090,18 @@ defmodule ProviderTrainingLifecycleTest do
 
     trainer = %GRPOTrainingFixture{}
 
-    assert {:ok, %DSEx.Clients.TrainingJob{id: "job_grpo"}} =
-             DSEx.Optimizer.GRPO.new(fn _example -> 0.75 end, trainer: trainer)
+    assert {:ok, compiled} =
+             DSEx.Optimizer.GRPO.new(fn _example -> 0.75 end,
+               trainer: trainer,
+               num_train_steps: 1,
+               status_poll_interval_ms: 0
+             )
              |> DSEx.Optimizer.GRPO.compile(program, trainset)
 
-    assert_received {:grpo_finetune, ^lm, [enriched], [method: :grpo]}
-    assert DSEx.Example.get(enriched, :reward) == 0.75
+    assert DSEx.ProgramAccess.lm(compiled).model == "grpo-model"
+    assert_received {:grpo_started, ^lm, [num_generations: 1]}
+    assert_received {:grpo_step, [%{batch_id: 1, group: [%{reward: 0.75}]}]}
+    assert_received :grpo_terminated
   end
 
   test "an explicit GRPO-only trainer rejects SFT before trainer dispatch" do
@@ -1085,7 +1115,7 @@ defmodule ProviderTrainingLifecycleTest do
                method: :sft
              )
 
-    refute_received {:grpo_finetune, _, _, _}
+    refute_received {:grpo_started, _, _}
   end
 
   test "GRPO rejects OpenAI before reward evaluation or network submission" do

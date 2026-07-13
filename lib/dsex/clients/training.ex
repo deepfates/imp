@@ -545,6 +545,112 @@ defmodule DSEx.Clients.TrainingJob do
   defp auth_headers(key), do: [{"authorization", "Bearer #{key}"}]
 end
 
+defmodule DSEx.Clients.ReinforcementSession do
+  @moduledoc "Provider-neutral, explicit state for an iterative reinforcement training job."
+
+  @type t :: %__MODULE__{
+          id: String.t(),
+          provider: atom() | String.t(),
+          model: term(),
+          status: atom() | {:unknown, String.t()},
+          pending_batch_ids: [term()],
+          fulfilled_batch_ids: [term()],
+          current_model: String.t() | nil,
+          result_model: String.t() | nil,
+          backend_state: term(),
+          metadata: map()
+        }
+
+  defstruct [
+    :id,
+    :provider,
+    :model,
+    :current_model,
+    :result_model,
+    :backend_state,
+    status: :created,
+    pending_batch_ids: [],
+    fulfilled_batch_ids: [],
+    metadata: %{}
+  ]
+
+  def new(attrs \\ [])
+
+  def new(attrs) when is_map(attrs) or is_list(attrs) do
+    attrs = Map.new(attrs)
+
+    %__MODULE__{
+      id: fetch(attrs, :id, "reinforce-#{System.unique_integer([:positive])}"),
+      provider: fetch(attrs, :provider, :local),
+      model: fetch(attrs, :model, nil),
+      status: fetch(attrs, :status, :created) |> DSEx.Clients.TrainingJob.normalize_status(),
+      pending_batch_ids: fetch(attrs, :pending_batch_ids, []),
+      fulfilled_batch_ids: fetch(attrs, :fulfilled_batch_ids, []),
+      current_model: fetch(attrs, :current_model, nil),
+      result_model: fetch(attrs, :result_model, nil),
+      backend_state: fetch(attrs, :backend_state, nil),
+      metadata: fetch(attrs, :metadata, %{}) |> DSEx.Redaction.redact()
+    }
+    |> validate!()
+  end
+
+  def new(attrs) do
+    raise ArgumentError,
+          "DSEx.Clients.ReinforcementSession.new/1 expects a map or keyword list; got: #{inspect(attrs)}"
+  end
+
+  def merge_status(%__MODULE__{}, %__MODULE__{} = updated), do: validate!(updated)
+
+  def merge_status(%__MODULE__{} = session, status) when is_map(status) or is_list(status) do
+    status = Map.new(status)
+
+    %{
+      session
+      | status:
+          fetch(status, :status, session.status)
+          |> DSEx.Clients.TrainingJob.normalize_status(),
+        pending_batch_ids: fetch(status, :pending_batch_ids, session.pending_batch_ids),
+        current_model: fetch(status, :current_model, session.current_model),
+        result_model: fetch(status, :result_model, session.result_model),
+        backend_state: fetch(status, :backend_state, session.backend_state),
+        metadata:
+          Map.merge(session.metadata, fetch(status, :metadata, %{}) |> DSEx.Redaction.redact())
+    }
+    |> validate!()
+  end
+
+  def merge_status(_session, status),
+    do: raise(ArgumentError, "invalid reinforcement status: #{inspect(status)}")
+
+  def fulfill(%__MODULE__{} = session, batch_ids) when is_list(batch_ids) do
+    %{
+      session
+      | fulfilled_batch_ids: session.fulfilled_batch_ids ++ batch_ids,
+        pending_batch_ids: Enum.reject(session.pending_batch_ids, &(&1 in batch_ids))
+    }
+  end
+
+  defp validate!(%__MODULE__{} = session) do
+    unless is_binary(session.id) and session.id != "",
+      do: raise(ArgumentError, "reinforcement session id must be a non-empty string")
+
+    unless is_list(session.pending_batch_ids),
+      do: raise(ArgumentError, "reinforcement pending_batch_ids must be a list")
+
+    unless is_list(session.fulfilled_batch_ids),
+      do: raise(ArgumentError, "reinforcement fulfilled_batch_ids must be a list")
+
+    unless is_map(session.metadata),
+      do: raise(ArgumentError, "reinforcement session metadata must be a map")
+
+    session
+  end
+
+  defp fetch(attrs, key, default) do
+    Map.get(attrs, key, Map.get(attrs, Atom.to_string(key), default))
+  end
+end
+
 defmodule DSEx.Clients.Trainer do
   @moduledoc "Behaviour for provider-specific training backends."
 
@@ -564,7 +670,46 @@ defmodule DSEx.Clients.Trainer do
               keyword()
             ) ::
               {:ok, DSEx.Clients.TrainingJob.t()} | {:error, term()}
-  @optional_callbacks finetune: 3, finetune: 4, supported_methods: 0, supported_methods: 1
+
+  @callback start_reinforcement(term(), keyword()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t()} | {:error, term()}
+  @callback start_reinforcement(term(), term(), keyword()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t()} | {:error, term()}
+  @callback reinforcement_status(DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback reinforcement_status(term(), DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback reinforcement_step(DSEx.Clients.ReinforcementSession.t(), list(), keyword()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback reinforcement_step(
+              term(),
+              DSEx.Clients.ReinforcementSession.t(),
+              list(),
+              keyword()
+            ) :: {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback terminate_reinforcement(DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback terminate_reinforcement(term(), DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, DSEx.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback final_model_artifact(DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, String.t()} | {:error, term()}
+  @callback final_model_artifact(term(), DSEx.Clients.ReinforcementSession.t()) ::
+              {:ok, String.t()} | {:error, term()}
+
+  @optional_callbacks finetune: 3,
+                      finetune: 4,
+                      supported_methods: 0,
+                      supported_methods: 1,
+                      start_reinforcement: 2,
+                      start_reinforcement: 3,
+                      reinforcement_status: 1,
+                      reinforcement_status: 2,
+                      reinforcement_step: 3,
+                      reinforcement_step: 4,
+                      terminate_reinforcement: 1,
+                      terminate_reinforcement: 2,
+                      final_model_artifact: 1,
+                      final_model_artifact: 2
 
   def finetune(provider, lm, examples, opts \\ [])
 
@@ -587,6 +732,55 @@ defmodule DSEx.Clients.Trainer do
   end
 
   def supports_method(_provider, method), do: {:error, {:unsupported_training_method, method}}
+
+  def start_reinforcement(provider, lm, opts \\ []) do
+    opts = validate_opts!(opts)
+
+    with :ok <- supports_method(provider, :grpo),
+         {:ok, session} <- dispatch(provider, :start_reinforcement, [lm, opts]),
+         {:ok, session} <- normalize_session(session) do
+      {:ok, session}
+    end
+  end
+
+  def reinforcement_status(provider, %DSEx.Clients.ReinforcementSession{} = session) do
+    with {:ok, status} <- dispatch(provider, :reinforcement_status, [session]) do
+      normalize_session_update(session, status)
+    end
+  end
+
+  def reinforcement_step(
+        provider,
+        %DSEx.Clients.ReinforcementSession{} = session,
+        groups,
+        opts \\ []
+      ) do
+    opts = validate_opts!(opts)
+
+    with :ok <- validate_groups(groups),
+         {:ok, update} <- dispatch(provider, :reinforcement_step, [session, groups, opts]),
+         {:ok, updated} <- normalize_session_update(session, update) do
+      ids = Enum.map(groups, &Map.get(&1, :batch_id, Map.get(&1, "batch_id")))
+      {:ok, DSEx.Clients.ReinforcementSession.fulfill(updated, ids)}
+    end
+  end
+
+  def terminate_reinforcement(provider, %DSEx.Clients.ReinforcementSession{} = session) do
+    with {:ok, update} <- dispatch(provider, :terminate_reinforcement, [session]) do
+      normalize_session_update(session, update)
+    end
+  end
+
+  def final_model_artifact(provider, %DSEx.Clients.ReinforcementSession{} = session) do
+    with {:ok, artifact} <- dispatch(provider, :final_model_artifact, [session]),
+         true <- is_binary(artifact) and String.trim(artifact) != "" do
+      {:ok, artifact}
+    else
+      false -> {:error, :reinforcement_artifact_missing}
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_reinforcement_artifact, other}}
+    end
+  end
 
   def validate_provider(nil), do: {:ok, nil}
   def validate_provider(provider) when is_atom(provider), do: {:ok, provider}
@@ -639,6 +833,79 @@ defmodule DSEx.Clients.Trainer do
   end
 
   defp do_finetune(provider, _lm, _examples, _opts), do: {:error, {:not_a_trainer, provider}}
+
+  defp dispatch(module, callback, args) when is_atom(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, callback, length(args)) do
+      call_reinforcement(fn -> apply(module, callback, args) end, module, callback)
+    else
+      {:error, {:reinforcement_callback_not_supported, callback}}
+    end
+  end
+
+  defp dispatch(%module{} = trainer, callback, args) do
+    if Code.ensure_loaded?(module) and function_exported?(module, callback, length(args) + 1) do
+      call_reinforcement(fn -> apply(module, callback, [trainer | args]) end, module, callback)
+    else
+      {:error, {:reinforcement_callback_not_supported, callback}}
+    end
+  end
+
+  defp dispatch(_provider, callback, _args),
+    do: {:error, {:reinforcement_callback_not_supported, callback}}
+
+  defp call_reinforcement(fun, trainer, callback) do
+    case fun.() do
+      {:ok, _value} = result -> result
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_reinforcement_result, callback, other}}
+    end
+  rescue
+    error -> {:error, {:trainer_failed, trainer_name(trainer), error_message(error)}}
+  catch
+    kind, reason ->
+      {:error, {:trainer_failed, trainer_name(trainer), error_message({kind, reason})}}
+  end
+
+  defp normalize_session(%DSEx.Clients.ReinforcementSession{} = session), do: {:ok, session}
+
+  defp normalize_session(attrs) when is_map(attrs) or is_list(attrs),
+    do: {:ok, DSEx.Clients.ReinforcementSession.new(attrs)}
+
+  defp normalize_session(other), do: {:error, {:invalid_reinforcement_session, other}}
+
+  defp normalize_session_update(session, update) do
+    {:ok, DSEx.Clients.ReinforcementSession.merge_status(session, update)}
+  rescue
+    error -> {:error, {:invalid_reinforcement_status, Exception.message(error)}}
+  end
+
+  defp validate_groups(groups) when is_list(groups) and groups != [] do
+    if Enum.all?(groups, &valid_group?/1),
+      do: :ok,
+      else: {:error, :invalid_reinforcement_groups}
+  end
+
+  defp validate_groups(_groups), do: {:error, :invalid_reinforcement_groups}
+
+  defp valid_group?(group) when is_map(group) do
+    batch_id = Map.get(group, :batch_id, Map.get(group, "batch_id"))
+    completions = Map.get(group, :group, Map.get(group, "group"))
+
+    not is_nil(batch_id) and is_list(completions) and completions != [] and
+      Enum.all?(completions, &valid_completion?/1)
+  end
+
+  defp valid_group?(_group), do: false
+
+  defp valid_completion?(completion) when is_map(completion) do
+    messages = Map.get(completion, :messages, Map.get(completion, "messages"))
+    response = Map.get(completion, :completion, Map.get(completion, "completion"))
+    reward = Map.get(completion, :reward, Map.get(completion, "reward"))
+
+    is_list(messages) and is_map(response) and is_number(reward)
+  end
+
+  defp valid_completion?(_completion), do: false
 
   defp validate_opts!(opts) when is_list(opts) do
     if Keyword.keyword?(opts) do
@@ -1381,7 +1648,7 @@ defmodule DSEx.Clients.DatabricksTrainer do
       retry_backoff_ms: opts[:retry_backoff_ms],
       status_url: String.trim_trailing(base, "/") <> "/api/2.0/dsex/finetune/{id}",
       cancel_url: String.trim_trailing(base, "/") <> "/api/2.0/dsex/finetune/{id}/cancel",
-      supported_methods: [:sft, :grpo],
+      supported_methods: [:sft],
       payload_builder: &payload/3
     )
   end
