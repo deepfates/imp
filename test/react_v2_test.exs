@@ -78,6 +78,46 @@ defmodule ReActV2Test do
     assert get_in(Map.new(forced_opts), [:tool_choice, :function, :name]) == "submit"
   end
 
+  test "accepts atom and string per-call max_iters overrides" do
+    for max_iters_key <- [:max_iters, "max_iters"] do
+      parent = self()
+
+      lm =
+        action_lm(
+          [
+            %{tool_calls: [%{name: "lookup", arguments: %{}}]},
+            %{tool_calls: [%{name: "submit", arguments: %{answer: "forced"}}]}
+          ],
+          parent
+        )
+
+      lookup = DSEx.tool(:lookup, "lookup", fn _arguments -> "observed" end)
+      program = DSEx.react_v2("question -> answer", [lookup], lm: lm, max_iters: 5)
+
+      assert {:ok, prediction} =
+               DSEx.call(program, Map.put(%{question: "q"}, max_iters_key, 1))
+
+      assert DSEx.get(prediction, :answer) == "forced"
+      assert DSEx.get(prediction, :termination_reason) == :forced_submit
+      assert_received {:lm_call, _normal_opts}
+      assert_received {:lm_call, _forced_opts}
+      refute_received {:lm_call, _extra_opts}
+    end
+  end
+
+  test "strictly validates per-call max_iters before calling the model" do
+    parent = self()
+    lm = action_lm([], parent)
+    program = DSEx.react_v2("question -> answer", [], lm: lm)
+
+    for invalid <- [-1, 1.0, "1", nil] do
+      assert {:error, {:invalid_react_v2_max_iters, ^invalid}} =
+               DSEx.call(program, %{"max_iters" => invalid, question: "q"})
+    end
+
+    refute_received {:lm_call, _opts}
+  end
+
   test "records malformed submit as an error result and returns an inspectable incomplete prediction" do
     lm =
       action_lm([

@@ -3,8 +3,9 @@ defmodule DSEx.Predict.ReAct do
   Iterative provider-tool-call ReAct program with a reserved submit step.
 
   ReAct lets the LM choose from an explicit tool catalog, append observations to
-  history, and eventually call the reserved `submit` tool with the signature's
-  required output fields.
+  history, and eventually call the reserved `submit` tool. In provider-native
+  mode `submit` carries the required outputs; in DSPy 3.2.1 mode it triggers a
+  separate extraction pass.
 
   Use it when the model must gather information or perform bounded actions
   before answering. Keep the tool policy narrow in production:
@@ -17,7 +18,7 @@ defmodule DSEx.Predict.ReAct do
           max_iters: 4
         )
 
-  Failure semantics are explicit:
+  The default `:provider_native` mode preserves the original DSEx contract:
 
   - unknown model-selected tools return `{:error, {:unknown_tool, name}}`;
   - denied tools return `{:error, {:tool_denied, name}}`;
@@ -25,12 +26,25 @@ defmodule DSEx.Predict.ReAct do
   - tool-policy crashes return `{:error, {:tool_policy_error, name, reason}}`;
   - missing final fields return `{:error, {:missing_output_fields, fields}}`.
 
+  Set `mode: :dspy_3_2_1` for the upstream DSPy 3.2.1 completion contract.
+  That mode records unknown-tool and tool-execution failures as observations so
+  the model can recover, then runs a separate extraction pass after `submit`,
+  action parse failure, empty tool calls, or iteration exhaustion. Tool-policy
+  failures and malformed provider calls remain fail-fast in both modes.
+
   Tool call history is redacted before it is attached to the final prediction.
   """
 
   @behaviour DSEx.Module
 
-  defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
+  defstruct [
+    :signature,
+    :react,
+    tools: %{},
+    max_iters: 20,
+    tool_policy: :allow,
+    mode: :provider_native
+  ]
 
   @option_schema [
     lm: [type: {:custom, DSEx.LM, :validate_lm, []}],
@@ -39,6 +53,7 @@ defmodule DSEx.Predict.ReAct do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     max_iters: [type: :non_neg_integer, default: 20],
+    mode: [type: {:in, [:provider_native, :dspy_3_2_1]}, default: :provider_native],
     tool_policy: [
       type: {:custom, DSEx.ToolPolicy, :validate, []},
       default: :allow
@@ -49,7 +64,8 @@ defmodule DSEx.Predict.ReAct do
     signature = DSEx.Signature.ensure(signature)
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Predict.ReAct.new/3")
     tool_map = DSEx.Tool.index_tools!(tools, "DSEx.Predict.ReAct.new/3")
-    submit = DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
+    mode = opts[:mode]
+    submit = submit_tool(mode)
     tools = Map.put(tool_map, :submit, submit)
 
     react_signature = %DSEx.Signature{
@@ -66,12 +82,12 @@ defmodule DSEx.Predict.ReAct do
         ),
         DSEx.Signature.Field.new(%{name: :tool_calls, type: :array}, :output)
       ],
-      instructions: react_instructions(signature.instructions)
+      instructions: react_instructions(signature.instructions, mode)
     }
 
     react_opts =
-      Keyword.update(opts, :config, provider_tool_config(tools, signature), fn config ->
-        Keyword.merge(config, provider_tool_config(tools, signature))
+      Keyword.update(opts, :config, provider_tool_config(tools, signature, mode), fn config ->
+        Keyword.merge(config, provider_tool_config(tools, signature, mode))
       end)
 
     %__MODULE__{
@@ -79,11 +95,23 @@ defmodule DSEx.Predict.ReAct do
       react: DSEx.Predict.Predict.new(react_signature, react_opts),
       tools: tools,
       max_iters: non_negative_integer(opts[:max_iters]),
-      tool_policy: opts[:tool_policy]
+      tool_policy: opts[:tool_policy],
+      mode: mode
     }
   end
 
-  defp react_instructions(instructions) do
+  defp submit_tool(:provider_native),
+    do: DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
+
+  defp submit_tool(:dspy_3_2_1),
+    do:
+      DSEx.Tool.new(
+        :submit,
+        "Mark the task complete so the collected information can be extracted",
+        fn _args -> "Completed." end
+      )
+
+  defp react_instructions(instructions, :provider_native) do
     """
     #{instructions}
 
@@ -92,6 +120,20 @@ defmodule DSEx.Predict.ReAct do
     Read the history field before choosing the next action.
     If history already contains the information needed for the final answer,
     call the reserved submit tool with the required output fields.
+    Do not repeat a tool call when its result is already present in history.
+    """
+  end
+
+  defp react_instructions(instructions, :dspy_3_2_1) do
+    """
+    #{instructions}
+
+    You are running an iterative tool-use loop.
+    Use the supplied provider tools to collect the information needed for the final outputs.
+    Read the history field before choosing the next action.
+    Tool execution failures are observations that may be corrected on a later turn.
+    When all necessary information is present in history, call the reserved submit tool.
+    Do not include final outputs in submit arguments; a separate step extracts them from history.
     Do not repeat a tool call when its result is already present in history.
     """
   end
@@ -115,6 +157,10 @@ defmodule DSEx.Predict.ReAct do
     _error -> {:error, {:invalid_react_inputs, "expected inputs as {key, value} pairs"}}
   end
 
+  defp run_loop(%{mode: :dspy_3_2_1} = agent, inputs, history, 0) do
+    extract_final(agent, inputs, history, :max_iters)
+  end
+
   defp run_loop(_agent, _inputs, history, 0) do
     {:error, {:react_max_iters, history}}
   end
@@ -125,48 +171,82 @@ defmodule DSEx.Predict.ReAct do
 
     call_inputs = Map.merge(inputs, %{history: history, tools: tool_descriptions})
 
-    with {:ok, prediction} <- DSEx.Predict.Predict.call(agent.react, call_inputs) do
-      case DSEx.Prediction.get(prediction, :tool_calls, []) do
-        [] ->
-          final = project_outputs(agent.signature, prediction)
-          validate_final(agent.signature, final, history, :direct)
+    case DSEx.Predict.Predict.call(agent.react, call_inputs) do
+      {:ok, prediction} ->
+        handle_action_prediction(agent, inputs, history, remaining, prediction)
 
-        calls ->
-          {events, final} = execute_calls(agent, List.wrap(calls))
-          history = history ++ events
+      {:error, reason} when agent.mode == :dspy_3_2_1 ->
+        if action_parse_failure?(reason) do
+          extract_final(agent, inputs, history, :parse_failure)
+        else
+          {:error, reason}
+        end
 
-          error = Enum.find(events, &match?(%{result: {:error, _reason}}, &1))
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
-          cond do
-            error ->
-              error.result
+  defp handle_action_prediction(agent, inputs, history, remaining, prediction) do
+    case DSEx.Prediction.get(prediction, :tool_calls, []) do
+      [] when agent.mode == :dspy_3_2_1 ->
+        extract_final(agent, inputs, history, :empty_tool_calls)
 
-            final ->
-              final = Map.merge(final, %{history: history, termination_reason: :submit})
-              prediction = DSEx.Prediction.new(final)
-              validate_final(agent.signature, prediction, history, :submit)
+      [] ->
+        final = project_outputs(agent.signature, prediction)
+        validate_final(agent.signature, final, history, :direct)
 
-            true ->
-              run_loop(agent, inputs, history, remaining - 1)
-          end
-      end
+      calls ->
+        {events, final, failure, submitted?} = execute_calls(agent, List.wrap(calls))
+        events = attach_thought(agent.mode, prediction, events)
+        history = history ++ events
+
+        cond do
+          failure ->
+            failure
+
+          submitted? and agent.mode == :dspy_3_2_1 ->
+            extract_final(agent, inputs, history, :submit)
+
+          final ->
+            prediction = DSEx.Prediction.new(final)
+            validate_final(agent.signature, prediction, history, :submit)
+
+          true ->
+            run_loop(agent, inputs, history, remaining - 1)
+        end
     end
   end
 
   defp execute_calls(agent, calls) do
-    Enum.reduce_while(calls, {[], nil}, fn call, {events, final} ->
-      {name, args, result} = prepare_tool_call(agent, call)
+    Enum.reduce_while(calls, {[], nil, nil, false}, fn call,
+                                                       {events, final, failure, _submitted?} ->
+      {name, args, outcome} = prepare_tool_call(agent, call)
+      {result, call_failure} = interpret_outcome(agent.mode, name, outcome)
 
       event = DSEx.Redaction.redact(%{tool: name, arguments: args, result: result})
-      final = if name == :submit and is_map(result), do: Map.new(result), else: final
+      submitted? = name == :submit
 
-      if final do
-        {:halt, {events ++ [event], final}}
-      else
-        {:cont, {events ++ [event], final}}
-      end
+      final =
+        if agent.mode == :provider_native and submitted? and is_map(result),
+          do: Map.new(result),
+          else: final
+
+      state = {events ++ [event], final, failure || call_failure, submitted?}
+      halt_on_submit? = submitted? and agent.mode == :dspy_3_2_1
+
+      if call_failure || final || halt_on_submit?, do: {:halt, state}, else: {:cont, state}
     end)
   end
+
+  defp attach_thought(:dspy_3_2_1, prediction, [event | events]) do
+    case DSEx.Prediction.get(prediction, :next_thought) do
+      nil -> [event | events]
+      thought -> [DSEx.Redaction.redact(Map.put(event, :thought, thought)) | events]
+    end
+  end
+
+  defp attach_thought(_mode, _prediction, events), do: events
 
   defp prepare_tool_call(agent, call) when is_map(call) do
     requested_name = tool_call_name(call)
@@ -177,7 +257,8 @@ defmodule DSEx.Predict.ReAct do
     {name, args, execute_tool_call(agent, name, requested_name, args)}
   end
 
-  defp prepare_tool_call(_agent, call), do: {nil, %{}, {:error, {:malformed_tool_call, call}}}
+  defp prepare_tool_call(_agent, call),
+    do: {nil, %{}, {:error, {:malformed_tool_call, call}}}
 
   defp tool_call_name(call) do
     function = Map.get(call, :function) || Map.get(call, "function") || %{}
@@ -211,7 +292,7 @@ defmodule DSEx.Predict.ReAct do
   end
 
   defp call_tool(tool, args) do
-    DSEx.Tool.call(tool, args)
+    {:ok, DSEx.Tool.call(tool, args)}
   rescue
     exception ->
       {:error, {:tool_error, tool.name, Exception.message(exception)}}
@@ -221,6 +302,91 @@ defmodule DSEx.Predict.ReAct do
   end
 
   defp authorize_tool(policy, name, args), do: DSEx.ToolPolicy.authorize(policy, name, args)
+
+  defp interpret_outcome(:provider_native, _name, {:ok, {:error, reason}}),
+    do: {{:error, reason}, {:error, reason}}
+
+  defp interpret_outcome(:provider_native, _name, {:ok, result}), do: {result, nil}
+
+  defp interpret_outcome(:provider_native, _name, {:error, reason}),
+    do: {{:error, reason}, {:error, reason}}
+
+  defp interpret_outcome(:dspy_3_2_1, name, {:ok, {:error, reason}}),
+    do: {"Execution error in #{display_tool_name(name)}: #{format_tool_error(reason)}", nil}
+
+  defp interpret_outcome(:dspy_3_2_1, _name, {:ok, result}), do: {result, nil}
+
+  defp interpret_outcome(:dspy_3_2_1, name, {:error, reason}) do
+    if observable_tool_failure?(reason) do
+      {tool_failure_observation(name, reason), nil}
+    else
+      {{:error, reason}, {:error, reason}}
+    end
+  end
+
+  defp observable_tool_failure?({:unknown_tool, _name}), do: true
+  defp observable_tool_failure?({:tool_error, _name, _reason}), do: true
+  defp observable_tool_failure?(_reason), do: false
+
+  defp tool_failure_observation(name, {:unknown_tool, requested_name}),
+    do: "Execution error in #{display_tool_name(name || requested_name)}: unknown tool"
+
+  defp tool_failure_observation(name, {:tool_error, _tool, reason}),
+    do: "Execution error in #{display_tool_name(name)}: #{format_tool_error(reason)}"
+
+  defp display_tool_name(nil), do: "unknown"
+  defp display_tool_name(name), do: to_string(name)
+
+  defp format_tool_error(reason) when is_binary(reason), do: reason
+  defp format_tool_error(reason), do: inspect(reason)
+
+  defp action_parse_failure?(%{reason: {:error, %DSEx.AdapterParseError{}}}), do: true
+  defp action_parse_failure?(%{reason: {:error, {:missing_output_fields, _fields}}}), do: true
+  defp action_parse_failure?(%DSEx.AdapterParseError{}), do: true
+  defp action_parse_failure?({:missing_output_fields, _fields}), do: true
+  defp action_parse_failure?(_reason), do: false
+
+  defp extract_final(agent, inputs, history, reason) do
+    extractor = extraction_program(agent)
+
+    with {:ok, prediction} <-
+           DSEx.Predict.ChainOfThought.call(extractor, Map.put(inputs, :history, history)) do
+      final = project_extraction(agent.signature, prediction)
+      validate_final(agent.signature, final, history, reason)
+    end
+  end
+
+  defp project_extraction(signature, prediction) do
+    fields =
+      prediction
+      |> DSEx.Prediction.to_map()
+      |> Map.take([:reasoning | DSEx.Signature.output_names(signature)])
+
+    DSEx.Prediction.new(fields, metadata: prediction.metadata)
+  end
+
+  defp extraction_program(agent) do
+    signature = %DSEx.Signature{
+      inputs: agent.signature.inputs ++ [DSEx.Signature.Field.new(:history, :input)],
+      outputs: agent.signature.outputs,
+      instructions: agent.signature.instructions
+    }
+
+    predict = agent.react
+
+    opts = [
+      demos: [],
+      config: Keyword.drop(predict.config, [:tools, :tool_choice]),
+      metadata: predict.metadata
+    ]
+
+    opts = if predict.dynamic_lm?, do: opts, else: Keyword.put(opts, :lm, predict.lm)
+
+    opts =
+      if predict.dynamic_adapter?, do: opts, else: Keyword.put(opts, :adapter, predict.adapter)
+
+    DSEx.Predict.ChainOfThought.new(signature, opts)
+  end
 
   defp project_outputs(signature, prediction) do
     fields =
@@ -259,7 +425,7 @@ defmodule DSEx.Predict.ReAct do
     end
   end
 
-  defp provider_tool_config(tools_map, signature) do
+  defp provider_tool_config(tools_map, signature, mode) do
     tools =
       tools_map
       |> Map.values()
@@ -269,7 +435,7 @@ defmodule DSEx.Predict.ReAct do
           function: %{
             name: to_string(tool.name),
             description: tool.description,
-            parameters: tool_parameters(tool, signature)
+            parameters: tool_parameters(tool, signature, mode)
           }
         }
       end)
@@ -277,13 +443,17 @@ defmodule DSEx.Predict.ReAct do
     [tools: tools, tool_choice: "auto"]
   end
 
-  defp tool_parameters(%DSEx.Tool{name: :submit}, signature),
+  defp tool_parameters(%DSEx.Tool{name: :submit}, _signature, :dspy_3_2_1),
+    do: %{"type" => "object", "properties" => %{}, "additionalProperties" => false}
+
+  defp tool_parameters(%DSEx.Tool{name: :submit}, signature, :provider_native),
     do: DSEx.Signature.json_schema(signature)
 
-  defp tool_parameters(%DSEx.Tool{schema: schema}, _signature) when map_size(schema) > 0,
+  defp tool_parameters(%DSEx.Tool{schema: schema}, _signature, _mode) when map_size(schema) > 0,
     do: schema
 
-  defp tool_parameters(_tool, _signature), do: %{"type" => "object", "properties" => %{}}
+  defp tool_parameters(_tool, _signature, _mode),
+    do: %{"type" => "object", "properties" => %{}}
 
   defp normalize_tool_name(tools, name), do: DSEx.Tool.resolve_name(tools, name)
 

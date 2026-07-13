@@ -68,6 +68,8 @@ defmodule DSEx.Predict.ReActV2 do
   @impl true
   def call(%__MODULE__{} = react, inputs) when is_map(inputs) or is_list(inputs) do
     with {:ok, inputs} <- normalize_inputs(inputs),
+         {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
+         :ok <- validate_call_max_iters(max_iters),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       pending =
         react.signature
@@ -75,7 +77,7 @@ defmodule DSEx.Predict.ReActV2 do
         |> Map.new(fn name -> {name, fetch_input(inputs, name)} end)
         |> Map.reject(fn {_key, value} -> is_nil(value) end)
 
-      run(react, history, pending, 0)
+      run(react, history, pending, 0, max_iters)
     end
   end
 
@@ -84,10 +86,10 @@ defmodule DSEx.Predict.ReActV2 do
       {:error,
        {:invalid_react_v2_inputs, "expected a map or field pairs, got: #{inspect(inputs)}"}}
 
-  defp run(react, history, pending, turn) when turn >= react.max_iters,
+  defp run(react, history, pending, turn, max_iters) when turn >= max_iters,
     do: forced_submit(react, history, pending, :max_iters, turn, nil)
 
-  defp run(react, history, pending, turn) do
+  defp run(react, history, pending, turn, max_iters) do
     case predict(react.react, react, history, pending) do
       {:ok, prediction} ->
         calls = prediction |> DSEx.get(:tool_calls, []) |> normalize_calls(turn)
@@ -101,7 +103,7 @@ defmodule DSEx.Predict.ReActV2 do
 
           if final,
             do: final_prediction(final, history, :submit),
-            else: run(react, history, %{}, turn + 1)
+            else: run(react, history, %{}, turn + 1, max_iters)
         end
 
       {:error, reason} ->
@@ -268,6 +270,22 @@ defmodule DSEx.Predict.ReActV2 do
   defp coerce_history(history), do: {:error, {:invalid_react_v2_history, history}}
 
   defp normalize_inputs(inputs), do: {:ok, Map.new(inputs)}
+
+  defp pop_max_iters(inputs, default) do
+    max_iters =
+      cond do
+        Map.has_key?(inputs, :max_iters) -> Map.fetch!(inputs, :max_iters)
+        Map.has_key?(inputs, "max_iters") -> Map.fetch!(inputs, "max_iters")
+        true -> default
+      end
+
+    {max_iters, Map.drop(inputs, [:max_iters, "max_iters"])}
+  end
+
+  defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
+
+  defp validate_call_max_iters(max_iters),
+    do: {:error, {:invalid_react_v2_max_iters, max_iters}}
 
   defp fetch_input(inputs, name), do: Map.get(inputs, name, Map.get(inputs, to_string(name)))
   defp maybe_put(map, _key, nil), do: map

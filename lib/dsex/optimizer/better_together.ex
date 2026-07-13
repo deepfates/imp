@@ -1,13 +1,38 @@
 defmodule DSEx.Optimizer.BetterTogether do
-  @moduledoc "Meta-optimizer that applies named prompt/weight optimizers in sequence."
+  @moduledoc """
+  Evaluate-and-select meta-optimizer for prompt and weight optimization sequences.
+
+  DSEx evaluates the original program and every successfully compiled strategy
+  prefix. With validation data it returns the highest-scoring candidate, with
+  earlier candidates winning ties; without validation it returns the latest
+  successful candidate. Compilation stops at the first failed step.
+
+  Unlike upstream DSPy, DSEx provider training does not manage model process
+  lifecycles or rebind a completed fine-tuned model. A `BootstrapFinetune`
+  provider error is therefore reported as a failed step rather than represented
+  as successful weight optimization.
+  """
+
+  alias DSEx.Optimizer.{BootstrapFinetune, Report, Sampling}
 
   defstruct [:metric, optimizers: %{}]
 
   @option_schema [
     strategy: [
       type: {:custom, __MODULE__, :validate_strategy, []},
-      default: "p"
-    ]
+      default: "p -> w -> p"
+    ],
+    valset_ratio: [
+      type: {:custom, __MODULE__, :validate_valset_ratio, []},
+      default: 0.1
+    ],
+    shuffle_trainset_between_steps: [type: :boolean, default: true],
+    seed: [type: :integer, default: 0],
+    max_errors: [
+      type: {:custom, DSEx.Evaluate, :validate_max_errors, []},
+      default: :infinity
+    ],
+    max_concurrency: [type: :pos_integer, default: 1]
   ]
 
   def new(metric, optimizers \\ %{}) do
@@ -18,7 +43,7 @@ defmodule DSEx.Optimizer.BetterTogether do
       if map_size(optimizers) == 0 do
         %{
           p: DSEx.Optimizer.RandomSearch.new(metric),
-          w: DSEx.Optimizer.BootstrapFinetune.new(metric)
+          w: BootstrapFinetune.new(metric)
         }
       else
         optimizers
@@ -29,38 +54,52 @@ defmodule DSEx.Optimizer.BetterTogether do
 
   def compile(%__MODULE__{} = bt, student, trainset, valset, opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.BetterTogether.compile/5")
-    strategy = opts[:strategy]
-    steps = strategy_steps(strategy)
+    steps = strategy_steps(opts[:strategy])
+    {trainset, valset} = prepare_validation!(trainset, valset, opts[:valset_ratio])
+    evaluator = evaluator(bt.metric, valset, opts)
 
-    {compiled, step_reports, errors} =
-      Enum.reduce(steps, {student, [], []}, fn key, {program, reports, errors} ->
-        case fetch_optimizer(bt.optimizers, key) do
-          {:ok, optimizer} ->
-            case compile_step(optimizer, program, trainset, valset) do
-              {:ok, next, metadata} ->
-                {next, reports ++ [Map.merge(%{key: key, status: :ok}, metadata)], errors}
+    baseline = evaluate_candidate(student, [], nil, evaluator, 0)
+    rng = Sampling.new(opts[:seed])
 
-              {:error, reason} ->
-                error = %{key: key, error: reason}
+    {candidates, errors, _rng} =
+      run_steps(
+        bt,
+        steps,
+        student,
+        trainset,
+        valset,
+        evaluator,
+        opts[:shuffle_trainset_between_steps],
+        rng,
+        [baseline],
+        []
+      )
 
-                {program, reports ++ [%{key: key, status: :error, error: reason}],
-                 errors ++ [error]}
-            end
+    selected = select_candidate(candidates, valset)
+    baseline = hd(candidates)
+    report_candidates = report_candidates(candidates)
 
-          {:error, reason} ->
-            error = %{key: key, error: reason}
-            {program, reports ++ [%{key: key, status: :error, error: reason}], errors ++ [error]}
-        end
-      end)
-
-    DSEx.Optimizer.Report.attach(
-      compiled,
-      DSEx.Optimizer.Report.new(%{
+    Report.attach(
+      selected.program,
+      Report.new(%{
         optimizer: :better_together,
-        candidate_count: length(step_reports),
-        candidates: step_reports,
+        best_score: selected.score,
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
         errors: errors,
-        metadata: %{strategy: strategy, steps: steps}
+        metadata: %{
+          strategy: opts[:strategy],
+          steps: steps,
+          selected_strategy: selected.strategy,
+          baseline_score: baseline.score,
+          baseline_evaluation: baseline.evaluation,
+          validation_size: validation_size(valset),
+          trainset_size: length(trainset),
+          compilation_error_occurred: errors != [],
+          stopped_early: errors != [],
+          provider_training_semantics:
+            :jobs_are_reported_but_trained_model_rebinding_and_lifecycle_are_not_available
+        }
       })
     )
   end
@@ -71,17 +110,199 @@ defmodule DSEx.Optimizer.BetterTogether do
         if Enum.all?(steps, &valid_strategy_step?/1) do
           {:ok, strategy}
         else
-          {:error, "expected a non-empty optimizer key, \"a->b\" string, or list of keys"}
+          {:error, "expected a non-empty optimizer key, \"a -> b\" string, or list of keys"}
         end
 
       _empty ->
-        {:error, "expected a non-empty optimizer key, \"a->b\" string, or list of keys"}
+        {:error, "expected a non-empty optimizer key, \"a -> b\" string, or list of keys"}
     end
   end
 
+  def validate_valset_ratio(value) when is_number(value) and value >= 0 and value < 1,
+    do: {:ok, value}
+
+  def validate_valset_ratio(value),
+    do: {:error, "expected a number in the range [0, 1), got: #{inspect(value)}"}
+
+  defp prepare_validation!(trainset, valset, ratio) do
+    trainset = enumerable_to_list!(trainset, "trainset")
+
+    if trainset == [] do
+      raise ArgumentError, "DSEx.Optimizer.BetterTogether.compile/5: trainset cannot be empty"
+    end
+
+    case optional_enumerable_to_list!(valset, "valset") do
+      [_ | _] = provided ->
+        {trainset, provided}
+
+      [] when ratio == 0 ->
+        {trainset, nil}
+
+      [] ->
+        Enum.split(trainset, floor(ratio * length(trainset)))
+        |> then(fn {validation, training} -> {training, validation} end)
+    end
+  end
+
+  defp enumerable_to_list!(value, name) do
+    if Enumerable.impl_for(value) do
+      Enum.to_list(value)
+    else
+      raise ArgumentError,
+            "DSEx.Optimizer.BetterTogether.compile/5: #{name} must be enumerable, got: #{inspect(value)}"
+    end
+  end
+
+  defp optional_enumerable_to_list!(nil, _name), do: []
+  defp optional_enumerable_to_list!(value, name), do: enumerable_to_list!(value, name)
+
+  defp evaluator(_metric, nil, _opts), do: nil
+  defp evaluator(_metric, [], _opts), do: nil
+
+  defp evaluator(metric, valset, opts) do
+    DSEx.Evaluate.new(valset, metric,
+      max_errors: opts[:max_errors],
+      max_concurrency: opts[:max_concurrency]
+    )
+  end
+
+  defp run_steps(
+         _bt,
+         [],
+         _student,
+         _trainset,
+         _valset,
+         _evaluator,
+         _shuffle?,
+         rng,
+         candidates,
+         errors
+       ),
+       do: {candidates, errors, rng}
+
+  defp run_steps(
+         bt,
+         [key | rest],
+         student,
+         trainset,
+         valset,
+         evaluator,
+         shuffle?,
+         rng,
+         candidates,
+         errors
+       ) do
+    {step_trainset, rng} = maybe_shuffle(trainset, shuffle?, rng)
+    strategy = Enum.map(candidates, & &1.key) |> Enum.reject(&is_nil/1) |> Kernel.++([key])
+    index = length(candidates)
+
+    result =
+      with {:ok, optimizer} <- fetch_optimizer(bt.optimizers, key),
+           {:ok, compiled, compile_metadata} <-
+             compile_step(optimizer, student, step_trainset, valset) do
+        {:ok,
+         evaluate_candidate(compiled, strategy, key, evaluator, index)
+         |> Map.put(:compile_metadata, compile_metadata)}
+      end
+
+    case result do
+      {:ok, candidate} ->
+        run_steps(
+          bt,
+          rest,
+          candidate.program,
+          trainset,
+          valset,
+          evaluator,
+          shuffle?,
+          rng,
+          candidates ++ [candidate],
+          errors
+        )
+
+      {:error, reason} ->
+        failed = %{
+          index: index,
+          key: key,
+          strategy: strategy_label(strategy),
+          status: :error,
+          error: reason
+        }
+
+        {candidates ++ [failed], errors ++ [%{index: index, key: key, error: reason}], rng}
+    end
+  end
+
+  defp evaluate_candidate(program, strategy, key, nil, index) do
+    %{
+      index: index,
+      key: key,
+      strategy: strategy_label(strategy),
+      score: nil,
+      status: :ok,
+      evaluation: %{validation_size: 0, errors: []},
+      program: program
+    }
+  end
+
+  defp evaluate_candidate(program, strategy, key, evaluator, index) do
+    result = DSEx.Evaluate.run(evaluator, program)
+
+    %{
+      index: index,
+      key: key,
+      strategy: strategy_label(strategy),
+      score: result.score,
+      status: :ok,
+      evaluation: %{
+        validation_size: length(result.rows),
+        error_count: length(result.errors),
+        errors: result.errors
+      },
+      program: program
+    }
+  end
+
+  # Preserve the established DSEx error-only report shape when the first step
+  # cannot compile. Baseline diagnostics remain available in report metadata.
+  defp report_candidates([
+         %{key: nil, status: :ok},
+         %{status: :error} = failed
+       ]) do
+    [Map.take(failed, [:key, :status, :error])]
+  end
+
+  defp report_candidates(candidates), do: Enum.map(candidates, &Map.delete(&1, :program))
+
+  defp select_candidate(candidates, nil), do: latest_successful(candidates)
+  defp select_candidate(candidates, []), do: latest_successful(candidates)
+
+  defp select_candidate(candidates, _valset) do
+    candidates
+    |> Enum.filter(&(&1.status == :ok))
+    |> Enum.max_by(& &1.score, fn -> raise "BetterTogether produced no candidate" end)
+  end
+
+  defp latest_successful(candidates) do
+    candidates
+    |> Enum.filter(&(&1.status == :ok))
+    |> List.last()
+  end
+
+  defp maybe_shuffle(trainset, false, rng), do: {trainset, rng}
+  defp maybe_shuffle(trainset, true, rng), do: Sampling.shuffle(trainset, rng)
+
+  defp validation_size(nil), do: 0
+  defp validation_size(valset), do: length(valset)
+
+  defp strategy_label([]), do: ""
+
+  defp strategy_label(strategy),
+    do: Enum.map_join(strategy, " -> ", &to_string/1)
+
   defp strategy_steps(strategy) when is_binary(strategy) do
     strategy
-    |> String.split("->")
+    |> String.split(~r/\s*->\s*/)
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
   end
@@ -92,22 +313,20 @@ defmodule DSEx.Optimizer.BetterTogether do
   defp valid_strategy_step?(step) when is_binary(step), do: String.trim(step) != ""
   defp valid_strategy_step?(_step), do: false
 
-  defp compile_step(
-         %DSEx.Optimizer.BootstrapFinetune{} = optimizer,
-         program,
-         trainset,
-         _valset
-       ) do
-    case safe_call(fn ->
-           DSEx.Optimizer.BootstrapFinetune.compile(optimizer, program, trainset)
-         end) do
-      {:ok, %{program: compiled} = result} ->
-        metadata =
-          result
-          |> Map.take([:job, :error])
-          |> Map.put(:optimizer, optimizer.__struct__)
+  defp compile_step(%BootstrapFinetune{} = optimizer, program, trainset, _valset) do
+    case safe_call(fn -> BootstrapFinetune.compile(optimizer, program, trainset) end) do
+      {:ok, %{program: compiled, error: reason}} ->
+        {:error,
+         {:provider_training_failed, reason, %{compiled_program_available: compiled != nil}}}
 
-        {:ok, compiled, metadata}
+      {:ok, %{program: compiled, job: job}} ->
+        {:ok, compiled,
+         %{
+           optimizer: BootstrapFinetune,
+           job: job,
+           trained_model_rebound?: false,
+           provider_lifecycle_managed?: false
+         }}
 
       {:ok, other} ->
         {:error, {:invalid_optimizer_result, other}}
@@ -126,14 +345,14 @@ defmodule DSEx.Optimizer.BetterTogether do
         {:error, {:optimizer_not_loaded, optimizer.__struct__}}
 
       function_exported?(optimizer.__struct__, :compile, 4) ->
-        optimizer
-        |> safe_compile(fn ->
+        safe_compile(optimizer, fn ->
           optimizer.__struct__.compile(optimizer, program, trainset, valset)
         end)
 
       function_exported?(optimizer.__struct__, :compile, 3) ->
-        optimizer
-        |> safe_compile(fn -> optimizer.__struct__.compile(optimizer, program, trainset) end)
+        safe_compile(optimizer, fn ->
+          optimizer.__struct__.compile(optimizer, program, trainset)
+        end)
 
       true ->
         {:error, {:unsupported_optimizer, optimizer.__struct__}}
@@ -164,8 +383,7 @@ defmodule DSEx.Optimizer.BetterTogether do
       Map.has_key?(optimizers, key) ->
         {:ok, Map.fetch!(optimizers, key)}
 
-      is_atom(existing_atom_or_string(key)) and
-          Map.has_key?(optimizers, existing_atom_or_string(key)) ->
+      Map.has_key?(optimizers, existing_atom_or_string(key)) ->
         {:ok, Map.fetch!(optimizers, existing_atom_or_string(key))}
 
       true ->
@@ -173,7 +391,7 @@ defmodule DSEx.Optimizer.BetterTogether do
     end
   end
 
-  defp existing_atom_or_string(key) when is_atom(key), do: key
+  defp existing_atom_or_string(key) when is_atom(key), do: Atom.to_string(key)
 
   defp existing_atom_or_string(key) when is_binary(key) do
     String.to_existing_atom(key)

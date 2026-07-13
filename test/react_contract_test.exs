@@ -324,4 +324,191 @@ defmodule ReActContractTest do
     refute_received :side_effect_ran
     assert [%{tool: :submit}] = DSEx.Prediction.get(prediction, :history)
   end
+
+  test "DSPy 3.2.1 mode observes tool execution failures and extracts after submit" do
+    Process.put(:react_actions, [
+      %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]},
+      %{tool_calls: [%{name: :submit, arguments: %{}}]},
+      %{reasoning: "The failed lookup is enough context", answer: "recovered"}
+    ])
+
+    lm = sequence_lm(:react_actions)
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        max_iters: 3
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "recovered"
+    assert DSEx.Prediction.get(prediction, :reasoning) == "The failed lookup is enough context"
+    assert DSEx.Prediction.get(prediction, :termination_reason) == :submit
+
+    assert [
+             %{
+               tool: :lookup,
+               result: "Execution error in lookup: provider exploded"
+             },
+             %{tool: :submit, result: "Completed."}
+           ] = DSEx.Prediction.get(prediction, :history)
+
+    assert Process.get(:react_actions) == []
+  end
+
+  test "DSPy 3.2.1 mode extracts after iteration exhaustion" do
+    Process.put(:react_actions, [
+      %{tool_calls: [%{name: :lookup, arguments: %{}}]},
+      %{reasoning: "Use the observation", answer: "observed"}
+    ])
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: sequence_lm(:react_actions),
+        mode: :dspy_3_2_1,
+        max_iters: 1
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "observed"
+    assert DSEx.Prediction.get(prediction, :termination_reason) == :max_iters
+    assert [%{tool: :lookup, result: "observed"}] = DSEx.Prediction.get(prediction, :history)
+  end
+
+  test "DSPy 3.2.1 mode makes unknown tools recoverable observations" do
+    Process.put(:react_actions, [
+      %{tool_calls: [%{name: "missing", arguments: %{}}]},
+      %{tool_calls: [%{name: :submit, arguments: %{}}]},
+      %{reasoning: "The missing tool was not needed", answer: "done"}
+    ])
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [],
+        lm: sequence_lm(:react_actions),
+        mode: :dspy_3_2_1
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+
+    assert [
+             %{tool: nil, result: "Execution error in missing: unknown tool"},
+             %{tool: :submit, result: "Completed."}
+           ] = DSEx.Prediction.get(prediction, :history)
+  end
+
+  test "DSPy 3.2.1 mode treats BEAM error tuples as recoverable observations" do
+    Process.put(:react_actions, [
+      %{tool_calls: [%{name: :lookup, arguments: %{}}]},
+      %{tool_calls: [%{name: :submit, arguments: %{}}]},
+      %{reasoning: "Recovered from the explicit error", answer: "done"}
+    ])
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> {:error, :not_found} end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: sequence_lm(:react_actions),
+        mode: :dspy_3_2_1
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+
+    assert [
+             %{tool: :lookup, result: "Execution error in lookup: :not_found"},
+             %{tool: :submit, result: "Completed."}
+           ] = DSEx.Prediction.get(prediction, :history)
+  end
+
+  test "DSPy 3.2.1 mode extracts after action parse failure" do
+    Process.put(:react_actions, [
+      %{next_thought: "I cannot select an action"},
+      %{reasoning: "Answer without another action", answer: "fallback"}
+    ])
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [],
+        lm: sequence_lm(:react_actions),
+        adapter: DSEx.Adapter.JSON,
+        mode: :dspy_3_2_1,
+        max_iters: 2
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "fallback"
+    assert DSEx.Prediction.get(prediction, :termination_reason) == :parse_failure
+    assert DSEx.Prediction.get(prediction, :history) == []
+  end
+
+  test "DSPy 3.2.1 mode does not weaken tool policy failures" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          send(parent, :react_lm_called)
+          %{tool_calls: [%{name: :lookup, arguments: %{}}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> raise "must not execute" end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        tool_policy: []
+      )
+
+    assert {:error, {:tool_denied, :lookup}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+
+    assert_received :react_lm_called
+    refute_received :react_lm_called
+  end
+
+  test "DSPy 3.2.1 mode keeps malformed provider calls fail-fast" do
+    Process.put(:react_actions, [
+      %{tool_calls: ["not-a-tool-call"]},
+      %{reasoning: "must not extract", answer: "bad"}
+    ])
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [],
+        lm: sequence_lm(:react_actions),
+        mode: :dspy_3_2_1
+      )
+
+    assert {:error, {:malformed_tool_call, "not-a-tool-call"}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+
+    assert [_unused_extraction] = Process.get(:react_actions)
+  end
+
+  test "ReAct mode defaults honestly to the existing provider-native contract" do
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: nil)
+    assert agent.mode == :provider_native
+
+    assert_raise ArgumentError, ~r/expected one of \[:provider_native, :dspy_3_2_1\]/, fn ->
+      DSEx.Predict.ReAct.new("question -> answer", [], mode: :source_faithful)
+    end
+  end
+
+  defp sequence_lm(key) do
+    %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [next | rest] = Process.get(key)
+          Process.put(key, rest)
+          next
+        end
+      ]
+    }
+  end
 end

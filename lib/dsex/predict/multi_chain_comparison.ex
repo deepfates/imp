@@ -55,6 +55,7 @@ defmodule DSEx.Predict.MultiChainComparison do
     signature = DSEx.Signature.ensure(signature)
     last_key = signature |> DSEx.Signature.output_names() |> List.last()
     m = Keyword.get(opts, :m, Keyword.get(opts, :M, 3))
+    predict_opts = Keyword.put(opts, :config, Keyword.put_new(opts[:config], :temperature, 0.7))
 
     comparison_signature =
       Enum.reduce(1..m, signature, fn index, acc ->
@@ -67,7 +68,7 @@ defmodule DSEx.Predict.MultiChainComparison do
       |> DSEx.Signature.prepend_output(%{name: :rationale, desc: "Corrected reasoning"})
 
     %__MODULE__{
-      predict: DSEx.Predict.Predict.new(comparison_signature, opts),
+      predict: DSEx.Predict.Predict.new(comparison_signature, predict_opts),
       last_key: last_key,
       m: m
     }
@@ -125,8 +126,13 @@ defmodule DSEx.Predict.MultiChainComparison do
               completion_value(completion, :rationale) || completion_value(completion, :reasoning) ||
                 ""
 
-            answer = completion_value(completion, mcc.last_key) || ""
-            {:"reasoning_attempt_#{index}", "I tried #{rationale}; prediction #{answer}"}
+            rationale = normalize_evidence(rationale)
+            answer = completion |> completion_value(mcc.last_key) |> normalize_evidence()
+
+            attempt =
+              "«I'm trying to #{rationale} I'm not sure but my prediction is #{answer}»"
+
+            {:"reasoning_attempt_#{index}", attempt}
           end)
 
         inputs =
@@ -146,4 +152,21 @@ defmodule DSEx.Predict.MultiChainComparison do
   end
 
   defp completion_value(_completion, _field), do: nil
+
+  defp normalize_evidence(value) do
+    value
+    |> evidence_string()
+    |> String.split(~r/\R/, parts: 2)
+    |> hd()
+    |> String.trim()
+  end
+
+  defp evidence_string(nil), do: ""
+  defp evidence_string(value) when is_binary(value), do: value
+
+  defp evidence_string(value) do
+    to_string(value)
+  rescue
+    _error -> inspect(value)
+  end
 end
