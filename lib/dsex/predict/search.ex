@@ -1,5 +1,10 @@
 defmodule DSEx.Predict.Search.Candidate do
-  @moduledoc false
+  @moduledoc """
+  An explicitly identified candidate for request-local inference search.
+
+  `projected_budget` is a non-negative, multidimensional estimate used for
+  admission and accounting. It does not represent measured provider usage.
+  """
 
   @enforce_keys [:id, :value]
   defstruct [:id, :value, projected_budget: %{}]
@@ -36,7 +41,10 @@ defmodule DSEx.Predict.Search.Candidate do
 end
 
 defmodule DSEx.Predict.Search.Result do
-  @moduledoc false
+  @moduledoc """
+  The ordered outcomes, provenance, selection, and projected-budget accounting
+  produced by `DSEx.Predict.Search.run/3`.
+  """
 
   defstruct [
     :best,
@@ -58,7 +66,17 @@ defmodule DSEx.Predict.Search.Result do
 end
 
 defmodule DSEx.Predict.Search do
-  @moduledoc false
+  @moduledoc """
+  Executes a bounded candidate search owned by one inference request.
+
+  Search supports sequential evaluation with causal prior outcomes or bounded
+  concurrent evaluation, deterministic tie selection, threshold stopping,
+  ordered-prefix projected budgets, task failure isolation, and complete
+  candidate-order provenance. It keeps no global or persistent search state.
+
+  Projected budgets describe caller estimates. Actual token usage, latency, and
+  provider billing must be measured separately by the caller or provider.
+  """
 
   alias DSEx.Predict.Search.{Candidate, Result}
 
