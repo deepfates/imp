@@ -9,9 +9,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         --reflection-model openai:gpt-5 \\
         --api-key-env OPENAI_API_KEY \\
         --families AIMEBench,HotpotQABench \\
-        --max-concurrency 8 \\
+        --max-concurrency 32 \\
         --temperature 1.0 \\
-        --max-tokens 256 \\
+        --max-tokens 16384 \\
         --pricing-source "ReqLLM usage telemetry with provider pricing metadata" \\
         --token-cost-file path/to/fallback-costs.json \\
         --dspy-source stanfordnlp/dspy@... \\
@@ -35,9 +35,24 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   use Mix.Task
 
   @shortdoc "Run the DSEx side of the GEPA replication campaign"
+  @upstream_max_tokens 16_384
+  @upstream_max_concurrency 32
+  @upstream_max_retries 0
+
+  @doc false
+  def research_defaults do
+    %{
+      temperature: 1.0,
+      max_tokens: @upstream_max_tokens,
+      max_concurrency: @upstream_max_concurrency,
+      max_retries: @upstream_max_retries
+    }
+  end
 
   @impl true
   def run(args) do
+    defaults = research_defaults()
+
     {opts, _argv, invalid} =
       OptionParser.parse(args,
         strict: [
@@ -74,7 +89,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
 
     req_llm_opts =
       Keyword.merge(
-        [api_key: api_key, temperature: Keyword.get(opts, :temperature, 1.0)],
+        [
+          api_key: api_key,
+          temperature: Keyword.get(opts, :temperature, defaults.temperature),
+          max_retries: defaults.max_retries
+        ],
         generation_opts(opts)
       )
 
@@ -96,7 +115,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         reflection_model: reflection_model,
         out_dir: Keyword.get(opts, :out, "benchmarks/results"),
         families: families,
-        max_concurrency: Keyword.get(opts, :max_concurrency, 1),
+        max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
         seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
         generations: Keyword.get(opts, :generations, :metric_budget),
         pricing_source: fetch!(opts, :pricing_source),
@@ -153,18 +172,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   end
 
   defp generation_opts(opts) do
-    case Keyword.get(opts, :max_tokens) do
-      nil -> []
-      max_tokens -> [max_tokens: max_tokens]
-    end
+    [max_tokens: Keyword.get(opts, :max_tokens, research_defaults().max_tokens)]
   end
 
   defp execution_identity(opts) do
     %{
       "lm" => %{
         "provider" => "req_llm",
-        "temperature" => Keyword.get(opts, :temperature, 1.0),
-        "max_tokens" => Keyword.get(opts, :max_tokens)
+        "temperature" => Keyword.get(opts, :temperature, research_defaults().temperature),
+        "max_tokens" => Keyword.get(opts, :max_tokens, research_defaults().max_tokens),
+        "max_retries" => research_defaults().max_retries
       },
       "retrieval" => %{
         "hover_upstream_bm25" => truthy_env?("DSEX_HOVER_UPSTREAM_BM25"),

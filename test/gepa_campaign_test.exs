@@ -3,6 +3,15 @@ defmodule GepaCampaignTest do
 
   alias DSEx.BenchmarkTruth.{GepaCampaign, GepaReplicationContract, HoverBM25}
 
+  test "research task defaults match the pinned upstream GEPA runner" do
+    assert Mix.Tasks.Dsex.Benchmark.GepaCampaign.research_defaults() == %{
+             temperature: 1.0,
+             max_tokens: 16_384,
+             max_concurrency: 32,
+             max_retries: 0
+           }
+  end
+
   defmodule OptimizerConfigCallback do
     @behaviour DSEx.Optimizer.GEPA.Callback
 
