@@ -88,4 +88,16 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
     assert snapshot["usage"]["input_tokens"] == 7
     assert snapshot["active_reservations"] == 0
   end
+
+  test "marks an unexpected provider overrun as exhausted" do
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 10, output_tokens: 10, usd: 1.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 1
+      )
+
+    :ok = CampaignBudget.record_usage(budget, %{input_tokens: 11, output_tokens: 1, usd: 0.1})
+    assert CampaignBudget.snapshot(budget)["exhausted"] == "input_tokens"
+  end
 end

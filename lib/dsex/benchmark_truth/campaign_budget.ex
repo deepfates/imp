@@ -84,7 +84,9 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
   end
 
   def handle_call({:usage, usage}, _from, state) do
-    {:reply, :ok, %{state | usage: sum_usage(state.usage, normalize_usage!(usage))}}
+    state = %{state | usage: sum_usage(state.usage, normalize_usage!(usage))}
+    exhausted = state.exhausted || observed_exhausted_dimension(state)
+    {:reply, :ok, %{state | exhausted: exhausted}}
   end
 
   def handle_call(:snapshot, _from, state) do
@@ -133,6 +135,14 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
     Enum.find([:requests, :input_tokens, :output_tokens, :usd], fn key ->
       limit = Map.fetch!(state.limits, key)
       limit != :infinity and Map.fetch!(totals, key) > limit
+    end)
+  end
+
+  defp observed_exhausted_dimension(state) do
+    Enum.find([:input_tokens, :output_tokens, :usd], fn key ->
+      limit = Map.fetch!(state.limits, key)
+      observed = state.usage[Atom.to_string(key)]
+      limit != :infinity and observed > limit
     end)
   end
 

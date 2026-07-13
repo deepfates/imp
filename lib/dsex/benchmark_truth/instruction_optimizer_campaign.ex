@@ -155,6 +155,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
           budget
         )
 
+      reject_if_exhausted!(budget)
       report = Report.fetch(program)
 
       %{
