@@ -139,6 +139,7 @@ defmodule PublicSurfaceTest do
     DSEx.Optimizer.Trajectory.Usage,
     DSEx.Optimizer.TrajectoryRunner,
     DSEx.Playbook,
+    DSEx.Playbook.WithContext,
     DSEx.Playbook.Delta,
     DSEx.Playbook.Entry,
     DSEx.Playbook.Operation.Add,

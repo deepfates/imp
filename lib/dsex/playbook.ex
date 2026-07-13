@@ -82,6 +82,56 @@ defmodule DSEx.Playbook do
   @spec serialize(t()) :: String.t()
   def serialize(%__MODULE__{} = playbook), do: playbook |> dump() |> Canonical.encode()
 
+  @doc "Loads and validates a data-only playbook representation."
+  @spec load!(map()) :: t()
+  def load!(state) when is_map(state) do
+    exact_keys!(
+      state,
+      ~w(entries hash id parent_hash policy revision schema_version tombstones),
+      "playbook"
+    )
+
+    unless state["schema_version"] == 2,
+      do:
+        raise(
+          ArgumentError,
+          "unsupported playbook schema version: #{inspect(state["schema_version"])}"
+        )
+
+    policy = load_policy!(state["policy"])
+    revision = non_negative_integer!(state["revision"], "playbook revision")
+    id = valid_id!(state["id"], "playbook id")
+    parent_hash = parent_hash!(state["parent_hash"], revision, "playbook")
+    entries = load_list!(state["entries"], "playbook entries", &load_entry!(&1, policy))
+
+    tombstones =
+      load_list!(state["tombstones"], "playbook tombstones", fn tombstone ->
+        load_tombstone!(tombstone, policy, revision)
+      end)
+
+    playbook = %__MODULE__{
+      id: id,
+      revision: revision,
+      parent_hash: parent_hash,
+      entries: entries,
+      tombstones: tombstones,
+      policy: policy,
+      hash: valid_hash!(state["hash"], "playbook hash")
+    }
+
+    with :ok <- validate_loaded_identity(playbook),
+         :ok <- validate_final(playbook),
+         expected = rehash(playbook).hash,
+         :ok <- equal_hash(playbook.hash, expected, "playbook") do
+      playbook
+    else
+      {:error, reason} -> raise ArgumentError, "invalid playbook: #{inspect(reason)}"
+    end
+  end
+
+  def load!(state),
+    do: raise(ArgumentError, "playbook state must be a map, got: #{inspect(state)}")
+
   @doc "Renders active entries in stable playbook order."
   @spec render(t()) :: String.t()
   def render(%__MODULE__{entries: entries}) do
@@ -445,6 +495,207 @@ defmodule DSEx.Playbook do
       true ->
         :ok
     end
+  end
+
+  defp validate_loaded_identity(playbook) do
+    active_ids = Enum.map(playbook.entries, & &1.id)
+    historical_ids = Enum.map(playbook.tombstones, & &1.entry.id)
+    active_content = Enum.map(playbook.entries, & &1.content)
+
+    cond do
+      playbook.revision == 0 and (playbook.entries != [] or playbook.tombstones != []) ->
+        {:error, :non_empty_root}
+
+      Enum.uniq(active_ids) != active_ids ->
+        {:error, :duplicate_active_ids}
+
+      Enum.uniq(historical_ids) != historical_ids ->
+        {:error, :duplicate_historical_ids}
+
+      not MapSet.disjoint?(MapSet.new(active_ids), MapSet.new(historical_ids)) ->
+        {:error, :active_historical_id_collision}
+
+      Enum.uniq(active_content) != active_content ->
+        {:error, :duplicate_active_content}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp load_policy!(state) when is_map(state) do
+    keys =
+      ~w(max_counter max_entries max_entry_bytes max_operations max_playbook_bytes max_provenance_items max_section_bytes max_source_id_bytes max_tombstones reject_secrets)
+
+    exact_keys!(state, keys, "playbook policy")
+
+    Policy.new(
+      max_counter: state["max_counter"],
+      max_entries: state["max_entries"],
+      max_entry_bytes: state["max_entry_bytes"],
+      max_operations: state["max_operations"],
+      max_playbook_bytes: state["max_playbook_bytes"],
+      max_provenance_items: state["max_provenance_items"],
+      max_section_bytes: state["max_section_bytes"],
+      max_source_id_bytes: state["max_source_id_bytes"],
+      max_tombstones: state["max_tombstones"],
+      reject_secrets: state["reject_secrets"]
+    )
+  end
+
+  defp load_policy!(state),
+    do: raise(ArgumentError, "playbook policy must be a map, got: #{inspect(state)}")
+
+  defp load_entry!(state, policy) when is_map(state) do
+    exact_keys!(
+      state,
+      ~w(content harmful hash helpful id parent_hash provenance revision section status),
+      "playbook entry"
+    )
+
+    revision = positive_integer!(state["revision"], "entry revision")
+    content = state["content"]
+
+    unless is_binary(content) and Entry.normalize(content) == content,
+      do: raise(ArgumentError, "playbook entry content is not canonically normalized")
+
+    provenance = load_provenance!(state["provenance"])
+    status = load_status!(state["status"])
+
+    with :ok <- Policy.validate_content(content, policy),
+         {:ok, fields} <-
+           Entry.validate_fields(
+             [
+               section: state["section"],
+               status: status,
+               helpful: state["helpful"],
+               harmful: state["harmful"],
+               provenance: provenance
+             ],
+             policy
+           ) do
+      id = valid_id!(state["id"], "entry id")
+      parent_hash = parent_hash!(state["parent_hash"], revision - 1, "entry")
+
+      entry =
+        Entry.build(
+          content,
+          Keyword.merge(fields, id: id, revision: revision, parent_hash: parent_hash)
+        )
+
+      case equal_hash(valid_hash!(state["hash"], "entry hash"), entry.hash, "entry #{id}") do
+        :ok ->
+          entry
+
+        {:error, reason} ->
+          raise ArgumentError, "invalid playbook entry #{id}: #{inspect(reason)}"
+      end
+    else
+      {:error, reason} -> raise ArgumentError, "invalid playbook entry: #{inspect(reason)}"
+    end
+  end
+
+  defp load_entry!(state, _policy),
+    do: raise(ArgumentError, "playbook entry must be a map, got: #{inspect(state)}")
+
+  defp load_provenance!(state) when is_map(state) do
+    exact_keys!(state, ~w(digests source_ids), "playbook provenance")
+    %Provenance{digests: state["digests"], source_ids: state["source_ids"]}
+  end
+
+  defp load_provenance!(state),
+    do: raise(ArgumentError, "playbook provenance must be a map, got: #{inspect(state)}")
+
+  defp load_tombstone!(state, policy, playbook_revision) when is_map(state) do
+    exact_keys!(state, ~w(at_revision entry operation replacement_id), "playbook tombstone")
+    at_revision = positive_integer!(state["at_revision"], "tombstone revision")
+
+    if at_revision > playbook_revision,
+      do: raise(ArgumentError, "tombstone revision exceeds playbook revision")
+
+    {operation, replacement_id} =
+      case {state["operation"], state["replacement_id"]} do
+        {"remove", nil} -> {:remove, nil}
+        {"merge", replacement_id} -> {:merge, valid_id!(replacement_id, "replacement id")}
+        other -> raise ArgumentError, "invalid playbook tombstone operation: #{inspect(other)}"
+      end
+
+    entry = load_entry!(state["entry"], policy)
+
+    if replacement_id == entry.id,
+      do: raise(ArgumentError, "tombstone replacement id must differ from source id")
+
+    %Tombstone{
+      entry: entry,
+      operation: operation,
+      at_revision: at_revision,
+      replacement_id: replacement_id
+    }
+  end
+
+  defp load_tombstone!(state, _policy, _revision),
+    do: raise(ArgumentError, "playbook tombstone must be a map, got: #{inspect(state)}")
+
+  defp load_status!("active"), do: :active
+  defp load_status!("inactive"), do: :inactive
+
+  defp load_status!(status),
+    do: raise(ArgumentError, "invalid playbook entry status: #{inspect(status)}")
+
+  defp load_list!(value, _context, loader) when is_list(value), do: Enum.map(value, loader)
+
+  defp load_list!(value, context, _loader),
+    do: raise(ArgumentError, "#{context} must be a list, got: #{inspect(value)}")
+
+  defp parent_hash!(nil, 0, _context), do: nil
+
+  defp parent_hash!(hash, revision, context) when revision > 0,
+    do: valid_hash!(hash, "#{context} parent hash")
+
+  defp parent_hash!(value, _revision, context),
+    do: raise(ArgumentError, "invalid #{context} parent hash: #{inspect(value)}")
+
+  defp valid_hash!(hash, _context) when is_binary(hash) and byte_size(hash) == 64 do
+    if Regex.match?(~r/\A[0-9a-f]{64}\z/, hash),
+      do: hash,
+      else: raise(ArgumentError, "invalid SHA-256 hash")
+  end
+
+  defp valid_hash!(hash, context),
+    do: raise(ArgumentError, "invalid #{context}: #{inspect(hash)}")
+
+  defp valid_id!(id, context) do
+    if Entry.valid_id?(id),
+      do: id,
+      else: raise(ArgumentError, "invalid #{context}: #{inspect(id)}")
+  end
+
+  defp positive_integer!(value, _context) when is_integer(value) and value > 0, do: value
+
+  defp positive_integer!(value, context),
+    do: raise(ArgumentError, "#{context} must be positive, got: #{inspect(value)}")
+
+  defp non_negative_integer!(value, _context) when is_integer(value) and value >= 0, do: value
+
+  defp non_negative_integer!(value, context),
+    do: raise(ArgumentError, "#{context} must be non-negative, got: #{inspect(value)}")
+
+  defp equal_hash(actual, expected, _context) when byte_size(actual) == byte_size(expected) do
+    if :crypto.hash_equals(actual, expected), do: :ok, else: {:error, :hash_mismatch}
+  end
+
+  defp equal_hash(_actual, _expected, _context), do: {:error, :hash_mismatch}
+
+  defp exact_keys!(state, expected, context) do
+    actual = Map.keys(state) |> Enum.sort()
+    expected = Enum.sort(expected)
+
+    unless actual == expected,
+      do:
+        raise(
+          ArgumentError,
+          "#{context} keys must be exactly #{inspect(expected)}, got: #{inspect(actual)}"
+        )
   end
 
   defp rehash(playbook) do

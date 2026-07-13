@@ -82,6 +82,14 @@ defmodule DSEx.Saving do
   def dump(%DSEx.Predict.Predict{} = program),
     do: Map.put(DSEx.Predict.Predict.dump(program), "type", "predict")
 
+  def dump(%DSEx.Playbook.WithContext{} = wrapper) do
+    %{
+      "type" => "with_playbook",
+      "program" => dump(wrapper.program),
+      "playbook" => DSEx.Playbook.dump(wrapper.playbook)
+    }
+  end
+
   def dump(%DSEx.Predict.ChainOfThought{predict: predict}) do
     predict |> dump() |> Map.put("type", "chain_of_thought")
   end
@@ -305,6 +313,15 @@ defmodule DSEx.Saving do
       |> maybe_put_lm(state)
 
     DSEx.Predict.Predict.new(DSEx.Signature.load(signature), opts)
+  end
+
+  def load(%{"type" => "with_playbook"} = state) do
+    require_keys!(state, ["type", "program", "playbook"])
+
+    DSEx.Playbook.WithContext.new(
+      load(Map.fetch!(state, "program")),
+      DSEx.Playbook.load!(Map.fetch!(state, "playbook"))
+    )
   end
 
   def load(%{"type" => "chain_of_thought"} = state) do

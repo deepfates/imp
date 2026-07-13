@@ -175,6 +175,10 @@ defmodule DSEx do
   """
   def predict(signature, opts \\ []), do: Predict.new(signature, opts)
 
+  @doc "Executes a program with immutable active playbook guidance."
+  def with_playbook(program, %DSEx.Playbook{} = playbook),
+    do: DSEx.Playbook.WithContext.new(program, playbook)
+
   @doc "Attaches demonstrations to a demo-bearing DSEx program or example."
   def with_demos(program_or_example, demos)
 
