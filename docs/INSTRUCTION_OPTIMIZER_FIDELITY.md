@@ -212,6 +212,7 @@ Always render the deterministic no-network plan before a paid run:
 ```bash
 mix dsex.benchmark.instruction_optimizer_experiment \
   --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json \
+  --env-file .env \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \
@@ -231,6 +232,7 @@ manifest:
 ```bash
 mix dsex.benchmark.instruction_optimizer_experiment \
   --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
+  --env-file .env \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \

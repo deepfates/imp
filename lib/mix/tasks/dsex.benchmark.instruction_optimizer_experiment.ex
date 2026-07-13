@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerExperiment do
 
       mix dsex.benchmark.instruction_optimizer_experiment \
         --manifest benchmarks/config/instruction-optimizer-experiment.json \
+        --env-file .env \
         --runtime both \
         --out benchmarks/results
 
@@ -33,6 +34,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerExperiment do
           api_key_env: :string,
           dsex_artifact: :string,
           dspy_artifact: :string,
+          env_file: :string,
           plan: :boolean
         ]
       )
@@ -41,6 +43,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.InstructionOptimizerExperiment do
       do: Mix.raise("invalid arguments: #{inspect(invalid ++ argv)}")
 
     Mix.Task.run("app.start")
+    DSEx.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
 
     experiment_opts =
       [
