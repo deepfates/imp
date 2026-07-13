@@ -56,12 +56,19 @@ defmodule Mix.Tasks.Dsex.Package.CleanRoom do
 
     if package do
       package_dir = Path.expand(package, root)
-      relative = Path.relative_to(package_dir, output)
 
-      if relative == "." or not String.starts_with?(relative, "..") do
+      if output_contains_package?(output, package_dir) do
         Mix.raise("--output must not contain the supplied package directory")
       end
     end
+  end
+
+  @doc false
+  def output_contains_package?(output, package_dir) do
+    output = Path.expand(output)
+    package_dir = Path.expand(package_dir)
+
+    package_dir == output or String.starts_with?(package_dir, output <> "/")
   end
 
   defp prepare_package!(nil, output, root) do

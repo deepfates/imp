@@ -72,6 +72,14 @@ defmodule PackageContractTest do
     assert moduledoc =~ "mix dsex.package.clean_room"
   end
 
+  test "clean-room output guard accepts siblings but rejects deleting its package input" do
+    guard = &Mix.Tasks.Dsex.Package.CleanRoom.output_contains_package?/2
+
+    refute guard.("tmp/package-clean-room", "tmp/package-check")
+    assert guard.("tmp/package-check", "tmp/package-check")
+    assert guard.("tmp", "tmp/package-check")
+  end
+
   test "package exclusion list names current repository files" do
     assert Enum.all?(@excluded_files, &File.regular?/1)
   end
