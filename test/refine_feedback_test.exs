@@ -28,6 +28,15 @@ defmodule RefineFeedbackTest do
     def call(%__MODULE__{}, _inputs), do: :not_a_module_result
   end
 
+  defmodule SequenceProgram do
+    defstruct [:agent]
+
+    def call(%__MODULE__{agent: agent}, _inputs) do
+      answer = Agent.get_and_update(agent, fn [answer | rest] -> {answer, rest} end)
+      {:ok, DSEx.Prediction.new(%{answer: answer})}
+    end
+  end
+
   test "Refine injects feedback hints from prior attempts" do
     metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) == "fixed" end
     feedback = fn history -> "repair after #{length(history)} miss" end
@@ -93,6 +102,36 @@ defmodule RefineFeedbackTest do
     assert DSEx.Prediction.get(prediction, :answer) == "fixed"
   end
 
+  test "Refine retains the best-scoring candidate after exhausting attempts" do
+    {:ok, agent} = Agent.start_link(fn -> [0.8, 0.2, 0.5] end)
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%SequenceProgram{agent: agent}, metric,
+               max_attempts: 3,
+               threshold: 1.0
+             )
+             |> DSEx.Predict.Refine.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :answer) == 0.8
+    assert length(DSEx.Prediction.get(prediction, :refine_history)) == 3
+  end
+
+  test "Refine uses inclusive threshold semantics" do
+    {:ok, agent} = Agent.start_link(fn -> [0.5, 0.9] end)
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%SequenceProgram{agent: agent}, metric,
+               max_attempts: 2,
+               threshold: 0.5
+             )
+             |> DSEx.Predict.Refine.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :answer) == 0.5
+    assert [_first] = DSEx.Prediction.get(prediction, :refine_history)
+  end
+
   test "BestOfN attaches comparison feedback to selected prediction" do
     program = %HintProgram{}
 
@@ -107,6 +146,38 @@ defmodule RefineFeedbackTest do
              |> DSEx.Predict.BestOfN.call(%{})
 
     assert DSEx.Prediction.get(prediction, :feedback) == "compared 2 attempts"
+  end
+
+  test "BestOfN gives each attempt a distinct rollout identity at temperature 1.0" do
+    parent = self()
+
+    lm = fn _messages, opts ->
+      send(parent, {:attempt_options, opts})
+      {:ok, %{answer: Integer.to_string(opts[:rollout_id])}}
+    end
+
+    program =
+      DSEx.Predict.Predict.new("question -> answer",
+        lm: lm,
+        config: [rollout_id: 7, temperature: 0.2]
+      )
+
+    metric = fn _example, prediction ->
+      prediction |> DSEx.Prediction.get(:answer) |> String.to_integer()
+    end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.BestOfN.new(program, metric, n: 3, threshold: 8)
+             |> DSEx.Predict.BestOfN.call(%{question: "q"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "8"
+    assert_receive {:attempt_options, first}
+    assert_receive {:attempt_options, second}
+    assert first[:rollout_id] == 7
+    assert second[:rollout_id] == 8
+    assert first[:temperature] == 1.0
+    assert second[:temperature] == 1.0
+    refute_receive {:attempt_options, _third}
   end
 
   test "BestOfN treats metric callback failures as zero-score attempts" do

@@ -1,14 +1,18 @@
 defmodule DSEx.Predict.Refine do
   @moduledoc "Iteratively call a program until a metric passes or attempts are exhausted."
 
-  defstruct [:program, :metric, :feedback_fn, max_attempts: 3]
+  alias DSEx.Predict.{Attempt, Search}
+  alias DSEx.Predict.Search.Candidate
+
+  defstruct [:program, :metric, :feedback_fn, max_attempts: 3, threshold: 1.0]
 
   @option_schema [
     feedback_fn: [
       type: {:custom, __MODULE__, :validate_feedback_fn, []},
       default: nil
     ],
-    max_attempts: [type: :non_neg_integer, default: 3]
+    max_attempts: [type: :non_neg_integer, default: 3],
+    threshold: [type: {:or, [:integer, :float, nil]}, default: 1.0]
   ]
 
   def new(program, metric, opts \\ []) do
@@ -19,7 +23,8 @@ defmodule DSEx.Predict.Refine do
       program: program,
       metric: metric,
       feedback_fn: opts[:feedback_fn],
-      max_attempts: opts[:max_attempts]
+      max_attempts: opts[:max_attempts],
+      threshold: opts[:threshold]
     }
   end
 
@@ -31,40 +36,46 @@ defmodule DSEx.Predict.Refine do
   end
 
   def call(%__MODULE__{} = refine, inputs) do
-    Enum.reduce_while(attempts(refine.max_attempts), {:error, :no_attempts, []}, fn attempt,
-                                                                                    {_status,
-                                                                                     _last,
-                                                                                     history} ->
-      inputs = maybe_add_hint(inputs, refine.feedback_fn, history)
+    rollout_ids = Attempt.rollout_ids(refine.program, refine.max_attempts)
 
-      case DSEx.Module.call(refine.program, inputs) do
-        {:ok, prediction} ->
-          history = history ++ [%{attempt: attempt, prediction: prediction}]
-
-          if safe_metric(refine.metric, prediction) |> DSEx.Metrics.pass?(),
-            do: {:halt, {:ok, DSEx.Prediction.put(prediction, :refine_history, history)}},
-            else: {:cont, {:ok, prediction, history}}
-
-        {:error, reason} ->
-          {:cont, {:error, reason, history}}
-
-        other ->
-          {:cont, {:error, {:invalid_refine_result, inspect(other)}, history}}
-      end
+    rollout_ids
+    |> Enum.with_index(1)
+    |> Enum.map(fn {rollout_id, attempt} ->
+      Candidate.new(attempt, rollout_id, %{attempts: 1})
     end)
+    |> Search.run(
+      fn candidate, context ->
+        history = history(context.outcomes)
+        attempt_inputs = maybe_add_hint(inputs, refine.feedback_fn, history)
+        program = Attempt.bind(refine.program, candidate.value)
+
+        case DSEx.Module.call(program, attempt_inputs) do
+          {:ok, prediction} -> {:ok, prediction, Attempt.score(refine.metric, prediction)}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      mode: :sequential,
+      threshold: refine.threshold,
+      tie_policy: :first
+    )
     |> case do
-      {:ok, prediction, history} ->
+      %{best: %{value: prediction}, outcomes: outcomes} ->
+        history = history(outcomes)
         {:ok, DSEx.Prediction.put(prediction, :refine_history, history)}
 
-      other ->
-        other
+      %{best: nil, outcomes: []} ->
+        {:error, :no_attempts, []}
+
+      %{best: nil, outcomes: outcomes} ->
+        {:error, outcomes |> List.last() |> Map.fetch!(:error), []}
     end
   end
 
-  defp attempts(max_attempts) when is_integer(max_attempts) and max_attempts > 0,
-    do: 1..max_attempts
-
-  defp attempts(_max_attempts), do: []
+  defp history(outcomes) do
+    for %{status: :ok, candidate_id: attempt, value: prediction} <- outcomes do
+      %{attempt: attempt, prediction: prediction}
+    end
+  end
 
   defp maybe_add_hint(inputs, nil, _history), do: inputs
   defp maybe_add_hint(inputs, _feedback_fn, []), do: inputs
@@ -75,32 +86,11 @@ defmodule DSEx.Predict.Refine do
     |> Map.put(:hint_, safe_feedback(feedback_fn, history))
   end
 
-  defp safe_metric(metric, prediction) do
-    metric
-    |> apply([%DSEx.Example{}, prediction])
-    |> DSEx.Metrics.normalize_result()
-  rescue
-    error ->
-      %DSEx.Metrics.Result{
-        feedback: {:metric_error, error_message(error)},
-        metadata: %{error: error}
-      }
-  catch
-    kind, reason ->
-      %DSEx.Metrics.Result{
-        feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{error: {kind, reason}}
-      }
-  end
-
   defp safe_feedback(feedback_fn, history) do
     feedback_fn.(history)
   rescue
-    error -> {:feedback_error, error_message(error)}
+    error -> {:feedback_error, Attempt.error_message(error)}
   catch
-    kind, reason -> {:feedback_error, error_message({kind, reason})}
+    kind, reason -> {:feedback_error, Attempt.error_message({kind, reason})}
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end

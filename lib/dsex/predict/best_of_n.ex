@@ -1,14 +1,18 @@
 defmodule DSEx.Predict.BestOfN do
   @moduledoc "Run a program multiple times and keep the prediction with the highest metric score."
 
-  defstruct [:program, :metric, :feedback_fn, n: 3]
+  alias DSEx.Predict.{Attempt, Search}
+  alias DSEx.Predict.Search.Candidate
+
+  defstruct [:program, :metric, :feedback_fn, n: 3, threshold: 1.0]
 
   @option_schema [
     n: [type: :non_neg_integer, default: 3],
     feedback_fn: [
       type: {:custom, __MODULE__, :validate_feedback_fn, []},
       default: nil
-    ]
+    ],
+    threshold: [type: {:or, [:integer, :float, nil]}, default: 1.0]
   ]
 
   def new(program, metric, opts \\ []) do
@@ -19,7 +23,8 @@ defmodule DSEx.Predict.BestOfN do
       program: program,
       metric: metric,
       n: opts[:n],
-      feedback_fn: opts[:feedback_fn]
+      feedback_fn: opts[:feedback_fn],
+      threshold: opts[:threshold]
     }
   end
 
@@ -31,58 +36,41 @@ defmodule DSEx.Predict.BestOfN do
   end
 
   def call(%__MODULE__{} = best, inputs) do
-    attempts = attempts(best.n)
+    rollout_ids = Attempt.rollout_ids(best.program, best.n)
 
-    results =
-      attempts
-      |> Enum.map(fn attempt -> {attempt, DSEx.Module.call(best.program, inputs)} end)
+    rollout_ids
+    |> Enum.with_index(1)
+    |> Enum.map(fn {rollout_id, attempt} ->
+      Candidate.new(attempt, rollout_id, %{attempts: 1})
+    end)
+    |> Search.run(
+      fn candidate, _context ->
+        program = Attempt.bind(best.program, candidate.value)
 
-    results
-    |> Enum.filter(fn {_attempt, result} -> match?({:ok, _}, result) end)
-    |> Enum.map(fn {_attempt, {:ok, prediction}} -> prediction end)
+        case DSEx.Module.call(program, inputs) do
+          {:ok, prediction} -> {:ok, prediction, Attempt.score(best.metric, prediction)}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      mode: :sequential,
+      threshold: best.threshold,
+      tie_policy: :first
+    )
     |> case do
-      [] ->
-        {:error, no_successful_predictions_error(attempts, results)}
+      %{best: nil, outcomes: outcomes} ->
+        errors = Enum.map(outcomes, &%{attempt: &1.candidate_id, error: &1.error})
+        {:error, no_successful_predictions_error(rollout_ids, errors)}
 
-      predictions ->
-        {:ok,
-         predictions
-         |> Enum.max_by(&score(best.metric, &1).score)
-         |> attach_feedback(best.feedback_fn, predictions)}
+      %{best: %{value: prediction}, outcomes: outcomes} ->
+        predictions = for %{status: :ok, value: value} <- outcomes, do: value
+        {:ok, attach_feedback(prediction, best.feedback_fn, predictions)}
     end
   end
 
-  defp attempts(n) when is_integer(n) and n > 0, do: 1..n
-  defp attempts(_n), do: []
-
   defp no_successful_predictions_error([], _results), do: :no_successful_predictions
 
-  defp no_successful_predictions_error(_attempts, results) do
-    errors =
-      Enum.map(results, fn
-        {attempt, {:error, reason}} -> %{attempt: attempt, error: reason}
-        {attempt, other} -> %{attempt: attempt, error: {:invalid_module_result, inspect(other)}}
-      end)
-
+  defp no_successful_predictions_error(_attempts, errors) do
     {:no_successful_predictions, errors}
-  end
-
-  defp score(metric, prediction) do
-    metric
-    |> apply([%DSEx.Example{}, prediction])
-    |> DSEx.Metrics.normalize_result()
-  rescue
-    error ->
-      %DSEx.Metrics.Result{
-        feedback: {:metric_error, error_message(error)},
-        metadata: %{error: error}
-      }
-  catch
-    kind, reason ->
-      %DSEx.Metrics.Result{
-        feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{error: {kind, reason}}
-      }
   end
 
   defp attach_feedback(prediction, nil, _predictions), do: prediction
@@ -93,11 +81,8 @@ defmodule DSEx.Predict.BestOfN do
   defp safe_feedback(feedback_fn, predictions) do
     feedback_fn.(predictions)
   rescue
-    error -> {:feedback_error, error_message(error)}
+    error -> {:feedback_error, Attempt.error_message(error)}
   catch
-    kind, reason -> {:feedback_error, error_message({kind, reason})}
+    kind, reason -> {:feedback_error, Attempt.error_message({kind, reason})}
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end
