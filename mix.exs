@@ -221,7 +221,8 @@ defmodule DSEx.MixProject do
       ],
       "package.check": [
         "test test/package_contract_test.exs",
-        "cmd mix hex.build --unpack --output tmp/package-check"
+        "cmd mix hex.build --unpack --output tmp/package-check",
+        "dsex.package.clean_room --package tmp/package-check"
       ],
       "livebook.check": [
         "test.livebooks --path livebooks"

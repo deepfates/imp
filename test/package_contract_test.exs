@@ -7,6 +7,7 @@ defmodule PackageContractTest do
     "lib/dsex.ex",
     "lib/dsex/clients/req_llm.ex",
     "lib/dsex/lm/static.ex",
+    "lib/mix/tasks/dsex.package.clean_room.ex",
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
@@ -60,6 +61,15 @@ defmodule PackageContractTest do
       |> Enum.sort()
 
     assert_release_files(files)
+  end
+
+  test "clean-room package gate is discoverable from the root Mix project" do
+    assert Mix.Task.get("dsex.package.clean_room") == Mix.Tasks.Dsex.Package.CleanRoom
+
+    assert {:docs_v1, _, _, _, %{"en" => moduledoc}, _, _} =
+             Code.fetch_docs(Mix.Tasks.Dsex.Package.CleanRoom)
+
+    assert moduledoc =~ "mix dsex.package.clean_room"
   end
 
   test "package exclusion list names current repository files" do

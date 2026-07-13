@@ -131,7 +131,8 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"package.check") == [
              "test test/package_contract_test.exs",
-             "cmd mix hex.build --unpack --output tmp/package-check"
+             "cmd mix hex.build --unpack --output tmp/package-check",
+             "dsex.package.clean_room --package tmp/package-check"
            ]
 
     assert Keyword.fetch!(aliases, :"livebook.check") == [
