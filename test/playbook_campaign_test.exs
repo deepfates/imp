@@ -23,4 +23,19 @@ defmodule DSEx.Optimizer.Playbook.CampaignTest do
     assert {:error, _} = Campaign.validate_equation("2 ? 3 ? 4 = 14", "2 + (3 * 4) = 14", 14)
     assert {:error, _} = Campaign.validate_equation("2 ? 3 = 5", "2 / 0 = 5", 5)
   end
+
+  test "portable audit reload preserves native JSON configuration" do
+    playbook = DSEx.Playbook.new(id: "campaign-persistence")
+
+    program =
+      "equation -> answer"
+      |> DSEx.predict(config: [native_json_schema: true])
+      |> DSEx.with_playbook(playbook)
+
+    restored =
+      program |> DSEx.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> DSEx.Saving.load()
+
+    assert restored.program.config == [native_json_schema: true]
+    assert restored.playbook == playbook
+  end
 end

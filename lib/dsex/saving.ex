@@ -1227,6 +1227,7 @@ defmodule DSEx.Saving do
       "receive_timeout" -> :receive_timeout
       "cache" -> :cache
       "rollout_id" -> :rollout_id
+      "native_json_schema" -> :native_json_schema
       "provider_options" -> :provider_options
       other -> other
     end
