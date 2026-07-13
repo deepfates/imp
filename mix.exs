@@ -121,9 +121,11 @@ defmodule DSEx.MixProject do
   defp package_files do
     excluded_lib =
       Path.wildcard("lib/mix/tasks/dsex.benchmark*.ex") ++
+        Path.wildcard("lib/mix/tasks/dsex.identity*.ex") ++
         Path.wildcard("lib/mix/tasks/dsex.gate_evidence.ex") ++
         Path.wildcard("lib/dsex/benchmark*.ex") ++
-        Path.wildcard("lib/dsex/benchmark_truth/**/*.ex")
+        Path.wildcard("lib/dsex/benchmark_truth/**/*.ex") ++
+        Path.wildcard("lib/dsex/identity_checkpoint*.ex")
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
       Path.wildcard("examples/deployment/**/*") ++
