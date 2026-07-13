@@ -98,8 +98,8 @@ defmodule DSEx.Settings do
 
   Each context snapshots all effective settings at entry, applies its overrides,
   and restores the previous snapshot even if the function raises. Child processes
-  do not inherit process-local settings automatically; use DSEx-owned task helpers
-  when you want snapshot propagation through supervised async work.
+  do not inherit process-local settings automatically; DSEx-owned task helpers
+  capture one complete effective snapshot when supervised async work is submitted.
 
       iex> DSEx.Settings.context([lm: :outer], fn ->
       ...>   DSEx.Settings.context([adapter: :inner], fn ->

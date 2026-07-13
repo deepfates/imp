@@ -78,7 +78,7 @@ defmodule TaskSupervisionTest do
     assert Task.await(task) == :ok
   end
 
-  test "core admission rejects excess async and generate_async work without queueing" do
+  test "core admission applies backpressure to excess async work" do
     DSEx.configure(async_max_workers: 1)
     parent = self()
 
@@ -89,27 +89,17 @@ defmodule TaskSupervisionTest do
       end)
 
     assert_receive {:blocked, blocker_pid}
-    assert DSEx.Tasks.admission_status() == %{active: 1, queued: 0}
 
-    assert_raise DSEx.Tasks.OverloadedError, ~r/1\/1 workers active/, fn ->
-      DSEx.Tasks.async(fn -> :never end)
-    end
+    submitter =
+      Task.async(fn ->
+        DSEx.Tasks.async_nolink(fn -> :after_backpressure end) |> Task.await()
+      end)
 
-    assert_raise DSEx.Tasks.OverloadedError, fn ->
-      DSEx.Tasks.async_nolink(fn -> :never end)
-    end
-
-    lm = %DSEx.Clients.ReqLLM{model: "test:model"}
-
-    assert_raise DSEx.Tasks.OverloadedError, fn ->
-      DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "never"}])
-    end
-
-    assert DSEx.Tasks.admission_status() == %{active: 1, queued: 0}
+    assert wait_for_status(%{active: 1, queued: 1})
     send(blocker_pid, :release)
     assert Task.await(blocker) == :released
-    assert DSEx.Tasks.admission_status() == %{active: 0, queued: 0}
-    assert DSEx.Tasks.async_nolink(fn -> :reused end) |> Task.await() == :reused
+    assert Task.await(submitter) == :after_backpressure
+    assert wait_for_status(%{active: 0, queued: 0})
   end
 
   test "crashes and cancellation release async admission" do
@@ -175,7 +165,7 @@ defmodule TaskSupervisionTest do
     assert DSEx.Tasks.admission_status() == %{active: 0, queued: 0}
   end
 
-  test "async_stream reports external saturation explicitly" do
+  test "async_stream waits for externally saturated capacity" do
     DSEx.configure(async_max_workers: 1)
     parent = self()
 
@@ -187,11 +177,11 @@ defmodule TaskSupervisionTest do
 
     assert_receive {:stream_blocker, blocker_pid}
 
-    assert [{:exit, {%DSEx.Tasks.OverloadedError{}, _stack}}] =
-             DSEx.Tasks.async_stream([:item], & &1) |> Enum.to_list()
-
+    runner = Task.async(fn -> DSEx.Tasks.async_stream([:item], & &1) |> Enum.to_list() end)
+    assert wait_for_status(%{active: 1, queued: 1})
     send(blocker_pid, :release)
     assert Task.await(blocker) == :ok
+    assert Task.await(runner) == [ok: :item]
   end
 
   test "DSEx.Tasks reports invalid task boundaries clearly" do
@@ -275,4 +265,17 @@ defmodule TaskSupervisionTest do
   end
 
   defp wait_for_active(_expected, 0), do: false
+
+  defp wait_for_status(expected, attempts \\ 100)
+
+  defp wait_for_status(expected, attempts) when attempts > 0 do
+    if DSEx.Tasks.admission_status() == expected do
+      true
+    else
+      Process.sleep(5)
+      wait_for_status(expected, attempts - 1)
+    end
+  end
+
+  defp wait_for_status(_expected, 0), do: false
 end

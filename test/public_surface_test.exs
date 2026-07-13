@@ -19,6 +19,7 @@ defmodule PublicSurfaceTest do
     DSEx.Clients.DatabricksTrainer,
     DSEx.Clients.HTTPTrainer,
     DSEx.Clients.OpenAITrainer,
+    DSEx.Clients.ReinforcementSession,
     DSEx.Clients.ReqLLM,
     DSEx.Clients.Trainer,
     DSEx.Clients.TrainingJob,

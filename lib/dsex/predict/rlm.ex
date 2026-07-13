@@ -29,7 +29,13 @@ defmodule DSEx.Predict.RLM do
   alias DSEx.Predict.RLM.{Budget, Interpreter, Runtime, Trace}
   alias DSEx.Predict.RLM.Interpreter.Effect
 
-  @task_process_keys [:"$ancestors", :"$callers", :"$initial_call"]
+  @task_process_keys [
+    :"$ancestors",
+    :"$callers",
+    :"$initial_call",
+    :dsex_context_stack,
+    :dsex_settings_snapshot
+  ]
 
   defstruct [
     :signature,

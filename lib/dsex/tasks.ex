@@ -1,14 +1,3 @@
-defmodule DSEx.Tasks.OverloadedError do
-  @moduledoc "Raised when a DSEx task cannot acquire async worker capacity."
-
-  defexception [:max_workers, :active]
-
-  @impl true
-  def message(%__MODULE__{max_workers: max_workers, active: active}) do
-    "DSEx async capacity is exhausted (#{active}/#{max_workers} workers active)"
-  end
-end
-
 defmodule DSEx.Tasks.Admission do
   @moduledoc false
 
@@ -17,13 +6,8 @@ defmodule DSEx.Tasks.Admission do
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
 
   def reserve!(max_workers) do
-    case GenServer.call(__MODULE__, {:reserve, max_workers}) do
-      {:ok, token} ->
-        token
-
-      {:error, active} ->
-        raise DSEx.Tasks.OverloadedError, max_workers: max_workers, active: active
-    end
+    {:ok, token} = GenServer.call(__MODULE__, {:reserve, max_workers}, :infinity)
+    token
   end
 
   def transfer(token, pid), do: GenServer.call(__MODULE__, {:transfer, token, pid})
@@ -31,25 +15,28 @@ defmodule DSEx.Tasks.Admission do
   def status, do: GenServer.call(__MODULE__, :status)
 
   @impl true
-  def init(_opts), do: {:ok, %{leases: %{}, monitors: %{}}}
+  def init(_opts),
+    do: {:ok, %{leases: %{}, monitors: %{}, waiters: %{}, queue: :queue.new()}}
 
   @impl true
-  def handle_call({:reserve, max_workers}, {owner, _tag}, state) do
+  def handle_call({:reserve, max_workers}, {owner, _tag} = from, state) do
     active = map_size(state.leases)
 
     if active < max_workers do
-      token = make_ref()
+      {token, state} = grant_lease(state, owner)
+      {:reply, {:ok, token}, state}
+    else
+      waiter = make_ref()
       monitor = Process.monitor(owner)
-      lease = %{pid: owner, monitor: monitor, phase: :reserved}
+      entry = %{from: from, owner: owner, monitor: monitor, max_workers: max_workers}
 
-      {:reply, {:ok, token},
+      {:noreply,
        %{
          state
-         | leases: Map.put(state.leases, token, lease),
-           monitors: Map.put(state.monitors, monitor, token)
+         | waiters: Map.put(state.waiters, waiter, entry),
+           queue: :queue.in(waiter, state.queue),
+           monitors: Map.put(state.monitors, monitor, {:waiter, waiter})
        }}
-    else
-      {:reply, {:error, active}, state}
     end
   end
 
@@ -66,9 +53,7 @@ defmodule DSEx.Tasks.Admission do
           state
           | leases: Map.put(state.leases, token, %{pid: pid, monitor: monitor, phase: :active}),
             monitors:
-              state.monitors
-              |> Map.delete(lease.monitor)
-              |> Map.put(monitor, token)
+              state.monitors |> Map.delete(lease.monitor) |> Map.put(monitor, {:lease, token})
         }
 
         {:reply, :ok, state}
@@ -79,17 +64,18 @@ defmodule DSEx.Tasks.Admission do
   end
 
   def handle_call({:release, token}, _from, state) do
-    {:reply, :ok, drop_lease(state, token)}
+    {:reply, :ok, state |> drop_lease(token) |> grant_waiters()}
   end
 
   def handle_call(:status, _from, state) do
-    {:reply, %{active: map_size(state.leases), queued: 0}, state}
+    {:reply, %{active: map_size(state.leases), queued: map_size(state.waiters)}, state}
   end
 
   @impl true
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, state) do
     case Map.fetch(state.monitors, monitor) do
-      {:ok, token} -> {:noreply, drop_lease(state, token, false)}
+      {:ok, {:lease, token}} -> {:noreply, state |> drop_lease(token, false) |> grant_waiters()}
+      {:ok, {:waiter, waiter}} -> {:noreply, drop_waiter(state, waiter, false)}
       :error -> {:noreply, state}
     end
   end
@@ -104,14 +90,62 @@ defmodule DSEx.Tasks.Admission do
         %{state | leases: leases, monitors: Map.delete(state.monitors, lease.monitor)}
     end
   end
+
+  defp drop_waiter(state, waiter, demonitor?) do
+    case Map.pop(state.waiters, waiter) do
+      {nil, _waiters} ->
+        state
+
+      {entry, waiters} ->
+        if demonitor?, do: Process.demonitor(entry.monitor, [:flush])
+        %{state | waiters: waiters, monitors: Map.delete(state.monitors, entry.monitor)}
+    end
+  end
+
+  defp grant_lease(state, owner, monitor \\ nil) do
+    token = make_ref()
+    monitor = monitor || Process.monitor(owner)
+    lease = %{pid: owner, monitor: monitor, phase: :reserved}
+
+    {token,
+     %{
+       state
+       | leases: Map.put(state.leases, token, lease),
+         monitors: Map.put(state.monitors, monitor, {:lease, token})
+     }}
+  end
+
+  defp grant_waiters(state) do
+    case :queue.out(state.queue) do
+      {:empty, _queue} ->
+        state
+
+      {{:value, waiter}, queue} ->
+        state = %{state | queue: queue}
+
+        case Map.fetch(state.waiters, waiter) do
+          :error ->
+            grant_waiters(state)
+
+          {:ok, entry} when map_size(state.leases) < entry.max_workers ->
+            state = %{state | waiters: Map.delete(state.waiters, waiter)}
+            {token, state} = grant_lease(state, entry.owner, entry.monitor)
+            GenServer.reply(entry.from, {:ok, token})
+            grant_waiters(state)
+
+          {:ok, _entry} ->
+            %{state | queue: :queue.in_r(waiter, state.queue)}
+        end
+    end
+  end
 end
 
 defmodule DSEx.Tasks do
   @moduledoc """
   Supervised, bounded task boundary for DSEx runtime fan-out.
 
-  DSEx rejects standalone submissions immediately when the effective
-  `:async_max_workers` capacity is exhausted. No pending work queue is kept.
+  DSEx applies monitored FIFO backpressure when the effective
+  `:async_max_workers` capacity is exhausted.
   """
 
   @supervisor DSEx.TaskSupervisor
@@ -192,8 +226,8 @@ defmodule DSEx.Tasks do
   Lazily runs a function through DSEx's bounded, supervised task boundary.
 
   Settings are captured when `async_stream/3` is called. Stream-local fan-out
-  is capped by the effective `:async_max_workers`; concurrent DSEx work can
-  still cause individual stream items to exit with `DSEx.Tasks.OverloadedError`.
+  is capped by the effective `:async_max_workers`; concurrent DSEx work waits
+  for capacity instead of turning contention into a prediction failure.
   """
   def async_stream(enumerable, fun, opts \\ [])
 
