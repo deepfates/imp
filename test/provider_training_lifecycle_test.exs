@@ -982,11 +982,9 @@ defmodule ProviderTrainingLifecycleTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2 expects a metric function with arity 2/,
+                 ~r/DSEx\.Optimizer\.BootstrapFinetune\.new\/2 expects a metric function with arity 2 or 3/,
                  fn ->
-                   DSEx.Optimizer.BootstrapFinetune.new(fn _example, _prediction, _trace ->
-                     true
-                   end)
+                   DSEx.Optimizer.BootstrapFinetune.new(fn _example -> true end)
                  end
 
     assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GRPO\.new\/2: expected keyword options/, fn ->
@@ -1075,7 +1073,8 @@ defmodule ProviderTrainingLifecycleTest do
              job: %DSEx.Clients.TrainingJob{id: "job_wrapped"}
            } = result
 
-    assert DSEx.Example.get(demo, :doubled) == 42
+    assert DSEx.Example.get(demo, :program) == "x * 2"
+    assert DSEx.Example.get(demo, :doubled) == nil
     assert_received {:bootstrap_finetune, ^lm, [^demo], [method: :sft]}
   end
 

@@ -11,7 +11,7 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   def new(metric, opts \\ []) do
     DSEx.FunctionContract.validate!(
       metric,
-      2,
+      [2, 3],
       "DSEx.Optimizer.BootstrapFinetune.new/2",
       "metric"
     )
