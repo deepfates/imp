@@ -115,6 +115,22 @@ axis scores, confidence, evidence, and free-form reasoning. Factual defects are
 flags, not negative scores disguised as facts. Preference, prediction of an
 audience response, and observed evidence remain separate.
 
+Use `mix dsex.identity.assess --plan` to inspect the exact pending work before
+calling providers. The production model lanes are declared explicitly rather
+than inherited from mutable defaults:
+
+```text
+--profile terra=openai:gpt-5.6-terra
+--profile sonnet=anthropic:claude-sonnet-5
+--profile flash=openrouter:google/gemini-3.5-flash
+```
+
+The runner validates every candidate ID, atlas axis, score, confidence, and
+evidence reference; writes append-only assessment and failure ledgers through
+atomic checkpoints; and resumes only records whose profile, atlas, and exact
+candidate-evidence digests still match. These are model assessments, never a
+substitute for listener, user, cultural, legal, or accessibility review.
+
 The corpus supports several views:
 
 - per-axis score distributions;
