@@ -279,6 +279,41 @@ defmodule DSEx.Optimizer.GEPA.EngineTest do
     assert Engine.dump_state(state)["stopper_state"]["schema_version"] == 1
   end
 
+  test "semantic stopper bounds repeated proposal errors without treating valid rejection as failure" do
+    state =
+      Engine.run(
+        %AdapterFixture{},
+        %{main: "base"},
+        ["alpha"],
+        ["alpha"],
+        fn _candidate, _component, _records, _iteration ->
+          {:error, :malformed_provider_output}
+        end,
+        max_iterations: 10,
+        stopper: Stopper.consecutive_outcome(:proposal_error, 3)
+      )
+
+    assert state.iteration == 3
+    assert length(state.rejected) == 3
+
+    assert state.stop_reason ==
+             {:stopper, [{:consecutive_outcome, :proposal_error, 3, 3, 3}]}
+
+    valid_rejections =
+      Engine.run(
+        %AdapterFixture{},
+        %{main: "alpha"},
+        ["alpha"],
+        ["alpha"],
+        fn candidate, _component, _records, _iteration -> candidate.main end,
+        max_iterations: 4,
+        stopper: Stopper.consecutive_outcome(:proposal_error, 2)
+      )
+
+    assert valid_rejections.iteration == 4
+    assert valid_rejections.stop_reason == :max_iterations
+  end
+
   test "custom evaluation policy controls validation coverage and checkpoint identity" do
     state =
       Engine.run(

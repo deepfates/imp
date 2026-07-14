@@ -2484,7 +2484,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           full_evaluations: state.budget.full_evaluations,
           reflection_calls: state.budget.reflection_calls,
           candidate_count: length(state.candidates),
-          best_score: best(state).validation.aggregate_score
+          best_score: best(state).validation.aggregate_score,
+          semantic_outcome: semantic_outcome(state)
         }
 
         case Stopper.check(policy, stopper_state, context, stopper_opts(opts)) do
@@ -2521,6 +2522,30 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     case Keyword.fetch(opts, :stopper_now) do
       {:ok, now} -> [now: now]
       :error -> []
+    end
+  end
+
+  defp semantic_outcome(%State{iteration: 0}), do: :none
+
+  defp semantic_outcome(%State{} = state) do
+    latest_event = List.last(state.history)
+
+    cond do
+      is_map(latest_event) and latest_event.iteration == state.iteration and
+          latest_event.status == :accepted ->
+        :accepted
+
+      is_map(latest_event) and latest_event.iteration == state.iteration and
+        latest_event.status == :rejected and
+          match?({:proposal_error, _reason}, latest_event.reason) ->
+        :proposal_error
+
+      is_map(latest_event) and latest_event.iteration == state.iteration and
+          latest_event.status == :rejected ->
+        :rejected
+
+      true ->
+        :none
     end
   end
 

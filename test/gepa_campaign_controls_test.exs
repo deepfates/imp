@@ -4,7 +4,7 @@ defmodule GepaCampaignControlsTest do
   alias DSEx.BenchmarkTruth.{GepaCampaign, GepaCampaignBudget, GepaCampaignManifest}
   alias Mix.Tasks.Dsex.Benchmark.GepaCampaign, as: GepaTask
 
-  @manifest "benchmarks/config/gepa-paper-campaign-v1.json"
+  @manifest "benchmarks/config/gepa-paper-campaign-v2.json"
 
   test "rejects a provider reservation that would exceed aggregate or shard ceilings" do
     path = checkpoint_path("over-budget")
@@ -41,7 +41,8 @@ defmodule GepaCampaignControlsTest do
         :reflection_model,
         :families,
         :budgets,
-        :sharding
+        :sharding,
+        :semantic_progress
       ])
 
     first = GepaCampaign.plan(plan_opts)
@@ -291,6 +292,7 @@ defmodule GepaCampaignControlsTest do
     assert plan["network_calls"] == 0
     assert plan["network_access"] == false
     assert plan["metric_call_budgets"] == manifest["optimizer"]["metric_call_budgets"]
+    assert plan["semantic_progress"] == %{"max_consecutive_proposal_errors" => 5}
   end
 
   test "manifest plan does not require credentials or upstream environment" do
@@ -304,6 +306,7 @@ defmodule GepaCampaignControlsTest do
     plan = Jason.decode!(output)
     assert plan["provider_calls"] == 0
     assert plan["network_calls"] == 0
+    assert plan["semantic_progress"] == %{"max_consecutive_proposal_errors" => 5}
   end
 
   defp start_budget(path, overrides) do

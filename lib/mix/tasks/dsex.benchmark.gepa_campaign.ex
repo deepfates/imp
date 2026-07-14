@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   Produce DSEx GEPA rows for the GEPA paper-replication evidence lane.
 
       mix dsex.benchmark.gepa_campaign \\
-        --manifest benchmarks/config/gepa-paper-campaign-v1.json
+        --manifest benchmarks/config/gepa-paper-campaign-v2.json
 
       mix dsex.benchmark.gepa_campaign \\
         --dataset-root path/to/gepa-family-splits \\
@@ -285,7 +285,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       },
       "ifbench" => %{
         "upstream_descriptions" => truthy_env?("DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS")
-      }
+      },
+      "semantic_progress" =>
+        Keyword.get(opts, :semantic_progress, %{
+          "max_consecutive_proposal_errors" => 5
+        })
     }
 
     case Keyword.get(opts, :manifest_identity) do

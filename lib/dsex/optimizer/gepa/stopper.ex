@@ -21,6 +21,12 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
                 best_score: number(),
                 iterations_without_improvement: non_neg_integer()
               }
+            | %{
+                kind: :consecutive_outcome,
+                outcome: atom(),
+                count: non_neg_integer(),
+                last_iteration: non_neg_integer() | nil
+              }
     @type t :: %__MODULE__{nodes: %{optional(path()) => node_state()}}
   end
 
@@ -30,6 +36,7 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
           | {:timeout, non_neg_integer(), non_neg_integer()}
           | {:deadline, integer(), integer()}
           | {:no_improvement, non_neg_integer(), pos_integer(), number()}
+          | {:consecutive_outcome, atom(), non_neg_integer(), pos_integer(), non_neg_integer()}
           | {:score_threshold, number(), number()}
           | {:file, Path.t()}
           | {:manual, term()}
@@ -40,6 +47,7 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
           | {:timeout, non_neg_integer()}
           | {:deadline, integer()}
           | {:no_improvement, pos_integer()}
+          | {:consecutive_outcome, atom(), pos_integer()}
           | {:score_threshold, number()}
           | {:file, Path.t(), (Path.t() -> boolean())}
           | {:manual, (context() -> term())}
@@ -63,6 +71,12 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
   @spec no_improvement(pos_integer()) :: policy()
   def no_improvement(patience) when is_integer(patience) and patience > 0,
     do: {:no_improvement, patience}
+
+  @doc "Stops after the same semantic outcome is observed on consecutive completed iterations."
+  @spec consecutive_outcome(atom(), pos_integer()) :: policy()
+  def consecutive_outcome(outcome, patience)
+      when is_atom(outcome) and is_integer(patience) and patience > 0,
+      do: {:consecutive_outcome, outcome, patience}
 
   @doc "Stops when `context.best_score` reaches the inclusive threshold."
   @spec score_threshold(number()) :: policy()
@@ -207,6 +221,35 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
     |> suppress_reason_unless_stopped()
   end
 
+  defp evaluate({:consecutive_outcome, outcome, patience}, path, nodes, context, _now) do
+    iteration = fetch_non_negative_integer!(context, :iteration)
+    observed = Map.get(context, :semantic_outcome)
+
+    node =
+      Map.get(nodes, path, %{
+        kind: :consecutive_outcome,
+        outcome: outcome,
+        count: 0,
+        last_iteration: nil
+      })
+
+    node =
+      cond do
+        node.last_iteration == iteration ->
+          node
+
+        observed == outcome ->
+          %{node | count: node.count + 1, last_iteration: iteration}
+
+        true ->
+          %{node | count: 0, last_iteration: iteration}
+      end
+
+    {node.count >= patience, [{:consecutive_outcome, outcome, node.count, patience, iteration}],
+     Map.put(nodes, path, node)}
+    |> suppress_reason_unless_stopped()
+  end
+
   defp evaluate({:score_threshold, threshold}, _path, nodes, context, _now) do
     score = fetch_number!(context, :best_score)
 
@@ -270,6 +313,16 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
     }
   end
 
+  defp dump_node(path, %{kind: :consecutive_outcome} = node) do
+    %{
+      "path" => path,
+      "kind" => "consecutive_outcome",
+      "outcome" => Atom.to_string(node.outcome),
+      "count" => node.count,
+      "last_iteration" => node.last_iteration
+    }
+  end
+
   defp load_node!(%{"path" => path, "kind" => "timeout", "elapsed_ms" => elapsed}, now) do
     validate_path!(path)
     validate_non_negative_integer!(elapsed, "elapsed_ms")
@@ -296,6 +349,40 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
     {path, %{kind: :no_improvement, best_score: score, iterations_without_improvement: count}}
   end
 
+  defp load_node!(
+         %{
+           "path" => path,
+           "kind" => "consecutive_outcome",
+           "outcome" => outcome,
+           "count" => count,
+           "last_iteration" => last_iteration
+         },
+         _now
+       ) do
+    validate_path!(path)
+    validate_non_negative_integer!(count, "count")
+
+    unless is_binary(outcome) do
+      raise ArgumentError, "GEPA stopper outcome must be a string"
+    end
+
+    unless is_nil(last_iteration) or (is_integer(last_iteration) and last_iteration >= 0) do
+      raise ArgumentError, "GEPA stopper last_iteration must be nil or non-negative"
+    end
+
+    outcome = String.to_existing_atom(outcome)
+
+    {path,
+     %{
+       kind: :consecutive_outcome,
+       outcome: outcome,
+       count: count,
+       last_iteration: last_iteration
+     }}
+  rescue
+    ArgumentError -> raise ArgumentError, "invalid GEPA stopper consecutive outcome"
+  end
+
   defp load_node!(node, _now) do
     raise ArgumentError, "invalid GEPA stopper checkpoint node: #{inspect(node)}"
   end
@@ -312,6 +399,10 @@ defmodule DSEx.Optimizer.GEPA.Stopper do
 
   defp validate_policy!({:no_improvement, patience}) when is_integer(patience) and patience > 0,
     do: :ok
+
+  defp validate_policy!({:consecutive_outcome, outcome, patience})
+       when is_atom(outcome) and is_integer(patience) and patience > 0,
+       do: :ok
 
   defp validate_policy!({:score_threshold, threshold}) when is_number(threshold), do: :ok
 

@@ -368,7 +368,7 @@ DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1 \
 DSEX_GEPA_PYTHON=path/to/pinned/python \
 DSEX_GEPA_ROOT=path/to/gepa-artifact \
 mix dsex.benchmark.gepa_campaign \
-  --manifest benchmarks/config/gepa-paper-campaign-v1.json
+  --manifest benchmarks/config/gepa-paper-campaign-v2.json
 
 mix dsex.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
@@ -384,7 +384,10 @@ matches the pinned paper artifact: GEPA leaves `teacher_lm` unset, so reflection
 uses the configured task LM, while Papillon separately fixes its judge to
 GPT-4.1-mini. The manifest also binds the six families, full dataset hash,
 seeds, metric-call budgets, source commits, request policy, output paths, and
-required source-exact environment. It rejects every CLI override. Direct CLI
+required source-exact environment. It also binds a checkpointed semantic
+sentinel: five consecutive proposal errors abort without producing a result
+artifact, while valid non-improving candidates remain ordinary GEPA evidence.
+It rejects every CLI override. Direct CLI
 mode remains available for partial operator runs, but it is not the canonical
 paper-reproduction contract.
 

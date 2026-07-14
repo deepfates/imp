@@ -57,6 +57,54 @@ defmodule DSEx.Optimizer.GEPA.StopperTest do
     assert stopped_state == stopped_state |> Stopper.dump() |> Stopper.load!(now: 10)
   end
 
+  test "consecutive semantic outcomes count each completed iteration once and resume" do
+    policy = Stopper.consecutive_outcome(:proposal_error, 3)
+    state = Stopper.new(policy, now: 0)
+
+    assert {:continue, state} =
+             Stopper.check(
+               policy,
+               state,
+               %{iteration: 1, semantic_outcome: :proposal_error},
+               now: 0
+             )
+
+    assert {:continue, ^state} =
+             Stopper.check(
+               policy,
+               state,
+               %{iteration: 1, semantic_outcome: :proposal_error},
+               now: 0
+             )
+
+    assert {:continue, state} =
+             Stopper.check(
+               policy,
+               state,
+               %{iteration: 2, semantic_outcome: :proposal_error},
+               now: 0
+             )
+
+    checkpoint = state |> Stopper.dump() |> Jason.encode!() |> Jason.decode!()
+    resumed = Stopper.load!(checkpoint, now: 10)
+
+    assert {:stop, [{:consecutive_outcome, :proposal_error, 3, 3, 3}], _state} =
+             Stopper.check(
+               policy,
+               resumed,
+               %{iteration: 3, semantic_outcome: :proposal_error},
+               now: 10
+             )
+
+    assert {:continue, _state} =
+             Stopper.check(
+               policy,
+               resumed,
+               %{iteration: 3, semantic_outcome: :accepted},
+               now: 10
+             )
+  end
+
   test "file and manual callbacks are deterministic injected controls" do
     parent = self()
 

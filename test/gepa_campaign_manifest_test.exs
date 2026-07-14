@@ -4,7 +4,17 @@ defmodule GepaCampaignManifestTest do
   alias DSEx.BenchmarkTruth.GepaCampaignManifest
   alias Mix.Tasks.Dsex.Benchmark.GepaCampaign, as: Task
 
-  @manifest "benchmarks/config/gepa-paper-campaign-v1.json"
+  @manifest "benchmarks/config/gepa-paper-campaign-v2.json"
+
+  test "legacy v1 manifest remains reproducible without retroactive sentinel policy" do
+    path = "benchmarks/config/gepa-paper-campaign-v1.json"
+    manifest = GepaCampaignManifest.load!(path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: path)
+
+    assert manifest["schema_version"] == 1
+    assert opts.campaign_id == "dsex-gepa-paper-campaign-v1"
+    assert opts.semantic_progress == nil
+  end
 
   test "loads the canonical manifest and resolves pinned paths" do
     manifest = GepaCampaignManifest.load!(@manifest)
@@ -17,6 +27,7 @@ defmodule GepaCampaignManifestTest do
     assert opts.seeds == [0, 1]
     assert opts.max_concurrency == 32
     assert opts.max_retries == 0
+    assert opts.semantic_progress == %{"max_consecutive_proposal_errors" => 5}
     assert opts.reflection_model == opts.model
     assert opts.judge_model == opts.model
     assert opts.dataset_root == Path.expand("benchmarks/data/gepa-campaign-full")
@@ -123,6 +134,13 @@ defmodule GepaCampaignManifestTest do
 
     assert_raise ArgumentError, ~r/families must be exactly/, fn ->
       changed = put_in(raw, ["families"], Enum.drop(raw["families"], -1))
+      GepaCampaignManifest.validate!(changed, @manifest)
+    end
+
+    assert_raise ArgumentError, ~r/max_consecutive_proposal_errors must be positive/, fn ->
+      changed =
+        put_in(raw, ["optimizer", "semantic_progress", "max_consecutive_proposal_errors"], 0)
+
       GepaCampaignManifest.validate!(changed, @manifest)
     end
   end

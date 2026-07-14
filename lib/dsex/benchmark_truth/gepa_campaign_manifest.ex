@@ -25,7 +25,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
       "manifest"
     )
 
-    require!(manifest["schema_version"] == 1, "schema_version must be 1")
+    require!(manifest["schema_version"] in [1, 2], "schema_version must be 1 or 2")
 
     require!(
       is_binary(manifest["campaign_id"]) and
@@ -36,7 +36,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
     validate_dataset!(manifest["dataset"])
     validate_models!(manifest["models"])
     validate_families!(manifest["families"])
-    validate_optimizer!(manifest["optimizer"])
+    validate_optimizer!(manifest["optimizer"], manifest["schema_version"])
     validate_execution!(manifest["execution"])
     validate_environment!(manifest["environment"])
     validate_request!(manifest["request"])
@@ -72,6 +72,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
       families: manifest["families"],
       seeds: manifest["optimizer"]["seeds"],
       generations: generation_policy(manifest["optimizer"]["generations"]),
+      semantic_progress: Map.get(manifest["optimizer"], "semantic_progress"),
       max_concurrency: manifest["execution"]["max_concurrency"],
       api_key_env: manifest["request"]["api_key_env"],
       temperature: manifest["request"]["temperature"],
@@ -129,8 +130,13 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
     )
   end
 
-  defp validate_optimizer!(optimizer) do
-    require_exact_keys!(optimizer, ~w(seeds generations metric_call_budgets), "optimizer")
+  defp validate_optimizer!(optimizer, schema_version) do
+    keys =
+      if schema_version == 1,
+        do: ~w(seeds generations metric_call_budgets),
+        else: ~w(seeds generations metric_call_budgets semantic_progress)
+
+    require_exact_keys!(optimizer, keys, "optimizer")
 
     require!(
       is_list(optimizer["seeds"]) and optimizer["seeds"] != [] and
@@ -155,6 +161,22 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
         "optimizer.metric_call_budgets.#{family} must be positive"
       )
     end)
+
+    if schema_version == 2 do
+      semantic_progress = optimizer["semantic_progress"]
+
+      require_exact_keys!(
+        semantic_progress,
+        ~w(max_consecutive_proposal_errors),
+        "optimizer.semantic_progress"
+      )
+
+      require!(
+        is_integer(semantic_progress["max_consecutive_proposal_errors"]) and
+          semantic_progress["max_consecutive_proposal_errors"] > 0,
+        "optimizer.semantic_progress.max_consecutive_proposal_errors must be positive"
+      )
+    end
   end
 
   defp validate_execution!(execution) do

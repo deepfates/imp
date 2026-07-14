@@ -305,9 +305,13 @@ For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
 DSEx scores.
 
 Produce canonical DSEx input with `mix dsex.benchmark.gepa_campaign --manifest
-benchmarks/config/gepa-paper-campaign-v1.json`. The immutable manifest binds the
+benchmarks/config/gepa-paper-campaign-v2.json`. The immutable manifest binds the
 full dataset hash, model roles, families, seeds, budgets, source commits,
-request policy, source-exact environment, and output/checkpoint paths. Legacy
+request policy, source-exact environment, semantic-progress threshold, and
+output/checkpoint paths. Five consecutive reflection proposal errors stop the
+run with a checkpointed machine-readable reason before any claim artifact is
+written. The v1 manifest remains available for exact reproduction of campaigns
+started before this fail-fast contract. Legacy
 partial runs remain path-driven: the dataset root must include a `families.json` contract and
 `train.jsonl` / `dev.jsonl` / `test.jsonl` files for every GEPA family. The
 runner records DSEx GEPA candidate/frontier metadata, seed variance, split

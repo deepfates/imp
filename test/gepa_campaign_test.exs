@@ -766,6 +766,37 @@ defmodule GepaCampaignTest do
     refute row["metric_judge"]["model"] == row["reflection_model"]
   end
 
+  test "semantic proposal failures abort boundedly and remain durable in the checkpoint" do
+    dataset_root = tmp_dir("gepa-campaign-semantic-stop-data")
+    rows_dir = tmp_dir("gepa-campaign-semantic-stop-rows")
+    write_dataset_root!(dataset_root)
+
+    opts =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-semantic-stop",
+        generations: 5,
+        reflection_lm: fn _messages, _opts -> {:error, :malformed_provider_output} end,
+        execution: %{
+          "semantic_progress" => %{"max_consecutive_proposal_errors" => 2}
+        }
+      )
+
+    error = assert_raise ArgumentError, fn -> GepaCampaign.run(opts) end
+    assert error.message =~ "semantic_progress_exhausted"
+    assert error.message =~ "proposal_error"
+
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    optimizer_state = get_in(checkpoint, ["in_progress", "0", "optimizer_state"])
+
+    assert optimizer_state["iteration"] == 2
+
+    assert get_in(optimizer_state, ["stop_reason", "items", Access.at(0), "value"]) ==
+             "stopper"
+
+    assert Path.wildcard(Path.join(rows_dir, "dsex-gepa-rows-*.json")) == []
+  end
+
   test "resumed seed selection uses dev even when another seed has the higher test score" do
     dataset_root = tmp_dir("gepa-campaign-dev-selection-data")
     rows_dir = tmp_dir("gepa-campaign-dev-selection-rows")

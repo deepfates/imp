@@ -18,6 +18,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
   alias DSEx.BenchmarkTruth.GepaCampaignBudget
 
   alias DSEx.Optimizer.GEPA
+  alias DSEx.Optimizer.GEPA.Stopper
 
   @required_families DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
 
@@ -31,6 +32,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     manifest_identity = Keyword.get(opts, :manifest_identity)
     sharding = Keyword.get(opts, :sharding)
     budgets = Keyword.get(opts, :budgets)
+
+    semantic_progress =
+      Keyword.get(opts, :semantic_progress, %{"max_consecutive_proposal_errors" => 5})
+
     specs = load_specs!(dataset_root)
     validate_requested_families!(parent_families, specs)
     parent_sharding = sharding || default_sharding(parent_families)
@@ -88,6 +93,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       "shards" => shards,
       "models" => %{"task" => model, "reflection" => reflection_model},
       "metric_call_budgets" => Map.new(shards, &{&1["family"], &1["metric_call_budget"]}),
+      "semantic_progress" => semantic_progress,
       "budgets" => budgets,
       "budget_scope" => budget_scope(budgets, families, selected_shard),
       "budget_identity" => identity,
@@ -975,6 +981,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       |> progress_fn.()
     end
 
+    semantic_progress = Map.get(execution, "semantic_progress")
+
     {compiled, report} =
       GEPA.new(metric,
         seed: seed,
@@ -985,6 +993,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         max_metric_calls: budget,
         callbacks: optimizer_callbacks,
         component_feedback: component_feedback,
+        stopper: semantic_progress_stopper(semantic_progress),
         feedback_fn: fn _trainset ->
           "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
         end
@@ -997,6 +1006,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     metric_calls = Map.get(report.metadata, :metric_calls)
     metric_call_limit = Map.get(report.metadata, :max_metric_calls)
     stop_reason = Map.get(report.metadata, :stop_reason)
+    reject_semantic_progress_failure!(stop_reason)
 
     unless non_negative_integer?(metric_calls) do
       raise ArgumentError, "GEPA optimizer did not export observed metric calls"
@@ -1026,6 +1036,32 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
         |> maybe_mark_upstream_ifbench_feedback(spec, execution)
     }
   end
+
+  defp semantic_progress_stopper(nil), do: nil
+
+  defp semantic_progress_stopper(%{"max_consecutive_proposal_errors" => threshold}) do
+    Stopper.consecutive_outcome(:proposal_error, threshold)
+  end
+
+  defp reject_semantic_progress_failure!({:stopper, reasons}) when is_list(reasons) do
+    case Enum.find(reasons, &match?({:consecutive_outcome, :proposal_error, _, _, _}, &1)) do
+      {:consecutive_outcome, :proposal_error, count, threshold, iteration} ->
+        diagnostic = %{
+          "type" => "semantic_progress_exhausted",
+          "outcome" => "proposal_error",
+          "count" => count,
+          "threshold" => threshold,
+          "iteration" => iteration
+        }
+
+        raise ArgumentError, "GEPA campaign aborted: #{Jason.encode!(diagnostic)}"
+
+      nil ->
+        :ok
+    end
+  end
+
+  defp reject_semantic_progress_failure!(_stop_reason), do: :ok
 
   defp maybe_mark_upstream_ifbench_feedback(
          identity,
