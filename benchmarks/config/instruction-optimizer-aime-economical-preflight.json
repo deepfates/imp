@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "campaign_id": "instruction-optimizer-aime-economical-preflight-v3-20260714",
+  "campaign_id": "instruction-optimizer-aime-economical-preflight-v4-20260714",
   "family": "AIMEBench",
   "model": {
     "logical": "gpt-4.1-mini-2025-04-14",
@@ -35,7 +35,7 @@
   "budget": {
     "requests": 80,
     "input_tokens": 200000,
-    "output_tokens": 100000,
+    "output_tokens": 140000,
     "usd": 0.5
   },
   "preflight": {
@@ -43,7 +43,7 @@
     "max_aggregate": {
       "requests": 480,
       "input_tokens": 1200000,
-      "output_tokens": 600000,
+      "output_tokens": 840000,
       "usd": 3.0
     }
   },
