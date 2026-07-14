@@ -446,7 +446,11 @@ def attributed_history_entry(
     history = getattr(dspy.settings.lm, "history", None)
     if not isinstance(history, list):
         return None
-    if len(history) == before_history_len + 1 and isinstance(history[-1], dict):
+    if (
+        len(history) == before_history_len + 1
+        and isinstance(history[-1], dict)
+        and (row is None or history_entry_matches_row(history[-1], row))
+    ):
         return history[-1]
     if row is None:
         return None
@@ -467,7 +471,13 @@ def history_entry_matches_row(entry: Dict[str, Any], row: Dict[str, Any]) -> boo
     if not question:
         return False
     haystack = history_entry_text(entry)
-    return question in haystack
+    if question not in haystack:
+        return False
+
+    # HotPotQA questions frequently occur inside another row's evidence. Bind
+    # attribution to the complete canonical input, not the question alone.
+    context = str(row.get("context", "")).strip()
+    return not context or context in haystack
 
 
 def history_entry_text(entry: Dict[str, Any]) -> str:

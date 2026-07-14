@@ -877,7 +877,8 @@ defmodule BenchmarkTruthTest do
 
     beta = runner.attributed_history_entry(0, {"question": "beta?"})
     assert beta["response"]["answer"] == "B"
-    assert runner.attributed_history_entry(1, {"question": "anything"})["response"]["answer"] == "B"
+    assert runner.attributed_history_entry(1, {"question": "beta?"})["response"]["answer"] == "B"
+    assert runner.attributed_history_entry(1, {"question": "anything"}) is None
     assert runner.attributed_history_entry(0, {"question": "missing?"}) is None
 
     usage = runner.history_instrumentation(beta)
@@ -978,6 +979,13 @@ defmodule BenchmarkTruthTest do
     assert runner.effective_generation(
         "responses/gpt-5.4-mini", 0.0, 700, "low"
     )[0] == {"max_completion_tokens": 700, "reasoning_effort": "low"}
+
+    matching = {"messages": [{"content": "Question A\\nContext A"}]}
+    collision = {"messages": [{"content": "Question A\\nContext B"}]}
+    fake.settings.lm = types.SimpleNamespace(history=[matching, collision])
+    assert runner.attributed_history_entry(
+        1, {"question": "Question A", "context": "Context A"}
+    ) == matching
     print("ok")
     """
 
