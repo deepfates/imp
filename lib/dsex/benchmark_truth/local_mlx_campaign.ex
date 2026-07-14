@@ -8,7 +8,11 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   @model "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
   @revision "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
   @dataset_payload_sha256 "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f"
+  @train_digest "sha256:0fa1c7321f2773485139a544054c619620f048ebd8dd52552e3a2ca57878b1ba"
+  @held_out_digest "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1"
   @model_tree_sha256 "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947"
+  @evaluation_contract_sha256 "e95d621cbb3afd8806e9554fcafce6b54bc615e031c3b0acbdcadaca039870c8"
+  @banking77_revision "90d4e2ee5521c04fc1488f065b8b083658768c57"
   @host "127.0.0.1"
 
   def run!(opts) when is_list(opts) do
@@ -141,8 +145,51 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
       ArtifactFile.write_run_json!(artifact_path, artifact, context)
 
     ^finished = ArtifactFile.read_run_json!(written_path)
+    {:ok, ^finished} = validate_artifact(finished)
     %{artifact: finished, path: written_path}
   end
+
+  @doc "Independently validates a completed local MLX effectiveness artifact."
+  def validate_artifact(artifact) when is_map(artifact) do
+    with {:ok, verified} <- verify_envelope(artifact) do
+      expected_acceptance = artifact_acceptance(verified)
+      expected_effect = effect(verified["baseline"], verified["fused"])
+
+      checks = [
+        {:clean_run,
+         get_in(verified, ["run_context", "workspace"]) == %{
+           "state" => "clean",
+           "reproducible" => true
+         }},
+        {:artifact_contract,
+         verified["artifact_type"] == "dsex_mlx_weight_training_campaign" and
+           verified["schema_version"] == 1 and verified["status"] == "complete" and
+           verified["runner"] == "elixir" and
+           verified["evidence_level"] == "local_weight_effectiveness"},
+        {:canonical_dataset, canonical_dataset_evidence?(verified["dataset"])},
+        {:canonical_model, canonical_model_evidence?(verified["model"])},
+        {:pinned_runtime, pinned_runtime?(verified["runtime"])},
+        {:fresh_verified_training, valid_training_evidence?(verified["training"])},
+        {:official_fusion, valid_fusion_evidence?(verified["fusion"], verified["model"])},
+        {:evaluation_contract,
+         valid_evaluation_contract?(verified["evaluation_contract"], verified["dataset"])},
+        {:server_identity_and_cleanup, valid_server_evidence?(verified)},
+        {:adapter_claim_scoped,
+         get_in(verified, ["adapter_inference", "status"]) == "not_admitted"},
+        {:recomputed_acceptance,
+         expected_acceptance["admissible"] and verified["acceptance"] == expected_acceptance},
+        {:recomputed_effect, json_equal?(verified["effect"], expected_effect)},
+        {:portable_program_digest, sha256?(verified["program_sha256"])}
+      ]
+
+      case for({name, false} <- checks, do: name) do
+        [] -> {:ok, verified}
+        errors -> {:error, errors}
+      end
+    end
+  end
+
+  def validate_artifact(_artifact), do: {:error, [:invalid_artifact]}
 
   defp train!(trainer, examples) do
     case Trainer.finetune(trainer, nil, examples) do
@@ -351,6 +398,16 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     Map.put(checks, "admissible", Enum.all?(checks, fn {_name, passed} -> passed end))
   end
 
+  defp artifact_acceptance(artifact) do
+    artifact["baseline"]
+    |> acceptance(artifact["fused"], artifact["reloaded"])
+    |> Map.put(
+      "official_fusion_completed",
+      valid_fusion_evidence?(artifact["fusion"], artifact["model"])
+    )
+    |> then(&Map.put(&1, "admissible", Enum.all?(Map.values(&1))))
+  end
+
   defp equivalent_rows?(left, right),
     do: row_outcomes(left) == row_outcomes(right)
 
@@ -433,6 +490,131 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
 
     Map.put(contract, "sha256", canonical_sha256(contract))
   end
+
+  defp verify_envelope(artifact) do
+    {:ok, RunContext.verify!(artifact)}
+  rescue
+    _error -> {:error, [:invalid_run_envelope]}
+  end
+
+  defp canonical_dataset_evidence?(dataset) when is_map(dataset) do
+    dataset["payload_sha256"] == @dataset_payload_sha256 and
+      dataset["train_digest"] == @train_digest and
+      dataset["held_out_digest"] == @held_out_digest and dataset["train_rows"] == 80 and
+      dataset["held_out_rows"] == 40 and
+      get_in(dataset, ["source", "dataset"]) == "PolyAI/banking77" and
+      get_in(dataset, ["source", "revision"]) == @banking77_revision and
+      get_in(dataset, ["selection", "train_held_out_overlap"]) == [] and
+      get_in(dataset, ["selection", "train_per_label"]) == 20 and
+      get_in(dataset, ["selection", "held_out_per_label"]) == 10
+  end
+
+  defp canonical_dataset_evidence?(_dataset), do: false
+
+  defp canonical_model_evidence?(model) when is_map(model) do
+    model["repository"] == @model and model["revision"] == @revision and
+      get_in(model, ["tree", "schema_version"]) == 1 and
+      get_in(model, ["tree", "sha256"]) == @model_tree_sha256 and
+      valid_tree_inventory?(model["tree"])
+  end
+
+  defp canonical_model_evidence?(_model), do: false
+
+  defp pinned_runtime?(runtime) when is_map(runtime) do
+    runtime["mlx_lm_version"] == @mlx_lm_version and
+      get_in(runtime, ["launcher", "argv_prefix"]) == ["--from", "mlx-lm==#{@mlx_lm_version}"] and
+      sha256?(get_in(runtime, ["launcher", "sha256"]))
+  end
+
+  defp pinned_runtime?(_runtime), do: false
+
+  defp valid_training_evidence?(training) when is_map(training) do
+    job = training["job"] || %{}
+    manifest = training["manifest"] || %{}
+    artifacts = manifest["artifacts"] || %{}
+    adapter = artifacts["adapters.safetensors"] || %{}
+    config = artifacts["adapter_config.json"] || %{}
+
+    training["fresh"] == true and job["provider"] == "mlx_lm" and
+      job["status"] == "succeeded" and job["training_data"] == [72, 8] and
+      job["model"] == "#{@model}@#{@revision}" and is_binary(job["result_model"]) and
+      manifest["artifact_type"] == "dsex_mlx_lm_sft_run" and
+      manifest["schema_version"] == 1 and manifest["status"] == "succeeded" and
+      get_in(manifest, ["spec", "mlx_lm_version"]) == @mlx_lm_version and
+      get_in(manifest, ["spec", "model"]) == @model and
+      get_in(manifest, ["spec", "model_revision"]) == @revision and
+      get_in(manifest, ["dataset", "train_count"]) == 72 and
+      get_in(manifest, ["dataset", "valid_count"]) == 8 and
+      get_in(manifest, ["command", "exit_status"]) == 0 and
+      positive_file?(adapter) and positive_file?(config) and
+      digest_matches_job?(job, "adapters.safetensors", adapter["sha256"]) and
+      digest_matches_job?(job, "adapter_config.json", config["sha256"]) and
+      sha256?(training["job_checkpoint_sha256"]) and sha256?(training["manifest_sha256"])
+  end
+
+  defp valid_training_evidence?(_training), do: false
+
+  defp valid_fusion_evidence?(fusion, model) when is_map(fusion) and is_map(model) do
+    argv = get_in(fusion, ["command", "argv"]) || []
+    tree = fusion["tree"] || %{}
+
+    get_in(fusion, ["result", "exit_status"]) == 0 and
+      Enum.take(argv, 3) == ["--from", "mlx-lm==#{@mlx_lm_version}", "mlx_lm.fuse"] and
+      "--adapter-path" in argv and "--save-path" in argv and
+      valid_tree_inventory?(tree) and tree["sha256"] != get_in(model, ["tree", "sha256"]) and
+      Enum.any?(tree["files"], &(&1["path"] == "model.safetensors" and &1["bytes"] > 0))
+  end
+
+  defp valid_fusion_evidence?(_fusion, _model), do: false
+
+  defp valid_evaluation_contract?(contract, dataset) when is_map(contract) do
+    ids = contract["held_out_ids"]
+
+    contract["sha256"] == @evaluation_contract_sha256 and
+      contract["adapter"] == "DSEx.Adapter.Chat" and
+      contract["cache"] == false and contract["temperature"] == 0 and
+      contract["max_tokens"] == 32 and contract["server_max_tokens"] == 64 and
+      contract["timeout_ms"] == 120_000 and is_list(ids) and length(ids) == 40 and
+      Enum.uniq(ids) == ids and dataset["held_out_rows"] == length(ids) and
+      canonical_sha256(Map.delete(contract, "sha256")) == contract["sha256"]
+  end
+
+  defp valid_evaluation_contract?(_contract, _dataset), do: false
+
+  defp valid_server_evidence?(artifact) do
+    baseline = get_in(artifact, ["baseline", "server"]) || %{}
+    fused = get_in(artifact, ["fused", "server"]) || %{}
+    reloaded = get_in(artifact, ["reloaded", "server"]) || %{}
+
+    baseline["cleanup"] == "synchronous_process_group_absence_verified" and
+      fused["cleanup"] == "synchronous_process_group_absence_verified" and
+      reloaded == fused and baseline["model_id"] == "default_model" and
+      fused["model_id"] == "default_model" and
+      baseline["explicit_model_path"] == baseline["advertised_model_path"] and
+      fused["explicit_model_path"] == fused["advertised_model_path"]
+  end
+
+  defp valid_tree_inventory?(%{"files" => files, "sha256" => digest}) when is_list(files) do
+    files != [] and sha256?(digest) and
+      Enum.all?(files, fn file ->
+        is_binary(file["path"]) and is_integer(file["bytes"]) and file["bytes"] >= 0 and
+          sha256?(file["sha256"])
+      end)
+  end
+
+  defp valid_tree_inventory?(_tree), do: false
+
+  defp positive_file?(%{"bytes" => bytes, "sha256" => digest}),
+    do: is_integer(bytes) and bytes > 0 and sha256?(digest)
+
+  defp positive_file?(_file), do: false
+
+  defp digest_matches_job?(job, filename, digest) do
+    job_digest = get_in(job, ["metadata", "artifact_sha256", filename])
+    is_binary(job_digest) and String.replace(job_digest, ":", "") == digest
+  end
+
+  defp sha256?(digest), do: is_binary(digest) and Regex.match?(~r/\A[0-9a-f]{64}\z/, digest)
 
   defp dataset_evidence(path, dataset) do
     %{
