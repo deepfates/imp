@@ -3,6 +3,16 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
   alias DSEx.BenchmarkTruth.{ArtifactFile, InstructionOptimizerExperiment, RunContext}
 
+  test "economical AIME preflight reserves enough output for structured reasoning" do
+    manifest =
+      "benchmarks/config/instruction-optimizer-aime-economical-preflight.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert manifest["provider"]["max_output_tokens"] >= 8_192
+    assert manifest["budget"]["output_tokens"] >= manifest["provider"]["max_output_tokens"]
+  end
+
   test "derives one matched DSEx run and one all-arm DSPy run" do
     fixture = fixture!("derive")
     derived = derive(fixture)
