@@ -2,9 +2,14 @@ defmodule GepaCampaignControlsTest do
   use ExUnit.Case, async: false
 
   alias Imp.BenchmarkTruth.{GepaCampaign, GepaCampaignBudget, GepaCampaignManifest}
+  alias Imp.Test.GepaCampaignFixture
   alias Mix.Tasks.Imp.Benchmark.GepaCampaign, as: GepaTask
 
-  @manifest "benchmarks/config/gepa-paper-campaign-v2.json"
+  setup_all do
+    fixture = GepaCampaignFixture.create!()
+    on_exit(fn -> File.rm_rf!(fixture.root) end)
+    {:ok, manifest_path: fixture.manifest_path}
+  end
 
   test "rejects a provider reservation that would exceed aggregate or shard ceilings" do
     path = checkpoint_path("over-budget")
@@ -29,9 +34,10 @@ defmodule GepaCampaignControlsTest do
     File.rm(path)
   end
 
-  test "family shard identities are deterministic and family selection is immutable" do
-    manifest = GepaCampaignManifest.load!(@manifest)
-    opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest, plan: true)
+  test "family shard identities are deterministic and family selection is immutable", context do
+    manifest_path = context.manifest_path
+    manifest = GepaCampaignManifest.load!(manifest_path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: manifest_path, plan: true)
 
     plan_opts =
       Keyword.take(Map.to_list(opts), [
@@ -58,9 +64,10 @@ defmodule GepaCampaignControlsTest do
     end
   end
 
-  test "rejects an undeclared shard selector" do
-    manifest = GepaCampaignManifest.load!(@manifest)
-    opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest, plan: true)
+  test "rejects an undeclared shard selector", context do
+    manifest_path = context.manifest_path
+    manifest = GepaCampaignManifest.load!(manifest_path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: manifest_path, plan: true)
 
     assert_raise ArgumentError, ~r/unknown GEPA campaign shard selector/, fn ->
       GepaCampaign.plan(
@@ -80,9 +87,10 @@ defmodule GepaCampaignControlsTest do
     end
   end
 
-  test "parent identity is stable across selected shard plans" do
-    manifest = GepaCampaignManifest.load!(@manifest)
-    opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest, plan: true)
+  test "parent identity is stable across selected shard plans", context do
+    manifest_path = context.manifest_path
+    manifest = GepaCampaignManifest.load!(manifest_path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: manifest_path, plan: true)
 
     plan_opts =
       opts
@@ -111,9 +119,10 @@ defmodule GepaCampaignControlsTest do
     refute hd(aime["shards"])["shard_identity"] == hd(live["shards"])["shard_identity"]
   end
 
-  test "selected shard plans use disjoint checkpoint paths" do
-    manifest = GepaCampaignManifest.load!(@manifest)
-    opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest, plan: true)
+  test "selected shard plans use disjoint checkpoint paths", context do
+    manifest_path = context.manifest_path
+    manifest = GepaCampaignManifest.load!(manifest_path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: manifest_path, plan: true)
 
     checkpoint_dir =
       Path.join(System.tmp_dir!(), "gepa-shards-#{System.unique_integer([:positive])}")
@@ -270,9 +279,10 @@ defmodule GepaCampaignControlsTest do
     File.rm(path)
   end
 
-  test "canonical plan is explicitly zero-network" do
-    manifest = GepaCampaignManifest.load!(@manifest)
-    opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest, plan: true)
+  test "canonical plan is explicitly zero-network", context do
+    manifest_path = context.manifest_path
+    manifest = GepaCampaignManifest.load!(manifest_path)
+    opts = GepaCampaignManifest.task_options!(manifest, manifest: manifest_path, plan: true)
 
     plan =
       opts
@@ -295,12 +305,12 @@ defmodule GepaCampaignControlsTest do
     assert plan["semantic_progress"] == %{"max_consecutive_proposal_errors" => 5}
   end
 
-  test "manifest plan does not require credentials or upstream environment" do
+  test "manifest plan does not require credentials or upstream environment", context do
     Mix.Task.reenable("imp.benchmark.gepa_campaign")
 
     output =
       ExUnit.CaptureIO.capture_io(fn ->
-        assert :ok = GepaTask.run(["--manifest", @manifest, "--plan"])
+        assert :ok = GepaTask.run(["--manifest", context.manifest_path, "--plan"])
       end)
 
     plan = Jason.decode!(output)
