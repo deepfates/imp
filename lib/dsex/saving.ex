@@ -838,6 +838,21 @@ defmodule DSEx.Saving do
     raise ArgumentError, "portable playbook persistence requires reject_secrets: true"
   end
 
+  defp redact_dump(%{provider: :req_llm, model: model} = value) do
+    Map.new(value, fn
+      {:model, _nested} -> {:model, redact_req_llm_model(model)}
+      {key, nested} -> redact_req_llm_entry(key, nested)
+    end)
+  end
+
+  defp redact_dump(%{"provider" => provider, "model" => model} = value)
+       when provider in ["req_llm", :req_llm] do
+    Map.new(value, fn
+      {"model", _nested} -> {"model", redact_req_llm_model(model)}
+      {key, nested} -> redact_req_llm_entry(key, nested)
+    end)
+  end
+
   defp redact_dump(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
       cond do
@@ -851,6 +866,26 @@ defmodule DSEx.Saving do
   defp redact_dump(value) when is_list(value), do: Enum.map(value, &redact_dump/1)
   defp redact_dump(value) when is_binary(value), do: DSEx.Redaction.redact(value, [])
   defp redact_dump(value), do: value
+
+  defp redact_req_llm_model(model) when is_binary(model), do: model
+
+  defp redact_req_llm_model(model) when is_map(model) do
+    Map.new(model, fn {key, value} ->
+      normalized = key |> to_string() |> String.downcase()
+
+      cond do
+        sensitive_key?(key) -> {key, "[REDACTED]"}
+        normalized in ["id", "model"] and is_binary(value) -> {key, value}
+        true -> {key, redact_dump(value)}
+      end
+    end)
+  end
+
+  defp redact_req_llm_model(model), do: redact_dump(model)
+
+  defp redact_req_llm_entry(key, value) do
+    if sensitive_key?(key), do: {key, "[REDACTED]"}, else: {key, redact_dump(value)}
+  end
 
   defp sensitive_key?(key) do
     normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")

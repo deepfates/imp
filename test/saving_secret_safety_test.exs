@@ -67,4 +67,43 @@ defmodule DSEx.SavingSecretSafetyTest do
                  ~r/ReAct tool lookup is not present in the supplied saving registry/,
                  fn -> DSEx.dump(program) end
   end
+
+  test "ReqLLM model identities remain exact while credentials stay redacted" do
+    hash = String.duplicate("a", 64)
+    other_hash = String.duplicate("b", 64)
+    model_path = "/private/tmp/dsex-mlx/#{hash}/fused"
+
+    model = %{
+      provider: :openai,
+      id: model_path,
+      model: model_path,
+      token: "model-descriptor-secret",
+      extra: %{authorization: "Bearer nested-secret"}
+    }
+
+    state =
+      DSEx.predict("question -> answer",
+        lm: DSEx.req_llm(model, api_key: "runtime-secret")
+      )
+      |> DSEx.dump()
+
+    encoded = Jason.encode!(state)
+
+    assert get_in(state, ["lm", :model, :id]) == model_path
+    assert get_in(state, ["lm", :model, :model]) == model_path
+    assert get_in(state, ["lm", :model, :token]) == "[REDACTED]"
+    assert get_in(state, ["lm", :model, :extra, :authorization]) == "[REDACTED]"
+    refute encoded =~ "runtime-secret"
+    refute encoded =~ "model-descriptor-secret"
+    refute encoded =~ "nested-secret"
+    refute encoded =~ other_hash
+
+    distinct = put_in(model, [:id], "/private/tmp/dsex-mlx/#{other_hash}/fused")
+
+    distinct_state =
+      DSEx.predict("question -> answer", lm: DSEx.req_llm(distinct))
+      |> DSEx.dump()
+
+    refute get_in(distinct_state, ["lm", :model, :id]) == get_in(state, ["lm", :model, :id])
+  end
 end

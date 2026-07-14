@@ -36,6 +36,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
     loaded =
       DSEx.predict("question -> answer", lm: runtime_lm)
       |> DSEx.Saving.dump()
+      |> Jason.encode!()
+      |> Jason.decode!()
       |> DSEx.Saving.load()
 
     refute Keyword.has_key?(DSEx.ProgramAccess.lm(loaded).opts, :api_key)
@@ -51,6 +53,60 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
 
     assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
       LocalMLXCampaign.restore_runtime_credentials!(loaded, mismatched)
+    end
+  end
+
+  test "restores an exact MLX path identity after secret-shaped persistence redaction" do
+    run_id = String.duplicate("a", 64)
+    model_path = "/private/tmp/dsex-mlx/#{run_id}/fused"
+
+    runtime_lm =
+      local_mlx_lm(model_path,
+        api_key: "local",
+        base_url: "http://127.0.0.1:18821/v1"
+      )
+
+    portable =
+      DSEx.predict("question -> answer", lm: runtime_lm)
+      |> DSEx.Saving.dump()
+      |> Jason.encode!()
+      |> Jason.decode!()
+
+    assert get_in(portable, ["lm", "model", "id"]) == model_path
+    assert get_in(portable, ["lm", "model", "model"]) == model_path
+
+    loaded = DSEx.Saving.load(portable)
+
+    restored = LocalMLXCampaign.restore_runtime_credentials!(loaded, runtime_lm)
+    assert DSEx.ProgramAccess.lm(restored) == runtime_lm
+
+    wrong_path =
+      local_mlx_lm("/private/tmp/dsex-mlx/#{String.duplicate("b", 64)}/fused",
+        api_key: "local",
+        base_url: "http://127.0.0.1:18821/v1"
+      )
+
+    assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
+      LocalMLXCampaign.restore_runtime_credentials!(loaded, wrong_path)
+    end
+
+    wrong_endpoint =
+      local_mlx_lm(model_path,
+        api_key: "local",
+        base_url: "http://127.0.0.1:18822/v1"
+      )
+
+    assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
+      LocalMLXCampaign.restore_runtime_credentials!(loaded, wrong_endpoint)
+    end
+
+    wrong_backend = %{
+      runtime_lm
+      | model: put_in(runtime_lm.model, [:extra, :openai_compatible_backend], :other_backend)
+    }
+
+    assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
+      LocalMLXCampaign.restore_runtime_credentials!(loaded, wrong_backend)
     end
   end
 
@@ -278,6 +334,18 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
     {:ok, {_address, port}} = :inet.sockname(socket)
     :gen_tcp.close(socket)
     port
+  end
+
+  defp local_mlx_lm(model_path, opts) do
+    model = %{
+      provider: :openai,
+      id: model_path,
+      model: model_path,
+      base_url: Keyword.fetch!(opts, :base_url),
+      extra: %{openai_compatible_backend: :mlx_lm}
+    }
+
+    DSEx.req_llm(model, Keyword.delete(opts, :base_url))
   end
 
   defp fake_mlx_server do
