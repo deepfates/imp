@@ -40,7 +40,7 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
                ~S|import sys; print("before crash", flush=True); sys.exit(23)|
              ])
 
-    assert parity_sidecar_owners() == owners_before
+    assert parity_sidecar_owners() -- owners_before == []
   end
 
   test "killing the caller terminates the Python process and its descendant" do

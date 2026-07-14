@@ -126,8 +126,9 @@ defmodule Imp.ExternalCommand.Lifecycle do
 
     receive do
       {^ref, result} ->
-        Process.demonitor(monitor_ref, [:flush])
-        result
+        receive do
+          {:DOWN, ^monitor_ref, :process, ^owner, _reason} -> result
+        end
 
       {:DOWN, ^monitor_ref, :process, ^owner, reason} ->
         {:error, {:command_owner_failed, Imp.Redaction.redact(inspect(reason))}}
