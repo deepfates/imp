@@ -231,6 +231,12 @@ The large corpus is intentional. Reports are derived and replaceable; raw
 portfolios, registry events, assessment events, flags, and dissent remain the
 source material.
 
+Assessment shard cleanup has an additional hard gate: every canonical
+assessment ID must be referenced exactly once by a successful canonical run
+event. That event retains the original source ledger and process-local run ID,
+so interrupted attempts and cross-process ID collisions remain auditable after
+the redundant shard files are removed.
+
 ## What Is Reusable
 
 Reuse is high in the mechanics, medium in the domain model, and intentionally

@@ -137,6 +137,27 @@ atomic checkpoints; and resumes only records whose profile, atlas, and exact
 candidate-evidence digests still match. These are model assessments, never a
 substitute for listener, user, cultural, legal, or accessibility review.
 
+Provider shard files are resumable build intermediates. Once every profile is
+complete, consolidate them explicitly:
+
+```text
+mix dsex.identity.assessments.consolidate \
+  --assessment 'identity/research/assessments.flash*.jsonl' \
+  --assessment 'identity/research/assessments.sonnet*.jsonl' \
+  --assessment 'identity/research/assessments.terra*.jsonl' \
+  --run-ledger 'identity/research/assessment-runs.flash*.jsonl' \
+  --run-ledger 'identity/research/assessment-runs.sonnet*.jsonl' \
+  --run-ledger 'identity/research/assessment-runs.terra*.jsonl' \
+  --profile flash --profile sonnet --profile terra
+```
+
+Consolidation rejects incomplete candidate/profile matrices, schema failures,
+evidence or profile drift, duplicate records, malformed run sequencing, and
+assessment IDs without exactly one successful batch event. It writes the
+canonical assessment and run ledgers plus a source-hash audit. Raw shards may
+be removed only after that audit passes and `mix dsex.identity.assess --plan`
+reports every canonical record resumed with no work planned.
+
 The corpus supports several views:
 
 - per-axis score distributions;
