@@ -238,8 +238,9 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     base_url = "http://#{@host}:#{port}/v1"
 
     try do
-      advertised_model_path = File.realpath!(model_path)
-      model_ids = await_models!(handle, base_url, advertised_model_path, started + 120_000)
+      {model_ids, advertised_model_path} =
+        await_models!(handle, base_url, model_path, started + 120_000)
+
       model_id = "default_model"
 
       model = %{
@@ -290,9 +291,10 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     case Req.get(base_url <> "/models", receive_timeout: 1_000, retry: false) do
       {:ok, %{status: 200, body: %{"data" => data}}} when is_list(data) ->
         ids = Enum.map(data, & &1["id"])
+        advertised_path = Enum.find(ids, &same_file_identity?(&1, expected_model_path))
 
-        if expected_model_path in ids and Process.alive?(handle.owner),
-          do: ids,
+        if is_binary(advertised_path) and Process.alive?(handle.owner),
+          do: {ids, advertised_path},
           else: retry_models!(handle, base_url, expected_model_path, deadline)
 
       _result ->
@@ -310,6 +312,19 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     Process.sleep(100)
     await_models!(handle, base_url, expected_model_path, deadline)
   end
+
+  defp same_file_identity?(advertised, expected) when is_binary(advertised) do
+    with :absolute <- Path.type(advertised),
+         {:ok, left} <- File.stat(advertised),
+         {:ok, right} <- File.stat(expected) do
+      left.inode == right.inode and left.major_device == right.major_device and
+        left.minor_device == right.minor_device
+    else
+      _other -> false
+    end
+  end
+
+  defp same_file_identity?(_advertised, _expected), do: false
 
   defp await_closed!(port, deadline) do
     case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 100) do
