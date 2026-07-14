@@ -238,7 +238,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     base_url = "http://#{@host}:#{port}/v1"
 
     try do
-      model_ids = await_models!(handle, base_url, model_path, started + 120_000)
+      advertised_model_path = File.realpath!(model_path)
+      model_ids = await_models!(handle, base_url, advertised_model_path, started + 120_000)
       model_id = "default_model"
 
       model = %{
@@ -263,6 +264,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
         "base_url" => base_url,
         "model_id" => model_id,
         "advertised_model_ids" => model_ids,
+        "advertised_model_path" => advertised_model_path,
         "explicit_model_path" => model_path,
         "ready_ms" => System.monotonic_time(:millisecond) - started,
         "cleanup" => "synchronous_process_group_absence_verified"
