@@ -365,7 +365,7 @@ defmodule ProviderTrainingLifecycleTest do
     base_lm = DSEx.req_llm("openai:gpt-base", api_key: "secret")
 
     deployment_lm =
-      DSEx.req_llm(%{provider: :openai, id: "local-fused-model"},
+      DSEx.req_llm("openai:local-fused-model",
         api_key: "local",
         base_url: "http://127.0.0.1:8189/v1"
       )
@@ -381,8 +381,16 @@ defmodule ProviderTrainingLifecycleTest do
 
     program = DSEx.predict("question -> answer", lm: base_lm)
 
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "dsex-local-trained-program-#{System.unique_integer([:positive])}.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
     assert {:ok, rebound} =
-             DSEx.Clients.TrainingJob.rebind(job, program, lm: deployment_lm)
+             DSEx.Clients.TrainingJob.rebind(job, program, lm: deployment_lm, path: path)
 
     assert DSEx.ProgramAccess.lm(rebound) == deployment_lm
 
@@ -395,6 +403,13 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert {:error, {:invalid_training_deployment_lm, _message}} =
              DSEx.Clients.TrainingJob.rebind(job, program, lm: %{not: :an_lm})
+
+    assert %DSEx.Clients.ReqLLM{
+             model: "openai:local-fused-model",
+             opts: [base_url: "http://127.0.0.1:8189/v1"]
+           } =
+             DSEx.load!(path)
+             |> DSEx.ProgramAccess.lm()
   end
 
   test "training success without a provider artifact cannot be rebound or reported as success" do

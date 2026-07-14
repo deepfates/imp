@@ -1229,6 +1229,7 @@ defmodule DSEx.Saving do
       "rollout_id" -> :rollout_id
       "native_json_schema" -> :native_json_schema
       "provider_options" -> :provider_options
+      "base_url" -> :base_url
       other -> other
     end
   end
