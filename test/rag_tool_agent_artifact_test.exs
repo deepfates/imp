@@ -15,7 +15,9 @@ defmodule RagToolAgentArtifactTest do
     artifact = path |> File.read!() |> Jason.decode!()
 
     assert artifact["summary"]["all_passing"]
-    assert artifact["summary"]["full_rag_tool_agent_parity"]
+    assert artifact["summary"]["provider_free_contract_complete"]
+    refute artifact["summary"]["live_matched_behavior_complete"]
+    refute artifact["summary"]["full_rag_tool_agent_parity"]
     assert artifact["summary"]["direct_comparisons"] == 2
 
     rows = Map.new(artifact["rows"], &{&1["id"], &1})

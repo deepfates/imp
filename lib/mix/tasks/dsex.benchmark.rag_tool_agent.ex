@@ -517,7 +517,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.RagToolAgent do
         "all_passing" => passing == length(rows),
         "direct_comparisons" => Enum.count(rows, &(&1["comparison_status"] == "direct")),
         "dsex_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
-        "full_rag_tool_agent_parity" => true,
+        "provider_free_contract_complete" => true,
+        "live_matched_behavior_complete" => false,
+        "full_rag_tool_agent_parity" => false,
         "note" =>
           "Provider-free RAG/tool/agent artifact. Direct DSPy comparisons cover deterministic one-shot RAG retrieval and ReAct lookup. DSEx production rows cover multi-hop RAG, HTTP retriever protocol shape, MCP import, agent policy denial, ReAct error traces, CodeAct, ProgramOfThought success/error policy, streaming, async, and save/load redaction."
       },

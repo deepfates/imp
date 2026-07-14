@@ -1201,6 +1201,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "passing" => get_in(artifact, ["summary", "passing"]),
           "direct_comparisons" => get_in(artifact, ["summary", "direct_comparisons"]),
           "dsex_only_or_deviation" => get_in(artifact, ["summary", "dsex_only_or_deviation"]),
+          "provider_free_contract_complete" =>
+            get_in(artifact, ["summary", "provider_free_contract_complete"]) == true,
+          "live_matched_behavior_complete" =>
+            get_in(artifact, ["summary", "live_matched_behavior_complete"]) == true,
           "full_rag_tool_agent_parity" => full
         },
         limitation:
