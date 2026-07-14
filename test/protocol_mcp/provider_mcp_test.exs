@@ -75,54 +75,35 @@ defmodule ProtocolMCPProviderTest do
     script =
       Path.join(System.tmp_dir!(), "imp-live-mcp-#{System.unique_integer([:positive])}.exs")
 
-    File.write!(script, """
-    Enum.each(IO.stream(:stdio, :line), fn line ->
-      request = Jason.decode!(line)
+    File.write!(script, ~S"""
+    Enum.each(IO.stream(:stdio, :line), fn request ->
+      method = Regex.run(~r/"method":"([^"]+)"/, request, capture: :all_but_first)
+      id = Regex.run(~r/"id":(\d+)/, request, capture: :all_but_first)
 
-      response =
-        case request["method"] do
-          "initialize" ->
-            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"serverInfo" => %{"name" => "stdio"}}}
+      response = case {method, id} do
+        {["initialize"], [id]} ->
+          ~s({"jsonrpc":"2.0","id":#{id},"result":{"serverInfo":{"name":"stdio"}}})
 
-          "tools/list" ->
-            %{
-              "jsonrpc" => "2.0",
-              "id" => request["id"],
-              "result" => %{
-                "tools" => [
-                  %{
-                    "name" => "echo_stdio",
-                    "description" => "Echo trusted stdio input.",
-                    "input_schema" => %{
-                      "type" => "object",
-                      "properties" => %{"text" => %{"type" => "string"}},
-                      "required" => ["text"]
-                    }
-                  }
-                ]
-              }
-            }
+        {["tools/list"], [id]} ->
+          ~s({"jsonrpc":"2.0","id":#{id},"result":{"tools":[{"name":"echo_stdio","description":"Echo trusted stdio input.","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}]}})
 
-          "tools/call" ->
-            %{
-              "jsonrpc" => "2.0",
-              "id" => request["id"],
-              "result" => request["params"]["arguments"]["text"]
-            }
+        {["tools/call"], [id]} ->
+          [text] = Regex.run(~r/"text":"([^"]*)"/, request, capture: :all_but_first)
+          ~s({"jsonrpc":"2.0","id":#{id},"result":"#{text}"})
 
-          _ ->
-            nil
-        end
+        _ ->
+          nil
+      end
 
-      if response, do: IO.puts(Jason.encode!(response))
+      if response, do: IO.puts(response)
     end)
     """)
 
     on_exit(fn -> File.rm(script) end)
 
     [tool] =
-      System.find_executable("mix")
-      |> Imp.MCP.StdioClient.new(args: ["run", script], timeout: 15_000)
+      System.find_executable("elixir")
+      |> Imp.MCP.StdioClient.new(args: [script], timeout: 15_000)
       |> Imp.MCP.import_tools()
 
     assert tool.name == :echo_stdio

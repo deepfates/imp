@@ -520,10 +520,11 @@ defmodule Imp.MCP do
 
     defp request(port, method, params, timeout) do
       id = next_id()
+      deadline = System.monotonic_time(:millisecond) + timeout
 
       Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
         Port.command(port, encode(method, params, id))
-        read_response(port, id, "", timeout)
+        read_response(port, id, "", deadline)
       end)
     end
 
@@ -536,21 +537,23 @@ defmodule Imp.MCP do
       end)
     end
 
-    defp read_response(port, id, buffer, timeout) do
+    defp read_response(port, id, buffer, deadline) do
+      remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
       receive do
         {^port, {:data, data}} ->
           buffer = buffer <> data
 
           case decode_line(buffer, id) do
             {:ok, decoded} -> {:ok, decoded}
-            :more -> read_response(port, id, buffer, timeout)
+            :more -> read_response(port, id, buffer, deadline)
             {:error, reason} -> {:error, reason}
           end
 
         {^port, {:exit_status, status}} ->
           {:error, {:stdio_exit, status}}
       after
-        timeout -> {:error, :timeout}
+        remaining -> {:error, :timeout}
       end
     end
 

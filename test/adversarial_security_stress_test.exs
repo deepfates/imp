@@ -79,14 +79,18 @@ defmodule AdversarialSecurityStressTest do
       Path.join(System.tmp_dir!(), "imp-mcp-timeout-#{System.unique_integer([:positive])}.exs")
 
     File.write!(script, """
-    Process.sleep(:infinity)
+    Stream.repeatedly(fn ->
+      IO.puts("non-json subprocess noise")
+      Process.sleep(5)
+    end)
+    |> Stream.run()
     """)
 
     on_exit(fn -> File.rm(script) end)
 
     client =
-      System.find_executable("mix")
-      |> Imp.MCP.StdioClient.new(args: ["run", script], timeout: 50)
+      System.find_executable("elixir")
+      |> Imp.MCP.StdioClient.new(args: [script], timeout: 50)
 
     assert_raise ArgumentError, ~r/MCP stdio failed: :timeout/, fn ->
       Imp.MCP.import_tools(client)
