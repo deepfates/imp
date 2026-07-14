@@ -32,7 +32,8 @@ defmodule DSEx.IdentityReviewPools do
 
     errors =
       validate_decision_views(decision_views, candidate_ids) ++
-        validate_assessments(assessments, candidate_ids)
+        validate_assessments(assessments, candidate_ids) ++
+        validate_wildcard_inventory(candidates, limits[:scenario_limit])
 
     if errors == [] do
       {:ok, project(decision_views, assessments, limits)}
@@ -220,6 +221,21 @@ defmodule DSEx.IdentityReviewPools do
         [
           "decision views summary candidate_entities is #{inspect(count)}, expected #{candidate_count}"
         ]
+    end
+  end
+
+  defp validate_wildcard_inventory(candidates, limit) do
+    target_count = min(limit, length(candidates))
+    required = ceil(target_count * @wildcard_floor_ratio)
+    available = Enum.count(candidates, &(&1["wildcard"] == true))
+
+    if available >= required do
+      []
+    else
+      [
+        "scenario deliberation requires #{required} wildcard candidates for a " <>
+          "#{target_count}-candidate pool, but only #{available} are available"
+      ]
     end
   end
 

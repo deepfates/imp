@@ -49,6 +49,18 @@ defmodule DSEx.IdentityReviewPoolsTest do
            end)
   end
 
+  test "scenario deliberation fails when the wildcard floor cannot be met" do
+    decision_views =
+      update_in(decision_views()["candidates"], fn candidates ->
+        Enum.map(candidates, &Map.put(&1, "wildcard", false))
+      end)
+
+    assert {:error, errors} =
+             IdentityReviewPools.compile(decision_views, assessments(), limits())
+
+    assert "scenario deliberation requires 1 wildcard candidates for a 1-candidate pool, but only 0 are available" in errors
+  end
+
   test "Pareto pool is the union of every scenario membership" do
     report = compile!()
     pool = report["pools"]["pareto_pool"]
