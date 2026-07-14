@@ -2270,7 +2270,9 @@ defmodule BenchmarkTruthTest do
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
-        matrix_dir
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
       ])
     end)
 
@@ -2420,7 +2422,9 @@ defmodule BenchmarkTruthTest do
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
-        matrix_dir
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
       ])
     end)
 
@@ -2481,6 +2485,8 @@ defmodule BenchmarkTruthTest do
         Path.join(in_dir, "*.json"),
         "--out",
         matrix_dir,
+        "--max-age-hours",
+        "100000",
         "--availability-file",
         availability_path
       ])
@@ -2527,7 +2533,9 @@ defmodule BenchmarkTruthTest do
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
-        matrix_dir
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
       ])
     end)
 
@@ -2582,7 +2590,9 @@ defmodule BenchmarkTruthTest do
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
-        matrix_dir
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
       ])
     end)
 
