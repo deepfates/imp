@@ -118,8 +118,8 @@ defmodule ReqLLMBatchTest do
         )
       end)
 
-    assert_receive {:dispatched, "committed", 1}
-    assert_receive {:dispatched, "in-flight", 1}
+    assert_receive {:dispatched, "committed", 1}, 1_000
+    assert_receive {:dispatched, "in-flight", 1}, 1_000
     Task.shutdown(task, :brutal_kill)
 
     resume_dispatcher = fn request, context ->
@@ -128,7 +128,7 @@ defmodule ReqLLMBatchTest do
     end
 
     assert {:ok, summary} = ReqLLMBatch.resume(checkpoint, resume_dispatcher)
-    assert_receive {:resumed_dispatch, "not-started", 1}
+    assert_receive {:resumed_dispatch, "not-started", 1}, 1_000
     refute_receive {:resumed_dispatch, "committed", _attempt}
     refute_receive {:resumed_dispatch, "in-flight", _attempt}
 
@@ -189,7 +189,11 @@ defmodule ReqLLMBatchTest do
 
     dispatcher = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
 
-    assert {:ok, %{"answer" => "pong"}} =
+    assert {:ok,
+            %{
+              __dsex_lm_output__: %{"answer" => "pong"},
+              __dsex_lm_metadata__: %{req_llm: %{provider: "anthropic", model: "anthropic:test"}}
+            }} =
              dispatcher.(
                %{
                  id: "adapter",

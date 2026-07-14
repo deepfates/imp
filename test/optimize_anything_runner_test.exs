@@ -286,11 +286,21 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
     proposer = fn _candidate, _component, _records, iteration -> Integer.to_string(iteration) end
 
-    first =
-      Anything.optimize(
-        "0",
-        evaluator,
-        runner_options(1, dataset: dataset, fallback_proposer: proposer)
+    {:checkpoint, first_checkpoint} =
+      catch_throw(
+        Anything.optimize(
+          "0",
+          evaluator,
+          runner_options(2,
+            dataset: dataset,
+            fallback_proposer: proposer,
+            checkpoint_fn: fn checkpoint ->
+              if checkpoint["iteration"] == 1,
+                do: throw({:checkpoint, checkpoint}),
+                else: :ok
+            end
+          )
+        )
       )
 
     resumed =
@@ -300,7 +310,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
         runner_options(2,
           dataset: dataset,
           fallback_proposer: proposer,
-          resume_state: first.checkpoint
+          resume_state: first_checkpoint
         )
       )
 
@@ -311,7 +321,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
         runner_options(2, dataset: dataset, fallback_proposer: proposer)
       )
 
-    assert first.checkpoint["iteration"] == 1
+    assert first_checkpoint["iteration"] == 1
     assert resumed.checkpoint["iteration"] == 2
     assert resumed.candidates == uninterrupted.candidates
     assert resumed.parents == uninterrupted.parents

@@ -133,14 +133,14 @@ defmodule ProductionHardeningTest do
 
     messages = [%{role: :user, content: "cache me"}]
 
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
+    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert Process.get(:stable_count) == 1
 
     task =
       DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
 
-    assert {:ok, "Answer: recovered"} = Task.await(task)
+    assert_req_llm_output(Task.await(task), "Answer: recovered")
 
     assert_received {^ref, [:dsex, :lm, :start], _, %{lm: %{model: "openai:gpt-test"}}}
     assert_received {^ref, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
@@ -166,14 +166,25 @@ defmodule ProductionHardeningTest do
     messages = [%{role: :user, content: "cache transient"}]
 
     assert {:error, :temporary_unavailable} = DSEx.LM.generate(lm, messages, cache: true)
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
-    assert {:ok, "Answer: recovered"} = DSEx.LM.generate(lm, messages, cache: true)
+    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert Process.get(:transient_error_count) == 2
 
     assert_received {^ref, [:dsex, :cache, :miss], _, _}
     assert_received {^ref, [:dsex, :cache, :hit], _, _}
   after
     Process.delete(:transient_error_count)
+  end
+
+  defp assert_req_llm_output(
+         {:ok,
+          %{
+            __dsex_lm_output__: output,
+            __dsex_lm_metadata__: %{req_llm: %{provider: "openai", model: "openai:gpt-test"}}
+          }},
+         expected
+       ) do
+    assert output == expected
   end
 
   test "telemetry span emits redacted exception event for throws" do

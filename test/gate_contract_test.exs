@@ -19,6 +19,7 @@ defmodule GateContractTest do
     assert is_function(docs_clean, 1)
 
     assert Keyword.fetch!(aliases, :"evidence.check") == [
+             "reproduction.check",
              "benchmark.truth.check",
              "benchmark.trace.check",
              "benchmark.operations_stress.check",
