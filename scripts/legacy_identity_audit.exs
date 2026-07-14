@@ -4,7 +4,7 @@ allowed_prefixes = [
   "benchmarks/data/",
   "benchmarks/results/",
   "benchmarks/upstream/",
-  "identity/",
+  "identity/DECISION.md",
   "test/fixtures/"
 ]
 

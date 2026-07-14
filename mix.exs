@@ -127,14 +127,11 @@ defmodule Imp.MixProject do
   defp package_files do
     excluded_lib =
       Path.wildcard("lib/mix/tasks/imp.benchmark*.ex") ++
-        Path.wildcard("lib/mix/tasks/imp.identity*.ex") ++
         Path.wildcard("lib/mix/tasks/imp.gate_evidence.ex") ++
         Path.wildcard("lib/mix/tasks/imp.reproductions.ex") ++
         Path.wildcard("lib/imp/benchmark*.ex") ++
         Path.wildcard("lib/imp/benchmark_truth/**/*.ex") ++
         Path.wildcard("lib/imp/reproduction_registry.ex") ++
-        Path.wildcard("lib/imp/identity_*.ex") ++
-        Path.wildcard("lib/imp/identity_progress/**/*.ex") ++
         [
           "lib/imp/optimizer/playbook/campaign.ex",
           "lib/imp/optimizer/playbook/equation_search.ex"

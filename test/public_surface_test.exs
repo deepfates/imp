@@ -66,8 +66,6 @@ defmodule PublicSurfaceTest do
     Imp.ExternalCommand.Handle,
     Imp.HTTP,
     Imp.History,
-    Imp.IdentityAssessmentConsolidation,
-    Imp.IdentityReliability,
     Imp.LM,
     Imp.LM.Result,
     Imp.LMError,
