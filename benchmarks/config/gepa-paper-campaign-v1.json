@@ -56,6 +56,68 @@
     "source": "ReqLLM usage telemetry with provider pricing metadata",
     "cost_accounting": "req_llm_telemetry"
   },
+  "budgets": {
+    "aggregate": {
+      "requests": 377904,
+      "input_tokens": 1200000000,
+      "output_tokens": 1200000000,
+      "usd": 1500.0
+    },
+    "per_shard": {
+      "AIMEBench": {
+        "requests": 29424,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      },
+      "HotpotQABench": {
+        "requests": 109936,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      },
+      "hoverBench": {
+        "requests": 112816,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      },
+      "IFBench": {
+        "requests": 57488,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      },
+      "LiveBenchMathBench": {
+        "requests": 29424,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      },
+      "Papillon": {
+        "requests": 38816,
+        "input_tokens": 200000000,
+        "output_tokens": 200000000,
+        "usd": 250.0
+      }
+    },
+    "reservation_pricing": {
+      "input_per_million": 0.4,
+      "output_per_million": 1.6
+    }
+  },
+  "sharding": {
+    "immutable": true,
+    "strategy": "one_family_per_shard",
+    "shards": [
+      {"id": "family:AIMEBench", "families": ["AIMEBench"]},
+      {"id": "family:HotpotQABench", "families": ["HotpotQABench"]},
+      {"id": "family:hoverBench", "families": ["hoverBench"]},
+      {"id": "family:IFBench", "families": ["IFBench"]},
+      {"id": "family:LiveBenchMathBench", "families": ["LiveBenchMathBench"]},
+      {"id": "family:Papillon", "families": ["Papillon"]}
+    ]
+  },
   "source_commits": {
     "dspy": "gepa-ai/dspy@62dc3b634d7dc0c4889abcf905cb4c391ea6b396",
     "gepa_artifact": "gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e"

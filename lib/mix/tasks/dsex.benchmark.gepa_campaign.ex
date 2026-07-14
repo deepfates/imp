@@ -37,6 +37,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   Manifest mode is immutable: `--manifest` cannot be combined with any other
   CLI option. Legacy CLI invocation remains available for operator and partial
   runs; canonical future research runs use the source-controlled manifest.
+  `--manifest ... --plan` emits the immutable six-family shard plan and hard
+  ceilings without starting the application, reading credentials, or making
+  provider/network calls.
+  Add `--shard family:<family>` to plan or run exactly one declared family
+  shard. Without it, the canonical campaign runs all six families sequentially.
   """
 
   use Mix.Task
@@ -66,6 +71,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       OptionParser.parse(args,
         strict: [
           manifest: :string,
+          plan: :boolean,
+          shard: :string,
           dataset_root: :string,
           campaign_id: :string,
           model: :string,
@@ -93,65 +100,97 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
 
     opts = resolve_manifest_options!(opts, argv)
 
-    Mix.Task.run("app.start")
-    verify_manifest_environment!(opts)
-
-    api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
-    api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
-    model = fetch!(opts, :model)
-    reflection_model = fetch!(opts, :reflection_model)
-
-    req_llm_opts =
-      Keyword.merge(
-        [
-          api_key: api_key,
-          temperature: Keyword.get(opts, :temperature, defaults.temperature),
-          max_retries: Keyword.get(opts, :max_retries, defaults.max_retries)
-        ],
-        generation_opts(opts)
-      )
-
-    families = parse_families(Keyword.get(opts, :families))
-    require_upstream_bm25!(families)
-    require_upstream_ifbench_descriptions!(families)
-
-    run_context =
-      DSEx.BenchmarkTruth.RunContext.capture_git!(
-        source_commits: upstream_source_commits(opts),
-        require_clean: true
-      )
-
-    result =
-      with_progress_reporter(fn reporter ->
-        DSEx.BenchmarkTruth.GepaCampaign.run(
+    if Keyword.get(opts, :plan, false) do
+      plan =
+        DSEx.BenchmarkTruth.GepaCampaign.plan(
           dataset_root: fetch!(opts, :dataset_root),
           campaign_id: fetch!(opts, :campaign_id),
-          model: model,
-          reflection_model: reflection_model,
-          out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+          model: Keyword.get(opts, :model),
+          reflection_model: Keyword.get(opts, :reflection_model),
+          families: Keyword.get(opts, :families),
+          budgets: Keyword.get(opts, :budgets),
+          sharding: Keyword.get(opts, :sharding),
+          shard: Keyword.get(opts, :shard),
           checkpoint_dir:
             Keyword.get(
               opts,
               :checkpoint_dir,
               Path.join(Keyword.get(opts, :out, "benchmarks/results"), "gepa-checkpoints")
             ),
-          families: families,
-          max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
-          seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
-          generations: Keyword.get(opts, :generations, :metric_budget),
-          pricing_source: fetch!(opts, :pricing_source),
-          token_cost: token_cost(opts),
-          run_context: run_context,
-          execution: execution_identity(opts),
-          reporter: reporter,
-          lm: DSEx.req_llm(model, req_llm_opts),
-          reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts),
-          judge_lm: DSEx.req_llm(Keyword.get(opts, :judge_model, model), req_llm_opts),
-          judge_model: Keyword.get(opts, :judge_model, model)
+          manifest_identity: Keyword.get(opts, :manifest_identity),
+          source_commits: %{
+            "dspy" => Keyword.get(opts, :dspy_source),
+            "gepa_artifact" => Keyword.get(opts, :gepa_artifact_source)
+          }
         )
-      end)
 
-    Mix.shell().info("DSEx GEPA rows: #{result.out_path}")
+      Mix.shell().info(Jason.encode!(plan, pretty: true))
+      :ok
+    else
+      Mix.Task.run("app.start")
+      verify_manifest_environment!(opts)
+
+      api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
+      api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
+      model = fetch!(opts, :model)
+      reflection_model = fetch!(opts, :reflection_model)
+
+      req_llm_opts =
+        Keyword.merge(
+          [
+            api_key: api_key,
+            temperature: Keyword.get(opts, :temperature, defaults.temperature),
+            max_retries: Keyword.get(opts, :max_retries, defaults.max_retries)
+          ],
+          generation_opts(opts)
+        )
+
+      families = parse_families(Keyword.get(opts, :families))
+      require_upstream_bm25!(families)
+      require_upstream_ifbench_descriptions!(families)
+
+      run_context =
+        DSEx.BenchmarkTruth.RunContext.capture_git!(
+          source_commits: upstream_source_commits(opts),
+          require_clean: true
+        )
+
+      result =
+        with_progress_reporter(fn reporter ->
+          DSEx.BenchmarkTruth.GepaCampaign.run(
+            dataset_root: fetch!(opts, :dataset_root),
+            campaign_id: fetch!(opts, :campaign_id),
+            model: model,
+            reflection_model: reflection_model,
+            out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+            checkpoint_dir:
+              Keyword.get(
+                opts,
+                :checkpoint_dir,
+                Path.join(Keyword.get(opts, :out, "benchmarks/results"), "gepa-checkpoints")
+              ),
+            families: families,
+            max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
+            seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
+            generations: Keyword.get(opts, :generations, :metric_budget),
+            pricing_source: fetch!(opts, :pricing_source),
+            token_cost: token_cost(opts),
+            budgets: Keyword.get(opts, :budgets),
+            sharding: Keyword.get(opts, :sharding),
+            shard: Keyword.get(opts, :shard),
+            manifest_identity: Keyword.get(opts, :manifest_identity),
+            run_context: run_context,
+            execution: execution_identity(opts),
+            reporter: reporter,
+            lm: DSEx.req_llm(model, req_llm_opts),
+            reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts),
+            judge_lm: DSEx.req_llm(Keyword.get(opts, :judge_model, model), req_llm_opts),
+            judge_model: Keyword.get(opts, :judge_model, model)
+          )
+        end)
+
+      Mix.shell().info("DSEx GEPA rows: #{result.out_path}")
+    end
   end
 
   defp fetch!(opts, key), do: Keyword.get(opts, key) || Mix.raise("--#{dash(key)} is required")

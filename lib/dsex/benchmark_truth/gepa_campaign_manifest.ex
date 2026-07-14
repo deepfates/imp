@@ -21,7 +21,7 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
   def validate!(manifest, path) when is_map(manifest) do
     require_exact_keys!(
       manifest,
-      ~w(schema_version campaign_id dataset models families optimizer execution environment request pricing source_commits output),
+      ~w(schema_version campaign_id dataset models families optimizer execution environment request pricing budgets sharding source_commits output),
       "manifest"
     )
 
@@ -41,6 +41,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
     validate_environment!(manifest["environment"])
     validate_request!(manifest["request"])
     validate_pricing!(manifest["pricing"])
+    validate_budgets!(manifest["budgets"], manifest["families"])
+    validate_sharding!(manifest["sharding"], manifest["families"])
     validate_source_commits!(manifest["source_commits"], manifest["dataset"])
     validate_output!(manifest["output"])
 
@@ -53,7 +55,8 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
     do: raise(ArgumentError, "GEPA campaign manifest must be a JSON object")
 
   def task_options!(manifest, cli_opts) do
-    overrides = Keyword.drop(cli_opts, [:manifest])
+    overrides = Keyword.drop(cli_opts, [:manifest, :plan, :shard])
+    validate_shard_selector!(manifest, Keyword.get(cli_opts, :shard))
 
     require!(
       overrides == [],
@@ -81,6 +84,10 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
       out: manifest["output"]["resolved_out_dir"],
       checkpoint_dir: manifest["output"]["resolved_checkpoint_dir"],
       manifest_environment: manifest["environment"],
+      budgets: manifest["budgets"],
+      sharding: manifest["sharding"],
+      plan: Keyword.get(cli_opts, :plan, false),
+      shard: Keyword.get(cli_opts, :shard),
       manifest_identity: %{
         "path" => Path.relative_to_cwd(manifest["manifest_path"]),
         "sha256" => manifest["manifest_sha256"]
@@ -207,6 +214,87 @@ defmodule DSEx.BenchmarkTruth.GepaCampaignManifest do
       "pricing.cost_accounting must be req_llm_telemetry"
     )
   end
+
+  defp validate_budgets!(budgets, families) do
+    require_exact_keys!(budgets, ~w(aggregate per_shard reservation_pricing), "budgets")
+    validate_budget_limits!(budgets["aggregate"], "budgets.aggregate")
+
+    require_exact_keys!(budgets["per_shard"], families, "budgets.per_shard")
+
+    Enum.each(families, fn family ->
+      validate_budget_limits!(budgets["per_shard"][family], "budgets.per_shard.#{family}")
+    end)
+
+    pricing = budgets["reservation_pricing"]
+
+    require_exact_keys!(
+      pricing,
+      ~w(input_per_million output_per_million),
+      "budgets.reservation_pricing"
+    )
+
+    Enum.each(pricing, fn {key, value} ->
+      require!(
+        is_number(value) and value >= 0,
+        "budgets.reservation_pricing.#{key} must be non-negative"
+      )
+    end)
+
+    aggregate = budgets["aggregate"]
+
+    Enum.each(~w(requests input_tokens output_tokens usd), fn key ->
+      total =
+        Enum.reduce(families, 0, fn family, acc -> acc + budgets["per_shard"][family][key] end)
+
+      require!(
+        aggregate[key] >= total,
+        "budgets.aggregate.#{key} must cover all per-shard ceilings"
+      )
+    end)
+  end
+
+  defp validate_budget_limits!(limits, label) do
+    require_exact_keys!(limits, ~w(requests input_tokens output_tokens usd), label)
+
+    Enum.each(~w(requests input_tokens output_tokens), fn key ->
+      require!(
+        is_integer(limits[key]) and limits[key] >= 0,
+        "#{label}.#{key} must be a non-negative integer"
+      )
+    end)
+
+    require!(is_number(limits["usd"]) and limits["usd"] >= 0, "#{label}.usd must be non-negative")
+  end
+
+  defp validate_sharding!(sharding, families) do
+    require_exact_keys!(sharding, ~w(immutable strategy shards), "sharding")
+    require!(sharding["immutable"] == true, "sharding.immutable must be true")
+    require!(sharding["strategy"] == "one_family_per_shard", "sharding.strategy is unsupported")
+
+    shards = sharding["shards"]
+
+    require!(
+      is_list(shards) and length(shards) == length(families),
+      "sharding.shards must contain one shard per family"
+    )
+
+    Enum.each(Enum.zip(shards, families), fn {shard, family} ->
+      require_exact_keys!(shard, ~w(id families), "sharding.shard")
+      require!(shard["id"] == "family:" <> family, "sharding shard id must be family:#{family}")
+      require!(shard["families"] == [family], "sharding shard must contain only #{family}")
+    end)
+  end
+
+  defp validate_shard_selector!(_manifest, nil), do: :ok
+
+  defp validate_shard_selector!(manifest, selector) when is_binary(selector) do
+    declared = Enum.map(manifest["sharding"]["shards"], & &1["id"])
+
+    require!(selector in declared, "unknown GEPA campaign shard selector: #{selector}")
+  end
+
+  defp validate_shard_selector!(_manifest, selector),
+    do: raise(ArgumentError, "unknown GEPA campaign shard selector: #{inspect(selector)}")
 
   defp validate_source_commits!(commits, dataset) do
     require_exact_keys!(commits, ~w(dspy gepa_artifact), "source_commits")

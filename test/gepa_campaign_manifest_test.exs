@@ -42,6 +42,12 @@ defmodule GepaCampaignManifestTest do
     end
   end
 
+  test "manifest rejects an undeclared shard selector before execution" do
+    assert_raise Mix.Error, ~r/unknown GEPA campaign shard selector/, fn ->
+      Task.resolve_manifest_options!(manifest: @manifest, shard: "family:NotDeclared")
+    end
+  end
+
   test "task resolves typed manifest families and seeds without CSV coercion" do
     opts = Task.resolve_manifest_options!(manifest: @manifest)
 

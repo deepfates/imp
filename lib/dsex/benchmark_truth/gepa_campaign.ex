@@ -15,9 +15,97 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
     RunContext
   }
 
+  alias DSEx.BenchmarkTruth.GepaCampaignBudget
+
   alias DSEx.Optimizer.GEPA
 
   @required_families DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+
+  @doc "Builds a deterministic, provider-free GEPA campaign plan."
+  def plan(opts) do
+    dataset_root = Keyword.fetch!(opts, :dataset_root)
+    campaign_id = Keyword.fetch!(opts, :campaign_id)
+    parent_families = Keyword.get(opts, :families) || @required_families
+    model = Keyword.get(opts, :model)
+    reflection_model = Keyword.get(opts, :reflection_model)
+    manifest_identity = Keyword.get(opts, :manifest_identity)
+    sharding = Keyword.get(opts, :sharding)
+    budgets = Keyword.get(opts, :budgets)
+    specs = load_specs!(dataset_root)
+    validate_requested_families!(parent_families, specs)
+    parent_sharding = sharding || default_sharding(parent_families)
+    shard_map = validate_sharding!(parent_sharding, parent_families)
+    validate_budgets!(budgets, parent_families)
+    selected_shard = select_shard!(Keyword.get(opts, :shard), parent_sharding)
+    families = selected_families(parent_families, selected_shard)
+
+    selected_checkpoint_dir =
+      checkpoint_dir_for_shard(
+        Keyword.get(opts, :checkpoint_dir, "benchmarks/results/gepa-checkpoints"),
+        selected_shard
+      )
+
+    identity =
+      budget_identity(
+        campaign_id,
+        parent_families,
+        parent_sharding,
+        model,
+        reflection_model,
+        manifest_identity
+      )
+
+    shards =
+      Enum.map(families, fn family ->
+        spec = Map.fetch!(specs, family)
+        paths = split_paths(dataset_root, family)
+
+        %{
+          "family" => family,
+          "shard" => Map.fetch!(shard_map, family),
+          "shard_identity" => shard_identity(family, spec, paths, %{budget_identity: identity}),
+          "metric_call_budget" => spec["metric_calls"],
+          "split_counts" => spec["split_counts"],
+          "split_checksums" => split_checksums(paths),
+          "paths" => paths
+        }
+      end)
+
+    %{
+      "schema_version" => 1,
+      "runner" => "dsex-gepa-campaign",
+      "campaign_id" => campaign_id,
+      "parent_families" => parent_families,
+      "families" => families,
+      "selected_shard" => selected_shard && selected_shard["id"],
+      "selection" => %{
+        "shard" => selected_shard && selected_shard["id"],
+        "families" => families,
+        "partial" => selected_shard != nil or families != @required_families
+      },
+      "immutable_family_shards" => true,
+      "sharding" => parent_sharding,
+      "shards" => shards,
+      "models" => %{"task" => model, "reflection" => reflection_model},
+      "metric_call_budgets" => Map.new(shards, &{&1["family"], &1["metric_call_budget"]}),
+      "budgets" => budgets,
+      "budget_scope" => budget_scope(budgets, families, selected_shard),
+      "budget_identity" => identity,
+      "manifest_identity" => manifest_identity,
+      "checkpoint" => %{
+        "directory" => selected_checkpoint_dir,
+        "budget_path" => Path.join(selected_checkpoint_dir, "gepa-campaign-budget.json"),
+        "family_paths" =>
+          Map.new(families, fn family ->
+            {family, checkpoint_path(selected_checkpoint_dir, campaign_id, family)}
+          end)
+      },
+      "artifact_scope" => if(selected_shard, do: "shard", else: "campaign"),
+      "network_access" => false,
+      "network_calls" => 0,
+      "provider_calls" => 0
+    }
+  end
 
   def run(opts) do
     dataset_root = Keyword.fetch!(opts, :dataset_root)
@@ -40,94 +128,366 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       end)
 
     source_commits = run_context.source_commits
+    manifest_identity = Keyword.get(opts, :manifest_identity)
     validate_source_commits!(source_commits)
     lm = Keyword.fetch!(opts, :lm)
     reflection_lm = Keyword.get(opts, :reflection_lm)
     {judge_lm, judge_model} = judge_config!(opts, lm, model)
     optimizer_callbacks = Keyword.get(opts, :optimizer_callbacks, [])
-    families = Keyword.get(opts, :families, @required_families)
-    partial? = families != @required_families
+    parent_families = Keyword.get(opts, :families) || @required_families
     reporter = Keyword.get(opts, :reporter, fn _event -> :ok end)
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     execution = Keyword.get(opts, :execution, %{"source" => "library_default"})
     checkpoint_dir = Keyword.get(opts, :checkpoint_dir, Path.join(out_dir, "gepa-checkpoints"))
+    budgets = Keyword.get(opts, :budgets)
+    sharding = Keyword.get(opts, :sharding)
 
     File.mkdir_p!(out_dir)
     File.mkdir_p!(checkpoint_dir)
     specs = load_specs!(dataset_root)
-    validate_requested_families!(families, specs)
+    validate_requested_families!(parent_families, specs)
+    parent_sharding = sharding || default_sharding(parent_families)
+    shard_map = validate_sharding!(parent_sharding, parent_families)
+    validate_budgets!(budgets, parent_families)
+    selected_shard = select_shard!(Keyword.get(opts, :shard), parent_sharding)
+    families = selected_families(parent_families, selected_shard)
+    partial? = selected_shard != nil or families != @required_families
+    checkpoint_dir = checkpoint_dir_for_shard(checkpoint_dir, selected_shard)
+    File.mkdir_p!(checkpoint_dir)
 
-    context = %{
-      dataset_root: dataset_root,
-      campaign_id: campaign_id,
-      model: model,
-      reflection_model: reflection_model,
-      seeds: seeds,
-      generations: generation_policy,
-      lm: lm,
-      reflection_lm: reflection_lm,
-      judge_lm: judge_lm,
-      judge_model: judge_model,
-      pricing_source: pricing_source,
-      reporter: reporter,
-      max_concurrency: max_concurrency,
-      checkpoint_dir: checkpoint_dir,
-      source_commits: source_commits,
-      source_git_sha: run_context.code_revision,
-      execution: execution,
-      optimizer_callbacks: optimizer_callbacks
-    }
+    budget_server =
+      start_budget(
+        budgets,
+        checkpoint_dir,
+        budget_identity(
+          campaign_id,
+          parent_families,
+          parent_sharding,
+          model,
+          reflection_model,
+          manifest_identity
+        ),
+        families
+      )
 
-    rows =
-      Enum.map(families, fn family ->
-        spec = Map.fetch!(specs, family)
-        row(spec, context, explicit_token_cost!(token_cost, family, seeds, families))
-      end)
-      |> Enum.map(&Map.put(&1, "source_commits", source_commits))
+    try do
+      context = %{
+        dataset_root: dataset_root,
+        campaign_id: campaign_id,
+        model: model,
+        reflection_model: reflection_model,
+        seeds: seeds,
+        generations: generation_policy,
+        lm: lm,
+        reflection_lm: reflection_lm,
+        judge_lm: judge_lm,
+        judge_model: judge_model,
+        pricing_source: pricing_source,
+        reporter: reporter,
+        max_concurrency: max_concurrency,
+        checkpoint_dir: checkpoint_dir,
+        source_commits: source_commits,
+        source_git_sha: run_context.code_revision,
+        execution: execution,
+        optimizer_callbacks: optimizer_callbacks,
+        budget_server: budget_server,
+        shard_map: shard_map,
+        budget_identity:
+          budget_identity(
+            campaign_id,
+            parent_families,
+            parent_sharding,
+            model,
+            reflection_model,
+            manifest_identity
+          )
+      }
 
-    validate_dsex_rows!(rows, partial?: partial?)
+      rows =
+        Enum.map(families, fn family ->
+          spec = Map.fetch!(specs, family)
+          row(spec, context, explicit_token_cost!(token_cost, family, seeds, families))
+        end)
+        |> Enum.map(&Map.put(&1, "source_commits", source_commits))
 
-    campaign_contract = %{
-      "schema_version" => 1,
-      "campaign_id" => campaign_id,
-      "model" => model,
-      "reflection_model" => reflection_model,
-      "judge_model" => judge_model,
-      "seeds" => seeds,
-      "generations" => generation_identity,
-      "max_concurrency" => max_concurrency,
-      "pricing_source" => pricing_source,
-      "token_cost_schedule_sha256" => term_sha256(token_cost),
-      "source_commits" => source_commits,
-      "execution" => execution
-    }
+      validate_dsex_rows!(rows, partial?: partial?)
 
-    report = %{
-      "schema_version" => 1,
-      "runner" => "dsex-gepa-campaign",
-      "summary" => %{
-        "total" => length(rows),
-        "families" => Enum.map(rows, & &1["family"]),
-        "partial" => partial?,
-        "preflight" => Enum.any?(rows, &(&1["evidence_level"] == "research_preflight")),
+      campaign_contract = %{
+        "schema_version" => 1,
         "campaign_id" => campaign_id,
         "model" => model,
         "reflection_model" => reflection_model,
+        "judge_model" => judge_model,
         "seeds" => seeds,
         "generations" => generation_identity,
         "max_concurrency" => max_concurrency,
+        "pricing_source" => pricing_source,
+        "token_cost_schedule_sha256" => term_sha256(token_cost),
+        "source_commits" => source_commits,
         "execution" => execution,
-        "campaign_contract" => campaign_contract
-      },
-      "rows" => rows
+        "budgets" => budgets,
+        "sharding" => parent_sharding,
+        "parent_families" => parent_families,
+        "selected_shard" => selected_shard && selected_shard["id"]
+      }
+
+      report = %{
+        "schema_version" => 1,
+        "runner" => "dsex-gepa-campaign",
+        "parent_campaign_id" => campaign_id,
+        "parent_families" => parent_families,
+        "selected_shard" => selected_shard && selected_shard["id"],
+        "artifact_scope" => if(selected_shard, do: "shard", else: "campaign"),
+        "complete" => not partial?,
+        "budget_scope" => budget_scope(budgets, families, selected_shard),
+        "summary" => %{
+          "total" => length(rows),
+          "families" => Enum.map(rows, & &1["family"]),
+          "parent_families" => parent_families,
+          "selected_shard" => selected_shard && selected_shard["id"],
+          "artifact_scope" => if(selected_shard, do: "shard", else: "campaign"),
+          "partial" => partial?,
+          "preflight" => Enum.any?(rows, &(&1["evidence_level"] == "research_preflight")),
+          "campaign_id" => campaign_id,
+          "model" => model,
+          "reflection_model" => reflection_model,
+          "seeds" => seeds,
+          "generations" => generation_identity,
+          "max_concurrency" => max_concurrency,
+          "execution" => execution,
+          "budgets" => budgets,
+          "budget_scope" => budget_scope(budgets, families, selected_shard),
+          "budget" => budget_snapshot(budget_server),
+          "sharding" => parent_sharding,
+          "campaign_contract" => campaign_contract
+        },
+        "rows" => rows
+      }
+
+      artifact_slug = if selected_shard, do: "#{shard_slug(selected_shard["id"])}-", else: ""
+      out_path = Path.join(out_dir, "dsex-gepa-rows-#{artifact_slug}#{timestamp_slug()}.json")
+
+      %{artifact: report, path: out_path} =
+        ArtifactFile.write_run_json!(out_path, report, run_context)
+
+      %{report: report, out_path: out_path}
+    after
+      stop_budget(budget_server)
+    end
+  end
+
+  defp start_budget(nil, _checkpoint_dir, _identity, _families), do: nil
+
+  defp start_budget(budgets, checkpoint_dir, identity, families) do
+    {:ok, server} =
+      GepaCampaignBudget.start_link(
+        identity: identity,
+        checkpoint_path: Path.join(checkpoint_dir, "gepa-campaign-budget.json"),
+        limits: budgets["aggregate"],
+        shard_limits: Map.take(budgets["per_shard"], families),
+        pricing: budgets["reservation_pricing"]
+      )
+
+    server
+  end
+
+  defp stop_budget(nil), do: :ok
+  defp stop_budget(server), do: GenServer.stop(server)
+  defp budget_snapshot(nil), do: nil
+  defp budget_snapshot(server), do: GepaCampaignBudget.snapshot(server)
+
+  defp budget_shard_snapshot(nil, _family), do: nil
+
+  defp budget_shard_snapshot(server, family) do
+    server
+    |> GepaCampaignBudget.snapshot()
+    |> get_in(["shards", family])
+  end
+
+  defp budget_lm(nil, _server, _family), do: nil
+  defp budget_lm(lm, nil, _family), do: lm
+  defp budget_lm(lm, server, family), do: GepaCampaignBudget.wrap_lm(lm, server, family)
+
+  defp attach_budget_handler(nil, _family), do: nil
+
+  defp attach_budget_handler(server, family),
+    do: GepaCampaignBudget.attach_req_llm(server, family)
+
+  defp detach_budget_handler(nil), do: :ok
+  defp detach_budget_handler(handler), do: :telemetry.detach(handler)
+
+  defp validate_budgets!(nil, _families), do: :ok
+
+  defp validate_budgets!(budgets, families) when is_map(budgets) do
+    require_exact_budget_keys!(budgets, ~w(aggregate per_shard reservation_pricing), "budgets")
+    validate_budget_limits!(budgets["aggregate"], "budgets.aggregate")
+
+    require!(
+      Map.keys(budgets["per_shard"]) |> Enum.sort() == Enum.sort(families),
+      "budgets.per_shard must match immutable families"
+    )
+
+    Enum.each(
+      families,
+      &validate_budget_limits!(budgets["per_shard"][&1], "budgets.per_shard.#{&1}")
+    )
+
+    validate_pricing_limits!(budgets["reservation_pricing"])
+
+    Enum.each(~w(requests input_tokens output_tokens usd), fn key ->
+      total =
+        Enum.reduce(families, 0, fn family, acc -> acc + budgets["per_shard"][family][key] end)
+
+      require!(
+        budgets["aggregate"][key] >= total,
+        "budgets.aggregate.#{key} must cover all per-shard ceilings"
+      )
+    end)
+  end
+
+  defp validate_budgets!(budgets, _families),
+    do: raise(ArgumentError, "GEPA campaign budgets must be a map or nil: #{inspect(budgets)}")
+
+  defp validate_budget_limits!(limits, label) when is_map(limits) do
+    require_exact_budget_keys!(limits, ~w(requests input_tokens output_tokens usd), label)
+
+    Enum.each(~w(requests input_tokens output_tokens), fn key ->
+      require!(
+        is_integer(limits[key]) and limits[key] >= 0,
+        "#{label}.#{key} must be non-negative"
+      )
+    end)
+
+    require!(is_number(limits["usd"]) and limits["usd"] >= 0, "#{label}.usd must be non-negative")
+  end
+
+  defp validate_budget_limits!(_limits, label),
+    do: raise(ArgumentError, "#{label} must be a map")
+
+  defp validate_pricing_limits!(pricing) when is_map(pricing) do
+    require_exact_budget_keys!(
+      pricing,
+      ~w(input_per_million output_per_million),
+      "budgets.reservation_pricing"
+    )
+
+    Enum.each(pricing, fn {key, value} ->
+      require!(
+        is_number(value) and value >= 0,
+        "budgets.reservation_pricing.#{key} must be non-negative"
+      )
+    end)
+  end
+
+  defp validate_pricing_limits!(_pricing),
+    do: raise(ArgumentError, "budgets.reservation_pricing must be a map")
+
+  defp validate_sharding!(nil, families),
+    do: shard_map_from_config!(default_sharding(families), families)
+
+  defp validate_sharding!(sharding, families) when is_map(sharding) do
+    require_exact_budget_keys!(sharding, ~w(immutable strategy shards), "sharding")
+    require!(sharding["immutable"] == true, "sharding.immutable must be true")
+    require!(sharding["strategy"] == "one_family_per_shard", "sharding.strategy is unsupported")
+
+    require!(
+      is_list(sharding["shards"]) and length(sharding["shards"]) == length(families),
+      "sharding.shards must match families"
+    )
+
+    shard_map_from_config!(sharding, families)
+  end
+
+  defp validate_sharding!(value, _families),
+    do: raise(ArgumentError, "GEPA campaign sharding must be a map or nil: #{inspect(value)}")
+
+  defp select_shard!(nil, _sharding), do: nil
+
+  defp select_shard!(selector, %{"shards" => shards}) when is_binary(selector) do
+    case Enum.find(shards, &(&1["id"] == selector)) do
+      nil -> raise ArgumentError, "unknown GEPA campaign shard selector: #{selector}"
+      shard -> shard
+    end
+  end
+
+  defp select_shard!(selector, _sharding),
+    do: raise(ArgumentError, "unknown GEPA campaign shard selector: #{inspect(selector)}")
+
+  defp selected_families(parent_families, nil), do: parent_families
+  defp selected_families(_parent_families, %{"families" => families}), do: families
+
+  defp budget_scope(nil, _families, _selected_shard), do: nil
+
+  defp budget_scope(budgets, families, selected_shard) do
+    %{
+      "parent_aggregate" => budgets["aggregate"],
+      "selected_shard" => selected_shard && selected_shard["id"],
+      "selected_ceiling" => Map.take(budgets["per_shard"], families)
     }
+  end
 
-    out_path = Path.join(out_dir, "dsex-gepa-rows-#{timestamp_slug()}.json")
+  defp checkpoint_dir_for_shard(directory, nil), do: directory
 
-    %{artifact: report, path: out_path} =
-      ArtifactFile.write_run_json!(out_path, report, run_context)
+  defp checkpoint_dir_for_shard(directory, %{"id" => shard}),
+    do: Path.join([directory, "shards", shard_slug(shard)])
 
-    %{report: report, out_path: out_path}
+  defp shard_slug(shard), do: String.replace(shard, ~r/[^A-Za-z0-9._-]+/, "-")
+
+  defp default_sharding(families) do
+    %{
+      "immutable" => true,
+      "strategy" => "one_family_per_shard",
+      "shards" => Enum.map(families, &%{"id" => "family:" <> &1, "families" => [&1]})
+    }
+  end
+
+  defp shard_map_from_config!(sharding, families) do
+    shards = sharding["shards"]
+
+    Enum.zip(shards, families)
+    |> Enum.each(fn {shard, family} ->
+      require_exact_budget_keys!(shard, ~w(id families), "sharding.shard")
+
+      require!(
+        shard["id"] == "family:" <> family and shard["families"] == [family],
+        "sharding family selection is not immutable"
+      )
+    end)
+
+    Map.new(shards, fn shard -> {hd(shard["families"]), shard} end)
+  end
+
+  defp require_exact_budget_keys!(map, keys, label) when is_map(map) do
+    require!(
+      Map.keys(map) |> Enum.sort() == Enum.sort(keys),
+      "#{label} keys must be exactly #{Enum.join(keys, ", ")}"
+    )
+  end
+
+  defp require_exact_budget_keys!(_map, _keys, label),
+    do: raise(ArgumentError, "#{label} must be a map")
+
+  defp require!(true, _message), do: :ok
+
+  defp require!(false, message),
+    do: raise(ArgumentError, "invalid GEPA campaign controls: #{message}")
+
+  defp budget_identity(
+         campaign_id,
+         families,
+         sharding,
+         model,
+         reflection_model,
+         manifest_identity
+       ) do
+    term_sha256(
+      {campaign_id, families, sharding || default_sharding(families), model, reflection_model,
+       manifest_identity}
+    )
+  end
+
+  defp shard_identity(family, spec, paths, context) do
+    term_sha256({context.budget_identity, family, term_sha256(spec), split_checksums(paths)})
   end
 
   defp validate_source_commits!(source_commits) do
@@ -224,253 +584,272 @@ defmodule DSEx.BenchmarkTruth.GepaCampaign do
       checkpoint_dir: checkpoint_dir,
       source_commits: source_commits,
       execution: execution,
-      optimizer_callbacks: optimizer_callbacks
+      optimizer_callbacks: optimizer_callbacks,
+      budget_server: budget_server,
+      shard_map: shard_map,
+      budget_identity: budget_identity
     } = context
 
     family = spec["family"]
-    program = spec["program"]
-    signature = spec["signature"]
-    input_keys = spec["input_keys"]
-    budget = spec["metric_calls"]
-    generations = generation_limit(generation_policy, budget)
-    paths = split_paths(dataset_root, family)
+    budget_handler = attach_budget_handler(budget_server, family)
+    lm = budget_lm(lm, budget_server, family)
+    reflection_lm = budget_lm(reflection_lm, budget_server, family)
+    judge_lm = budget_lm(judge_lm, budget_server, family)
 
-    trainset = DSEx.Datasets.jsonl(paths.train, input_keys)
-    devset = DSEx.Datasets.jsonl(paths.dev, input_keys)
-    testset = DSEx.Datasets.jsonl(paths.test, input_keys)
-    validate_family_spec!(spec)
+    try do
+      program = spec["program"]
+      signature = spec["signature"]
+      input_keys = spec["input_keys"]
+      budget = spec["metric_calls"]
+      generations = generation_limit(generation_policy, budget)
+      paths = split_paths(dataset_root, family)
 
-    seed_context = %{
-      spec: spec,
-      trainset: trainset,
-      devset: devset,
-      testset: testset,
-      lm: lm,
-      reflection_lm: reflection_lm,
-      judge_lm: judge_lm,
-      budget: budget,
-      generations: generations,
-      max_concurrency: max_concurrency,
-      execution: execution,
-      optimizer_callbacks: optimizer_callbacks
-    }
+      trainset = DSEx.Datasets.jsonl(paths.train, input_keys)
+      devset = DSEx.Datasets.jsonl(paths.dev, input_keys)
+      testset = DSEx.Datasets.jsonl(paths.test, input_keys)
+      validate_family_spec!(spec)
 
-    report_progress(reporter, %{
-      event: :family_start,
-      family: family,
-      split_counts: %{
-        train: length(trainset),
-        dev: length(devset),
-        test: length(testset)
-      },
-      seeds: seeds,
-      generations: generations,
-      max_concurrency: max_concurrency
-    })
-
-    checkpoint_path = checkpoint_path(checkpoint_dir, campaign_id, family)
-
-    checkpoint_identity = %{
-      "schema_version" => 1,
-      "campaign_id" => campaign_id,
-      "family" => family,
-      "model" => model,
-      "reflection_model" => reflection_model,
-      "judge_model" => judge_model,
-      "seeds" => seeds,
-      "generations" => generations,
-      "max_concurrency" => max_concurrency,
-      "pricing_source" => pricing_source,
-      "token_cost" => token_cost,
-      "source_commits" => source_commits,
-      "execution" => execution,
-      "dataset" => %{
-        "spec_sha256" => term_sha256(spec),
-        "split_checksums" => split_checksums(paths)
+      seed_context = %{
+        spec: spec,
+        trainset: trainset,
+        devset: devset,
+        testset: testset,
+        lm: lm,
+        reflection_lm: reflection_lm,
+        judge_lm: judge_lm,
+        budget: budget,
+        generations: generations,
+        max_concurrency: max_concurrency,
+        execution: execution,
+        optimizer_callbacks: optimizer_callbacks
       }
-    }
 
-    checkpoint = load_checkpoint!(checkpoint_path, checkpoint_identity)
+      report_progress(reporter, %{
+        event: :family_start,
+        family: family,
+        split_counts: %{
+          train: length(trainset),
+          dev: length(devset),
+          test: length(testset)
+        },
+        seeds: seeds,
+        generations: generations,
+        max_concurrency: max_concurrency
+      })
 
-    checkpoint =
-      Enum.reduce(seeds, checkpoint, fn seed, checkpoint ->
-        case checkpoint_seed(checkpoint, seed) do
-          nil ->
-            report_progress(reporter, %{event: :seed_start, family: family, seed: seed})
-            progress = checkpoint_progress(checkpoint, seed)
-            {:ok, progress_agent} = Agent.start_link(fn -> progress end)
+      checkpoint_path = checkpoint_path(checkpoint_dir, campaign_id, family)
 
-            progress_fn = fn seed_progress ->
-              Agent.update(progress_agent, fn _current -> seed_progress end)
+      checkpoint_identity = %{
+        "schema_version" => 1,
+        "campaign_id" => campaign_id,
+        "family" => family,
+        "model" => model,
+        "reflection_model" => reflection_model,
+        "judge_model" => judge_model,
+        "seeds" => seeds,
+        "generations" => generations,
+        "max_concurrency" => max_concurrency,
+        "pricing_source" => pricing_source,
+        "token_cost" => token_cost,
+        "source_commits" => source_commits,
+        "execution" => execution,
+        "dataset" => %{
+          "spec_sha256" => term_sha256(spec),
+          "split_checksums" => split_checksums(paths)
+        }
+      }
 
-              updated =
-                put_in(checkpoint, ["in_progress", Integer.to_string(seed)], seed_progress)
+      checkpoint = load_checkpoint!(checkpoint_path, checkpoint_identity)
 
-              write_checkpoint!(checkpoint_path, updated)
+      checkpoint =
+        Enum.reduce(seeds, checkpoint, fn seed, checkpoint ->
+          case checkpoint_seed(checkpoint, seed) do
+            nil ->
+              report_progress(reporter, %{event: :seed_start, family: family, seed: seed})
+              progress = checkpoint_progress(checkpoint, seed)
+              {:ok, progress_agent} = Agent.start_link(fn -> progress end)
 
-              candidates = get_in(seed_progress, ["optimizer_state", "candidates"]) || []
-              baseline = Map.get(seed_progress, "baseline", %{})
+              progress_fn = fn seed_progress ->
+                Agent.update(progress_agent, fn _current -> seed_progress end)
 
-              report_progress(reporter, %{
-                event: :seed_checkpoint,
-                family: family,
-                seed: seed,
-                phase: if(candidates == [], do: :baseline, else: :optimizer),
-                baseline_splits: completed_baseline_splits(baseline),
-                baseline_prefixes: baseline_prefixes(baseline),
-                baseline_in_flight: baseline_in_flight(baseline),
-                completed_generations: max(length(candidates) - 1, 0)
-              })
+                updated =
+                  put_in(checkpoint, ["in_progress", Integer.to_string(seed)], seed_progress)
 
-              :ok
-            end
+                write_checkpoint!(checkpoint_path, updated)
 
-            initial_usage = Map.get(progress, "usage", empty_usage())
+                candidates = get_in(seed_progress, ["optimizer_state", "candidates"]) || []
+                baseline = Map.get(seed_progress, "baseline", %{})
 
-            persist_usage = fn usage ->
-              progress_agent
-              |> Agent.get(& &1)
-              |> Map.put("usage", usage)
-              |> progress_fn.()
-            end
+                report_progress(reporter, %{
+                  event: :seed_checkpoint,
+                  family: family,
+                  seed: seed,
+                  phase: if(candidates == [], do: :baseline, else: :optimizer),
+                  baseline_splits: completed_baseline_splits(baseline),
+                  baseline_prefixes: baseline_prefixes(baseline),
+                  baseline_in_flight: baseline_in_flight(baseline),
+                  completed_generations: max(length(candidates) - 1, 0)
+                })
 
-            {wall_us, result, usage} =
-              try do
-                measure_req_llm_usage(
-                  initial_usage,
-                  fn usage_fn ->
-                    :timer.tc(fn ->
-                      run_seed(
-                        seed_context,
-                        seed,
-                        progress,
-                        fn seed_progress ->
-                          seed_progress
-                          |> Map.put("usage", usage_fn.())
-                          |> progress_fn.()
-                        end
-                      )
-                    end)
-                  end,
-                  persist_usage
-                )
-              after
-                Agent.stop(progress_agent)
+                :ok
               end
 
-            report_progress(reporter, %{
-              event: :seed_done,
-              family: family,
-              seed: seed,
-              train: result.train,
-              dev: result.dev,
-              test: result.test,
-              candidate_count: result.candidate_count
-            })
+              initial_usage = Map.get(progress, "usage", empty_usage())
 
-            entry = %{
-              "seed" => seed,
-              "result" => stringify_seed_result(result),
-              "wall_us" => wall_us,
-              "usage" => usage
-            }
+              persist_usage = fn usage ->
+                progress_agent
+                |> Agent.get(& &1)
+                |> Map.put("usage", usage)
+                |> progress_fn.()
+              end
 
-            updated =
+              {wall_us, result, usage} =
+                try do
+                  measure_req_llm_usage(
+                    initial_usage,
+                    fn usage_fn ->
+                      :timer.tc(fn ->
+                        run_seed(
+                          seed_context,
+                          seed,
+                          progress,
+                          fn seed_progress ->
+                            seed_progress
+                            |> Map.put("usage", usage_fn.())
+                            |> progress_fn.()
+                          end
+                        )
+                      end)
+                    end,
+                    persist_usage
+                  )
+                after
+                  Agent.stop(progress_agent)
+                end
+
+              report_progress(reporter, %{
+                event: :seed_done,
+                family: family,
+                seed: seed,
+                train: result.train,
+                dev: result.dev,
+                test: result.test,
+                candidate_count: result.candidate_count
+              })
+
+              entry = %{
+                "seed" => seed,
+                "result" => stringify_seed_result(result),
+                "wall_us" => wall_us,
+                "usage" => usage
+              }
+
+              updated =
+                checkpoint
+                |> update_in(["completed"], &(&1 ++ [entry]))
+                |> update_in(["in_progress"], &Map.delete(&1, Integer.to_string(seed)))
+
+              write_checkpoint!(checkpoint_path, updated)
+              updated
+
+            _entry ->
+              report_progress(reporter, %{event: :seed_resumed, family: family, seed: seed})
               checkpoint
-              |> update_in(["completed"], &(&1 ++ [entry]))
-              |> update_in(["in_progress"], &Map.delete(&1, Integer.to_string(seed)))
+          end
+        end)
 
-            write_checkpoint!(checkpoint_path, updated)
-            updated
+      entries = Enum.map(seeds, &checkpoint_seed(checkpoint, &1))
+      seed_results = Enum.map(entries, &atomize_seed_result(&1["result"]))
+      wall_us = Enum.sum(Enum.map(entries, & &1["wall_us"]))
+      usage = Enum.reduce(entries, empty_usage(), &sum_usage(&2, &1["usage"]))
 
-          _entry ->
-            report_progress(reporter, %{event: :seed_resumed, family: family, seed: seed})
-            checkpoint
-        end
-      end)
+      best = Enum.max_by(seed_results, &{&1.dev, -&1.seed})
 
-    entries = Enum.map(seeds, &checkpoint_seed(checkpoint, &1))
-    seed_results = Enum.map(entries, &atomize_seed_result(&1["result"]))
-    wall_us = Enum.sum(Enum.map(entries, & &1["wall_us"]))
-    usage = Enum.reduce(entries, empty_usage(), &sum_usage(&2, &1["usage"]))
+      budget_complete? =
+        Enum.all?(seed_results, &(&1.optimizer_stop_reason == "max_metric_calls"))
 
-    best = Enum.max_by(seed_results, &{&1.dev, -&1.seed})
-    budget_complete? = Enum.all?(seed_results, &(&1.optimizer_stop_reason == "max_metric_calls"))
+      report_progress(reporter, %{
+        event: :family_done,
+        family: family,
+        selected_seed: best.seed,
+        best_dev: best.dev,
+        selected_test: best.test,
+        wall_clock_ms: max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond))
+      })
 
-    report_progress(reporter, %{
-      event: :family_done,
-      family: family,
-      selected_seed: best.seed,
-      best_dev: best.dev,
-      selected_test: best.test,
-      wall_clock_ms: max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond))
-    })
-
-    %{
-      "family" => family,
-      "program" => program,
-      "campaign_id" => campaign_id,
-      "model" => model,
-      "reflection_model" => reflection_model,
-      "execution" => execution,
-      "evidence_level" =>
-        if(budget_complete?, do: "research_campaign", else: "research_preflight"),
-      "metric_calls" => budget,
-      "token_cost" => token_cost!(usage, token_cost, pricing_source, family),
-      "optimizer_budgets" => %{
-        "baseline" => length(testset),
-        "dspy_gepa" => budget,
-        "dsex_gepa" => budget,
-        "mipro_v2" => budget
-      },
-      "metric_call_evidence" => metric_call_evidence(best, seed_results),
-      "dataset" => %{
-        "source" => "DSEx GEPA dataset root #{Path.expand(dataset_root)}",
-        "split" => "train_dev_test",
-        "scope" => Map.get(spec, "dataset_scope", "unknown"),
-        "max_per_split" => spec["max_per_split"],
-        "split_counts" => spec["split_counts"],
-        "checksums" => split_checksums(paths),
-        "retrieval" => retrieval_evidence(spec["retrieval"], execution)
-      },
-      "wall_clock_ms" => max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond)),
-      "seed_variance" => seed_variance(seed_results),
-      "seed_selection" => %{
-        "dsex_gepa" => %{
-          "method" => "best_dev",
-          "seeds" => Enum.map(seed_results, & &1.seed),
-          "selected_seed" => best.seed,
-          "selection_split" => "dev",
-          "test_scores_used" => false,
-          "source" => "DSEx GEPA campaign completed-seed dev score comparison"
+      %{
+        "family" => family,
+        "program" => program,
+        "campaign_id" => campaign_id,
+        "model" => model,
+        "reflection_model" => reflection_model,
+        "execution" => execution,
+        "shard" => Map.fetch!(shard_map, family),
+        "shard_identity" => shard_identity(family, spec, paths, context),
+        "budget_identity" => budget_identity,
+        "budget" => budget_shard_snapshot(budget_server, family),
+        "evidence_level" =>
+          if(budget_complete?, do: "research_campaign", else: "research_preflight"),
+        "metric_calls" => budget,
+        "token_cost" => token_cost!(usage, token_cost, pricing_source, family),
+        "optimizer_budgets" => %{
+          "baseline" => length(testset),
+          "dspy_gepa" => budget,
+          "dsex_gepa" => budget,
+          "mipro_v2" => budget
+        },
+        "metric_call_evidence" => metric_call_evidence(best, seed_results),
+        "dataset" => %{
+          "source" => "DSEx GEPA dataset root #{Path.expand(dataset_root)}",
+          "split" => "train_dev_test",
+          "scope" => Map.get(spec, "dataset_scope", "unknown"),
+          "max_per_split" => spec["max_per_split"],
+          "split_counts" => spec["split_counts"],
+          "checksums" => split_checksums(paths),
+          "retrieval" => retrieval_evidence(spec["retrieval"], execution)
+        },
+        "wall_clock_ms" => max(1, System.convert_time_unit(wall_us, :microsecond, :millisecond)),
+        "seed_variance" => seed_variance(seed_results),
+        "seed_selection" => %{
+          "dsex_gepa" => %{
+            "method" => "best_dev",
+            "seeds" => Enum.map(seed_results, & &1.seed),
+            "selected_seed" => best.seed,
+            "selection_split" => "dev",
+            "test_scores_used" => false,
+            "source" => "DSEx GEPA campaign completed-seed dev score comparison"
+          }
+        },
+        "train_dev_test_gap" => %{
+          "train" => best.train,
+          "dev" => best.dev,
+          "test" => best.test,
+          "split_digests" => split_checksums(paths)
+        },
+        "results" => %{
+          "dsex_gepa" => %{
+            "score" => best.test,
+            "source" =>
+              "DSEx GEPA campaign runner #{context.source_git_sha} #{family}/#{program}",
+            "candidate_count" => best.candidate_count,
+            "frontier_size" => best.frontier_size,
+            "seed" => best.seed
+          }
+        },
+        "metadata" => %{
+          "budget_complete" => budget_complete?,
+          "generation_policy" => generation_identity(generation_policy),
+          "max_iterations" => generations,
+          "signature" => signature,
+          "instructions" => spec["instructions"],
+          "output_key" => spec["output_key"],
+          "component_feedback" => best.component_feedback
         }
-      },
-      "train_dev_test_gap" => %{
-        "train" => best.train,
-        "dev" => best.dev,
-        "test" => best.test,
-        "split_digests" => split_checksums(paths)
-      },
-      "results" => %{
-        "dsex_gepa" => %{
-          "score" => best.test,
-          "source" => "DSEx GEPA campaign runner #{context.source_git_sha} #{family}/#{program}",
-          "candidate_count" => best.candidate_count,
-          "frontier_size" => best.frontier_size,
-          "seed" => best.seed
-        }
-      },
-      "metadata" => %{
-        "budget_complete" => budget_complete?,
-        "generation_policy" => generation_identity(generation_policy),
-        "max_iterations" => generations,
-        "signature" => signature,
-        "instructions" => spec["instructions"],
-        "output_key" => spec["output_key"],
-        "component_feedback" => best.component_feedback
       }
-    }
-    |> maybe_put_papillon_judge(spec, judge_model)
+      |> maybe_put_papillon_judge(spec, judge_model)
+    after
+      detach_budget_handler(budget_handler)
+    end
   end
 
   defp report_progress(reporter, event) when is_function(reporter, 1) do
