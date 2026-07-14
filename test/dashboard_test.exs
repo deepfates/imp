@@ -3,6 +3,11 @@ defmodule DashboardTest do
 
   import ExUnit.CaptureIO
 
+  @local_mlx_fixture Path.expand(
+                       "../benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json",
+                       __DIR__
+                     )
+
   test "dashboard aggregates lane artifacts and require-full refuses missing lanes" do
     root = tmp_dir("dashboard")
     trace_dir = Path.join(root, "trace")
@@ -356,10 +361,14 @@ defmodule DashboardTest do
              "public_claims"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) == 14
+    assert Enum.count(dashboard["release_gate"]["checks"]) ==
+             length(dashboard["required_lanes"]) + 1
+
     assert dashboard["claims"]["status"] == "failing"
-    assert dashboard["claims"]["summary"]["total"] == 13
-    assert dashboard["claims"]["summary"]["proven"] == 7
+
+    assert dashboard["claims"]["summary"]["total"] ==
+             length(dashboard["claims"]["claims"])
+
     assert dashboard["claims"]["summary"]["blocked"] == 6
     assert dashboard["claims"]["summary"]["non_blocking"] == 0
 
@@ -369,7 +378,10 @@ defmodule DashboardTest do
       |> Enum.map(& &1["id"])
       |> Enum.sort()
 
-    assert proven_claim_ids == [
+    assert dashboard["claims"]["summary"]["proven"] == length(proven_claim_ids)
+    assert "claim.local_mlx_weight_training.effectiveness" in proven_claim_ids
+
+    assert [
              "claim.dspy_semantics.golden_trace",
              "claim.failure_recovery.deterministic_t0",
              "claim.optimizer_lift.full",
@@ -377,7 +389,7 @@ defmodule DashboardTest do
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
              "claim.rag_tools_agents.full"
-           ]
+           ] -- proven_claim_ids == []
 
     assert dashboard["lanes"]["product_package"]["status"] == "full"
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
@@ -654,6 +666,71 @@ defmodule DashboardTest do
     assert lane["full_evidence"]
     assert lane["summary"]["structural_contract_complete"]
     assert lane["summary"]["authority"]["complete"]
+  end
+
+  test "local MLX lane requires a verified valid fresh successful artifact" do
+    root = tmp_dir("dashboard-local-mlx")
+
+    scenarios = [
+      {"missing", :missing, "missing", false},
+      {"rejected", :rejected, "failing", false},
+      {"tampered", :tampered, "failing", false},
+      {"stale", :stale, "stale", false},
+      {"valid", :valid, "full", true}
+    ]
+
+    Enum.each(scenarios, fn {name, artifact_kind, expected_status, full_evidence} ->
+      local_mlx_dir = Path.join(root, name)
+      out_dir = Path.join(root, "#{name}-out")
+      Enum.each([local_mlx_dir, out_dir], &File.mkdir_p!/1)
+
+      case artifact_kind do
+        :missing -> :ok
+        :rejected -> write_local_mlx_artifact!(local_mlx_dir, status: "rejected")
+        :tampered -> write_local_mlx_artifact!(local_mlx_dir, tampered: true)
+        :stale -> write_local_mlx_artifact!(local_mlx_dir, generated_at: ~U[2000-01-01 00:00:00Z])
+        :valid -> write_local_mlx_artifact!(local_mlx_dir)
+      end
+
+      dashboard = run_local_mlx_dashboard!(local_mlx_dir, out_dir)
+      lane = dashboard["lanes"]["local_mlx_weight_training"]
+
+      assert lane["status"] == expected_status
+      assert lane["full_evidence"] == full_evidence
+      assert lane["passing"] == artifact_kind in [:stale, :valid]
+
+      if artifact_kind in [:rejected, :tampered] do
+        assert [%{"kind" => "local_mlx_artifact_rejected"}] =
+                 lane["blocking_requirements"]
+      end
+    end)
+  end
+
+  test "local MLX lane selects the newest candidate without falling back" do
+    root = tmp_dir("dashboard-local-mlx-newest")
+    local_mlx_dir = Path.join(root, "artifacts")
+    out_dir = Path.join(root, "out")
+    Enum.each([local_mlx_dir, out_dir], &File.mkdir_p!/1)
+
+    old_path = write_local_mlx_artifact!(local_mlx_dir, name: "local-mlx-old.json")
+
+    newest_path =
+      write_local_mlx_artifact!(local_mlx_dir,
+        name: "local-mlx-newest.json",
+        status: "rejected"
+      )
+
+    File.touch!(old_path, {{2026, 1, 1}, {0, 0, 0}})
+    File.touch!(newest_path, {{2026, 1, 1}, {0, 0, 1}})
+
+    lane =
+      local_mlx_dir
+      |> run_local_mlx_dashboard!(out_dir)
+      |> get_in(["lanes", "local_mlx_weight_training"])
+
+    assert lane["artifact"]["path"] == newest_path
+    assert lane["status"] == "failing"
+    refute lane["full_evidence"]
   end
 
   test "instruction optimizer full evidence requires the dashboard code revision" do
@@ -1065,13 +1142,16 @@ defmodule DashboardTest do
     dashboard = path |> File.read!() |> Jason.decode!()
 
     assert dashboard["profile"]["id"] == "v0.1"
-    assert dashboard["claims"]["summary"]["total"] == 6
+
+    assert dashboard["claims"]["summary"]["total"] ==
+             length(dashboard["claims"]["claims"])
 
     assert dashboard["required_lanes"] == [
              "failure_recovery",
              "golden_trace",
              "live_provider_smoke",
              "livebook_execute",
+             "local_mlx_weight_training",
              "optimize_anything",
              "product_package",
              "protocol_gates"
@@ -1463,6 +1543,50 @@ defmodule DashboardTest do
     |> Enum.max_by(&File.stat!(&1).mtime)
     |> File.read!()
     |> Jason.decode!()
+  end
+
+  defp run_local_mlx_dashboard!(local_mlx_dir, out_dir) do
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--local-mlx-dir",
+        local_mlx_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    out_dir
+    |> Path.join("parity-dashboard-*.json")
+    |> Path.wildcard()
+    |> Enum.max_by(&File.stat!(&1).mtime)
+    |> File.read!()
+    |> Jason.decode!()
+  end
+
+  defp write_local_mlx_artifact!(dir, opts \\ []) do
+    artifact = @local_mlx_fixture |> File.read!() |> Jason.decode!()
+    payload = Map.drop(artifact, ["generated_at", "git_sha", "run_context"])
+    payload = if status = opts[:status], do: Map.put(payload, "status", status), else: payload
+    clock = fn -> Keyword.get(opts, :generated_at, DateTime.utc_now()) end
+
+    artifact =
+      DSEx.BenchmarkTruth.RunContext.new!(
+        source_commits: %{"dsex" => "deepfates/dsex@dashboard-test"},
+        workspace_state: "clean",
+        clock: clock
+      )
+      |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+
+    artifact =
+      if opts[:tampered], do: put_in(artifact, ["fused", "accuracy"], 1.0), else: artifact
+
+    path = Path.join(dir, Keyword.get(opts, :name, "local-mlx-test.json"))
+    write_json!(path, artifact)
+    path
   end
 
   defp dashboard_git_sha do

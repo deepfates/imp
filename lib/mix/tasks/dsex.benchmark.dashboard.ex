@@ -17,7 +17,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   use Mix.Task
 
-  alias DSEx.BenchmarkTruth.ReleaseProfile
+  alias DSEx.BenchmarkTruth.{ArtifactFile, LocalMLXCampaign, ReleaseProfile}
 
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
@@ -72,6 +72,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           rlm_dir: :string,
           live_matrix_dir: :string,
           failure_campaign_dir: :string,
+          local_mlx_dir: :string,
           results_dir: :string,
           gate_dir: :string,
           claims_file: :string,
@@ -161,6 +162,11 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       "failure_recovery" =>
         failure_recovery_lane(
           Keyword.get(opts, :failure_campaign_dir, "tmp/failure-campaign"),
+          max_age_hours
+        ),
+      "local_mlx_weight_training" =>
+        local_mlx_weight_training_lane(
+          Keyword.get(opts, :local_mlx_dir, "benchmarks/results/local-mlx"),
           max_age_hours
         ),
       "golden_trace" =>
@@ -560,9 +566,78 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   end
 
   defp read_verified_failure_artifact(path) do
-    {:ok, DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path)}
+    {:ok, ArtifactFile.read_run_json!(path)}
   rescue
     error -> {:error, {:unverifiable, path, Exception.message(error)}}
+  end
+
+  defp local_mlx_weight_training_lane(dir, max_age_hours) do
+    with {:ok, path} <- latest(Path.join(dir, "local-mlx-*.json")),
+         {:ok, artifact} <- read_verified_local_mlx_artifact(path),
+         {:ok, validated} <- validate_local_mlx_artifact(path, artifact) do
+      artifact_lane("local_mlx_weight_training", path, validated, max_age_hours,
+        passing: true,
+        full_evidence: true,
+        scale: "full",
+        summary: %{
+          "status" => validated["status"],
+          "evidence_level" => validated["evidence_level"],
+          "effect" => validated["effect"],
+          "acceptance" => validated["acceptance"]
+        },
+        limitation:
+          "This evidence establishes local MLX weight-training effectiveness only; it does not establish BetterTogether parity."
+      )
+    else
+      {:error, :missing} ->
+        missing_lane(
+          "local_mlx_weight_training",
+          "no local-mlx campaign artifact found in #{dir}"
+        )
+
+      {:error, {:unverifiable, path, reason}} ->
+        rejected_local_mlx_lane(path, "artifact envelope is invalid or tampered: #{reason}")
+
+      {:error, {:rejected, path, reasons}} ->
+        rejected_local_mlx_lane(
+          path,
+          "artifact was rejected by LocalMLXCampaign validation: #{inspect(reasons)}"
+        )
+    end
+  end
+
+  defp read_verified_local_mlx_artifact(path) do
+    {:ok, ArtifactFile.read_run_json!(path)}
+  rescue
+    error -> {:error, {:unverifiable, path, Exception.message(error)}}
+  end
+
+  defp validate_local_mlx_artifact(path, artifact) do
+    case LocalMLXCampaign.validate_artifact(artifact) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, reasons} -> {:error, {:rejected, path, reasons}}
+    end
+  end
+
+  defp rejected_local_mlx_lane(path, reason) do
+    %{
+      "id" => "local_mlx_weight_training",
+      "status" => "failing",
+      "passing" => false,
+      "fresh" => false,
+      "full_evidence" => false,
+      "scale" => "rejected",
+      "artifact" => if(path, do: %{"path" => path, "sha256" => file_sha256(path)}, else: nil),
+      "summary" => %{"validated" => false},
+      "limitation" => reason,
+      "blocking_requirements" => [
+        %{
+          "kind" => "local_mlx_artifact_rejected",
+          "message" =>
+            "Local MLX weight-training evidence requires a verified, independently validated successful artifact."
+        }
+      ]
+    }
   end
 
   defp failure_recovery_authority(artifact) do
