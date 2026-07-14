@@ -64,11 +64,49 @@
       "official_metric": "numeric score 0.75^abs(gold-prediction); non-numeric exact match, per the OOLONG/RLM papers"
     },
     "oolong_pairs": {
-      "status": "inputs_and_gold_complete_operator_scorer_only",
+      "status": "t2_operator_reconstructed_inputs_and_gold_complete",
       "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs",
       "revision": "d1e1522b86ac0c169bbc890b0471408aaa29e8fa",
       "license": "MIT",
+      "questions_source_file": "questions.json",
       "questions_sha256": "9d147c25ce727d09d35470ef267db59b3877132429b8b0269a46d941f252cada",
+      "gold_source_files": {
+        "data/oolong-pairs-1024.json": "375d70294a8bd4d4c88d7ac589870713eb731d8815d75f79fac13a770a29073a",
+        "data/oolong-pairs-2048.json": "962eda3c679d77fe9fc27babc38d090ec81508f5904a25952f0bd9505b306ff9",
+        "data/oolong-pairs-4096.json": "1c7ab88bbb7e2ab43fe9c72ebc5f9fa6a07578b5f75bd26d6c17bcc93ea2c148",
+        "data/oolong-pairs-8192.json": "e14baad4ff09f327287e2a583c207b68e824761f84dd1d9b351fb654e61b3fcf",
+        "data/oolong-pairs-16384.json": "355db1522b4231026ff48ac424d3013735e3d8dc5b9b5c4f7cfb48fa25e38b3e",
+        "data/oolong-pairs-32768.json": "22842670c332bd357eabcacde621e1807d0d8c832bd90b3f29eb4b8578f61cb6",
+        "data/oolong-pairs-65536.json": "f16257e2254f28415b6764f0c8e2515c4173ea954a3e718985f2acf242f5f3fc",
+        "data/oolong-pairs-131072.json": "12ef36ddda61aa9f6268a1d35399d6dd88df0141d9a9bca864f3c3941dbf89e5",
+        "data/oolong-pairs-262144.json": "7d2fb2f287ae5f830e48abdeabbefb295df12711eae3e14d4d8ebc255595a1ca",
+        "data/oolong-pairs-524288.json": "aa5ee1d0022f996c80c9297a9fcb5b06b5aa12099372ae986f839026408fd48b",
+        "data/oolong-pairs-1048576.json": "584fef670a06b16f5c9cc4dd0a6f733decac8ba5706c0afcd97994f193a14785"
+      },
+      "context_source": "https://huggingface.co/datasets/oolongbench/oolong-synth",
+      "context_revision": "49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "context_source_files": {
+        "data/validation-00000-of-00007.parquet": "707c8228407e54b028e004745dd6804e3675573df7bdbfbbe84e925acf8befc1",
+        "data/validation-00001-of-00007.parquet": "75101cfb9f8edea437106a6458bf7ad65e2b5795ae1c74c9eb9a0262f6346ac8",
+        "data/validation-00002-of-00007.parquet": "38ad97de5e85394c67a2383b0cb9373214210025a048fc99e802a97561b9a457",
+        "data/validation-00003-of-00007.parquet": "2f5092896af3e25f2582fc754551b7e6d3d0a3a43a3338d8ab37d7ec9001cfe4",
+        "data/validation-00004-of-00007.parquet": "f3c2e82a0044a1e48c078f523e75c32c46064a4d5690e0bedcee4e58f2a9983c",
+        "data/validation-00005-of-00007.parquet": "8c0d27a796b471b93cd9323646f80a1b1216f88e16612cfb67df1bbe33dbae4b",
+        "data/validation-00006-of-00007.parquet": "2cc47c7be03411cf4e898f987193031d93b4743b9ed946478e762bd39221483e"
+      },
+      "context_window_id_by_context_size": {
+        "1024": 0,
+        "2048": 3,
+        "4096": 8,
+        "8192": 9,
+        "16384": 12,
+        "32768": 0,
+        "65536": 3,
+        "131072": 8,
+        "262144": 9,
+        "524288": 12,
+        "1048576": 16
+      },
       "gold_sha256_by_context": {
         "1024": "375d70294a8bd4d4c88d7ac589870713eb731d8815d75f79fac13a770a29073a",
         "2048": "962eda3c679d77fe9fc27babc38d090ec81508f5904a25952f0bd9505b306ff9",
@@ -82,10 +120,12 @@
         "524288": "aa5ee1d0022f996c80c9297a9fcb5b06b5aa12099372ae986f839026408fd48b",
         "1048576": "584fef670a06b16f5c9cc4dd0a6f733decac8ba5706c0afcd97994f193a14785"
       },
-      "context_source": "oolongbench/oolong-synth validation trec_coarse at revision 49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "normalized_sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+      "normalized_layout": "shared_context_row_v1",
+      "reserved_context_row_id": "__contexts__",
       "operator_metric": "versioned set precision/recall/F1 parser over normalized unordered user-ID pairs",
       "scorer_authority": "operator-defined; the paper-promised run_all.py pair scorer is not public, and the public OOLONG eval_helpers.py is not a pair scorer",
-      "blocker": "Each context length has a different gold set, while the current normalized row contract permits only one scalar answer reused at all lengths. Exact paper scoring remains unavailable even after the schema is repaired."
+      "blocker": "The public pair scorer remains unavailable and the canonical context-window mapping is an operator reconstruction matched to the public gold counts; this tranche is T2-only and cannot authorize T3."
     },
     "longbench_v2_codeqa": {
       "status": "complete",

@@ -342,7 +342,7 @@
     },
     "oolong_pairs": {
       "path": "../data/rlm/oolong_pairs_trec_coarse.jsonl",
-      "sha256": "ACQUIRE_AND_PIN_SHA256",
+      "sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
       "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs + oolongbench/oolong-synth",
       "revision": "pairs@d1e1522b86ac0c169bbc890b0471408aaa29e8fa; contexts@49898a421f4b14f2c9cae084d2d270f930ff4c90",
       "split": "trec_coarse",

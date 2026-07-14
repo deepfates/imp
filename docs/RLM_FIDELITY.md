@@ -106,6 +106,13 @@ The checked-in manifest intentionally contains `ACQUIRE_AND_PIN_SHA256` and
 execution reject a selected unavailable family. A pinned family remains
 runnable when unavailable families are excluded explicitly.
 
+OOLONG-Pairs is pinned as a T2 tranche: its 20 questions, 11 per-length gold
+files, and canonical unlabeled contexts are materialized in a shared-context
+JSONL contract (`__contexts__` plus 20 query rows), but its context-window
+mapping is an operator reconstruction and its paper-promised scorer remains
+unavailable. The pinned normalized artifact SHA-256 is
+`11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc`.
+
 ```console
 mix dsex.benchmark.rlm_campaign --plan
 mix dsex.benchmark.rlm_campaign --dry-run

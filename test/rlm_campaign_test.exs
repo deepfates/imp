@@ -5,6 +5,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     CampaignBudget,
     RLMCampaign,
     RLMCheckpoint,
+    RLMDataset,
     RLMProtocol,
     RLMRuntime,
     RLMStatistics
@@ -195,7 +196,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     fixture = fixture!()
     result = run!(fixture, GoodRuntime)
     assert result.artifact["evidence_tier"] == "t2_live_sample"
-    assert result.artifact["summary"]["total"] == 20
+    assert result.artifact["summary"]["total"] == 60
     assert result.artifact["summary"]["all_passing"]
     refute result.artifact["summary"]["paper_protocol_complete"]
 
@@ -208,10 +209,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert Enum.find(gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
 
     assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) ==
-             1.25
+             3.75
 
     resumed = run!(fixture, CrashRuntime)
-    assert resumed.artifact["summary"]["total"] == 20
+    assert resumed.artifact["summary"]["total"] == 60
     assert resumed.artifact["summary"]["all_passing"]
   end
 
@@ -342,8 +343,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
                row["usage"]["cost_authority"] == "provider_reported"
            end)
 
-    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "calls"]) == 10
-    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) == 2.5
+    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "calls"]) == 30
+    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) == 7.5
 
     resumed = run!(fixture, CrashRuntime)
     assert Enum.all?(resumed.artifact["rows"], &(&1["usage"]["requests"] == 2))
@@ -362,10 +363,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
 
     direct = get_in(result.artifact, ["aggregate", "approaches", "dsex:direct"])
     assert direct["completed"] == 0
-    assert direct["calls"] == 5
-    assert direct["input_tokens"] == 35
+    assert direct["calls"] == 15
+    assert direct["input_tokens"] == 105
     assert direct["output_tokens"] == 0
-    assert direct["cost_authorities"] == %{"pricing_derived" => 5}
+    assert direct["cost_authorities"] == %{"pricing_derived" => 15}
 
     resumed = run!(fixture, CrashRuntime)
     assert Enum.all?(resumed.artifact["rows"], &(&1["usage"]["input_tokens"] == 7))
@@ -727,6 +728,98 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert RLMCampaign.score("no pairs", "no pairs", "set_f1") == 1.0
   end
 
+  test "OOLONG-Pairs expands the frozen query into all 11 sizes with size-specific gold" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    spec = manifest["datasets"]["oolong_pairs"]
+
+    loaded = RLMDataset.load!("oolong_pairs", spec, Path.dirname(fixture.manifest_path))
+
+    assert loaded["logical_instances"] == 1
+    assert loaded["evaluated_rows"] == 11
+
+    assert Enum.map(loaded["rows"], & &1["context_size"]) ==
+             [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131_072, 262_144, 524_288, 1_048_576]
+
+    assert Enum.map(loaded["rows"], & &1["gold"]) ==
+             ["(1, 2)", "", "(3, 4)", "", "(5, 6)", "", "(7, 8)", "", "(9, 10)", "", "(11, 12)"]
+
+    assert_raise ArgumentError, ~r/exact 11-size context grid/, fn ->
+      RLMDataset.load!(
+        "oolong_pairs",
+        Map.put(spec, "context_grid", [1024]),
+        Path.dirname(fixture.manifest_path)
+      )
+    end
+  end
+
+  test "OOLONG-Pairs rejects malformed shared-context contracts" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    spec = manifest["datasets"]["oolong_pairs"]
+    path = fixture.dataset_paths["oolong_pairs"]
+    rows = path |> File.read!() |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+
+    assert_rejected = fn mutated, message ->
+      File.write!(path, Enum.map_join(mutated, "\n", &Jason.encode!/1) <> "\n")
+      mutated_spec = Map.put(spec, "sha256", sha(path))
+
+      assert_raise ArgumentError, message, fn ->
+        RLMDataset.load!("oolong_pairs", mutated_spec, Path.dirname(fixture.manifest_path))
+      end
+    end
+
+    assert_rejected.([hd(rows) | rows], ~r/exactly one __contexts__ row/)
+
+    assert_rejected.(
+      [Map.update!(hd(rows), "contexts", &Map.delete(&1, "1024")) | tl(rows)],
+      ~r/exactly 11 contexts/
+    )
+
+    assert_rejected.(
+      [Map.update!(hd(rows), "contexts", &Map.put(&1, "2097152", "extra")) | tl(rows)],
+      ~r/exactly 11 contexts/
+    )
+
+    assert_rejected.(
+      [hd(rows), Map.put(Enum.at(rows, 1), "contexts", %{}) | Enum.drop(rows, 2)],
+      ~r/must not contain contexts/
+    )
+  end
+
+  test "filtered OOLONG-Pairs planning is labeled T2 and makes no provider calls" do
+    fixture = fixture!()
+
+    plan =
+      RLMCampaign.plan(fixture.manifest_path,
+        families: ["oolong_pairs"],
+        approaches: ["direct"],
+        runtime: "dsex",
+        row_limit: 1
+      )
+
+    assert plan["requested_evidence_tier"] == "t2_live_sample"
+    assert plan["evidence_tier"] == "t2_live_sample"
+    assert plan["provider_calls"] == 0
+    assert plan["families"] == %{"oolong_pairs" => 1}
+    assert Enum.all?(plan["jobs"], &(&1["context_size"] == 1024))
+  end
+
+  test "plan metadata stays bounded and never hydrates context or gold bodies" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    spec = manifest["datasets"]["oolong_pairs"]
+
+    metadata = RLMDataset.metadata!("oolong_pairs", spec, Path.dirname(fixture.manifest_path))
+
+    assert metadata["logical_instances"] == 1
+    assert metadata["evaluated_rows"] == 11
+
+    assert Enum.all?(metadata["rows"], fn row ->
+             Map.keys(row) == ~w(context_size family id query_id)
+           end)
+  end
+
   test "official scorer contracts do not fall back to generic exact match" do
     assert_in_delta RLMCampaign.score("12", "10", "oolong_official"), 0.5625, 1.0e-12
     assert RLMCampaign.score("['entity']", "['entity']", "oolong_official") == 1.0
@@ -882,7 +975,27 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     dataset_paths =
       Map.new(rows, fn {family, row} ->
         path = Path.join(root, "#{family}.jsonl")
-        File.write!(path, Jason.encode!(row) <> "\n")
+
+        records =
+          if family == "oolong_pairs" do
+            context_row =
+              row
+              |> Map.take(~w(source revision split contexts))
+              |> Map.put("id", "__contexts__")
+
+            query_rows =
+              Enum.map(1..20, fn index ->
+                row
+                |> Map.delete("contexts")
+                |> Map.put("id", "oolong_pairs-#{index}")
+              end)
+
+            [context_row | query_rows]
+          else
+            [row]
+          end
+
+        File.write!(path, Enum.map_join(records, "\n", &Jason.encode!/1) <> "\n")
         {family, path}
       end)
 
@@ -910,7 +1023,23 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
           "sample_count" => 1,
           "sample_seed" => 17,
           "sample_ids" => ["#{family}-1"],
-          "context_grid" => if(family == "oolong_pairs", do: [1024], else: []),
+          "context_grid" =>
+            if(family == "oolong_pairs",
+              do: [
+                1024,
+                2048,
+                4096,
+                8192,
+                16384,
+                32768,
+                65536,
+                131_072,
+                262_144,
+                524_288,
+                1_048_576
+              ],
+              else: []
+            ),
           "docs_per_instance" => if(family == "browsecomp_plus", do: 2, else: nil),
           "metric" => "exact_match"
         }
@@ -1024,9 +1153,25 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
       },
       "oolong_pairs" => %{
         "id" => "oolong_pairs-1",
-        "contexts" => %{"1024" => "yes"},
+        "contexts" =>
+          Map.new(
+            [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131_072, 262_144, 524_288, 1_048_576],
+            &{Integer.to_string(&1), "context #{&1}"}
+          ),
         "question" => "answer?",
-        "answer" => "yes"
+        "gold_by_context_size" => %{
+          "1024" => ["(1, 2)"],
+          "2048" => [],
+          "4096" => ["(3, 4)"],
+          "8192" => [],
+          "16384" => ["(5, 6)"],
+          "32768" => [],
+          "65536" => ["(7, 8)"],
+          "131072" => [],
+          "262144" => ["(9, 10)"],
+          "524288" => [],
+          "1048576" => ["(11, 12)"]
+        }
       },
       "longbench_v2_codeqa" => %{
         "id" => "longbench_v2_codeqa-1",

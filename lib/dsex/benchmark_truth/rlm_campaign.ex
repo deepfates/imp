@@ -17,7 +17,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
     source_status = source_status(manifest, root)
     selection = selection!(manifest, opts)
     ensure_runnable_selection!(manifest, selection)
-    datasets = load_selected_datasets!(manifest, selection)
+    datasets = plan_selected_datasets!(manifest, selection)
     planned_jobs = jobs(manifest, datasets, selection)
 
     %{
@@ -687,6 +687,17 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
 
     selected_manifest
     |> RLMDataset.load_all!()
+    |> Map.new(fn {family, data} ->
+      {family, limit_dataset(data, selection["row_limit_per_family"])}
+    end)
+  end
+
+  defp plan_selected_datasets!(manifest, selection) do
+    selected_manifest =
+      put_in(manifest["datasets"], Map.take(manifest["datasets"], selection["families"]))
+
+    selected_manifest
+    |> RLMDataset.metadata_all!()
     |> Map.new(fn {family, data} ->
       {family, limit_dataset(data, selection["row_limit_per_family"])}
     end)

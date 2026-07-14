@@ -60,20 +60,41 @@ def download(url, destination, expected_sha256):
 
 def materialize(family, provenance, cache, normalizer):
     spec = provenance["families"][family]
-    revision = spec["revision"]
-    source_file = spec["source_file"]
-    source_name = f"{family}-{Path(source_file).name}"
-    source_path = cache / source_name
-    url = f"{spec['source']}/resolve/{revision}/{source_file}?download=true"
-
-    download(url, source_path, spec["source_file_sha256"])
-
     if family == "longbench_v2_codeqa":
+        source_file = spec["source_file"]
+        source_path = cache / f"{family}-{Path(source_file).name}"
+        url = f"{spec['source']}/resolve/{spec['revision']}/{source_file}?download=true"
+        download(url, source_path, spec["source_file_sha256"])
         output = ROOT / "longbench_v2_codeqa.jsonl"
         normalizer.normalize_codeqa(source_path, output)
     elif family == "oolong":
+        source_file = spec["source_file"]
+        source_path = cache / f"{family}-{Path(source_file).name}"
+        url = f"{spec['source']}/resolve/{spec['revision']}/{source_file}?download=true"
+        download(url, source_path, spec["source_file_sha256"])
         output = ROOT / "oolong_trec_coarse.jsonl"
         normalizer.normalize_oolong(source_path, output)
+    elif family == "oolong_pairs":
+        questions_path = cache / f"{family}-questions.json"
+        questions_url = f"{spec['source']}/resolve/{spec['revision']}/{spec['questions_source_file']}?download=true"
+        download(questions_url, questions_path, spec["questions_sha256"])
+
+        answers_dir = cache / f"{family}-answers"
+        answers_dir.mkdir(parents=True, exist_ok=True)
+        for source_file, expected_sha256 in spec["gold_source_files"].items():
+            answer_path = answers_dir / Path(source_file).name
+            answer_url = f"{spec['source']}/resolve/{spec['revision']}/{source_file}?download=true"
+            download(answer_url, answer_path, expected_sha256)
+
+        context_paths = []
+        for source_file, expected_sha256 in spec["context_source_files"].items():
+            context_path = cache / f"{family}-{Path(source_file).name}"
+            context_url = f"{spec['context_source']}/resolve/{spec['context_revision']}/{source_file}?download=true"
+            download(context_url, context_path, expected_sha256)
+            context_paths.append(context_path)
+
+        output = ROOT / "oolong_pairs_trec_coarse.jsonl"
+        normalizer.normalize_oolong_pairs(questions_path, answers_dir, context_paths, output)
     else:
         raise ValueError(f"unsupported complete family: {family}")
 
@@ -92,7 +113,7 @@ def main():
     parser.add_argument(
         "--family",
         action="append",
-        choices=["longbench_v2_codeqa", "oolong"],
+        choices=["longbench_v2_codeqa", "oolong", "oolong_pairs"],
         help="family to materialize; repeatable (default: both)",
     )
     parser.add_argument("--cache", type=Path, default=ROOT / ".cache")
