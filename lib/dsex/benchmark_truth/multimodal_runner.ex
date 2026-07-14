@@ -366,17 +366,23 @@ defmodule DSEx.BenchmarkTruth.MultimodalRunner do
     )
   end
 
-  defp unwrap_response(%{
-         __dsex_lm_output__: output,
-         __dsex_lm_metadata__: %{req_llm: metadata}
-       }),
-       do: {:ok, output, metadata}
+  defp unwrap_response(%{__dsex_lm_metadata__: _metadata} = result) do
+    with {:ok, output, metadata} <- DSEx.LM.Result.split(result),
+         %{} = req_llm <- Map.get(metadata, :req_llm) do
+      {:ok, output, req_llm}
+    else
+      _error -> {:error, {:malformed_output, "ReqLLM metadata envelope missing"}}
+    end
+  end
 
-  defp unwrap_response(%{
-         "__dsex_lm_output__" => output,
-         "__dsex_lm_metadata__" => %{"req_llm" => metadata}
-       }),
-       do: {:ok, output, metadata}
+  defp unwrap_response(%{"__dsex_lm_metadata__" => _metadata} = result) do
+    with {:ok, output, metadata} <- DSEx.LM.Result.split(result),
+         %{} = req_llm <- Map.get(metadata, "req_llm") do
+      {:ok, output, req_llm}
+    else
+      _error -> {:error, {:malformed_output, "ReqLLM metadata envelope missing"}}
+    end
+  end
 
   defp unwrap_response(_), do: {:error, {:malformed_output, "ReqLLM metadata envelope missing"}}
 

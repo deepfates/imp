@@ -209,7 +209,7 @@ defmodule DSEx.BenchmarkTruth.OperationsStress do
     Agent.stop(counter)
 
     pass? =
-      req_llm_output(first) == {:ok, "cached answer"} and second == first and calls == 1 and
+      DSEx.LM.Result.unwrap(first) == {:ok, "cached answer"} and second == first and calls == 1 and
         Enum.any?(events, &(&1["event"] == ["dsex", "cache", "miss"])) and
         Enum.any?(events, &(&1["event"] == ["dsex", "cache", "hit"])) and
         not (inspect(events) =~ "sk-test-cache-secret")
@@ -219,9 +219,6 @@ defmodule DSEx.BenchmarkTruth.OperationsStress do
       "events" => events
     })
   end
-
-  defp req_llm_output({:ok, %{__dsex_lm_output__: output}}), do: {:ok, output}
-  defp req_llm_output(result), do: result
 
   defp redacted_telemetry_check do
     ref = attach_events([[:dsex, :ops, :stress]])

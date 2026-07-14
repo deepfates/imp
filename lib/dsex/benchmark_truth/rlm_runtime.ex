@@ -60,11 +60,21 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       end
     end
 
-    defp usage(%{__dsex_lm_metadata__: metadata}, pricing),
-      do: normalize(get_in(metadata, [:req_llm, :usage]), pricing)
+    defp usage(%{__dsex_lm_metadata__: _metadata} = result, pricing) do
+      with {:ok, metadata} <- DSEx.LM.Result.metadata(result) do
+        normalize(get_in(metadata, [:req_llm, :usage]), pricing)
+      else
+        _error -> nil
+      end
+    end
 
-    defp usage(%{"__dsex_lm_metadata__" => metadata}, pricing),
-      do: normalize(get_in(metadata, ["req_llm", "usage"]), pricing)
+    defp usage(%{"__dsex_lm_metadata__" => _metadata} = result, pricing) do
+      with {:ok, metadata} <- DSEx.LM.Result.metadata(result) do
+        normalize(get_in(metadata, ["req_llm", "usage"]), pricing)
+      else
+        _error -> nil
+      end
+    end
 
     defp usage(%{usage: usage}, pricing), do: normalize(usage, pricing)
     defp usage(%{"usage" => usage}, pricing), do: normalize(usage, pricing)
@@ -221,15 +231,23 @@ defmodule DSEx.BenchmarkTruth.RLMRuntime do
       end
     end
 
-    defp controller_content(%{__dsex_lm_metadata__: %{req_llm: %{content: content}}})
-         when is_binary(content),
-         do: {:ok, content}
+    defp controller_content(%{__dsex_lm_metadata__: _metadata} = result) do
+      with {:ok, metadata} <- DSEx.LM.Result.metadata(result),
+           content when is_binary(content) <- get_in(metadata, [:req_llm, :content]) do
+        {:ok, content}
+      else
+        _error -> {:error, :missing_rlm_controller_content}
+      end
+    end
 
-    defp controller_content(%{
-           "__dsex_lm_metadata__" => %{"req_llm" => %{"content" => content}}
-         })
-         when is_binary(content),
-         do: {:ok, content}
+    defp controller_content(%{"__dsex_lm_metadata__" => _metadata} = result) do
+      with {:ok, metadata} <- DSEx.LM.Result.metadata(result),
+           content when is_binary(content) <- get_in(metadata, ["req_llm", "content"]) do
+        {:ok, content}
+      else
+        _error -> {:error, :missing_rlm_controller_content}
+      end
+    end
 
     defp controller_content(content) when is_binary(content), do: {:ok, content}
     defp controller_content(_result), do: {:error, :missing_rlm_controller_content}

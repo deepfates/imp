@@ -120,23 +120,13 @@ defmodule DSEx.BenchmarkTruth.Papillon do
     DSEx.LM.generate(untrusted_model, [%{role: :user, content: llm_request}], [])
   end
 
-  defp untrusted_response(response) when is_binary(response), do: {:ok, response}
-
-  defp untrusted_response(%{
-         __dsex_lm_output__: response,
-         __dsex_lm_metadata__: _metadata
-       })
-       when is_binary(response),
-       do: {:ok, response}
-
-  defp untrusted_response(%{
-         "__dsex_lm_output__" => response,
-         "__dsex_lm_metadata__" => _metadata
-       })
-       when is_binary(response),
-       do: {:ok, response}
-
-  defp untrusted_response(_response), do: {:error, :invalid_untrusted_model_response}
+  defp untrusted_response(response) do
+    case DSEx.LM.Result.output(response) do
+      {:ok, output} when is_binary(output) -> {:ok, output}
+      {:ok, _output} -> {:error, :invalid_untrusted_model_response}
+      {:error, _reason} = error -> error
+    end
+  end
 
   defp empty_prediction do
     {:ok, DSEx.Prediction.new(llm_request: "", llm_response: "", response: "")}

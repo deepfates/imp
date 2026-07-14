@@ -551,6 +551,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     inner = fn _messages, _opts ->
       {:ok,
        %{
+         __dsex_lm_output__: action,
          __dsex_lm_metadata__: %{
            req_llm: %{content: Jason.encode!(action), usage: %{input_tokens: 1}}
          }

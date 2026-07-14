@@ -193,7 +193,7 @@ defmodule DSEx.Optimize.Anything.Refiner do
   defp propose(lm, refiner_prompt, current_params, attempts) do
     messages = [%{role: :user, content: refiner_prompt(refiner_prompt, current_params, attempts)}]
 
-    case DSEx.LM.generate(lm, messages, []) do
+    case lm |> DSEx.LM.generate(messages, []) |> DSEx.LM.Result.unwrap() do
       {:ok, output} -> parse_proposal(output, current_params)
       {:error, reason} -> {:runtime_error, redact_error(reason)}
     end

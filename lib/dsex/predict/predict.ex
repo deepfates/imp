@@ -277,14 +277,24 @@ defmodule DSEx.Predict.Predict do
   defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
 
   defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos) do
-    {raw, lm_metadata} = unwrap_lm_output(raw)
+    with {:ok, output, lm_metadata} <- DSEx.LM.Result.split(raw) do
+      case adapter.parse(signature, output, []) do
+        {:ok, prediction} ->
+          {:ok, prediction, messages, output, lm_metadata}
 
-    case adapter.parse(signature, raw, []) do
-      {:ok, prediction} ->
-        {:ok, prediction, messages, raw, lm_metadata}
-
-      {:error, _reason} = error ->
-        recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw)
+        {:error, _reason} = error ->
+          recover_parse_failure(
+            error,
+            adapter,
+            signature,
+            messages,
+            lm,
+            opts,
+            inputs,
+            demos,
+            output
+          )
+      end
     end
   end
 
@@ -330,17 +340,15 @@ defmodule DSEx.Predict.Predict do
       |> Keyword.merge(DSEx.Adapter.JSON.lm_opts(signature, opts))
       |> Keyword.put(:json_fallback, false)
 
-    case DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)) do
-      {:ok, retry_raw} ->
-        {retry_raw, retry_lm_metadata} = unwrap_lm_output(retry_raw)
-
-        case DSEx.Adapter.JSON.parse(signature, retry_raw, []) do
-          {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
-          _retry_error -> parse_error(error, original_messages, original_raw)
-        end
-
-      {:error, _reason} = lm_error ->
-        parse_error(lm_error, original_messages, original_raw)
+    with {:ok, retry_raw} <- DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
+         {:ok, retry_raw, retry_lm_metadata} <- DSEx.LM.Result.split(retry_raw) do
+      case DSEx.Adapter.JSON.parse(signature, retry_raw, []) do
+        {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
+        _retry_error -> parse_error(error, original_messages, original_raw)
+      end
+    else
+      {:error, _reason} = retry_error ->
+        parse_error(retry_error, original_messages, original_raw)
     end
   end
 
@@ -362,9 +370,8 @@ defmodule DSEx.Predict.Predict do
     retry_messages = messages ++ [%{role: :user, content: error.message}]
     retry_opts = Keyword.update!(opts, :json_retries, &(&1 - 1))
 
-    with {:ok, retry_raw} <- DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)) do
-      {retry_raw, retry_lm_metadata} = unwrap_lm_output(retry_raw)
-
+    with {:ok, retry_raw} <- DSEx.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
+         {:ok, retry_raw, retry_lm_metadata} <- DSEx.LM.Result.split(retry_raw) do
       case adapter.parse(signature, retry_raw, []) do
         {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
         retry_error -> parse_error(retry_error, retry_messages, retry_raw)
@@ -387,16 +394,6 @@ defmodule DSEx.Predict.Predict do
   defp parse_error_message(error), do: error
 
   defp provider_lm_opts(opts), do: Keyword.drop(opts, [:json_fallback, :json_retries])
-
-  defp unwrap_lm_output(%{__dsex_lm_output__: raw, __dsex_lm_metadata__: metadata})
-       when is_map(metadata),
-       do: {raw, metadata}
-
-  defp unwrap_lm_output(%{"__dsex_lm_output__" => raw, "__dsex_lm_metadata__" => metadata})
-       when is_map(metadata),
-       do: {raw, metadata}
-
-  defp unwrap_lm_output(raw), do: {raw, %{}}
 
   defp parse_error(error, messages, raw) do
     {:error,

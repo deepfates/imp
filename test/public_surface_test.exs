@@ -69,6 +69,7 @@ defmodule PublicSurfaceTest do
     DSEx.IdentityAssessmentConsolidation,
     DSEx.IdentityReliability,
     DSEx.LM,
+    DSEx.LM.Result,
     DSEx.LMError,
     DSEx.LM.Static,
     DSEx.Logprobs,

@@ -5,7 +5,7 @@ defmodule BenchmarkArtifactFileTest do
     root =
       Path.join(System.tmp_dir!(), "dsex-artifact-file-#{System.unique_integer([:positive])}")
 
-    File.mkdir_p!(root)
+    prepare_root!(root)
     path = Path.join(root, "artifact.json")
 
     first = DSEx.BenchmarkTruth.ArtifactFile.write_json!(path, %{"value" => 1})
@@ -21,7 +21,7 @@ defmodule BenchmarkArtifactFileTest do
     root =
       Path.join(System.tmp_dir!(), "dsex-run-artifact-#{System.unique_integer([:positive])}")
 
-    File.mkdir_p!(root)
+    prepare_root!(root)
     path = Path.join(root, "artifact.json")
     timestamp = ~U[2026-07-13 18:00:00Z]
 
@@ -59,7 +59,7 @@ defmodule BenchmarkArtifactFileTest do
     root =
       Path.join(System.tmp_dir!(), "dsex-tampered-artifact-#{System.unique_integer([:positive])}")
 
-    File.mkdir_p!(root)
+    prepare_root!(root)
     path = Path.join(root, "artifact.json")
 
     context =
@@ -79,5 +79,10 @@ defmodule BenchmarkArtifactFileTest do
     assert_raise ArgumentError, ~r/must end with an immutable identity/, fn ->
       DSEx.BenchmarkTruth.RunContext.new!(source_commits: %{"dsex" => "deepfates/dsex"})
     end
+  end
+
+  defp prepare_root!(root) do
+    File.rm_rf!(root)
+    File.mkdir_p!(root)
   end
 end

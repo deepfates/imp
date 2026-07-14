@@ -74,6 +74,7 @@ defmodule DSEx.ExternalCommandTest do
       Path.join(System.tmp_dir!(), "dsex-managed-command-#{System.unique_integer([:positive])}")
 
     child_file = Path.join(root, "child.pid")
+    File.rm_rf!(root)
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)
 
@@ -103,6 +104,7 @@ defmodule DSEx.ExternalCommandTest do
   test "normal leader exit cleans descendants before run returns" do
     root = Path.join(System.tmp_dir!(), "dsex-exit-command-#{System.unique_integer([:positive])}")
     child_file = Path.join(root, "child.pid")
+    File.rm_rf!(root)
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)
 
@@ -132,11 +134,21 @@ defmodule DSEx.ExternalCommandTest do
   defp await_pid_file!(path, attempts) do
     case File.read(path) do
       {:ok, value} ->
-        String.to_integer(value)
+        case Integer.parse(String.trim(value)) do
+          {pid, ""} when pid > 0 -> pid
+          _incomplete -> retry_pid_file!(path, attempts)
+        end
 
       {:error, :enoent} ->
-        Process.sleep(10)
-        await_pid_file!(path, attempts - 1)
+        retry_pid_file!(path, attempts)
+
+      {:error, reason} ->
+        raise "failed to read child pid file: #{inspect(reason)}"
     end
+  end
+
+  defp retry_pid_file!(path, attempts) do
+    Process.sleep(10)
+    await_pid_file!(path, attempts - 1)
   end
 end

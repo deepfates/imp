@@ -40,7 +40,7 @@ defmodule DSEx.Optimizer.InstructionProposer do
               temperature: Keyword.get(opts, :temperature, 1.0)
             )
 
-          case result do
+          case DSEx.LM.Result.unwrap(result) do
             {:ok, raw} ->
               case parse(raw, 1, []) do
                 [instruction | _] ->
@@ -111,6 +111,7 @@ defmodule DSEx.Optimizer.InstructionProposer do
   defp propose_with_lm(lm, program, trainset, opts, count, fallback) do
     lm
     |> DSEx.LM.generate(messages(program, trainset, opts), [])
+    |> DSEx.LM.Result.unwrap()
     |> case do
       {:ok, raw} -> parse(raw, count, fallback)
       {:error, _reason} -> fallback

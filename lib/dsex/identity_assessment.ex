@@ -564,13 +564,13 @@ defmodule DSEx.IdentityAssessment do
   end
 
   defp parse_response(response) do
-    response
-    |> unwrap_response()
-    |> decode_response()
+    with {:ok, output} <- DSEx.LM.Result.output(response) do
+      output
+      |> unwrap_response()
+      |> decode_response()
+    end
   end
 
-  defp unwrap_response(%{__dsex_lm_output__: output}), do: unwrap_response(output)
-  defp unwrap_response(%{"__dsex_lm_output__" => output}), do: unwrap_response(output)
   defp unwrap_response(%{tool_calls: [call]}), do: unwrap_tool_call(call)
   defp unwrap_response(%{"tool_calls" => [call]}), do: unwrap_tool_call(call)
   defp unwrap_response(response), do: response

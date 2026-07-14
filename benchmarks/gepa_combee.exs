@@ -180,11 +180,12 @@ defmodule DSEx.Benchmarks.GEPAComBee do
           output
 
         :live ->
-          case DSEx.LM.generate(lm, [%{role: "user", content: prompt}],
+          case lm
+               |> DSEx.LM.generate([%{role: "user", content: prompt}],
                  max_tokens: @max_output_tokens,
                  temperature: 0
-               ) do
-            {:ok, %{__dsex_lm_output__: output}} when is_binary(output) -> output
+               )
+               |> DSEx.LM.Result.unwrap() do
             {:ok, output} when is_binary(output) -> output
             {:error, reason} -> raise "provider reducer failed: #{inspect(reason)}"
             other -> raise "invalid provider reducer response: #{inspect(other)}"

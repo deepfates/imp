@@ -397,12 +397,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Trace do
     }
   end
 
-  defp generated_content({:ok, content}) when is_binary(content), do: content
-
-  defp generated_content({:ok, %{__dsex_lm_output__: content}}) when is_binary(content),
-    do: content
-
-  defp generated_content(_result), do: nil
+  defp generated_content(result) do
+    case DSEx.LM.Result.unwrap(result) do
+      {:ok, content} when is_binary(content) -> content
+      _other -> nil
+    end
+  end
 
   defp provider_stream_chunk_replay_check do
     lm =

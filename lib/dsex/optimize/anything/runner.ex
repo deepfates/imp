@@ -303,18 +303,18 @@ defmodule DSEx.Optimize.Anything.Runner do
         )
   end
 
-  defp lm_text!({:ok, text}) when is_binary(text), do: text
-  defp lm_text!({:ok, %{__dsex_lm_output__: output}}), do: lm_text!({:ok, output})
-  defp lm_text!({:ok, %{"__dsex_lm_output__" => output}}), do: lm_text!({:ok, output})
-  defp lm_text!({:ok, %{"instruction" => text}}) when is_binary(text), do: text
-  defp lm_text!({:ok, %{instruction: text}}) when is_binary(text), do: text
-  defp lm_text!({:ok, %{"new_instruction" => text}}) when is_binary(text), do: text
-  defp lm_text!({:ok, %{new_instruction: text}}) when is_binary(text), do: text
+  defp lm_text!(result), do: result |> DSEx.LM.Result.unwrap() |> lm_output_text!()
 
-  defp lm_text!({:error, reason}),
+  defp lm_output_text!({:ok, text}) when is_binary(text), do: text
+  defp lm_output_text!({:ok, %{"instruction" => text}}) when is_binary(text), do: text
+  defp lm_output_text!({:ok, %{instruction: text}}) when is_binary(text), do: text
+  defp lm_output_text!({:ok, %{"new_instruction" => text}}) when is_binary(text), do: text
+  defp lm_output_text!({:ok, %{new_instruction: text}}) when is_binary(text), do: text
+
+  defp lm_output_text!({:error, reason}),
     do: raise(RuntimeError, "Optimize Anything reflection LM failed: #{inspect(reason)}")
 
-  defp lm_text!(result),
+  defp lm_output_text!(result),
     do:
       raise(
         ArgumentError,

@@ -285,9 +285,13 @@ defmodule DSEx.Predict.RLM do
         "legacy discrete action maps are unsupported; return a map with reasoning and code",
         action}}
 
-  defp normalize_action(%{__dsex_lm_output__: output}), do: normalize_action(output)
+  defp normalize_action(%{__dsex_lm_output__: _output} = result) do
+    with {:ok, output} <- DSEx.LM.Result.output(result), do: normalize_action(output)
+  end
 
-  defp normalize_action(%{"__dsex_lm_output__" => output}), do: normalize_action(output)
+  defp normalize_action(%{"__dsex_lm_output__" => _output} = result) do
+    with {:ok, output} <- DSEx.LM.Result.output(result), do: normalize_action(output)
+  end
 
   defp normalize_action(%{submit: _} = action),
     do:
@@ -472,8 +476,9 @@ defmodule DSEx.Predict.RLM do
        when is_binary(prompt) do
     with {:ok, _used} <- Budget.reserve_lm(budget, 1),
          :ok <- Budget.check(budget),
-         {:ok, raw} <- run_budgeted(budget, fn -> query_sub_lm(rlm, prompt) end) do
-      {:ok, subquery_value(raw), runtime}
+         {:ok, raw} <- run_budgeted(budget, fn -> query_sub_lm(rlm, prompt) end),
+         {:ok, value} <- subquery_value(raw) do
+      {:ok, value, runtime}
     else
       {:error, reason} -> {:error, reason, runtime}
     end
@@ -488,8 +493,14 @@ defmodule DSEx.Predict.RLM do
          {:ok, results} <- run_leased_batch(budget, prompts, &query_sub_lm(rlm, &1)) do
       normalized =
         Enum.map(results, fn
-          {:ok, value} -> subquery_value(value)
-          {:error, reason} -> {:error, reason}
+          {:ok, value} ->
+            case subquery_value(value) do
+              {:ok, output} -> output
+              {:error, reason} -> {:error, reason}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
         end)
 
       {:ok, normalized, runtime}
@@ -656,9 +667,10 @@ defmodule DSEx.Predict.RLM do
   end
 
   defp subquery_value(value) do
-    case unwrap_lm_output(value) do
-      %DSEx.Prediction{} = prediction -> DSEx.Prediction.to_map(prediction)
-      output -> output
+    case DSEx.LM.Result.output(value) do
+      {:ok, %DSEx.Prediction{} = prediction} -> {:ok, DSEx.Prediction.to_map(prediction)}
+      {:ok, output} -> {:ok, output}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -759,7 +771,7 @@ defmodule DSEx.Predict.RLM do
     ]
 
     with {:ok, raw} <- run_budgeted(state.budget, fn -> DSEx.LM.generate(lm, messages, []) end),
-         raw = unwrap_lm_output(raw),
+         {:ok, raw} <- DSEx.LM.Result.output(raw),
          {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []) do
       state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
       {:ok, add_trace(prediction, state)}
@@ -771,10 +783,6 @@ defmodule DSEx.Predict.RLM do
 
   defp add_observation(state, observation),
     do: Map.update!(state, :observations, &[trace_term(observation, state.trace_limit) | &1])
-
-  defp unwrap_lm_output(%{__dsex_lm_output__: output}), do: output
-  defp unwrap_lm_output(%{"__dsex_lm_output__" => output}), do: output
-  defp unwrap_lm_output(output), do: output
 
   defp trace(state, iteration, action, input, output) do
     event = %{

@@ -111,7 +111,7 @@ defmodule DSEx.Streaming do
   defp stream_lm(lm, _messages, _opts), do: error_response({:not_an_lm, lm})
 
   defp generate_once(lm, messages, opts) do
-    case DSEx.LM.generate(lm, messages, opts) do
+    case lm |> DSEx.LM.generate(messages, opts) |> DSEx.LM.Result.unwrap() do
       {:ok, value} ->
         [%DSEx.Streaming.Messages.StreamResponse{chunk: stream_value(value)}]
 

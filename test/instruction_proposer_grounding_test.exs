@@ -91,6 +91,28 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
     assert length(failed_report.errors) == 2
   end
 
+  test "provider envelopes produce proposals instead of silent fallbacks" do
+    lm = fn _messages, _opts ->
+      {:ok,
+       %{
+         __dsex_lm_output__: %{"instructions" => ["Use the provider proposal."]},
+         __dsex_lm_metadata__: %{req_llm: %{provider: "test"}}
+       }}
+    end
+
+    program = DSEx.predict("question -> answer")
+    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+
+    assert ["Use the provider proposal."] =
+             InstructionProposer.propose(program, [example], lm: lm, count: 1)
+
+    assert {["Use the provider proposal."], %{status: :ok, calls: 1, errors: []}} =
+             InstructionProposer.propose_with_report(program, [example],
+               lm: lm,
+               count: 1
+             )
+  end
+
   test "proposal slots rotate grounded demo sets and preserve repeated instructions" do
     parent = self()
 
