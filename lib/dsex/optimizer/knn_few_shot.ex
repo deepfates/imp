@@ -65,6 +65,7 @@ defmodule DSEx.Optimizer.KNNFewShot.Program do
 end
 
 defmodule DSEx.Optimizer.KNNFewShot do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Attach nearest training examples as demonstrations at call time.
 
@@ -90,6 +91,21 @@ defmodule DSEx.Optimizer.KNNFewShot do
       knn: DSEx.Predict.KNN.new(k, trainset, field: opts[:field]),
       bootstrap: DSEx.Optimizer.LabeledFewShot.new(k: k)
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :constructor,
+      datasets: %{trainset: :unsupported, validation: :unsupported},
+      result: :constructed_program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, student, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok, compile(optimizer, student)}
+    end
   end
 
   def compile(%__MODULE__{} = optimizer, student),

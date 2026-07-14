@@ -8,6 +8,33 @@ defmodule DSEx.Optimizer.PlaybookTest do
   alias DSEx.Playbook.{Delta, Provenance}
   alias DSEx.Playbook.Operation.{Add, Revise}
 
+  test "canonical workflow contract validates named splits and invocation checkpointing" do
+    optimizer = successful_optimizer()
+    program = wrapped_program(baseline_playbook())
+
+    assert {:error, {:missing_dataset, :auditset}} =
+             DSEx.Optimizer.run(optimizer, program,
+               trainset: train_rows(),
+               promotionset: promotion_rows()
+             )
+
+    owner = self()
+
+    assert {:ok, %PlaybookOptimizer.Result{}} =
+             DSEx.Optimizer.run(optimizer, program,
+               trainset: train_rows(),
+               promotionset: promotion_rows(),
+               auditset: audit_rows(),
+               checkpoint_fn: fn checkpoint ->
+                 send(owner, {:runtime_checkpoint, checkpoint})
+                 :ok
+               end
+             )
+
+    assert_receive {:runtime_checkpoint, %{"payload" => %{"status" => "started"}}}
+    assert optimizer.checkpoint_fn == nil
+  end
+
   test "promotes disjoint durable lift, checkpoints exactly, and rolls back deterministically" do
     parent = self()
     baseline = baseline_playbook()

@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.RandomSearch do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Try random demo subsets and keep the program with the best dev score.
 
@@ -67,6 +68,27 @@ defmodule DSEx.Optimizer.RandomSearch do
       demos_per_candidate: opts[:demos_per_candidate],
       seed: opts[:seed]
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :required},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok,
+       compile(
+         optimizer,
+         program,
+         DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+         DSEx.Optimizer.fetch_dataset!(opts, :validation)
+       )}
+    end
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do

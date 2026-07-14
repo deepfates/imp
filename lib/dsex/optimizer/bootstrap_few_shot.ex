@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.BootstrapFewShot do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Compile a predictor by selecting successful demonstrations from a trainset.
 
@@ -32,6 +33,21 @@ defmodule DSEx.Optimizer.BootstrapFewShot do
       metric: metric,
       max_bootstrapped_demos: opts[:max_bootstrapped_demos]
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :unsupported},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok, compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset))}
+    end
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do

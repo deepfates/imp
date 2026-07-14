@@ -333,46 +333,93 @@ defmodule DSEx do
   @doc """
   Compiles a program with an optimizer.
 
-  Use `DSEx.optimize/4` for optimizers that need a dev set, such as
-  `RandomSearch`, `COPRO`, `MIPROv2`, `SIMBA`, and `GEPA`. Use
-  `DSEx.optimize/3` for trainset-only optimizers such as `LabeledFewShot`.
+  Optimizer modules declare their dataset requirements through the
+  `DSEx.Optimizer` behaviour. Use `DSEx.optimize/4` for optimizers that need a
+  validation set and `DSEx.optimize/3` for trainset-only optimizers. Invocation
+  options for checkpoint-aware optimizers belong in `DSEx.optimize/5`.
   """
-  def optimize(program, optimizer, trainset)
+  def optimize(program, optimizer, trainset),
+    do: run_optimizer!(program, optimizer, [trainset: trainset], :program, "DSEx.optimize/3")
 
-  def optimize(program, %module{} = optimizer, trainset) do
-    if function_exported?(module, :compile, 3) do
-      module.compile(optimizer, program, trainset)
-    else
-      raise ArgumentError,
-            "#{inspect(module)} cannot compile through DSEx.optimize/3; pass a devset with DSEx.optimize/4"
+  def optimize(program, optimizer, trainset, validation),
+    do:
+      run_optimizer!(
+        program,
+        optimizer,
+        [trainset: trainset, validation: validation],
+        :program,
+        "DSEx.optimize/4"
+      )
+
+  def optimize(program, optimizer, trainset, validation, opts) when is_list(opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "DSEx.optimize/5 expects keyword invocation options")
+
+    run_optimizer!(
+      program,
+      optimizer,
+      Keyword.merge(opts, trainset: trainset, validation: validation),
+      :program,
+      "DSEx.optimize/5"
+    )
+  end
+
+  def optimize(_program, _optimizer, _trainset, _validation, _opts),
+    do: raise(ArgumentError, "DSEx.optimize/5 expects keyword invocation options")
+
+  @doc """
+  Executes a training optimizer through the explicit training lifecycle.
+
+  The result is tagged and contains a `DSEx.Optimizer.TrainingResult`. SFT
+  returns `status: :job_created`; synchronous reinforcement training
+  returns `status: :completed` with the rebound program.
+  """
+  def train(program, optimizer, trainset, opts \\ [])
+
+  def train(program, optimizer, trainset, opts) when is_list(opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "DSEx.train/4 expects keyword invocation options")
+
+    case run_optimizer(program, optimizer, Keyword.put(opts, :trainset, trainset), :training) do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
     end
   end
 
-  def optimize(_program, optimizer, _trainset) do
-    raise ArgumentError,
-          "DSEx.optimize/3 expects an optimizer struct with compile/3; got: #{inspect(optimizer)}"
-  end
+  def train(_program, _optimizer, _trainset, _opts),
+    do: raise(ArgumentError, "DSEx.train/4 expects keyword invocation options")
 
-  def optimize(program, optimizer, trainset, devset)
+  @doc "Returns the explicit execution capabilities declared by an optimizer."
+  defdelegate optimizer_capabilities(optimizer), to: DSEx.Optimizer, as: :capabilities
 
-  def optimize(program, %module{} = optimizer, trainset, devset) do
-    cond do
-      function_exported?(module, :compile, 4) ->
-        module.compile(optimizer, program, trainset, devset)
-
-      function_exported?(module, :compile, 3) ->
-        module.compile(optimizer, program, trainset)
-
-      true ->
-        raise ArgumentError,
-              "#{inspect(module)} is not a DSEx optimizer with compile/3 or compile/4"
+  defp run_optimizer!(program, optimizer, opts, kind, api) do
+    case run_optimizer(program, optimizer, opts, kind) do
+      {:ok, result} -> result
+      {:error, reason} -> raise ArgumentError, optimizer_error(api, optimizer, reason)
     end
   end
 
-  def optimize(_program, optimizer, _trainset, _devset) do
-    raise ArgumentError,
-          "DSEx.optimize/4 expects an optimizer struct with compile/4 or compile/3; got: #{inspect(optimizer)}"
+  defp run_optimizer(program, optimizer, opts, kind) do
+    with {:ok, result} <- DSEx.Optimizer.run(optimizer, program, opts, kind) do
+      {:ok, result}
+    end
   end
+
+  defp optimizer_error(api, optimizer, {:not_an_optimizer, _value}),
+    do:
+      "#{api} expects an optimizer struct implementing DSEx.Optimizer; got: #{inspect(optimizer)}"
+
+  defp optimizer_error(api, _optimizer, {:optimizer_kind_mismatch, :program, :training}),
+    do: "#{api} received a training optimizer; use DSEx.train/4"
+
+  defp optimizer_error(api, _optimizer, {:optimizer_kind_mismatch, :program, kind}),
+    do: "#{api} cannot execute an optimizer of kind #{inspect(kind)} through program optimization"
+
+  defp optimizer_error(api, _optimizer, {:missing_dataset, :validation}),
+    do: "#{api} requires a validation set; use DSEx.optimize/4 or DSEx.optimize/5"
+
+  defp optimizer_error(api, _optimizer, reason),
+    do: "#{api} failed: #{inspect(reason)}"
 
   @doc "Returns a JSON-safe portable representation of a DSEx program."
   defdelegate dump(program), to: DSEx.Saving

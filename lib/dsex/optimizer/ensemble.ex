@@ -78,6 +78,7 @@ defmodule DSEx.Optimizer.Ensemble.Program do
 end
 
 defmodule DSEx.Optimizer.Ensemble do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Compile multiple programs into an ensemble program.
 
@@ -107,6 +108,21 @@ defmodule DSEx.Optimizer.Ensemble do
       size: opts[:size],
       deterministic: opts[:deterministic]
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :constructor,
+      datasets: %{trainset: :unsupported, validation: :unsupported},
+      result: :constructed_program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = ensemble, programs, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok, compile(ensemble, programs)}
+    end
   end
 
   def compile(%__MODULE__{} = ensemble, programs),

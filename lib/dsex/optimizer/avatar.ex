@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.Avatar do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Rewrites Avatar actor instructions from positive and negative trajectories.
 
@@ -70,6 +71,21 @@ defmodule DSEx.Optimizer.Avatar do
           maybe_lm(common_opts, opts[:rewrite_lm] || default_lm)
         )
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :unsupported},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok, compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset))}
+    end
   end
 
   def compile(%__MODULE__{} = optimizer, %DSEx.Predict.Avatar{} = student, trainset) do

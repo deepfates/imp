@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.Playbook do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Bounded optimization for persistent `DSEx.Playbook` parameters.
 
@@ -105,13 +106,49 @@ defmodule DSEx.Optimizer.Playbook do
     validate_optimizer!(optimizer)
   end
 
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :workflow,
+      datasets: %{
+        trainset: :required,
+        promotionset: :required,
+        auditset: :required,
+        validation: :unsupported
+      },
+      result: :workflow_result
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with {:ok, promotionset} <- Keyword.fetch(opts, :promotionset),
+         {:ok, auditset} <- Keyword.fetch(opts, :auditset) do
+      compile_opts =
+        opts
+        |> DSEx.Optimizer.invocation_options()
+        |> Keyword.drop([:promotionset, :auditset])
+
+      compile(
+        optimizer,
+        program,
+        DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+        promotionset,
+        auditset,
+        compile_opts
+      )
+    else
+      :error -> {:error, :playbook_splits_required}
+    end
+  end
+
   @type t :: %__MODULE__{}
 
   @doc "Proposes, evaluates, and transactionally promotes one playbook delta."
   @spec compile(t(), struct(), [row()], [row()], [row()], keyword()) ::
           {:ok, Result.t()} | {:error, term()}
   def compile(%__MODULE__{} = optimizer, program, trainset, promotionset, auditset, opts \\ []) do
-    with :ok <- validate_compile_options(opts),
+    with {:ok, optimizer, opts} <- apply_runtime_options(optimizer, opts),
+         :ok <- validate_compile_options(opts),
          {:ok, baseline} <- fetch_playbook(program, optimizer.parameter),
          {:ok, splits} <- validate_splits(trainset, promotionset, auditset),
          identity <- identity(optimizer, baseline, splits),
@@ -847,6 +884,22 @@ defmodule DSEx.Optimizer.Playbook do
   end
 
   defp validate_compile_options(_), do: {:error, :compile_options_must_be_a_keyword_list}
+
+  defp apply_runtime_options(optimizer, opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      checkpoint_fn = Keyword.get(opts, :checkpoint_fn, optimizer.checkpoint_fn)
+
+      if is_nil(checkpoint_fn) or is_function(checkpoint_fn, 1),
+        do:
+          {:ok, %{optimizer | checkpoint_fn: checkpoint_fn}, Keyword.delete(opts, :checkpoint_fn)},
+        else: {:error, :checkpoint_fn_must_be_arity_one_or_nil}
+    else
+      {:error, :compile_options_must_be_a_keyword_list}
+    end
+  end
+
+  defp apply_runtime_options(_optimizer, _opts),
+    do: {:error, :compile_options_must_be_a_keyword_list}
 
   defp fetch_playbook(program, name) do
     case Enum.find(ProgramParameters.playbooks(program), &(&1.name == name)) do

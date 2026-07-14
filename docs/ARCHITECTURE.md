@@ -23,7 +23,8 @@ Example / inputs
 - `DSEx.predict/2`, `chain_of_thought/2`, `multi_chain_comparison/2`, `best_of_n/3`, `refine/3`, `assert/3`, `parallel/3`, `knn/3`, `nearest/2`
 - `DSEx.program_of_thought/2`, `code_act/3`, `react/3`, `rlm/2`
 - `DSEx.memory/2`, `DSEx.retrieve/3`, `DSEx.rag/3`
-- `DSEx.tool/4`, `DSEx.with_demos/2`, `DSEx.call/2`, `DSEx.evaluate/4`, `DSEx.optimize/4`
+- `DSEx.tool/4`, `DSEx.with_demos/2`, `DSEx.call/2`, `DSEx.evaluate/4`
+- `DSEx.optimize/3`, `DSEx.optimize/4`, `DSEx.optimize/5`, `DSEx.train/3`, `DSEx.train/4`, `DSEx.optimizer_capabilities/1`
 - `DSEx.exact_match/1`, `DSEx.extractive_qa/3`, `DSEx.classification/3`, `DSEx.classification_report/2`
 - `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, `DSEx.load!/1`
 - provider helper: `DSEx.req_llm/2`
@@ -272,6 +273,34 @@ argument.
 
 ## Optimization
 
+`DSEx.Optimizer` is the canonical execution behaviour. Implementations expose
+`__optimizer__/0` capability metadata and a single `run/3` callback. Dispatch
+does not inspect legacy `compile` arities to decide what arguments mean. The
+capability declaration contains:
+
+- `kind`: `:program`, `:training`, `:constructor`, or `:workflow`;
+- `datasets`: named splits mapped to `:required`, `:optional`, or
+  `:unsupported`;
+- `result`: `:program`, `:training_result`, `:constructed_program`, or
+  `:workflow_result`.
+
+`DSEx.Optimizer.run/3` validates the capability shape, keyword invocation
+options, declared dataset presence or absence, and the outer result shape. The
+optimizer implementation validates dataset contents, split relationships, and
+its own options. This keeps split routing centralized without claiming that the
+behaviour can validate optimizer-specific data semantics.
+
+The facade enforces lifecycle separation. `DSEx.optimize/3-5` accepts only
+`:program` optimizers and returns the compiled program, raising `ArgumentError`
+for contract failures. Validation-required optimizers use `optimize/4` or
+`optimize/5`; optional-validation optimizers can use `optimize/3` or supply the
+split. `DSEx.train/3` and `DSEx.train/4` accept only `:training` optimizers and
+return `{:ok, %DSEx.Optimizer.TrainingResult{}} | {:error, reason}`.
+Constructor and workflow kinds retain their explicit module APIs rather than being routed
+through either facade function. Optimizer-specific `compile` functions also
+remain available when advanced callers need native return values or direct
+checkpoint orchestration.
+
 Metric-driven optimizers live under `DSEx.Optimizer.*`:
 
 - `LabeledFewShot`
@@ -283,12 +312,15 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 - `SIMBA`
 - `GEPA`
 - `BetterTogether`
-- `BootstrapFinetune`, `GRPO` build provider training jobs only when an
-  explicit real trainer backend is supplied. DSEx does not include an in-process
-  local training fallback. Training jobs enforce provider job and terminal
-  artifact identity, support idempotent bounded-retry submit/refresh/cancel,
-  persist credential-free checkpoints, and rebind a successful model artifact
-  onto the compiled program.
+- `BootstrapFinetune`, `GRPO` run through `DSEx.train/3` or `DSEx.train/4` only
+  when an explicit trainer backend is supplied. Bootstrap fine-tuning returns
+  a `:job_created` training result containing its provider job; GRPO returns a completed
+  training result containing the rebound program. A missing trainer is an error;
+  DSEx does not silently select a local training fallback. The optional
+  `DSEx.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
+  enforce job and terminal artifact identity, support idempotent bounded-retry
+  submit/refresh/cancel, persist credential-free checkpoints, and can rebind a
+  successful model artifact onto the compiled program.
 - Fast-Slow state modules and `DSEx.Training.FastSlow.Runner` preserve the paper's
   prefetch, GEPA fast update, cross-prompt rollout grouping, and exactly `T`
   slow-update cycle. Provider effects cross an explicit backend behaviour with

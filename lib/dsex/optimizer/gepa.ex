@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.GEPA do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Program-level GEPA optimizer for DSEx programs.
 
@@ -136,6 +137,26 @@ defmodule DSEx.Optimizer.GEPA do
       max_full_evaluations: validate_limit!(opts[:max_full_evaluations], :max_full_evaluations),
       max_reflection_calls: validate_limit!(opts[:max_reflection_calls], :max_reflection_calls)
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :required},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+       DSEx.Optimizer.fetch_dataset!(opts, :validation),
+       DSEx.Optimizer.invocation_options(opts)
+     )}
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do

@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.SIMBA do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Stochastic Introspective Mini-Batch Ascent over arbitrary DSEx programs.
 
@@ -80,6 +81,29 @@ defmodule DSEx.Optimizer.SIMBA do
       compatibility: Enum.map(Keyword.keys(legacy), &{:deprecated_option, &1})
     }
     |> validate!()
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :optional},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    trainset = DSEx.Optimizer.fetch_dataset!(opts, :trainset)
+    invocation_opts = DSEx.Optimizer.invocation_options(opts)
+
+    compiled =
+      if Keyword.has_key?(opts, :validation) do
+        compile(optimizer, program, trainset, Keyword.fetch!(opts, :validation), invocation_opts)
+      else
+        compile(optimizer, program, trainset, invocation_opts)
+      end
+
+    {:ok, compiled}
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do

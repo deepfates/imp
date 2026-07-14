@@ -4,17 +4,36 @@ defmodule BetterTogetherTest do
   alias DSEx.Optimizer.BetterTogether
 
   defmodule SetInstruction do
+    @behaviour DSEx.Optimizer
     defstruct [:instruction]
 
-    def compile(%__MODULE__{instruction: instruction}, program, _trainset) do
-      DSEx.Optimizer.InstructionSearch.put_instruction(program, instruction)
-    end
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{instruction: instruction}, program, _opts),
+      do: {:ok, DSEx.Optimizer.InstructionSearch.put_instruction(program, instruction)}
   end
 
   defmodule PromptSequence do
+    @behaviour DSEx.Optimizer
     defstruct []
 
-    def compile(%__MODULE__{}, program, _trainset) do
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{}, program, _opts) do
       instruction = DSEx.Optimizer.InstructionSearch.current_instruction(program)
 
       next =
@@ -22,31 +41,63 @@ defmodule BetterTogetherTest do
           do: "Answer every question.",
           else: "Answer only the France question."
 
-      DSEx.Optimizer.InstructionSearch.put_instruction(program, next)
+      {:ok, DSEx.Optimizer.InstructionSearch.put_instruction(program, next)}
     end
   end
 
   defmodule FailingOptimizer do
+    @behaviour DSEx.Optimizer
     defstruct []
 
-    def compile(%__MODULE__{}, _program, _trainset), do: {:error, :compile_failed}
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts), do: {:error, :compile_failed}
   end
 
   defmodule SpyOptimizer do
+    @behaviour DSEx.Optimizer
     defstruct [:owner]
 
-    def compile(%__MODULE__{owner: owner}, program, _trainset) do
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{owner: owner}, program, _opts) do
       send(owner, :unexpected_later_step)
-      program
+      {:ok, program}
     end
   end
 
   defmodule CaptureSets do
+    @behaviour DSEx.Optimizer
     defstruct [:owner]
 
-    def compile(%__MODULE__{owner: owner}, program, trainset, valset) do
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :required},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{owner: owner}, program, opts) do
+      trainset = Keyword.fetch!(opts, :trainset)
+      valset = Keyword.fetch!(opts, :validation)
       send(owner, {:prepared_sets, length(trainset), length(valset)})
-      program
+      {:ok, program}
     end
   end
 
@@ -198,10 +249,10 @@ defmodule BetterTogetherTest do
     assert report.metadata.compilation_error_occurred
     assert report.metadata.selected_strategy == ""
 
-    assert [%{error: {:provider_training_failed, :trainer_required, _details}}] = report.errors
+    assert [%{error: {:training_not_started, :trainer_required, _compiled}}] = report.errors
 
     assert report.metadata.provider_training_semantics ==
-             :jobs_are_reported_but_trained_model_rebinding_and_lifecycle_are_not_available
+             :completed_training_results_only
   end
 
   test "rejects empty training data and invalid holdout ratios during preparation" do

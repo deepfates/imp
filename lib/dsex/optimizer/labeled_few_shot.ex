@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.LabeledFewShot do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Compile a predictor by attaching the first labeled examples as demos.
 
@@ -17,6 +18,21 @@ defmodule DSEx.Optimizer.LabeledFewShot do
   def new(opts \\ []) do
     opts = DSEx.Options.validate!(opts, @option_schema, "DSEx.Optimizer.LabeledFewShot.new/1")
     %__MODULE__{k: opts[:k]}
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :unsupported},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok, compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset))}
+    end
   end
 
   def compile(%__MODULE__{k: k}, program, trainset) do

@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.BetterTogether do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Evaluate-and-select meta-optimizer for prompt and weight optimization sequences.
 
@@ -7,10 +8,10 @@ defmodule DSEx.Optimizer.BetterTogether do
   earlier candidates winning ties; without validation it returns the latest
   successful candidate. Compilation stops at the first failed step.
 
-  Unlike upstream DSPy, DSEx provider training does not manage model process
-  lifecycles or rebind a completed fine-tuned model. A `BootstrapFinetune`
-  provider error is therefore reported as a failed step rather than represented
-  as successful weight optimization.
+  Training steps contribute a candidate only after returning a completed,
+  rebound `DSEx.Optimizer.TrainingResult`. Creating an asynchronous training job
+  is reported as an incomplete step and stops the sequence without pretending
+  that weight optimization occurred.
   """
 
   alias DSEx.Optimizer.{BootstrapFinetune, Report, Sampling}
@@ -50,6 +51,26 @@ defmodule DSEx.Optimizer.BetterTogether do
       end
 
     %__MODULE__{metric: metric, optimizers: optimizers}
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :optional},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+       Keyword.get(opts, :validation),
+       DSEx.Optimizer.invocation_options(opts)
+     )}
   end
 
   def compile(%__MODULE__{} = bt, student, trainset, valset, opts \\ []) do
@@ -97,8 +118,7 @@ defmodule DSEx.Optimizer.BetterTogether do
           trainset_size: length(trainset),
           compilation_error_occurred: errors != [],
           stopped_early: errors != [],
-          provider_training_semantics:
-            :jobs_are_reported_but_trained_model_rebinding_and_lifecycle_are_not_available
+          provider_training_semantics: :completed_training_results_only
         }
       })
     )
@@ -313,69 +333,59 @@ defmodule DSEx.Optimizer.BetterTogether do
   defp valid_strategy_step?(step) when is_binary(step), do: String.trim(step) != ""
   defp valid_strategy_step?(_step), do: false
 
-  defp compile_step(%BootstrapFinetune{} = optimizer, program, trainset, _valset) do
-    case safe_call(fn -> BootstrapFinetune.compile(optimizer, program, trainset) end) do
-      {:ok, %{program: compiled, error: reason}} ->
-        {:error,
-         {:provider_training_failed, reason, %{compiled_program_available: compiled != nil}}}
+  defp compile_step(optimizer, program, trainset, valset) do
+    with {:ok, capabilities} <- DSEx.Optimizer.capabilities(optimizer) do
+      compile_declared_step(capabilities, optimizer, program, trainset, valset)
+    end
+  end
 
-      {:ok, %{program: compiled, job: job}} ->
+  defp compile_declared_step(
+         %{kind: :program} = capabilities,
+         optimizer,
+         program,
+         trainset,
+         valset
+       ) do
+    opts = step_options(capabilities, trainset, valset)
+
+    case DSEx.Optimizer.run(optimizer, program, opts, capabilities) do
+      {:ok, compiled} -> {:ok, compiled, %{optimizer: optimizer.__struct__, kind: :program}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp compile_declared_step(
+         %{kind: :training} = capabilities,
+         optimizer,
+         program,
+         trainset,
+         valset
+       ) do
+    opts = step_options(capabilities, trainset, valset)
+
+    case DSEx.Optimizer.run(optimizer, program, opts, capabilities) do
+      {:ok, %DSEx.Optimizer.TrainingResult{status: :completed, program: compiled} = result} ->
         {:ok, compiled,
-         %{
-           optimizer: BootstrapFinetune,
-           job: job,
-           trained_model_rebound?: false,
-           provider_lifecycle_managed?: false
-         }}
+         %{optimizer: optimizer.__struct__, kind: :training, training_status: result.status}}
 
-      {:ok, other} ->
-        {:error, {:invalid_optimizer_result, other}}
+      {:ok, %DSEx.Optimizer.TrainingResult{status: status}} ->
+        {:error, {:training_step_incomplete, optimizer.__struct__, status}}
 
       {:error, reason} ->
         {:error, reason}
     end
   end
 
-  defp compile_step(optimizer, program, trainset, valset) do
-    cond do
-      not is_map(optimizer) or not Map.has_key?(optimizer, :__struct__) ->
-        {:error, {:invalid_optimizer, optimizer}}
+  defp compile_declared_step(%{kind: kind}, optimizer, _program, _trainset, _valset),
+    do: {:error, {:unsupported_optimizer_kind, optimizer.__struct__, kind}}
 
-      not optimizer_module_loaded?(optimizer.__struct__) ->
-        {:error, {:optimizer_not_loaded, optimizer.__struct__}}
+  defp step_options(capabilities, trainset, valset) do
+    opts = [trainset: trainset]
 
-      function_exported?(optimizer.__struct__, :compile, 4) ->
-        safe_compile(optimizer, fn ->
-          optimizer.__struct__.compile(optimizer, program, trainset, valset)
-        end)
-
-      function_exported?(optimizer.__struct__, :compile, 3) ->
-        safe_compile(optimizer, fn ->
-          optimizer.__struct__.compile(optimizer, program, trainset)
-        end)
-
-      true ->
-        {:error, {:unsupported_optimizer, optimizer.__struct__}}
-    end
-  end
-
-  defp safe_compile(optimizer, fun) do
-    case safe_call(fun) do
-      {:ok, {:error, reason}} -> {:error, reason}
-      {:ok, compiled} -> {:ok, compiled, %{optimizer: optimizer.__struct__}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp optimizer_module_loaded?(module) when is_atom(module), do: Code.ensure_loaded?(module)
-  defp optimizer_module_loaded?(_module), do: false
-
-  defp safe_call(fun) do
-    {:ok, fun.()}
-  rescue
-    exception -> {:error, Exception.message(exception)}
-  catch
-    kind, reason -> {:error, {kind, reason}}
+    if Map.get(capabilities.datasets, :validation, :unsupported) == :unsupported or
+         is_nil(valset),
+       do: opts,
+       else: Keyword.put(opts, :validation, valset)
   end
 
   defp fetch_optimizer(optimizers, key) do

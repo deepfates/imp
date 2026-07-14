@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.COPRO do
+  @behaviour DSEx.Optimizer
   @moduledoc "Coordinate prompt optimizer over instruction candidates."
 
   defstruct [:metric, :proposer_lm, breadth: 5, depth: 2, extra_instructions: []]
@@ -21,6 +22,27 @@ defmodule DSEx.Optimizer.COPRO do
       proposer_lm: opts[:proposer_lm],
       extra_instructions: opts[:extra_instructions]
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :required},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      {:ok,
+       compile(
+         optimizer,
+         program,
+         DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+         DSEx.Optimizer.fetch_dataset!(opts, :validation)
+       )}
+    end
   end
 
   def compile(%__MODULE__{depth: 0} = optimizer, program, trainset, devset) do

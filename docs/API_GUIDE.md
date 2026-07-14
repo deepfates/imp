@@ -629,6 +629,25 @@ compiled = DSEx.optimize(program, optimizer, trainset, devset)
 DSEx.Optimizer.Report.fetch(compiled)
 ```
 
+The facade dispatches through the `DSEx.Optimizer` behaviour. Each optimizer
+implements `__optimizer__/0` and `run/3`; `DSEx.optimizer_capabilities/1`
+returns its validated declaration:
+
+- `kind` is `:program`, `:training`, `:constructor`, or `:workflow`.
+- `datasets` maps named splits such as `trainset`, `validation`,
+  `promotionset`, and `auditset` to `:required`, `:optional`, or
+  `:unsupported`.
+- `result` declares the expected result shape.
+
+Use `DSEx.optimize/3` when a program optimizer does not require validation,
+`DSEx.optimize/4` when supplying validation, and `DSEx.optimize/5` when also
+passing invocation options such as checkpoint controls. This choice follows the
+declared split requirements; DSEx does not infer argument meaning from an
+optimizer module's exported function arities. The behaviour layer checks that
+required splits are present and unsupported splits are absent. Each optimizer
+remains responsible for validating split contents and any optimizer-specific
+relationship between them.
+
 Use:
 
 | Optimizer | Use it when |
@@ -729,15 +748,14 @@ and GEPA-style artifact optimization, use the same explicit LM shapes as
 programs. `proposer_lm:`, `judge_lm:`, and `reflection_lm:` reject malformed
 values when the optimizer is built or run, before a search loop starts.
 
-Provider-backed `BootstrapFinetune` and `GRPO` return a
-`DSEx.Clients.TrainingJob`. The job can be refreshed, cancelled when the
-provider exposes a cancellation endpoint, saved without credentials, restored
-with an explicitly reinjected transport and API key, and rebound to a compiled
-program only after the provider reports a non-empty model artifact. Submit,
-refresh, and cancel requests use stable idempotency keys and bounded retries.
-These lifecycle APIs do not imply that an account-specific paid training job
-has run. From a source checkout, `mix protocol.training.check` exercises the
-provider wire contracts locally.
+Provider training jobs can be refreshed, cancelled when the provider exposes a
+cancellation endpoint, saved without credentials, restored with an explicitly
+reinjected transport and API key, and rebound to a compiled program only after
+the provider reports a non-empty model artifact. Submit, refresh, and cancel
+requests use stable idempotency keys and bounded retries. These lifecycle APIs
+do not imply that an account-specific paid training job has run. From a source
+checkout, the source-checkout-only `mix protocol.training.check` gate exercises the provider wire contracts
+locally.
 
 Fast-Slow Training has a separate provider-neutral orchestration surface. Build
 immutable configuration and state with `DSEx.Training.FastSlow.Config` and
@@ -763,6 +781,37 @@ token-aligned trajectories, including behavior-policy token log probabilities,
 response token IDs and masks, reward, and normalized advantage. The runner is a
 paper-faithful BEAM orchestration adaptation; it is not a bundled weight trainer
 and does not by itself establish paid-provider CISPO effectiveness.
+
+### Run Training
+
+Training optimizers are intentionally separate from program optimizers. Execute
+`BootstrapFinetune` and `GRPO` with `DSEx.train/3` or `DSEx.train/4`, not
+`DSEx.optimize`:
+
+```elixir
+trainer = MyApp.training_backend()
+optimizer = DSEx.Optimizer.BootstrapFinetune.new(metric, trainer: trainer)
+
+{:ok, training} = DSEx.train(program, optimizer, trainset)
+```
+
+`DSEx.train/3` and `DSEx.train/4` return
+`{:ok, %DSEx.Optimizer.TrainingResult{}}` or
+`{:error, reason}`. Bootstrap fine-tuning reports `status: :job_created` with its
+provider job; GRPO reports `status: :completed` after its synchronous trainer
+workflow returns the rebound program. Both require an explicitly configured
+trainer. DSEx does not silently fall back to local training when no trainer is
+configured. `DSEx.Clients.MLXLMTrainer` is an optional, explicit local SFT
+backend, not a fallback. A training optimizer that declares optional validation
+accepts it as `validation:` in the fourth-argument keyword options.
+
+Optimizer-specific `compile` functions remain public for advanced workflows
+that need their native return values or split/options layout. The MIPROv2 and
+SIMBA checkpoint examples above use that direct surface. Constructor optimizers
+such as `Ensemble` and `KNNFewShot`, and workflow optimizers such as `Playbook`,
+also use their documented direct APIs; the `DSEx.optimize` facade accepts only
+optimizers declaring `kind: :program`, while `DSEx.train` accepts only
+`kind: :training`.
 
 ## Optimize Arbitrary Artifacts
 

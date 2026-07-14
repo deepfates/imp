@@ -4,7 +4,19 @@ defmodule OptimizerReportTest do
   defmodule ErrorOptimizer do
     defstruct []
 
-    def compile(%__MODULE__{}, _program, _trainset, _devset), do: {:error, :optimizer_declined}
+    @behaviour DSEx.Optimizer
+
+    @impl true
+    def __optimizer__ do
+      %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :optional},
+        result: :program
+      }
+    end
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts), do: {:error, :optimizer_declined}
   end
 
   defp lm do
@@ -681,10 +693,10 @@ defmodule OptimizerReportTest do
 
     assert report.optimizer == :better_together
 
-    assert [%{key: :bad, status: :error, error: {:invalid_optimizer, :not_an_optimizer}}] =
+    assert [%{key: :bad, status: :error, error: {:not_an_optimizer, :not_an_optimizer}}] =
              report.candidates
 
-    assert [%{key: :bad, error: {:invalid_optimizer, :not_an_optimizer}}] = report.errors
+    assert [%{key: :bad, error: {:not_an_optimizer, :not_an_optimizer}}] = report.errors
   end
 
   test "better together reports optimizer error tuples instead of treating them as compiled programs" do
@@ -706,7 +718,7 @@ defmodule OptimizerReportTest do
     assert [%{key: :bad, error: :optimizer_declined}] = report.errors
   end
 
-  test "better together reports unloaded optimizer modules explicitly" do
+  test "better together rejects unloaded optimizer modules through the canonical contract" do
     {train, dev} = sets()
     metric = DSEx.Metrics.exact_match(:answer)
     program = DSEx.predict("question -> answer", lm: lm())
@@ -723,11 +735,11 @@ defmodule OptimizerReportTest do
              %{
                key: :missing,
                status: :error,
-               error: {:optimizer_not_loaded, :"Elixir.MissingOptimizer"}
+               error: {:not_an_optimizer, :"Elixir.MissingOptimizer"}
              }
            ] = report.candidates
 
-    assert [%{key: :missing, error: {:optimizer_not_loaded, :"Elixir.MissingOptimizer"}}] =
+    assert [%{key: :missing, error: {:not_an_optimizer, :"Elixir.MissingOptimizer"}}] =
              report.errors
   end
 

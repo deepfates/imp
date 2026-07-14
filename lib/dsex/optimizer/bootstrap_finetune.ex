@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.BootstrapFinetune do
+  @behaviour DSEx.Optimizer
   @moduledoc "Creates provider training jobs from bootstrapped demonstrations."
 
   defstruct [:metric, :trainer, max_demos: 32]
@@ -23,6 +24,33 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
       trainer: opts[:trainer],
       max_demos: opts[:max_demos]
     }
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :training,
+      datasets: %{trainset: :required, validation: :unsupported},
+      result: :training_result
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
+      case compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset)) do
+        %{program: compiled, job: job} ->
+          {:ok,
+           %DSEx.Optimizer.TrainingResult{
+             program: compiled,
+             job: job,
+             status: :job_created,
+             metadata: %{method: :sft}
+           }}
+
+        %{program: compiled, error: reason} ->
+          {:error, {:training_not_started, reason, compiled}}
+      end
+    end
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do

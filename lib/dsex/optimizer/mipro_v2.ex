@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.MIPROv2 do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Joint instruction and few-shot optimization using grounded proposals and categorical TPE.
 
@@ -62,6 +63,26 @@ defmodule DSEx.Optimizer.MIPROv2 do
       compatibility: compatibility
     }
     |> validate_runtime!()
+  end
+
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :program,
+      datasets: %{trainset: :required, validation: :required},
+      result: :program
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       DSEx.Optimizer.fetch_dataset!(opts, :trainset),
+       DSEx.Optimizer.fetch_dataset!(opts, :validation),
+       DSEx.Optimizer.invocation_options(opts)
+     )}
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, valset) do

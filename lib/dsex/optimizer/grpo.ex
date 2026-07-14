@@ -1,4 +1,5 @@
 defmodule DSEx.Optimizer.GRPO do
+  @behaviour DSEx.Optimizer
   @moduledoc """
   Provider-neutral, iterative GRPO compilation.
 
@@ -77,6 +78,35 @@ defmodule DSEx.Optimizer.GRPO do
     struct!(__MODULE__, Keyword.put(opts, :reward_fn, reward_fn))
   end
 
+  @impl true
+  def __optimizer__,
+    do: %{
+      kind: :training,
+      datasets: %{trainset: :required, validation: :optional},
+      result: :training_result
+    }
+
+  @impl true
+  def run(%__MODULE__{} = optimizer, program, opts) do
+    compile_opts =
+      opts
+      |> DSEx.Optimizer.invocation_options()
+      |> maybe_put_validation(opts)
+
+    case compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset), compile_opts) do
+      {:ok, compiled} ->
+        {:ok,
+         %DSEx.Optimizer.TrainingResult{
+           program: compiled,
+           status: :completed,
+           metadata: %{method: :grpo}
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def compile(%__MODULE__{} = optimizer, program, trainset),
     do: compile(optimizer, program, trainset, [])
 
@@ -109,6 +139,12 @@ defmodule DSEx.Optimizer.GRPO do
         ArgumentError,
         "DSEx.Optimizer.GRPO.compile/4 expects keyword options, got: #{inspect(opts)}"
       )
+
+  defp maybe_put_validation(compile_opts, opts) do
+    if Keyword.has_key?(opts, :validation),
+      do: Keyword.put(compile_opts, :valset, Keyword.fetch!(opts, :validation)),
+      else: compile_opts
+  end
 
   defp run_started_session(optimizer, program, trainset, valset, session) do
     trainset = repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
