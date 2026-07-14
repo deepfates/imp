@@ -94,7 +94,9 @@ defmodule DSEx.MixProject do
   defp deps do
     [
       {:jason, "~> 1.4"},
+      {:jsv, "~> 0.21"},
       {:nimble_options, "~> 1.1"},
+      {:req, "~> 0.6"},
       {:req_llm, "~> 1.17"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},
