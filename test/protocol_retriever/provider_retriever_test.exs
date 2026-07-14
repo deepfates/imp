@@ -42,7 +42,10 @@ defmodule ProtocolRetrieverProviderTest do
              DSEx.Retrieve.retrieve(retriever, "capital France", k: 2)
 
     assert metadata["id"] == "p-live"
-    assert_received {^ref, [:dsex, :retriever, :start], _, %{query: "capital France"}}
+    assert_received {^ref, [:dsex, :retriever, :start], _, start_metadata}
+    assert start_metadata.retriever == DSEx.Retrievers.HTTP
+    assert start_metadata.method == :post
+    refute Map.has_key?(start_metadata, :query)
     assert_received {^ref, [:dsex, :retriever, :stop], %{duration: duration}, %{result: :ok}}
     assert is_integer(duration)
   end
