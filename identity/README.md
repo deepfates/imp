@@ -173,6 +173,14 @@ vote: confidence scales are not calibrated across providers, and allowing one
 provider's confidence style to determine its influence would break jury
 independence.
 
+Run `mix dsex.identity.reliability` to publish per-axis and per-scenario
+pairwise rank agreement, score bias, error, and two-way ICC(A,1)/ICC(A,k) and
+ICC(C,1)/ICC(C,k). These are descriptive diagnostics, not automatic acceptance
+thresholds. Run `mix dsex.identity.review` to derive deterministic scenario
+leaders, the full wildcard and Pareto pools, model disagreements, flagged
+contenders, and axis-based resurrection candidates without deleting or
+selecting anything.
+
 No global winner is computed during divergence.
 
 ### 7. Test Saturation

@@ -225,6 +225,8 @@ the process without letting the process tune itself around the expected answer.
 | `assessments.jsonl` | Three independent evidence-bounded judgments per entity | 6,156 records at checkpoint completion |
 | `assessment-runs.jsonl` | Starts, successes, failures, retries, and model provenance | Consolidated after provider completion |
 | `scenarios.json` | Visible decision policy | 6 scenarios, 5 tiers |
+| `reports/inter-rater-reliability.json` | Jury agreement, scale bias, and mean reliability | 18 axes and 6 scenarios across 3 profiles |
+| `reports/review-pools.json` | Deterministic non-destructive attention views | Leaders, 439 wildcards, Pareto, disagreement, flags, resurrection |
 | `reports/*.json` and `reports/*.md` | Reproducible projections and audits | Coverage, saturation, decision, hostile, and integrity reports |
 
 The large corpus is intentional. Reports are derived and replaceable; raw
