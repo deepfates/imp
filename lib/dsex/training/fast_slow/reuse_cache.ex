@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.CachedTrajectory do
-  @moduledoc false
+  @moduledoc "Portable trajectory retained for exact rollout reuse."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -132,7 +132,7 @@ defmodule DSEx.Training.FastSlow.CachedTrajectory do
 end
 
 defmodule DSEx.Training.FastSlow.ReuseCache do
-  @moduledoc false
+  @moduledoc "Validated cache of portable rollout trajectories keyed by identity."
 
   alias DSEx.Training.FastSlow.{CachedTrajectory, Config}
 

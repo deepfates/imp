@@ -317,8 +317,13 @@ after
 end
 ```
 
-The source-checkout campaign `mix dsex.benchmark.local_mlx` owns the complete
-local effectiveness proof: immutable dataset and model-tree validation, matched
+Run the source-checkout campaign with:
+
+```sh
+mix dsex.benchmark.local_mlx
+```
+
+The campaign owns the complete local effectiveness proof: immutable dataset and model-tree validation, matched
 base/adapter/fused evaluation, adapter replay verification, fusion, explicit
 deployment-LM rebinding, checksummed save/load, synchronous server cleanup, and
 a verified run envelope. It requires a clean checkout by default and writes a

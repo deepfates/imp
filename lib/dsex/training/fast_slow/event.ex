@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Event do
-  @moduledoc false
+  @moduledoc "Ordered durable event emitted by the Fast-Slow state machine."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -42,7 +42,7 @@ defmodule DSEx.Training.FastSlow.Event do
 end
 
 defmodule DSEx.Training.FastSlow.OperationIntent do
-  @moduledoc false
+  @moduledoc "Durable intent and reconciliation state for one provider effect."
 
   alias DSEx.Training.FastSlow.Config
 

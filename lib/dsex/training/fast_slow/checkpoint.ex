@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Checkpoint do
-  @moduledoc false
+  @moduledoc "Versioned, checksummed persistence for Fast-Slow training state."
 
   alias DSEx.Training.FastSlow.{
     Budget,

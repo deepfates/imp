@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Rollout do
-  @moduledoc false
+  @moduledoc "One verified slow-training rollout with token and reward provenance."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -351,7 +351,7 @@ defmodule DSEx.Training.FastSlow.Rollout do
 end
 
 defmodule DSEx.Training.FastSlow.AdvantageGroup do
-  @moduledoc false
+  @moduledoc "Question-level rollout group with normalized training advantages."
 
   alias DSEx.Training.FastSlow.{Config, Rollout}
 

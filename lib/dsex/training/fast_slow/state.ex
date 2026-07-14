@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Theta do
-  @moduledoc false
+  @moduledoc "Immutable policy parameter identity and lineage node."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -40,7 +40,7 @@ defmodule DSEx.Training.FastSlow.Theta do
 end
 
 defmodule DSEx.Training.FastSlow.PromptPopulation do
-  @moduledoc false
+  @moduledoc "Bounded prompt population used by the fast adaptation phase."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -269,7 +269,7 @@ defmodule DSEx.Training.FastSlow.PromptPopulation do
 end
 
 defmodule DSEx.Training.FastSlow.Lookahead do
-  @moduledoc false
+  @moduledoc "Prefetched minibatch window and deterministic dataset progress."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -373,7 +373,7 @@ defmodule DSEx.Training.FastSlow.Lookahead do
 end
 
 defmodule DSEx.Training.FastSlow.DatasetState do
-  @moduledoc false
+  @moduledoc "Deterministic dataset cursor, epoch, and random-state snapshot."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -396,7 +396,7 @@ defmodule DSEx.Training.FastSlow.DatasetState do
 end
 
 defmodule DSEx.Training.FastSlow.Budget do
-  @moduledoc false
+  @moduledoc "Named immutable limits and accumulated usage for a training run."
 
   @enforce_keys [:limits, :used]
   defstruct @enforce_keys
@@ -452,7 +452,7 @@ defmodule DSEx.Training.FastSlow.Budget do
 end
 
 defmodule DSEx.Training.FastSlow.Terminal do
-  @moduledoc false
+  @moduledoc "Terminal reason and details for a completed or stopped run."
 
   alias DSEx.Training.FastSlow.Config
 
@@ -478,7 +478,7 @@ defmodule DSEx.Training.FastSlow.Terminal do
 end
 
 defmodule DSEx.Training.FastSlow.State do
-  @moduledoc false
+  @moduledoc "Validated durable state for the Fast-Slow training state machine."
 
   alias DSEx.Training.FastSlow.{
     Budget,

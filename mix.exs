@@ -209,6 +209,7 @@ defmodule DSEx.MixProject do
       "public_surface.check": ["test test/public_surface_test.exs"],
       "production.check": [
         "format --check-formatted",
+        "clean",
         "compile --warnings-as-errors",
         "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "benchmark.failure_campaign.check",

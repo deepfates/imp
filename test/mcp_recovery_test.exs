@@ -94,7 +94,7 @@ defmodule MCPRecoveryTest do
     started = System.monotonic_time(:millisecond)
     assert [tool] = MCP.import_tools(client)
     elapsed = System.monotonic_time(:millisecond) - started
-    assert tool.name == "recoverable"
+    assert tool.name == :recoverable
     assert elapsed >= 8
     assert elapsed < 500
 
@@ -162,7 +162,7 @@ defmodule MCPRecoveryTest do
     assert_receive {:blocking_transport, attempt, port}, 1_000
     attempt_ref = Process.monitor(attempt)
 
-    assert_receive {:import_result, [%DSEx.Tool{name: "recoverable"}]}, 500
+    assert_receive {:import_result, [%DSEx.Tool{name: :recoverable}]}, 500
     assert_receive {:DOWN, ^attempt_ref, :process, ^attempt, _reason}, 500
     assert_receive {:DOWN, ^caller_ref, :process, ^caller, :normal}, 500
     eventually(fn -> Port.info(port) == nil end)

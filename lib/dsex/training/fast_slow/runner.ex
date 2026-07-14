@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Runner.Context do
-  @moduledoc false
+  @moduledoc "Runtime-only backend and prefetched dataset context for a runner step."
 
   alias DSEx.Training.FastSlow.DatasetState
 

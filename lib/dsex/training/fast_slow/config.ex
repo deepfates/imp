@@ -1,5 +1,5 @@
 defmodule DSEx.Training.FastSlow.Config do
-  @moduledoc false
+  @moduledoc "Immutable, credential-free configuration for Fast-Slow training runs."
 
   @enforce_keys [
     :program_topology,

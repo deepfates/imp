@@ -6,6 +6,7 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"production.check") == [
              "format --check-formatted",
+             "clean",
              "compile --warnings-as-errors",
              "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
              "benchmark.failure_campaign.check",
@@ -147,6 +148,7 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"package.check") == [
+             "package.clean",
              "test test/package_contract_test.exs",
              "cmd mix hex.build --unpack --output tmp/package-check",
              "dsex.package.clean_room --package tmp/package-check"
