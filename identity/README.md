@@ -31,6 +31,13 @@ package, API, runtime, tooling, evidence, and repository contracts that the
 eventual decision must migrate together. It recommends a clean pre-release
 rename while preserving immutable identity and benchmark provenance.
 
+The owner's held-out candidate has now been revealed as `Imp`. The
+[`reports/imp-finalist-review.md`](reports/imp-finalist-review.md) records its
+pre-reveal embodiment, independent adversarial review, technical projection,
+direct public conflicts, and comparison with `DSX`. `Imp` is the provisional
+intrinsic winner, but selection remains conditional on the owner accepting a
+shared AI/software identity and obtaining qualified legal-risk review.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate

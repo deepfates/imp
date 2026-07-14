@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "screen_id": "imp-finalist-screen-01",
+  "observed_at": "2026-07-14T05:34:04Z",
+  "kind": "heldout_finalist_review",
+  "candidate_source": "identity/preferences/owner-heldout-01.json",
+  "selection_made": false,
+  "ranking_changed": false,
+  "legal_clearance": false,
+  "verdict": "conditional_pass",
+  "weighting_policy": {
+    "primary": [
+      "owner_taste_fit",
+      "project_semantic_truth",
+      "master_brand_strength",
+      "identity_architecture",
+      "durability"
+    ],
+    "material_gates": [
+      "active_direct_same_category_use",
+      "exact_intended_hex_namespace",
+      "demonstrated_speech_or_code_failure",
+      "qualified_legal_risk"
+    ],
+    "supporting_context": [
+      "adjacent_package_records",
+      "github_exact_name_count",
+      "domain_and_social_handles",
+      "distant_industry_use"
+    ],
+    "policy": "Intrinsic judgment and collision evidence remain separate. A direct collision can prevent selection, but namespace cleanliness cannot repair a weak identity and distant use is not an automatic veto."
+  },
+  "intrinsic_review": {
+    "result": "strong_pass",
+    "comparison_to_dsx": "Imp is stronger as a memorable, speakable, extensible master brand and as Elixir code nomenclature. DSX is stronger only as literal DSPy-lineage shorthand.",
+    "strengths": [
+      "The name works as an ordinary word without requiring an acronym.",
+      "Imp embedded in self-improving preserves the original concept without copying DSPy's surface form.",
+      "Imp, :imp, mix imp.*, IMP_*, and [:imp] form one compact identity grammar.",
+      "The descriptor states the category while the brand carries personality and recall.",
+      "The word can extend naturally across optimizer, evaluation, runtime, artifact, research, and hosted-product surfaces."
+    ],
+    "risks": [
+      "The primary noun senses are a small demon and a mischievous child, which can suggest playfulness or uncontrolled behavior.",
+      "The name alone does not communicate Elixir, language-model programs, or production rigor.",
+      "Capital I can resemble lowercase l in some typefaces.",
+      "The very short common word is intrinsically difficult to search for and own broadly."
+    ]
+  },
+  "technical_observations": {
+    "hex": {
+      "http_status": 404,
+      "meaning": "No exact public package record returned; not a reservation or legal guarantee.",
+      "source": "https://hex.pm/api/packages/imp"
+    },
+    "crates": {
+      "http_status": 200,
+      "versions_observed": ["0.0.0", "0.0.1", "0.1.0"],
+      "source": "https://index.crates.io/3/i/imp"
+    },
+    "npm": {
+      "http_status": 200,
+      "latest_version": "0.0.1",
+      "description": "Implicit type conversion",
+      "latest_release_at": "2012-10-05T17:04:52.798Z",
+      "source": "https://registry.npmjs.org/imp"
+    },
+    "pypi": {
+      "http_status": 404,
+      "meaning": "No exact public package record returned; Python's former standard-library imp module and PyPI policy may still constrain practical use.",
+      "source": "https://pypi.org/pypi/imp/json"
+    },
+    "github": {
+      "exact_repository_names_in_first_100": 16,
+      "intended_repository_path_observed_absent": "deepfates/imp",
+      "source": "https://api.github.com/search/repositories?q=imp%20in%3Aname&per_page=100"
+    },
+    "local_projection": {
+      "command_named_imp": false,
+      "built_erlang_module_imp": false,
+      "built_elixir_module_imp": false,
+      "environment_variables_with_imp_prefix": false,
+      "result": "No current build artifact, local shell command, or environment-prefix collision was observed."
+    }
+  },
+  "market_and_ecosystem_observations": [
+    {
+      "impact": "material",
+      "directness": "same_ai_infrastructure_audience",
+      "observation": "An active exact-name repository uses imp for a C++/CUDA inference engine aimed at agentic AI. It was created in February 2026 and reports a substantial implementation and benchmark surface.",
+      "source": "https://github.com/kekzl/imp"
+    },
+    {
+      "impact": "material",
+      "directness": "same_ai_engineering_workflow_audience",
+      "observation": "A February 2026 Python project brands itself imp and describes an AI-powered engineering workflow framework for planning, validation, review, and metrics. Its PyPI package is impx and its observed public footprint is very small.",
+      "source": "https://github.com/halljoshr/imp",
+      "additional_source": "https://pypi.org/project/impx/"
+    },
+    {
+      "impact": "material_context",
+      "directness": "exact_ai_model_family",
+      "observation": "Imp is the published name of a family of efficient large multimodal models with released training and evaluation code.",
+      "source": "https://github.com/MILVLG/imp",
+      "additional_source": "https://arxiv.org/abs/2405.12107"
+    },
+    {
+      "impact": "context",
+      "directness": "active_software_different_category",
+      "observation": "Electric Imp is an active edge-to-cloud IoT platform and uses imp for its hardware modules and impOS software.",
+      "source": "https://www.electricimp.com/platform/how-it-works/"
+    },
+    {
+      "impact": "context",
+      "directness": "active_scientific_software_different_category",
+      "observation": "IMP is an active open-source C++ and Python Integrative Modeling Platform for biomolecular modeling.",
+      "source": "https://integrativemodeling.org/"
+    },
+    {
+      "impact": "context",
+      "directness": "programming_language_term",
+      "observation": "IMP is a conventional name for small imperative languages in programming-language education and research, and LiSA maintains a concrete IMP test language.",
+      "source": "https://www.cs.utexas.edu/~bornholt/courses/cs345h-24sp/lectures/4-operational/",
+      "additional_source": "https://lisa-analyzer.github.io/imp/"
+    },
+    {
+      "impact": "context",
+      "directness": "historical_python_namespace",
+      "observation": "Python's imp standard-library module was deprecated in Python 3.4 and removed in Python 3.12, but remains familiar to the DSPy-adjacent audience and dominates some searches.",
+      "source": "https://docs.python.org/3/library/imp.html"
+    },
+    {
+      "impact": "material_legal_context",
+      "directness": "crowded_short_software_mark",
+      "observation": "Several active software and AI uses create common-law and search-confusion questions. No comprehensive federal, state, international, company-name, or common-law clearance was performed.",
+      "source": "https://www.uspto.gov/trademarks/search"
+    }
+  ],
+  "linguistic_observations": {
+    "source": "https://www.merriam-webster.com/dictionary/imp",
+    "primary_senses": [
+      "small demon",
+      "mischievous child"
+    ],
+    "older_senses": [
+      "shoot or bud",
+      "to graft or repair a bird's feather to improve flight",
+      "to equip with wings"
+    ],
+    "interpretation": "The mischievous reading adds memorable character but can weaken enterprise trust. The older repair-and-flight sense is unusually aligned with measured program improvement, though too obscure to carry the public explanation."
+  },
+  "independent_review": {
+    "reviewer": "subagent:Ramanujan",
+    "result": "conditional_go",
+    "summary": "The reviewer found Imp materially stronger than DSX as a master brand and code namespace, while requiring qualified legal review, permanent descriptor use, and deliberate trust framing.",
+    "correction": "The reviewer suggested preserving broad DSEx compatibility. The repository audit contradicts that generic recommendation: the project is private, pre-release, untagged, and unpublished on Hex, so only persisted-artifact readers warrant targeted compatibility."
+  },
+  "recommendation": {
+    "intrinsic_rank": 1,
+    "overall_status": "provisional_winner_pending_owner_risk_acceptance_and_qualified_legal_review",
+    "decision": "Imp works as the Elixir package and is preferred to DSX. It is not a clean or exclusive master-brand namespace because active exact-name AI projects exist.",
+    "go_conditions": [
+      "The owner knowingly accepts a shared and crowded software identity rather than requiring broad exclusivity.",
+      "A qualified legal review finds no blocking likelihood-of-confusion issue in the intended jurisdictions and goods or services.",
+      "The descriptor Declarative self-improving Elixir accompanies the brand on first-contact surfaces.",
+      "A small listener set does not consistently interpret the name as unsafe, unserious, or as the existing AI inference engine.",
+      "The final identity record uses Imp as a word and does not invent a required acronym expansion."
+    ],
+    "no_go_conditions": [
+      "The master brand must be broadly ownable across AI infrastructure, developer tools, and future hosted services.",
+      "Qualified review finds the active exact-name software uses materially confusing.",
+      "Target users consistently reject the mischievous or demonic connotation."
+    ]
+  },
+  "limitations": [
+    "This is a targeted public-web and registry screen, not legal advice or trademark clearance.",
+    "No native-speaker, international community, assistive-technology, or statistically meaningful listener study was performed.",
+    "Repository counts and project activity can change after the observation time.",
+    "Domain and social-handle availability was not used as decision evidence."
+  ]
+}
