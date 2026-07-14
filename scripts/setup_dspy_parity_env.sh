@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-VENV_DIR="${DSEX_DSPY_VENV:-tmp/dspy-parity-venv}"
+VENV_DIR="${IMP_DSPY_VENV:-tmp/dspy-parity-venv}"
 PYTHON="${PYTHON:-}"
-RECREATE="${DSEX_DSPY_RECREATE:-}"
+RECREATE="${IMP_DSPY_RECREATE:-}"
 
 if [ -z "$PYTHON" ]; then
   for candidate in python3.13 python3.12 python3.11 python3.10; do
@@ -15,7 +15,7 @@ if [ -z "$PYTHON" ]; then
 fi
 
 if [ -z "$PYTHON" ]; then
-  echo "DSEx parity requires Python 3.10+ for current DSPy; no python3.10+ executable found." >&2
+  echo "Imp parity requires Python 3.10+ for current DSPy; no python3.10+ executable found." >&2
   exit 1
 fi
 
@@ -24,7 +24,7 @@ import sys
 
 if sys.version_info < (3, 10):
     raise SystemExit(
-        f"DSEx parity requires Python 3.10+ for current DSPy; found {sys.version.split()[0]}"
+        f"Imp parity requires Python 3.10+ for current DSPy; found {sys.version.split()[0]}"
     )
 PY
 
@@ -38,7 +38,7 @@ PY
       echo "Rebuilding stale DSPy parity venv at $VENV_DIR with $PYTHON"
       rm -rf "$VENV_DIR"
     else
-      echo "$VENV_DIR uses Python older than 3.10. Set DSEX_DSPY_RECREATE=1 to rebuild it." >&2
+      echo "$VENV_DIR uses Python older than 3.10. Set IMP_DSPY_RECREATE=1 to rebuild it." >&2
       exit 1
     fi
   fi

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Audit ledger of upstream authorities for algorithm and benchmark families named by DSEx claim surfaces. This inventory is not proof of conformance, parity, benchmark validity, or effectiveness.",
+  "purpose": "Audit ledger of upstream authorities for algorithm and benchmark families named by Imp claim surfaces. This inventory is not proof of conformance, parity, benchmark validity, or effectiveness.",
   "generated_from": [
     "benchmarks/claims.json",
     "docs/UPSTREAM_SURFACE_MAP.md",
@@ -76,7 +76,7 @@
       "upstream_tests": {"status": "present", "references": ["tests/docs/test_mkdocs_links.py#sha256=20591b9b45fedb526777f6ffee4ff3c863f368b5e9187369394d25e1f2bda915"]},
       "dataset_protocol": {"status": "not_applicable", "references": [], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["test/package_contract_test.exs", "test/livebook_contract_test.exs", "benchmarks/results/parity-dashboard-*.json"]},
-      "notes": "DSPy 3.2.1 documentation and package metadata are the immutable upstream comparison surface; DSEx Hex and GitHub publication remain DSEx-owned release evidence."
+      "notes": "DSPy 3.2.1 documentation and package metadata are the immutable upstream comparison surface; Imp Hex and GitHub publication remain Imp-owned release evidence."
     },
     {
       "id": "family.dspy_core_programming",
@@ -193,10 +193,10 @@
       "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.2.1", "git_ref": "refs/tags/3.2.1", "commit": "29448ae12756abdd14bd8796c819247ebb83673c", "source_paths": ["dspy/teleprompt/copro_optimizer.py", "dspy/teleprompt/infer_rules.py"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json", "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a", "file_count": 296}},
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},
-      "upstream_tests": {"status": "partial", "references": ["tests/teleprompt/test_copro_optimizer.py#sha256=a9561ce73c056f60ed3ad9fd51c59da27d7acb6d271a16868f94d339eff0db47", "No dedicated upstream tests were found for InferRules or the DSEx-native InstructionSearch/SignatureOptimizer surfaces."]},
+      "upstream_tests": {"status": "partial", "references": ["tests/teleprompt/test_copro_optimizer.py#sha256=a9561ce73c056f60ed3ad9fd51c59da27d7acb6d271a16868f94d339eff0db47", "No dedicated upstream tests were found for InferRules or the Imp-native InstructionSearch/SignatureOptimizer surfaces."]},
       "dataset_protocol": {"status": "protocol_defined", "references": ["docs/PARITY_VALIDATION_PROGRAM.md#lane-3-optimizer-lift-parity"], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["benchmarks/results/optimizer-lift-parity-*.json"]},
-      "notes": "InstructionSearch is recorded as a DSEx deviation where no stable sidecar equivalent exists."
+      "notes": "InstructionSearch is recorded as a Imp deviation where no stable sidecar equivalent exists."
     },
     {
       "id": "family.optimizer_miprov2",
@@ -276,9 +276,9 @@
       "upstream_repository": {"status": "gap", "repository": null, "version": null, "git_ref": null, "commit": null, "source_paths": [], "source_manifest": {"path": null, "sha256": null, "file_count": 0}},
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2605.12484v2", "revision": "v2", "title": "Learning, Fast and Slow: Towards LLMs That Adapt Continually"},
       "upstream_tests": {"status": "absent", "references": ["The official Fast-Slow project article states that first-party code is forthcoming."]},
-      "dataset_protocol": {"status": "partial", "references": ["arXiv:2605.12484v2", "mix dsex.benchmark.fast_slow"], "immutable_digests": []},
-      "local_differential": {"status": "partial", "artifacts": ["mix dsex.benchmark.fast_slow", "test/fast_slow_campaign_test.exs"]},
-      "notes": "DSEx currently claims a paper-faithful BEAM orchestration adaptation, not source parity or provider effectiveness. The deterministic campaign proves protocol wiring only."
+      "dataset_protocol": {"status": "partial", "references": ["arXiv:2605.12484v2", "mix imp.benchmark.fast_slow"], "immutable_digests": []},
+      "local_differential": {"status": "partial", "artifacts": ["mix imp.benchmark.fast_slow", "test/fast_slow_campaign_test.exs"]},
+      "notes": "Imp currently claims a paper-faithful BEAM orchestration adaptation, not source parity or provider effectiveness. The deterministic campaign proves protocol wiring only."
     },
     {
       "id": "family.optimizer_anything",
@@ -292,8 +292,8 @@
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2605.19633v1", "revision": "v1", "title": "optimize_anything: A Universal API for Optimizing any Text Parameter"},
       "upstream_tests": {"status": "partial", "references": ["https://github.com/gepa-ai/gepa/tree/b4dbb55b7601dac448cdb836d5a401ca7d9eb920/tests", "https://github.com/gepa-ai/optimize-anything-artifact/tree/58cdf89d856f2fbc174991b89076eccdcf68e4ca"]},
       "dataset_protocol": {"status": "protocol_defined", "references": ["https://github.com/gepa-ai/optimize-anything-artifact/tree/58cdf89d856f2fbc174991b89076eccdcf68e4ca"], "immutable_digests": []},
-      "local_differential": {"status": "present", "artifacts": ["benchmarks/results/optimize-anything-replication-20260713T092840Z.json", "mix benchmark.optimize_anything.check", "mix dsex.benchmark.optimize_anything --live"]},
-      "notes": "Released algorithm authority is GEPA v0.1.1. Unreleased main snapshot 92dadfffbe98c8ecf508179a1cab09c1bb85cd32 is tracked separately for callbacks, custom acceptance, parallel proposals, adapter state, LM/cost controls, ConfidenceAdapter, and LangChain support. The production contract and scoped three-family DSEx-native effectiveness lane are implemented; paper-scale upstream comparison remains open."
+      "local_differential": {"status": "present", "artifacts": ["benchmarks/results/optimize-anything-replication-20260713T092840Z.json", "mix benchmark.optimize_anything.check", "mix imp.benchmark.optimize_anything --live"]},
+      "notes": "Released algorithm authority is GEPA v0.1.1. Unreleased main snapshot 92dadfffbe98c8ecf508179a1cab09c1bb85cd32 is tracked separately for callbacks, custom acceptance, parallel proposals, adapter state, LM/cost controls, ConfidenceAdapter, and LangChain support. The production contract and scoped three-family Imp-native effectiveness lane are implemented; paper-scale upstream comparison remains open."
     },
     {
       "id": "family.retrieval_rag_data",
@@ -338,7 +338,7 @@
       "upstream_tests": {"status": "present", "references": ["tests/utils/test_saving.py#sha256=28e7da4d227ee4a426d9b06df8725e74f1a09dae3bebcadb3959ab8f53379a25", "tests/primitives/test_module.py#sha256=05cf969f1cfd7f111d742122b1601b9d5ca9264ec82eb9c891d87b06be1ea603"]},
       "dataset_protocol": {"status": "protocol_defined", "references": ["test/protocol_training", "test/protocol_retriever", "test/protocol_mcp"], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["benchmarks/results/rag-tool-agent-parity-*.json", "test/fixtures/golden_trace/cases.json"]},
-      "notes": "Protocol gates establish DSEx-owned boundaries, not upstream service equivalence."
+      "notes": "Protocol gates establish Imp-owned boundaries, not upstream service equivalence."
     },
     {
       "id": "family.benchmark_gsm8k",
@@ -383,7 +383,7 @@
       "upstream_tests": {"status": "not_applicable", "references": []},
       "dataset_protocol": {"status": "partial", "references": ["Color/classification smoke", "local classification and instruction-following rows"], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["benchmarks/results/dsex-dspy-parity-campaign-*.json", "benchmarks/results/optimizer-lift-parity-*.json"]},
-      "notes": "This is an explicitly DSEx-owned smoke fixture, not an upstream benchmark or scientific-effectiveness authority; it remains partial until its generated rows are materialized and hashed."
+      "notes": "This is an explicitly Imp-owned smoke fixture, not an upstream benchmark or scientific-effectiveness authority; it remains partial until its generated rows are materialized and hashed."
     },
     {
       "id": "family.benchmark_aime",
@@ -412,7 +412,7 @@
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2011.03088v2", "revision": "v2", "title": "HoVer: A Dataset for Many-Hop Fact Extraction And Claim Verification"},
       "upstream_tests": {"status": "not_applicable", "references": []},
       "dataset_protocol": {"status": "pinned", "references": ["hover-nlp/hover@c0e43052759879b3461642ca6c0dd26658f47691", "GEPA artifact three-hop filter and Random(0) split construction", "wiki.abstracts.2017 BM25S corpus/index"], "immutable_digests": ["sha256:448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370", "sha256:b342dbaaa4516e55b7f4f7ac046828c2201952e69de5b97751173238674a74a7", "sha256:cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807", "sha256:c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724", "sha256:c35ec78680306e6521110e714083998edc653926ea0641fb272908b744629d22"]},
-      "local_differential": {"status": "present", "artifacts": ["test/hover_bm25_parity_test.exs", "scripts/hover_bm25_upstream_eval.py", "DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs"]},
+      "local_differential": {"status": "present", "artifacts": ["test/hover_bm25_parity_test.exs", "scripts/hover_bm25_upstream_eval.py", "IMP_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs"]},
       "notes": "The source-exact Python adapter matches pinned upstream BM25S top-five title order over the 5,233,330-document index; the native Elixir retriever is explicitly labeled approximate. Full campaign evidence remains separate."
     },
     {
@@ -427,7 +427,7 @@
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2507.02833v3", "revision": "v3", "title": "Generalizing Verifiable Instruction Following"},
       "upstream_tests": {"status": "not_applicable", "references": []},
       "dataset_protocol": {"status": "pinned", "references": ["GEPA artifact embedded IFBench train/test files", "train rows 300:600, dev rows 0:300, complete test file", "AllenAI IFBench/IFEval merged evaluator registry"], "immutable_digests": ["sha256:a5ec13223a93879b7172da783d54669d5873dc4632b57fd6d961730c9679fc8c", "sha256:11c3d683dcc7f4908a4d3cacd05c9a8bbd5484af2f8fde969e7abe2b8bad3e34", "sha256:6b6d87e50a8a4490075cac1c685c004ccb4e1b49c9c1e261a9876d49f21a4ad2", "sha256:96700ae2f5f9a1916b9a435f852bc65b53f45ab7ae860a81691f0836543aa277", "sha256:9eba8a4800a29d03057b7a92092368ada27d89c00cae6bb2a0d0cce345804032"]},
-      "local_differential": {"status": "present", "artifacts": ["test/fixtures/ifbench_registry_parity.jsonl", "scripts/ifbench_upstream_eval.py", "DSEX_IFBENCH_UPSTREAM_PARITY=1 mix test test/gepa_metrics_test.exs"]},
+      "local_differential": {"status": "present", "artifacts": ["test/fixtures/ifbench_registry_parity.jsonl", "scripts/ifbench_upstream_eval.py", "IMP_IFBENCH_UPSTREAM_PARITY=1 mix test test/gepa_metrics_test.exs"]},
       "notes": "The source-checkout differential covers all 83 active merged-registry instruction ids against the pinned GEPA artifact, including language detection and NLP-backed checks. Full paper-campaign evidence remains separate."
     },
     {

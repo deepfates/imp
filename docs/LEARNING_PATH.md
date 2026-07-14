@@ -1,10 +1,10 @@
 # Learning Path
 
-This is the canonical DSEx path. Work through it in order: each local snippet
+This is the canonical Imp path. Work through it in order: each local snippet
 is deterministic and executed by `test/learning_path_contract_test.exs`. The
 only provider-backed snippet is labeled credential-gated.
 
-DSEx follows the DSPy idea that an LM program should be a declarative,
+Imp follows the DSPy idea that an LM program should be a declarative,
 measurable object rather than a prompt string. Its Elixir realization is a
 struct with explicit fields, behaviours at runtime boundaries, and values that
 fit naturally in ExUnit and OTP applications.
@@ -12,28 +12,28 @@ fit naturally in ExUnit and OTP applications.
 ## 1. State The Contract
 
 A signature names the inputs and outputs. `Predict` is the default module: one
-validated model call from that contract to a `DSEx.Prediction`. Start here
+validated model call from that contract to a `Imp.Prediction`. Start here
 instead of building an agent or assembling provider messages yourself.
 
 ```elixir
 # learning-path-contract: predict
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
 program =
   "question -> answer: short_span"
-  |> DSEx.signature("Answer with the shortest correct span.")
-  |> DSEx.predict(lm: lm)
+  |> Imp.signature("Answer with the shortest correct span.")
+  |> Imp.predict(lm: lm)
 
-{:ok, prediction} = DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
-DSEx.get(prediction, :answer)
+{:ok, prediction} = Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
+Imp.get(prediction, :answer)
 ```
 
-`DSEx.LM.Static` makes the task contract testable without a provider. In an
+`Imp.LM.Static` makes the task contract testable without a provider. In an
 application, pass the LM to the program when its dependency should be explicit,
-or use `DSEx.context/2` for a request-scoped override.
+or use `Imp.context/2` for a request-scoped override.
 
 ## 2. Measure Before Changing It
 
@@ -44,22 +44,22 @@ meaningful. Keep a held-out set for release decisions.
 ```elixir
 # learning-path-contract: evaluate
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
 devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
-report = DSEx.evaluate(program, devset, DSEx.exact_match(:answer))
+report = Imp.evaluate(program, devset, Imp.exact_match(:answer))
 report.score
 ```
 
-Use `DSEx.exact_match/1` when it represents the product requirement. For a
+Use `Imp.exact_match/1` when it represents the product requirement. For a
 different requirement, write a two- or three-arity metric that returns a
 boolean, number, or structured score with feedback. Inspect `report.rows` when
 the aggregate does not explain a failure.
@@ -75,7 +75,7 @@ select the candidate.
 ```elixir
 # learning-path-contract: optimize
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -84,22 +84,22 @@ lm = %{
   ]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
 trainset = [
-  DSEx.example(question: "What is the capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "What is the capital of France?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
-metric = DSEx.exact_match(:answer)
-baseline = DSEx.evaluate(program, devset, metric).score
-compiled = DSEx.optimize(program, DSEx.Optimizer.LabeledFewShot.new(k: 1), trainset)
-lifted = DSEx.evaluate(compiled, devset, metric).score
+metric = Imp.exact_match(:answer)
+baseline = Imp.evaluate(program, devset, metric).score
+compiled = Imp.optimize(program, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
+lifted = Imp.evaluate(compiled, devset, metric).score
 {baseline, lifted}
 ```
 
@@ -111,7 +111,7 @@ as an improvement until the held-out score supports it.
 ## 4. Give The Program Bounded Actions
 
 ReAct is for tasks that need the model to choose an action, observe its result,
-and then submit typed outputs. A `DSEx.Tool` is a named unary Elixir function;
+and then submit typed outputs. A `Imp.Tool` is a named unary Elixir function;
 the policy is the capability boundary. The reserved `submit` tool validates the
 original signature, so a tool loop cannot bypass the output contract.
 
@@ -124,7 +124,7 @@ Process.put(:learning_path_react_actions, [
 
 try do
   lm = %{
-    module: DSEx.LM.Static,
+    module: Imp.LM.Static,
     opts: [
       handler: fn _messages, _opts ->
         [action | rest] = Process.get(:learning_path_react_actions)
@@ -134,11 +134,11 @@ try do
     ]
   }
 
-  lookup = DSEx.tool(:lookup, "Look up a capital", fn %{query: "capital-france"} -> "Paris" end)
-  program = DSEx.react("question -> answer: short_span", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+  lookup = Imp.tool(:lookup, "Look up a capital", fn %{query: "capital-france"} -> "Paris" end)
+  program = Imp.react("question -> answer: short_span", [lookup], lm: lm, tool_policy: [:lookup, :submit])
 
-  {:ok, prediction} = DSEx.call(program, %{question: "What is France's capital?"})
-  DSEx.get(prediction, :answer)
+  {:ok, prediction} = Imp.call(program, %{question: "What is France's capital?"})
+  Imp.get(prediction, :answer)
 after
   Process.delete(:learning_path_react_actions)
 end
@@ -151,15 +151,15 @@ action.
 
 ## 5. Retrieve Context Deliberately
 
-Retrieval supplies context; it does not replace evaluation. `DSEx.memory/2` is
-a deterministic in-memory retriever for tests and local workflows. `DSEx.rag/3`
+Retrieval supplies context; it does not replace evaluation. `Imp.memory/2` is
+a deterministic in-memory retriever for tests and local workflows. `Imp.rag/3`
 retrieves, injects a context field, calls the wrapped program, and records the
 retrieved documents in prediction metadata.
 
 ```elixir
 # learning-path-contract: retrieval
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, " ", & &1.content)
@@ -168,15 +168,15 @@ lm = %{
   ]
 }
 
-retriever = DSEx.memory([%{id: "france", text: "France has capital Paris"}], k: 1)
-base = DSEx.predict("question, context -> answer", lm: lm)
-program = DSEx.rag(base, retriever, k: 1)
+retriever = Imp.memory([%{id: "france", text: "France has capital Paris"}], k: 1)
+base = Imp.predict("question, context -> answer", lm: lm)
+program = Imp.rag(base, retriever, k: 1)
 
-{:ok, prediction} = DSEx.call(program, %{question: "capital France"})
-{DSEx.get(prediction, :answer), prediction.metadata.retrieval.count}
+{:ok, prediction} = Imp.call(program, %{question: "capital France"})
+{Imp.get(prediction, :answer), prediction.metadata.retrieval.count}
 ```
 
-For an external store, implement the `DSEx.Retrieve` behaviour or pass a
+For an external store, implement the `Imp.Retrieve` behaviour or pass a
 two-argument retriever function that returns `{:ok, docs}`. Evaluate retrieval
 and answer quality together, including cases where the relevant document is
 missing or misleading.
@@ -192,13 +192,13 @@ and interpreter work.
 ```elixir
 # learning-path-contract: rlm
 controller = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "Paris"})|} end]
 }
 
-program = DSEx.rlm("question -> answer", lm: controller, max_iterations: 1)
-{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
-{DSEx.get(prediction, :answer), Enum.map(prediction.metadata.rlm_trace, & &1.action)}
+program = Imp.rlm("question -> answer", lm: controller, max_iterations: 1)
+{:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+{Imp.get(prediction, :answer), Enum.map(prediction.metadata.rlm_trace, & &1.action)}
 ```
 
 Use RLM when a controller must explore or compute over context through those
@@ -207,28 +207,28 @@ redacted RLM trace before increasing them.
 
 ## 7. Persist Programs, Not Secrets
 
-`DSEx.dump/1` and `DSEx.load/1` round-trip a portable program representation.
-`DSEx.save!/2` and `DSEx.load!/1` use JSON artifacts. Provider credentials are
-not persisted; rebind a loaded program with `DSEx.with_lm/2` or a scoped
-`DSEx.context/2`. Functions such as tools and custom metrics require named
-entries in `DSEx.Saving.Registry` before they can be saved.
+`Imp.dump/1` and `Imp.load/1` round-trip a portable program representation.
+`Imp.save!/2` and `Imp.load!/1` use JSON artifacts. Provider credentials are
+not persisted; rebind a loaded program with `Imp.with_lm/2` or a scoped
+`Imp.context/2`. Functions such as tools and custom metrics require named
+entries in `Imp.Saving.Registry` before they can be saved.
 
 ```elixir
 # learning-path-contract: persistence
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-path = Path.join(System.tmp_dir!(), "dsex-learning-path-#{System.unique_integer([:positive])}.json")
+path = Path.join(System.tmp_dir!(), "imp-learning-path-#{System.unique_integer([:positive])}.json")
 
 try do
-  program = DSEx.predict("question -> answer", lm: lm)
-  :ok = DSEx.save!(program, path)
-  loaded = DSEx.load!(path)
+  program = Imp.predict("question -> answer", lm: lm)
+  :ok = Imp.save!(program, path)
+  loaded = Imp.load!(path)
 
-  {:ok, prediction} = DSEx.context([lm: lm], fn -> DSEx.call(loaded, %{question: "Capital of France?"}) end)
-  DSEx.get(prediction, :answer)
+  {:ok, prediction} = Imp.context([lm: lm], fn -> Imp.call(loaded, %{question: "Capital of France?"}) end)
+  Imp.get(prediction, :answer)
 after
   File.rm(path)
 end
@@ -239,20 +239,20 @@ the metric and evaluation data that justified promotion.
 
 ## 8. Inspect Runtime Behavior
 
-`DSEx.trace/2` captures selected redacted telemetry while a function runs.
-`DSEx.Observability.inspect_artifact/2`, `DSEx.inspect_history/2`, and
-`DSEx.Observability.status/1` provide bounded, redacted views of predictions,
+`Imp.trace/2` captures selected redacted telemetry while a function runs.
+`Imp.Observability.inspect_artifact/2`, `Imp.inspect_history/2`, and
+`Imp.Observability.status/1` provide bounded, redacted views of predictions,
 tool history, RLM traces, optimizer reports, and provider state. Subscribe with
-`DSEx.subscribe_optimizer_progress/1` when an interactive process needs
+`Imp.subscribe_optimizer_progress/1` when an interactive process needs
 optimizer progress events.
 
 ```elixir
 # learning-path-contract: observability
-tool = DSEx.tool(:lookup, "Look up a capital", fn %{country: "France"} -> "Paris" end)
+tool = Imp.tool(:lookup, "Look up a capital", fn %{country: "France"} -> "Paris" end)
 
 trace =
-  DSEx.trace(fn ->
-    DSEx.Tool.call(tool, %{country: "France"})
+  Imp.trace(fn ->
+    Imp.Tool.call(tool, %{country: "France"})
   end)
 
 {trace.result, Enum.map(trace.events, &elem(&1, 0))}
@@ -287,13 +287,13 @@ change.
 ```elixir
 # learning-path-credential-gated: live_provider
 lm =
-  DSEx.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
+  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
     api_key: System.fetch_env!("OPENAI_API_KEY"),
     temperature: 0
   )
 
-program = DSEx.predict("question -> answer: short_span", lm: lm)
-DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+program = Imp.predict("question -> answer: short_span", lm: lm)
+Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
 ```
 
 Run the repository's opt-in provider checks with `LIVE_PROVIDER=1 mix

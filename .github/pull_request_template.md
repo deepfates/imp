@@ -1,6 +1,6 @@
 ## User Story
 
-What becomes possible or more reliable for a DSEx user?
+What becomes possible or more reliable for an Imp user?
 
 ## Semantic Contract
 

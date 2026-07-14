@@ -1,10 +1,10 @@
 # Instruction Optimizer Fidelity
 
-DSEx implements MIPROv2 and SIMBA as Elixir-native optimizer engines. Their
+Imp implements MIPROv2 and SIMBA as Elixir-native optimizer engines. Their
 algorithms are derived from immutable upstream sources, while execution,
 concurrency, random-state handling, and reporting use BEAM-native primitives.
 
-The Mix commands in this document are maintainer gates run from a DSEx source
+The Mix commands in this document are maintainer gates run from an Imp source
 checkout; they are not package-consumer commands.
 
 ## Pinned Authorities
@@ -23,7 +23,7 @@ checkout; they are not package-consumer commands.
 | SIMBA strategies | `dspy/teleprompt/simba_utils.py` | `ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c` |
 
 The pinned DSPy tree contains adjacent tests for bootstrap trace behavior and
-the grounded proposer, but no dedicated MIPROv2 or SIMBA tests. DSEx therefore
+the grounded proposer, but no dedicated MIPROv2 or SIMBA tests. Imp therefore
 treats released engine source as the control-flow authority and maintains its
 own differential contract corpus rather than implying upstream test coverage
 that does not exist.
@@ -38,11 +38,11 @@ described as paper replication in the absence of a primary SIMBA paper.
 
 The optimizers share only mechanisms that are semantically common:
 
-- `DSEx.ProgramParameters` exposes stable named predictor lenses and functional
+- `Imp.ProgramParameters` exposes stable named predictor lenses and functional
   updates for built-in and custom compositional programs.
-- `DSEx.Optimizer.TrajectoryRunner` produces normalized per-example prediction,
+- `Imp.Optimizer.TrajectoryRunner` produces normalized per-example prediction,
   trace, reward, feedback, metadata, and failure records.
-- `DSEx.Optimizer.Sampling` threads explicit `:rand` state through deterministic
+- `Imp.Optimizer.Sampling` threads explicit `:rand` state through deterministic
   shuffle, categorical, softmax, percentile, and Poisson operations.
 
 MIPROv2 owns its categorical TPE study. SIMBA owns its population, variability
@@ -67,7 +67,7 @@ The implementation performs:
 Reports preserve effective configuration, parameter assignments, trial kind,
 full-evaluation history, call accounting, seed, upstream release, and commit.
 
-DSPy delegates this stage to Optuna's multivariate `TPESampler`; DSEx uses a
+DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp uses a
 native joint categorical Parzen implementation with explicit immutable random
 state. The engines are expected to share the search-space, observation, and
 promotion contracts, not identical trial sequences from the same integer seed.
@@ -75,7 +75,7 @@ Any claim that the native search is equivalent or better therefore requires a
 recorded decision-tape differential plus T3 effectiveness evidence.
 
 DSPy's bootstrap utility hashes repeated calls and deterministically chooses an
-earlier or final call. DSEx currently retains one call per predictor and chooses
+earlier or final call. Imp currently retains one call per predictor and chooses
 the final call. This is a declared native deviation until a cross-runtime hash
 fixture proves the exact selection rule.
 
@@ -161,14 +161,14 @@ persist = fn checkpoint ->
 end
 
 paused =
-  DSEx.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
+  Imp.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
     max_steps: 2,
     checkpoint_fn: persist
   )
 
 resume_state = checkpoint_path |> File.read!() |> Jason.decode!()
 
-DSEx.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
+Imp.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
   resume_state: resume_state,
   checkpoint_fn: persist
 )
@@ -186,7 +186,7 @@ DSEx.Optimizer.SIMBA.compile(simba, program, trainset, final_set,
   metric-call and token budgets, cost, wall time, and uncertainty demonstrate
   lift against baseline and upstream comparators.
 
-From a DSEx source checkout, run T1 with:
+From an Imp source checkout, run T1 with:
 
 ```bash
 mix benchmark.instruction_optimizer.contract.check
@@ -210,7 +210,7 @@ optimizer quality.
 Always render the deterministic no-network plan before a paid run:
 
 ```bash
-mix dsex.benchmark.instruction_optimizer_experiment \
+mix imp.benchmark.instruction_optimizer_experiment \
   --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json \
   --env-file .env \
   --runtime both \
@@ -226,11 +226,11 @@ aggregate exposure, and records `network_calls: 0`. Manifest validation rejects
 the run before credential lookup when any calculated aggregate dimension
 exceeds `preflight.max_aggregate`.
 
-The one-seed AIME preflight runs both native DSEx and pinned DSPy from one
+The one-seed AIME preflight runs both native Imp and pinned DSPy from one
 manifest:
 
 ```bash
-mix dsex.benchmark.instruction_optimizer_experiment \
+mix imp.benchmark.instruction_optimizer_experiment \
   --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
   --env-file .env \
   --runtime both \
@@ -247,14 +247,14 @@ input-token, output-token, and USD ceilings. The economical manifest pins
 `$1.60/M` output, prefix limits `6/3/3`, and a maximum two-runtime exposure of
 `480` requests and `$3`. See the
 [official model page](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
-The orchestrator derives one DSEx
+The orchestrator derives one Imp
 campaign and one all-arm DSPy campaign and refuses to merge incomplete or
 identity-mismatched artifacts.
 
 Each arm is evaluated on the frozen test split and compared with that runtime's
 baseline. The dev leader is descriptive only: MIPROv2 already uses dev as its
 optimizer validation set, so this protocol does not select a global winner.
-DSEx optimizer checkpoints and both runtimes' committed evaluation rows resume.
+Imp optimizer checkpoints and both runtimes' committed evaluation rows resume.
 Pinned DSPy MIPROv2 and SIMBA do not expose compatible internal compile
 checkpoints; an interrupted upstream compile fails closed and requires a new
 campaign identity. The resulting artifact is costed T2/research-preflight

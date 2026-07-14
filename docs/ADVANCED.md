@@ -1,12 +1,12 @@
-# Advanced DSEx
+# Advanced Imp
 
-This guide covers DSEx's advanced program-building tools: arbitrary artifact
+This guide covers Imp's advanced program-building tools: arbitrary artifact
 optimization, Pareto-guided reflection, agent runtimes, MCP-style tool
 catalogs, schema constraints, and deterministic benchmark fixtures.
 
 ## Gates
 
-Advanced DSEx behavior is part of the source-checkout production gate. These
+Advanced Imp behavior is part of the source-checkout production gate. These
 commands must pass before release:
 
 ```sh
@@ -23,8 +23,8 @@ and negative controls that must remain below threshold.
 ## Optimize Anything
 
 ```elixir
-alias DSEx.Optimize.Anything
-alias DSEx.Optimize.Anything.{Config, Result}
+alias Imp.Optimize.Anything
+alias Imp.Optimize.Anything.{Config, Result}
 
 config =
   Config.new(
@@ -64,7 +64,7 @@ perfect-score skipping, merge, stopping, metric/reflection budgets, bounded
 concurrency, and callbacks. Custom selectors implement the documented GEPA
 selector behaviours rather than being special-cased in the runner.
 
-When `run_dir` is set, DSEx writes atomic JSON checkpoints and seed/best
+When `run_dir` is set, Imp writes atomic JSON checkpoints and seed/best
 validation outputs. Evaluation caching defaults to durable, content-addressed
 JSON storage for run directories and fails closed on corrupt or incompatible
 entries. Without a run directory, enabled caching is in-memory. Persisted
@@ -88,7 +88,7 @@ Config.new(
 W&B reads `WANDB_API_KEY` unless `wandb_api_key` is supplied at runtime.
 MLflow supports `MLFLOW_TRACKING_TOKEN` or the standard username/password
 environment variables. Backend startup failures abort the run; later logging
-or finish failures are warnings. DSEx reports accurate failed terminal status,
+or finish failures are warnings. Imp reports accurate failed terminal status,
 while the isolated W&B client can reproduce GEPA v0.1.1's success-only finish
 behavior when explicitly configured for compatibility.
 
@@ -97,7 +97,7 @@ configuration, and scheduling artifacts:
 
 ```sh
 mix benchmark.optimize_anything.check
-mix dsex.benchmark.optimize_anything --live --provider openai \
+mix imp.benchmark.optimize_anything --live --provider openai \
   --model gpt-5.4-2026-03-05 --seeds 17,23,31 --max-proposals 5 \
   --out benchmarks/results
 ```
@@ -108,32 +108,32 @@ that authorize the scoped live effectiveness claim.
 
 Release fidelity is pinned to GEPA v0.1.1. Adapter-owned resume, reflection
 budgets, attachable tracking runs, and other selected post-tag lifecycle fixes
-are DSEx production extensions, not a claim of parity with unreleased GEPA
+are Imp production extensions, not a claim of parity with unreleased GEPA
 main. Real non-prompt effectiveness campaigns remain a separate release gate.
 
 ## Agents And MCP
 
 ```elixir
-tool = DSEx.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+tool = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
 agent =
-  DSEx.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
-    DSEx.Agent.call_tool(agent, :double, %{x: x}, runtime)
+  Imp.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
+    Imp.Agent.call_tool(agent, :double, %{x: x}, runtime)
   end, tools: [tool])
 
-{:ok, %{y: 8}, runtime} = DSEx.Agent.run(agent, %{x: 4})
+{:ok, %{y: 8}, runtime} = Imp.Agent.run(agent, %{x: 4})
 runtime.traces
 ```
 
-MCP-style catalogs import external schemas into ordinary `DSEx.Tool` structs:
+MCP-style catalogs import external schemas into ordinary `Imp.Tool` structs:
 
 ```elixir
 catalog =
-  DSEx.MCP.Catalog.new([
+  Imp.MCP.Catalog.new([
     %{name: :lookup, description: "lookup", input_schema: %{required: [:key]}, run: & &1}
   ])
 
-[tool] = DSEx.MCP.import_tools(catalog)
+[tool] = Imp.MCP.import_tools(catalog)
 ```
 
 Runtime sessions support memory, large context references, tool failures, child
@@ -142,16 +142,16 @@ and trace capture.
 
 ## Protocol Clients
 
-The normal provider path for LM inference is still `DSEx.req_llm/2`. Use the
+The normal provider path for LM inference is still `Imp.req_llm/2`. Use the
 protocol clients below only when your application owns the external service
 boundary directly.
 
-HTTP retrievers wrap search services behind the shared `DSEx.Retrieve`
+HTTP retrievers wrap search services behind the shared `Imp.Retrieve`
 behaviour:
 
 ```elixir
 retriever =
-  DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+  Imp.Retrievers.HTTP.new("https://retriever.example/search",
     body_builder: fn query, opts -> %{query: query, k: Keyword.get(opts, :k, 3)} end,
     response_mapper: fn _retriever, decoded -> decoded["documents"] end
   )
@@ -161,10 +161,10 @@ Provider-shaped retriever constructors build payload-compatible clients for
 specific APIs while keeping credentials explicit:
 
 ```elixir
-weaviate = DSEx.Retrievers.Weaviate.new("https://weaviate.example", "Passage")
+weaviate = Imp.Retrievers.Weaviate.new("https://weaviate.example", "Passage")
 
 databricks =
-  DSEx.Retrievers.Databricks.new(
+  Imp.Retrievers.Databricks.new(
     "https://workspace.example",
     "catalog.schema.index",
     token: System.fetch_env!("DATABRICKS_TOKEN")
@@ -185,11 +185,11 @@ an arity-3 callback so tests and applications can inject the training boundary
 without ambient provider state.
 
 ```elixir
-trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
+trainer = Imp.Clients.OpenAITrainer.new(training_file: "file-provider-id")
 ```
 
 `OpenAITrainer` and `DatabricksTrainer` return configured
-`%DSEx.Clients.HTTPTrainer{}` values. Pattern match on `provider: :openai` or
+`%Imp.Clients.HTTPTrainer{}` values. Pattern match on `provider: :openai` or
 `provider: :databricks` when you need to inspect the returned trainer. The
 OpenAI trainer submits a fine-tuning job for an already uploaded provider file;
 it does not upload examples itself.
@@ -202,7 +202,7 @@ Apple Silicon hosts can install the separately versioned trainer executable:
 uv tool install 'mlx-lm[train]==0.31.3'
 ```
 
-`DSEx.Clients.MLXLMTrainer` accepts only a local Hugging Face snapshot whose
+`Imp.Clients.MLXLMTrainer` accepts only a local Hugging Face snapshot whose
 directory name is the exact configured revision. The successful proof used this
 pinned model artifact; do not replace its revision with `main`:
 
@@ -211,7 +211,7 @@ pinned model artifact; do not replace its revision with `main`:
 | `mlx-community/Qwen2.5-0.5B-Instruct-4bit` | `a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3` |
 
 Download a snapshot into the normal Hugging Face cache before training, then
-pass the signature and actual DSEx adapter used by the program:
+pass the signature and actual Imp adapter used by the program:
 
 ```bash
 hf download mlx-community/Qwen2.5-0.5B-Instruct-4bit \
@@ -220,15 +220,15 @@ hf download mlx-community/Qwen2.5-0.5B-Instruct-4bit \
 
 ```elixir
 trainer =
-  DSEx.Clients.MLXLMTrainer.new(
-    signature: DSEx.signature("question -> answer"),
-    adapter: DSEx.Adapter.Chat,
+  Imp.Clients.MLXLMTrainer.new(
+    signature: Imp.signature("question -> answer"),
+    adapter: Imp.Adapter.Chat,
     stratify_by: [:route],
     executable: "uvx",
     executable_args: ["--from", "mlx-lm==0.31.3", "mlx_lm.lora"]
   )
 
-{:ok, job} = DSEx.Clients.Trainer.finetune(trainer, deployment_lm, examples)
+{:ok, job} = Imp.Clients.Trainer.finetune(trainer, deployment_lm, examples)
 ```
 
 The proven 80-example configuration produced 72 training and 8 validation rows
@@ -249,7 +249,7 @@ as `uvx`; these prefix arguments participate in that direct invocation.
 
 #### External process dependency decision
 
-DSEx intentionally does not add MuonTrap or Rambo for this backend. The review
+Imp intentionally does not add MuonTrap or Rambo for this backend. The review
 was against MuonTrap `1.8.0` and Rambo `0.3.4`, not their names or README claims:
 
 | Candidate | Decision | Blocking gap |
@@ -257,7 +257,7 @@ was against MuonTrap `1.8.0` and Rambo `0.3.4`, not their names or README claims
 | [MuonTrap 1.8.0](https://github.com/fhunleth/muontrap/tree/v1.8.0) | Do not buy for MLX-LM | Its non-cgroup path escalates TERM to KILL for the immediate child; complete descendant cleanup is implemented only through Linux cgroups, which does not cover Apple Silicon/macOS training hosts. |
 | [Rambo 0.3.4](https://github.com/jayjun/rambo/tree/0.3.4) | Do not buy for MLX-LM | Timeout closes its shim and Rust `kill_on_drop(true)` targets the direct child; captured stdout/stderr are accumulated without a byte bound and there is no TERM grace period. |
 
-`DSEx.ExternalCommand` therefore follows the repository's exercised
+`Imp.ExternalCommand` therefore follows the repository's exercised
 `ParitySidecar` precedent: direct executable plus argv, one Port-owned OS process
 group, checked group TERM/KILL, caller-death cleanup, and bounded tail capture.
 This is a deliberate narrow wrapper, not a general process-management library.
@@ -268,7 +268,7 @@ fallback rather than the normal shutdown protocol:
 
 ```elixir
 {:ok, handle} =
-  DSEx.ExternalCommand.start("uvx", server_argv,
+  Imp.ExternalCommand.start("uvx", server_argv,
     timeout: :infinity,
     kill_grace_ms: 2_000
   )
@@ -276,14 +276,14 @@ fallback rather than the normal shutdown protocol:
 try do
   evaluate_local_model()
 after
-  :ok = DSEx.ExternalCommand.stop(handle, 10_000)
+  :ok = Imp.ExternalCommand.stop(handle, 10_000)
 end
 ```
 
 Run the source-checkout campaign with:
 
 ```sh
-mix dsex.benchmark.local_mlx
+mix imp.benchmark.local_mlx
 ```
 
 The campaign owns the complete local effectiveness proof: immutable dataset and model-tree validation, matched
@@ -311,7 +311,7 @@ does not report the server's base-model output as adapter inference.
 
 ```elixir
 signature =
-  DSEx.signature(%{
+  Imp.signature(%{
     inputs: [:question],
     outputs: [
       %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},
@@ -319,7 +319,7 @@ signature =
     ]
   })
 
-DSEx.Signature.json_schema(signature)
+Imp.Signature.json_schema(signature)
 ```
 
 Supported constraints include enum, numeric bounds, string length, regex
@@ -328,7 +328,7 @@ return retry feedback suitable for another model attempt.
 
 ## Release Evidence
 
-DSEx keeps release evidence behind Mix gates rather than presenting benchmark
+Imp keeps release evidence behind Mix gates rather than presenting benchmark
 helpers as application APIs. In a source checkout:
 
 ```sh
@@ -348,15 +348,15 @@ The deterministic evidence fixtures cover:
 
 ## Production Boundaries
 
-Advanced DSEx APIs are part of the same release contract as the core facade:
+Advanced Imp APIs are part of the same release contract as the core facade:
 they must pass deterministic tests, compile with warnings as errors, preserve
 JSON-safe persistence where applicable, and keep provider credentials out of
 saved artifacts.
 
 MCP support covers catalog import plus JSON-RPC HTTP, stdio, and Streamable HTTP
 clients. The benchmark fixtures are deterministic regression fixtures for
-DSEx behavior, not public leaderboard claims. Provider-native schema APIs and
-streaming are explicit provider responsibilities layered over the shared DSEx
+Imp behavior, not public leaderboard claims. Provider-native schema APIs and
+streaming are explicit provider responsibilities layered over the shared Imp
 contracts and tested through injectable transports.
 
 For real dataset benchmark evidence, use the maintainer evidence notes in the

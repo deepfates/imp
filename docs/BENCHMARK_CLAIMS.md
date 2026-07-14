@@ -1,6 +1,6 @@
 # Public Claim Inventory
 
-`benchmarks/claims.json` is the machine-readable inventory of public DSEx
+`benchmarks/claims.json` is the machine-readable inventory of public Imp
 release claims. The benchmark dashboard evaluates that file alongside the
 evidence lanes and adds a `public_claims` release-gate check.
 
@@ -34,7 +34,7 @@ Each claim has:
 - `surface`: the APIs or user stories covered by the claim.
 - `claim_type`: feature completeness, conformance, live-provider proof,
   functional effectiveness, or performance.
-- `comparison`: `dspy`, `dsex_native`, or a narrower comparison target.
+- `comparison`: `dspy`, `imp_native`, or a narrower comparison target.
 - `decision`: `proven_target` or `active_gap` for the named release scope.
 - `release`: the release whose policy owns the decision, such as `v0.1` or
   `post-v0.1`.
@@ -99,7 +99,7 @@ unavailable.
 GEPA research claims use the `gepa_replication` lane, not the generic
 `optimizer_lift` lane. The dashboard only accepts those claims when a fresh
 non-smoke `gepa-replication-*.json` artifact covers the required GEPA paper
-families and reports baseline, DSPy GEPA, DSEx GEPA, MIPROv2, metric-call
+families and reports baseline, DSPy GEPA, Imp GEPA, MIPROv2, metric-call
 budget, token/cost, wall-clock, seed variance, and train/dev/test gap. The
 dashboard recomputes full evidence from the row contract: campaign provenance,
 dataset scope, split counts, dataset checksums, source commits, concrete
@@ -114,7 +114,7 @@ scheduling artifact families; at least three live provider-backed seeds per
 family; positive mean held-out lift; a strict majority of improving runs;
 positive usage and cost; and durable checkpoint provenance. Smoke artifacts
 and authored comparator scores cannot authorize the claim. This lane proves
-the scoped DSEx-native effectiveness statement, not paper-scale upstream
+the scoped Imp-native effectiveness statement, not paper-scale upstream
 parity.
 
 Local MLX weight-training effectiveness uses the `local_mlx_weight_training`

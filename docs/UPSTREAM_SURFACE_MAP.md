@@ -1,4 +1,4 @@
-# DSEx Executable Upstream Conformance
+# Imp Executable Upstream Conformance
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
@@ -47,7 +47,7 @@ Status: `conformant`
 
 Upstream source: `dspy/signatures; dspy/primitives`
 
-DSEx modules: `DSEx.Signature`, `DSEx.Example`, `DSEx.Prediction`, `DSEx.History`
+Imp modules: `Imp.Signature`, `Imp.Example`, `Imp.Prediction`, `Imp.History`
 Semantic invariants:
 
 - signatures declare named typed inputs and outputs
@@ -57,7 +57,7 @@ Semantic invariants:
 
 Executable evidence:
 
-- test: `test/dsex_test.exs`
+- test: `test/imp_test.exs`
 - test: `test/schema_constraints_test.exs`
 - test: `test/history_test.exs`
 - docs: `docs/API_GUIDE.md`
@@ -74,7 +74,7 @@ Status: `conformant`
 
 Upstream source: `dspy/primitives/module.py; dspy/predict`
 
-DSEx modules: `DSEx.Module`, `DSEx.Predict.Predict`, `DSEx.Predict.ChainOfThought`, `DSEx.Predict.MultiChainComparison`, `DSEx.Predict.Parallel`
+Imp modules: `Imp.Module`, `Imp.Predict.Predict`, `Imp.Predict.ChainOfThought`, `Imp.Predict.MultiChainComparison`, `Imp.Predict.Parallel`
 Semantic invariants:
 
 - programs are composable callable values
@@ -101,8 +101,8 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/clients; dspy/dsp/utils/settings.py; dspy/utils/exceptions.py`
 
-DSEx modules: `DSEx.LM`, `DSEx.Clients.ReqLLM`, `DSEx.Embeddings`, `DSEx.Settings`
-Elixir-native rationale: ReqLLM owns provider transport while DSEx owns program semantics; process-local context replaces Python context variables.
+Imp modules: `Imp.LM`, `Imp.Clients.ReqLLM`, `Imp.Embeddings`, `Imp.Settings`
+Elixir-native rationale: ReqLLM owns provider transport while Imp owns program semantics; process-local context replaces Python context variables.
 
 Semantic invariants:
 
@@ -130,7 +130,7 @@ Status: `tracking`
 
 Upstream source: `dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.0b1`
 
-DSEx modules: `DSEx.Core.LMRequest`, `DSEx.Core.LMResponse`
+Imp modules: `Imp.Core.LMRequest`, `Imp.Core.LMResponse`
 Semantic invariants:
 
 - stable DSPy remains the release baseline until 3.3 is final
@@ -151,7 +151,7 @@ Status: `conformant`
 
 Upstream source: `dspy/adapters`
 
-DSEx modules: `DSEx.Adapter`, `DSEx.Adapter.Chat`, `DSEx.Adapter.JSON`, `DSEx.Adapter.XML`, `DSEx.Adapter.TwoStep`
+Imp modules: `Imp.Adapter`, `Imp.Adapter.Chat`, `Imp.Adapter.JSON`, `Imp.Adapter.XML`, `Imp.Adapter.TwoStep`
 Semantic invariants:
 
 - adapters format signature fields and demonstrations
@@ -176,7 +176,7 @@ Status: `conformant`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
-DSEx modules: `DSEx.Adapters.Types`
+Imp modules: `Imp.Adapters.Types`
 Semantic invariants:
 
 - encoding support is not evidence of model reasoning quality
@@ -199,12 +199,12 @@ Status: `conformant`
 
 Upstream source: `dspy/adapters/types/tool.py; dspy/utils/mcp.py`
 
-DSEx modules: `DSEx.Tool`, `DSEx.MCP`
+Imp modules: `Imp.Tool`, `Imp.MCP`
 Semantic invariants:
 
 - tool schemas are validated before execution
 - provider tool-call ids and results are retained
-- MCP discovery creates ordinary DSEx tools
+- MCP discovery creates ordinary Imp tools
 
 Executable evidence:
 
@@ -225,8 +225,8 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py`
 
-DSEx modules: `DSEx.Predict.ReAct`, `DSEx.Predict.ReActV2`, `DSEx.Predict.CodeAct`, `DSEx.Predict.ProgramOfThought`, `DSEx.Sandbox`
-Elixir-native rationale: DSEx ReAct uses provider-native function calls with a reserved submit tool and fails fast on unknown tools, denied calls, malformed calls, and execution errors; upstream ReAct uses action fields, a finish control tool, and observation-based continuation. ReActV2 and code execution retain their separately documented DSEx contracts.
+Imp modules: `Imp.Predict.ReAct`, `Imp.Predict.ReActV2`, `Imp.Predict.CodeAct`, `Imp.Predict.ProgramOfThought`, `Imp.Sandbox`
+Elixir-native rationale: Imp ReAct uses provider-native function calls with a reserved submit tool and fails fast on unknown tools, denied calls, malformed calls, and execution errors; upstream ReAct uses action fields, a finish control tool, and observation-based continuation. ReActV2 and code execution retain their separately documented Imp contracts.
 
 Semantic invariants:
 
@@ -255,8 +255,8 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/rlm.py; arXiv:2512.24601`
 
-DSEx modules: `DSEx.Predict.RLM`, `DSEx.Predict.RLM.SandboxSerializable`
-Elixir-native rationale: DSEx implements the recursive controller as a bounded BEAM-native effect interpreter with supervised subcalls, shared budgets, transactional replay, and no Python runtime dependency; paper-scale effectiveness remains a separately gated research claim.
+Imp modules: `Imp.Predict.RLM`, `Imp.Predict.RLM.SandboxSerializable`
+Elixir-native rationale: Imp implements the recursive controller as a bounded BEAM-native effect interpreter with supervised subcalls, shared budgets, transactional replay, and no Python runtime dependency; paper-scale effectiveness remains a separately gated research claim.
 
 Semantic invariants:
 
@@ -287,7 +287,7 @@ Status: `conformant`
 
 Upstream source: `dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`
 
-DSEx modules: `DSEx.Predict.BestOfN`, `DSEx.Predict.Refine`, `DSEx.Predict.Assertions`
+Imp modules: `Imp.Predict.BestOfN`, `Imp.Predict.Refine`, `Imp.Predict.Assertions`
 Semantic invariants:
 
 - metrics select or refine predictions
@@ -317,7 +317,7 @@ Status: `conformant`
 
 Upstream source: `dspy/evaluate`
 
-DSEx modules: `DSEx.Evaluate`, `DSEx.Metrics`, `DSEx.Evaluate.SemanticF1`, `DSEx.Evaluate.CompleteAndGrounded`
+Imp modules: `Imp.Evaluate`, `Imp.Metrics`, `Imp.Evaluate.SemanticF1`, `Imp.Evaluate.CompleteAndGrounded`
 Semantic invariants:
 
 - boolean, numeric, and feedback-bearing metrics normalize consistently
@@ -327,7 +327,7 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/metric_contract_test.exs`
-- test: `test/dsex_test.exs`
+- test: `test/imp_test.exs`
 - test: `test/property_invariants_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
@@ -343,7 +343,7 @@ Status: `conformant`
 
 Upstream source: `dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py`
 
-DSEx modules: `DSEx.Optimizer.LabeledFewShot`, `DSEx.Optimizer.BootstrapFewShot`, `DSEx.Optimizer.BootstrapFewShotWithRandomSearch`, `DSEx.Optimizer.BootstrapRS`, `DSEx.Optimizer.RandomSearch`, `DSEx.Optimizer.KNNFewShot`
+Imp modules: `Imp.Optimizer.LabeledFewShot`, `Imp.Optimizer.BootstrapFewShot`, `Imp.Optimizer.BootstrapFewShotWithRandomSearch`, `Imp.Optimizer.BootstrapRS`, `Imp.Optimizer.RandomSearch`, `Imp.Optimizer.KNNFewShot`
 Semantic invariants:
 
 - successful traces become module-specific demonstrations
@@ -368,7 +368,7 @@ Status: `gap`
 
 Upstream source: `dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py`
 
-DSEx modules: `DSEx.Optimizer.COPRO`, `DSEx.Optimizer.MIPROv2`, `DSEx.Optimizer.SIMBA`, `DSEx.Optimizer.InferRules`, `DSEx.Optimizer.SignatureOptimizer`
+Imp modules: `Imp.Optimizer.COPRO`, `Imp.Optimizer.MIPROv2`, `Imp.Optimizer.SIMBA`, `Imp.Optimizer.InferRules`, `Imp.Optimizer.SignatureOptimizer`
 Semantic invariants:
 
 - public names preserve the upstream optimization mechanism
@@ -393,7 +393,7 @@ Status: `conformant`
 
 Upstream source: `dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457`
 
-DSEx modules: `DSEx.Optimizer.GEPA`, `DSEx.Optimize.Anything`
+Imp modules: `Imp.Optimizer.GEPA`, `Imp.Optimize.Anything`
 Semantic invariants:
 
 - reflective mutation uses per-example feedback and trajectories
@@ -421,7 +421,7 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
-DSEx modules: `DSEx.Predict.Avatar`, `DSEx.Optimizer.Avatar`, `DSEx.Optimizer.BootstrapFinetune`, `DSEx.Optimizer.GRPO`, `DSEx.Optimizer.BetterTogether`, `DSEx.Optimizer.Ensemble`
+Imp modules: `Imp.Predict.Avatar`, `Imp.Optimizer.Avatar`, `Imp.Optimizer.BootstrapFinetune`, `Imp.Optimizer.GRPO`, `Imp.Optimizer.BetterTogether`, `Imp.Optimizer.Ensemble`
 Elixir-native rationale: BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.
 
 Semantic invariants:
@@ -460,8 +460,8 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
-DSEx modules: `DSEx.Training.FastSlow.Runner`, `DSEx.Training.FastSlow.Backend`, `DSEx.Training.FastSlow.Checkpoint`
-Elixir-native rationale: No first-party implementation accompanied the paper; DSEx provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.
+Imp modules: `Imp.Training.FastSlow.Runner`, `Imp.Training.FastSlow.Backend`, `Imp.Training.FastSlow.Checkpoint`
+Elixir-native rationale: No first-party implementation accompanied the paper; Imp provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.
 
 Semantic invariants:
 
@@ -493,7 +493,7 @@ Status: `tracking`
 
 Upstream source: `arXiv:2605.19633; gepa-ai optimize-anything`
 
-DSEx modules: `DSEx.Optimize.Anything`, `DSEx.Optimize.Anything.Config`, `DSEx.Optimize.Anything.Result`
+Imp modules: `Imp.Optimize.Anything`, `Imp.Optimize.Anything.Config`, `Imp.Optimize.Anything.Result`
 Semantic invariants:
 
 - artifacts are not limited to prompts
@@ -527,8 +527,8 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/retrievers; dspy/datasets`
 
-DSEx modules: `DSEx.Retrieve`, `DSEx.Embeddings`, `DSEx.Retrievers.HTTP`, `DSEx.Datasets`
-Elixir-native rationale: DSEx owns retrieval protocols and composition while production indexes remain replaceable services; embedded ColBERT is intentionally omitted.
+Imp modules: `Imp.Retrieve`, `Imp.Embeddings`, `Imp.Retrievers.HTTP`, `Imp.Datasets`
+Elixir-native rationale: Imp owns retrieval protocols and composition while production indexes remain replaceable services; embedded ColBERT is intentionally omitted.
 
 Semantic invariants:
 
@@ -555,7 +555,7 @@ Status: `conformant`
 
 Upstream source: `dspy/utils; dspy/streaming; dspy/clients/cache.py`
 
-DSEx modules: `DSEx.Tasks`, `DSEx.Streaming`, `DSEx.Cache`
+Imp modules: `Imp.Tasks`, `Imp.Streaming`, `Imp.Cache`
 Semantic invariants:
 
 - work is supervised and cancellable
@@ -582,7 +582,7 @@ Status: `conformant`
 
 Upstream source: `dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs`
 
-DSEx modules: `DSEx.Observability`, `DSEx.Telemetry`, `DSEx.Streaming.Messages`
+Imp modules: `Imp.Observability`, `Imp.Telemetry`, `Imp.Streaming.Messages`
 Semantic invariants:
 
 - developers can inspect model, tool, optimizer, and RLM traces
@@ -607,7 +607,7 @@ Status: `conformant`
 
 Upstream source: `dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs`
 
-DSEx modules: `DSEx.Saving`, `DSEx.Saving.Registry`
+Imp modules: `Imp.Saving`, `Imp.Saving.Registry`
 Semantic invariants:
 
 - portable state round-trips transactionally
@@ -634,7 +634,7 @@ Status: `conformant`
 
 Upstream source: `dspy/docs/docs`
 
-DSEx modules: `DSEx`
+Imp modules: `Imp`
 Semantic invariants:
 
 - one progressive path teaches the complete product
@@ -663,7 +663,7 @@ Status: `conformant`
 
 Upstream source: `Hex package and canonical GitHub repository`
 
-DSEx modules: `DSEx`
+Imp modules: `Imp`
 Semantic invariants:
 
 - documented installation resolves

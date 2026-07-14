@@ -1,13 +1,13 @@
-# DSEx 01: Real LM Front Door
+# Imp 01: Real LM Front Door
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dsex, path: repo}])
+Mix.install([{:imp, path: repo}])
 ```
 
 ## Program, Don't Prompt
 
-This notebook is the DSEx front door. It mirrors the core DSP idea:
+This notebook is the Imp front door. It mirrors the core DSP idea:
 declare a task, run it as a program, then grow the same task into tools,
 evaluation, optimization, and persistence.
 
@@ -22,7 +22,7 @@ safe to execute in local gates.
 live_lm = fn opts ->
   if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
-     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
          [
            api_key: System.fetch_env!("OPENAI_API_KEY"),
@@ -47,31 +47,31 @@ system can test, evaluate, optimize, and persist.
 case live_lm.(max_completion_tokens: 120) do
   {:ok, lm} ->
     extract =
-      DSEx.predict(
-        DSEx.signature(
+      Imp.predict(
+        Imp.signature(
           "email -> event_name: string, date: string",
           "Extract the event name and date from the email. Return JSON only."
         ),
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     {:ok, prediction} =
-      DSEx.call(extract, %{
+      Imp.call(extract, %{
         email: "Team Offsite moved to Thursday, June 5. Bring questions for planning."
       })
 
-    event_name = prediction |> DSEx.get(:event_name, "") |> to_string() |> String.downcase()
-    date = prediction |> DSEx.get(:date, "") |> to_string() |> String.downcase()
+    event_name = prediction |> Imp.get(:event_name, "") |> to_string() |> String.downcase()
+    date = prediction |> Imp.get(:date, "") |> to_string() |> String.downcase()
 
     unless String.contains?(event_name, "offsite") and
              (String.contains?(date, "june") or String.contains?(date, "thursday") or
                 String.contains?(date, "06-05") or String.contains?(date, "6/5")) do
-      raise "live extraction proof failed: #{inspect(DSEx.to_map(prediction))}"
+      raise "live extraction proof failed: #{inspect(Imp.to_map(prediction))}"
     end
 
-    DSEx.to_map(prediction)
+    Imp.to_map(prediction)
 
   skip ->
     skip
@@ -87,27 +87,27 @@ is a program shape around the same signature idea.
 case live_lm.(max_completion_tokens: 160) do
   {:ok, lm} ->
     classify =
-      DSEx.chain_of_thought(
-        DSEx.signature(
+      Imp.chain_of_thought(
+        Imp.signature(
           "ticket -> reasoning: string, urgency: enum[low,high], team: string",
           "Route the support ticket. Return JSON only."
         ),
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     {:ok, prediction} =
-      DSEx.call(classify, %{
+      Imp.call(classify, %{
         ticket: "Production checkout is failing for all EU customers."
       })
 
-    unless DSEx.get(prediction, :urgency) == "high" and
-             prediction |> DSEx.get(:reasoning, "") |> to_string() |> byte_size() > 0 do
-      raise "live ChainOfThought proof failed: #{inspect(DSEx.to_map(prediction))}"
+    unless Imp.get(prediction, :urgency) == "high" and
+             prediction |> Imp.get(:reasoning, "") |> to_string() |> byte_size() > 0 do
+      raise "live ChainOfThought proof failed: #{inspect(Imp.to_map(prediction))}"
     end
 
-    DSEx.to_map(prediction)
+    Imp.to_map(prediction)
 
   skip ->
     skip
@@ -116,7 +116,7 @@ end
 
 ## Add Conversation History
 
-History is prior task data keyed by the signature fields. DSEx renders it as
+History is prior task data keyed by the signature fields. Imp renders it as
 prior turns for the model, while the program still receives named inputs and
 returns named outputs.
 
@@ -124,8 +124,8 @@ returns named outputs.
 case live_lm.(max_completion_tokens: 120) do
   {:ok, lm} ->
     qa =
-      DSEx.predict(
-        DSEx.signature(
+      Imp.predict(
+        Imp.signature(
           "question, history -> answer: short_span",
           "Answer the latest question using the conversation history when relevant."
         ),
@@ -133,21 +133,21 @@ case live_lm.(max_completion_tokens: 120) do
       )
 
     history =
-      DSEx.history([
+      Imp.history([
         %{question: "What is the capital of France?", answer: "Paris"},
         %{question: "What country is Paris in?", answer: "France"}
       ])
 
     {:ok, prediction} =
-      DSEx.call(qa, %{question: "What city did we identify first?", history: history})
+      Imp.call(qa, %{question: "What city did we identify first?", history: history})
 
-    answer = prediction |> DSEx.get(:answer, "") |> to_string() |> String.downcase()
+    answer = prediction |> Imp.get(:answer, "") |> to_string() |> String.downcase()
 
     unless String.contains?(answer, "paris") do
-      raise "live history proof failed: #{inspect(DSEx.to_map(prediction))}"
+      raise "live history proof failed: #{inspect(Imp.to_map(prediction))}"
     end
 
-    DSEx.to_map(prediction)
+    Imp.to_map(prediction)
 
   skip ->
     skip
@@ -163,7 +163,7 @@ inside an explicit policy and final `submit` boundary.
 case live_lm.(max_completion_tokens: 180) do
   {:ok, lm} ->
     lookup =
-      DSEx.tool(:lookup, "Lookup a fact by query.", fn
+      Imp.tool(:lookup, "Lookup a fact by query.", fn
         %{query: "capital-france"} -> "Paris"
         %{"query" => "capital-france"} -> "Paris"
         other -> {:error, {:unexpected_query, other}}
@@ -176,8 +176,8 @@ case live_lm.(max_completion_tokens: 180) do
       )
 
     react =
-      DSEx.react(
-        DSEx.signature(
+      Imp.react(
+        Imp.signature(
           "question -> answer",
           """
           Use the lookup tool first with query "capital-france".
@@ -193,18 +193,18 @@ case live_lm.(max_completion_tokens: 180) do
 
     {:ok, prediction} =
       Enum.reduce_while(1..3, {:error, :not_run}, fn _attempt, _last ->
-        case DSEx.call(react, %{question: "What is the capital of France?"}) do
+        case Imp.call(react, %{question: "What is the capital of France?"}) do
           {:ok, prediction} -> {:halt, {:ok, prediction}}
           {:error, _reason} = error -> {:cont, error}
         end
       end)
 
-    unless DSEx.get(prediction, :answer) == "Paris" and
-             Enum.any?(DSEx.get(prediction, :history), &(&1.tool == :lookup)) do
-      raise "live ReAct proof failed: #{inspect(DSEx.to_map(prediction))}"
+    unless Imp.get(prediction, :answer) == "Paris" and
+             Enum.any?(Imp.get(prediction, :history), &(&1.tool == :lookup)) do
+      raise "live ReAct proof failed: #{inspect(Imp.to_map(prediction))}"
     end
 
-    DSEx.to_map(prediction)
+    Imp.to_map(prediction)
 
   skip ->
     skip
@@ -219,33 +219,33 @@ evaluation and optimization workflow.
 
 ```elixir
 static_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: static_lm)
+program = Imp.predict("question -> answer", lm: static_lm)
 
 trainset = [
-  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Eiffel Tower city?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
-metric = DSEx.exact_match(:answer)
+metric = Imp.exact_match(:answer)
 
 compiled =
   program
-  |> DSEx.optimize(
-    DSEx.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
+  |> Imp.optimize(
+    Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
     trainset,
     devset
   )
 
-{DSEx.evaluate(program, devset, metric).score, DSEx.evaluate(compiled, devset, metric).score}
+{Imp.evaluate(program, devset, metric).score, Imp.evaluate(compiled, devset, metric).score}
 ```
 
 ## Save Without Secrets
@@ -256,12 +256,12 @@ credentials. Livebook 05 returns to this from the operations side.
 ```elixir
 case live_lm.(temperature: 0) do
   {:ok, lm} ->
-    program = DSEx.predict("question -> answer", lm: lm)
-    state = DSEx.dump(program)
+    program = Imp.predict("question -> answer", lm: lm)
+    state = Imp.dump(program)
 
     proof = %{
       credential_leaked?: inspect(state) =~ System.fetch_env!("OPENAI_API_KEY"),
-      loadable?: match?(%{__struct__: DSEx.Predict.Predict}, DSEx.load(state))
+      loadable?: match?(%{__struct__: Imp.Predict.Predict}, Imp.load(state))
     }
 
     unless proof == %{credential_leaked?: false, loadable?: true} do

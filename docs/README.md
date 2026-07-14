@@ -1,6 +1,6 @@
-# DSEx Manual
+# Imp Manual
 
-DSEx turns language-model work into declared, callable, measurable, improvable
+Imp turns language-model work into declared, callable, measurable, improvable
 Elixir programs. This manual is organized by what you are trying to do.
 
 ## Manual Spine
@@ -8,8 +8,8 @@ Elixir programs. This manual is organized by what you are trying to do.
 Every guide and notebook follows the same product story:
 
 1. **Declare** the task as a typed signature.
-2. **Run** it as a DSEx program through `DSEx.call/2`.
-3. **Develop** it deterministically with `DSEx.LM.Static`.
+2. **Run** it as an Imp program through `Imp.call/2`.
+3. **Develop** it deterministically with `Imp.LM.Static`.
 4. **Measure** behavior with examples, metrics, and evaluation reports.
 5. **Improve** the program with optimizers.
 6. **Extend** it with tools, retrieval, agents, or RLM only when needed.
@@ -20,9 +20,9 @@ Every guide and notebook follows the same product story:
 
 - [Learning Path](LEARNING_PATH.md): what to read and run in 30 minutes,
   two hours, an afternoon, and a production app.
-- [Philosophy](DSEX_PHILOSOPHY.md): the mental model: signatures, programs,
+- [Philosophy](IMP_PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
-- [Glossary](GLOSSARY.md): short definitions for DSEx vocabulary.
+- [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
 - [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
@@ -30,13 +30,13 @@ Every guide and notebook follows the same product story:
 - [Research Landscape](RESEARCH_LANDSCAPE.md): the paper lineage, neighboring
   repositories, implementation comparators, and architecture implications.
 
-## Build With DSEx
+## Build With Imp
 
 - [API Guide](API_GUIDE.md): task-oriented examples for normal application
   code.
 - [Tutorial And Example Parity](TUTORIAL_EXAMPLE_PARITY.md): where each
-  tutorial and real-world example family belongs in the executable DSEx path.
-- [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA-style reflection,
+  tutorial and real-world example family belongs in the executable Imp path.
+- [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic fixtures.
 - [RLM Fidelity](RLM_FIDELITY.md): the BEAM-native recursive-control design,
   upstream invariants, evidence tiers, and remaining paper-scale blocker.
@@ -85,12 +85,15 @@ credentials are loaded.
 6. From the source checkout, run `mix livebook.execute.check` after changing public examples or notebooks.
 
 Package consumers do not need the source-checkout Mix aliases; those gates are
-for DSEx maintainers validating this repository before release.
+for Imp maintainers validating this repository before release.
 
 ## Maintainer Evidence
 
 The repository also keeps release-evidence notes for maintainers and reviewers.
-They audit DSEx-vs-DSPy parity and performance claims, but they are intentionally
+They audit Imp-vs-DSPy parity and performance claims, but they are intentionally
 separate from the packaged user manual. In the source checkout, the benchmark
 catalog and release-evidence notes are the maintainer starting point for
 outside-view validation work.
+
+- [Identity Compatibility](IDENTITY_COMPATIBILITY.md): the narrow read-time
+  boundary for checksummed DSEx-era evidence after the Imp cutover.

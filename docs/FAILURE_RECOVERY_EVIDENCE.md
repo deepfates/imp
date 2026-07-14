@@ -1,6 +1,6 @@
 # Failure and recovery evidence
 
-The canonical failure campaign exercises DSEx runtime behavior through public
+The canonical failure campaign exercises Imp runtime behavior through public
 Elixir APIs. It does not substitute benchmark-only recovery implementations for
 the production paths.
 
@@ -45,7 +45,7 @@ Use the pinned settings in
 `benchmarks/config/failure-recovery-live.json` from a clean commit:
 
 ```bash
-mix dsex.benchmark.failure_campaign \
+mix imp.benchmark.failure_campaign \
   --iterations 10 \
   --max-concurrency 2 \
   --live \

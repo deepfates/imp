@@ -1,6 +1,6 @@
 # Research Landscape
 
-This note records the outside view used to shape DSEx. It separates scientific
+This note records the outside view used to shape Imp. It separates scientific
 authorities, implementation comparators, production complements, and recent
 work that is promising but too new to become a release claim.
 
@@ -84,13 +84,13 @@ The useful lineage is broader than one lab:
     reports frequent negative lift in compound systems and proposes inexpensive
     headroom and interaction diagnostics before optimization. Its result is a
     direct warning against treating an optimizer run as inherently useful and
-    belongs in DSEx's campaign and promotion design even if its exact diagnostic
+    belongs in Imp's campaign and promotion design even if its exact diagnostic
     is not adopted.
 
 SIMBA is different from the paper-backed entries above. No authoritative
 standalone SIMBA paper was located. Its released DSPy source, adjacent tests,
 documentation, pull requests, and release history are therefore its behavioral
-authorities. DSEx must not describe source fidelity as SIMBA paper parity.
+authorities. Imp must not describe source fidelity as SIMBA paper parity.
 
 ## Fast-Slow Training
 
@@ -128,24 +128,24 @@ for the slow update. Reuse is a single-claim operation within that cycle; stale,
 duplicate, or mismatched trajectories must fall back to a fresh rollout rather
 than silently altering the off-policy ratio or advantage group.
 
-DSEx treats this as a paper-faithful Elixir/BEAM orchestration adaptation, not
+Imp treats this as a paper-faithful Elixir/BEAM orchestration adaptation, not
 source parity: no first-party Fast-Slow implementation was published with the
 paper as of this review. Its explicit immutable cycle state, bounded concurrent
 rollouts, durable operation intent, and checkpoint recovery may exploit the
 BEAM, but those mechanisms must preserve the ordering and statistical groups
 above. This section does not establish end-to-end provider evidence or claim
-that the DSEx implementation is complete. Revisit the design and parity status
+that the Imp implementation is complete. Revisit the design and parity status
 when first-party code, a revised paper, or an official executable artifact is
 released.
 
 ## Repositories And Roles
 
-| System | Role for DSEx | Pin or authority policy |
+| System | Role for Imp | Pin or authority policy |
 | --- | --- | --- |
 | [DSPy](https://github.com/stanfordnlp/dspy) | Primary compatibility authority for signatures, modules, runtime semantics, and named optimizers. | Pin an exact release, commit, source hashes, and relevant tests for each claim. Current instruction-optimizer gates use `3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`. |
 | [GEPA](https://github.com/gepa-ai/gepa) | Primary standalone implementation authority for generic reflective text optimization. | Release `v0.1.1` resolves to `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. Current `main` is separate and must not silently replace the release pin. |
 | [Ax](https://github.com/ax-llm/ax) | Strongest independent implementation comparator for a typed TypeScript interpretation of DSPy-style programming. | Release `23.0.0` resolves to `eb5835e54ba0c5b2fbac380daed1cb87faeefd5e`. Use for API and behavioral comparison, not as scientific authority. |
-| [BAML](https://github.com/BoundaryML/baml) | Comparator for compiler diagnostics, generated typed clients, and partial structured streaming. | Study its contracts; do not add a separate DSEx language unless Elixir modules and macros are demonstrably insufficient. |
+| [BAML](https://github.com/BoundaryML/baml) | Comparator for compiler diagnostics, generated typed clients, and partial structured streaming. | Study its contracts; do not add a separate Imp language unless Elixir modules and macros are demonstrably insufficient. |
 | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow), [TextGrad](https://github.com/zou-group/textgrad), and [SAMMO](https://github.com/microsoft/sammo) | Comparators for explicit parameter graphs, textual feedback, and structure-aware prompt transformations. | Borrow mechanisms only after pinning code and paper protocols independently. |
 | [ReqLLM](https://github.com/agentjido/req_llm) | Preferred BEAM provider substrate. | Release `v1.17.1` resolves to `33840077c2f1332eb6dff2d268dff02393014da4`. Integrate its provider, multimodal, tool, stream, usage, error, and telemetry contracts instead of rebuilding them. |
 | [Jido](https://github.com/agentjido/jido) and [Jido AI](https://github.com/agentjido/jido_ai) | Optional deployment and long-running-agent complements. | Study immutable state, explicit effects, supervision, and signals without making their agent model mandatory. |
@@ -171,7 +171,7 @@ That system needs:
 - deterministic aggregation over bounded parallel work;
 - resumable current-schema checkpoints, strict schema rejection, secret sanitization, and rollback.
 
-This is compatible with the current Elixir design. `DSEx.ProgramParameters`,
+This is compatible with the current Elixir design. `Imp.ProgramParameters`,
 optimizer reports, explicit random state, trajectories, GEPA archives, and
 save/load boundaries are the beginning of that system. The next step is to make
 their shared contract explicit without flattening MIPROv2, SIMBA, GEPA, and

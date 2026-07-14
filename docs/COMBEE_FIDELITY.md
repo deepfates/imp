@@ -1,6 +1,6 @@
 # ComBee-Style GEPA Aggregation Fidelity
 
-DSEx implements a BEAM-native ComBee-style reflection aggregation policy. It is
+Imp implements a BEAM-native ComBee-style reflection aggregation policy. It is
 an independent implementation of the algorithm described in the ComBee paper,
 not a port of hidden or unreleased GEPA code.
 
@@ -17,13 +17,13 @@ Primary design authority:
 
 The pinned GEPA tree contains the April 2026 post and its figures, but no
 visible ComBee aggregation or controller implementation. Therefore exact
-implementation parity with GEPA cannot be established from that source. DSEx
+implementation parity with GEPA cannot be established from that source. Imp
 claims structural fidelity to the published algorithm and documents its
 runtime adaptations below.
 
 ## Paper-specified behavior
 
-For `n > 0` component-specific reflection records, DSEx:
+For `n > 0` component-specific reflection records, Imp:
 
 1. Sets `k = floor(sqrt(n))` from the original record count.
 2. Makes `p` total copies of every record, with `p = 2` by default.
@@ -49,23 +49,23 @@ The built-in no-LM fallback is phase-aware and exhaustive. It includes every
 record in a first-level group and every ordered intermediate update at the final
 level. It does not apply a record-count truncation. When a configured reflection
 LM returns an error or an invalid response, proposal generation fails closed;
-DSEx does not silently substitute the fallback.
+Imp does not silently substitute the fallback.
 
 ## Runtime batch controller
 
 The paper's controller runs one synchronized trial iteration at each candidate
 batch size, measures end-to-end delay, converts it to epoch time, fits a power
 law, and selects the plateau where marginal improvement reaches 1.6% of the
-peak slope. DSEx now executes those trials as ordinary GEPA iterations through
+peak slope. Imp now executes those trials as ordinary GEPA iterations through
 the staged parent, reflection, and child pipeline. Trial candidates can be
 accepted or rejected, iteration numbers advance, callbacks fire, and metric and
 reflection calls are reserved and charged to the same budgets as later work.
 
-The v1 source does not publish its default candidate values. DSEx therefore
+The v1 source does not publish its default candidate values. Imp therefore
 uses the explicit `:candidate_batch_sizes` list when supplied. Otherwise it uses
-the documented DSEx adaptation `[min, 2 * min, 4 * min]`, deduplicated after
+the documented Imp adaptation `[min, 2 * min, 4 * min]`, deduplicated after
 clamping to the configured maximum and trainset size. The source contains a
-commented 200 upper-bound expression rather than a normative constant; DSEx
+commented 200 upper-bound expression rather than a normative constant; Imp
 retains 200 as a tested safety policy, not an upstream parity claim.
 
 For trainset size `N`, both runtime and offline modes compute:
@@ -83,7 +83,7 @@ plateau_batch_size = (alpha * A / tau)^(1 / (alpha + 1))
 ```
 
 The integer selection is floored and clamped to the configured range, trainset
-size, and DSEx safety cap. Fewer than two successful trials, duplicate batch
+size, and Imp safety cap. Fewer than two successful trials, duplicate batch
 sizes, invalid range coverage, a non-positive `alpha`, or a non-finite fit
 returns `status: :degenerate` and selects the smallest safe batch. It never
 guesses a larger batch after a degenerate fit.
@@ -91,7 +91,7 @@ guesses a larger batch after a degenerate fit.
 Runtime trials are strictly ordered and never overlap. `:profiling_timeout` is
 one absolute monotonic deadline shared by all candidates, checkpoint/callback
 overhead, and every nested GEPA phase. Completed-trial elapsed time is carried
-across resume. Before each trial, DSEx checkpoints controller status `:started`;
+across resume. Before each trial, Imp checkpoints controller status `:started`;
 the normal GEPA phase checkpoints then persist reservations before dispatch. A
 clean budget refusal records a failed trial and all observed call deltas but
 does not admit its delay to the fit. Timeout, caller death, crash, or resume from
@@ -109,7 +109,7 @@ Externally collected measurements remain available under the separate
 Example using externally collected measurements:
 
 ```elixir
-DSEx.Optimizer.GEPA.new(metric,
+Imp.Optimizer.GEPA.new(metric,
   generations: 4,
   timeout: 300_000,
   proposal_timeout: 120_000,
@@ -131,7 +131,7 @@ DSEx.Optimizer.GEPA.new(metric,
 Runtime profiling example:
 
 ```elixir
-DSEx.Optimizer.GEPA.new(metric,
+Imp.Optimizer.GEPA.new(metric,
   generations: 5,
   max_metric_calls: 100,
   max_reflection_calls: 40,
@@ -151,7 +151,7 @@ DSEx.Optimizer.GEPA.new(metric,
   is omitted, it inherits `timeout` so existing callers receive bounded
   reflection calls.
 - Single-call reflection and both ComBee levels run under
-  `DSEx.UnlinkedTaskSupervisor`. Each proposal receives one absolute monotonic
+  `Imp.UnlinkedTaskSupervisor`. Each proposal receives one absolute monotonic
   deadline. Nested component aggregation, queued first-level groups, and the
   final level consume the same remaining time. A finite ComBee timeout is an
   additional cap on that inherited proposal deadline.
@@ -163,7 +163,7 @@ DSEx.Optimizer.GEPA.new(metric,
   When the inner aggregation returns, a final call is charged only if it was
   dispatched. If an enclosing speculative proposal is killed first, effects
   are ambiguous and the full reservation is conservatively charged.
-- ComBee `:auto` concurrency divides `DSEx.Settings.async_max_workers` by the
+- ComBee `:auto` concurrency divides `Imp.Settings.async_max_workers` by the
   resolved speculative `proposal_concurrency`. Explicit combinations exceeding
   that worker allowance are rejected before optimization.
 - Callback effects and aggregation reports are applied in proposal-slot and
@@ -174,7 +174,7 @@ DSEx.Optimizer.GEPA.new(metric,
   concurrency, candidate schedule, safety range, fit threshold, profiling
   timeout, or offline measurements. A profiling checkpoint marked `started`
   remains non-resumable. A started reflection phase resumes without replay:
-  DSEx charges every reserved reflection call, converts the interrupted proposal
+  Imp charges every reserved reflection call, converts the interrupted proposal
   to a rejected iteration, and continues from a prepared child phase. Started
   parent and child phases remain non-resumable.
 
@@ -182,14 +182,14 @@ DSEx.Optimizer.GEPA.new(metric,
 for an offline fit. Runtime reports use `measurement_source: :runtime_trials`
 and include ordered trial iteration, batch, delay, metric calls, reflection
 calls, status, and failure reason.
-`on_combee_aggregation` exposes `DSEx.Optimizer.GEPA.ComBee.Report`, including
+`on_combee_aggregation` exposes `Imp.Optimizer.GEPA.ComBee.Report`, including
 group sizes, source-copy assignments, call counts, status, and deterministic
 failure identity. The optimizer report includes resolved policy and ordered
 aggregation reports under `metadata.combee`.
 
 ## Campaign restart policy
 
-A process already blocked in the old direct `DSEx.LM.generate/3` reflection
+A process already blocked in the old direct `Imp.LM.generate/3` reflection
 path cannot acquire the new task boundary through code reload. Stop that process
 and resume from the last completed checkpoint. If the checkpoint predates the
 hung reflection, that provider call is an ambiguous external spend and may be
@@ -210,7 +210,7 @@ mix run benchmarks/gepa_combee.exs
 ```
 
 The default fixture mode compares small-batch aggregation, one naive large
-batch, and ComBee on the same first eight rows of DSEx's checked-in GSM8K data.
+batch, and ComBee on the same first eight rows of Imp's checked-in GSM8K data.
 It reports exact-answer quality/retention, monotonic latency, reducer calls,
 fixture token estimates, and provider-free cost. The deterministic fixture run
 on 2026-07-13 retained 8/8, 4/8, and 6/8 records respectively with 4, 1, and 3

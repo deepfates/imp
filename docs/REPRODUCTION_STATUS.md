@@ -1,6 +1,6 @@
 # Reproduction Status
 
-`benchmarks/reproductions.json` is the executable index of research-derived DSEx surfaces. It links each canonical authority family to implementation files, runnable protocols, artifact validation, admitted evidence, and unresolved constraints.
+`benchmarks/reproductions.json` is the executable index of research-derived Imp surfaces. It links each canonical authority family to implementation files, runnable protocols, artifact validation, admitted evidence, and unresolved constraints.
 
 The registry is an index and gate, not evidence. `T0` means deterministic behavior, `T1` a pinned source differential, `T2` a live sample, and `T3` a paper-scale campaign. Only a validated, literal artifact may advance a row. Smoke output cannot authorize effectiveness.
 
@@ -53,4 +53,4 @@ The registry is an index and gate, not evidence. `T0` means deterministic behavi
 | Papillon privacy delegation | adaptation | NONE | red | gepa_dataset<br>gepa_live | judge_provenance |
 <!-- reproduction-registry:end -->
 
-Regenerate with `mix dsex.reproductions`; verify with `mix dsex.reproductions --check`.
+Regenerate with `mix imp.reproductions`; verify with `mix imp.reproductions --check`.

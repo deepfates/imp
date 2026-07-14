@@ -1,4 +1,4 @@
-defmodule DSExDeployment.ProgramServer do
+defmodule ImpDeployment.ProgramServer do
   use GenServer
 
   @default_timeout 30_000
@@ -34,7 +34,7 @@ defmodule DSExDeployment.ProgramServer do
        program: program,
        lm: Keyword.get_lazy(opts, :lm, &runtime_lm/0),
        executor: Keyword.get(opts, :executor, &execute/3),
-       task_supervisor: Keyword.get(opts, :task_supervisor, DSExDeployment.TaskSupervisor)
+       task_supervisor: Keyword.get(opts, :task_supervisor, ImpDeployment.TaskSupervisor)
      }}
   end
 
@@ -69,24 +69,24 @@ defmodule DSExDeployment.ProgramServer do
   end
 
   defp load_program do
-    path = System.fetch_env!("DSEX_ARTIFACT_PATH")
-    DSEx.load!(path, registry: DSExDeployment.Callbacks.registry())
+    path = System.fetch_env!("IMP_ARTIFACT_PATH")
+    Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
   end
 
   defp execute(program, lm, inputs) do
-    DSEx.context([lm: lm], fn -> DSEx.call(program, inputs) end)
+    Imp.context([lm: lm], fn -> Imp.call(program, inputs) end)
   end
 
   defp runtime_lm do
-    case System.get_env("DSEX_STATIC_ANSWER") do
+    case System.get_env("IMP_STATIC_ANSWER") do
       nil ->
-        DSEx.req_llm(System.fetch_env!("DSEX_MODEL"),
-          api_key: System.fetch_env!("DSEX_API_KEY"),
+        Imp.req_llm(System.fetch_env!("IMP_MODEL"),
+          api_key: System.fetch_env!("IMP_API_KEY"),
           temperature: 0
         )
 
       answer ->
-        %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: answer} end]}
+        %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: answer} end]}
     end
   end
 end

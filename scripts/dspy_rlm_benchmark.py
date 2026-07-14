@@ -98,7 +98,7 @@ def main() -> int:
             "name": "synthetic_hotpotqa_shaped_fixture",
             "path": args.data,
             "examples": len(examples),
-            "source": "hand-authored DSEx contract fixture",
+            "source": "hand-authored Imp contract fixture",
         },
         "rows": rows,
         "summary": summarize(rows),

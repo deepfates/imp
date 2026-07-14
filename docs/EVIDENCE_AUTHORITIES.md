@@ -1,9 +1,9 @@
 # Evidence Authorities
 
 `benchmarks/authorities.json` is the machine-readable upstream authority
-inventory for DSEx's claimed algorithm and benchmark families. It is an audit
+inventory for Imp's claimed algorithm and benchmark families. It is an audit
 ledger, not proof by itself. A pinned source identifies what should be compared;
-it does not show that DSEx conforms to it. A paper identifies a research claim;
+it does not show that Imp conforms to it. A paper identifies a research claim;
 it does not establish a faithful implementation or a reproduced result. Local
 tests and artifact paths identify evidence locations, but their presence alone
 does not establish freshness, validity, scale, or a passing verdict.
@@ -35,7 +35,7 @@ Each row records five independent authority dimensions:
 | `primary_authority` | Primary paper or specification locator and revision | Missing or non-primary documentation is recorded as `gap` or `no_primary_authority`. |
 | `upstream_tests` | Whether the audited upstream tree has relevant tests | Unaudited coverage is `not_audited`; absence is not inferred from silence. |
 | `dataset_protocol` | Dataset split/protocol references and immutable digests | A named dataset without source and split digests is `partial`, `protocol_defined`, or `gap`. |
-| `local_differential` | Checked-in or generated DSEx-vs-upstream artifact locations | Unit tests and artifact globs are not promoted to completed differential proof. |
+| `local_differential` | Checked-in or generated Imp-vs-upstream artifact locations | Unit tests and artifact globs are not promoted to completed differential proof. |
 
 All five blocks are required on every row. Empty arrays and explicit `null`
 values are intentional: they prevent a consumer from confusing an omitted field
@@ -136,7 +136,7 @@ fact separately from the `0.1.1` tag identity.
 | `src/gepa/utils/stop_condition.py` | `3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c` |
 
 `mix benchmark.gepa.contract.check` executes released provider-free helpers and
-fixtures, then compares equivalent DSEx pure-module behavior. Its T1 artifact
+fixtures, then compares equivalent Imp pure-module behavior. Its T1 artifact
 does not satisfy GEPA paper reproduction, effectiveness, or full-parity claims.
 
 The ledger also pins GEPA `v0.1.1` as an algorithm authority, Ax `23.0.0` as an

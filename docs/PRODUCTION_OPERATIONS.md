@@ -1,10 +1,10 @@
 # Production Operations
 
 This document is the authoritative source-checkout release gate contract for
-DSEx.
+Imp.
 
 It is the final chapter of the same manual path used by the README, API guide,
-and Livebooks: after a DSEx program has a signature, examples, metrics,
+and Livebooks: after an Imp program has a signature, examples, metrics,
 optimization, and any needed tools, this page explains how maintainers prove the
 repository and how applications run live providers without hiding credentials or
 transport behavior.
@@ -46,61 +46,61 @@ mix evidence.check
 ```
 
 Use benchmark evidence when changing prompts, adapters, metrics, optimizers, or
-claims about DSEx-vs-DSPy parity. Do not make paid live campaigns part of the
+claims about Imp-vs-DSPy parity. Do not make paid live campaigns part of the
 default product workflow.
 
 ## Runtime Posture
 
-Production applications should run DSEx as an OTP application:
+Production applications should run Imp as an OTP application:
 
 ```elixir
-Application.ensure_all_started(:dsex)
+Application.ensure_all_started(:imp)
 ```
 
 Normal Mix releases and applications start dependencies automatically. The
 explicit call matters for embedded scripts, Livebook setup cells, and unusual
-host runtimes. DSEx keeps lazy-start fallbacks only for script-style contexts
-where the OTP application spec is unavailable. If the `:dsex` application is
-available but fails to start, DSEx raises instead of creating shadow runtime
+host runtimes. Imp keeps lazy-start fallbacks only for script-style contexts
+where the OTP application spec is unavailable. If the `:imp` application is
+available but fails to start, Imp raises instead of creating shadow runtime
 state outside supervision.
 
-Supervised DSEx runtime state:
+Supervised Imp runtime state:
 
-- `DSEx.Settings` owns global defaults. Prefer `DSEx.context/2` for scoped
+- `Imp.Settings` owns global defaults. Prefer `Imp.context/2` for scoped
   overrides in request code and tests. Plain BEAM tasks keep ordinary
-  process-local semantics; DSEx-owned fan-out through `DSEx.Tasks`,
+  process-local semantics; Imp-owned fan-out through `Imp.Tasks`,
   `Parallel`, provider async, and agent event streams inherits the caller's
-  DSEx context.
-- `DSEx.Cache` owns the ETS table used by the built-in response cache.
-- `DSEx.TaskSupervisor` owns linked DSEx async helpers, including provider
-  async and parallel prediction fan-out through `DSEx.Tasks`.
-- `DSEx.UnlinkedTaskSupervisor` owns unlinked event workers, including agent
+  Imp context.
+- `Imp.Cache` owns the ETS table used by the built-in response cache.
+- `Imp.TaskSupervisor` owns linked Imp async helpers, including provider
+  async and parallel prediction fan-out through `Imp.Tasks`.
+- `Imp.UnlinkedTaskSupervisor` owns unlinked event workers, including agent
   event streaming.
 - host applications still own higher-level orchestration lifetimes and
   cancellation policy.
 
-Calling settings/cache APIs before `:dsex` is started attempts to start the
+Calling settings/cache APIs before `:imp` is started attempts to start the
 application, so lazy library use and supervised app use share the same ownership
 path. Global settings are intentionally mutable and node-local. Use
-`DSEx.context/2` for request, test, or task scoped overrides; those overrides
+`Imp.context/2` for request, test, or task scoped overrides; those overrides
 live in the calling process and are restored after the function returns.
 
-Cache entries live in an ETS table owned by `DSEx.Cache`. A cache owner
+Cache entries live in an ETS table owned by `Imp.Cache`. A cache owner
 crash/restart recreates the table and loses cached values by design.
 `fetch_or_store/2` coalesces concurrent misses per key while unrelated keys
 continue independently. The owner monitors the active producer and promotes a
 waiting caller after a producer crash; coalescing, retries, and producer
 failures have dedicated redacted telemetry events.
 
-Provider access uses `DSEx.req_llm/2`, which delegates provider
+Provider access uses `Imp.req_llm/2`, which delegates provider
 catalogs, Req/Finch transport, streaming, structured-output negotiation, and
-provider-specific option translation to `ReqLLM`. DSEx does not maintain a
+provider-specific option translation to `ReqLLM`. Imp does not maintain a
 parallel OpenAI-compatible provider client stack.
 
 Dependency policy:
 
 - runtime dependencies must own a real operational boundary or a stable
-  primitive DSEx should not reimplement;
+  primitive Imp should not reimplement;
 - test/dev dependencies are encouraged when they strengthen contracts,
   property coverage, local integration harnesses, or static review without
   bloating production runtime;
@@ -137,7 +137,7 @@ The current integration gate proves:
 - stdio MCP discovery and tool-call flow through a trusted local executable
 
 `mix protocol.check` runs provider-compatible protocol tests over local
-controlled endpoints. It proves DSEx's production HTTP/MCP/training/retriever
+controlled endpoints. It proves Imp's production HTTP/MCP/training/retriever
 code paths and wire-shape handling, but it does not claim paid external service
 state:
 
@@ -172,7 +172,7 @@ evidence. These commands are not shipped as package APIs:
 Source-checkout maintainer aliases:
 
 - benchmark truth fixture harness tests through `mix benchmark.truth.check`
-- provider-free DSEx-vs-DSPy golden trace parity through
+- provider-free Imp-vs-DSPy golden trace parity through
   `mix benchmark.trace.check`
 - overhead checks through `mix benchmark.overhead.check`
 - optimizer lift checks through `mix benchmark.optimizer_lift.check`
@@ -195,21 +195,21 @@ The live provider tests prove a real provider can execute:
 
 - basic `Predict`
 - JSON `Predict` with schema validation and retry feedback
-- basic `Predict` through the ReqLLM-backed DSEx client
+- basic `Predict` through the ReqLLM-backed Imp client
 - `ChainOfThought` with required reasoning
-- provider streaming through `DSEx.Streaming`
+- provider streaming through `Imp.Streaming`
 - `ReAct` function-tool calls plus reserved `submit`
 - orchestration wrappers over real calls: `Parallel`, `BestOfN`, and `Refine`
 - `ProgramOfThought` planning followed by BEAM-safe sandbox execution
 
 In a source checkout, `mix benchmark.live.check` is a separate research smoke
-gate. It fetches fresh GSM8K and HotPotQA rows and runs DSEx programs over a
+gate. It fetches fresh GSM8K and HotPotQA rows and runs Imp programs over a
 live provider, writing result artifacts under `benchmarks/results/`. It is
 intentionally not part of the fast production gate because it spends provider
 tokens and depends on external dataset and provider availability.
 
 In a source checkout, `mix benchmark.parity.check` is a live smoke comparison:
-it runs DSEx and the real Python DSPy package against the same rows and model
+it runs Imp and the real Python DSPy package against the same rows and model
 endpoint, then writes a parity artifact with score, latency, error, row-level
 agreement, and evidence scale. It requires a local Python environment with
 `dspy-ai` installed and live provider credentials. It proves wiring, not full
@@ -218,7 +218,7 @@ parity.
 In a source checkout, `mix benchmark.parity.full` is the expensive evidence
 lane. It fetches the full canonical GSM8K test and HotPotQA distractor
 validation splits, uses current OpenAI-compatible model discovery when
-`OPENAI_MODEL` is unset, and writes the same DSEx-vs-DSPy report schema over
+`OPENAI_MODEL` is unset, and writes the same Imp-vs-DSPy report schema over
 the full row set. Use full-lane artifacts, not smoke runs, before making
 production parity claims.
 
@@ -273,43 +273,43 @@ Operational advice:
 - prefer short-lived provider keys for CI and demos
 - use explicit `api_key:` or environment variables at runtime, not saved state
 - treat MCP, retriever, training, and provider URLs as trusted configuration;
-  DSEx does not provide a network egress sandbox or private-IP SSRF guard
+  Imp does not provide a network egress sandbox or private-IP SSRF guard
 
 ## Telemetry Events
 
-DSEx emits redacted `:telemetry` events through `DSEx.Telemetry`.
+Imp emits redacted `:telemetry` events through `Imp.Telemetry`.
 
-Use `DSEx.trace/2` to capture selected redacted runtime events around one
+Use `Imp.trace/2` to capture selected redacted runtime events around one
 operation without installing telemetry handlers manually. Use
-`DSEx.inspect_history/2` for a redacted rendering of recent signature-shaped
+`Imp.inspect_history/2` for a redacted rendering of recent signature-shaped
 turns. Long-running optimizer UIs can call
-`DSEx.subscribe_optimizer_progress/1` and detach the returned handle with
-`DSEx.unsubscribe_optimizer_progress/1`.
+`Imp.subscribe_optimizer_progress/1` and detach the returned handle with
+`Imp.unsubscribe_optimizer_progress/1`.
 
-`DSEx.disable_logging/0` and `DSEx.enable_logging/0` control only logs emitted
-through `DSEx.Observability.log/3`; they do not mutate the host application's
+`Imp.disable_logging/0` and `Imp.enable_logging/0` control only logs emitted
+through `Imp.Observability.log/3`; they do not mutate the host application's
 global Logger level. Log metadata is redacted before emission.
 
 ## Deployment Reference
 
 `examples/deployment` is a packaged OTP reference application. It loads a
 checksummed program artifact during supervised startup, resolves callback names
-through `DSEx.Saving.Registry`, obtains provider configuration from runtime
+through `Imp.Saving.Registry`, obtains provider configuration from runtime
 environment variables, and serves calls through a GenServer. The accompanying
 test executes the same server with a deterministic LM and registry-backed
 artifact before release.
 
 Stable event families:
 
-- `[:dsex, :lm, :start | :stop]`
-- `[:dsex, :lm, :stream, :start | :chunk | :stop]`
-- `[:dsex, :adapter, :parse, :retry | :error]`
-- `[:dsex, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
-- `[:dsex, :tool, :start | :stop | :exception]`
-- `[:dsex, :retriever, :start | :stop | :exception]`
-- `[:dsex, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
-- `[:dsex, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
-- `[:dsex, :optimizer, :trial, :start | :stop | :exception]`
+- `[:imp, :lm, :start | :stop]`
+- `[:imp, :lm, :stream, :start | :chunk | :stop]`
+- `[:imp, :adapter, :parse, :retry | :error]`
+- `[:imp, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
+- `[:imp, :tool, :start | :stop | :exception]`
+- `[:imp, :retriever, :start | :stop | :exception]`
+- `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
+- `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
+- `[:imp, :optimizer, :trial, :start | :stop | :exception]`
 
 Event metadata is redacted before dispatch. Secret-shaped values and common
 secret keys are replaced with `[REDACTED]`.

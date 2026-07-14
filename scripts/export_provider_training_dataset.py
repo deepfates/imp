@@ -78,7 +78,7 @@ def main() -> None:
         raise RuntimeError(f"train/held-out text overlap: {overlap}")
 
     payload = {
-        "artifact_type": "dsex_provider_training_dataset",
+        "artifact_type": "imp_provider_training_dataset",
         "schema_version": 1,
         "task": "opaque-route adaptation over natural BANKING77 customer queries",
         "source": {

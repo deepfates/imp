@@ -2,7 +2,7 @@
 
 This guide is organized around the things you build.
 
-Most examples use the public `DSEx` facade. Reach for deeper `DSEx.*` modules
+Most examples use the public `Imp` facade. Reach for deeper `Imp.*` modules
 when you need direct control over adapters, optimizer reports, tools, agents, or
 persistence. The canonical path is:
 
@@ -14,19 +14,19 @@ For deterministic examples:
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 ```
 
 Programs built without explicit `:lm` or `:adapter` resolve settings when they
-are called, so a later `DSEx.configure/1` or scoped `DSEx.context/2` affects
+are called, so a later `Imp.configure/1` or scoped `Imp.context/2` affects
 existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
 runtime dependency.
 
-Explicit `lm:` values are checked when the program is built. DSEx accepts
+Explicit `lm:` values are checked when the program is built. Imp accepts
 `nil`, an LM module, an LM struct, a configured `%{module: module, opts:
 keyword}` map, or an arity-2 callback. Explicit `adapter:` values accept `nil`
 or a module exporting `format/3` and `parse/3`. Omit the option when you want
@@ -38,12 +38,12 @@ For production provider access, use the ReqLLM-backed client:
 model = System.fetch_env!("OPENAI_MODEL")
 api_key = System.fetch_env!("OPENAI_API_KEY")
 
-lm = DSEx.req_llm("openai:#{model}", api_key: api_key, temperature: 0)
-DSEx.configure(lm: lm)
+lm = Imp.req_llm("openai:#{model}", api_key: api_key, temperature: 0)
+Imp.configure(lm: lm)
 ```
 
 This delegates provider/model lookup, Req/Finch transport, streaming, and
-provider option translation to the Elixir `req_llm` ecosystem. DSEx still owns
+provider option translation to the Elixir `req_llm` ecosystem. Imp still owns
 the signature, adapter, optimizer, evaluation, and trace vocabulary.
 
 For a runnable real-provider walkthrough, open
@@ -52,13 +52,13 @@ guide when you want the "this is actually an LM program" moment.
 
 ### Run A Resumable Provider Batch
 
-Use `DSEx.Clients.ReqLLMBatch` when a collection of independent provider calls
+Use `Imp.Clients.ReqLLMBatch` when a collection of independent provider calls
 must survive process or host restarts. Each request needs a stable, unique ID
 and a JSON-safe payload. The callback is provider-neutral and reports an
 explicit outcome so retry policy does not depend on provider-specific structs:
 
 ```elixir
-alias DSEx.Clients.ReqLLMBatch
+alias Imp.Clients.ReqLLMBatch
 
 requests = [
   %{id: "question-001", payload: %{question: "Capital of France?"}},
@@ -107,7 +107,7 @@ do not place credentials in request payloads.
 A committed success is never replayed. If a checkpoint contains a dispatch
 intent without a committed outcome, resume marks that request `:ambiguous` and
 does not send it again. Resolve that state using provider-side idempotency or
-reconciliation before starting a new request; DSEx deliberately cannot infer
+reconciliation before starting a new request; Imp deliberately cannot infer
 whether the remote provider accepted an interrupted call.
 
 For ReqLLM, the included adapter works with any model spec supported by the
@@ -115,7 +115,7 @@ client. Its default classification treats ReqLLM errors as transient; use a
 custom callback when application knowledge can classify errors more narrowly.
 
 ```elixir
-client = DSEx.Clients.ReqLLM.new("gemini:gemini-2.5-flash", api_key: api_key)
+client = Imp.Clients.ReqLLM.new("gemini:gemini-2.5-flash", api_key: api_key)
 dispatch = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
 
 requests = [
@@ -132,19 +132,19 @@ ReqLLMBatch.run(requests, dispatch, checkpoint: "var/req-llm-batch.json")
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
 program =
   "question -> answer: short_span"
-  |> DSEx.signature(
+  |> Imp.signature(
     "Answer with the shortest correct span. Do not explain."
   )
-  |> DSEx.predict(lm: lm)
+  |> Imp.predict(lm: lm)
 
-{:ok, pred} = DSEx.call(program, %{question: "Capital of France?"})
-DSEx.get(pred, :answer)
+{:ok, pred} = Imp.call(program, %{question: "Capital of France?"})
+Imp.get(pred, :answer)
 ```
 
 ## Handle Failures
@@ -153,12 +153,12 @@ Program calls return tagged tuples. Match both branches at application
 boundaries instead of assuming every provider call succeeds:
 
 ```elixir
-case DSEx.call(program, %{question: question}) do
+case Imp.call(program, %{question: question}) do
   {:ok, prediction} ->
-    {:ok, DSEx.get(prediction, :answer)}
+    {:ok, Imp.get(prediction, :answer)}
 
   {:error, reason} ->
-    Logger.warning("DSEx call failed", reason: inspect(reason))
+    Logger.warning("Imp call failed", reason: inspect(reason))
     {:error, :language_model_unavailable}
 end
 ```
@@ -171,10 +171,10 @@ configuration defects and should fail before serving traffic.
 Evaluation keeps per-example failures visible rather than hiding them:
 
 ```elixir
-report = DSEx.evaluate(program, devset, metric, failure_score: 0.0, max_errors: 5)
+report = Imp.evaluate(program, devset, metric, failure_score: 0.0, max_errors: 5)
 
 Enum.each(report.errors, fn error ->
-  Logger.warning("DSEx evaluation row failed", error: inspect(error))
+  Logger.warning("Imp evaluation row failed", error: inspect(error))
 end)
 ```
 
@@ -183,35 +183,35 @@ campaign. Use `:infinity` only when collecting every failure is intentional.
 
 ## Conversation History
 
-Use `DSEx.history/1` when a signature should see prior task turns. History is
+Use `Imp.history/1` when a signature should see prior task turns. History is
 signature-shaped data, not provider chat logs: each turn is a field map with the
 same input/output names the program already understands.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Rome"} end]
 }
 
-program = DSEx.predict("question, history -> answer", lm: lm)
+program = Imp.predict("question, history -> answer", lm: lm)
 
 history =
-  DSEx.history([
+  Imp.history([
     %{question: "What is the capital of France?", answer: "Paris"},
     %{question: "What is the capital of Germany?", answer: "Berlin"}
   ])
 
 {:ok, prediction} =
-  DSEx.call(program, %{question: "What is the capital of Italy?", history: history})
+  Imp.call(program, %{question: "What is the capital of Italy?", history: history})
 
-DSEx.get(prediction, :answer)
+Imp.get(prediction, :answer)
 ```
 
 The Chat adapter renders history turns before the current request, splitting
 each turn into prior user/assistant messages according to the active signature.
-`DSEx.History.dump/1` and `DSEx.History.load/1` give a JSON-safe boundary for
-application state, while `DSEx.History.redact/1` supports safe inspection.
-Provider-native role messages remain explicit as `DSEx.Adapters.Types.History`.
+`Imp.History.dump/1` and `Imp.History.load/1` give a JSON-safe boundary for
+application state, while `Imp.History.redact/1` supports safe inspection.
+Provider-native role messages remain explicit as `Imp.Adapters.Types.History`.
 
 ## The Canonical Path
 
@@ -220,40 +220,40 @@ after the metric is meaningful:
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
 trainset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "Eiffel Tower city?", answer: "Paris")
+  |> Imp.with_inputs(:question)
 ]
 
-metric = DSEx.exact_match(:answer)
+metric = Imp.exact_match(:answer)
 
-baseline = DSEx.evaluate(program, devset, metric)
+baseline = Imp.evaluate(program, devset, metric)
 
 compiled =
   program
-  |> DSEx.optimize(
-    DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1),
+  |> Imp.optimize(
+    Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1),
     trainset,
     devset
   )
 
-{baseline.score, DSEx.Optimizer.Report.fetch(compiled)}
+{baseline.score, Imp.Optimizer.Report.fetch(compiled)}
 ```
 
-Use deeper modules such as `DSEx.Evaluate` or `DSEx.Optimizer.RandomSearch`
+Use deeper modules such as `Imp.Evaluate` or `Imp.Optimizer.RandomSearch`
 directly when you need to hold evaluator structs, inspect optimizer internals,
-or build custom orchestration. `DSEx.Evaluate.new/3` accepts
+or build custom orchestration. `Imp.Evaluate.new/3` accepts
 `max_concurrency:` for bounded parallel row evaluation while preserving row
 order, process-local settings, feedback, metric metadata, and error budgeting.
 
@@ -261,46 +261,46 @@ order, process-local settings, feedback, metric metadata, and error budgeting.
 
 | Use this | When |
 | --- | --- |
-| `DSEx.predict/2` | One model call maps named inputs to named outputs. |
-| `DSEx.chain_of_thought/2` | You want a reasoning field before the final answer. |
-| `DSEx.multi_chain_comparison/2` | You already have candidate completions and want a self-consistency chooser. |
-| `DSEx.best_of_n/3` | You want to run one program several times and keep the highest-scored result. |
-| `DSEx.refine/3` | You want bounded retry with feedback until a metric passes. |
-| `DSEx.assert/3` | You want named runtime constraints to produce feedback and self-repair attempts. |
-| `DSEx.parallel/3` | You want supervised concurrent batch calls with one result per input. |
-| `DSEx.knn/3`, `DSEx.nearest/2` | You want nearest-neighbor examples from a local trainset. |
-| `DSEx.react/3` | The model should choose tools and then submit a validated answer. |
-| `DSEx.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
-| `DSEx.code_act/3` | You want interleaved tool/code execution under a policy. |
-| `DSEx.rlm/2` | You need a bounded recursive controller for large-context exploration. |
-| `DSEx.Agent` | You want an explicit Elixir agent runtime with tools and events. |
+| `Imp.predict/2` | One model call maps named inputs to named outputs. |
+| `Imp.chain_of_thought/2` | You want a reasoning field before the final answer. |
+| `Imp.multi_chain_comparison/2` | You already have candidate completions and want a self-consistency chooser. |
+| `Imp.best_of_n/3` | You want to run one program several times and keep the highest-scored result. |
+| `Imp.refine/3` | You want bounded retry with feedback until a metric passes. |
+| `Imp.assert/3` | You want named runtime constraints to produce feedback and self-repair attempts. |
+| `Imp.parallel/3` | You want supervised concurrent batch calls with one result per input. |
+| `Imp.knn/3`, `Imp.nearest/2` | You want nearest-neighbor examples from a local trainset. |
+| `Imp.react/3` | The model should choose tools and then submit a validated answer. |
+| `Imp.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
+| `Imp.code_act/3` | You want interleaved tool/code execution under a policy. |
+| `Imp.rlm/2` | You need a bounded recursive controller for large-context exploration. |
+| `Imp.Agent` | You want an explicit Elixir agent runtime with tools and events. |
 
 The later sections are there when your program needs more control, not because
-every DSEx project should start with agents or recursive controllers.
+every Imp project should start with agents or recursive controllers.
 
 ## Composition Helpers
 
 ```elixir
-lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-program = DSEx.predict("question -> answer", lm: lm)
-metric = DSEx.exact_match(:answer)
+lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+program = Imp.predict("question -> answer", lm: lm)
+metric = Imp.exact_match(:answer)
 
 {:ok, best} =
   program
-  |> DSEx.best_of_n(metric, n: 2)
-  |> DSEx.call(%{question: "2+2?"})
+  |> Imp.best_of_n(metric, n: 2)
+  |> Imp.call(%{question: "2+2?"})
 
 {:ok, refined} =
   program
-  |> DSEx.refine(metric, max_attempts: 1)
-  |> DSEx.call(%{question: "sqrt 16?"})
+  |> Imp.refine(metric, max_attempts: 1)
+  |> Imp.call(%{question: "sqrt 16?"})
 
 batch =
-  DSEx.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
+  Imp.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
     max_concurrency: 2
   )
 
-{DSEx.get(best, :answer), DSEx.get(refined, :answer), length(batch)}
+{Imp.get(best, :answer), Imp.get(refined, :answer), length(batch)}
 ```
 
 Use assertion-guided refinement when the constraint is clearer than a full task
@@ -308,9 +308,9 @@ metric:
 
 ```elixir
 one_word =
-  DSEx.assertion(:one_word, fn prediction ->
+  Imp.assertion(:one_word, fn prediction ->
     prediction
-    |> DSEx.get(:answer, "")
+    |> Imp.get(:answer, "")
     |> to_string()
     |> String.split()
     |> length() == 1
@@ -318,19 +318,19 @@ one_word =
 
 {:ok, constrained} =
   program
-  |> DSEx.assert(one_word, max_attempts: 2)
-  |> DSEx.call(%{question: "Capital of France?"})
+  |> Imp.assert(one_word, max_attempts: 2)
+  |> Imp.call(%{question: "Capital of France?"})
 
-{DSEx.get(constrained, :answer), DSEx.get(constrained, :assertion_score)}
+{Imp.get(constrained, :answer), Imp.get(constrained, :assertion_score)}
 ```
 
-`DSEx.multi_chain_comparison/2` is useful when candidate completions are
+`Imp.multi_chain_comparison/2` is useful when candidate completions are
 already available:
 
 ```elixir
-chooser = DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 2)
+chooser = Imp.multi_chain_comparison("question -> answer", lm: lm, m: 2)
 
-DSEx.call(chooser, %{
+Imp.call(chooser, %{
   question: "2+2?",
   completions: [
     %{reasoning: "addition", answer: "4"},
@@ -339,29 +339,29 @@ DSEx.call(chooser, %{
 })
 ```
 
-`DSEx.knn/3` builds a local nearest-neighbor predictor over examples. It returns
+`Imp.knn/3` builds a local nearest-neighbor predictor over examples. It returns
 retrieved examples rather than a model prediction:
 
 ```elixir
 trainset = [
-  DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question)
+  Imp.example(question: "capital France", answer: "Paris") |> Imp.with_inputs(:question)
 ]
 
-knn = DSEx.knn(1, trainset, field: "question")
-DSEx.nearest(knn, %{question: "France"})
+knn = Imp.knn(1, trainset, field: "question")
+Imp.nearest(knn, %{question: "France"})
 ```
 
 ## Request-Local Inference Search
 
-`DSEx.Predict.Search.run/3` is the shared request-local engine for evaluating
+`Imp.Predict.Search.run/3` is the shared request-local engine for evaluating
 explicitly identified inference candidates. It is an advanced module API, not
 an optimizer and not a globally registered service. Every call owns its
 candidate list, budget admission, tasks, outcomes, and provenance; no search
 state survives the request.
 
 ```elixir
-alias DSEx.Predict.Search
-alias DSEx.Predict.Search.Candidate
+alias Imp.Predict.Search
+alias Imp.Predict.Search.Candidate
 
 candidates = [
   Candidate.new(:direct, %{answer: "Paris"}, %{calls: 1, cost_units: 1}),
@@ -392,7 +392,7 @@ provider billing or measured token usage. Record actual provider usage
 separately when an evaluator can observe it.
 
 The evaluator returns `{:ok, value, metric_result}` or `{:error, reason}`.
-Metric results use normal `DSEx.Metrics` normalization. Exceptions, throws,
+Metric results use normal `Imp.Metrics` normalization. Exceptions, throws,
 task exits, invalid returns, and timeouts become isolated failed outcomes.
 Selection is highest score with explicit `:first` or `:last` tie policy;
 threshold comparison is inclusive.
@@ -405,13 +405,13 @@ threshold can cancel work that has not completed, but already completed
 speculation remains in outcomes and projected-budget accounting. Result and
 provenance order always follows candidate order, not task completion order.
 
-`DSEx.Predict.BestOfN` delegates attempt execution and metric selection to this
+`Imp.Predict.BestOfN` delegates attempt execution and metric selection to this
 engine in sequential, first-tie mode. It creates one projected `attempts: 1`
 candidate per rollout, stops at its threshold, selects the highest-scoring
 prediction, and optionally computes comparison feedback over successful
 predictions.
 
-`DSEx.Predict.Refine` keeps the same sequential, first-tie semantics but owns its
+`Imp.Predict.Refine` keeps the same sequential, first-tie semantics but owns its
 causal retry loop so it can enforce the DSPy `fail_count` boundary. After each
 below-threshold success it asks the wrapped program's LM with the DSPy
 `OfferFeedback` field contract: program and predictor definitions, inputs,
@@ -432,26 +432,26 @@ old artifacts without the optional field load with the default budget.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
 }
 
-DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
-program = DSEx.chain_of_thought("question -> answer")
-{:ok, pred} = DSEx.call(program, %{question: "2+2?"})
+program = Imp.chain_of_thought("question -> answer")
+{:ok, pred} = Imp.call(program, %{question: "2+2?"})
 
-DSEx.get(pred, :reasoning)
-DSEx.get(pred, :answer)
+Imp.get(pred, :reasoning)
+Imp.get(pred, :answer)
 ```
 
 Manual reasoning fields are ordinary signature outputs. Provider-native
 reasoning is separate: ReqLLM-backed providers can return thinking/reasoning
-tokens, and DSEx preserves them in prediction metadata without pretending they
+tokens, and Imp preserves them in prediction metadata without pretending they
 are a declared output field:
 
 ```elixir
-{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+{:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
 
 prediction.metadata[:native_reasoning]
 prediction.metadata[:reasoning_details]
@@ -459,14 +459,14 @@ prediction.metadata[:reasoning_details]
 
 Streaming provider-native thinking chunks arrive as `%{reasoning: text}` chunks
 with `metadata.type == :reasoning`; ordinary answer text still streams as text.
-Outbound `DSEx.Adapters.Types.Reasoning` values become ReqLLM thinking content
+Outbound `Imp.Adapters.Types.Reasoning` values become ReqLLM thinking content
 parts for providers that support reasoning continuity.
 
 ## Schema-Constrained JSON
 
 ```elixir
 signature =
-  DSEx.signature(%{
+  Imp.signature(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
@@ -474,7 +474,7 @@ signature =
     ]
   })
 
-program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
+program = Imp.predict(signature, adapter: Imp.Adapter.JSON)
 ```
 
 The JSON adapter validates output fields and returns retry feedback for schema
@@ -484,7 +484,7 @@ Answer-shape constraints are useful for extractive tasks:
 
 ```elixir
 signature =
-  DSEx.signature(
+  Imp.signature(
     "question -> verdict: yes_no, amount: numeric_span, answer: short_span",
     "Extract only the requested answer fields."
   )
@@ -494,51 +494,51 @@ signature =
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
 }
 
 demo =
-  DSEx.example(question: "2+2?", answer: "4")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "2+2?", answer: "4")
+  |> Imp.with_inputs(:question)
 
 program =
   "question -> answer"
-  |> DSEx.predict(lm: lm)
-  |> DSEx.with_demos([demo])
+  |> Imp.predict(lm: lm)
+  |> Imp.with_demos([demo])
 ```
 
 ## Evaluate A Program
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
 devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
 ]
 
-metric = DSEx.exact_match(:answer)
-report = DSEx.evaluate(program, devset, metric)
+metric = Imp.exact_match(:answer)
+report = Imp.evaluate(program, devset, metric)
 report.score
 ```
 
 Metrics may return booleans, numbers, maps with `:score` / `:feedback`, or a
-`DSEx.Prediction` carrying score and feedback. DSEx normalizes those returns
+`Imp.Prediction` carrying score and feedback. Imp normalizes those returns
 into row scores, pass/fail state, feedback, and metric metadata. Arity-3 metrics
 receive the prediction trace as their third argument.
 
 Built-in metric helpers cover common benchmark shapes:
 
 ```elixir
-qa = DSEx.extractive_qa("since 2000", "2000")
+qa = Imp.extractive_qa("since 2000", "2000")
 
 report =
-  DSEx.classification_report([
+  Imp.classification_report([
     {"warm", "warm"},
     {"warm", "cool"},
     {"cool", "cool"}
@@ -551,7 +551,7 @@ report =
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
@@ -560,37 +560,37 @@ docs = [
   %{text: "Germany has capital Berlin."}
 ]
 
-retriever = DSEx.memory(docs, k: 1)
+retriever = Imp.memory(docs, k: 1)
 
 program =
   "question, context -> answer"
-  |> DSEx.predict(lm: lm)
-  |> DSEx.rag(retriever, k: 1)
+  |> Imp.predict(lm: lm)
+  |> Imp.rag(retriever, k: 1)
 
-{:ok, prediction} = DSEx.call(program, %{question: "capital France"})
-DSEx.get(prediction, :answer)
+{:ok, prediction} = Imp.call(program, %{question: "capital France"})
+Imp.get(prediction, :answer)
 prediction.metadata.retrieval
 ```
 
-`DSEx.rag/3` is intentionally small: it retrieves documents, renders them into
+`Imp.rag/3` is intentionally small: it retrieves documents, renders them into
 the configured context field, calls the wrapped program, and records retrieval
 metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
-program, or any other callable DSEx module that expects a context input. For
+program, or any other callable Imp module that expects a context input. For
 multi-hop retrieval, pass `hops: 2` or higher; each hop expands the original
 query with previously retrieved passages, deduplicates documents, injects the
 combined context, and records per-hop retrieval metadata.
-RAG programs backed by `DSEx.memory/2` can be saved and loaded with
-`DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, and `DSEx.load!/1`; network
+RAG programs backed by `Imp.memory/2` can be saved and loaded with
+`Imp.dump/1`, `Imp.load/1`, `Imp.save!/2`, and `Imp.load!/1`; network
 retrievers remain host-owned dependencies. Callback-bearing programs use a
-named `DSEx.Saving.Registry` supplied explicitly by the host when dumping and
+named `Imp.Saving.Registry` supplied explicitly by the host when dumping and
 loading; functions are never written into artifacts.
 
 ## Local Embeddings
 
 ```elixir
 {:ok, vectors} =
-  DSEx.Embeddings.embed(
-    DSEx.Embeddings.BagOfWords,
+  Imp.Embeddings.embed(
+    Imp.Embeddings.BagOfWords,
     ["elixir language model programs", "python prompt scripts"],
     dims: 8
   )
@@ -598,9 +598,9 @@ loading; functions are never written into artifacts.
 length(hd(vectors))
 ```
 
-`DSEx.Embeddings.BagOfWords` is deterministic and local. It is useful for
+`Imp.Embeddings.BagOfWords` is deterministic and local. It is useful for
 examples, tests, and small retrieval experiments. Production semantic embeddings
-should be injected behind the `DSEx.Embeddings` behaviour so credentials,
+should be injected behind the `Imp.Embeddings` behaviour so credentials,
 network calls, and model choice stay explicit. Any provider must return exactly
 one numeric vector for each input text, in the same order.
 
@@ -608,29 +608,29 @@ one numeric vector for each input text, in the same order.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
 trainset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
+  Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
+  Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
 ]
 
-metric = DSEx.exact_match(:answer)
-optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-compiled = DSEx.optimize(program, optimizer, trainset, devset)
+metric = Imp.exact_match(:answer)
+optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+compiled = Imp.optimize(program, optimizer, trainset, devset)
 
-DSEx.Optimizer.Report.fetch(compiled)
+Imp.Optimizer.Report.fetch(compiled)
 ```
 
-The facade dispatches through the `DSEx.Optimizer` behaviour. Each optimizer
-implements `__optimizer__/0` and `run/3`; `DSEx.optimizer_capabilities/1`
+The facade dispatches through the `Imp.Optimizer` behaviour. Each optimizer
+implements `__optimizer__/0` and `run/3`; `Imp.optimizer_capabilities/1`
 returns its validated declaration:
 
 - `kind` is `:program`, `:training`, `:constructor`, or `:workflow`.
@@ -640,10 +640,10 @@ returns its validated declaration:
 - `result` declares the expected result shape; workflows name their concrete
   result module.
 
-Use `DSEx.optimize/3` when a program optimizer does not require validation,
-`DSEx.optimize/4` when supplying validation, and `DSEx.optimize/5` when also
+Use `Imp.optimize/3` when a program optimizer does not require validation,
+`Imp.optimize/4` when supplying validation, and `Imp.optimize/5` when also
 passing invocation options such as checkpoint controls. This choice follows the
-declared split requirements; DSEx does not infer argument meaning from an
+declared split requirements; Imp does not infer argument meaning from an
 optimizer module's exported function arities. The behaviour layer checks that
 required splits are present and unsupported splits are absent. Each optimizer
 remains responsible for validating split contents and any optimizer-specific
@@ -658,7 +658,7 @@ Use:
 | `RandomSearch` / `BootstrapRS` | You want a small deterministic baseline search over demo sets. |
 | `InstructionSearch` / `InferRules` / `COPRO` | Instructions or signature-level rules are the likely bottleneck. |
 | `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
-| `GEPA` | You want DSEx-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
+| `GEPA` | You want Imp-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
@@ -667,7 +667,7 @@ the runtime `startup_trials` setting explicitly:
 
 ```elixir
 mipro =
-  DSEx.Optimizer.MIPROv2.new(metric,
+  Imp.Optimizer.MIPROv2.new(metric,
     auto: nil,
     num_candidates: 4,
     num_trials: 8,
@@ -690,7 +690,7 @@ persist = fn checkpoint ->
 end
 
 paused =
-  DSEx.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
+  Imp.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
     max_trials: 2,
     checkpoint_fn: persist
   )
@@ -698,7 +698,7 @@ paused =
 checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
 
 resumed =
-  DSEx.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
+  Imp.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
     resume_state: checkpoint,
     checkpoint_fn: persist
   )
@@ -708,7 +708,7 @@ For SIMBA, use the corresponding five-argument call and invocation-level
 `max_steps:` option:
 
 ```elixir
-DSEx.Optimizer.SIMBA.compile(simba, program, trainset, devset,
+Imp.Optimizer.SIMBA.compile(simba, program, trainset, devset,
   max_steps: 1,
   checkpoint_fn: persist
 )
@@ -737,17 +737,17 @@ Build an Avatar through the facade, then optimize its actor instruction with
 the dedicated optimizer:
 
 ```elixir
-lookup = DSEx.tool(:lookup, "Look up a country capital", &lookup_country/1)
-avatar = DSEx.avatar("question -> answer", [lookup], lm: lm, max_iters: 3)
+lookup = Imp.tool(:lookup, "Look up a country capital", &lookup_country/1)
+avatar = Imp.avatar("question -> answer", [lookup], lm: lm, max_iters: 3)
 
 avatar_optimizer =
-  DSEx.Optimizer.Avatar.new(DSEx.exact_match(:answer),
+  Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
     comparator_lm: feedback_lm,
     rewrite_lm: rewrite_lm,
     max_iters: 2
   )
 
-compiled_avatar = DSEx.optimize(avatar, avatar_optimizer, trainset)
+compiled_avatar = Imp.optimize(avatar, avatar_optimizer, trainset)
 ```
 
 Avatar records typed action observations, treats unknown, denied, and failed
@@ -774,16 +774,16 @@ checkout, the source-checkout-only `mix protocol.training.check` gate exercises 
 locally.
 
 Fast-Slow Training has a separate provider-neutral orchestration surface. Build
-immutable configuration and state with `DSEx.Training.FastSlow.Config` and
+immutable configuration and state with `Imp.Training.FastSlow.Config` and
 `State`, then execute paper-ordered cycles through
-`DSEx.Training.FastSlow.Runner` and a module implementing
-`DSEx.Training.FastSlow.Backend`. Each cycle prefetches exactly `T` minibatches,
+`Imp.Training.FastSlow.Runner` and a module implementing
+`Imp.Training.FastSlow.Backend`. Each cycle prefetches exactly `T` minibatches,
 runs the GEPA fast phase once, allocates exactly `G / K` rollouts to each of the
 `K` retained prompts per question, and keeps that population fixed through the
 `T` slow updates.
 
 The checkpoint callback receives `%{state: state, runner_context: context}`.
-Persist `state` with `DSEx.Training.FastSlow.Checkpoint` and persist the supplied
+Persist `state` with `Imp.Training.FastSlow.Checkpoint` and persist the supplied
 context map alongside it; `Runner.load_context!/2` verifies the actual
 minibatch content digests against the state's lookahead. Backend context must be
 credential-free, JSON-safe data. A backend must return `true` from
@@ -792,7 +792,7 @@ operation intent or that the earlier attempt was not applied. Otherwise resume
 fails with `:ambiguous_external_outcome` instead of duplicating a rollout or
 weight update.
 
-The shared `DSEx.Clients.Trainer` reinforcement boundary accepts the resulting
+The shared `Imp.Clients.Trainer` reinforcement boundary accepts the resulting
 token-aligned trajectories, including behavior-policy token log probabilities,
 response token IDs and masks, reward, and normalized advantage. The runner is a
 paper-faithful BEAM orchestration adaptation; it is not a bundled weight trainer
@@ -801,25 +801,25 @@ and does not by itself establish paid-provider CISPO effectiveness.
 ### Run Training
 
 Training optimizers are intentionally separate from program optimizers. Execute
-`BootstrapFinetune` and `GRPO` with `DSEx.train/3` or `DSEx.train/4`, not
-`DSEx.optimize`:
+`BootstrapFinetune` and `GRPO` with `Imp.train/3` or `Imp.train/4`, not
+`Imp.optimize`:
 
 ```elixir
 trainer = MyApp.training_backend()
-optimizer = DSEx.Optimizer.BootstrapFinetune.new(metric, trainer: trainer)
+optimizer = Imp.Optimizer.BootstrapFinetune.new(metric, trainer: trainer)
 
-{:ok, training} = DSEx.train(program, optimizer, trainset)
+{:ok, training} = Imp.train(program, optimizer, trainset)
 ```
 
-`DSEx.train/3` and `DSEx.train/4` return
-`{:ok, %DSEx.Optimizer.TrainingResult{}}` or
+`Imp.train/3` and `Imp.train/4` return
+`{:ok, %Imp.Optimizer.TrainingResult{}}` or
 `{:error, reason}`. Bootstrap fine-tuning reports `status: :job_created` for an
 asynchronous provider job and `status: :completed` with a rebound program when
 the trainer returns a successful terminal job. Terminal failures remain errors.
 GRPO reports `status: :completed` after its synchronous trainer workflow returns
 the rebound program. Both require an explicitly configured
-trainer. DSEx does not silently fall back to local training when no trainer is
-configured. `DSEx.Clients.MLXLMTrainer` is an optional, explicit local SFT
+trainer. Imp does not silently fall back to local training when no trainer is
+configured. `Imp.Clients.MLXLMTrainer` is an optional, explicit local SFT
 backend, not a fallback. A training optimizer that declares optional validation
 accepts it as `validation:` in the fourth-argument keyword options.
 
@@ -827,8 +827,8 @@ Optimizer-specific `compile` functions remain public for advanced workflows
 that need their native return values or split/options layout. The MIPROv2 and
 SIMBA checkpoint examples above use that direct surface. Constructor optimizers
 such as `Ensemble` and `KNNFewShot`, and workflow optimizers such as `Playbook`,
-also use their documented direct APIs; the `DSEx.optimize` facade accepts only
-optimizers declaring `kind: :program`, while `DSEx.train` accepts only
+also use their documented direct APIs; the `Imp.optimize` facade accepts only
+optimizers declaring `kind: :program`, while `Imp.train` accepts only
 `kind: :training`.
 
 ## Optimize Arbitrary Artifacts
@@ -839,8 +839,8 @@ call per candidate. A `dataset:` selects multi-task optimization; adding a
 non-empty `valset:` selects held-out generalization.
 
 ```elixir
-alias DSEx.Optimize.Anything
-alias DSEx.Optimize.Anything.{Config, Result}
+alias Imp.Optimize.Anything
+alias Imp.Optimize.Anything.{Config, Result}
 
 config =
   Config.new(
@@ -881,7 +881,7 @@ Optimize Anything surface.
   end)
 
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       Agent.get_and_update(actions, fn
@@ -893,7 +893,7 @@ lm = %{
 }
 
 lookup =
-  DSEx.tool(
+  Imp.tool(
     :lookup,
     "lookup facts",
     fn %{query: "capital-france"} -> "Paris" end,
@@ -904,37 +904,37 @@ lookup =
     }
   )
 
-program = DSEx.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
-{:ok, prediction} = DSEx.call(program, %{question: "What is the capital of France?"})
-DSEx.get(prediction, :answer)
+program = Imp.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+{:ok, prediction} = Imp.call(program, %{question: "What is the capital of France?"})
+Imp.get(prediction, :answer)
 ```
 
 `ReAct` sends provider-style function definitions when the LM client supports
 them. A reserved `submit` tool validates final outputs against the original
 signature.
 
-Use `DSEx.react_v2/3` when native multi-turn tool history and parallel calls are
-required. ReActV2 preserves call/result IDs in `DSEx.History`, records unknown
+Use `Imp.react_v2/3` when native multi-turn tool history and parallel calls are
+required. ReActV2 preserves call/result IDs in `Imp.History`, records unknown
 and failing tools as observations instead of aborting, and forces one final
-`submit` call when the normal loop ends. Existing `DSEx.react/3` retains its
-fail-fast behavior. The pinned source mapping and deliberate DSEx policy/redaction
+`submit` call when the normal loop ends. Existing `Imp.react/3` retains its
+fail-fast behavior. The pinned source mapping and deliberate Imp policy/redaction
 extensions are documented in `docs/REACT_V2_FIDELITY.md`.
 
 ### Tool Call Primitives
 
-Use `DSEx.Adapters.Types.ToolCall` and `ToolCalls` when you need to inspect,
+Use `Imp.Adapters.Types.ToolCall` and `ToolCalls` when you need to inspect,
 persist, or pass provider-native tool-call values outside a full ReAct loop.
-They normalize DSEx maps and OpenAI-style nested function calls into the same
+They normalize Imp maps and OpenAI-style nested function calls into the same
 shape:
 
 ```elixir
 calls =
-  DSEx.Adapters.Types.ToolCalls.from_dict_list([
+  Imp.Adapters.Types.ToolCalls.from_dict_list([
     %{id: "call_lookup", name: "lookup", arguments: %{query: "beam"}},
     %{id: "call_translate", function: %{name: "translate", arguments: ~s({"text":"hello"})}}
   ])
 
-DSEx.Adapters.Types.ToolCalls.format(calls)
+Imp.Adapters.Types.ToolCalls.format(calls)
 ```
 
 ReqLLM-backed assistant messages accept the same primitive values through the
@@ -944,76 +944,76 @@ streaming exposes tool-call chunks as `%{tool_calls: [...]}` stream chunks.
 ## Agents
 
 ```elixir
-tool = DSEx.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+tool = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
 agent =
-  DSEx.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
-    DSEx.Agent.call_tool(agent, :double, %{x: x}, runtime)
+  Imp.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
+    Imp.Agent.call_tool(agent, :double, %{x: x}, runtime)
   end, tools: [tool], tool_policy: [:double])
 
-{:ok, output, runtime} = DSEx.Agent.run(agent, %{x: 4})
+{:ok, output, runtime} = Imp.Agent.run(agent, %{x: 4})
 ```
 
 For incremental traces:
 
 ```elixir
-DSEx.Agent.stream_events(agent, %{x: 4}) |> Enum.to_list()
+Imp.Agent.stream_events(agent, %{x: 4}) |> Enum.to_list()
 ```
 
 ## MCP Import
 
 ```elixir
 catalog =
-  DSEx.MCP.Catalog.new([
+  Imp.MCP.Catalog.new([
     %{name: :lookup, description: "lookup", input_schema: %{required: [:key]}, run: & &1}
   ])
 
-[tool] = DSEx.MCP.import_tools(catalog)
+[tool] = Imp.MCP.import_tools(catalog)
 ```
 
 For HTTP-backed discovery, configure a real MCP endpoint. This is an external
 service sketch, not a local runnable snippet:
 
 ```elixir
-client = DSEx.MCP.HTTPClient.new("https://mcp.example/tools")
-tools = DSEx.MCP.import_tools(client)
+client = Imp.MCP.HTTPClient.new("https://mcp.example/tools")
+tools = Imp.MCP.import_tools(client)
 ```
 
-For stdio or Streamable HTTP transports, point DSEx at trusted services you own:
+For stdio or Streamable HTTP transports, point Imp at trusted services you own:
 
 ```elixir
-stdio = DSEx.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
-streamable = DSEx.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", session_id: "session")
+stdio = Imp.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
+streamable = Imp.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", session_id: "session")
 ```
 
 Only connect MCP stdio clients to trusted local executables. The stdio client
 opens a process for discovery and opens a fresh process for each imported tool
-call. DSEx treats MCP tools like ordinary `DSEx.Tool` values, so use tool
+call. Imp treats MCP tools like ordinary `Imp.Tool` values, so use tool
 policies for anything with side effects.
 
 ## Advanced Protocol Clients
 
-The normal provider path for inference is `DSEx.req_llm/2`. DSEx also ships
+The normal provider path for inference is `Imp.req_llm/2`. Imp also ships
 explicit protocol clients for application boundaries that are not ordinary LM
 inference: HTTP retrievers, MCP transports, and provider training jobs. Those
-clients are documented in [Advanced DSEx](ADVANCED.md) and
+clients are documented in [Advanced Imp](ADVANCED.md) and
 [Production Operations](PRODUCTION_OPERATIONS.md) because they require explicit
 service ownership, credentials, payload contracts, and protocol-specific tests.
 
 ## RLM
 
-RLM is DSEx's recursive language-model controller. It is not a synonym for RAG:
+RLM is Imp's recursive language-model controller. It is not a synonym for RAG:
 retrieval fetches context, while RLM runs a bounded loop that can assign state,
 call tools, ask subquestions, recurse, and submit a final answer.
 
 ```elixir
 lookup =
-  DSEx.tool(:lookup, "lookup a fact", fn
+  Imp.tool(:lookup, "lookup a fact", fn
     %{"key" => "priority"} -> "Prefer concise answers backed by evidence."
   end)
 
 controller_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       %{
@@ -1027,7 +1027,7 @@ controller_lm = %{
 long_context = "priority: concise answers backed by evidence"
 
 rlm =
-  DSEx.rlm("context, question -> answer",
+  Imp.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 20,
@@ -1038,7 +1038,7 @@ rlm =
     max_time_ms: 30_000
   )
 
-DSEx.call(rlm, %{context: long_context, question: "What matters?"})
+Imp.call(rlm, %{context: long_context, question: "What matters?"})
 ```
 
 The primary controller response contains reasoning and constrained Elixir code:
@@ -1071,13 +1071,13 @@ it explicitly:
 
 ```elixir
 context =
-  DSEx.rlm_serializable(:large_context, fn ->
+  Imp.rlm_serializable(:large_context, fn ->
     File.read!("large-report.txt")
   end,
     metadata: %{source: "large-report.txt"}
   )
 
-DSEx.call(rlm, %{large_context: context, question: "What changed?"})
+Imp.call(rlm, %{large_context: context, question: "What changed?"})
 ```
 
 The controller initially sees only metadata for the serializable value. The
@@ -1085,9 +1085,9 @@ The controller initially sees only metadata for the serializable value. The
 runs sub-LM calls concurrently through supervised BEAM tasks, preserves result
 order, and atomically reserves every item against the shared `max_llm_calls`
 ledger. Recursive children use that same ledger and deadline. If controller
-code submits malformed output, DSEx records
+code submits malformed output, Imp records
 the parse feedback as an observation and gives the controller another turn. If
-the loop exhausts its iteration budget, DSEx runs an extract pass over the
+the loop exhausts its iteration budget, Imp runs an extract pass over the
 variables, observations, and trace to recover final structured output when
 possible. A zero-iteration RLM still fails immediately without spending a
 provider call.
@@ -1095,11 +1095,11 @@ provider call.
 ## Save And Load
 
 ```elixir
-program = DSEx.predict("question -> answer")
+program = Imp.predict("question -> answer")
 
-path = Path.join(System.tmp_dir!(), "dsex-program.json")
-DSEx.save!(program, path)
-loaded = DSEx.load!(path)
+path = Path.join(System.tmp_dir!(), "imp-program.json")
+Imp.save!(program, path)
+loaded = Imp.load!(path)
 File.rm(path)
 ```
 
@@ -1107,12 +1107,12 @@ File artifacts use a versioned, checksummed envelope and atomic same-directory
 replacement. Callback-bearing programs use trusted names:
 
 ```elixir
-metric = fn _example, prediction -> DSEx.get(prediction, :answer, "") != "" end
-registry = DSEx.Saving.Registry.new(quality_metric: metric)
-program = DSEx.Predict.BestOfN.new(program, metric)
+metric = fn _example, prediction -> Imp.get(prediction, :answer, "") != "" end
+registry = Imp.Saving.Registry.new(quality_metric: metric)
+program = Imp.Predict.BestOfN.new(program, metric)
 
-DSEx.save!(program, path, registry: registry)
-loaded = DSEx.load!(path, registry: registry)
+Imp.save!(program, path, registry: registry)
+loaded = Imp.load!(path, registry: registry)
 ```
 
 The deploying application must provide every referenced callback with the
@@ -1121,12 +1121,12 @@ program is returned.
 
 DSPy 3.3.0b1 has two persistence modes. `module.save("state.json")` plus
 `module.load("state.json")` applies parameter state to an existing Python
-program; the DSEx-native data boundary is `DSEx.dump/1` and `DSEx.load/1`, or
-their checksummed file equivalents `DSEx.save!/2` and `DSEx.load!/1`. DSPy's
+program; the Imp-native data boundary is `Imp.dump/1` and `Imp.load/1`, or
+their checksummed file equivalents `Imp.save!/2` and `Imp.load!/1`. DSPy's
 `module.save(path, save_program: true)` plus `dspy.load(path, allow_pickle:
-true)` serializes executable Python with `cloudpickle`. DSEx intentionally has
+true)` serializes executable Python with `cloudpickle`. Imp intentionally has
 no executable-code artifact mode: it saves allowlisted program architecture as
-JSON, stores callback names through `DSEx.Saving.Registry`, and requires the
+JSON, stores callback names through `Imp.Saving.Registry`, and requires the
 deploying application to rebind callbacks, tools, LMs, and credentials from
 trusted runtime code.
 
@@ -1135,18 +1135,18 @@ credentials. Rebind a freshly configured LM explicitly before live use:
 
 ```elixir
 lm =
-  DSEx.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
+  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
     api_key: System.fetch_env!("OPENAI_API_KEY"),
     temperature: 0
   )
 
-loaded = DSEx.with_lm(loaded, lm)
-DSEx.call(loaded, %{question: "What changed?"})
+loaded = Imp.with_lm(loaded, lm)
+Imp.call(loaded, %{question: "What changed?"})
 ```
 
-Portable saving supports the program types accepted by `DSEx.Saving`, including
+Portable saving supports the program types accepted by `Imp.Saving`, including
 compiled few-shot and ensemble graphs, callback wrappers, agents, and RAG
-programs backed by `DSEx.memory/2`. External service clients remain host-owned.
+programs backed by `Imp.memory/2`. External service clients remain host-owned.
 Functions and tool closures must have stable names in a supplied registry; an
 unregistered closure fails during dumping instead of entering the artifact.
 
@@ -1154,15 +1154,15 @@ unregistered closure fails during dumping instead of entering the artifact.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
+program = Imp.predict("question -> answer", lm: lm)
 
-DSEx.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
+Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
 
-DSEx.Streaming.incremental_fields(
+Imp.Streaming.incremental_fields(
   ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
   "question -> answer, rationale"
 )

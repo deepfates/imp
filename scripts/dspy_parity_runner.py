@@ -2,7 +2,7 @@
 """Run canonical benchmark rows through the real Python DSPy package.
 
 This script intentionally lives outside the Elixir runtime. It is the
-side-by-side reference runner used by DSEx parity reports.
+side-by-side reference runner used by Imp parity reports.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ DIAGNOSTIC_SECRETS: Tuple[str, ...] = ()
 
 
 def isolate_from_beam_process_group() -> None:
-    if os.name == "posix" and os.environ.get("DSEX_BEAM_PORT_OWNER") == "1":
+    if os.name == "posix" and os.environ.get("IMP_BEAM_PORT_OWNER") == "1":
         if os.getpgrp() != os.getpid():
             os.setsid()
 
@@ -230,7 +230,7 @@ def effective_generation(
             effective,
             [
                 "DSPy/LiteLLM routed this comparison through OpenAI Responses for endpoint-equivalent parity",
-                "DSPy LM was configured with temperature=1.0 because GPT-5-family requests reject temperature=0.0; this matches the provider default that DSEx reaches by dropping temperature",
+                "DSPy LM was configured with temperature=1.0 because GPT-5-family requests reject temperature=0.0; this matches the provider default that Imp reaches by dropping temperature",
             ],
         )
     if dspy_reasoning_model(normalized):

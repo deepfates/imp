@@ -1,38 +1,38 @@
-# DSEx 02: Programming, Not Prompting
+# Imp 02: Programming, Not Prompting
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dsex, path: repo}])
+Mix.install([{:imp, path: repo}])
 ```
 
 ## The Idea
 
 Livebook 01 showed the real-provider shape. This chapter removes provider
-variance so you can inspect the same DSEx ideas with a deterministic local LM.
+variance so you can inspect the same Imp ideas with a deterministic local LM.
 
 It also includes a live-provider proof cell near the end. The point is that
-`DSEx.LM.Static` is a development tool, not a different product path.
+`Imp.LM.Static` is a development tool, not a different product path.
 
-DSEx-style programming means declaring the task boundary first:
+Imp-style programming means declaring the task boundary first:
 
-The signature is the smallest useful unit in DSEx. It says what data enters the
+The signature is the smallest useful unit in Imp. It says what data enters the
 task and what data must come back. It does not say which provider to use, how
 many examples to show, or how the final prompt should look.
 
 ```elixir
-signature = DSEx.signature("question -> answer")
-DSEx.Signature.to_spec(signature)
+signature = Imp.signature("question -> answer")
+Imp.Signature.to_spec(signature)
 ```
 
 Then you attach an LM and call a program:
 
 This notebook uses a deterministic local LM so the behavior is stable. The LM
-is deliberately boring; the point is to see the DSEx program shape without
+is deliberately boring; the point is to see the Imp program shape without
 network calls or provider variance.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -41,18 +41,18 @@ lm = %{
   ]
 }
 
-DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
-qa_program = DSEx.predict("question -> answer")
-{:ok, prediction} = DSEx.call(qa_program, %{question: "Capital of France?"})
-DSEx.to_map(prediction)
+qa_program = Imp.predict("question -> answer")
+{:ok, prediction} = Imp.call(qa_program, %{question: "Capital of France?"})
+Imp.to_map(prediction)
 ```
 
 ## Inspect The Generated Messages
 
 Predictions keep trace metadata:
 
-The generated messages are still available. DSEx is not asking you to trust a
+The generated messages are still available. Imp is not asking you to trust a
 black box; it is giving the prompt an owner, a contract, and a place in normal
 Elixir data.
 
@@ -65,18 +65,18 @@ artifact of a typed program.
 
 ## Chain Of Thought
 
-Some tasks benefit from a separate reasoning field. In DSEx that is still a
+Some tasks benefit from a separate reasoning field. In Imp that is still a
 structured output, not an informal convention hidden in a prompt.
 
 ```elixir
 cot_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
 }
 
-cot_program = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
-{:ok, pred} = DSEx.call(cot_program, %{question: "What is 2+2?"})
-DSEx.to_map(pred)
+cot_program = Imp.chain_of_thought("question -> answer", lm: cot_lm)
+{:ok, pred} = Imp.call(cot_program, %{question: "What is 2+2?"})
+Imp.to_map(pred)
 ```
 
 ## Schema-Constrained Output
@@ -87,7 +87,7 @@ fields and returns feedback when output does not fit the signature.
 
 ```elixir
 signature =
-  DSEx.signature(%{
+  Imp.signature(%{
     inputs: [:text],
     outputs: [
       %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
@@ -96,32 +96,32 @@ signature =
   })
 
 {:ok, pred} =
-  DSEx.Adapter.JSON.parse(
+  Imp.Adapter.JSON.parse(
     signature,
     ~s({"sentiment":"positive","confidence":0.91}),
     []
   )
 
-DSEx.to_map(pred)
+Imp.to_map(pred)
 ```
 
 Try a bad output:
 
 ```elixir
-DSEx.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [])
+Imp.Adapter.JSON.parse(signature, ~s({"sentiment":"mixed","confidence":2.0}), [])
 ```
 
 ## Examples
 
-Examples are rows of data. Marking inputs tells DSEx which fields the model can
+Examples are rows of data. Marking inputs tells Imp which fields the model can
 see and which fields are labels for evaluation or optimization.
 
 ```elixir
 example =
-  DSEx.example(question: "2+2?", answer: "4")
-  |> DSEx.with_inputs(:question)
+  Imp.example(question: "2+2?", answer: "4")
+  |> Imp.with_inputs(:question)
 
-{DSEx.to_map(DSEx.inputs(example)), DSEx.to_map(DSEx.labels(example))}
+{Imp.to_map(Imp.inputs(example)), Imp.to_map(Imp.labels(example))}
 ```
 
 ## Live Provider Proof
@@ -133,7 +133,7 @@ typed JSON result when `OPENAI_API_KEY` and `OPENAI_MODEL` are present.
 live_lm = fn opts ->
   if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
-     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
          [
            api_key: System.fetch_env!("OPENAI_API_KEY"),
@@ -153,24 +153,24 @@ end
 case live_lm.(max_completion_tokens: 120) do
   {:ok, lm} ->
     live_program =
-      DSEx.predict(
-        DSEx.signature(
+      Imp.predict(
+        Imp.signature(
           "text -> sentiment: enum[positive,negative], confidence: number",
           "Classify the text. Return JSON only."
         ),
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     {:ok, live_prediction} =
-      DSEx.call(live_program, %{text: "DSEx makes LM programs testable and useful."})
+      Imp.call(live_program, %{text: "Imp makes LM programs testable and useful."})
 
-    sentiment = DSEx.get(live_prediction, :sentiment)
-    confidence = DSEx.get(live_prediction, :confidence)
+    sentiment = Imp.get(live_prediction, :sentiment)
+    confidence = Imp.get(live_prediction, :confidence)
 
     unless sentiment == "positive" and is_number(confidence) do
-      raise "live provider returned an invalid typed prediction: #{inspect(DSEx.to_map(live_prediction))}"
+      raise "live provider returned an invalid typed prediction: #{inspect(Imp.to_map(live_prediction))}"
     end
 
     %{
@@ -191,12 +191,12 @@ reasonable to treat compiled programs as artifacts while rebinding live
 credentials at runtime.
 
 ```elixir
-path = Path.join(System.tmp_dir!(), "dsex-livebook-program.json")
-DSEx.save!(qa_program, path)
-loaded = DSEx.load!(path)
+path = Path.join(System.tmp_dir!(), "imp-livebook-program.json")
+Imp.save!(qa_program, path)
+loaded = Imp.load!(path)
 File.rm(path)
 
-loaded.signature |> DSEx.Signature.to_spec()
+loaded.signature |> Imp.Signature.to_spec()
 ```
 
 Next: open `livebooks/03_evaluate_and_optimize.livemd` to turn examples into a

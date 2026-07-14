@@ -1,12 +1,12 @@
-# DSEx Release Criteria
+# Imp Release Criteria
 
-This document records the release criteria for a production-ready DSEx build.
+This document records the release criteria for a production-ready Imp build.
 
 For v0.1, "production-ready" means the scoped product contract in
 `docs/V0_1_RELEASE_LEDGER.md`. It does not mean full DSPy parity or paper-level
 replication. Research gates authorize those stronger claims independently.
 
-The central standard is simple: DSEx should feel like an Elixir-native system
+The central standard is simple: Imp should feel like an Elixir-native system
 from a world where declarative self-improving programs were designed on the
 BEAM from the start. It should not be a Python compatibility layer, a set of
 hand-written prompt helpers, or a collection of impressive demos with hidden
@@ -31,27 +31,27 @@ The release standard is grounded in:
 - optimize_anything's generalization: any measurable text artifact can be
   optimized with per-task/per-metric feedback and Pareto-aware search:
   <https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/>
-- DSEx's parity validation program: golden trace parity, live matched-model
+- Imp's parity validation program: golden trace parity, live matched-model
   parity, optimizer lift, production semantics, RLM benchmark parity, and
   provider-free performance evidence: `docs/PARITY_VALIDATION_PROGRAM.md`
-- DSEx's benchmark catalog: a source-grounded outside-view map of DSPy-derived
+- Imp's benchmark catalog: a source-grounded outside-view map of DSPy-derived
   benchmark families and which ones are runnable, sampled, deferred, or
   release-blocking: `docs/BENCHMARK_CATALOG.md`
 
 ## Release Scope
 
-The production release scope is the current DSEx product surface plus the
+The production release scope is the current Imp product surface plus the
 evidence required to trust it. Historical planning tickets are not release
 criteria; current commands, docs, tests, and artifacts are.
 
 | Surface | Release Meaning |
 | --- | --- |
-| Coverage matrix | `docs/COVERAGE_MATRIX.md` maps each DSPy/Ax/optimize_anything concept to DSEx status, tests, docs, and intentional deviations. |
+| Coverage matrix | `docs/COVERAGE_MATRIX.md` maps each DSPy/Ax/optimize_anything concept to Imp status, tests, docs, and intentional deviations. |
 | Runtime boundary | Provider access goes through ReqLLM, injectable behaviours, explicit transports, option validation, telemetry, and redaction rather than hidden fallbacks. |
 | Proof-level gates | Deterministic production, local integration, provider-compatible protocol, paid live inference, and parity evidence gates are separate commands with separate claims. |
 | External workflows | MCP, retrievers, save/load/rebind, streaming, tools, and provider-compatible training are exercised through local integration or protocol gates before they appear as production surface. |
 | Evaluation and optimization | Metrics preserve score, feedback, traces, failures, and optimizer-facing signal; optimizers emit executable compiled programs and reports. |
-| Documentation | README, ExDoc, docs, and Livebooks teach DSEx as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
+| Documentation | README, ExDoc, docs, and Livebooks teach Imp as a cohesive Elixir-native system rather than a Python compatibility layer or project history. |
 | Parity evidence | Release claims are backed by separate dashboard lanes for golden trace parity, live matched models, optimizer lift, Optimize Anything non-prompt effectiveness, pinned instruction-optimizer structure, production semantics, and provider-free performance. |
 | Clean-room product proof | A fresh Mix project can consume the unpacked package and exercise the golden user journey through the public API: predict, optimize, save/load, ReAct tools, provider construction, and credential redaction. |
 
@@ -81,15 +81,15 @@ mix protocol.retriever.check
 mix protocol.mcp.check
 ```
 
-If DSEx does not support one of those workflows as production surface, the API
+If Imp does not support one of those workflows as production surface, the API
 and docs must say so directly rather than presenting unsupported behavior as a
 complete feature.
 
 ## Completion Criteria
 
-DSEx is production complete when:
+Imp is production complete when:
 
-1. `tk ready | rg '^de-'` shows no ready DSEx production-release blockers
+1. `tk ready | rg '^de-'` shows no ready Imp production-release blockers
    that lack an owner or an explicit non-blocking release decision.
 2. `tk dep cycle` reports no cycles.
 3. `mix production.check` passes.
@@ -111,7 +111,7 @@ DSEx is production complete when:
 13. Any public production claim about paid training, external retrievers, or
    external MCP servers is backed by dedicated external-service tests, or the
    claim is removed.
-14. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
+14. The docs and Livebooks teach Imp as a coherent Elixir-native system.
 15. `mix benchmark.dashboard` produces a current v0.1-scoped
     `parity-dashboard-*.json` artifact.
 16. `mix benchmark.dashboard.full` passes, and the dashboard reports
@@ -131,9 +131,9 @@ DSEx is production complete when:
     research view; failures there do not block a v0.1 product release unless
     those broader claims are presented as product capabilities.
 17. The parity dashboard reports `performance_claim_supported: true` before the
-    release claims DSEx is faster than DSPy on any named path.
+    release claims Imp is faster than DSPy on any named path.
 18. Live latency claims cite dashboard or matrix instrumentation that separates
-    provider/model time from DSEx local overhead and adapter recovery.
+    provider/model time from Imp local overhead and adapter recovery.
 19. Live matched-model claims cite artifacts whose prompt/signature contract is
     current for every selected model lane.
 20. Live matched-model claims cite artifacts with one consistent

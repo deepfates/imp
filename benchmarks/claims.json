@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "purpose": "Machine-readable DSEx public claim inventory. The benchmark dashboard evaluates these rows against evidence lanes and refuses claim-ready/full-parity status while release-blocking claims are missing fresh evidence.",
+  "purpose": "Machine-readable Imp public claim inventory. The benchmark dashboard evaluates these rows against evidence lanes and refuses claim-ready/full-parity status while release-blocking claims are missing fresh evidence.",
   "claims": [
     {
       "id": "claim.product.public_api_installable",
       "decision": "proven_target",
       "release": "v0.1",
       "scope": "Clean package consumption and the documented v0.1 public API paths covered by package contract tests.",
-      "statement": "DSEx passes the clean-room package contract for the documented v0.1 public API paths exercised outside the source checkout.",
+      "statement": "Imp passes the clean-room package contract for the documented v0.1 public API paths exercised outside the source checkout.",
       "category": "package",
       "surface": ["package", "public_api", "docs"],
       "claim_type": "feature_completeness",
-      "comparison": "dsex_native",
+      "comparison": "imp_native",
       "release_blocking": true,
       "sources": ["README.md", "docs/RELEASE_CRITERIA.md", "test/package_contract_test.exs"],
       "requirements": [
@@ -29,11 +29,11 @@
       "decision": "proven_target",
       "release": "v0.1",
       "scope": "Executable shipped documentation plus a current provider smoke.",
-      "statement": "DSEx docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
+      "statement": "Imp docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
       "category": "docs",
       "surface": ["README", "docs", "livebooks", "ReqLLM"],
       "claim_type": "live_provider_proof",
-      "comparison": "dsex_native",
+      "comparison": "imp_native",
       "release_blocking": true,
       "sources": ["docs/README.md", "livebooks/*.livemd", "test/livebook_contract_test.exs"],
       "requirements": [
@@ -57,8 +57,8 @@
       "id": "claim.dspy_semantics.golden_trace",
       "decision": "proven_target",
       "release": "v0.1",
-      "scope": "The pinned normalized golden-trace cases and named DSEx semantic checks; excludes byte-identical Python prompt templates and unlisted upstream behavior.",
-      "statement": "DSEx passes the pinned golden-trace cases for signatures, Predict, ChainOfThought, typed adapters, and ReAct tool traces, plus named semantic checks for streaming, save/load redaction, and cache behavior.",
+      "scope": "The pinned normalized golden-trace cases and named Imp semantic checks; excludes byte-identical Python prompt templates and unlisted upstream behavior.",
+      "statement": "Imp passes the pinned golden-trace cases for signatures, Predict, ChainOfThought, typed adapters, and ReAct tool traces, plus named semantic checks for streaming, save/load redaction, and cache behavior.",
       "category": "dspy_parity",
       "surface": ["signature", "predict", "chain_of_thought", "adapters", "react", "streaming", "save_load", "cache"],
       "claim_type": "conformance",
@@ -71,7 +71,7 @@
           "kind": "parity",
           "lane": "golden_trace",
           "evidence": "full",
-          "threshold": "all golden trace parity cases and DSEx semantic checks pass"
+          "threshold": "all golden trace parity cases and Imp semantic checks pass"
         }
       ]
     },
@@ -81,7 +81,7 @@
       "release": "telos",
       "scope": "Telos research comparison on the named live benchmark tasks under current_low_cost, frontier_sanity, and historical_research policy; excludes the v0.1 provider runtime contract and blanket all-task parity.",
       "limitations": ["Requires fresh complete matched-model campaigns."],
-      "statement": "The telos research target is a matched-model effectiveness comparison between DSEx and Python DSPy on the named live benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings.",
+      "statement": "The telos research target is a matched-model effectiveness comparison between Imp and Python DSPy on the named live benchmark tasks with current prompt contracts, complete instrumentation, runtime-shape evidence, and consistent execution settings.",
       "category": "dspy_parity",
       "surface": ["gsm8k", "hotpotqa", "predict", "chain_of_thought", "rag"],
       "claim_type": "functional_effectiveness",
@@ -127,7 +127,7 @@
       "release": "telos",
       "scope": "Telos research replication across the six named GEPA paper families; excludes a claim for unlisted datasets or optimizer families.",
       "limitations": ["Papillon and HoVer full-scope artifacts are incomplete."],
-      "statement": "The telos research target is a six-family GEPA replication artifact comparing baseline, DSPy GEPA, DSEx GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
+      "statement": "The telos research target is a six-family GEPA replication artifact comparing baseline, DSPy GEPA, Imp GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
       "category": "optimizer",
       "surface": ["GEPA", "MIPROv2", "SIMBA", "AIMEBench", "HotpotQABench", "hoverBench", "IFBench", "LiveBenchMathBench", "Papillon"],
       "claim_type": "research_replication",
@@ -149,12 +149,12 @@
       "decision": "proven_target",
       "release": "v0.1",
       "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
-      "limitations": ["Scoped to DSEx-native effectiveness; does not claim paper-scale or matched-internals parity with upstream Optimize Anything."],
-      "statement": "DSEx Optimize Anything improves measurable non-prompt artifacts across multiple seeds using executable held-out evaluators, with provider cost and checkpoint provenance.",
+      "limitations": ["Scoped to Imp-native effectiveness; does not claim paper-scale or matched-internals parity with upstream Optimize Anything."],
+      "statement": "Imp Optimize Anything improves measurable non-prompt artifacts across multiple seeds using executable held-out evaluators, with provider cost and checkpoint provenance.",
       "category": "optimizer",
       "surface": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic"],
       "claim_type": "functional_effectiveness",
-      "comparison": "dsex_baseline_and_authored_comparator",
+      "comparison": "imp_baseline_and_authored_comparator",
       "release_blocking": true,
       "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
       "requirements": [
@@ -177,7 +177,7 @@
       "category": "tools_agents_rag",
       "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
       "claim_type": "feature_completeness",
-      "comparison": "dspy_and_dsex_native",
+      "comparison": "dspy_and_imp_native",
       "release_blocking": true,
       "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
       "requirements": [
@@ -221,8 +221,8 @@
       "decision": "active_gap",
       "release": "telos",
       "scope": "Telos research comparison for the named provider-free local paths; excludes end-to-end/provider latency and blanket speed claims.",
-      "limitations": ["No v0.1 claim that DSEx is faster than DSPy."],
-      "statement": "The telos research target is a provider-free local overhead comparison between DSEx and DSPy for the named core paths before making any performance claim.",
+      "limitations": ["No v0.1 claim that Imp is faster than DSPy."],
+      "statement": "The telos research target is a provider-free local overhead comparison between Imp and DSPy for the named core paths before making any performance claim.",
       "category": "performance",
       "surface": ["signature_parse", "adapter_format_parse", "schema_validation", "evaluation", "metrics", "optimizer_scheduling", "redaction", "cache", "concurrency"],
       "claim_type": "performance",
@@ -245,11 +245,11 @@
       "release": "v0.1",
       "scope": "Pinned local MLX LoRA training, official fused deployment, and portable-program rebinding on the canonical Banking77 holdout.",
       "limitations": ["Does not establish paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."],
-      "statement": "DSEx can execute a fresh Elixir-owned local MLX training lifecycle whose officially fused model improves the pinned held-out task and whose credential-free saved program reproduces the fused outputs after explicit runtime rebinding.",
+      "statement": "Imp can execute a fresh Elixir-owned local MLX training lifecycle whose officially fused model improves the pinned held-out task and whose credential-free saved program reproduces the fused outputs after explicit runtime rebinding.",
       "category": "optimizer",
       "surface": ["BootstrapFinetune", "training_protocol", "local_weight_training", "save_load"],
       "claim_type": "functional_effectiveness",
-      "comparison": "dsex_local_baseline",
+      "comparison": "imp_local_baseline",
       "release_blocking": true,
       "sources": ["docs/ADVANCED.md", "docs/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
@@ -267,11 +267,11 @@
       "decision": "proven_target",
       "release": "v0.1",
       "scope": "Provider-compatible local protocol boundaries; excludes paid training completion.",
-      "statement": "DSEx production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
+      "statement": "Imp production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
       "category": "operations",
       "surface": ["training_protocol", "retriever_protocol", "mcp_protocol"],
       "claim_type": "feature_completeness",
-      "comparison": "dsex_native",
+      "comparison": "imp_native",
       "release_blocking": true,
       "sources": ["docs/PRODUCTION_OPERATIONS.md", "docs/RELEASE_CRITERIA.md", "test/protocol_training", "test/protocol_retriever", "test/protocol_mcp"],
       "requirements": [
@@ -289,7 +289,7 @@
       "decision": "proven_target",
       "release": "v0.1",
       "scope": "Provider-free repeated failure and recovery behavior with verified runtime leak accounting.",
-      "statement": "DSEx deterministic cancellation, timeout, bounded concurrency, partial-stream failure, retry/idempotency, and optimizer resume recovery paths pass the canonical T0 campaign without runtime leaks.",
+      "statement": "Imp deterministic cancellation, timeout, bounded concurrency, partial-stream failure, retry/idempotency, and optimizer resume recovery paths pass the canonical T0 campaign without runtime leaks.",
       "category": "operations",
       "surface": [
         "concurrency",
@@ -298,10 +298,10 @@
         "optimizer_scheduling"
       ],
       "claim_type": "failure_recovery",
-      "comparison": "dsex_native",
+      "comparison": "imp_native",
       "release_blocking": true,
       "sources": [
-        "lib/dsex/benchmark_truth/failure_campaign.ex",
+        "lib/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"
       ],
       "requirements": [
@@ -333,10 +333,10 @@
         "agents"
       ],
       "claim_type": "live_provider_proof",
-      "comparison": "dsex_native",
+      "comparison": "imp_native",
       "release_blocking": true,
       "sources": [
-        "lib/dsex/benchmark_truth/failure_campaign.ex",
+        "lib/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"
       ],
       "requirements": [

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export GEPA artifact benchmark splits into DSEx GEPA campaign JSONL format."""
+"""Export GEPA artifact benchmark splits into Imp GEPA campaign JSONL format."""
 
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ def main() -> int:
                 "dataset_authorities": dataset_authorities(gepa_root, family, source),
                 **family_extra_metadata(gepa_root, family),
                 "metric_fidelity": (
-                    "upstream_metric_named_for_adapter; DSEx campaign runner ports "
+                    "upstream_metric_named_for_adapter; Imp campaign runner ports "
                     "deterministic adapters, Papillon judge scoring, IFBench registry "
                     "checks, and guarded LiveBenchMath symbolic bridge branches"
                 ),

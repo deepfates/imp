@@ -1,13 +1,13 @@
-# DSEx 05: Operate And Live Checks
+# Imp 05: Operate And Live Checks
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dsex, path: repo}])
+Mix.install([{:imp, path: repo}])
 ```
 
 ## Local Quality Gates
 
-The earlier notebooks built DSEx programs. This chapter is about trust: what
+The earlier notebooks built Imp programs. This chapter is about trust: what
 maintainers run before shipping the library, and what application developers
 should decide before putting provider calls in production.
 
@@ -48,10 +48,10 @@ Unknown external keys remain strings:
 
 ```elixir
 key = "external_key_#{System.unique_integer([:positive])}"
-example = DSEx.example(%{key => "value"})
+example = Imp.example(%{key => "value"})
 
 {
-  DSEx.get(example, key),
+  Imp.get(example, key),
   try do
     String.to_existing_atom(key)
   rescue
@@ -63,14 +63,14 @@ example = DSEx.example(%{key => "value"})
 Trace redaction:
 
 ```elixir
-echo = DSEx.tool(:echo, "echo", fn input -> input end)
+echo = Imp.tool(:echo, "echo", fn input -> input end)
 
 agent =
-  DSEx.Agent.new(:redactor, fn agent, _input, runtime ->
-    DSEx.Agent.call_tool(agent, :echo, %{api_key: "sk-live", nested: %{token: "secret"}}, runtime)
+  Imp.Agent.new(:redactor, fn agent, _input, runtime ->
+    Imp.Agent.call_tool(agent, :echo, %{api_key: "sk-live", nested: %{token: "secret"}}, runtime)
   end, tools: [echo])
 
-{:ok, _output, runtime} = DSEx.Agent.run(agent, %{})
+{:ok, _output, runtime} = Imp.Agent.run(agent, %{})
 runtime.traces
 ```
 
@@ -84,14 +84,14 @@ if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   model = System.fetch_env!("OPENAI_MODEL")
 
   lm =
-    DSEx.req_llm("openai:#{model}",
+    Imp.req_llm("openai:#{model}",
       api_key: System.fetch_env!("OPENAI_API_KEY"),
       temperature: 0,
       max_completion_tokens: 40
     )
 
-  program = DSEx.predict("question -> answer", lm: lm)
-  DSEx.call(program, %{question: "Reply with exactly: pong"})
+  program = Imp.predict("question -> answer", lm: lm)
+  Imp.call(program, %{question: "Reply with exactly: pong"})
 else
   {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live provider cell."}
 end
@@ -118,21 +118,21 @@ if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   model = System.fetch_env!("OPENAI_MODEL")
 
   lm =
-    DSEx.req_llm("openai:#{model}",
+    Imp.req_llm("openai:#{model}",
       api_key: System.fetch_env!("OPENAI_API_KEY"),
       temperature: 0,
       max_completion_tokens: 40
     )
 
-  program = DSEx.predict("question -> answer", lm: lm)
-  {:ok, prediction} = DSEx.call(program, %{question: "Reply with exactly: pong"})
-  answer = prediction |> DSEx.get(:answer, "") |> to_string() |> String.downcase()
+  program = Imp.predict("question -> answer", lm: lm)
+  {:ok, prediction} = Imp.call(program, %{question: "Reply with exactly: pong"})
+  answer = prediction |> Imp.get(:answer, "") |> to_string() |> String.downcase()
 
   unless String.contains?(answer, "pong") do
-    raise "live operations proof failed: #{inspect(DSEx.to_map(prediction))}"
+    raise "live operations proof failed: #{inspect(Imp.to_map(prediction))}"
   end
 
-  DSEx.to_map(prediction)
+  Imp.to_map(prediction)
 else
   {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live operations proof."}
 end
@@ -141,13 +141,13 @@ end
 ## Saving Without Secrets
 
 ```elixir
-lm = DSEx.req_llm("openai:gpt-test", api_key: "not-persisted", temperature: 0)
-program = DSEx.predict("question -> answer", lm: lm)
+lm = Imp.req_llm("openai:gpt-test", api_key: "not-persisted", temperature: 0)
+program = Imp.predict("question -> answer", lm: lm)
 
-path = Path.join(System.tmp_dir!(), "dsex-no-secret.json")
-DSEx.save!(program, path)
+path = Path.join(System.tmp_dir!(), "imp-no-secret.json")
+Imp.save!(program, path)
 state = File.read!(path)
-loaded = DSEx.load!(path)
+loaded = Imp.load!(path)
 File.rm(path)
 
 {
@@ -161,7 +161,7 @@ File.rm(path)
 
 For a production application, use
 [`examples/deployment`](../examples/deployment/README.md). It is the canonical
-DSEx deployment path: a supervised application loads a checksummed artifact,
+Imp deployment path: a supervised application loads a checksummed artifact,
 rebinds credentials from the environment, and runs provider calls through
 bounded workers. The static answer setting in that reference is only a smoke
-mode; production uses `DSEX_MODEL` and `DSEX_API_KEY`.
+mode; production uses `IMP_MODEL` and `IMP_API_KEY`.

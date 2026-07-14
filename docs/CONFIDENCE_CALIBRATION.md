@@ -1,9 +1,9 @@
 # Confidence And Calibration
 
-DSEx keeps constrained-label token confidence, optimization quality, and
+Imp keeps constrained-label token confidence, optimization quality, and
 empirical calibration separate.
 
-`DSEx.Confidence` extracts `raw_confidence = exp(joint_logprob)` for the
+`Imp.Confidence` extracts `raw_confidence = exp(joint_logprob)` for the
 selected JSON enum value. This uncalibrated model score is available in metric
 diagnostics and reflective feedback. It is never a maximized GEPA objective.
 
@@ -22,12 +22,12 @@ Threshold and sigmoid strategies use their documented upstream formulas and
 also assign every incorrect prediction `0.0`.
 
 The pinned upstream ConfidenceAdapter additionally exports raw probability as
-a Pareto objective. DSEx intentionally does not copy that unsafe behavior: a
+a Pareto objective. Imp intentionally does not copy that unsafe behavior: a
 confidently wrong prediction must not survive solely because it is confident.
 
 ## Held-Out Calibration
 
-`DSEx.Confidence.Calibration` reports:
+`Imp.Confidence.Calibration` reports:
 
 - Brier score and expected calibration error;
 - fixed-width reliability buckets;
@@ -69,7 +69,7 @@ process without printing it, then run:
 set -a
 source .env
 set +a
-mix dsex.benchmark.confidence_calibration --bins 10 --min-bin-size 5
+mix imp.benchmark.confidence_calibration --bins 10 --min-bin-size 5
 ```
 
 The checked-in live dataset is a deterministic 200/200 subset of the public

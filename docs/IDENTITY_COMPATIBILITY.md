@@ -10,7 +10,7 @@ created before the Imp cutover. Readers verify original envelopes and checksums
 before translating an enumerated set of historical tags, runtime keys, and case
 identifiers in memory. Unknown forms fail through the current strict validators.
 
-`Imp.Persistence.Legacy` owns these translations. New writers emit only Imp
+Imp.Persistence.Legacy owns these translations. New writers emit only Imp
 identities. Frozen evidence is never rewritten to make a current-name audit
 pass, because doing so would invalidate its provenance or checksum. Tests cover
 both successful migration and collision or tampering rejection.

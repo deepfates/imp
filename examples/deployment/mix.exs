@@ -1,18 +1,18 @@
-defmodule DSExDeployment.MixProject do
+defmodule ImpDeployment.MixProject do
   use Mix.Project
 
   def project do
-    [app: :dsex_deployment, version: "0.1.0", elixir: "~> 1.17", deps: deps()]
+    [app: :imp_deployment, version: "0.1.0", elixir: "~> 1.17", deps: deps()]
   end
 
   def application do
-    [extra_applications: [:logger], mod: {DSExDeployment.Application, []}]
+    [extra_applications: [:logger], mod: {ImpDeployment.Application, []}]
   end
 
   defp deps do
-    case System.get_env("DSEX_PATH") do
-      nil -> [{:dsex, "~> 0.1"}]
-      path -> [{:dsex, path: path}]
+    case System.get_env("IMP_PATH") do
+      nil -> [{:imp, "~> 0.1"}]
+      path -> [{:imp, path: path}]
     end
   end
 end

@@ -1,14 +1,14 @@
-# DSEx 04: Tools, Agents, MCP, And RLM
+# Imp 04: Tools, Agents, MCP, And RLM
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dsex, path: repo}])
+Mix.install([{:imp, path: repo}])
 ```
 
 ## Tools
 
 Livebook 03 handled improvement loops. This chapter adds action boundaries:
-tools, ReAct, MCP imports, agents, and RLM all let a DSEx program do controlled
+tools, ReAct, MCP imports, agents, and RLM all let an Imp program do controlled
 work outside a single LM completion.
 
 Tools are ordinary named functions with metadata. Agents, ReAct, and RLM all
@@ -16,7 +16,7 @@ use the same tool struct, which keeps policy and tracing consistent.
 
 ```elixir
 lookup =
-  DSEx.tool(:lookup, "lookup a fact", fn
+  Imp.tool(:lookup, "lookup a fact", fn
     %{query: "capital-france"} -> "Paris"
     %{"query" => "capital-france"} -> "Paris"
     %{query: query} when is_binary(query) -> "Paris"
@@ -24,7 +24,7 @@ lookup =
     _other -> "Paris"
   end)
 
-DSEx.Tool.call(lookup, %{query: "capital-france"})
+Imp.Tool.call(lookup, %{query: "capital-france"})
 ```
 
 ## Agent Runtime
@@ -35,44 +35,44 @@ memory or child-agent calls.
 
 ```elixir
 agent =
-  DSEx.Agent.new(
+  Imp.Agent.new(
     :qa_agent,
     fn agent, %{query: query}, runtime ->
-      DSEx.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
+      Imp.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
     end,
     tools: [lookup],
     tool_policy: [:lookup]
   )
 
-{:ok, output, runtime} = DSEx.Agent.run(agent, %{query: "capital-france"})
+{:ok, output, runtime} = Imp.Agent.run(agent, %{query: "capital-france"})
 {output, runtime.traces}
 ```
 
 Incremental trace events:
 
 ```elixir
-DSEx.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
+Imp.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
 ```
 
 Tool policy denial:
 
 ```elixir
 locked =
-  DSEx.Agent.new(:locked, fn agent, _input, runtime ->
-    DSEx.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
+  Imp.Agent.new(:locked, fn agent, _input, runtime ->
+    Imp.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
   end, tools: [lookup], tool_policy: [])
 
-DSEx.Agent.run(locked, %{})
+Imp.Agent.run(locked, %{})
 ```
 
 ## MCP Catalog Import
 
-Catalog import turns external tool descriptions into DSEx tools so the rest of
+Catalog import turns external tool descriptions into Imp tools so the rest of
 the system does not care whether a tool was handwritten or discovered.
 
 ```elixir
 catalog =
-  DSEx.MCP.Catalog.new([
+  Imp.MCP.Catalog.new([
     %{
       name: :remote_lookup,
       description: "lookup through an imported catalog",
@@ -81,8 +81,8 @@ catalog =
     }
   ])
 
-[tool] = DSEx.MCP.import_tools(catalog)
-DSEx.Tool.call(tool, %{key: "capital"})
+[tool] = Imp.MCP.import_tools(catalog)
+Imp.Tool.call(tool, %{key: "capital"})
 ```
 
 ## ReAct
@@ -92,7 +92,7 @@ submits a final signature-shaped answer through the reserved `submit` tool.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       %{
@@ -105,9 +105,9 @@ lm = %{
   ]
 }
 
-react = DSEx.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
-{:ok, pred} = DSEx.call(react, %{question: "Capital of France?"})
-DSEx.to_map(pred)
+react = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
+{:ok, pred} = Imp.call(react, %{question: "Capital of France?"})
+Imp.to_map(pred)
 ```
 
 ## Live ReAct Proof
@@ -119,7 +119,7 @@ are present.
 live_lm = fn opts ->
   if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
-     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
          [
            api_key: System.fetch_env!("OPENAI_API_KEY"),
@@ -139,8 +139,8 @@ end
 case live_lm.(max_completion_tokens: 180) do
   {:ok, lm} ->
     live_react =
-      DSEx.react(
-        DSEx.signature(
+      Imp.react(
+        Imp.signature(
           "question -> answer",
           """
           Use the lookup tool first with query "capital-france".
@@ -156,19 +156,19 @@ case live_lm.(max_completion_tokens: 180) do
 
     {:ok, live_prediction} =
       Enum.reduce_while(1..3, {:error, :not_run}, fn _attempt, _last ->
-        case DSEx.call(live_react, %{question: "What is the capital of France?"}) do
+        case Imp.call(live_react, %{question: "What is the capital of France?"}) do
           {:ok, prediction} -> {:halt, {:ok, prediction}}
           {:error, _reason} = error -> {:cont, error}
         end
       end)
-    answer = DSEx.get(live_prediction, :answer)
-    history = DSEx.get(live_prediction, :history)
+    answer = Imp.get(live_prediction, :answer)
+    history = Imp.get(live_prediction, :history)
 
     unless answer == "Paris" and Enum.any?(history, &(&1.tool == :lookup)) do
-      raise "live ReAct proof failed: #{inspect(DSEx.to_map(live_prediction))}"
+      raise "live ReAct proof failed: #{inspect(Imp.to_map(live_prediction))}"
     end
 
-    DSEx.to_map(live_prediction)
+    Imp.to_map(live_prediction)
 
   skip ->
     skip
@@ -191,7 +191,7 @@ actions = [
 ]
 
 controller_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_actions)
@@ -204,7 +204,7 @@ controller_lm = %{
 Process.put(:rlm_actions, actions)
 
 rlm =
-  DSEx.rlm("context, question -> answer",
+  Imp.rlm("context, question -> answer",
     lm: controller_lm,
     tools: [lookup],
     max_iterations: 5,
@@ -213,14 +213,14 @@ rlm =
   )
 
 {:ok, pred} =
-  DSEx.call(rlm, %{
+  Imp.call(rlm, %{
     context: String.duplicate("large context ", 200),
     question: "What is the capital?"
   })
 
 Process.delete(:rlm_actions)
 
-{DSEx.to_map(pred), pred.metadata.rlm_trace}
+{Imp.to_map(pred), pred.metadata.rlm_trace}
 ```
 
 ## RLM Lazy Context Loading
@@ -230,7 +230,7 @@ first controller prompt. The controller loads it only if needed.
 
 ```elixir
 lazy_context =
-  DSEx.rlm_serializable(:context, fn ->
+  Imp.rlm_serializable(:context, fn ->
     "large private context"
   end,
     metadata: %{source: "demo"}
@@ -243,7 +243,7 @@ Process.put(:rlm_lazy_actions, [
 ])
 
 lazy_controller = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_lazy_actions)
@@ -253,11 +253,11 @@ lazy_controller = %{
   ]
 }
 
-lazy_rlm = DSEx.rlm("context, question -> answer", lm: lazy_controller)
-{:ok, lazy_pred} = DSEx.call(lazy_rlm, %{context: lazy_context, question: "q"})
+lazy_rlm = Imp.rlm("context, question -> answer", lm: lazy_controller)
+{:ok, lazy_pred} = Imp.call(lazy_rlm, %{context: lazy_context, question: "q"})
 Process.delete(:rlm_lazy_actions)
 
-{DSEx.to_map(lazy_pred), lazy_pred.metadata.rlm_trace}
+{Imp.to_map(lazy_pred), lazy_pred.metadata.rlm_trace}
 ```
 
 ## RLM Batched Subqueries
@@ -269,7 +269,7 @@ ordinary environment values. Each batch item counts against `max_llm_calls`.
 parent = self()
 
 batch_controller = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_batch_actions)
@@ -280,7 +280,7 @@ batch_controller = %{
 }
 
 batch_sub_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -299,24 +299,24 @@ Process.put(:rlm_batch_actions, [
 ])
 
 batch_rlm =
-  DSEx.rlm("question -> answer",
+  Imp.rlm("question -> answer",
     lm: batch_controller,
     sub_lm: batch_sub_lm,
     max_iterations: 3,
     max_llm_calls: 2
   )
 
-{:ok, batch_pred} = DSEx.call(batch_rlm, %{question: "parent"})
+{:ok, batch_pred} = Imp.call(batch_rlm, %{question: "parent"})
 Process.delete(:rlm_batch_actions)
 
-{DSEx.to_map(batch_pred), batch_pred.metadata.rlm_trace}
+{Imp.to_map(batch_pred), batch_pred.metadata.rlm_trace}
 ```
 
 ## RLM Budget Failure
 
 ```elixir
 loop_lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       if Enum.map_join(messages, "\n", & &1.content) =~ "RLM extract pass" do
@@ -328,8 +328,8 @@ loop_lm = %{
   ]
 }
 
-rlm = DSEx.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
-DSEx.call(rlm, %{question: "loop?"})
+rlm = Imp.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
+Imp.call(rlm, %{question: "loop?"})
 ```
 
 ## Live RLM Submit Proof
@@ -342,8 +342,8 @@ requires a real `llm_query/1` call from generated code.
 case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"}) do
   {:ok, lm} ->
     live_rlm =
-      DSEx.rlm(
-        DSEx.signature(
+      Imp.rlm(
+        Imp.signature(
           "question -> answer",
           "Return reasoning and Elixir code that assigns Paris to a variable and submits it as answer."
         ),
@@ -353,15 +353,15 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
       )
 
     {:ok, live_prediction} =
-      DSEx.call(live_rlm, %{
+      Imp.call(live_rlm, %{
         question: "Capital of France?"
       })
 
-    unless DSEx.get(live_prediction, :answer) == "Paris" do
-      raise "live RLM proof failed: #{inspect(DSEx.to_map(live_prediction))}"
+    unless Imp.get(live_prediction, :answer) == "Paris" do
+      raise "live RLM proof failed: #{inspect(Imp.to_map(live_prediction))}"
     end
 
-    {DSEx.to_map(live_prediction), live_prediction.metadata.rlm_trace}
+    {Imp.to_map(live_prediction), live_prediction.metadata.rlm_trace}
 
   skip ->
     skip

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free DSPy overhead benchmarks for DSEx parity reports."""
+"""Provider-free DSPy overhead benchmarks for Imp parity reports."""
 
 from __future__ import annotations
 

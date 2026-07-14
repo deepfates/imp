@@ -1,9 +1,9 @@
 # Prior Art
 
-DSEx is an independent Elixir library. It is not affiliated with, endorsed by,
+Imp is an independent Elixir library. It is not affiliated with, endorsed by,
 or API-compatible with the projects below.
 
-DSEx exists in a lineage of work on programming language-model systems instead
+Imp exists in a lineage of work on programming language-model systems instead
 of hand-writing prompt glue:
 
 - [DSPy](https://dspy.ai/) and
@@ -22,7 +22,7 @@ of hand-writing prompt glue:
   [TextGrad](https://github.com/zou-group/textgrad), and
   [SAMMO](https://github.com/microsoft/sammo) provide useful comparisons for
   compiler diagnostics, parameter graphs, textual feedback, and structured
-  prompt transformations. They are comparators, not DSEx compatibility targets.
+  prompt transformations. They are comparators, not Imp compatibility targets.
 - [ReqLLM](https://github.com/agentjido/req_llm),
   [Jido](https://github.com/agentjido/jido), and
   [Jido AI](https://github.com/agentjido/jido_ai) are the nearest BEAM production
@@ -33,7 +33,7 @@ of hand-writing prompt glue:
   [gepa_ex](https://github.com/nshkrdotcom/gepa_ex) is nearby Elixir GEPA work.
   They are prior art to inspect, not authorities for parity or effectiveness.
 
-The goal of DSEx is not a mechanical translation of any one codebase. It is a
+The goal of Imp is not a mechanical translation of any one codebase. It is a
 BEAM-native interpretation of the same broad philosophy:
 
 - explicit data structures over ambient prompt strings
@@ -43,9 +43,9 @@ BEAM-native interpretation of the same broad philosophy:
 - tool, agent, MCP, streaming, and sandbox contracts expressed as ordinary
   Elixir modules
 
-When DSEx borrows terminology such as signature, module, metric, optimizer,
+When Imp borrows terminology such as signature, module, metric, optimizer,
 MIPROv2, GEPA, ReAct, or RLM, the local module documentation and tests define
-the DSEx contract.
+the Imp contract.
 
 The broader paper, repository, and production-system review is recorded in
 [Research Landscape](RESEARCH_LANDSCAPE.md).

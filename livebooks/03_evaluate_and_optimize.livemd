@@ -1,8 +1,8 @@
-# DSEx 03: Evaluate And Optimize
+# Imp 03: Evaluate And Optimize
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:dsex, path: repo}])
+Mix.install([{:imp, path: repo}])
 ```
 
 ## Build Train And Dev Sets
@@ -17,22 +17,22 @@ between those candidates.
 
 ```elixir
 trainset = [
-  DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question),
-  DSEx.example(question: "3+3?", answer: "6") |> DSEx.with_inputs(:question)
+  Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question),
+  Imp.example(question: "3+3?", answer: "6") |> Imp.with_inputs(:question)
 ]
 
 devset = [
-  DSEx.example(question: "2 plus 2?", answer: "4") |> DSEx.with_inputs(:question)
+  Imp.example(question: "2 plus 2?", answer: "4") |> Imp.with_inputs(:question)
 ]
 ```
 
 ## Define A Metric
 
-The metric is the telos of an optimization run. DSEx can search demos,
+The metric is the telos of an optimization run. Imp can search demos,
 instructions, or artifacts, but it can only improve what the metric can see.
 
 ```elixir
-metric = DSEx.exact_match(:answer)
+metric = Imp.exact_match(:answer)
 ```
 
 ## Evaluate A Baseline
@@ -42,7 +42,7 @@ metric, dev set, adapter, and LM are wired together before search adds motion.
 
 ```elixir
 lm = %{
-  module: DSEx.LM.Static,
+  module: Imp.LM.Static,
   opts: [
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -53,8 +53,8 @@ lm = %{
   ]
 }
 
-program = DSEx.predict("question -> answer", lm: lm)
-DSEx.evaluate(program, devset, metric)
+program = Imp.predict("question -> answer", lm: lm)
+Imp.evaluate(program, devset, metric)
 ```
 
 ## Labeled Few-Shot
@@ -64,10 +64,10 @@ magic training; it is ordinary data being rendered by the adapter.
 
 ```elixir
 compiled =
-  DSEx.Optimizer.LabeledFewShot.new(k: 1)
-  |> then(&DSEx.optimize(program, &1, trainset))
+  Imp.Optimizer.LabeledFewShot.new(k: 1)
+  |> then(&Imp.optimize(program, &1, trainset))
 
-DSEx.evaluate(compiled, devset, metric)
+Imp.evaluate(compiled, devset, metric)
 ```
 
 ## Random Search
@@ -79,12 +79,12 @@ inspectable optimization report.
 ```elixir
 compiled =
   metric
-  |> DSEx.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-  |> then(&DSEx.optimize(program, &1, trainset, devset))
+  |> Imp.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+  |> then(&Imp.optimize(program, &1, trainset, devset))
 
 {
-  DSEx.evaluate(compiled, devset, metric),
-  DSEx.Optimizer.Report.fetch(compiled)
+  Imp.evaluate(compiled, devset, metric),
+  Imp.Optimizer.Report.fetch(compiled)
 }
 ```
 
@@ -97,7 +97,7 @@ Use this when the examples are fine but the task wording is the bottleneck.
 
 ```elixir
 compiled =
-  DSEx.Optimizer.InstructionSearch.compile(
+  Imp.Optimizer.InstructionSearch.compile(
     program,
     metric,
     trainset,
@@ -105,21 +105,21 @@ compiled =
     ["Answer unknown.", "Always answer 4."]
   )
 
-DSEx.Optimizer.Report.fetch(compiled)
+Imp.Optimizer.Report.fetch(compiled)
 ```
 
 ## Optimize Anything
 
-Use artifact optimization when the thing you want to improve is not a DSEx
+Use artifact optimization when the thing you want to improve is not an Imp
 program yet: a config file, policy text, rubric, template, or other named
 artifact.
 
-This is the broader DSEx philosophy in miniature: define an artifact, define
+This is the broader Imp philosophy in miniature: define an artifact, define
 how to score it, then let the system propose and evaluate changes.
 
 ```elixir
-alias DSEx.Optimize.Anything
-alias DSEx.Optimize.Anything.{Config, Result}
+alias Imp.Optimize.Anything
+alias Imp.Optimize.Anything.{Config, Result}
 
 result =
   Anything.run(
@@ -159,7 +159,7 @@ keeping the dataset intentionally tiny.
 live_lm = fn opts ->
   if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
-     DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
+     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
          [
            api_key: System.fetch_env!("OPENAI_API_KEY"),
@@ -179,52 +179,52 @@ end
 case live_lm.(max_completion_tokens: 100) do
   {:ok, lm} ->
     live_program =
-      DSEx.predict(
-        DSEx.signature(
+      Imp.predict(
+        Imp.signature(
           "question -> answer: string",
           "Return JSON only. The answer field must be exactly the requested numeral."
         ),
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     live_trainset = [
-      DSEx.example(question: "Return the answer exactly 4.", answer: "4")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "Return the answer exactly 4.", answer: "4")
+      |> Imp.with_inputs(:question)
     ]
 
     live_devset = [
-      DSEx.example(question: "Return the answer exactly 4.", answer: "4")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "Return the answer exactly 4.", answer: "4")
+      |> Imp.with_inputs(:question)
     ]
 
     live_metric = fn _example, prediction ->
       prediction
-      |> DSEx.get(:answer, "")
+      |> Imp.get(:answer, "")
       |> to_string()
       |> String.trim()
       |> Kernel.==("4")
     end
 
-    baseline = DSEx.evaluate(live_program, live_devset, live_metric)
+    baseline = Imp.evaluate(live_program, live_devset, live_metric)
 
     unless baseline.score == 1.0 do
       raise "live provider failed the evaluation proof: #{inspect(baseline)}"
     end
 
     compiled =
-      DSEx.optimize(
+      Imp.optimize(
         live_program,
-        DSEx.Optimizer.RandomSearch.new(live_metric, candidates: 2, demos_per_candidate: 1),
+        Imp.Optimizer.RandomSearch.new(live_metric, candidates: 2, demos_per_candidate: 1),
         live_trainset,
         live_devset
       )
 
     %{
       baseline_score: baseline.score,
-      compiled_score: DSEx.evaluate(compiled, live_devset, live_metric).score,
-      optimizer_report: DSEx.Optimizer.Report.fetch(compiled)
+      compiled_score: Imp.evaluate(compiled, live_devset, live_metric).score,
+      optimizer_report: Imp.Optimizer.Report.fetch(compiled)
     }
 
   skip ->
@@ -242,8 +242,8 @@ The key idea is not "make a bigger prompt." The key idea is to preserve useful
 diagnostics from failures and use them as material for the next candidate.
 
 ```elixir
-alias DSEx.Optimize.Anything
-alias DSEx.Optimize.Anything.{Config, Result}
+alias Imp.Optimize.Anything
+alias Imp.Optimize.Anything.{Config, Result}
 
 result =
   Anything.run(

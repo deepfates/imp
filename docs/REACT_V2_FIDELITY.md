@@ -17,7 +17,7 @@ with stable ReAct, CodeAct, and ProgramOfThought behavior unchanged from DSPy
 
 ## ReAct
 
-`DSEx.Predict.ReAct` retains its provider-native, fail-fast default and offers
+`Imp.Predict.ReAct` retains its provider-native, fail-fast default and offers
 `mode: :dspy_3_2_1` for upstream observation-and-extraction control flow. In the
 upstream mode, failed and unknown tool calls become observations, `submit`
 corresponds to upstream `finish`, and final outputs come from a separate
@@ -25,47 +25,47 @@ extraction pass. Both modes accept the pinned implementation's invocation-local
 `max_iters` override and remove it before formatting task inputs.
 
 The contracts are not identical. DSPy emits one action per iteration and
-formats a flat trajectory through the active adapter. DSEx accepts
+formats a flat trajectory through the active adapter. Imp accepts
 provider-native parallel tool calls and stores a redacted event list. In DSPy
 compatibility mode, action and extraction calls each receive at most three
 attempts after a context-window error, dropping the oldest completed event
-before each retry. Provider-native mode keeps DSEx's deliberate fail-fast
+before each retry. Provider-native mode keeps Imp's deliberate fail-fast
 policy instead of observation-and-continue.
 
-DSEx implements ReActV2 as a distinct module rather than an alias for the
-existing fail-fast `DSEx.Predict.ReAct`.
+Imp implements ReActV2 as a distinct module rather than an alias for the
+existing fail-fast `Imp.Predict.ReAct`.
 
-| Upstream behavior | DSEx implementation | Evidence |
+| Upstream behavior | Imp implementation | Evidence |
 | --- | --- | --- |
 | Original task inputs become optional after the first turn | Internal ReActV2 signature marks copied inputs optional and clears pending inputs after each turn | `test/react_v2_test.exs` multi-turn recovery case |
-| History is structured rather than one growing trajectory string | `DSEx.History` stores per-turn inputs, thought, typed calls, call results, and final fields | parallel, failure, serialization, and adapter replay tests |
+| History is structured rather than one growing trajectory string | `Imp.History` stores per-turn inputs, thought, typed calls, call results, and final fields | parallel, failure, serialization, and adapter replay tests |
 | Parallel tool calls preserve IDs and execute all calls | Every missing ID receives `call_<turn>_<index>`; results retain the corresponding ID | parallel call test |
 | Unknown tools and execution failures become observations | ReActV2 records error results and continues; existing ReAct remains fail-fast | recovery test |
 | `submit` is reserved and validates final outputs | Constructor rejects user `submit`; the generated submit tool uses the task JSON schema | reserved-submit and missing-output tests |
 | Empty calls, parse failure, context exhaustion, or budget exhaustion force one submit call | The final predictor call pins provider `tool_choice` to `submit` and clears `reasoning_effort`, matching the pinned call configuration | forced-submit test |
 | Prior calls replay as native assistant/tool messages | Chat adapter emits assistant `tool_calls` and matching tool-result messages by call ID | native history adapter test and ReqLLM tests |
 
-DSEx additionally applies its existing explicit tool policy to every call and
+Imp additionally applies its existing explicit tool policy to every call and
 redacts stored history. These are deliberate production constraints, not claims
 about upstream behavior.
 
-DSEx stores call results in a separate `tool_call_results` event field, while
+Imp stores call results in a separate `tool_call_results` event field, while
 DSPy nests results inside `ToolCalls`. The Chat adapter replays both as matched
 assistant/tool messages by call ID, so this is an Elixir-native representation
 difference rather than a provider-protocol difference.
 
 ## CodeAct
 
-DSEx matches the pinned bounded planner loop, parse/execution observations,
+Imp matches the pinned bounded planner loop, parse/execution observations,
 `finished` termination, final signature extraction, and invocation-local
 `max_iters` override. The override is strictly validated before any LM call and
 removed from planner inputs. Provider-free tests cover successful execution,
 multi-output extraction, parse and runtime recovery, bounded exhaustion, and
 control-input isolation.
 
-DSEx intentionally does not preload arbitrary functions into a persistent
+Imp intentionally does not preload arbitrary functions into a persistent
 Python interpreter. It evaluates a restricted Elixir expression language in
-`DSEx.Sandbox` and exposes policy-gated `DSEx.Tool` calls as explicit actions.
+`Imp.Sandbox` and exposes policy-gated `Imp.Tool` calls as explicit actions.
 Consequently, Python standard-library access, arbitrary Python snippets, and
 interpreter state shared across iterations are unsupported rather than parity
 claims. Tool denial and tool crashes also fail explicitly instead of becoming
@@ -73,7 +73,7 @@ Python execution observations.
 
 ## ProgramOfThought
 
-DSEx matches bounded error-conditioned regeneration, fenced-code extraction,
+Imp matches bounded error-conditioned regeneration, fenced-code extraction,
 separate final-output extraction, multi-output signatures, and exact retry
 accounting. Input containers are normalized before generation, preventing an
 invalid field-pair list from spending a provider call. Trajectories and errors
@@ -81,7 +81,7 @@ are redacted before exposure.
 
 The executable language remains the restricted BEAM sandbox, not Python with
 `SUBMIT()`. When a sandbox value already validates against every declared
-output, DSEx returns it directly; pinned DSPy always invokes its final answer
+output, Imp returns it directly; pinned DSPy always invokes its final answer
 generator. This is an explicit efficiency and validation deviation. Arbitrary
 Python semantics and exact Python-interpreter error text therefore remain out
 of scope until a separately isolated execution backend and matched campaign
@@ -96,5 +96,5 @@ runtime, and ProgramOfThought regeneration/extraction quality.
 
 The stable fidelity baseline remains DSPy 3.2.1. ReActV2 is prerelease tracking
 implemented from the pinned 3.3.0b1 source because the release goal explicitly
-requires this surface; it does not silently move unrelated DSEx contracts to the
+requires this surface; it does not silently move unrelated Imp contracts to the
 prerelease baseline.

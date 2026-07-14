@@ -1,7 +1,7 @@
-defmodule DSExDeployment.OptimizerArtifacts do
+defmodule ImpDeployment.OptimizerArtifacts do
   @moduledoc false
 
-  alias DSEx.Optimizer.Artifact
+  alias Imp.Optimizer.Artifact
 
   def load_apply_and_preserve(path, live_program, candidate_id \\ :champion) do
     artifact = Artifact.read!(path)

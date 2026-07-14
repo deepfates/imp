@@ -1,19 +1,19 @@
 # Benchmark Truth
 
-DSEx has two benchmark lanes, one outside-view benchmark catalog, and one
+Imp has two benchmark lanes, one outside-view benchmark catalog, and one
 release-level validation program.
 
-DSEx keeps benchmark evidence behind Mix tasks instead of treating benchmark
+Imp keeps benchmark evidence behind Mix tasks instead of treating benchmark
 helpers as part of the application API. Deterministic production fixtures prove
 that core mechanics keep working: structured parsing, tools, program
 optimization, and artifact optimization.
 
-The benchmark truth tasks are the research-evidence lane. They run DSEx
+The benchmark truth tasks are the research-evidence lane. They run Imp
 programs over canonical DSPy-style dataset rows, write auditable result JSON,
 and separate fixture-mode harness proof from live-provider evidence.
 
 `BENCHMARK_CATALOG.md` maps the broader DSPy paper/docs/example benchmark
-universe to DSEx's current samplers and gaps. `PARITY_VALIDATION_PROGRAM.md`
+universe to Imp's current samplers and gaps. `PARITY_VALIDATION_PROGRAM.md`
 defines the full release evidence standard. A full-row live benchmark is one
 important lane, but it is not sufficient by itself. Full parity claims also
 require provider-free golden trace parity, optimizer lift parity,
@@ -31,7 +31,7 @@ closely tied to DSPy examples and papers:
 
 DSPy's public docs list HotPotQA, GSM8K, and Color as built-in datasets. The
 DSPy paper lineage evaluates math word problems and multi-hop QA, especially
-GSM8K and HotPotQA. DSEx should not claim benchmark parity until it has run
+GSM8K and HotPotQA. Imp should not claim benchmark parity until it has run
 real provider/model comparisons over fixed train/dev/test manifests.
 
 The broader benchmark backlog is intentionally larger than this minimum. See
@@ -44,13 +44,13 @@ exact answer scoring.
 ## Fetch Data
 
 ```sh
-mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 20 --out benchmarks/data
+mix imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 20 --out benchmarks/data
 ```
 
 For a full canonical split fetch:
 
 ```sh
-mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data
+mix imp.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data
 ```
 
 `--full` currently means GSM8K test `1319` rows and HotPotQA distractor
@@ -71,7 +71,7 @@ small fixtures only when they are needed for deterministic tests.
 ## Check Data Integrity
 
 ```sh
-mix dsex.benchmark.integrity \
+mix imp.benchmark.integrity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --out benchmarks/results \
@@ -97,7 +97,7 @@ and an oracle LM. It proves:
 - loaders accept benchmark-shaped records
 - GSM8K canonical-answer extraction works
 - HotPotQA context flattening works
-- DSEx programs can be evaluated over the real benchmark artifact schema
+- Imp programs can be evaluated over the real benchmark artifact schema
 - result JSON includes dataset digests, per-row scores, git SHA, Elixir, and OTP
 - result JSON includes baseline-vs-optimized smoke comparisons for
   `LabeledFewShot`, `BootstrapFewShot`, `COPRO`, `MIPROv2`, `SIMBA`, and
@@ -111,8 +111,8 @@ It does not prove model quality.
 mix benchmark.trace.check
 ```
 
-This is the provider-free DSEx-vs-DSPy parity lane. It replays checked-in
-fixture responses through DSEx and the Python DSPy sidecar, then writes a
+This is the provider-free Imp-vs-DSPy parity lane. It replays checked-in
+fixture responses through Imp and the Python DSPy sidecar, then writes a
 `golden-trace-parity-*.json` artifact. The current corpus covers:
 
 - `Predict` with field-labelled chat output
@@ -120,18 +120,18 @@ fixture responses through DSEx and the Python DSPy sidecar, then writes a
 - typed output coercion
 - JSON adapter output
 - ReAct lookup tool trajectory normalized across DSPy trajectory fields and
-  DSEx provider tool calls
+  Imp provider tool calls
 - multi-tool ReAct trajectory normalization
 - ReAct tool-argument error status parity
 - missing-field error status parity
 - normalized prediction parity
-- retained DSEx and DSPy message histories for prompt-template review
-- DSEx semantic checks for incremental field streaming, save/load credential
+- retained Imp and DSPy message histories for prompt-template review
+- Imp semantic checks for incremental field streaming, save/load credential
   redaction, ReqLLM cache hits, and provider text/tool-call stream chunk replay
 
 This lane is intentionally stricter and cheaper than live benchmark parity:
 prediction and expected-error parity must pass without provider nondeterminism.
-It does not claim byte-identical prompt/message-template parity; DSEx keeps an
+It does not claim byte-identical prompt/message-template parity; Imp keeps an
 Elixir-native provider-tool prompt shape and records both message histories so
 template differences stay reviewable instead of hidden.
 
@@ -141,7 +141,7 @@ template differences stay reviewable instead of hidden.
 mix benchmark.overhead.check
 ```
 
-This lane compares DSEx and Python DSPy without provider latency. It runs local
+This lane compares Imp and Python DSPy without provider latency. It runs local
 runtime benchmarks for:
 
 - signature parsing
@@ -156,7 +156,7 @@ runtime benchmarks for:
 - concurrent orchestration
 
 The artifact reports per-case median, mean, p95, min, max, and
-`median_ratio_dsex_over_dspy`. The production gate currently enforces a
+`median_ratio_imp_over_dspy`. The production gate currently enforces a
 conservative maximum ratio of `50.0` so regressions are visible without
 pretending every local path is faster. Speed claims must name the exact case and
 artifact they come from; slower paths such as cache miss overhead are evidence
@@ -169,7 +169,7 @@ mix benchmark.search.check
 ```
 
 This provider-free source-checkout lane runs the same natural answer-candidate
-fixture through sequential and bounded-concurrent `DSEx.Predict.Search`. Its
+fixture through sequential and bounded-concurrent `Imp.Predict.Search`. Its
 deterministic checks cover selected answer and quality, candidate-order
 provenance, admitted projected budget, executed outcomes' projected budget,
 and the observed concurrency bound. The artifact labels projected cost units
@@ -192,14 +192,14 @@ mix benchmark.gepa.contract.check
 ```
 
 This provider-free lane uses a deterministic task with known baseline and
-optimum scores. The current artifact directly compares DSEx and DSPy
+optimum scores. The current artifact directly compares Imp and DSPy
 `LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `COPRO`, `MIPROv2`, and
 `SIMBA` and `GEPA` lift when the installed DSPy sidecar exposes them. It records
-documented DSEx-only or intentional-deviation evidence for Elixir-native
+documented Imp-only or intentional-deviation evidence for Elixir-native
 `InstructionSearch` and provider-side trainer workflows such as finetuning and
 GRPO. The artifact records the installed Python `dspy` package version and
 detected optimizer capabilities so the lane stays honest as the upstream runtime
-changes. The same artifact includes natural DSEx user-story lanes for
+changes. The same artifact includes natural Imp user-story lanes for
 classification, QA, retrieval/KNN few-shot, and instruction following, with
 baseline score, optimized score, lift, call counts, cost estimate, and selected
 demos or instructions.
@@ -209,11 +209,11 @@ DSPy `3.3.0b1`. It validates exact source hashes and compares MIPROv2 budgets,
 demo topology, proposal rotation, search-space shape, and full-evaluation cadence
 plus SIMBA bucket, finalist, rollout, tied-rule, and eviction invariants.
 
-Run the resumable, paid one-seed AIME preflight from the shared DSEx/DSPy
+Run the resumable, paid one-seed AIME preflight from the shared Imp/DSPy
 manifest with:
 
 ```sh
-mix dsex.benchmark.instruction_optimizer_experiment \
+mix imp.benchmark.instruction_optimizer_experiment \
   --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
@@ -229,8 +229,8 @@ and its one seed is explicitly research preflight rather than T3 evidence.
 
 The third command runs a T1 structural differential against standalone GEPA
 `v0.1.1` at commit `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`.
-Set `DSEX_GEPA_V011_ROOT` to the exact checkout and, when needed,
-`DSEX_GEPA_V011_PYTHON` to its Python environment. The task validates the tag,
+Set `IMP_GEPA_V011_ROOT` to the exact checkout and, when needed,
+`IMP_GEPA_V011_PYTHON` to its Python environment. The task validates the tag,
 commit, tagged project-version anomaly, and source hashes before comparing
 provider-free acceptance, Pareto, component rotation, merge, frontier, budget,
 JSON resume/RNG, and named-program mutation semantics. It explicitly does not
@@ -239,7 +239,7 @@ establish paper reproduction, effectiveness, or full optimizer parity.
 Optimizer lift is outcome evidence, not full optimizer parity. The dashboard
 keeps `full_optimizer_parity` false when the structural artifact is missing,
 stale, authority-mismatched, or failing. Even a passing T1 artifact does not
-replace held-out multi-seed T3 effectiveness evidence. DSEx-only rows and equal
+replace held-out multi-seed T3 effectiveness evidence. Imp-only rows and equal
 scores under unmatched internal decision paths cannot satisfy that stronger
 claim.
 
@@ -254,7 +254,7 @@ mix benchmark.optimize_anything.check
 Run the live non-prompt effectiveness campaign with a pinned provider model:
 
 ```sh
-mix dsex.benchmark.optimize_anything \
+mix imp.benchmark.optimize_anything \
   --live \
   --provider openai \
   --model gpt-5.4-2026-03-05 \
@@ -278,7 +278,7 @@ proves campaign wiring and artifact validation only and never authorizes the
 effectiveness claim. The dashboard consumes full artifacts through its
 `optimize_anything` lane.
 
-This campaign establishes DSEx-native non-prompt optimization effectiveness at
+This campaign establishes Imp-native non-prompt optimization effectiveness at
 the declared scale. It does not establish full paper reproduction or equality
 with an upstream implementation under matched internals.
 
@@ -293,11 +293,11 @@ validates GEPA paper-family artifact shape. It does not turn provider-free
 optimizer lift or smoke rows into a paper claim. A full artifact must cover
 `AIMEBench`, `HotpotQABench`, `hoverBench`, `IFBench`,
 `LiveBenchMathBench`, and `Papillon`; for each row it must report baseline,
-DSPy GEPA, DSEx GEPA, MIPROv2, configured metric-call budget, observed metric
+DSPy GEPA, Imp GEPA, MIPROv2, configured metric-call budget, observed metric
 calls with enforced limits, token/cost, wall-clock, seed variance, seed-selection
 provenance, and train/dev/test gap. Full rows must also carry a campaign id,
 dataset source, dataset scope, split counts, split checksums, source commits
-for DSPy, DSEx, and the GEPA artifact, concrete non-placeholder comparator
+for DSPy, Imp, and the GEPA artifact, concrete non-placeholder comparator
 sources, distinct train/dev/test split digests, and positive live token/cost
 accounting. The full-evidence contract requires `dataset.scope == "full"` and
 rejects capped `--max-per-split` dataset roots; capped roots are useful for
@@ -320,8 +320,8 @@ methods are a predeclared seed, dev-only best-seed selection, or an aggregate
 over declared seeds, all with concrete provenance and `test_scores_used: false`.
 Choosing the reported best seed from test scores is test-set leakage and cannot
 support parity or source-fidelity claims, even when seed variance is reported.
-The DSEx campaign passes every `--seeds` value and each family’s declared
-`metric_calls` limit into `DSEx.Optimizer.GEPA`, selects the reported seed by
+The Imp campaign passes every `--seeds` value and each family’s declared
+`metric_calls` limit into `Imp.Optimizer.GEPA`, selects the reported seed by
 dev score, and exports the optimizer report’s observed metric calls plus the
 enforced limit for each seed. Comparator-side evidence must be added by the
 upstream artifact converter before strict full-artifact validation.
@@ -356,24 +356,24 @@ than a custom component map. Campaign rows record the component-feedback
 identity so reviewers can distinguish these contracts.
 
 When upstream GEPA artifact experiments have been run, convert their
-`experiment_runs_data` output into DSEx dashboard rows with:
+`experiment_runs_data` output into Imp dashboard rows with:
 
 ```sh
-mix dsex.benchmark.gepa_dataset \
+mix imp.benchmark.gepa_dataset \
   --gepa-root path/to/gepa-artifact \
   --out benchmarks/data/gepa-campaign
 
-DSEX_HOVER_UPSTREAM_BM25=1 \
-DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1 \
-DSEX_GEPA_PYTHON=path/to/pinned/python \
-DSEX_GEPA_ROOT=path/to/gepa-artifact \
-mix dsex.benchmark.gepa_campaign \
+IMP_HOVER_UPSTREAM_BM25=1 \
+IMP_IFBENCH_UPSTREAM_DESCRIPTIONS=1 \
+IMP_GEPA_PYTHON=path/to/pinned/python \
+IMP_GEPA_ROOT=path/to/gepa-artifact \
+mix imp.benchmark.gepa_campaign \
   --manifest benchmarks/config/gepa-paper-campaign-v2.json
 
-mix dsex.benchmark.gepa_replication \
+mix imp.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
   --upstream-evidence benchmarks/results/gepa-upstream-evidence.json \
-  --dsex-input benchmarks/results/dsex-gepa-rows-*.json \
+  --imp-input benchmarks/results/imp-gepa-rows-*.json \
   --campaign-id gepa-full-YYYYMMDD \
   --artifact-model gpt-41-mini
 ```
@@ -394,10 +394,10 @@ paper-reproduction contract.
 For long full-scope runs, execute one or more families at a time with
 `--families AIMEBench,HotpotQABench`. These partial campaign artifacts are
 resumable operator evidence; before conversion, merge the six family rows into
-one DSEx input artifact so the replication contract can verify the complete
+one Imp input artifact so the replication contract can verify the complete
 paper-family set.
 
-The DSEx campaign producer expects a `families.json` file plus one directory
+The Imp campaign producer expects a `families.json` file plus one directory
 per GEPA family, each with `train.jsonl`, `dev.jsonl`, and `test.jsonl`.
 `families.json` declares each family’s signature, instructions, input keys,
 output key, program name, metric-call budget, upstream metric name, source
@@ -406,7 +406,7 @@ checksums. The dataset exporter imports the upstream GEPA artifact benchmark
 classes and preserves their split construction. Passing `--max-per-split`
 marks the root as `capped`, and those rows cannot satisfy a full GEPA research
 claim. The converter then reads upstream `Baseline`, `GEPA`, and `MIPROv2-Heavy`
-`evaluation_result.txt` files and merges them with DSEx-produced `dsex_gepa`
+`evaluation_result.txt` files and merges them with Imp-produced `imp_gepa`
 rows. It refuses missing families, missing comparator outputs, ambiguous
 artifact models, and rows that do not satisfy the full-evidence contract after
 merge.
@@ -440,7 +440,7 @@ do not satisfy the full GEPA contract. They must remain red until the producer
 emits the observed/enforced call evidence and non-test seed-selection provenance
 described above.
 
-The exported `families.json` records upstream metric names. DSEx currently
+The exported `families.json` records upstream metric names. Imp currently
 ports deterministic metric adapters for AIME integer exact match, HotPotQA
 answer exact match, HoVer supporting-title retrieval, IFBench
 IFEval-style instruction constraints, Papillon LLM-judge quality/leakage
@@ -452,34 +452,34 @@ retrieved_docs`); the metric scores retrieved document titles against
 `hoverBench` require `dataset.retrieval` provenance for the same upstream
 `wiki.abstracts.2017` BM25 corpus and index, including corpus and index
 checksums. For either family, the campaign command requires
-`DSEX_HOVER_UPSTREAM_BM25=1`; it then executes retrieval through the pinned
+`IMP_HOVER_UPSTREAM_BM25=1`; it then executes retrieval through the pinned
 upstream Python BM25S index. The native Elixir BM25 retriever is an explicitly
 labeled approximation, not a source-exact campaign substitute: it does not
 reproduce the upstream English stopword tokenizer or PyStemmer stemming. The
 pinned Python adapter uses upstream commit
 `cbefbc1aa0f43dd39874ec4bf42211365dbda42e`, `bm25s==0.2.12`, and
 `pystemmer==2.2.0.3`; its fixed top-k title order is validated with
-`DSEX_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`. For
-campaign rows over the full upstream corpus, set `DSEX_HOVER_UPSTREAM_BM25=1`,
-`DSEX_GEPA_ROOT`, and `DSEX_GEPA_PYTHON` for both families. Their multi-hop
+`IMP_HOVER_UPSTREAM_PARITY=1 mix test test/hover_bm25_parity_test.exs`. For
+campaign rows over the full upstream corpus, set `IMP_HOVER_UPSTREAM_BM25=1`,
+`IMP_GEPA_ROOT`, and `IMP_GEPA_PYTHON` for both families. Their multi-hop
 queries are generated by the LM and the resulting rows report ReqLLM usage
 telemetry. These rows do not support a full GEPA research claim until uncapped
 results are merged with matching upstream comparator outputs and sidecar
 evidence.
-IFBench imports the larger AllenAI `instructions_registry`; DSEx ports the
+IFBench imports the larger AllenAI `instructions_registry`; Imp ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
 scoring as false. Four upstream IFBench checks depend on Python NLP packages
-(`nltk` stopwords/POS data, `emoji`, and `syllapy`). DSEx ships native fallback
+(`nltk` stopwords/POS data, `emoji`, and `syllapy`). Imp ships native fallback
 checks for normal deterministic evidence and a source-exact bridge for research
-campaigns: set `DSEX_IFBENCH_NLP_BRIDGE=scripts/ifbench_nlp_check.py` and, when
-needed, `DSEX_IFBENCH_NLP_PYTHON` to a Python with those packages and corpora.
+campaigns: set `IMP_IFBENCH_NLP_BRIDGE=scripts/ifbench_nlp_check.py` and, when
+needed, `IMP_IFBENCH_NLP_PYTHON` to a Python with those packages and corpora.
 The registry differential covers all 83 active merged-registry instruction ids
 and matches the pinned GEPA artifact fixtures, including language detection and
 the four NLP-backed checks. Reproduce it with:
 
 Full IFBench GEPA campaigns also set
-`DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1`, `DSEX_GEPA_ROOT`, and
-`DSEX_GEPA_PYTHON`. Scoring remains in the Elixir registry port; reflective
+`IMP_IFBENCH_UPSTREAM_DESCRIPTIONS=1`, `IMP_GEPA_ROOT`, and
+`IMP_GEPA_PYTHON`. Scoring remains in the Elixir registry port; reflective
 feedback renders the corresponding human instruction descriptions through
 `scripts/ifbench_upstream_describe.py` from the pinned upstream registry. The
 campaign records that description source and fails closed if the bridge is
@@ -493,8 +493,8 @@ tmp/ifbench-parity-venv/bin/python -m nltk.downloader \
   -d tmp/ifbench-parity-venv/nltk_data \
   stopwords averaged_perceptron_tagger_eng punkt_tab
 NLTK_DATA="$PWD/tmp/ifbench-parity-venv/nltk_data" \
-DSEX_IFBENCH_UPSTREAM_PARITY=1 \
-DSEX_IFBENCH_UPSTREAM_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
+IMP_IFBENCH_UPSTREAM_PARITY=1 \
+IMP_IFBENCH_UPSTREAM_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
   mix test test/gepa_metrics_test.exs
 ```
 
@@ -507,8 +507,8 @@ that provenance. Unknown LiveBenchMath task branches now fail closed.
 LiveBenchMath `amps_hard` remains guarded because upstream uses SymPy/Lark
 symbolic equivalence; install and validate the symbolic Python bridge before
 claiming AMPS_Hard parity. The default bridge is
-`scripts/livebench_math_score.py`; pin `DSEX_LIVEBENCH_MATH_PYTHON` and, when
-needed, `DSEX_LIVEBENCH_MATH_BRIDGE` for research campaigns.
+`scripts/livebench_math_score.py`; pin `IMP_LIVEBENCH_MATH_PYTHON` and, when
+needed, `IMP_LIVEBENCH_MATH_BRIDGE` for research campaigns.
 
 ## Run RAG, Tool, And Agent Parity
 
@@ -516,8 +516,8 @@ needed, `DSEX_LIVEBENCH_MATH_BRIDGE` for research campaigns.
 mix benchmark.rag_tool_agent.check
 ```
 
-This provider-free lane directly compares DSEx and DSPy on deterministic RAG
-retrieval/answering and ReAct lookup-tool semantics. It also records DSEx
+This provider-free lane directly compares Imp and DSPy on deterministic RAG
+retrieval/answering and ReAct lookup-tool semantics. It also records Imp
 production-semantics evidence for HTTP retriever protocol shape, MCP import
 through agents, tool policy denial traces, ReAct error traces, CodeAct,
 ProgramOfThought success and sandbox rejection, streaming incremental fields,
@@ -531,7 +531,7 @@ mix benchmark.rlm.check
 ```
 
 This command runs T0 deterministic contract replay over two hand-authored,
-HotPotQA-shaped rows. It verifies that the local DSEx and Python DSPy harnesses
+HotPotQA-shaped rows. It verifies that the local Imp and Python DSPy harnesses
 execute their scripted paths and records traces for inspection. Gold-derived
 outputs, tiny contexts, and intentionally different traces mean this artifact
 does not prove effectiveness, long-context behavior, operational parity, or
@@ -546,11 +546,11 @@ uv pip install --target tmp/dspy-current-target --no-deps 'dspy==3.3.0b1'
 mix benchmark.rlm.contract.check
 ```
 
-This T1 suite executes twelve required cases in both DSEx and DSPy 3.3.0b1:
+This T1 suite executes twelve required cases in both Imp and DSPy 3.3.0b1:
 persistent state, typed submission, safe transformations, single and
 programmatic-loop subqueries, ordered batches, exact and atomic call accounting,
 submit repair, extraction fallback, and trajectory retention. The artifact pins
-the installed upstream source SHA256 and declares DSEx's symbolic `recurse/2`
+the installed upstream source SHA256 and declares Imp's symbolic `recurse/2`
 helper as an extension. T1 proves matched execution semantics only; it does not
 measure long-context effectiveness and cannot satisfy the T3 release lane.
 
@@ -560,10 +560,10 @@ measure long-context effectiveness and cannot satisfy the T3 release lane.
 OPENAI_API_KEY=... OPENAI_MODEL=... mix benchmark.live.check
 ```
 
-This fetches two fresh rows from GSM8K and HotPotQA, runs DSEx programs against
+This fetches two fresh rows from GSM8K and HotPotQA, runs Imp programs against
 a live provider, and writes a result artifact under `benchmarks/results/`.
 
-## Run DSEx vs DSPy Parity
+## Run Imp vs DSPy Parity
 
 Install Python DSPy in the local parity environment:
 
@@ -588,10 +588,10 @@ Then run:
 OPENAI_API_KEY=... mix benchmark.parity.check
 ```
 
-This runs DSEx and the real Python `dspy` package over the same fetched GSM8K
+This runs Imp and the real Python `dspy` package over the same fetched GSM8K
 and HotPotQA rows, using the same OpenAI-compatible model. For reproducible
 evidence, set `OPENAI_MODEL` or pass `--model` with a provider model id you have
-verified in the current account. If neither is set, DSEx queries the
+verified in the current account. If neither is set, Imp queries the
 OpenAI-compatible `/models` endpoint and auto-selects only when exactly one
 text-generation-looking candidate is visible. If discovery fails, returns no
 candidate, or returns multiple candidates, the task stops and asks for an
@@ -600,19 +600,19 @@ models on the operator's behalf.
 
 The parity report records:
 
-- DSEx and DSPy versions/runtime metadata
+- Imp and DSPy versions/runtime metadata
 - benchmark prompt/signature contract identity for each runtime
 - requested and effective generation settings, including endpoint route
   evidence
 - task scores and aggregate score delta
-- task latency and DSEx/DSPy latency ratio
+- task latency and Imp/DSPy latency ratio
 - error counts
 - row-level pass/fail agreement and answers
 - bounded disagreement examples and per-task disagreement direction counts
 - evidence scale: `smoke`, `research_sample`, or `full`
 
-This is the required lane for parity claims. DSEx-only benchmark truth proves
-DSEx behavior; parity requires the Python DSPy sidecar.
+This is the required lane for parity claims. Imp-only benchmark truth proves
+Imp behavior; parity requires the Python DSPy sidecar.
 
 The Python runner is a direct OTP Port executable in its own session and
 process group. If the campaign caller exits or `--dspy-timeout-ms` expires, the
@@ -632,8 +632,8 @@ can run against the same data and endpoint. Use research samples or the full
 lane before making quality/efficiency claims:
 
 ```sh
-mix dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 200 --out benchmarks/data
-mix dsex.benchmark.parity \
+mix imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 200 --out benchmarks/data
+mix imp.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-200.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-200.jsonl \
   --max-examples 200 \
@@ -645,16 +645,16 @@ explicit so the artifact proves a matched operational path instead of an
 accidental OpenAI-shaped comparison:
 
 ```sh
-PROVIDER_API_KEY=... mix dsex.benchmark.parity \
+PROVIDER_API_KEY=... mix imp.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-200.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-200.jsonl \
   --max-examples 200 \
-  --model "$DSEX_PROVIDER_MODEL" \
-  --dspy-model "$DSEX_DSPY_MODEL" \
+  --model "$IMP_PROVIDER_MODEL" \
+  --dspy-model "$IMP_DSPY_MODEL" \
   --api-key-env PROVIDER_API_KEY
 ```
 
-The DSEx side takes a ReqLLM model spec such as `anthropic:...` or
+The Imp side takes a ReqLLM model spec such as `anthropic:...` or
 `google:...`; the DSPy side takes the matching LiteLLM/DSPy model name such as
 `anthropic/...` or `gemini/...`. The artifact records both wire API families so
 the live matrix can reject endpoint mismatches.
@@ -666,7 +666,7 @@ OPENAI_API_KEY=... mix benchmark.parity.full
 ```
 
 That command fetches GSM8K test and HotPotQA distractor validation in full, then
-runs DSEx and Python DSPy over the same rows. It can take a long time and spend
+runs Imp and Python DSPy over the same rows. It can take a long time and spend
 real provider money. Its artifacts can support the live matched-model part of a
 full parity claim, but not the entire claim by themselves. Use
 `PARITY_VALIDATION_PROGRAM.md` for the complete standard.
@@ -677,7 +677,7 @@ full parity claim, but not the entire claim by themselves. Use
 mix benchmark.live_matrix
 ```
 
-This consumes existing `dsex-dspy-parity-campaign-*.json` artifacts and writes
+This consumes existing `imp-dspy-parity-campaign-*.json` artifacts and writes
 `live-matched-model-matrix-*.json`. It is the canonical answer to "which
 provider/model lanes have actually been proven?" It groups by provider and
 model, skips malformed historical artifacts, tags current low-cost, frontier,
@@ -696,12 +696,12 @@ historical/research lanes require fresh matched research samples: enough rows
 to expose provider drift without pretending every flagship or legacy model must
 pay the full canonical cost. If the matrix reports smoke coverage, stale prompt
 contracts, incomplete current low-cost coverage, or unsatisfied research-sample
-lanes, DSEx has not yet proven live matched model parity. Each model row and
+lanes, Imp has not yet proven live matched model parity. Each model row and
 live-lane blocker reports covered rows,
-remaining rows, percent coverage, and estimated remaining/full DSEx-plus-DSPy
+remaining rows, percent coverage, and estimated remaining/full Imp-plus-DSPy
 tokens so staged campaigns can be planned from the dashboard instead of hand
 calculated. Cost is token-only by default; set
-`DSEX_BENCH_INPUT_USD_PER_1M` and `DSEX_BENCH_OUTPUT_USD_PER_1M` when you want
+`IMP_BENCH_INPUT_USD_PER_1M` and `IMP_BENCH_OUTPUT_USD_PER_1M` when you want
 the matrix to include USD estimates from current provider pricing.
 
 When a lane has multiple candidate models, the lane-level `coverage` and `cost`
@@ -709,7 +709,7 @@ headline the strongest candidate because one satisfying model is sufficient for
 that lane. The same objects retain a nested `cumulative` summary so operator
 dashboards can still see total evidence and spend across all candidates.
 
-The selected artifact for a model must also carry the current DSEx benchmark
+The selected artifact for a model must also carry the current Imp benchmark
 prompt contract compiled into the benchmark truth runner. Older artifacts
 remain valuable history, but they are not release evidence after the task prompt
 or signature contract changes. The matrix exposes this as
@@ -720,7 +720,7 @@ When a dataset contract changes or a fresh full campaign supersedes older
 smoke evidence, filter the matrix to the intended lineage:
 
 ```sh
-DSEX_BENCH_CAMPAIGN_ID=req-llm-current-low-cost-full-YYYYMMDD \
+IMP_BENCH_CAMPAIGN_ID=req-llm-current-low-cost-full-YYYYMMDD \
   mix benchmark.live_matrix
 ```
 
@@ -732,7 +732,7 @@ For operationally safer full runs, execute fixed-size chunks with `--offset`
 and `--max-examples`, then preserve every emitted artifact:
 
 ```sh
-mix dsex.benchmark.parity \
+mix imp.benchmark.parity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
   --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
@@ -752,7 +752,7 @@ claim.
 To advance a campaign without babysitting each offset:
 
 ```sh
-mix dsex.benchmark.parity.campaign \
+mix imp.benchmark.parity.campaign \
   --model "$CURRENT_LOW_COST_MODEL" \
   --dspy-model "$CURRENT_LOW_COST_DSPY_MODEL" \
   --campaign-id req-llm-current-low-cost-full-YYYYMMDD \
@@ -769,18 +769,18 @@ mix dsex.benchmark.parity.campaign \
 For non-OpenAI campaign lanes, use the provider-qualified ReqLLM model as
 `--model`, the matching DSPy/LiteLLM model as `--dspy-model`, and the relevant
 `--api-key-env`. The campaign driver forwards those settings to every chunk.
-For example, Anthropic uses `--model anthropic:claude-haiku-4-5` on the DSEx
+For example, Anthropic uses `--model anthropic:claude-haiku-4-5` on the Imp
 side and `--dspy-model anthropic/claude-haiku-4-5` on the Python DSPy side.
 Do not pass the ReqLLM colon form as `--dspy-model`; omit the flag when the
-default DSEx mapper can derive the matching LiteLLM id.
+default Imp mapper can derive the matching LiteLLM id.
 
 For measured transport A/B checks, configure ReqLLM's Finch pool before startup
 through the same runner:
 
 ```sh
-mix dsex.benchmark.parity.campaign \
-  --model "$DSEX_PROVIDER_MODEL" \
-  --dspy-model "$DSEX_DSPY_MODEL" \
+mix imp.benchmark.parity.campaign \
+  --model "$IMP_PROVIDER_MODEL" \
+  --dspy-model "$IMP_DSPY_MODEL" \
   --api-key-env PROVIDER_API_KEY \
   --env-file .env \
   --req-llm-pool-protocols http1 \
@@ -809,7 +809,7 @@ staged live campaigns because the stopping condition is evidence coverage, not a
 hand-counted number of offsets.
 
 Current parity rows retain provider-reported input tokens, output tokens, and
-USD cost independently for DSEx and DSPy. DSEx attributes ReqLLM telemetry in
+USD cost independently for Imp and DSPy. Imp attributes ReqLLM telemetry in
 the row process; the Python side attributes DSPy LM history by canonical row
 input. Aggregation marks usage complete only when both runtimes have numeric
 usage for every accepted row. The live matrix then projects remaining and full
@@ -820,7 +820,7 @@ campaign.
 
 If a live chunk produces runner/API errors, the campaign runner halts after that
 chunk instead of continuing to spend provider calls. Any rows with complete
-DSEx/DSPy evidence are preserved, but quota/rate-limit failures remain
+Imp/DSPy evidence are preserved, but quota/rate-limit failures remain
 incomplete evidence, not negative benchmark rows. Fix provider
 quota/credentials or switch to a matched provider/model lane, then rerun the
 same campaign id to continue from the earliest missing accepted row.
@@ -828,7 +828,7 @@ same campaign id to continue from the earliest missing accepted row.
 Use `--dspy-model responses/<model>` when the matching Python DSPy/LiteLLM path
 must force OpenAI Responses endpoint semantics for the selected model. The
 runner normalizes that shorthand to LiteLLM's provider-qualified
-`openai/responses/<model>` identity. DSEx reaches the provider through ReqLLM;
+`openai/responses/<model>` identity. Imp reaches the provider through ReqLLM;
 the explicit DSPy model route prevents comparing Responses semantics against
 Chat Completions semantics by accident.
 
@@ -850,7 +850,7 @@ deprecation evidence. Current-model full coverage remains required for the
 `current_low_cost` lane.
 
 Concurrency improves wall-clock time by issuing independent row calls in
-parallel on both the DSEx and Python DSPy sides. It does not reduce the number
+parallel on both the Imp and Python DSPy sides. It does not reduce the number
 of benchmark rows or provider calls, and reports record `max_concurrency` so
 serial and concurrent artifacts are auditable. Campaign aggregates require one
 consistent `max_concurrency` value before `full_parity` can be true; the live
@@ -860,15 +860,15 @@ blocker because latency and throughput claims are not comparable otherwise.
 Aggregate chunk artifacts into a campaign report:
 
 ```sh
-mix dsex.benchmark.parity.aggregate \
+mix imp.benchmark.parity.aggregate \
   --provider req_llm \
   --model "$CURRENT_LOW_COST_MODEL" \
-  --in "benchmarks/results/dsex-dspy-parity-${CURRENT_LOW_COST_MODEL}-*.json" \
+  --in "benchmarks/results/imp-dspy-parity-${CURRENT_LOW_COST_MODEL}-*.json" \
   --max-concurrency 8
 ```
 
 The aggregator counts each `(task, absolute_index)` once, so overlapping smoke
-or retry chunks cannot inflate coverage. It also scopes reports by DSEx provider
+or retry chunks cannot inflate coverage. It also scopes reports by Imp provider
 and model, so historical direct-client artifacts cannot be mixed into ReqLLM
 campaigns. Runner/API error rows are incomplete evidence: they are not included
 in coverage or scores, and a newer incomplete row cannot replace an older
@@ -879,10 +879,10 @@ missing ranges instead of being treated as both-failed parity rows. It reports:
 
 - total covered rows versus canonical expected rows
 - per-task covered rows, missing ranges, incomplete rows, and runner-error rows
-- weighted DSEx/DSPy scores from row-level pass/fail outcomes
+- weighted Imp/DSPy scores from row-level pass/fail outcomes
 - aggregate and task score gaps
 - latency ratio from covered chunk artifacts
-- runtime instrumentation summaries: DSEx LM call counts, LM-duration share,
+- runtime instrumentation summaries: Imp LM call counts, LM-duration share,
   local overhead, fallback/retry counts, prompt size, raw output size, and
   DSPy-side input/message/raw-size diagnostics. DSPy `message_chars` records
   its source as `lm_history` when a concurrent history entry is unambiguously
@@ -895,7 +895,7 @@ missing ranges instead of being treated as both-failed parity rows. It reports:
 contract and effective generation settings are consistent, complete, and
 matched, `max_concurrency` is consistent across the campaign evidence, aggregate
 and per-task score gaps are within the configured strict thresholds, and the
-DSEx/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
+Imp/DSPy latency ratio is within the configured `--max-latency-ratio` threshold
 (`1.5` by default). Latency is part of the decision because parity is about
 operational behavior, not only answer quality.
 
@@ -905,10 +905,10 @@ contract, model-lane policy, effective generation settings, and concurrency
 requirements. Treat stale named-model campaigns as prior evidence, not as a
 template for new operator commands.
 
-Use the `dsex_instrumentation`, `dspy_instrumentation`, and `runtime_shape`
-summaries before optimizing runtime code. When DSEx `lm_duration_share` is close
+Use the `imp_instrumentation`, `dspy_instrumentation`, and `runtime_shape`
+summaries before optimizing runtime code. When Imp `lm_duration_share` is close
 to `1.0`, the observed live latency is dominated by the provider/model call
-rather than DSEx adapter parsing or metric evaluation. Large DSEx-vs-DSPy
+rather than Imp adapter parsing or metric evaluation. Large Imp-vs-DSPy
 `message_chars` or `raw_chars` ratios point toward prompt/output shape work;
 nonzero `json_fallbacks` or `parse_retries` point toward adapter recovery work.
 `runtime_shape.coverage.complete` must be true before treating shape ratios as a
@@ -924,14 +924,14 @@ was ambiguous under concurrency.
 
 ## Evidence Standard
 
-A credible DSEx benchmark report must include:
+A credible Imp benchmark report must include:
 
 - dataset manifest SHA256 digests
 - train/dev/test or offset/length split description
 - model/provider/version metadata
 - prompt/signature contract identity
 - requested and effective generation settings
-- DSEx git SHA
+- Imp git SHA
 - baseline score
 - optimized score
 - optimizer settings

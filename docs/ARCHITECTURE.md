@@ -15,26 +15,26 @@ Example / inputs
 
 ## Public Facade
 
-`DSEx` in `lib/dsex.ex` is the canonical public entry point:
+`Imp` in `lib/imp.ex` is the canonical public entry point:
 
-- `DSEx.configure/1`, `DSEx.context/2`
-- `DSEx.signature/2`, `DSEx.example/1`, `DSEx.prediction/1`
-- `DSEx.with_inputs/2`, `DSEx.inputs/1`, `DSEx.labels/1`, `DSEx.get/3`, `DSEx.to_map/1`
-- `DSEx.predict/2`, `chain_of_thought/2`, `multi_chain_comparison/2`, `best_of_n/3`, `refine/3`, `assert/3`, `parallel/3`, `knn/3`, `nearest/2`
-- `DSEx.program_of_thought/2`, `code_act/3`, `react/3`, `rlm/2`
-- `DSEx.memory/2`, `DSEx.retrieve/3`, `DSEx.rag/3`
-- `DSEx.tool/4`, `DSEx.with_demos/2`, `DSEx.call/2`, `DSEx.evaluate/4`
-- `DSEx.optimize/3`, `DSEx.optimize/4`, `DSEx.optimize/5`, `DSEx.train/3`, `DSEx.train/4`, `DSEx.optimizer_capabilities/1`
-- `DSEx.exact_match/1`, `DSEx.extractive_qa/3`, `DSEx.classification/3`, `DSEx.classification_report/2`
-- `DSEx.dump/1`, `DSEx.load/1`, `DSEx.save!/2`, `DSEx.load!/1`
-- provider helper: `DSEx.req_llm/2`
+- `Imp.configure/1`, `Imp.context/2`
+- `Imp.signature/2`, `Imp.example/1`, `Imp.prediction/1`
+- `Imp.with_inputs/2`, `Imp.inputs/1`, `Imp.labels/1`, `Imp.get/3`, `Imp.to_map/1`
+- `Imp.predict/2`, `chain_of_thought/2`, `multi_chain_comparison/2`, `best_of_n/3`, `refine/3`, `assert/3`, `parallel/3`, `knn/3`, `nearest/2`
+- `Imp.program_of_thought/2`, `code_act/3`, `react/3`, `rlm/2`
+- `Imp.memory/2`, `Imp.retrieve/3`, `Imp.rag/3`
+- `Imp.tool/4`, `Imp.with_demos/2`, `Imp.call/2`, `Imp.evaluate/4`
+- `Imp.optimize/3`, `Imp.optimize/4`, `Imp.optimize/5`, `Imp.train/3`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
+- `Imp.exact_match/1`, `Imp.extractive_qa/3`, `Imp.classification/3`, `Imp.classification_report/2`
+- `Imp.dump/1`, `Imp.load/1`, `Imp.save!/2`, `Imp.load!/1`
+- provider helper: `Imp.req_llm/2`
 
 Use the facade for application code. Use deeper modules when you need direct
 control in tests, docs, or advanced systems.
 
 ## Core Data
 
-### `DSEx.Signature`
+### `Imp.Signature`
 
 Defines input and output fields. The string DSL supports typed flat fields,
 descriptions, arrays, and enum/class constraints with position-aware parse
@@ -50,7 +50,7 @@ Important functions:
 - `dump/1`, `load/1`
 - `json_schema/1`
 
-### `DSEx.Example`
+### `Imp.Example`
 
 Stores train/dev/test rows and optional input keys.
 
@@ -61,7 +61,7 @@ Important functions:
 - `inputs/1`, `labels/1`
 - `get/3`, `fetch!/2`, `put/3`, `delete/2`
 
-### `DSEx.Prediction`
+### `Imp.Prediction`
 
 Stores model outputs plus completions, score, and metadata.
 
@@ -74,25 +74,25 @@ Important functions:
 
 ## Program Modules
 
-All major program structs implement the `DSEx.Module` behaviour.
+All major program structs implement the `Imp.Module` behaviour.
 
 | Module | Purpose |
 | --- | --- |
-| `DSEx.Predict.Predict` | Basic signature-to-output LM call. |
-| `DSEx.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
-| `DSEx.Predict.ReAct` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
-| `DSEx.Predict.ProgramOfThought` | LM emits a safe expression or tool action plan. |
-| `DSEx.Predict.CodeAct` | Iterates tool observations and BEAM-safe sandbox execution with trace metadata. |
-| `DSEx.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
-| `DSEx.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
-| `DSEx.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
-| `DSEx.Predict.Refine` | Repeated attempts with reward threshold. |
-| `DSEx.Predict.Search` | Request-local candidate execution, selection, budgets, and provenance shared by BestOfN and Refine. |
-| `DSEx.Predict.Parallel` | Parallel map helpers. |
+| `Imp.Predict.Predict` | Basic signature-to-output LM call. |
+| `Imp.Predict.ChainOfThought` | Prepends `reasoning` before signature outputs. |
+| `Imp.Predict.ReAct` | Canonical iterative provider-tool-call ReAct with reserved `submit`. |
+| `Imp.Predict.ProgramOfThought` | LM emits a safe expression or tool action plan. |
+| `Imp.Predict.CodeAct` | Iterates tool observations and BEAM-safe sandbox execution with trace metadata. |
+| `Imp.Predict.RLM` | Recursive language model loop over metadata, sandbox actions, tools, sub-LM calls, and submit. |
+| `Imp.Predict.MultiChainComparison` | Compares multiple chain-of-thought outputs. |
+| `Imp.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
+| `Imp.Predict.Refine` | Repeated attempts with reward threshold. |
+| `Imp.Predict.Search` | Request-local candidate execution, selection, budgets, and provenance shared by BestOfN and Refine. |
+| `Imp.Predict.Parallel` | Parallel map helpers. |
 
 ### Request-Local Search Boundary
 
-`DSEx.Predict.Search` is an immutable orchestration boundary for one inference
+`Imp.Predict.Search` is an immutable orchestration boundary for one inference
 request. Callers supply explicit `Search.Candidate` values and an evaluator;
 the engine does not read optimizer state, cache search results, register a
 process, or persist state between calls. BestOfN and Refine translate their
@@ -104,7 +104,7 @@ starts. `admitted_budget` is the sum of all admitted projections, while
 `observed_budget` is the sum of projections attached to completed outcomes.
 Neither field is actual provider usage. Sequential evaluators receive prior
 ordered outcomes, which Refine uses for feedback history. Concurrent evaluators
-run under `DSEx.TaskSupervisor` through `DSEx.Tasks.async_stream/3`, bounded by
+run under `Imp.TaskSupervisor` through `Imp.Tasks.async_stream/3`, bounded by
 `max_concurrency`, and receive no causal prior outcomes. Concurrent threshold
 stopping may therefore include completed speculative work; incomplete work is
 cancelled and represented in full-list provenance.
@@ -125,41 +125,41 @@ parse(signature, raw, opts) :: {:ok, prediction} | {:error, reason}
 
 Available adapters:
 
-- `DSEx.Adapter.Chat`
-- `DSEx.Adapter.JSON`
-- `DSEx.Adapter.XML`
-- `DSEx.Adapter.TwoStep`
+- `Imp.Adapter.Chat`
+- `Imp.Adapter.JSON`
+- `Imp.Adapter.XML`
+- `Imp.Adapter.TwoStep`
 
 `JSON` and schema-constrained signatures are the best fit when the output shape
 matters more than prose flexibility.
 
 ## LMs And Providers
 
-`DSEx.LM` is a small behaviour. Tests usually use:
+`Imp.LM` is a small behaviour. Tests usually use:
 
 ```elixir
-%{module: DSEx.LM.Static, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
+%{module: Imp.LM.Static, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
 ```
 
 The preferred production client is:
 
-- `DSEx.Clients.ReqLLM`
+- `Imp.Clients.ReqLLM`
 
-`DSEx.Clients.ReqLLM` delegates provider/model lookup, Req/Finch transport,
+`Imp.Clients.ReqLLM` delegates provider/model lookup, Req/Finch transport,
 streaming, tool/schema option translation, and response normalization to the
-Elixir `req_llm` ecosystem. DSEx keeps the declarative programming layer:
+Elixir `req_llm` ecosystem. Imp keeps the declarative programming layer:
 signatures, adapters, modules, optimizers, evaluation, traces, persistence, and
 redacted telemetry.
 
-Production provider access goes through ReqLLM. DSEx does not maintain a
+Production provider access goes through ReqLLM. Imp does not maintain a
 parallel OpenAI-compatible provider client stack; deterministic provider tests
 use ReqLLM test modules or the live ReqLLM-backed gates.
 
 Provider streaming is client-dependent. The ReqLLM-backed client streams through
-ReqLLM's Finch/SSE machinery and maps `ReqLLM.StreamChunk` values into the DSEx
-streaming vocabulary. Direct `DSEx.HTTP` transports that implement `stream/4`
+ReqLLM's Finch/SSE machinery and maps `ReqLLM.StreamChunk` values into the Imp
+streaming vocabulary. Direct `Imp.HTTP` transports that implement `stream/4`
 can also deliver incremental chunks. Transports that only implement `post/4`,
-including the default `:httpc` transport, expose a buffered body that DSEx can
+including the default `:httpc` transport, expose a buffered body that Imp can
 parse as stream events but cannot make incrementally arrive.
 
 Runtime dependencies are deliberately justified and production-oriented:
@@ -170,18 +170,18 @@ Runtime dependencies are deliberately justified and production-oriented:
   options so typos fail before a live request or training job is submitted.
 - `ReqLLM` is the provider ecosystem boundary. It brings Req/Finch transport,
   streaming, provider registries, model metadata, structured-output support, and
-  provider-specific option translation so DSEx does not need to own those
+  provider-specific option translation so Imp does not need to own those
   fast-moving concerns itself.
-- `:telemetry` is the stable observability boundary. DSEx keeps a tiny wrapper
-  in `DSEx.Telemetry` so tests can also attach process-local handlers.
+- `:telemetry` is the stable observability boundary. Imp keeps a tiny wrapper
+  in `Imp.Telemetry` so tests can also attach process-local handlers.
 - `ExDoc` is dev/test only and is part of the production gate because generated
   docs are treated as release artifacts.
 
 ### Dependency Posture
 
-DSEx is intentionally not autarkic. It brings in ecosystem dependencies when
+Imp is intentionally not autarkic. It brings in ecosystem dependencies when
 the dependency owns a fast-moving or operationally specialized boundary better
-than DSEx can:
+than Imp can:
 
 - provider APIs, model catalogs, transport, retries, streaming, and structured
   output negotiation belong to `ReqLLM`;
@@ -189,48 +189,48 @@ than DSEx can:
 - test-only dependencies may be added for stronger contracts, property tests,
   static analysis, and local-service harnesses.
 
-DSEx keeps code in core when the behavior is part of declarative
+Imp keeps code in core when the behavior is part of declarative
 self-improving programming itself: signatures, adapters, prediction structs,
 module composition, evaluation, optimization, traces, saving, sandbox policy,
 and the Elixir-facing public API. A dependency should either remove operational
-risk, align DSEx with normal OTP practice, or provide test evidence that would
+risk, align Imp with normal OTP practice, or provide test evidence that would
 be hard to maintain in bespoke code.
 
-Production application code should use `DSEx.req_llm/2`. Provider APIs,
+Production application code should use `Imp.req_llm/2`. Provider APIs,
 transport pooling, streaming, retries, model metadata, and structured output
-belong to ReqLLM, not to a parallel DSEx-owned client stack.
+belong to ReqLLM, not to a parallel Imp-owned client stack.
 
 ### OTP Runtime Boundary
 
-DSEx is an OTP application, but most program values are ordinary immutable
+Imp is an OTP application, but most program values are ordinary immutable
 structs. The supervised runtime boundary currently owns:
 
-- `DSEx.Settings`, an Agent for global defaults plus process-local overrides;
-- `DSEx.Cache`, an ETS-backed cache process and table;
-- `DSEx.TaskSupervisor`, the named task supervisor used by linked provider
+- `Imp.Settings`, an Agent for global defaults plus process-local overrides;
+- `Imp.Cache`, an ETS-backed cache process and table;
+- `Imp.TaskSupervisor`, the named task supervisor used by linked provider
   async and parallel prediction fan-out;
-- `DSEx.UnlinkedTaskSupervisor`, the named task supervisor used by unlinked
+- `Imp.UnlinkedTaskSupervisor`, the named task supervisor used by unlinked
   event workers such as agent event streaming.
 
-In production releases, start the `:dsex` application under the host
+In production releases, start the `:imp` application under the host
 supervision tree. Mix does this automatically for normal applications, but
-embedded or script-style users should call `Application.ensure_all_started(:dsex)`
-before relying on global settings or cache behavior. DSEx keeps lazy-start
+embedded or script-style users should call `Application.ensure_all_started(:imp)`
+before relying on global settings or cache behavior. Imp keeps lazy-start
 fallbacks for library ergonomics, but the supervised path is the production
 posture.
 
-Long-running or fan-out work should have an OTP owner. DSEx routes its built-in
-async helpers through `DSEx.Tasks`, which uses linked and unlinked named task
+Long-running or fan-out work should have an OTP owner. Imp routes its built-in
+async helpers through `Imp.Tasks`, which uses linked and unlinked named task
 supervisors when the application is running and falls back to plain task
 helpers only for script-style library use before supervised startup. That keeps
 cancellation, crash reporting, telemetry context, and shutdown behavior visible
 to the host system in production.
 
-`DSEx.Tasks.cancel/2` terminates a supervised task with a bounded wait.
-`DSEx.Streaming.Messages.StreamListener.attach/2` observes normalized stream
+`Imp.Tasks.cancel/2` terminates a supervised task with a bounded wait.
+`Imp.Streaming.Messages.StreamListener.attach/2` observes normalized stream
 events while yielding the original chunks, including terminal and error events,
-unchanged. `DSEx.Cache.configure/1` controls enablement, TTL, and maximum entry
-count; `DSEx.Cache.stats/0` reports atomic hit, miss, write, bypass, expiration,
+unchanged. `Imp.Cache.configure/1` controls enablement, TTL, and maximum entry
+count; `Imp.Cache.stats/0` reports atomic hit, miss, write, bypass, expiration,
 and eviction counters. Cache reads and writes remain ETS hot paths while the
 owner process controls policy and table lifecycle.
 
@@ -242,29 +242,29 @@ retrievers, MCP requests, training jobs, and optimizer trials.
 
 Retrievers:
 
-- `DSEx.Retrieve.Memory`
-- `DSEx.Retrievers.KNN`
-- `DSEx.Retrievers.HTTP`
-- `DSEx.Retrievers.Weaviate`
-- `DSEx.Retrievers.Databricks`
+- `Imp.Retrieve.Memory`
+- `Imp.Retrievers.KNN`
+- `Imp.Retrievers.HTTP`
+- `Imp.Retrievers.Weaviate`
+- `Imp.Retrievers.Databricks`
 
 Datasets:
 
-- `DSEx.Datasets.from_records/3`
+- `Imp.Datasets.from_records/3`
 - `jsonl/3`, `csv/3`
 - `GSM8K`, `HotPotQA`, `MATH`, `Colors`
-- `DSEx.Datasets.Dataset` split container
+- `Imp.Datasets.Dataset` split container
 
 ## Evaluation
 
-`DSEx.Evaluate` runs a program over a dev set with a metric.
+`Imp.Evaluate` runs a program over a dev set with a metric.
 
-Built-in metrics live in `DSEx.Metrics`:
+Built-in metrics live in `Imp.Metrics`:
 
 - exact match
 - semantic-ish F1 helpers
 
-Metric returns are normalized by `DSEx.Metrics.normalize_result/1`. Metrics may
+Metric returns are normalized by `Imp.Metrics.normalize_result/1`. Metrics may
 return booleans, numbers, maps with score/feedback, or predictions. Evaluation
 rows preserve normalized score, pass/fail state, feedback, metric metadata, and
 program errors. Arity-3 metrics receive the prediction trace as their third
@@ -273,7 +273,7 @@ argument.
 
 ## Optimization
 
-`DSEx.Optimizer` is the canonical execution behaviour. Implementations expose
+`Imp.Optimizer` is the canonical execution behaviour. Implementations expose
 `__optimizer__/0` capability metadata and a single `run/3` callback. Dispatch
 does not inspect legacy `compile` arities to decide what arguments mean. The
 capability declaration contains:
@@ -284,24 +284,24 @@ capability declaration contains:
 - `result`: `:program`, `:training_result`, `:constructed_program`, or a
   `{:workflow_result, module}` contract.
 
-`DSEx.Optimizer.run/3` validates the capability shape, keyword invocation
+`Imp.Optimizer.run/3` validates the capability shape, keyword invocation
 options, declared dataset presence or absence, and the outer result shape. The
 optimizer implementation validates dataset contents, split relationships, and
 its own options. This keeps split routing centralized without claiming that the
 behaviour can validate optimizer-specific data semantics.
 
-The facade enforces lifecycle separation. `DSEx.optimize/3-5` accepts only
+The facade enforces lifecycle separation. `Imp.optimize/3-5` accepts only
 `:program` optimizers and returns the compiled program, raising `ArgumentError`
 for contract failures. Validation-required optimizers use `optimize/4` or
 `optimize/5`; optional-validation optimizers can use `optimize/3` or supply the
-split. `DSEx.train/3` and `DSEx.train/4` accept only `:training` optimizers and
-return `{:ok, %DSEx.Optimizer.TrainingResult{}} | {:error, reason}`.
+split. `Imp.train/3` and `Imp.train/4` accept only `:training` optimizers and
+return `{:ok, %Imp.Optimizer.TrainingResult{}} | {:error, reason}`.
 Constructor and workflow kinds retain their explicit module APIs rather than being routed
 through either facade function. Optimizer-specific `compile` functions also
 remain available when advanced callers need native return values or direct
 checkpoint orchestration.
 
-Metric-driven optimizers live under `DSEx.Optimizer.*`:
+Metric-driven optimizers live under `Imp.Optimizer.*`:
 
 - `LabeledFewShot`
 - `BootstrapFewShot`
@@ -312,42 +312,42 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 - `SIMBA`
 - `GEPA`
 - `BetterTogether`
-- `BootstrapFinetune`, `GRPO` run through `DSEx.train/3` or `DSEx.train/4` only
+- `BootstrapFinetune`, `GRPO` run through `Imp.train/3` or `Imp.train/4` only
   when an explicit trainer backend is supplied. Bootstrap fine-tuning returns
   a `:job_created` training result for asynchronous work or a completed result
   containing the rebound program when the trainer returns terminal success;
   terminal failures remain errors. GRPO returns a completed training result
   containing the rebound program. A missing trainer is an error;
-  DSEx does not silently select a local training fallback. The optional
-  `DSEx.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
+  Imp does not silently select a local training fallback. The optional
+  `Imp.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
   enforce job and terminal artifact identity, support idempotent bounded-retry
   submit/refresh/cancel, persist credential-free checkpoints, and can rebind a
   successful model artifact onto the compiled program.
-- Fast-Slow state modules and `DSEx.Training.FastSlow.Runner` preserve the paper's
+- Fast-Slow state modules and `Imp.Training.FastSlow.Runner` preserve the paper's
   prefetch, GEPA fast update, cross-prompt rollout grouping, and exactly `T`
   slow-update cycle. Provider effects cross an explicit backend behaviour with
   durable operation intents, content-bound state/context checkpoints, and
   fail-closed replay certification. Token-aligned CISPO groups flow through the
   shared trainer contract; no local weight-training fallback is implied.
 
-Arbitrary artifact optimization lives under `DSEx.Optimize.*`:
+Arbitrary artifact optimization lives under `Imp.Optimize.*`:
 
-- `DSEx.Optimize.Anything`
+- `Imp.Optimize.Anything`
 
 ## Agents, Tools, MCP
 
-`DSEx.Tool` wraps callable functionality. `DSEx.Agent` composes tools, child
+`Imp.Tool` wraps callable functionality. `Imp.Agent` composes tools, child
 agents, memory/context, policies, and traces.
 
-`DSEx.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
-into `DSEx.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,
+`Imp.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
+into `Imp.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,
 initialize before discovery, and expose remote `tools/list` / `tools/call`
 style flows through ordinary tools. Stdio clients spawn trusted local MCP
 server executables; they are not a sandbox for untrusted commands.
 
 ## RLM
 
-`DSEx.Predict.RLM` is intentionally not RAG. It gives the controller LM:
+`Imp.Predict.RLM` is intentionally not RAG. It gives the controller LM:
 
 - signature metadata
 - variable metadata and previews
@@ -383,7 +383,7 @@ effects, batches, and recursive children; timed effects are registered with the
 execution coordinator so cancellation terminates in-flight tasks.
 
 Large or expensive values can enter the loop as
-`DSEx.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
+`Imp.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
 only their metadata; `context = load("context")` materializes the value into
 variable space when needed. RLM also exposes internal action, extract, and subquery
 predictors through the program-access helper so optimizers and audits can see the
@@ -391,7 +391,7 @@ parts that govern behavior.
 
 ## Persistence
 
-`DSEx.Saving` saves portable program state for `Predict`, `ChainOfThought`,
+`Imp.Saving` saves portable program state for `Predict`, `ChainOfThought`,
 `ProgramOfThought`, and memory-backed `RAG`. It does not persist secrets.
 Loading an HTTP LM requires explicit credential rebinding rather than silently
 capturing ambient environment credentials. Programs that embed function tools,

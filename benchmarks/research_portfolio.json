@@ -29,7 +29,7 @@
       "confounders": ["provider nondeterminism", "runtime-specific prompt serialization", "model training contamination", "retrieval leakage on HotPotQA"],
       "decision_rules": {"go": "All required model-policy lanes complete and Imp is non-inferior by the predeclared paired quality margin with no material parse or reliability regression.", "fail": "A complete matched lane places Imp below the quality margin or shows a material structured-output/reliability regression that persists on rerun.", "inconclusive": "Provider drift, incomplete rows, unmatched prompts or budgets, or confidence intervals spanning both go and fail regions."},
       "cost_ceiling_usd": 25.0,
-      "preflight": {"command": "mix dsex.benchmark.live_matrix --out /tmp/imp-live-matrix-preflight", "manifest": null}
+      "preflight": {"command": "mix imp.benchmark.live_matrix --out /tmp/imp-live-matrix-preflight", "manifest": null}
     },
     {
       "id": "optimizer_lift",
@@ -53,7 +53,7 @@
       "confounders": ["tiny dev-set selection noise", "candidate-budget mismatch", "proposal parse failures", "cross-runtime random-number sequences", "test-set reuse"],
       "decision_rules": {"go": "Mean held-out lift is at least 3 percentage points, paired 95% interval lower bound is above zero, at least two of three seeds improve, no family regresses by more than 2 points, and Imp is non-inferior to upstream under matched budgets.", "fail": "Dev lift exceeds 5 points while test lift is non-positive, random-label lift exceeds 5 points, or an optimizer costs over 2x for less than 1 point of additional test lift.", "inconclusive": "Fewer than the declared seeds finish, semantic proposal errors exceed threshold, task headroom is absent, or model/provider mismatch prevents a paired comparison."},
       "cost_ceiling_usd": 3.0,
-      "preflight": {"command": "mix dsex.benchmark.instruction_optimizer_experiment --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json --runtime both --out /tmp/imp-optimizer-preflight --plan", "manifest": "benchmarks/config/instruction-optimizer-aime-economical-preflight.json"}
+      "preflight": {"command": "mix imp.benchmark.instruction_optimizer_experiment --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json --runtime both --out /tmp/imp-optimizer-preflight --plan", "manifest": "benchmarks/config/instruction-optimizer-aime-economical-preflight.json"}
     },
     {
       "id": "gepa_reflective_search",
@@ -76,7 +76,7 @@
       "confounders": ["private or changed paper artifacts", "judge-model drift", "retrieval corpus mismatch", "semantic proposal failure", "unequal stopping rules"],
       "decision_rules": {"go": "The preflight is semantically live and the completed matched campaign reproduces the claimed sample-efficiency direction on the available exact or adapted task portfolio.", "fail": "Repeated valid campaigns show no held-out gain or materially worse sample efficiency than actual GEPA under matched controls.", "inconclusive": "An original artifact is unavailable and no construct-valid public substitute is complete, or comparator evidence cannot be matched."},
       "cost_ceiling_usd": 1500.0,
-      "preflight": {"command": "mix dsex.benchmark.gepa_campaign --manifest benchmarks/config/gepa-paper-campaign-v2.json --plan", "manifest": "benchmarks/config/gepa-paper-campaign-v2.json"}
+      "preflight": {"command": "mix imp.benchmark.gepa_campaign --manifest benchmarks/config/gepa-paper-campaign-v2.json --plan", "manifest": "benchmarks/config/gepa-paper-campaign-v2.json"}
     },
     {
       "id": "arbitrary_artifact_optimization",
@@ -98,7 +98,7 @@
       "confounders": ["metric gaming", "training-instance overfit", "domain-specific hand tuning", "unequal sandbox capabilities"],
       "decision_rules": {"go": "Imp improves held-out results in at least two materially different domains without correctness regressions and is competitive with upstream under matched budgets.", "fail": "Lift appears only on training instances, artifacts violate executable constraints, or upstream materially outperforms Imp across the portfolio.", "inconclusive": "A domain metric is not independently executable or fewer than two heterogeneous domains complete."},
       "cost_ceiling_usd": 15.0,
-      "preflight": {"command": "mix dsex.benchmark.optimize_anything --smoke --out /tmp/imp-optimize-anything-preflight", "manifest": null}
+      "preflight": {"command": "mix imp.benchmark.optimize_anything --smoke --out /tmp/imp-optimize-anything-preflight", "manifest": null}
     },
     {
       "id": "retrieval_tools_agents",
@@ -120,7 +120,7 @@
       "confounders": ["parametric knowledge", "retriever nondeterminism", "tool-schema serialization", "benchmark-to-provider function-call translation", "different recovery defaults"],
       "decision_rules": {"go": "Both retrieval QA and tool-use rows complete on Imp and DSPy, with non-inferior task quality and no material trajectory-validity or recovery regression.", "fail": "Imp retrieves materially worse evidence, emits materially fewer valid calls, or cannot terminate correctly under the shared fault schedule.", "inconclusive": "Document identities, call arguments/results, or matched runtime settings are absent from either side."},
       "cost_ceiling_usd": 8.0,
-      "preflight": {"command": "mix dsex.benchmark.rag_tool_agent --out /tmp/imp-rag-tool-agent-preflight", "manifest": null}
+      "preflight": {"command": "mix imp.benchmark.rag_tool_agent --out /tmp/imp-rag-tool-agent-preflight", "manifest": null}
     },
     {
       "id": "recursive_long_context",
@@ -145,7 +145,7 @@
       "confounders": ["model-native long-context improvements", "different interpreter/tool capabilities", "unmatched aggregate token budgets", "benchmark contamination", "answer leakage through filenames or metadata"],
       "decision_rules": {"go": "Depth-one RLM beats direct prompting by at least 5 points on aggregation rows with paired interval lower bound above zero, is non-inferior to DSPy RLM under matched aggregate budgets, and traces prove recursive context use.", "fail": "RLM does not beat direct prompting in any aggregation regime, or is materially inferior to DSPy while consuming equal or greater aggregate budget; simple-retrieval losses remain scoped negative evidence.", "inconclusive": "Tasks fit comfortably in the direct window, traces do not prove context access, aggregate budgets are unmatched, or unavailable paper mappings/scorers prevent an exact-replication label."},
       "cost_ceiling_usd": 12.0,
-      "preflight": {"command": "mix dsex.benchmark.rlm_campaign --manifest benchmarks/config/rlm-paper-protocol-v3.json --plan", "manifest": "benchmarks/config/rlm-paper-protocol-v3.json"}
+      "preflight": {"command": "mix imp.benchmark.rlm_campaign --manifest benchmarks/config/rlm-paper-protocol-v3.json --plan", "manifest": "benchmarks/config/rlm-paper-protocol-v3.json"}
     },
     {
       "id": "evaluation_refinement",
@@ -166,7 +166,7 @@
       "confounders": ["same-model self-preference", "judge leakage", "selection overfit", "unequal candidate budgets", "non-independent assertions"],
       "decision_rules": {"go": "Refinement improves independently scored held-out quality at a useful cost and provider-free evaluation remains behaviorally conformant.", "fail": "Apparent judge gains do not transfer to independent checks or refinement regresses quality under matched budgets.", "inconclusive": "Only self-judged metrics are available or candidate budgets differ."},
       "cost_ceiling_usd": 5.0,
-      "preflight": {"command": "mix dsex.benchmark.auto_evaluation_contract --manifest benchmarks/config/auto-evaluation-differential-v1.json", "manifest": "benchmarks/config/auto-evaluation-differential-v1.json"}
+      "preflight": {"command": "mix imp.benchmark.auto_evaluation_contract --manifest benchmarks/config/auto-evaluation-differential-v1.json", "manifest": "benchmarks/config/auto-evaluation-differential-v1.json"}
     },
     {
       "id": "beam_operations",
@@ -188,7 +188,7 @@
       "confounders": ["different language runtimes", "JIT and VM warmup", "host contention", "provider latency variance", "benchmark implementation overhead"],
       "decision_rules": {"go": "All correctness and recovery invariants hold, no resource leak appears in soak tests, and measured overhead remains within lane-specific bounds.", "fail": "Capacity leaks, unbounded queues, incorrect terminal states, or reproducible tail-latency/throughput regressions violate the declared bounds.", "inconclusive": "Host contention or provider variance dominates, runtime versions are unmatched, or the workload does not reach steady state."},
       "cost_ceiling_usd": 5.0,
-      "preflight": {"command": "mix dsex.benchmark.operations_stress --out /tmp/imp-operations-preflight", "manifest": null}
+      "preflight": {"command": "mix imp.benchmark.operations_stress --out /tmp/imp-operations-preflight", "manifest": null}
     }
   ]
 }

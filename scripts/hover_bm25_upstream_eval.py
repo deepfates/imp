@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate upstream GEPA HoVer BM25 retrieval for DSEx parity checks."""
+"""Evaluate upstream GEPA HoVer BM25 retrieval for Imp parity checks."""
 
 from __future__ import annotations
 

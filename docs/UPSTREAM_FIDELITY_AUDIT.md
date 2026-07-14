@@ -1,15 +1,15 @@
 # Upstream Conformance
 
-DSEx tracks upstream fidelity as executable product contracts, not as a list of
+Imp tracks upstream fidelity as executable product contracts, not as a list of
 names found in source code or documentation. The authoritative ledger lives in
-`DSEx.UpstreamFidelity`; the generated, maintainer-readable projection is the
+`Imp.UpstreamFidelity`; the generated, maintainer-readable projection is the
 [Executable Upstream Conformance Map](UPSTREAM_SURFACE_MAP.md).
 
 ## Baseline Policy
 
 The release baseline is DSPy `3.2.1`, pinned to commit
 `29448ae12756abdd14bd8796c819247ebb83673c` (annotated tag object
-`27a8e2a134b0b8dbd2d7433ea67ffe9be627d376`). DSEx separately tracks DSPy
+`27a8e2a134b0b8dbd2d7433ea67ffe9be627d376`). Imp separately tracks DSPy
 `3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f` so prerelease work such as
 the normalized BaseLM runtime, ReActV2, and the GEPA 0.1.1 result contract is
 visible without silently changing the stable release target.
@@ -39,7 +39,7 @@ Every stable upstream surface belongs to exactly one MECE capability row. Each
 row records:
 
 - upstream names and pinned source locations;
-- the DSEx modules that own the behavior;
+- the Imp modules that own the behavior;
 - semantic invariants that an Elixir implementation must preserve;
 - executable test, integration, live, or benchmark evidence;
 - user-facing documentation;
@@ -48,10 +48,10 @@ row records:
 - an open owner ticket for every gap.
 
 `tracking` is reserved for prerelease or research-horizon behavior and is not
-release blocking until that behavior becomes stable or DSEx publicly adopts a
+release blocking until that behavior becomes stable or Imp publicly adopts a
 corresponding product claim.
 
-A missing evidence file, missing DSEx module, unowned gap, or unexplained native
+A missing evidence file, missing Imp module, unowned gap, or unexplained native
 equivalent becomes `invalid_evidence`. Every gap remains visible and owned, but
 only rows marked as product release blockers fail the product gate. A
 claim-specific gap instead prohibits the corresponding fidelity, parity, or
@@ -63,14 +63,14 @@ and smoke artifacts do not independently establish conformance.
 Generate JSON without asserting completion:
 
 ```sh
-mix dsex.upstream_fidelity \
+mix imp.upstream_fidelity \
   --out tmp/upstream-fidelity/upstream-fidelity.json
 ```
 
 Regenerate the checked-in readable projection:
 
 ```sh
-mix dsex.upstream_fidelity \
+mix imp.upstream_fidelity \
   --format markdown \
   --out docs/UPSTREAM_SURFACE_MAP.md
 ```

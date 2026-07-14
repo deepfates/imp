@@ -1,6 +1,6 @@
 # RLM Fidelity
 
-DSEx implements Recursive Language Models as a BEAM-native inference runtime,
+Imp implements Recursive Language Models as a BEAM-native inference runtime,
 not as RAG and not as a JSON action loop. The semantic references are DSPy
 3.3.0b1 `dspy/predict/rlm.py` and *Recursive Language Models*
 (arXiv:2512.24601v3).
@@ -57,11 +57,11 @@ claims.
 
 From a source checkout, `mix benchmark.rlm.contract.check` executes twelve
 required matched cases in
-DSEx and DSPy 3.3.0b1 using deterministic controller and sub-LM responses. It
+Imp and DSPy 3.3.0b1 using deterministic controller and sub-LM responses. It
 gates typed submission, persistent state, transformations, subqueries inside
 programmatic loops, ordered batches, exact and atomic call accounting, repair,
 extraction fallback, and trajectory retention. The artifact records the
-installed DSPy source SHA256. DSEx `recurse/2` is declared as an extension rather
+installed DSPy source SHA256. Imp `recurse/2` is declared as an extension rather
 than fabricated as upstream behavior.
 
 The T1 artifact proves operational semantics only.
@@ -111,17 +111,17 @@ unavailable. The pinned normalized artifact SHA-256 is
 `11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc`.
 
 ```console
-mix dsex.benchmark.rlm_campaign --plan
-mix dsex.benchmark.rlm_campaign --dry-run
-mix dsex.benchmark.rlm_campaign --runtime dsex
-mix dsex.benchmark.rlm_campaign --runtime dspy
-mix dsex.benchmark.rlm_campaign --runtime both
-mix dsex.benchmark.rlm_campaign --plan --family oolong \
+mix imp.benchmark.rlm_campaign --plan
+mix imp.benchmark.rlm_campaign --dry-run
+mix imp.benchmark.rlm_campaign --runtime imp
+mix imp.benchmark.rlm_campaign --runtime dspy
+mix imp.benchmark.rlm_campaign --runtime both
+mix imp.benchmark.rlm_campaign --plan --family oolong \
   --approach direct,simple_retrieval,rlm --runtime both --row-limit 1
 ```
 
 `--family` and `--approach` accept repeated or comma-separated values.
-`--runtime` accepts `dsex`, `dspy`, or `both`. `--row-limit` is a positive,
+`--runtime` accepts `imp`, `dspy`, or `both`. `--row-limit` is a positive,
 per-family limit over frozen normalized row order; `--sample-limit` is an
 alias. Plan output contains the exact ordered job keys and always reports zero
 provider calls. The same normalized selection controls execution, checkpoint
@@ -136,7 +136,7 @@ has an ambiguous external outcome, so resume fails closed instead of replaying
 the row. Committed rows are checksum and identity bound and are never replayed.
 
 Budgets are independent for every runtime/approach pair. Reservations happen
-before every DSEx provider call, and the DSPy sidecar snapshots its remaining
+before every Imp provider call, and the DSPy sidecar snapshots its remaining
 ceiling inside the serialized budget section. Each wrapped DSPy LM permits one
 in-flight dispatch through history capture, so a concurrent caller cannot read
 another request's shared `history[-1]`. Root and submodel wrappers still share
@@ -191,19 +191,19 @@ directory.
 
 | Runtime | Approach | Score | Calls | Input | Output | USD | Latency ms | Cost authority |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| DSEx | direct | 0.0 | 1 | 92,567 | 128 | 0.00260400 | 2,806.564 | provider reported |
-| DSEx | simple retrieval | 0.0 | 1 | 92,567 | 109 | 0.00256600 | 2,584.200 | provider reported |
-| DSEx | RLM | 0.0 | 1 | 301 | 468 | 0.00101100 | 3,487.324 | provider reported |
+| Imp | direct | 0.0 | 1 | 92,567 | 128 | 0.00260400 | 2,806.564 | provider reported |
+| Imp | simple retrieval | 0.0 | 1 | 92,567 | 109 | 0.00256600 | 2,584.200 | provider reported |
+| Imp | RLM | 0.0 | 1 | 301 | 468 | 0.00101100 | 3,487.324 | provider reported |
 | DSPy | direct | 0.0 | 1 | 92,571 | 88 | 0.02331875 | 4,907.162 | pricing derived |
 | DSPy | simple retrieval | 0.0 | 1 | 92,571 | 152 | 0.02344675 | 5,052.278 | pricing derived |
 | DSPy | RLM | 0.0 | 5 | 25,209 | 4,097 | 0.01449625 | 37,865.839 | pricing derived |
 
 The six valid scored rows used 10 calls, 395,786 input tokens, 5,042 output
-tokens, and $0.06744275 recorded cost. DSEx minus DSPy deltas were 0 score for
+tokens, and $0.06744275 recorded cost. Imp minus DSPy deltas were 0 score for
 every approach; -2,100.598 ms and -$0.02071475 for direct; -2,468.078 ms and
 -$0.02088075 for simple retrieval; and -34,378.515 ms, -$0.01348525, and four
 fewer calls for RLM. The USD comparison is not billing parity: ReqLLM reported
-DSEx cost directly, while DSPy cost was derived from the manifest's uncached
+Imp cost directly, while DSPy cost was derived from the manifest's uncached
 pinned rates.
 
 This is valid T2 operational evidence only. Every answer scored zero, one row
@@ -227,7 +227,7 @@ gate recomputes all of these conditions from artifact content:
   context offloading, and RLM depth 0--3 for GPT-5 and
   Qwen3-Coder-480B-A35B, plus Claude Code with and without context offloading
   for Claude Opus 4.1;
-- both DSEx and the pinned standalone `alexzhang13/rlm` runtime, rather than a
+- both Imp and the pinned standalone `alexzhang13/rlm` runtime, rather than a
   DSPy substitute;
 - pinned paper/RLM/DSPy authorities and root, submodel, and compaction roles;
 - exact unique dataset-key sets in every lane, pinned BrowseComp+ judge and
@@ -257,13 +257,13 @@ T2 evidence and cannot satisfy T3.
 
 ## Recorded Deviations
 
-- DSEx uses its constrained BEAM-native interpreter rather than Python syntax.
+- Imp uses its constrained BEAM-native interpreter rather than Python syntax.
 - The simple retrieval lane is deterministic lexical top-k and is not the
   paper's CodeAct+BM25 or CodeAct+subcalls baseline.
 - The chunk-and-summarize lane is not the paper's iterative threshold-based
   compaction agent.
 - The campaign currently runs one configured RLM depth and does not execute the
-  paper's depth 0--3 matrix. DSEx bounds RLM-loop calls and separately meters a
+  paper's depth 0--3 matrix. Imp bounds RLM-loop calls and separately meters a
   possible answer-extraction call; the campaign budget bounds their total.
   DSPy 3.3.0b1 counts subcalls. These scopes are recorded separately and
   mechanically fail equivalence.
@@ -281,5 +281,5 @@ T2 evidence and cannot satisfy T3.
 - `test/rlm_contract_artifact_test.exs`
 - `test/live_provider_e2e_test.exs`
 - Source checkout: `mix benchmark.rlm.contract.check`
-- Source checkout: `mix dsex.benchmark.rlm_campaign --plan`
+- Source checkout: `mix imp.benchmark.rlm_campaign --plan`
 - Source checkout: `LIVE_PROVIDER=1 mix live.check`

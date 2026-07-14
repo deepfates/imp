@@ -61,7 +61,7 @@ def fetch_task(task: str, spec: Dict[str, Any], offset: int, length: int) -> Lis
     files = parquet_files(spec)
     raw_rows: List[Dict[str, Any]] = []
 
-    with tempfile.TemporaryDirectory(prefix="dsex-hf-parquet-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="imp-hf-parquet-") as tmp:
         for file_index, file_info in enumerate(files):
             local_path = Path(tmp) / f"{task}-{file_index}.parquet"
             urllib.request.urlretrieve(file_info["url"], local_path)

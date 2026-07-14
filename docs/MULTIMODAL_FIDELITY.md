@@ -1,6 +1,6 @@
 # Multimodal Fidelity
 
-This document defines the evidence boundary for DSEx image and native-document
+This document defines the evidence boundary for Imp image and native-document
 quality. Typed value construction and pre-dispatch content shapes do not prove
 that ReqLLM serialized those values, that a provider received them, or that a
 model answered correctly.
@@ -62,7 +62,7 @@ request, the persisted redacted audit contains:
 - ReqLLM request ID and detected transport.
 
 The audit never persists data URIs, base64 payloads, file bytes, prompt text, or
-credentials. Pre-dispatch DSEx and ReqLLM content-part intentions remain in the
+credentials. Pre-dispatch Imp and ReqLLM content-part intentions remain in the
 artifact for diagnostics but explicitly cannot authorize claims.
 
 The response audit records HTTP status, raw provider token usage, OpenAI request
@@ -124,7 +124,7 @@ from OpenAI. The suite also covers:
 Run the provider-free plan and tests with:
 
 ```sh
-mix dsex.benchmark.multimodal_quality --profile openai-responses \
+mix imp.benchmark.multimodal_quality --profile openai-responses \
   --plan --out tmp/multimodal-plan
 mix test test/multimodal_quality_benchmark_test.exs \
   test/multimodal_adapter_test.exs \
@@ -135,7 +135,7 @@ mix test test/multimodal_quality_benchmark_test.exs \
 Execute a clean or resumable paid campaign with:
 
 ```sh
-mix dsex.benchmark.multimodal_quality \
+mix imp.benchmark.multimodal_quality \
   --profile openai-responses --live \
   --max-concurrency 2 \
   --out benchmarks/results
@@ -147,6 +147,6 @@ nonzero if the claim gate rejects any required evidence.
 ## Scope
 
 This campaign proves only the pinned six-sample image and native-PDF lane. It is
-not a broad multimodal leaderboard. `DSEx.Adapters.Types.Document` remains text
+not a broad multimodal leaderboard. `Imp.Adapters.Types.Document` remains text
 content, not document vision. Audio is unsupported and unproven. Provider or
 pricing drift requires a new campaign identity and fresh live evidence.

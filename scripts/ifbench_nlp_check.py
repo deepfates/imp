@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Source-derived IFBench NLP check bridge.
 
-DSEx ports most IFBench checks directly in Elixir. Four AllenAI IFBench
+Imp ports most IFBench checks directly in Elixir. Four AllenAI IFBench
 instructions depend on Python NLP packages upstream: NLTK stopwords/POS,
 emoji, and syllapy. This bridge provides a source-compatible path for parity
-runs without making those Python packages normal DSEx runtime dependencies.
+runs without making those Python packages normal Imp runtime dependencies.
 """
 
 import json

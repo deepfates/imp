@@ -2,7 +2,7 @@
 """Source-derived LiveBenchMath scoring bridge for symbolic branches.
 
 The Elixir runtime ports deterministic LiveBenchMath branches directly. AMPS_Hard
-uses SymPy/Lark symbolic equivalence upstream, so DSEx calls this narrow bridge
+uses SymPy/Lark symbolic equivalence upstream, so Imp calls this narrow bridge
 instead of implementing a weak approximation.
 """
 

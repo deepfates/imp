@@ -1,6 +1,6 @@
 # Glossary
 
-DSEx uses a small vocabulary. These words are meant to describe ordinary
+Imp uses a small vocabulary. These words are meant to describe ordinary
 Elixir values, not magic.
 
 The main workflow is: define a signature, build a program, call it, evaluate
@@ -10,10 +10,10 @@ through an explicit LM dependency.
 ## Adapter
 
 An adapter turns a signature, inputs, and demos into model messages, then turns
-raw model output back into a `DSEx.Prediction`.
+raw model output back into a `Imp.Prediction`.
 
-Use `DSEx.Adapter.Chat` for readable field-labelled text. Use
-`DSEx.Adapter.JSON` when output shape matters.
+Use `Imp.Adapter.Chat` for readable field-labelled text. Use
+`Imp.Adapter.JSON` when output shape matters.
 
 ## Demo
 
@@ -27,18 +27,18 @@ Optimizers score candidates on the dev set.
 
 ## Example
 
-An example is a row of named data. `DSEx.with_inputs/2` marks which fields are
+An example is a row of named data. `Imp.with_inputs/2` marks which fields are
 inputs; the remaining fields are labels.
 
 ## LM
 
 An LM is the runtime model dependency. In tests this is often
-`DSEx.LM.Static`. In production it is usually `DSEx.req_llm/2`.
+`Imp.LM.Static`. In production it is usually `Imp.req_llm/2`.
 
 ## Metric
 
 A metric scores a prediction against an example. Metrics can return booleans,
-numbers, maps with feedback, or `DSEx.Metrics.Result`.
+numbers, maps with feedback, or `Imp.Metrics.Result`.
 
 ## Optimizer
 
@@ -53,7 +53,7 @@ optional completions, score metadata, and traces.
 
 ## Program
 
-A program is a callable DSEx struct such as `Predict`, `ChainOfThought`,
+A program is a callable Imp struct such as `Predict`, `ChainOfThought`,
 `ReAct`, `ProgramOfThought`, or `CodeAct`. Programs hold or wrap the signature,
 adapter, LM, demos, configuration, and metadata needed to run.
 
@@ -65,14 +65,14 @@ constraints, and instructions.
 Example:
 
 ```elixir
-DSEx.signature("question -> answer: short_span")
+Imp.signature("question -> answer: short_span")
 ```
 
 ## Trace
 
 A trace records what happened around a call: generated messages, raw model
 output, retries, tool calls, and related metadata. Traces are for debugging and
-evaluation, and DSEx redacts common secret-shaped values.
+evaluation, and Imp redacts common secret-shaped values.
 
 ## Train Set
 
