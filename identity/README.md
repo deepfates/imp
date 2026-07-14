@@ -9,6 +9,11 @@ Start with [`reports/executive-brief.md`](reports/executive-brief.md) for the
 decision state and conclusion-first synthesis. The system map, hostile audit,
 and machine-readable reports provide the supporting detail.
 
+The complete 2,052-candidate frontier is in
+[`reports/candidate-tier-index.tsv`](reports/candidate-tier-index.tsv), with one
+candidate per row. Each role cell uses `tier/rank` (`A/3` means tier A, rank 3
+for that role); `best_rank` is only a compact sort key, not a universal score.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate
