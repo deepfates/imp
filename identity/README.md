@@ -5,6 +5,10 @@ This directory is the Step 8 decision checkpoint for replacing the working
 to rename the package. Final selection and implementation wait until the owner
 adds the unrevealed candidate to the completed corpus.
 
+Start with [`reports/executive-brief.md`](reports/executive-brief.md) for the
+decision state and conclusion-first synthesis. The system map, hostile audit,
+and machine-readable reports provide the supporting detail.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate
