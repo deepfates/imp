@@ -1,6 +1,10 @@
 defmodule Mix.Tasks.Dsex.Benchmark.Playbook do
   use Mix.Task
 
+  @evaluation_requests_per_row 3
+  @proposal_max_attempts 2
+  @input_per_million 0.40
+  @output_per_million 1.60
   @shortdoc "Runs the bounded persistent-playbook held-out campaign"
 
   @moduledoc """
@@ -37,24 +41,32 @@ defmodule Mix.Tasks.Dsex.Benchmark.Playbook do
   end
 
   defp plan(config) do
+    evaluation_rows =
+      config["train_count"] + 2 * config["promotion_count"] + 2 * config["audit_count"]
+
+    evaluation_calls = evaluation_rows * @evaluation_requests_per_row
+
+    max_input_tokens =
+      evaluation_calls * config["max_input_tokens_per_call"] +
+        @proposal_max_attempts * config["max_proposal_input_tokens"]
+
+    max_output_tokens =
+      evaluation_calls * config["max_output_tokens"] +
+        @proposal_max_attempts * config["max_proposal_output_tokens"]
+
     %{
-      "network_calls" =>
-        config["train_count"] + 2 * config["promotion_count"] +
-          2 * config["audit_count"] + 1,
+      "network_calls" => evaluation_calls + @proposal_max_attempts,
       "model" => config["model"],
       "splits" => %{
         "train" => config["train_count"],
         "promotion" => config["promotion_count"],
         "audit" => config["audit_count"]
       },
-      "max_input_tokens" =>
-        (config["train_count"] + 2 * config["promotion_count"] +
-           2 * config["audit_count"]) * config["max_input_tokens_per_call"] +
-          config["max_proposal_input_tokens"],
-      "max_output_tokens" =>
-        (config["train_count"] + 2 * config["promotion_count"] +
-           2 * config["audit_count"]) * config["max_output_tokens"] +
-          config["max_proposal_output_tokens"],
+      "max_input_tokens" => max_input_tokens,
+      "max_output_tokens" => max_output_tokens,
+      "max_cost_usd" =>
+        max_input_tokens / 1_000_000 * @input_per_million +
+          max_output_tokens / 1_000_000 * @output_per_million,
       "provider_calls_per_plan" => 0
     }
   end

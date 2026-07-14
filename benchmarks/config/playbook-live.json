@@ -1,6 +1,6 @@
 {
   "audit_count": 12,
-  "checkpoint": "benchmarks/results/playbook-checkpoint-live-v4.json",
+  "checkpoint": "benchmarks/results/playbook-checkpoint-live-v11.json",
   "data": "benchmarks/data/playbook/math-equation-balancer.jsonl",
   "max_input_tokens_per_call": 2500,
   "max_output_tokens": 512,
@@ -8,10 +8,10 @@
   "max_proposal_output_tokens": 256,
   "min_lift": 0.01,
   "model": "openai:gpt-4.1-mini-2025-04-14",
-  "out": "benchmarks/results/playbook-equation-balancer-live-v4.json",
+  "out": "benchmarks/results/playbook-equation-balancer-live-v11.json",
   "promotion_count": 12,
   "provenance": "benchmarks/data/playbook/provenance.json",
-  "seed": 57,
+  "seed": 61,
   "source": "benchmarks/data/playbook/math-equation-balancer.arrow",
   "train_count": 8
 }

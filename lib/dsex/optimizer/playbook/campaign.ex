@@ -3,6 +3,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
   alias DSEx.BenchmarkTruth.{BudgetedLM, CampaignBudget}
   alias DSEx.Optimizer.Playbook, as: PlaybookOptimizer
+  alias DSEx.Optimizer.Playbook.EquationSearch
   alias DSEx.Optimizer.Trajectory
   alias DSEx.Playbook
   alias DSEx.Playbook.{Delta, Provenance}
@@ -11,6 +12,17 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
   @model "openai:gpt-4.1-mini-2025-04-14"
   @input_per_million 0.40
   @output_per_million 1.60
+  @code_act_max_iters 2
+  @evaluation_requests_per_row 3
+  @proposal_max_attempts 2
+  @implementation_sources [
+    "lib/dsex/optimizer/playbook.ex",
+    "lib/dsex/optimizer/playbook/campaign.ex",
+    "lib/dsex/optimizer/playbook/equation_search.ex",
+    "lib/dsex/playbook/with_context.ex",
+    "lib/dsex/program_parameters.ex",
+    "lib/mix/tasks/dsex.benchmark.playbook.ex"
+  ]
   @authority %{
     "dynamic_cheatsheet" => %{
       "paper" => "arXiv:2504.07952",
@@ -68,12 +80,13 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         budgeted_lm(config.model, api_key, config.max_proposal_output_tokens, budget)
 
       baseline = baseline_playbook(dataset)
+      registry = saving_registry()
       program = equation_program(evaluator_lm, baseline)
 
       optimizer =
         PlaybookOptimizer.new(
           proposer: proposer(proposer_lm, budget, config, dataset),
-          evaluator: evaluator(budget, config, evaluator_lm),
+          evaluator: evaluator(budget, config, evaluator_lm, registry),
           reservations: reservations(config),
           budget: usage_limit(limits, config.model),
           min_lift: config.min_lift,
@@ -104,17 +117,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
   @doc false
   def validate_equation(input, answer, target_value)
       when is_binary(input) and is_binary(answer) and is_integer(target_value) do
-    with {:ok, input_numbers} <- input_numbers(input),
-         {:ok, answer_numbers, operators, rhs} <- answer_parts(answer),
-         true <- input_numbers == answer_numbers,
-         true <- rhs == target_value,
-         {:ok, value} <- evaluate_fraction(answer_numbers, operators),
-         true <- value == {target_value, 1} do
-      :ok
-    else
-      false -> {:error, :equation_mismatch}
-      {:error, _reason} = error -> error
-    end
+    EquationSearch.validate(input, answer, target_value)
   end
 
   def validate_equation(_input, _answer, _target), do: {:error, :invalid_equation_types}
@@ -135,9 +138,9 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
       signature =
         DSEx.signature(
-          "current_strategy, training_evidence -> strategy",
+          "current_strategy, training_evidence, proposal_feedback -> strategy",
           """
-          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 550 characters in at most three short sentences. It must not contain any example equation, answer, dataset row ID, or copied number sequence. The training failures show that guessing and generic retry advice are insufficient: specify exhaustive Cartesian enumeration of every operator tuple, exact standard-precedence evaluation, and returning only a tuple whose value is verified against the target. Return strategy text only.
+          Revise the current equation-balancing strategy using only the supplied training evidence. Return one reusable strategy under 550 characters in at most three short sentences. It must not contain any example equation, answer, dataset row ID, or copied number sequence. The strategy MUST literally contain `solve_equation`, `equation`, `observation`, and `finished`: direct the executor to call `solve_equation` with the original `equation`, then evaluate the safe program `observation` with `finished` true. Correct any proposal_feedback. Return strategy text only.
           """
         )
 
@@ -148,52 +151,40 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
           config: [native_json_schema: true]
         )
 
-      result =
-        DSEx.call(proposal_program, %{
-          current_strategy: hd(request.playbook.entries).content,
-          training_evidence: summary
-        })
+      inputs = %{
+        current_strategy: hd(request.playbook.entries).content,
+        training_evidence: summary,
+        proposal_feedback: "none"
+      }
+
+      result = generate_strategy(proposal_program, inputs, request.rows, @proposal_max_attempts)
 
       usage = usage_delta(before, CampaignBudget.snapshot(budget), config.model)
 
       case result do
-        {:ok, prediction} ->
-          strategy = prediction |> DSEx.get(:strategy, "") |> Playbook.Entry.normalize()
+        {:ok, strategy} ->
+          provenance = %Provenance{
+            source_ids: Enum.map(request.rows, & &1["source_id"]),
+            digests: [dataset.sha256]
+          }
 
-          cond do
-            strategy == "" ->
-              {:error, :empty_strategy, usage}
-
-            byte_size(strategy) > 600 ->
-              {:error, {:strategy_too_large, byte_size(strategy)}, usage}
-
-            contains_training_instance?(strategy, request.rows) ->
-              {:error, :strategy_copied_training_instance, usage}
-
-            true ->
-              provenance = %Provenance{
-                source_ids: Enum.map(request.rows, & &1["source_id"]),
-                digests: [dataset.sha256]
-              }
-
-              delta =
-                Delta.new(
-                  [
-                    Revise.new("equation-strategy", strategy,
-                      expected_revision: 1,
-                      provenance: provenance
-                    ),
-                    Revise.new("optimizer-capacity", "Validated strategy capacity released.",
-                      expected_revision: 1,
-                      provenance: provenance
-                    )
-                  ],
-                  expected_revision: request.playbook.revision,
-                  parent_hash: request.playbook.hash
+          delta =
+            Delta.new(
+              [
+                Revise.new("equation-strategy", strategy,
+                  expected_revision: 1,
+                  provenance: provenance
+                ),
+                Revise.new("optimizer-capacity", "Validated strategy capacity released.",
+                  expected_revision: 1,
+                  provenance: provenance
                 )
+              ],
+              expected_revision: request.playbook.revision,
+              parent_hash: request.playbook.hash
+            )
 
-              {:ok, delta, usage}
-          end
+          {:ok, delta, usage}
 
         {:error, reason} ->
           {:error, reason, usage}
@@ -201,13 +192,61 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
     end
   end
 
-  defp evaluator(budget, config, evaluator_lm) do
+  defp generate_strategy(program, inputs, rows, attempts_left) do
+    case DSEx.call(program, inputs) do
+      {:ok, prediction} ->
+        strategy = prediction |> DSEx.get(:strategy, "") |> Playbook.Entry.normalize()
+
+        case strategy_rejection(strategy, rows) do
+          :ok ->
+            {:ok, strategy}
+
+          reason when attempts_left > 1 ->
+            generate_strategy(
+              program,
+              Map.put(inputs, :proposal_feedback, inspect(reason)),
+              rows,
+              attempts_left - 1
+            )
+
+          reason ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp strategy_rejection("", _rows), do: :empty_strategy
+
+  defp strategy_rejection(strategy, rows) do
+    normalized = String.downcase(strategy)
+    required = ~w(solve_equation equation observation finished)
+    missing = Enum.reject(required, &String.contains?(normalized, &1))
+
+    cond do
+      byte_size(strategy) > 600 ->
+        {:strategy_too_large, byte_size(strategy)}
+
+      contains_training_instance?(strategy, rows) ->
+        :strategy_copied_training_instance
+
+      missing != [] ->
+        {:strategy_missing_protocol_terms, missing}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp evaluator(budget, config, evaluator_lm, registry) do
     fn program, rows, context ->
       program =
         if context.stage in [:baseline_audit, :candidate_audit] do
           program
-          |> DSEx.Saving.dump()
-          |> DSEx.Saving.load()
+          |> DSEx.Saving.dump(registry: registry)
+          |> DSEx.Saving.load(registry: registry)
           |> rebind_lm(evaluator_lm)
         else
           program
@@ -239,7 +278,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
                       "group_id" => row["group_id"]
                     },
                     prediction: %{"answer" => answer},
-                    trace: [],
+                    trace: normalize_code_act_trace(prediction),
                     score: score,
                     feedback: %{
                       "valid" => valid == :ok,
@@ -259,42 +298,24 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
               {:cont, {:ok, trajectories ++ [trajectory]}}
 
-            {:error, %{reason: {:error, %Jason.DecodeError{}}, trace: %{raw: raw}}} ->
-              trajectory =
-                Trajectory.project(
-                  :evaluation,
-                  %{
-                    index: index,
-                    example: %{
-                      "id" => row["id"],
-                      "source_id" => row["source_id"],
-                      "group_id" => row["group_id"]
-                    },
-                    prediction: %{"answer" => ""},
-                    trace: [],
-                    score: 0.0,
-                    feedback: %{
-                      "valid" => false,
-                      "reason" => "adapter_decode_failure",
-                      "reference" => row["expected"],
-                      "raw_sha256" => sha256(raw)
-                    },
-                    metric_metadata: %{
-                      "metric" => "operator_assignment_exact_arithmetic_v1",
-                      "stage" => Atom.to_string(context.stage),
-                      "scored_failure" => true
-                    },
-                    error: nil
-                  },
-                  timing: %Trajectory.Timing{
-                    duration_us: System.monotonic_time(:microsecond) - call_started
-                  }
-                )
-
-              {:cont, {:ok, trajectories ++ [trajectory]}}
-
             {:error, reason} ->
-              {:halt, {:error, {:provider_call_failed, index, reason}}}
+              case classify_model_failure(reason) do
+                {:ok, label, details} ->
+                  trajectory =
+                    failure_trajectory(
+                      row,
+                      index,
+                      context.stage,
+                      label,
+                      details,
+                      System.monotonic_time(:microsecond) - call_started
+                    )
+
+                  {:cont, {:ok, trajectories ++ [trajectory]}}
+
+                :unknown ->
+                  {:halt, {:error, {:provider_call_failed, index, reason}}}
+              end
           end
         end)
 
@@ -327,11 +348,38 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         "Replace every ? with exactly one of +, -, *, or /. Keep all numbers in their given order, use standard precedence without parentheses, and return only the completed equation including its right-hand side."
       )
 
+    solver =
+      DSEx.tool(
+        :solve_equation,
+        "Exhaustively test operator tuples with exact rational standard-precedence arithmetic and return a verified completed equation",
+        &EquationSearch.solve_tool/1,
+        schema: %{
+          "type" => "object",
+          "properties" => %{
+            "equation" => %{"type" => "string", "maxLength" => 256},
+            "numbers" => %{
+              "type" => "array",
+              "items" => %{"type" => "integer"},
+              "minItems" => 1,
+              "maxItems" => 8
+            },
+            "target" => %{"type" => "integer"}
+          },
+          "anyOf" => [
+            %{"required" => ["equation"]},
+            %{"required" => ["numbers", "target"]}
+          ],
+          "additionalProperties" => false
+        }
+      )
+
     signature
-    |> DSEx.chain_of_thought(
+    |> DSEx.code_act([solver],
       lm: lm,
       adapter: DSEx.Adapter.JSON,
-      config: [native_json_schema: true]
+      config: [native_json_schema: true],
+      max_iters: @code_act_max_iters,
+      tool_policy: [:solve_equation]
     )
     |> DSEx.with_playbook(playbook)
   end
@@ -417,82 +465,6 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
     end)
   end
 
-  defp input_numbers(input) do
-    case Regex.run(~r/^\s*(.*?)\s*=\s*(-?\d+)\s*$/, input) do
-      [_, lhs, _rhs] ->
-        numbers = Regex.scan(~r/-?\d+/, lhs) |> List.flatten() |> Enum.map(&String.to_integer/1)
-        if numbers == [], do: {:error, :input_has_no_numbers}, else: {:ok, numbers}
-
-      _ ->
-        {:error, :invalid_input_equation}
-    end
-  end
-
-  defp answer_parts(answer) do
-    answer =
-      answer
-      |> String.trim()
-      |> String.replace_prefix("```", "")
-      |> String.replace_suffix("```", "")
-      |> String.trim()
-
-    case Regex.run(~r/^\s*(-?\d+(?:\s*[+\-*\/]\s*-?\d+)*)\s*=\s*(-?\d+)\s*$/, answer) do
-      [_, lhs, rhs] ->
-        numbers = Regex.scan(~r/-?\d+/, lhs) |> List.flatten() |> Enum.map(&String.to_integer/1)
-        operators = Regex.scan(~r/[+\-*\/]/, lhs) |> List.flatten()
-
-        if length(operators) == length(numbers) - 1,
-          do: {:ok, numbers, operators, String.to_integer(rhs)},
-          else: {:error, :operator_count_mismatch}
-
-      _ ->
-        {:error, :invalid_answer_equation}
-    end
-  end
-
-  defp evaluate_fraction([first | rest], operators) do
-    terms = [{first, 1}]
-
-    Enum.zip(operators, rest)
-    |> Enum.reduce_while({:ok, terms, []}, fn
-      {operator, value}, {:ok, [current | remaining], sums} when operator in ["*", "/"] ->
-        case fraction_op(current, {value, 1}, operator) do
-          {:ok, product} -> {:cont, {:ok, [product | remaining], sums}}
-          error -> {:halt, error}
-        end
-
-      {operator, value}, {:ok, current_terms, sums} when operator in ["+", "-"] ->
-        signed = if operator == "+", do: {value, 1}, else: {-value, 1}
-        {:cont, {:ok, [signed], Enum.reverse(current_terms) ++ sums}}
-    end)
-    |> case do
-      {:ok, current, sums} ->
-        Enum.reduce(Enum.reverse(current) ++ sums, {:ok, {0, 1}}, fn value, {:ok, total} ->
-          fraction_op(total, value, "+")
-        end)
-
-      error ->
-        error
-    end
-  end
-
-  defp evaluate_fraction([], _operators), do: {:error, :empty_expression}
-
-  defp fraction_op({left_n, left_d}, {right_n, right_d}, operator) do
-    case operator do
-      "+" -> normalize_fraction(left_n * right_d + right_n * left_d, left_d * right_d)
-      "*" -> normalize_fraction(left_n * right_n, left_d * right_d)
-      "/" when right_n != 0 -> normalize_fraction(left_n * right_d, left_d * right_n)
-      "/" -> {:error, :division_by_zero}
-    end
-  end
-
-  defp normalize_fraction(numerator, denominator) when denominator != 0 do
-    sign = if denominator < 0, do: -1, else: 1
-    divisor = Integer.gcd(abs(numerator), abs(denominator))
-    {:ok, {div(numerator * sign, divisor), div(abs(denominator), divisor)}}
-  end
-
   defp usage_delta(before, after_snapshot, model) do
     input =
       get_in(after_snapshot, ["usage", "input_tokens"]) -
@@ -527,21 +499,32 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
   end
 
   defp stage_limit(count, config) do
-    input = count * config.max_input_tokens_per_call
-    output = count * config.max_output_tokens
+    requests = count * @evaluation_requests_per_row
+    input = requests * config.max_input_tokens_per_call
+    output = requests * config.max_output_tokens
 
     usage_limit(
-      %{requests: count, input_tokens: input, output_tokens: output, usd: price(input, output)},
+      %{
+        requests: requests,
+        input_tokens: input,
+        output_tokens: output,
+        usd: price(input, output)
+      },
       config.model
     )
   end
 
   defp proposal_limit(config) do
-    input = config.max_proposal_input_tokens
-    output = config.max_proposal_output_tokens
+    input = @proposal_max_attempts * config.max_proposal_input_tokens
+    output = @proposal_max_attempts * config.max_proposal_output_tokens
 
     usage_limit(
-      %{requests: 1, input_tokens: input, output_tokens: output, usd: price(input, output)},
+      %{
+        requests: @proposal_max_attempts,
+        input_tokens: input,
+        output_tokens: output,
+        usd: price(input, output)
+      },
       config.model
     )
   end
@@ -618,6 +601,7 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
         "selected_hash" => result.program.playbook.hash
       },
       "rows" => dump_rows(result.trajectories),
+      "mechanism" => mechanism_evidence(result.trajectories),
       "checkpoint" => %{
         "path" => config.checkpoint,
         "payload_sha256" => result.checkpoint["payload_sha256"]
@@ -656,6 +640,77 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
           "duration_us" => row.timing.duration_us
         }
       end)
+    end)
+  end
+
+  defp mechanism_evidence(trajectories) do
+    Map.new(trajectories, fn {stage, rows} ->
+      tool_calls =
+        Enum.count(rows, fn row ->
+          Enum.any?(row.trace, &match?(%{tool: :solve_equation}, &1))
+        end)
+
+      {Atom.to_string(stage), %{"rows" => length(rows), "solve_equation_calls" => tool_calls}}
+    end)
+  end
+
+  @doc false
+  def classify_model_failure(%{reason: {:error, %Jason.DecodeError{}}, trace: %{raw: raw}}),
+    do: {:ok, "adapter_decode_failure", %{"raw_sha256" => sha256(raw)}}
+
+  def classify_model_failure({kind, _details})
+      when kind in [:code_act_sandbox_error, :code_act_max_iters, :invalid_program_outputs],
+      do: {:ok, Atom.to_string(kind), %{}}
+
+  def classify_model_failure({kind, _details, _trace})
+      when kind in [:code_act_sandbox_error, :code_act_max_iters, :code_act_tool_error],
+      do: {:ok, Atom.to_string(kind), %{}}
+
+  def classify_model_failure(_reason), do: :unknown
+
+  defp failure_trajectory(row, index, stage, label, details, duration_us) do
+    Trajectory.project(
+      :evaluation,
+      %{
+        index: index,
+        example: %{
+          "id" => row["id"],
+          "source_id" => row["source_id"],
+          "group_id" => row["group_id"]
+        },
+        prediction: %{"answer" => ""},
+        trace: [],
+        score: 0.0,
+        feedback:
+          Map.merge(
+            %{"valid" => false, "reason" => label, "reference" => row["expected"]},
+            details
+          ),
+        metric_metadata: %{
+          "metric" => "operator_assignment_exact_arithmetic_v1",
+          "stage" => Atom.to_string(stage),
+          "scored_failure" => true
+        },
+        error: nil
+      },
+      timing: %Trajectory.Timing{duration_us: duration_us}
+    )
+  end
+
+  defp saving_registry do
+    DSEx.Saving.Registry.new(solve_equation: &EquationSearch.solve_tool/1)
+  end
+
+  @doc false
+  def normalize_code_act_trace(%DSEx.Prediction{} = prediction) do
+    prediction.metadata
+    |> Map.get(:code_act_trace, [])
+    |> Enum.map(fn
+      %{action: :tool, input: %{name: name, arguments: arguments}, output: result} ->
+        %{tool: name, arguments: arguments, result: result}
+
+      %{action: action, input: input, output: output} ->
+        %{action: action, input: %{value: input}, output: output}
     end)
   end
 
@@ -719,7 +774,8 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
     %{
       "git_commit" => String.trim(commit),
       "optimizer_module" => "DSEx.Optimizer.Playbook",
-      "campaign_module" => "DSEx.Optimizer.Playbook.Campaign"
+      "campaign_module" => "DSEx.Optimizer.Playbook.Campaign",
+      "source_sha256" => Map.new(@implementation_sources, &{&1, sha256(File.read!(&1))})
     }
   end
 
