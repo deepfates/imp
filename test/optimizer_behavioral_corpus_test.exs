@@ -251,7 +251,14 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
     baseline_score = evaluator(program).score
 
-    optimizer = DSEx.Optimizer.SIMBA.new(metric(), steps: 3, demos_per_step: 1)
+    optimizer =
+      DSEx.Optimizer.SIMBA.new(metric(),
+        bsize: 1,
+        num_candidates: 1,
+        max_steps: 3,
+        max_demos: 1
+      )
+
     compiled = DSEx.Optimizer.SIMBA.compile(optimizer, program, trainset(), devset())
     report = DSEx.Optimizer.Report.fetch(compiled)
 
@@ -268,7 +275,7 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.SIMBA.new(metric(), steps: 0, demos_per_step: 0)
+      DSEx.Optimizer.SIMBA.new(metric(), bsize: 1, max_steps: 0, max_demos: 0)
       |> DSEx.Optimizer.SIMBA.compile(program, trainset(), devset())
 
     report = DSEx.Optimizer.Report.fetch(compiled)
@@ -283,7 +290,7 @@ defmodule OptimizerBehavioralCorpusTest do
   end
 
   test "SIMBA records an explicitly configured reflection model" do
-    judge_lm = %{
+    prompt_lm = %{
       module: DSEx.LM.Static,
       opts: [
         handler: fn messages, _opts ->
@@ -294,11 +301,16 @@ defmodule OptimizerBehavioralCorpusTest do
     }
 
     compiled =
-      DSEx.Optimizer.SIMBA.new(metric(), steps: 1, demos_per_step: 1, judge_lm: judge_lm)
+      DSEx.Optimizer.SIMBA.new(metric(),
+        bsize: 1,
+        max_steps: 1,
+        max_demos: 1,
+        prompt_lm: prompt_lm
+      )
       |> DSEx.Optimizer.SIMBA.compile(france_program(), trainset(), devset())
 
     report = DSEx.Optimizer.Report.fetch(compiled)
-    assert {:deprecated_option, :judge_lm} in report.metadata.compatibility
+    refute Map.has_key?(report.metadata, :compatibility)
     assert report.best_score >= 0.0
     refute_received {:simba_judge, _messages}
   end
@@ -307,7 +319,7 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/final_set must be enumerable/, fn ->
-      DSEx.Optimizer.SIMBA.new(metric(), steps: 2, demos_per_step: 1)
+      DSEx.Optimizer.SIMBA.new(metric(), max_steps: 2, max_demos: 1)
       |> DSEx.Optimizer.SIMBA.compile(program, trainset(), :not_an_enumerable_devset)
     end
   end
@@ -316,7 +328,7 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
-      DSEx.Optimizer.SIMBA.new(metric(), steps: 1, demos_per_step: 1)
+      DSEx.Optimizer.SIMBA.new(metric(), max_steps: 1, max_demos: 1)
       |> DSEx.Optimizer.SIMBA.compile(program, :not_an_enumerable_trainset, devset())
     end
   end
@@ -436,13 +448,13 @@ defmodule OptimizerBehavioralCorpusTest do
     assert_raise ArgumentError,
                  ~r/max_steps must be an integer >= 0/,
                  fn ->
-                   DSEx.Optimizer.SIMBA.new(metric(), steps: -1)
+                   DSEx.Optimizer.SIMBA.new(metric(), max_steps: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/max_demos must be an integer >= 0/,
                  fn ->
-                   DSEx.Optimizer.SIMBA.new(metric(), demos_per_step: -1)
+                   DSEx.Optimizer.SIMBA.new(metric(), max_demos: -1)
                  end
 
     assert_raise ArgumentError,
@@ -479,7 +491,15 @@ defmodule OptimizerBehavioralCorpusTest do
 
     assert_raise ArgumentError,
                  ~r/prompt_lm expected/,
-                 fn -> DSEx.Optimizer.SIMBA.new(metric(), judge_lm: %{provider: :missing}) end
+                 fn -> DSEx.Optimizer.SIMBA.new(metric(), prompt_lm: %{provider: :missing}) end
+  end
+
+  test "SIMBA rejects deprecated option aliases" do
+    for alias <- [:steps, :demos_per_step, :judge_lm] do
+      assert_raise ArgumentError, ~r/unknown SIMBA options/, fn ->
+        DSEx.Optimizer.SIMBA.new(metric(), [{alias, 1}])
+      end
+    end
   end
 
   test "COPRO can use LM-generated score-informed instruction proposals" do

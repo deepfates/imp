@@ -746,7 +746,7 @@ claim provider lifecycle completion or trained-model rebinding.
 
 Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
-programs. `proposer_lm:`, `judge_lm:`, and `reflection_lm:` reject malformed
+programs. `proposer_lm:`, `prompt_lm:`, and `reflection_lm:` reject malformed
 values when the optimizer is built or run, before a search loop starts.
 
 Provider training jobs can be refreshed, cancelled when the provider exposes a

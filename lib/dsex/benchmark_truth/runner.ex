@@ -703,7 +703,7 @@ defmodule DSEx.BenchmarkTruth.Runner do
        end},
       {"SIMBA",
        fn program, trainset, devset ->
-         DSEx.Optimizer.SIMBA.new(metric, steps: 1, demos_per_step: k)
+         DSEx.Optimizer.SIMBA.new(metric, max_steps: 1, max_demos: k)
          |> DSEx.Optimizer.SIMBA.compile(program, trainset, devset)
        end},
       {"GEPA",

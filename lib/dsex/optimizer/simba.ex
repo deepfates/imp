@@ -25,8 +25,7 @@ defmodule DSEx.Optimizer.SIMBA do
     timeout: 5_000,
     sampling_temperature: 0.2,
     candidate_temperature: 0.2,
-    seed: 0,
-    compatibility: []
+    seed: 0
   ]
 
   @option_keys [
@@ -43,7 +42,6 @@ defmodule DSEx.Optimizer.SIMBA do
     :candidate_temperature,
     :seed
   ]
-  @legacy_keys [:steps, :demos_per_step, :judge_lm]
   @compile_runtime_keys [:resume_state, :checkpoint_fn, :max_steps]
 
   def new(metric, opts \\ []) do
@@ -52,22 +50,13 @@ defmodule DSEx.Optimizer.SIMBA do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "DSEx.Optimizer.SIMBA.new/2: expected keyword options")
 
-    unknown = Keyword.keys(opts) -- (@option_keys ++ @legacy_keys)
+    unknown = Keyword.keys(opts) -- @option_keys
     if unknown != [], do: raise(ArgumentError, "unknown SIMBA options: #{inspect(unknown)}")
-
-    legacy = Keyword.take(opts, @legacy_keys)
-
-    opts =
-      opts
-      |> Keyword.drop(@legacy_keys)
-      |> put_legacy(:max_steps, legacy[:steps])
-      |> put_legacy(:max_demos, legacy[:demos_per_step])
-      |> put_legacy(:prompt_lm, legacy[:judge_lm])
 
     %__MODULE__{
       metric: metric,
-      bsize: Keyword.get(opts, :bsize, legacy_bsize(legacy)),
-      num_candidates: Keyword.get(opts, :num_candidates, legacy_candidates(legacy)),
+      bsize: Keyword.get(opts, :bsize, 32),
+      num_candidates: Keyword.get(opts, :num_candidates, 6),
       max_steps: Keyword.get(opts, :max_steps, 8),
       max_demos: Keyword.get(opts, :max_demos, 4),
       prompt_lm: opts[:prompt_lm],
@@ -77,8 +66,7 @@ defmodule DSEx.Optimizer.SIMBA do
       timeout: Keyword.get(opts, :timeout, 5_000),
       sampling_temperature: Keyword.get(opts, :sampling_temperature, 0.2),
       candidate_temperature: Keyword.get(opts, :candidate_temperature, 0.2),
-      seed: Keyword.get(opts, :seed, 0),
-      compatibility: Enum.map(Keyword.keys(legacy), &{:deprecated_option, &1})
+      seed: Keyword.get(opts, :seed, 0)
     }
     |> validate!()
   end
@@ -322,7 +310,6 @@ defmodule DSEx.Optimizer.SIMBA do
           candidate_evaluation_calls: state.candidate_evaluation_calls,
           final_evaluation_calls: state.final_evaluation_calls,
           search_policy: SearchPolicy.dump(state.population.policy),
-          compatibility: optimizer.compatibility,
           resumed: resumed?,
           run_status: if(complete?, do: :complete, else: :paused),
           completed_steps: state.completed_steps,
@@ -1069,13 +1056,6 @@ defmodule DSEx.Optimizer.SIMBA do
     Protocol.UndefinedError ->
       reraise ArgumentError, [message: "#{name} must be enumerable"], __STACKTRACE__
   end
-
-  defp put_legacy(opts, _key, nil), do: opts
-  defp put_legacy(opts, key, value), do: Keyword.put_new(opts, key, value)
-  defp legacy_bsize([]), do: 32
-  defp legacy_bsize(_legacy), do: 1
-  defp legacy_candidates([]), do: 6
-  defp legacy_candidates(_legacy), do: 1
 
   defp validate_compile_options!(opts) do
     unless Keyword.keyword?(opts) do

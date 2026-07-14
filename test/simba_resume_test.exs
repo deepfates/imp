@@ -126,6 +126,16 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
                      resume_state: checkpoint
                    )
                  end
+
+    changed_optimizer = %{optimizer | max_demos: 1}
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program, datasets, or search configuration/,
+                 fn ->
+                   SIMBA.compile(changed_optimizer, program, trainset, final_set,
+                     resume_state: checkpoint
+                   )
+                 end
   end
 
   test "resume does not replay completed final evaluations" do
