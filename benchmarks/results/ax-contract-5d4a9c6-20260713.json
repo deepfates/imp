@@ -1,0 +1,313 @@
+{
+  "authority": {
+    "commit": "eb5835e54ba0c5b2fbac380daed1cb87faeefd5e",
+    "npm_integrity": "sha512-CWL/vM9RfS0wvVvRbApjYfwhgLa5UOdJno5y2Ime+lWSLYBEwHOhiBJonx08jhh01KoyJYHWS+QcYeInqR7Fsw==",
+    "repository": "https://github.com/ax-llm/ax",
+    "role": "independent_implementation_comparator",
+    "source_tests": {
+      "optimizer_selection": "src/ax/dsp/optimizers/gepaSelection.test.ts#sha256=56919a54c8eb441756947b413155686ce1e1ea3bbfc710996931ff1e770965f7",
+      "streaming_optional": "src/ax/dsp/streaming-optional.test.ts#sha256=e37eee1e061e29698b41f0a43d4dc3b92a2d3a5b47ef225af519662ab37e6ac0",
+      "structured_output": "src/ax/dsp/jsonSchema.test.ts#sha256=45d679ab5364268131f5c5e82596ec45845f323d3f8df9395612e221570a9485",
+      "tools": "src/ax/dsp/functions.test.ts#sha256=f9c72a33bb416a48dc3867ebf1de3ba554f03bb8e1195da7e4905a8c0704b789",
+      "typed_signature": "src/ax/dsp/sig.test.ts#sha256=1b14f9fbeda0900d03e20fce128a28ca2f7d1f4c37d18a65d6f9b42250152974",
+      "usage": "src/ax/ai/openai/usage.ts#sha256=8a8f4adca391ec793e772592af557396e54ccc6fa17a4e1606673893e7b8ea14"
+    },
+    "version": "23.0.0"
+  },
+  "claim_scope": "provider-free independent implementation comparison",
+  "evidence_tier": "t1_ax_independent_implementation_differential",
+  "generated_at": "2026-07-14T02:47:48Z",
+  "git_sha": "5d4a9c62b4224c7d2886082c4ced37ade212cedc",
+  "rows": [
+    {
+      "ax": {
+        "inputs": [
+          {
+            "array": false,
+            "name": "question",
+            "optional": false,
+            "options": [],
+            "type": "string"
+          },
+          {
+            "array": true,
+            "name": "tags",
+            "optional": true,
+            "options": [],
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "array": false,
+            "name": "label",
+            "optional": false,
+            "options": [
+              "yes",
+              "no"
+            ],
+            "type": "class"
+          },
+          {
+            "array": false,
+            "name": "score",
+            "optional": false,
+            "options": [],
+            "type": "number"
+          }
+        ]
+      },
+      "deviation": null,
+      "dsex": {
+        "inputs": [
+          {
+            "array": false,
+            "name": "question",
+            "optional": false,
+            "options": [],
+            "type": "string"
+          },
+          {
+            "array": true,
+            "name": "tags",
+            "optional": true,
+            "options": [],
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "array": false,
+            "name": "label",
+            "optional": false,
+            "options": [
+              "yes",
+              "no"
+            ],
+            "type": "class"
+          },
+          {
+            "array": false,
+            "name": "score",
+            "optional": false,
+            "options": [],
+            "type": "number"
+          }
+        ]
+      },
+      "id": "typed_signature",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/dsp/sig.test.ts#sha256=1b14f9fbeda0900d03e20fce128a28ca2f7d1f4c37d18a65d6f9b42250152974",
+      "status": "matched"
+    },
+    {
+      "ax": {
+        "properties": {
+          "label": {
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "items": null,
+            "type": "string"
+          },
+          "question": {
+            "enum": [],
+            "items": null,
+            "type": "string"
+          },
+          "score": {
+            "enum": [],
+            "items": null,
+            "type": "number"
+          },
+          "tags": {
+            "enum": [],
+            "items": "string",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question",
+          "label",
+          "score"
+        ],
+        "type": "object"
+      },
+      "deviation": null,
+      "dsex": {
+        "properties": {
+          "label": {
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "items": null,
+            "type": "string"
+          },
+          "score": {
+            "enum": [],
+            "items": null,
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "score"
+        ],
+        "type": "object"
+      },
+      "id": "structured_output",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/dsp/jsonSchema.test.ts#sha256=45d679ab5364268131f5c5e82596ec45845f323d3f8df9395612e221570a9485",
+      "status": "matched"
+    },
+    {
+      "ax": {
+        "omitted": {
+          "requiredField": "only required"
+        },
+        "present": {
+          "optionalField": "present",
+          "requiredField": "required"
+        }
+      },
+      "deviation": null,
+      "dsex": {
+        "omitted": {
+          "requiredField": "only required"
+        },
+        "present": {
+          "optionalField": "present",
+          "requiredField": "required"
+        }
+      },
+      "id": "streaming_optional",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/dsp/streaming-optional.test.ts#sha256=e37eee1e061e29698b41f0a43d4dc3b92a2d3a5b47ef225af519662ab37e6ac0",
+      "status": "matched"
+    },
+    {
+      "ax": {
+        "objectResult": {
+          "found": true,
+          "key": "alpha"
+        },
+        "unknownToolError": {
+          "listsAvailableTool": true,
+          "name": "ValidationError",
+          "recoverable": true
+        }
+      },
+      "deviation": "Both preserve native object meaning and reject unknown tools; Ax exposes a retryable validation error while DSEx returns a fail-fast tagged error.",
+      "dsex": {
+        "objectResult": {
+          "found": true,
+          "key": "alpha"
+        },
+        "unknownToolError": {
+          "listsAvailableTool": false,
+          "name": "unknown_tool",
+          "recoverable": false
+        }
+      },
+      "id": "tools",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/dsp/functions.test.ts#sha256=f9c72a33bb416a48dc3867ebf1de3ba554f03bb8e1195da7e4905a8c0704b789",
+      "status": "intentional_deviation"
+    },
+    {
+      "ax": {
+        "cacheReadTokens": 20,
+        "completionTokens": 30,
+        "promptTokens": 100,
+        "reasoningTokens": 7,
+        "totalTokens": 150
+      },
+      "deviation": null,
+      "dsex": {
+        "cacheReadTokens": 20,
+        "completionTokens": 30,
+        "promptTokens": 100,
+        "reasoningTokens": 7,
+        "totalTokens": 150
+      },
+      "id": "usage",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/ai/openai/usage.ts#sha256=8a8f4adca391ec793e772592af557396e54ccc6fa17a4e1606673893e7b8ea14",
+      "status": "matched"
+    },
+    {
+      "ax": {
+        "pickAtHalf": "stale::instruction",
+        "snapshot": {
+          "recent::instruction": {
+            "accepts": 1,
+            "lastAcceptIter": 5,
+            "proposals": 1,
+            "stagnation": 0
+          },
+          "stale::instruction": {
+            "accepts": 0,
+            "lastAcceptIter": -1,
+            "proposals": 4,
+            "stagnation": 4
+          }
+        }
+      },
+      "deviation": "Ax ships an adaptive stagnation-weighted component bandit. DSEx ships deterministic round-robin/all policies and a BEAM callback boundary for custom selectors; Ax is a comparator, not scientific authority.",
+      "dsex": {
+        "componentOrder": [
+          "recent",
+          "stale"
+        ],
+        "policy": "deterministic_round_robin_or_custom_beam_selector"
+      },
+      "id": "optimizer_selection",
+      "passing": true,
+      "required": true,
+      "source_test": "src/ax/dsp/optimizers/gepaSelection.test.ts#sha256=56919a54c8eb441756947b413155686ce1e1ea3bbfc710996931ff1e770965f7",
+      "status": "intentional_deviation"
+    }
+  ],
+  "run_context": {
+    "code": {
+      "identity": "deepfates/dsex@5d4a9c62b4224c7d2886082c4ced37ade212cedc",
+      "revision": "5d4a9c62b4224c7d2886082c4ced37ade212cedc",
+      "source": "dsex"
+    },
+    "completed_at": "2026-07-14T02:47:48Z",
+    "payload_sha256": "sha256:d8fc50d57b77ce1ff10fa8b955f34719c1f3af6a007b4f221a20abc156e0fa14",
+    "schema_version": 1,
+    "source_commits": {
+      "ax": "ax-llm/ax@eb5835e54ba0c5b2fbac380daed1cb87faeefd5e",
+      "dsex": "deepfates/dsex@5d4a9c62b4224c7d2886082c4ced37ade212cedc"
+    },
+    "started_at": "2026-07-14T02:47:48Z",
+    "workspace": {
+      "reproducible": true,
+      "state": "clean"
+    }
+  },
+  "runtime": {
+    "network_calls": 0,
+    "package": "@ax-llm/ax",
+    "provider_calls": 0,
+    "version": "23.0.0"
+  },
+  "schema_version": 1,
+  "summary": {
+    "contract_complete": true,
+    "intentional_deviations": 2,
+    "matched_cases": 4,
+    "passing_cases": 6,
+    "provider_calls": 0,
+    "required_cases": 6,
+    "scientific_authority": false
+  }
+}
