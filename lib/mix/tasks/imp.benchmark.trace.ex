@@ -68,7 +68,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   end
 
   defp run_imp_case(case) do
-    {:ok, queue} = Agent.start_link(fn -> Map.get(case, "imp_responses", case["responses"]) end)
+    {:ok, queue} =
+      Agent.start_link(fn ->
+        case["imp_responses"] || case["dsex_responses"] || case["responses"]
+      end)
+
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
     lm = fn messages, opts ->

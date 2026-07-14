@@ -156,6 +156,7 @@ defmodule Imp.Optimizer.Artifact do
     path
     |> File.read!()
     |> Jason.decode!()
+    |> Imp.Persistence.Legacy.optimizer_artifact!()
     |> validate!()
   end
 

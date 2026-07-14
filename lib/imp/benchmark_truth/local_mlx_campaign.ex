@@ -12,7 +12,10 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
   @train_digest "sha256:0fa1c7321f2773485139a544054c619620f048ebd8dd52552e3a2ca57878b1ba"
   @held_out_digest "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1"
   @model_tree_sha256 "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947"
-  @evaluation_contract_sha256 "e95d621cbb3afd8806e9554fcafce6b54bc615e031c3b0acbdcadaca039870c8"
+  @evaluation_contract_sha256 %{
+    "Imp.Adapter.Chat" => "8d5ecfbe6b926ca5edf20d9d6a037579ba9ad23767f6a8aeee84e76613939cee",
+    "DSEx.Adapter.Chat" => "e95d621cbb3afd8806e9554fcafce6b54bc615e031c3b0acbdcadaca039870c8"
+  }
   @banking77_revision "90d4e2ee5521c04fc1488f065b8b083658768c57"
   @host "127.0.0.1"
   @model_tree_files [
@@ -235,7 +238,10 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
            "reproducible" => true
          }},
         {:artifact_contract,
-         verified["artifact_type"] == "imp_mlx_weight_training_campaign" and
+         verified["artifact_type"] in [
+           "imp_mlx_weight_training_campaign",
+           "dsex_mlx_weight_training_campaign"
+         ] and
            verified["schema_version"] == 1 and verified["status"] in ["complete", "rejected"] and
            verified["runner"] == "elixir" and
            verified["evidence_level"] == "local_weight_effectiveness" and
@@ -627,7 +633,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
     training["fresh"] == true and job["provider"] == "mlx_lm" and
       job["status"] == "succeeded" and job["training_data"] == [72, 8] and
       job["model"] == "#{@model}@#{@revision}" and is_binary(job["result_model"]) and
-      manifest["artifact_type"] == "imp_mlx_lm_sft_run" and
+      manifest["artifact_type"] in ["imp_mlx_lm_sft_run", "dsex_mlx_lm_sft_run"] and
       manifest["schema_version"] == 1 and manifest["status"] == "succeeded" and
       get_in(manifest, ["spec", "mlx_lm_version"]) == @mlx_lm_version and
       get_in(manifest, ["spec", "model"]) == @model and
@@ -659,8 +665,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
   defp valid_evaluation_contract?(contract, dataset) when is_map(contract) do
     ids = contract["held_out_ids"]
 
-    contract["sha256"] == @evaluation_contract_sha256 and
-      contract["adapter"] == "Imp.Adapter.Chat" and
+    contract["sha256"] == @evaluation_contract_sha256[contract["adapter"]] and
       contract["cache"] == false and contract["temperature"] == 0 and
       contract["max_tokens"] == 32 and contract["server_max_tokens"] == 64 and
       contract["timeout_ms"] == 120_000 and is_list(ids) and length(ids) == 40 and

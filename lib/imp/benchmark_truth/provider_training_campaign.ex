@@ -419,7 +419,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
     train_utterances = MapSet.new(data["train"], & &1["utterance"])
     held_out_utterances = MapSet.new(data["held_out"], & &1["utterance"])
 
-    data["artifact_type"] == "imp_provider_training_dataset" and
+    data["artifact_type"] in ["imp_provider_training_dataset", "dsex_provider_training_dataset"] and
       data["schema_version"] == 1 and is_list(data["train"]) and
       length(data["train"]) >= 10 and is_list(data["held_out"]) and
       data["held_out"] != [] and data["selection"]["train_held_out_overlap"] == [] and

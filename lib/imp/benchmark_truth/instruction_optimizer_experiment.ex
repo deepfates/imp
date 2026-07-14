@@ -163,7 +163,14 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
 
   defp read_manifest!(path, _opts) when is_binary(path) do
     expanded = Path.expand(path)
-    {expanded |> File.read!() |> Jason.decode!(), expanded}
+
+    manifest =
+      expanded
+      |> File.read!()
+      |> Jason.decode!()
+      |> Imp.Persistence.Legacy.instruction_manifest()
+
+    {manifest, expanded}
   rescue
     error in [File.Error, Jason.DecodeError] ->
       reraise ArgumentError,
@@ -179,7 +186,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
         Path.join(File.cwd!(), "instruction-optimizer-experiment.json")
       )
 
-    {json(map), Path.expand(path)}
+    {map |> json() |> Imp.Persistence.Legacy.instruction_manifest(), Path.expand(path)}
   end
 
   defp models!(raw) do

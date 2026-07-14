@@ -118,6 +118,24 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
     assert {:error, [:invalid_run_envelope]} = LocalMLXCampaign.validate_artifact(tampered)
   end
 
+  test "validates the current Imp artifact and evaluation contract identities" do
+    artifact = @artifact_path |> File.read!() |> Jason.decode!()
+
+    current =
+      reenvelope(artifact, fn value ->
+        value
+        |> Map.put("artifact_type", "imp_mlx_weight_training_campaign")
+        |> put_in(["training", "manifest", "artifact_type"], "imp_mlx_lm_sft_run")
+        |> put_in(["evaluation_contract", "adapter"], "Imp.Adapter.Chat")
+        |> put_in(
+          ["evaluation_contract", "sha256"],
+          "8d5ecfbe6b926ca5edf20d9d6a037579ba9ad23767f6a8aeee84e76613939cee"
+        )
+      end)
+
+    assert {:ok, ^current} = LocalMLXCampaign.validate_artifact(current)
+  end
+
   test "rejects re-enveloped canonical, metric, fusion, and persistence forgeries" do
     artifact = @artifact_path |> File.read!() |> Jason.decode!()
 

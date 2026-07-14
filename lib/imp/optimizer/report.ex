@@ -78,7 +78,7 @@ defmodule Imp.Optimizer.Report do
   end
 
   def json_safe(value), do: dump_value(value)
-  def restore_json_safe(value), do: load_value(value)
+  def restore_json_safe(value), do: value |> Imp.Persistence.Legacy.normalize() |> load_value()
 
   def attach(program, %__MODULE__{} = report),
     do: Imp.ProgramAccess.put_metadata(program, :optimizer_report, report)

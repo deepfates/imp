@@ -7,7 +7,7 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
   @sha256 ~r/\A[0-9a-f]{64}\z/
 
   def load!(path, opts \\ []) do
-    manifest = path |> File.read!() |> Jason.decode!()
+    manifest = path |> File.read!() |> Jason.decode!() |> Imp.Persistence.Legacy.rlm_manifest()
     validate!(manifest, path, opts)
   rescue
     error in Jason.DecodeError ->

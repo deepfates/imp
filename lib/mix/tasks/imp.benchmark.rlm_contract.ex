@@ -28,7 +28,12 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
     python = opts |> Keyword.get(:python, current_dspy_python()) |> Path.expand()
     File.mkdir_p!(out_dir)
 
-    fixture = cases_path |> File.read!() |> Jason.decode!()
+    fixture =
+      cases_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> Imp.Persistence.Legacy.rlm_contract_fixture()
+
     imp_rows = Enum.map(fixture["cases"], &run_imp_case/1)
     dspy = run_dspy!(python, cases_path, out_dir)
     artifact = compare(fixture, imp_rows, dspy)
@@ -211,8 +216,14 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
            stderr_to_stdout: true,
            env: current_dspy_env()
          ) do
-      {_output, 0} -> path |> File.read!() |> Jason.decode!()
-      {output, status} -> Mix.raise("DSPy RLM contract failed with status #{status}:\n#{output}")
+      {_output, 0} ->
+        path
+        |> File.read!()
+        |> Jason.decode!()
+        |> Imp.Persistence.Legacy.rlm_contract_result()
+
+      {output, status} ->
+        Mix.raise("DSPy RLM contract failed with status #{status}:\n#{output}")
     end
   end
 

@@ -80,6 +80,19 @@ defmodule Imp.Saving do
     load(payload)
   end
 
+  defp load_artifact!(
+         %{
+           "artifact_type" => "dsex_program_artifact",
+           "schema_version" => @artifact_schema_version,
+           "payload_sha256" => checksum,
+           "payload" => payload
+         } = artifact
+       ) do
+    require_keys!(artifact, ["artifact_type", "schema_version", "payload_sha256", "payload"])
+    Imp.Persistence.Legacy.verify_checksum!(payload, checksum, "legacy saved Imp artifact")
+    payload |> Imp.Persistence.Legacy.normalize() |> load()
+  end
+
   defp load_artifact!(%{"artifact_type" => @artifact_type, "schema_version" => version}) do
     raise ArgumentError, "unsupported saved Imp artifact schema version: #{inspect(version)}"
   end
@@ -721,8 +734,9 @@ defmodule Imp.Saving do
     )
   end
 
-  def load(%{"type" => "imp_optimizer_trajectory"} = state),
-    do: Trajectory.load!(state)
+  def load(%{"type" => type} = state)
+      when type in ~w(imp_optimizer_trajectory dsex_optimizer_trajectory),
+      do: state |> Imp.Persistence.Legacy.normalize() |> Trajectory.load!()
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved Imp program type: #{inspect(type)}"

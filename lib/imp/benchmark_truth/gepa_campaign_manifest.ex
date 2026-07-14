@@ -7,7 +7,12 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
 
   def load!(path) do
     expanded_path = Path.expand(path)
-    manifest = expanded_path |> File.read!() |> Jason.decode!()
+
+    manifest =
+      expanded_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> Imp.Persistence.Legacy.gepa_manifest()
 
     manifest
     |> validate!(expanded_path)
