@@ -185,6 +185,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "ignored_source_reports" => ignored_source_reports(reports, contributing_reports),
       "generation" => generation,
       "execution" => execution,
+      "usage" => campaign_usage(task_reports),
       "runner_order" => runner_order_summary(contributing_reports),
       "coverage" => %{
         "covered" => covered,
@@ -412,6 +413,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
       "dsex_instrumentation" => dsex_instrumentation_summary(complete_rows),
       "dspy_instrumentation" => runtime_instrumentation_summary(complete_rows, "dspy"),
       "runtime_shape" => runtime_shape_summary(complete_rows),
+      "usage" => usage_summary(complete_rows),
       "dsex_duration_ms" => summed_unique_task_duration(complete_rows, "dsex_duration_ms"),
       "dspy_duration_ms" => summed_unique_task_duration(complete_rows, "dspy_duration_ms")
     }
@@ -688,6 +690,98 @@ defmodule Mix.Tasks.Dsex.Benchmark.Parity.Aggregate do
         "Shape ratios use rows where both sides exposed comparable instrumentation. Coverage is complete only when every covered row has comparable DSEx and DSPy shape instrumentation."
     }
   end
+
+  defp usage_summary(rows) do
+    dsex = runtime_usage(rows, "dsex")
+    dspy = runtime_usage(rows, "dspy")
+
+    %{
+      "dsex" => dsex,
+      "dspy" => dspy,
+      "total" => sum_usage(dsex, dspy),
+      "coverage" => %{
+        "total_rows" => length(rows),
+        "complete" =>
+          get_in(dsex, ["coverage", "complete"]) == true and
+            get_in(dspy, ["coverage", "complete"]) == true
+      },
+      "source" => "provider-reported per-row runtime usage and cost"
+    }
+  end
+
+  defp runtime_usage(rows, runtime) do
+    key = "#{runtime}_instrumentation"
+
+    recorded =
+      Enum.filter(rows, fn row ->
+        instrumentation = row[key] || %{}
+
+        usage_recorded?(instrumentation, runtime) and
+          Enum.all?(~w(input_tokens output_tokens usd), &is_number(instrumentation[&1]))
+      end)
+
+    %{
+      "requests" =>
+        Enum.sum(
+          Enum.map(recorded, fn row ->
+            instrumentation = row[key]
+            instrumentation[if(runtime == "dsex", do: "usage_events", else: "lm_calls")] || 0
+          end)
+        ),
+      "input_tokens" => instrumentation_sum(recorded, key, "input_tokens"),
+      "output_tokens" => instrumentation_sum(recorded, key, "output_tokens"),
+      "usd" => instrumentation_sum(recorded, key, "usd"),
+      "coverage" => %{
+        "recorded_rows" => length(recorded),
+        "total_rows" => length(rows),
+        "complete" => rows != [] and length(recorded) == length(rows)
+      }
+    }
+  end
+
+  defp usage_recorded?(instrumentation, "dsex"),
+    do: is_integer(instrumentation["usage_events"]) and instrumentation["usage_events"] > 0
+
+  defp usage_recorded?(instrumentation, "dspy"), do: instrumentation["usage_found"] == true
+
+  defp campaign_usage(task_reports) do
+    dsex = sum_task_usage(task_reports, "dsex")
+    dspy = sum_task_usage(task_reports, "dspy")
+    covered = Enum.sum(Enum.map(task_reports, &get_in(&1, ["coverage", "covered"])))
+
+    %{
+      "dsex" => dsex,
+      "dspy" => dspy,
+      "total" => sum_usage(dsex, dspy),
+      "coverage" => %{
+        "total_rows" => covered,
+        "complete" =>
+          covered > 0 and
+            task_reports
+            |> Enum.filter(&(get_in(&1, ["coverage", "covered"]) > 0))
+            |> Enum.all?(&get_in(&1, ["usage", "coverage", "complete"]))
+      },
+      "source" => "provider-reported per-row runtime usage and cost"
+    }
+  end
+
+  defp sum_task_usage(task_reports, runtime) do
+    Enum.reduce(task_reports, empty_usage(), fn task, total ->
+      sum_usage(total, get_in(task, ["usage", runtime]) || empty_usage())
+    end)
+  end
+
+  defp sum_usage(left, right) do
+    %{
+      "requests" => (left["requests"] || 0) + (right["requests"] || 0),
+      "input_tokens" => (left["input_tokens"] || 0) + (right["input_tokens"] || 0),
+      "output_tokens" => (left["output_tokens"] || 0) + (right["output_tokens"] || 0),
+      "usd" => (left["usd"] || 0.0) + (right["usd"] || 0.0)
+    }
+  end
+
+  defp empty_usage,
+    do: %{"requests" => 0, "input_tokens" => 0, "output_tokens" => 0, "usd" => 0.0}
 
   defp paired_instrumentation_values(rows, key) do
     rows

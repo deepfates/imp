@@ -805,6 +805,16 @@ reached the requested paired-row coverage. This is the preferred way to run
 staged live campaigns because the stopping condition is evidence coverage, not a
 hand-counted number of offsets.
 
+Current parity rows retain provider-reported input tokens, output tokens, and
+USD cost independently for DSEx and DSPy. DSEx attributes ReqLLM telemetry in
+the row process; the Python side attributes DSPy LM history by canonical row
+input. Aggregation marks usage complete only when both runtimes have numeric
+usage for every accepted row. The live matrix then projects remaining and full
+campaign spend from the observed per-row averages. Its environment-based token
+model remains an explicit fallback for legacy artifacts. Run a bounded
+current-model tranche and inspect this projection before approving a full paid
+campaign.
+
 If a live chunk produces runner/API errors, the campaign runner halts after that
 chunk instead of continuing to spend provider calls. Any rows with complete
 DSEx/DSPy evidence are preserved, but quota/rate-limit failures remain

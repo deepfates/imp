@@ -7,6 +7,37 @@ defmodule BenchmarkTruthTest do
 
   @fixtures Path.expand("fixtures/benchmarks", __DIR__)
 
+  test "benchmark row instrumentation records ReqLLM tokens and provider cost" do
+    key = {__MODULE__, make_ref()}
+
+    Process.put(key, %{
+      "lm_calls" => 0,
+      "lm_duration_ms" => 0.0,
+      "json_fallbacks" => 0,
+      "parse_retries" => 0,
+      "usage_events" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "usd" => 0.0
+    })
+
+    on_exit(fn -> Process.delete(key) end)
+
+    DSEx.BenchmarkTruth.Runner.record_instrumentation(
+      [:req_llm, :token_usage],
+      %{tokens: %{input_tokens: 123, output_tokens: 45}, total_cost: 0.0067},
+      %{},
+      {self(), key}
+    )
+
+    assert Process.get(key) |> Map.take(~w(usage_events input_tokens output_tokens usd)) == %{
+             "usage_events" => 1,
+             "input_tokens" => 123,
+             "output_tokens" => 45,
+             "usd" => 0.0067
+           }
+  end
+
   test "RLM campaign plan task emits exact bounded jobs without execution" do
     manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
 
@@ -830,13 +861,29 @@ defmodule BenchmarkTruthTest do
             self.history = history
 
     runner.dspy.settings.lm = FakeLM([
-        {"messages": [{"content": "Question: alpha?"}], "response": {"answer": "A"}},
-        {"messages": [{"content": "Question: beta?"}], "response": {"answer": "B"}},
+        {
+            "messages": [{"content": "Question: alpha?"}],
+            "response": {"answer": "A"},
+            "usage": {"prompt_tokens": 11, "completion_tokens": 3},
+            "cost": 0.001,
+        },
+        {
+            "messages": [{"content": "Question: beta?"}],
+            "response": {"answer": "B"},
+            "usage": {"input_tokens": 13, "output_tokens": 5},
+            "cost": 0.002,
+        },
     ])
 
-    assert runner.attributed_history_entry(0, {"question": "beta?"})["response"]["answer"] == "B"
+    beta = runner.attributed_history_entry(0, {"question": "beta?"})
+    assert beta["response"]["answer"] == "B"
     assert runner.attributed_history_entry(1, {"question": "anything"})["response"]["answer"] == "B"
     assert runner.attributed_history_entry(0, {"question": "missing?"}) is None
+
+    usage = runner.history_instrumentation(beta)
+    assert usage["input_tokens"] == 13
+    assert usage["output_tokens"] == 5
+    assert usage["usd"] == 0.002
 
     runner.dspy.settings.lm = FakeLM([
         {"messages": [{"content": "Question: duplicate?"}]},
@@ -1166,6 +1213,94 @@ defmodule BenchmarkTruthTest do
     assert effective["dsex_wire_api_distinct"] == ["openai_responses"]
     assert effective["dspy_wire_api_distinct"] == ["litellm_chat_completion"]
     refute campaign["parity"]["full_parity"]
+  end
+
+  test "parity aggregate preserves complete provider-reported row usage" do
+    out_dir = tmp_dir("parity-aggregate-usage")
+
+    rows =
+      Enum.map(0..1, fn index ->
+        complete_row(index, true)
+        |> Map.put("dsex_instrumentation", %{
+          "usage_events" => 1,
+          "input_tokens" => 100 + index,
+          "output_tokens" => 20 + index,
+          "usd" => 0.01 + index * 0.001
+        })
+        |> Map.put("dspy_instrumentation", %{
+          "lm_calls" => 1,
+          "usage_found" => true,
+          "input_tokens" => 90 + index,
+          "output_tokens" => 18 + index,
+          "usd" => 0.009 + index * 0.001
+        })
+      end)
+
+    write_parity_rows(out_dir, "usage.json", rows)
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+        "--in",
+        Path.join(out_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--model",
+        "gpt-test"
+      ])
+    end)
+
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    campaign = campaign_path |> File.read!() |> Jason.decode!()
+
+    assert campaign["usage"]["coverage"] == %{"complete" => true, "total_rows" => 2}
+    assert campaign["usage"]["dsex"]["input_tokens"] == 201
+    assert campaign["usage"]["dspy"]["input_tokens"] == 181
+    assert campaign["usage"]["total"]["requests"] == 4
+    assert campaign["usage"]["total"]["output_tokens"] == 78
+    assert_in_delta campaign["usage"]["total"]["usd"], 0.04, 1.0e-12
+  end
+
+  test "live matrix projects remaining cost from complete observed usage" do
+    in_dir = tmp_dir("live-matrix-observed-usage-input")
+    out_dir = tmp_dir("live-matrix-observed-usage-output")
+
+    write_campaign_artifact(in_dir, "observed.json", %{
+      "provider" => "req_llm",
+      "model" => "gpt-mini-observed",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 2, "expected" => 10, "full" => false},
+      "parity" => %{"full_parity" => false, "latency_parity" => true},
+      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "usage" => %{
+        "coverage" => %{"complete" => true, "total_rows" => 2},
+        "dsex" => %{"input_tokens" => 60, "output_tokens" => 10, "usd" => 0.03},
+        "dspy" => %{"input_tokens" => 40, "output_tokens" => 10, "usd" => 0.02},
+        "total" => %{"input_tokens" => 100, "output_tokens" => 20, "usd" => 0.05}
+      },
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(out_dir, "live-matched-model-matrix-*.json"))
+    [model] = matrix_path |> File.read!() |> Jason.decode!() |> Map.fetch!("models")
+
+    assert model["cost"]["status"] == "observed_provider_usage"
+    assert model["cost"]["observed_total_tokens"] == 120
+    assert model["cost"]["estimated_remaining_total_tokens"] == 480
+    assert model["cost"]["estimated_full_total_tokens"] == 600
+    assert_in_delta model["cost"]["estimated_remaining_usd"], 0.2, 1.0e-12
+    assert_in_delta model["cost"]["estimated_full_usd"], 0.25, 1.0e-12
   end
 
   test "parity aggregate ignores superseded chunks for generation proof" do

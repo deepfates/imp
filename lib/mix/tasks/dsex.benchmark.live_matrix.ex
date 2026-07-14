@@ -1094,6 +1094,59 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
   defp cost_estimate(artifact) do
     covered = get_in(artifact, ["coverage", "covered"]) || 0
     expected = get_in(artifact, ["coverage", "expected"]) || covered
+
+    if covered > 0 and get_in(artifact, ["usage", "coverage", "complete"]) == true do
+      observed_cost_estimate(artifact["usage"], covered, expected)
+    else
+      modeled_cost_estimate(artifact, covered, expected)
+    end
+  end
+
+  defp observed_cost_estimate(usage, covered, expected) do
+    remaining = max(expected - covered, 0)
+    observed = usage["total"] || %{}
+    input_tokens = observed["input_tokens"] || 0
+    output_tokens = observed["output_tokens"] || 0
+    usd = observed["usd"] || 0.0
+    remaining_input_tokens = project_remaining(input_tokens, covered, remaining)
+    remaining_output_tokens = project_remaining(output_tokens, covered, remaining)
+    remaining_usd = project_remaining(usd, covered, remaining)
+    full_input_tokens = input_tokens + remaining_input_tokens
+    full_output_tokens = output_tokens + remaining_output_tokens
+    full_usd = usd + remaining_usd
+
+    %{
+      "status" => "observed_provider_usage",
+      "observed_input_tokens" => input_tokens,
+      "observed_output_tokens" => output_tokens,
+      "observed_total_tokens" => input_tokens + output_tokens,
+      "observed_usd" => usd,
+      "estimated_input_tokens" => input_tokens,
+      "estimated_output_tokens" => output_tokens,
+      "estimated_total_tokens" => input_tokens + output_tokens,
+      "estimated_usd" => usd,
+      "estimated_remaining_input_tokens" => remaining_input_tokens,
+      "estimated_remaining_output_tokens" => remaining_output_tokens,
+      "estimated_remaining_total_tokens" => remaining_input_tokens + remaining_output_tokens,
+      "estimated_remaining_usd" => remaining_usd,
+      "estimated_full_input_tokens" => full_input_tokens,
+      "estimated_full_output_tokens" => full_output_tokens,
+      "estimated_full_total_tokens" => full_input_tokens + full_output_tokens,
+      "estimated_full_usd" => full_usd,
+      "assumptions" => %{
+        "covered_examples" => covered,
+        "expected_examples" => expected,
+        "remaining_examples" => remaining,
+        "projection" => "linear_from_observed_provider_usage",
+        "usage_coverage" => usage["coverage"],
+        "runtime_usage" => Map.take(usage, ["dsex", "dspy"])
+      },
+      "note" =>
+        "Observed provider-reported DSEx and DSPy usage/cost for accepted rows; remaining and full estimates scale the observed per-row averages linearly."
+    }
+  end
+
+  defp modeled_cost_estimate(artifact, covered, expected) do
     remaining = max(expected - covered, 0)
     source_count = max(length(artifact["source_reports"] || []), 1)
     input_per_example = env_int("DSEX_BENCH_INPUT_TOKENS_PER_EXAMPLE", 1_500)
@@ -1157,6 +1210,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.LiveMatrix do
         )
     }
   end
+
+  defp project_remaining(value, covered, remaining) when is_integer(value),
+    do: round(value / covered * remaining)
+
+  defp project_remaining(value, covered, remaining) when is_float(value),
+    do: value / covered * remaining
 
   defp coverage_progress(coverage) when is_map(coverage) do
     covered = coverage["covered"] || 0

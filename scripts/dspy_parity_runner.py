@@ -392,6 +392,12 @@ def dspy_instrumentation(
         "raw_chars": history.get("raw_chars") or char_len(prediction),
         "raw_chars_source": "lm_history" if history.get("raw_chars") else "prediction_fallback",
         "history_found": history_entry is not None,
+        "usage_found": all(
+            history.get(key) is not None for key in ("input_tokens", "output_tokens", "usd")
+        ),
+        "input_tokens": history.get("input_tokens"),
+        "output_tokens": history.get("output_tokens"),
+        "usd": history.get("usd"),
         "history_keys": sorted(history_entry.keys()) if isinstance(history_entry, dict) else [],
         "note": (
             "DSPy instrumentation uses LM history when a history entry can be unambiguously "
@@ -427,7 +433,10 @@ def attributed_history_entry(
     if row is None:
         return None
 
-    search_space = [entry for entry in history[before_history_len:] if isinstance(entry, dict)]
+    # Concurrent calls can append between the length snapshot and this row's
+    # own history write. Match across the complete history by canonical input
+    # instead of assuming append order identifies the caller.
+    search_space = [entry for entry in history if isinstance(entry, dict)]
     candidates = [entry for entry in search_space if history_entry_matches_row(entry, row)]
     if len(candidates) == 1:
         return candidates[0]
@@ -464,7 +473,13 @@ def json_text(value: Any) -> str:
 
 def history_instrumentation(history_entry: Optional[Dict[str, Any]]) -> Dict[str, Optional[int]]:
     if not isinstance(history_entry, dict):
-        return {"message_chars": None, "raw_chars": None}
+        return {
+            "message_chars": None,
+            "raw_chars": None,
+            "input_tokens": None,
+            "output_tokens": None,
+            "usd": None,
+        }
 
     messages = history_entry.get("messages")
     prompt = history_entry.get("prompt")
@@ -474,11 +489,25 @@ def history_instrumentation(history_entry: Optional[Dict[str, Any]]) -> Dict[str
         or history_entry.get("completion")
         or history_entry.get("completions")
     )
+    usage = history_entry.get("usage") or {}
 
     return {
         "message_chars": messages_char_len(messages) if messages is not None else char_len(prompt),
         "raw_chars": char_len(response),
+        "input_tokens": first_number(usage, "input_tokens", "prompt_tokens", "input"),
+        "output_tokens": first_number(usage, "output_tokens", "completion_tokens", "output"),
+        "usd": first_number(history_entry, "cost"),
     }
+
+
+def first_number(mapping: Any, *keys: str) -> Optional[float]:
+    if not isinstance(mapping, dict):
+        return None
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value
+    return None
 
 
 def messages_char_len(messages: Any) -> int:

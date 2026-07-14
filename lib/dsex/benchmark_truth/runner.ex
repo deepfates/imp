@@ -506,7 +506,8 @@ defmodule DSEx.BenchmarkTruth.Runner do
     events = [
       [:dsex, :lm, :stop],
       [:dsex, :adapter, :parse, :json_fallback],
-      [:dsex, :adapter, :parse, :retry]
+      [:dsex, :adapter, :parse, :retry],
+      [:req_llm, :token_usage]
     ]
 
     :telemetry.attach_many(key, events, &__MODULE__.record_instrumentation/4, {self(), key})
@@ -524,7 +525,11 @@ defmodule DSEx.BenchmarkTruth.Runner do
       "lm_calls" => 0,
       "lm_duration_ms" => 0.0,
       "json_fallbacks" => 0,
-      "parse_retries" => 0
+      "parse_retries" => 0,
+      "usage_events" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "usd" => 0.0
     }
   end
 
@@ -556,7 +561,27 @@ defmodule DSEx.BenchmarkTruth.Runner do
   defp update_instrumentation(stats, [:dsex, :adapter, :parse, :retry], _measurements),
     do: Map.update!(stats, "parse_retries", &(&1 + 1))
 
+  defp update_instrumentation(stats, [:req_llm, :token_usage], measurements) do
+    tokens = Map.get(measurements, :tokens, %{})
+
+    stats
+    |> Map.update!("usage_events", &(&1 + 1))
+    |> Map.update!("input_tokens", &(&1 + trunc(first_number(tokens, [:input_tokens, :input]))))
+    |> Map.update!(
+      "output_tokens",
+      &(&1 + trunc(first_number(tokens, [:output_tokens, :output])))
+    )
+    |> Map.update!("usd", &(&1 + first_number(measurements, [:total_cost, :cost])))
+  end
+
   defp update_instrumentation(stats, _event, _measurements), do: stats
+
+  defp first_number(map, keys) do
+    Enum.find_value(keys, 0, fn key ->
+      value = Map.get(map, key, Map.get(map, Atom.to_string(key)))
+      if is_number(value), do: value
+    end)
+  end
 
   defp apply_metric(metric, example, prediction) when is_function(metric, 2),
     do: metric.(example, prediction)
