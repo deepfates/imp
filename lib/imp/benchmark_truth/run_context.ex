@@ -96,7 +96,10 @@ defmodule Imp.BenchmarkTruth.RunContext do
 
     artifact
   rescue
-    KeyError -> raise ArgumentError, "benchmark artifact is missing its run envelope"
+    KeyError ->
+      reraise ArgumentError,
+              [message: "benchmark artifact is missing its run envelope"],
+              __STACKTRACE__
   end
 
   defp revision!(source, identity) when is_binary(identity) do

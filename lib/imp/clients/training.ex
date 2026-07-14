@@ -1043,7 +1043,7 @@ defmodule Imp.Clients.Trainer do
   defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
 
   defp finite_number?(value) when is_integer(value), do: true
-  defp finite_number?(value) when is_float(value), do: value == value and abs(value) < 1.0e308
+  defp finite_number?(value) when is_float(value), do: abs(value) < 1.0e308
   defp finite_number?(_value), do: false
 
   defp validate_opts!(opts) when is_list(opts) do

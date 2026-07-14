@@ -31,8 +31,8 @@ defmodule Imp.Optimizer.GEPA.ConfidenceAdapter do
             "GEPA confidence adapter requires exactly one optimizable component, got: #{length(predictors)}"
     end
 
-    Keyword.fetch!(opts, :field)
-    Keyword.fetch!(opts, :enum)
+    _field = Keyword.fetch!(opts, :field)
+    _enum = Keyword.fetch!(opts, :enum)
     top_logprobs = Keyword.get(opts, :top_logprobs, 5)
 
     unless is_integer(top_logprobs) and top_logprobs in 1..20 do

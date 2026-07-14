@@ -380,7 +380,10 @@ defmodule Imp.Optimizer.GEPA.Stopper do
        last_iteration: last_iteration
      }}
   rescue
-    ArgumentError -> raise ArgumentError, "invalid GEPA stopper consecutive outcome"
+    ArgumentError ->
+      reraise ArgumentError,
+              [message: "invalid GEPA stopper consecutive outcome"],
+              __STACKTRACE__
   end
 
   defp load_node!(node, _now) do

@@ -12,8 +12,12 @@ defmodule Imp.ResearchPortfolio do
     validate!(portfolio, claims, root)
   rescue
     error in [File.Error, Jason.DecodeError, ArgumentError, KeyError] ->
-      raise ArgumentError,
-            "invalid research portfolio #{Path.expand(path)}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid research portfolio #{Path.expand(path)}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate!(

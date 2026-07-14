@@ -32,8 +32,12 @@ defmodule Imp.BenchmarkTruth.AutoEvaluationContract do
     Map.put(manifest, "sha256", sha256(bytes))
   rescue
     error in [File.Error, Jason.DecodeError, ArgumentError, KeyError] ->
-      raise ArgumentError,
-            "invalid auto-evaluation differential manifest #{Path.expand(path)}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid auto-evaluation differential manifest #{Path.expand(path)}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate_manifest!(manifest) do

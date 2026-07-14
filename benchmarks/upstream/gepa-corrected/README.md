@@ -1,9 +1,9 @@
 # Corrected GEPA comparator harness
 
-The published GEPA artifact archive cannot support DSEx's strict comparator
+The published GEPA artifact archive cannot support Imp's strict comparator
 claim: its GEPA runs exceed their reported limits, MIPROv2 does not enforce a
 runtime metric budget, baseline accounting is not phase-isolated, and the
-archive contains only seed 0. DSEx therefore keeps the published archive as an
+archive contains only seed 0. Imp therefore keeps the published archive as an
 audited historical input and runs fresh comparators from this explicit patch.
 
 The patch adds phase-local metric accounting, pre-callback hard budget

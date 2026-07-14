@@ -981,7 +981,7 @@ defmodule Imp.Optimizer.Playbook do
   defp finite_number?(value) when is_integer(value), do: true
 
   defp finite_number?(value) when is_float(value),
-    do: value == value and value not in [:infinity, :neg_infinity]
+    do: abs(value) < 1.0e308
 
   defp result_shape(value) when is_tuple(value), do: {:tuple, tuple_size(value)}
   defp result_shape(value) when is_list(value), do: {:list, length(value)}

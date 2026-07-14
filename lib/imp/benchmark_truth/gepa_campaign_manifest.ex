@@ -19,8 +19,12 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
     |> verify_dataset!()
   rescue
     error in Jason.DecodeError ->
-      raise ArgumentError,
-            "invalid GEPA campaign manifest JSON #{path}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid GEPA campaign manifest JSON #{path}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate!(manifest, path) when is_map(manifest) do

@@ -25,8 +25,12 @@ defmodule Imp.UpstreamAuthorityRegistry do
     validate!(registry, path)
   rescue
     error in [File.Error, Jason.DecodeError, ArgumentError, KeyError] ->
-      raise ArgumentError,
-            "invalid upstream authority registry #{Path.expand(path)}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid upstream authority registry #{Path.expand(path)}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   @doc false
@@ -36,7 +40,9 @@ defmodule Imp.UpstreamAuthorityRegistry do
     registry |> Map.fetch!("authorities") |> Map.fetch!(authority_id)
   rescue
     KeyError ->
-      raise ArgumentError, "upstream authority registry has no contract #{inspect(contract_id)}"
+      reraise ArgumentError,
+              [message: "upstream authority registry has no contract #{inspect(contract_id)}"],
+              __STACKTRACE__
   end
 
   defp validate!(

@@ -1,6 +1,6 @@
-# Contributing to DSEx
+# Contributing to Imp
 
-DSEx aims to be an idiomatic Elixir realization of declarative, self-improving
+Imp aims to be an idiomatic Elixir realization of declarative, self-improving
 LM programs. Contributions should preserve that goal rather than reproduce
 Python implementation details mechanically.
 

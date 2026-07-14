@@ -92,7 +92,9 @@ defmodule Imp.BenchmarkTruth.RLMCheckpoint do
     end
   rescue
     error in Jason.DecodeError ->
-      raise ArgumentError, "invalid RLM checkpoint JSON #{path}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [message: "invalid RLM checkpoint JSON #{path}: #{Exception.message(error)}"],
+              __STACKTRACE__
   end
 
   defp validate!(

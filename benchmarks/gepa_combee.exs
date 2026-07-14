@@ -1,7 +1,7 @@
 Mix.Task.run("app.start")
 
-defmodule DSEx.Benchmarks.GEPAComBee do
-  alias DSEx.Optimizer.GEPA.ComBee
+defmodule Imp.Benchmarks.GEPAComBee do
+  alias Imp.Optimizer.GEPA.ComBee
 
   @dataset "benchmarks/data/gsm8k-test-0-1319.jsonl"
   @model "openai:gpt-4.1-mini-2025-04-14"
@@ -181,11 +181,11 @@ defmodule DSEx.Benchmarks.GEPAComBee do
 
         :live ->
           case lm
-               |> DSEx.LM.generate([%{role: "user", content: prompt}],
+               |> Imp.LM.generate([%{role: "user", content: prompt}],
                  max_tokens: @max_output_tokens,
                  temperature: 0
                )
-               |> DSEx.LM.Result.unwrap() do
+               |> Imp.LM.Result.unwrap() do
             {:ok, output} when is_binary(output) -> output
             {:error, reason} -> raise "provider reducer failed: #{inspect(reason)}"
             other -> raise "invalid provider reducer response: #{inspect(other)}"
@@ -296,7 +296,7 @@ defmodule DSEx.Benchmarks.GEPAComBee do
       raise "live mode requires OPENAI_API_KEY"
     end
 
-    DSEx.req_llm(@model, api_key: key, temperature: 0, max_completion_tokens: @max_output_tokens)
+    Imp.req_llm(@model, api_key: key, temperature: 0, max_completion_tokens: @max_output_tokens)
   end
 
   defp mode! do
@@ -320,4 +320,4 @@ defmodule DSEx.Benchmarks.GEPAComBee do
   end
 end
 
-DSEx.Benchmarks.GEPAComBee.run()
+Imp.Benchmarks.GEPAComBee.run()

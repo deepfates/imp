@@ -218,8 +218,9 @@ defmodule Imp.IdentityAssessmentConsolidation do
     JSV.build!(source.data, formats: true)
   rescue
     error ->
-      raise ArgumentError,
-            "#{source.path}: invalid JSON schema: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [message: "#{source.path}: invalid JSON schema: #{Exception.message(error)}"],
+              __STACKTRACE__
   end
 
   defp load_jsonl_sources!(paths, cwd) do

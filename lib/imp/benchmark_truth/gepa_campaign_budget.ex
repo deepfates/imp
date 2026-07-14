@@ -197,7 +197,9 @@ defmodule Imp.BenchmarkTruth.GepaCampaignBudget do
     }
   rescue
     error in [Jason.DecodeError, KeyError] ->
-      raise ArgumentError, "invalid GEPA budget checkpoint #{path}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [message: "invalid GEPA budget checkpoint #{path}: #{Exception.message(error)}"],
+              __STACKTRACE__
   end
 
   defp reservation_bounds(state, messages, opts) do

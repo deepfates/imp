@@ -13,8 +13,12 @@ defmodule Imp.ReproductionRegistry do
     validate!(registry, Imp.EvidenceAuthorities.load!(authority_path), root)
   rescue
     error in [File.Error, Jason.DecodeError, ArgumentError, KeyError] ->
-      raise ArgumentError,
-            "invalid reproduction registry #{Path.expand(path)}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid reproduction registry #{Path.expand(path)}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate!(
@@ -141,14 +145,20 @@ defmodule Imp.ReproductionRegistry do
       try do
         String.to_existing_atom(module_name)
       rescue
-        ArgumentError -> raise ArgumentError, "protocol #{id} validator module does not exist"
+        ArgumentError ->
+          reraise ArgumentError,
+                  [message: "protocol #{id} validator module does not exist"],
+                  __STACKTRACE__
       end
 
     function_atom =
       try do
         String.to_existing_atom(function)
       rescue
-        ArgumentError -> raise ArgumentError, "protocol #{id} validator function does not exist"
+        ArgumentError ->
+          reraise ArgumentError,
+                  [message: "protocol #{id} validator function does not exist"],
+                  __STACKTRACE__
       end
 
     unless is_integer(arity) and arity >= 0 and Code.ensure_loaded?(module) and

@@ -11,8 +11,11 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
     validate!(manifest, path, opts)
   rescue
     error in Jason.DecodeError ->
-      raise ArgumentError,
-            "invalid RLM campaign manifest JSON #{path}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message: "invalid RLM campaign manifest JSON #{path}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate!(manifest, path, opts \\ [])
