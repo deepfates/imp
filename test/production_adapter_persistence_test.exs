@@ -636,9 +636,28 @@ defmodule ProductionAdapterPersistenceTest do
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
           cond do
-            prompt =~ "precision" -> %{reasoning: "exact", precision: 1, recall: 1, f1: 1}
-            prompt =~ "completeness" -> %{reasoning: "grounded", completeness: 1, groundedness: 1}
-            true -> %{answer: "Paris"}
+            prompt =~ "precision" ->
+              %{reasoning: "exact", precision: 1, recall: 1, f1: 1}
+
+            prompt =~ "completeness" ->
+              %{
+                reasoning: "complete",
+                ground_truth_key_ideas: "a",
+                system_response_key_ideas: "a",
+                discussion: "same",
+                completeness: 1
+              }
+
+            prompt =~ "groundedness" ->
+              %{
+                reasoning: "grounded",
+                system_response_claims: "a",
+                discussion: "supported",
+                groundedness: 1
+              }
+
+            true ->
+              %{answer: "Paris"}
           end
         end
       ]

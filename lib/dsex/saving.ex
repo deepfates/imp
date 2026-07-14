@@ -256,11 +256,26 @@ defmodule DSEx.Saving do
   end
 
   defp dump_state(%DSEx.Evaluate.SemanticF1{} = evaluator) do
-    %{"type" => "semantic_f1", "predict" => dump(evaluator.predict)}
+    %{
+      "type" => "semantic_f1",
+      "predict" => dump(evaluator.predict),
+      "threshold" => evaluator.threshold,
+      "decompositional" => evaluator.decompositional
+    }
+  end
+
+  defp dump_state(%DSEx.Evaluate.CompleteAndGrounded{predict: predict})
+       when not is_nil(predict) do
+    %{"type" => "complete_and_grounded", "predict" => dump(predict)}
   end
 
   defp dump_state(%DSEx.Evaluate.CompleteAndGrounded{} = evaluator) do
-    %{"type" => "complete_and_grounded", "predict" => dump(evaluator.predict)}
+    %{
+      "type" => "complete_and_grounded_v2",
+      "completeness" => dump(evaluator.completeness),
+      "groundedness" => dump(evaluator.groundedness),
+      "threshold" => evaluator.threshold
+    }
   end
 
   defp dump_state(%DSEx.Optimizer.KNNFewShot.Program{} = program) do
@@ -589,7 +604,9 @@ defmodule DSEx.Saving do
     require_keys!(state, ["type", "predict"])
 
     %DSEx.Evaluate.SemanticF1{
-      predict: require_chain_of_thought!(load(state["predict"]), "SemanticF1")
+      predict: require_chain_of_thought!(load(state["predict"]), "SemanticF1"),
+      threshold: require_threshold!(Map.get(state, "threshold", 0.66), "SemanticF1 threshold"),
+      decompositional: Map.get(state, "decompositional", false) == true
     }
   end
 
@@ -598,6 +615,18 @@ defmodule DSEx.Saving do
 
     %DSEx.Evaluate.CompleteAndGrounded{
       predict: require_chain_of_thought!(load(state["predict"]), "CompleteAndGrounded")
+    }
+  end
+
+  def load(%{"type" => "complete_and_grounded_v2"} = state) do
+    require_keys!(state, ["type", "completeness", "groundedness", "threshold"])
+
+    %DSEx.Evaluate.CompleteAndGrounded{
+      completeness:
+        require_chain_of_thought!(load(state["completeness"]), "CompleteAndGrounded completeness"),
+      groundedness:
+        require_chain_of_thought!(load(state["groundedness"]), "CompleteAndGrounded groundedness"),
+      threshold: require_threshold!(state["threshold"], "CompleteAndGrounded threshold")
     }
   end
 
