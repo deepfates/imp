@@ -31,7 +31,8 @@ DSEx.get(prediction, :answer)
 ```
 
 For source development, clone the repository, run `mix deps.get`, and use
-`mix test`. In a source checkout, `mix production.check` is the quality gate.
+`mix test`. In a source checkout, `mix production.check` is the quality gate and
+`mix livebook.execute.check` executes the full notebook learning path.
 
 The learning-path snippets are executed by
 `test/learning_path_contract_test.exs`; the one live-provider snippet is

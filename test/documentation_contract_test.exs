@@ -111,31 +111,32 @@ defmodule DocumentationContractTest do
     refute learner_text =~ "mix evidence.check"
   end
 
-  test "README teaches the new-app onboarding path" do
-    body = File.read!("README.md")
+  test "README routes onboarding into the executable canonical learning path" do
+    readme = File.read!("README.md")
+    learning = File.read!("docs/LEARNING_PATH.md")
+    docs = File.read!("docs/README.md")
 
-    assert body =~ "Program, don't prompt"
-    assert body =~ "mix new qa_bot --sup"
-    assert body =~ "DSEx.LM.Static"
-    assert body =~ "DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat]"
-    assert body =~ "OPENAI_MODEL"
-    assert body =~ "livebooks/01_real_lm_front_door.livemd"
-    refute body =~ "05_real_lm_wow_path"
+    assert readme =~ "Program your LMs on the BEAM"
+    assert readme =~ "DSEx.LM.Static"
+    assert readme =~ "docs/LEARNING_PATH.md"
+    assert readme =~ "test/learning_path_contract_test.exs"
+    assert learning =~ "DSEx.context/2"
+    assert learning =~ "OPENAI_MODEL"
+    assert docs =~ "livebooks/01_real_lm_front_door.livemd"
+    refute readme =~ "05_real_lm_wow_path"
   end
 
   test "docs teach the cutover Livebook sequence with real LM first" do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
-    learning = File.read!("docs/LEARNING_PATH.md")
     api = File.read!("docs/API_GUIDE.md")
     philosophy = File.read!("docs/DSEX_PHILOSOPHY.md")
 
-    assert readme =~ "The manual teaches one path all the way through"
+    assert readme =~ "canonical, self-contained route"
     assert docs =~ "## Manual Spine"
-    assert readme =~ "- `01_real_lm_front_door.livemd`"
+    assert readme =~ "docs/LEARNING_PATH.md"
     assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
-    assert learning =~ "Open `livebooks/01_real_lm_front_door.livemd`"
-    assert learning =~ "The sequence is deliberately the same everywhere"
+    assert docs =~ "[05 Operate And Live Checks](../livebooks/05_operate_and_live_checks.livemd)"
 
     assert api =~
              "signature -> program -> call -> evaluate -> optimize -> tools/agents -> operate"
@@ -144,18 +145,15 @@ defmodule DocumentationContractTest do
 
     refute readme =~ "01_programming_not_prompting"
     refute docs =~ "05 Real LM Wow Path"
-    refute learning =~ "Open `livebooks/02_programming_not_prompting.livemd`."
-    refute learning =~ "Optimize A Program"
   end
 
-  test "README distinguishes ReAct programs from agent runtimes in the quick path" do
-    body = File.read!("README.md")
+  test "canonical API guide distinguishes ReAct programs from agent runtimes" do
+    body = File.read!("docs/API_GUIDE.md")
 
-    assert body =~ "### Tools And ReAct"
-    assert body =~ "react =\n  DSEx.react"
+    assert body =~ "## Tools And ReAct"
+    assert body =~ "DSEx.react"
     assert body =~ "DSEx.Agent"
-    refute body =~ "### Tools And Agents"
-    refute body =~ "agent =\n  DSEx.react"
+    assert body =~ "explicit Elixir agent runtime"
   end
 
   test "API guide teaches facade-first composition helpers" do

@@ -34,6 +34,8 @@ Every guide and notebook follows the same product story:
 
 - [API Guide](API_GUIDE.md): task-oriented examples for normal application
   code.
+- [Tutorial And Example Parity](TUTORIAL_EXAMPLE_PARITY.md): where each
+  tutorial and real-world example family belongs in the executable DSEx path.
 - [Advanced DSEx](ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic fixtures.
 - [RLM Fidelity](RLM_FIDELITY.md): the BEAM-native recursive-control design,

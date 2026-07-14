@@ -156,3 +156,12 @@ File.rm(path)
   loaded.lm
 }
 ```
+
+## Canonical Deployment Reference
+
+For a production application, use
+[`examples/deployment`](../examples/deployment/README.md). It is the canonical
+DSEx deployment path: a supervised application loads a checksummed artifact,
+rebinds credentials from the environment, and runs provider calls through
+bounded workers. The static answer setting in that reference is only a smoke
+mode; production uses `DSEX_MODEL` and `DSEX_API_KEY`.

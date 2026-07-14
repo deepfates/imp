@@ -160,6 +160,7 @@ defmodule DSEx.MixProject do
       "docs/RESEARCH_LANDSCAPE.md",
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",
+      "docs/TUTORIAL_EXAMPLE_PARITY.md",
       "docs/ADVANCED.md",
       "docs/REACT_V2_FIDELITY.md",
       "docs/RLM_FIDELITY.md",
