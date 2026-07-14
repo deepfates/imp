@@ -1574,7 +1574,8 @@ defmodule DSEx.Clients.OpenAITrainer do
     end
   end
 
-  defp encode_jsonl(examples, encoder) do
+  @doc false
+  def encode_jsonl(examples, encoder \\ nil) do
     examples
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, []}, fn {example, index}, {:ok, rows} ->
