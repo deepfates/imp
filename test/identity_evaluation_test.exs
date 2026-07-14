@@ -148,6 +148,49 @@ defmodule DSEx.IdentityEvaluationTest do
              view["unranked"]
   end
 
+  test "uncalibrated model confidence does not reweight assessment scores" do
+    registry = [observation("cand-a", "Alpha")]
+
+    assessments =
+      [{0, 1.0}, {5, 0.1}, {5, 0.1}]
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{score, confidence}, replicate} ->
+        %{
+          "id" => "assessment-confidence-#{replicate}",
+          "candidate_id" => "cand-a",
+          "confidence" => confidence,
+          "scores" => %{"semantic-truth" => score},
+          "context" => %{}
+        }
+      end)
+
+    atlas = %{
+      "atlas_version" => 1,
+      "assessment_axes" => [%{"id" => "semantic-truth"}],
+      "audiences" => [],
+      "brand_architectures" => [],
+      "coverage_requirements" => %{"required_assessment_replicates_for_ranked_views" => 3}
+    }
+
+    scenarios = %{
+      "schema_version" => 1,
+      "tier_thresholds" => [%{"tier" => "A", "minimum" => 0.0}],
+      "scenarios" => [
+        %{"id" => "test", "label" => "Test", "weights" => %{"semantic-truth" => 1.0}}
+      ]
+    }
+
+    assert {:ok, report} =
+             IdentityEvaluation.compile(registry, assessments, [], [], atlas, scenarios)
+
+    [candidate] = report["candidates"]
+    axis = candidate["axis_scores"]["semantic-truth"]
+
+    assert report["score_aggregation"] == "equal_assessment_mean"
+    assert_in_delta axis["mean"], 10 / 3, 1.0e-12
+    assert_in_delta axis["mean_confidence"], 0.4, 1.0e-12
+  end
+
   defp observation(candidate_id, surface) do
     %{
       "event_type" => "candidate_observed",

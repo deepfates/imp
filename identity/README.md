@@ -167,6 +167,12 @@ The corpus supports several views:
 - wildcard, dissent, and resurrection pools;
 - flagged and collision-heavy candidates, still recoverable.
 
+Scenario scores use an equal mean across the completed assessment profiles.
+Model-reported confidence remains visible as metadata but does not weight the
+vote: confidence scales are not calibrated across providers, and allowing one
+provider's confidence style to determine its influence would break jury
+independence.
+
 No global winner is computed during divergence.
 
 ### 7. Test Saturation

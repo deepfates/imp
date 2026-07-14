@@ -66,6 +66,7 @@ defmodule DSEx.IdentityEvaluation do
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
          "atlas_version" => atlas["atlas_version"],
          "scenario_schema_version" => scenario_config["schema_version"],
+         "score_aggregation" => "equal_assessment_mean",
          "selection_made" => false,
          "summary" => %{
            "candidate_entities" => map_size(entities),
@@ -266,11 +267,10 @@ defmodule DSEx.IdentityEvaluation do
           inner,
           [
             Access.key(candidate_id, %{}),
-            Access.key(axis, %{weighted_sum: 0.0, confidence_sum: 0.0, raw_sum: 0.0, count: 0})
+            Access.key(axis, %{confidence_sum: 0.0, raw_sum: 0.0, count: 0})
           ],
           fn aggregate ->
             %{
-              weighted_sum: aggregate.weighted_sum + score * confidence,
               confidence_sum: aggregate.confidence_sum + confidence,
               raw_sum: aggregate.raw_sum + score,
               count: aggregate.count + 1
@@ -282,12 +282,12 @@ defmodule DSEx.IdentityEvaluation do
     |> Map.new(fn {candidate_id, axes} ->
       values =
         Map.new(axes, fn {axis, aggregate} ->
-          mean =
-            if aggregate.confidence_sum > 0,
-              do: aggregate.weighted_sum / aggregate.confidence_sum,
-              else: aggregate.raw_sum / aggregate.count
-
-          {axis, %{"mean" => mean, "replicates" => aggregate.count}}
+          {axis,
+           %{
+             "mean" => aggregate.raw_sum / aggregate.count,
+             "mean_confidence" => aggregate.confidence_sum / aggregate.count,
+             "replicates" => aggregate.count
+           }}
         end)
 
       {candidate_id, values}
