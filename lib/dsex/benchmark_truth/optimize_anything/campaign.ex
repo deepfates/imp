@@ -194,7 +194,7 @@ defmodule DSEx.BenchmarkTruth.OptimizeAnything.Campaign do
     {elapsed_us, result, usage} =
       measure_usage(fn ->
         :timer.tc(fn ->
-          OptimizeAnything.optimize(
+          OptimizeAnything.run(
             evaluator.baseline(),
             &evaluator.evaluate/2,
             config: config,

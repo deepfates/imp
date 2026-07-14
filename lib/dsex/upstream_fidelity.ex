@@ -441,7 +441,7 @@ defmodule DSEx.UpstreamFidelity do
       source: "dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457",
       disposition: :conformant,
       ticket: "de-izej",
-      dsex: [DSEx.Optimizer.GEPA, DSEx.Optimize.GEPA],
+      dsex: [DSEx.Optimizer.GEPA, DSEx.Optimize.Anything],
       invariants: [
         "reflective mutation uses per-example feedback and trajectories",
         "candidate lineage and Pareto state are retained",
@@ -450,7 +450,7 @@ defmodule DSEx.UpstreamFidelity do
       ],
       evidence: %{
         tests: [
-          "test/optimize_gepa_test.exs",
+          "test/optimize_anything_runner_test.exs",
           "test/gepa_engine_test.exs",
           "test/gepa_contract_artifact_test.exs",
           "test/gepa_replication_artifact_test.exs"

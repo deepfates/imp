@@ -3,7 +3,7 @@ defmodule DSEx.Benchmarks do
 
   alias DSEx.Agent
   alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.GEPA
+  alias DSEx.Optimize.Anything.{Config, Result}
 
   def run do
     [
@@ -93,26 +93,19 @@ defmodule DSEx.Benchmarks do
   end
 
   defp prompt_optimization do
-    artifact = Anything.new_artifact(:prompt, "Base")
-
     report =
-      GEPA.optimize(
-        artifact,
-        fn artifact, examples ->
-          %{
-            per_example_scores:
-              Enum.map(examples, fn expected ->
-                if artifact.text =~ expected, do: 1.0, else: 0.0
-              end),
-            asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
-          }
-        end,
-        examples: ["Paris", "concise"],
-        generations: 2,
-        mutation_fn: fn _artifact, asi, _generation -> Enum.join(asi, "\n") end
+      Anything.run(
+        "Base",
+        fn candidate, expected -> if(candidate =~ expected, do: 1.0, else: 0.0) end,
+        dataset: ["Paris", "concise"],
+        config: deterministic_config(2),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          current = Map.fetch!(candidate, component)
+          if current =~ "Paris", do: current, else: current <> "\nParis\nconcise"
+        end
       )
 
-    result(:prompt_optimization, report.best.aggregate_score)
+    result(:prompt_optimization, Result.best_candidate(report) |> prompt_score())
   end
 
   defp program_reward_optimization do
@@ -136,28 +129,27 @@ defmodule DSEx.Benchmarks do
   end
 
   defp arbitrary_artifact_optimization do
-    artifact = Anything.new_artifact(:config, "mode=slow")
-
     report =
-      Anything.optimize(
-        artifact,
-        fn artifact, _examples ->
+      Anything.run(
+        "mode=slow",
+        fn candidate ->
           cond do
-            artifact.text =~ "mode=fast" and artifact.text =~ "timeout=5" -> 1.0
-            artifact.text =~ "mode=fast" -> 0.5
+            candidate =~ "mode=fast" and candidate =~ "timeout=5" -> 1.0
+            candidate =~ "mode=fast" -> 0.5
             true -> 0.0
           end
         end,
-        trials: 2,
-        mutation_fn: fn _artifact, trial, _seed ->
-          case trial do
-            1 -> "mode=fast"
-            2 -> "timeout=5"
-          end
+        config: deterministic_config(2),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          current = Map.fetch!(candidate, component)
+
+          if current =~ "mode=fast",
+            do: current <> "\ntimeout=5",
+            else: current <> "\nmode=fast"
         end
       )
 
-    result(:arbitrary_artifact_optimization, report.best.score)
+    result(:arbitrary_artifact_optimization, Result.best_candidate(report) |> config_score())
   end
 
   defp result(name, score), do: %{name: name, score: score, threshold: 1.0}
@@ -204,20 +196,16 @@ defmodule DSEx.Benchmarks do
   end
 
   defp prompt_optimization_negative do
-    artifact = Anything.new_artifact(:prompt, "Base")
-
     report =
-      GEPA.optimize(
-        artifact,
-        fn _artifact, examples ->
-          %{per_example_scores: Enum.map(examples, fn _ -> 0.0 end), asi: examples}
-        end,
-        examples: ["Paris", "concise"],
-        generations: 1,
-        mutation_fn: fn _artifact, _asi, _generation -> "still wrong" end
+      Anything.run(
+        "Base",
+        fn _candidate, _example -> 0.0 end,
+        dataset: ["Paris", "concise"],
+        config: deterministic_config(1),
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "still wrong" end
       )
 
-    result(:prompt_optimization_negative, report.best.aggregate_score)
+    result(:prompt_optimization_negative, Result.best_candidate(report) |> prompt_score())
   end
 
   defp program_reward_optimization_negative do
@@ -238,17 +226,34 @@ defmodule DSEx.Benchmarks do
   end
 
   defp arbitrary_artifact_optimization_negative do
-    artifact = Anything.new_artifact(:config, "mode=slow")
-
     report =
-      Anything.optimize(
-        artifact,
-        fn _artifact, _examples -> 0.0 end,
-        trials: 1,
-        mutation_fn: fn _artifact, _trial, _seed -> "mode=slow" end
+      Anything.run(
+        "mode=slow",
+        fn _candidate -> 0.0 end,
+        config: deterministic_config(1),
+        fallback_proposer: fn candidate, _component, _records, _iteration -> candidate end
       )
 
-    result(:arbitrary_artifact_optimization_negative, report.best.score)
+    result(
+      :arbitrary_artifact_optimization_negative,
+      Result.best_candidate(report) |> config_score()
+    )
+  end
+
+  defp deterministic_config(max_candidate_proposals) do
+    Config.new(engine: [max_candidate_proposals: max_candidate_proposals, parallel: false])
+  end
+
+  defp prompt_score(candidate) do
+    if candidate =~ "Paris" and candidate =~ "concise", do: 1.0, else: 0.0
+  end
+
+  defp config_score(candidate) do
+    cond do
+      candidate =~ "mode=fast" and candidate =~ "timeout=5" -> 1.0
+      candidate =~ "mode=fast" -> 0.5
+      true -> 0.0
+    end
   end
 
   defp reward_lm do

@@ -393,7 +393,7 @@ Status: `conformant`
 
 Upstream source: `dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457`
 
-DSEx modules: `DSEx.Optimizer.GEPA`, `DSEx.Optimize.GEPA`
+DSEx modules: `DSEx.Optimizer.GEPA`, `DSEx.Optimize.Anything`
 Semantic invariants:
 
 - reflective mutation uses per-example feedback and trajectories
@@ -403,7 +403,7 @@ Semantic invariants:
 
 Executable evidence:
 
-- test: `test/optimize_gepa_test.exs`
+- test: `test/optimize_anything_runner_test.exs`
 - test: `test/gepa_engine_test.exs`
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`

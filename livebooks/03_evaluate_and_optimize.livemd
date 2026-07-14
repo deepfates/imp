@@ -118,28 +118,35 @@ This is the broader DSEx philosophy in miniature: define an artifact, define
 how to score it, then let the system propose and evaluate changes.
 
 ```elixir
-artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
+alias DSEx.Optimize.Anything
+alias DSEx.Optimize.Anything.{Config, Result}
 
-report =
-  DSEx.Optimize.Anything.optimize(
-    artifact,
-    fn artifact, _examples ->
+result =
+  Anything.run(
+    "mode=slow",
+    fn candidate ->
       cond do
-        artifact.text =~ "mode=fast" and artifact.text =~ "timeout=5" -> 1.0
-        artifact.text =~ "mode=fast" -> 0.5
+        candidate =~ "mode=fast" and candidate =~ "timeout=5" -> 1.0
+        candidate =~ "mode=fast" -> 0.5
         true -> 0.0
       end
     end,
-    trials: 2,
-    mutation_fn: fn _artifact, trial, _seed ->
-      case trial do
-        1 -> "mode=fast"
-        2 -> "timeout=5"
-      end
-    end
+    config:
+      Config.new(
+        engine: [max_candidate_proposals: 2, parallel: false],
+        reflection: [
+          custom_candidate_proposer: fn candidate, component, _records, _iteration ->
+            current = Map.fetch!(candidate, component)
+
+            if current =~ "mode=fast",
+              do: current <> "\ntimeout=5",
+              else: current <> "\nmode=fast"
+          end
+        ]
+      )
   )
 
-report.best
+Result.best_candidate(result)
 ```
 
 ## Live Evaluation Proof
@@ -235,29 +242,29 @@ The key idea is not "make a bigger prompt." The key idea is to preserve useful
 diagnostics from failures and use them as material for the next candidate.
 
 ```elixir
-reflection_lm = %{
-  module: DSEx.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{mutation: "Paris\nconcise"} end]
-}
+alias DSEx.Optimize.Anything
+alias DSEx.Optimize.Anything.{Config, Result}
 
-artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
-
-report =
-  DSEx.Optimize.GEPA.optimize(
-    artifact,
-    fn artifact, examples ->
-      %{
-        per_example_scores: Enum.map(examples, &if(String.contains?(artifact.text, &1), do: 1.0, else: 0.0)),
-        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
-      }
+result =
+  Anything.run(
+    "Base",
+    fn candidate, requirement ->
+      if String.contains?(candidate, requirement), do: 1.0, else: {0.0, %{feedback: requirement}}
     end,
-    examples: ["Paris", "concise"],
-    dev_examples: ["Paris"],
-    generations: 1,
-    reflection_lm: reflection_lm
+    dataset: ["Paris", "concise"],
+    valset: ["Paris"],
+    config:
+      Config.new(
+        engine: [max_candidate_proposals: 1, parallel: false],
+        reflection: [
+          custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+            "Paris\nconcise"
+          end
+        ]
+      )
   )
 
-report.best
+Result.best_candidate(result)
 ```
 
 Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs

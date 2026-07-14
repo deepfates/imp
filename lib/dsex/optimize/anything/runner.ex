@@ -397,6 +397,7 @@ defmodule DSEx.Optimize.Anything.Runner do
       unknown -> raise ArgumentError, "unknown Optimize Anything options: #{inspect(unknown)}"
     end
 
+    validate_resume_state!(opts)
     validate_optional_callback!(opts, :checkpoint_fn, 1)
     validate_optional_callback!(opts, :fallback_proposer, 4)
 
@@ -424,6 +425,13 @@ defmodule DSEx.Optimize.Anything.Runner do
       value ->
         raise ArgumentError,
               ":#{key} must be nil or an arity-#{arity} function, got: #{inspect(value)}"
+    end
+  end
+
+  defp validate_resume_state!(opts) do
+    case DSEx.Optimize.Anything.validate_resume_state(Keyword.get(opts, :resume_state)) do
+      {:ok, _state} -> :ok
+      {:error, message} -> raise ArgumentError, ":resume_state #{message}"
     end
   end
 

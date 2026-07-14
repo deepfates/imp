@@ -100,9 +100,12 @@ defmodule DSEx.Optimizer.GEPA do
   ]
 
   @compile_option_schema [
-    resume_state: [type: {:custom, DSEx.Optimize.GEPA, :validate_resume_state, []}, default: nil],
+    resume_state: [
+      type: {:custom, DSEx.Optimize.Anything, :validate_resume_state, []},
+      default: nil
+    ],
     checkpoint_fn: [
-      type: {:custom, DSEx.Optimize.GEPA, :validate_checkpoint_fn, []},
+      type: {:custom, DSEx.Optimize.Anything, :validate_checkpoint_fn, []},
       default: nil
     ]
   ]
@@ -234,7 +237,7 @@ defmodule DSEx.Optimizer.GEPA do
           proposal_timeout: optimizer.proposal_timeout,
           max_concurrency: optimizer.max_concurrency,
           timeout: optimizer.timeout,
-          implementation: DSEx.Optimize.GEPA,
+          implementation: __MODULE__,
           engine: Engine,
           frontier_size: length(Engine.frontier(state)),
           frontier_type: optimizer.frontier_type,

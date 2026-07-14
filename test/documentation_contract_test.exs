@@ -260,18 +260,18 @@ defmodule DocumentationContractTest do
              "Trainer options accept `nil`, a trainer module, a configured trainer struct, or\nan arity-3 callback"
   end
 
-  test "GEPA documentation is precise about DSEx-native scope" do
+  test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
     api = File.read!("docs/API_GUIDE.md")
     advanced = File.read!("docs/ADVANCED.md")
     coverage = File.read!("docs/COVERAGE_MATRIX.md")
     parity = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
 
-    assert api =~ "Elixir-native reflective optimizer"
-    assert api =~ "not a wrapper around Python GEPA"
+    assert api =~ "## Optimize Arbitrary Artifacts"
+    assert api =~ "sole\nOptimize Anything surface"
     assert api =~ "proposer_lm:"
     assert api =~ "reject malformed\nvalues when the optimizer is built or run"
-    assert advanced =~ "not a Python GEPA wrapper"
-    assert advanced =~ "does\nnot imply paper-scale benchmark results"
+    assert advanced =~ "public frontend delegates to the production GEPA engine"
+    assert advanced =~ "not a claim of parity with unreleased GEPA\nmain"
     assert coverage =~ "GEPA-style reflection"
     assert parity =~ "GEPA-style optimizer rows"
   end
@@ -495,43 +495,25 @@ defmodule DocumentationContractTest do
     assert %DSEx.Predict.RAG{retriever: %DSEx.Retrieve.Memory{}} = DSEx.Saving.load!(path)
   end
 
-  test "API guide Optimize.Anything and GEPA examples produce improving reports" do
-    artifact = DSEx.Optimize.Anything.new_artifact(:config, "mode=slow")
-
-    report =
-      DSEx.Optimize.Anything.optimize(
-        artifact,
-        fn artifact, _examples ->
-          if artifact.text =~ "mode=fast", do: 1.0, else: 0.0
-        end,
-        trials: 1,
-        mutation_fn: fn _artifact, _trial, _seed -> "mode=fast" end
+  test "API guide Optimize Anything example produces an improving result" do
+    result =
+      DSEx.Optimize.Anything.run(
+        "mode=slow",
+        fn candidate -> if(candidate =~ "mode=fast", do: 1.0, else: 0.0) end,
+        config:
+          DSEx.Optimize.Anything.Config.new(
+            engine: [max_candidate_proposals: 1, parallel: false],
+            reflection: [
+              custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+                "mode=fast"
+              end
+            ]
+          )
       )
 
-    assert report.baseline.score == 0.0
-    assert report.best.score == 1.0
-    assert report.best.artifact.text =~ "mode=fast"
-
-    prompt = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
-
-    gepa_report =
-      DSEx.Optimize.GEPA.optimize(
-        prompt,
-        fn artifact, examples ->
-          %{
-            per_example_scores:
-              Enum.map(examples, &if(String.contains?(artifact.text, &1), do: 1.0, else: 0.0)),
-            asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
-          }
-        end,
-        examples: ["Paris", "concise"],
-        dev_examples: ["Paris"],
-        generations: 2,
-        mutation_fn: fn _artifact, asi, _generation -> {:replace, Enum.join(asi, " ")} end
-      )
-
-    assert gepa_report.best.aggregate_score >= gepa_report.baseline.aggregate_score
-    assert gepa_report.metadata.frontier_size >= 1
+    assert hd(result.validation_scores) == 0.0
+    assert DSEx.Optimize.Anything.Result.best_candidate(result) == "mode=fast"
+    assert Enum.max(result.validation_scores) == 1.0
   end
 
   test "API guide MCP import example returns ordinary DSEx tools" do

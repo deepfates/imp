@@ -569,7 +569,7 @@ defmodule GepaCampaignTest do
     assert %{report: %{"rows" => [_row]}} = Task.await(task, 5_000)
   end
 
-  test "DSEx GEPA campaign consumes and clears persisted optimizer generation state" do
+  test "DSEx GEPA campaign rejects artifact optimizer state at the program resume boundary" do
     dataset_root = tmp_dir("gepa-campaign-generation-resume-data")
     rows_dir = tmp_dir("gepa-campaign-generation-resume-rows")
     write_dataset_root!(dataset_root)
@@ -593,19 +593,21 @@ defmodule GepaCampaignTest do
       |> Jason.decode!()
       |> Map.fetch!("families")
 
-    artifact =
-      DSEx.Optimize.Anything.new_artifact(:instruction, spec["instructions"])
-
     receiver = self()
 
-    DSEx.Optimize.GEPA.optimize(
-      artifact,
-      fn _artifact, examples ->
-        %{per_example_scores: Enum.map(examples, fn _example -> 1.0 end)}
-      end,
-      examples: [:dev_one, :dev_two],
-      generations: 1,
-      mutation_fn: fn _artifact, _asi, _generation -> "checkpointed mutation" end,
+    DSEx.Optimize.Anything.run(
+      spec["instructions"],
+      fn _candidate, _example -> 1.0 end,
+      dataset: [:dev_one, :dev_two],
+      config:
+        DSEx.Optimize.Anything.Config.new(
+          engine: [max_candidate_proposals: 1, parallel: false],
+          reflection: [
+            custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+              "checkpointed mutation"
+            end
+          ]
+        ),
       checkpoint_fn: fn state ->
         send(receiver, {:optimizer_checkpoint, state})
         :ok
@@ -639,39 +641,12 @@ defmodule GepaCampaignTest do
              }
            } = interrupted["in_progress"]
 
-    assert Enum.map(candidates, & &1["id"]) == ["baseline", "gepa-1"]
+    assert Enum.map(candidates, & &1["id"]) == [0]
     assert interrupted["completed"] == []
 
-    usage_lm =
-      static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, handler_opts ->
-        :telemetry.execute(
-          [:req_llm, :token_usage],
-          %{total_cost: 0.001, tokens: %{input_tokens: 10, output_tokens: 5}},
-          %{}
-        )
-
-        static_gold_handler(messages, handler_opts)
-      end)
-
-    result = opts |> Keyword.put(:lm, usage_lm) |> GepaCampaign.run()
-
-    assert [
-             %{
-               "results" => %{"dsex_gepa" => %{"candidate_count" => count}},
-               "token_cost" => token_cost
-             }
-           ] =
-             result.report["rows"]
-
-    assert count >= 3
-    assert token_cost["usd"] > 0.5
-    assert token_cost["input_tokens"] > 50
-    assert token_cost["output_tokens"] > 25
-
-    resumed = checkpoint_path |> File.read!() |> Jason.decode!()
-    assert resumed["in_progress"] == %{}
-    assert Enum.map(resumed["completed"], & &1["seed"]) == [0]
+    assert_raise ArgumentError, ~r/GEPA resume state does not match the seed candidate/, fn ->
+      GepaCampaign.run(opts)
+    end
   end
 
   test "DSEx GEPA campaign rejects checkpoint configuration and dataset mismatches" do

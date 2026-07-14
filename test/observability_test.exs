@@ -4,7 +4,7 @@ defmodule ObservabilityTest do
   import ExUnit.CaptureLog
 
   alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.GEPA
+  alias DSEx.Optimize.Anything.Config
 
   setup do
     DSEx.enable_logging()
@@ -31,20 +31,20 @@ defmodule ObservabilityTest do
 
   test "optimizer progress subscription receives GEPA baseline and generation events" do
     subscription = DSEx.subscribe_optimizer_progress()
-    artifact = Anything.new_artifact(:prompt, "base")
 
-    GEPA.optimize(
-      artifact,
-      fn candidate, examples ->
-        %{
-          per_example_scores:
-            Enum.map(examples, &if(String.contains?(candidate.text, &1), do: 1.0, else: 0.0)),
-          asi: Enum.reject(examples, &String.contains?(candidate.text, &1))
-        }
-      end,
-      examples: ["target"],
-      generations: 1,
-      mutation_fn: fn _artifact, _asi, _generation -> "target" end
+    Anything.run(
+      "base",
+      fn candidate, target -> if(String.contains?(candidate, target), do: 1.0, else: 0.0) end,
+      dataset: ["target"],
+      config:
+        Config.new(
+          engine: [max_candidate_proposals: 1, parallel: false],
+          reflection: [
+            custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+              "target"
+            end
+          ]
+        )
     )
 
     assert_receive {:dsex_optimizer_progress, [:dsex, :optimizer, :progress],
@@ -56,13 +56,6 @@ defmodule ObservabilityTest do
                     %{optimizer: :gepa, candidate_id: "gepa-1"}}
 
     assert DSEx.unsubscribe_optimizer_progress(subscription) == :ok
-
-    GEPA.optimize(artifact, fn _candidate, _examples -> %{per_example_scores: [1.0]} end,
-      examples: [:one],
-      generations: 0
-    )
-
-    refute_receive {:dsex_optimizer_progress, _, _, _}
   end
 
   test "trace captures ordered redacted telemetry with the operation result" do

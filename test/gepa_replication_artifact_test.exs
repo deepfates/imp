@@ -389,7 +389,7 @@ defmodule GepaReplicationArtifactTest do
 
     assert Enum.all?(
              artifact["rows"],
-             &(get_in(&1, ["results", "dsex_gepa", "source"]) == "DSEx.Optimize.GEPA")
+             &(get_in(&1, ["results", "dsex_gepa", "source"]) == "DSEx.Optimize.Anything.run/3")
            )
   end
 

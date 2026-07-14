@@ -19,7 +19,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
   use Mix.Task
 
   alias DSEx.BenchmarkTruth.{ArtifactFile, GepaReplicationContract}
-  alias DSEx.Optimize.{Anything, GEPA}
+  alias DSEx.Optimize.Anything
+  alias DSEx.Optimize.Anything.{Config, Result}
 
   @shortdoc "Validate GEPA paper-replication rows"
 
@@ -572,17 +573,27 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
     baseline_text = "Solve the task."
 
     dsex_report =
-      GEPA.optimize(
-        Anything.new_artifact(:instruction, baseline_text),
+      Anything.run(
+        baseline_text,
         smoke_evaluator(),
-        examples: examples,
-        dev_examples: examples,
-        generations: length(requirements),
-        mutation_fn: fn _artifact, asi, _generation -> Enum.join(asi, "\n") end
+        dataset: examples,
+        valset: examples,
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: length(requirements), parallel: false],
+            reflection: [
+              custom_candidate_proposer: fn candidate, component, _records, iteration ->
+                requirement = Enum.at(requirements, iteration)
+                Map.fetch!(candidate, component) <> "\n" <> requirement
+              end
+            ]
+          )
       )
 
-    baseline_score = dsex_report.baseline.aggregate_score
-    dsex_score = dsex_report.best.metadata.dev_score || dsex_report.best.aggregate_score
+    baseline_score = hd(dsex_report.validation_scores)
+
+    dsex_score =
+      dsex_report |> Result.best_index() |> then(&Enum.at(dsex_report.validation_scores, &1))
 
     %{
       "family" => family,
@@ -590,7 +601,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
       "model" => "deterministic/local-gepa-smoke",
       "reflection_model" => "deterministic/mutation-fn",
       "metric_calls" => metric_calls,
-      "actual_metric_calls" => length(dsex_report.candidates) * length(examples),
+      "actual_metric_calls" => dsex_report.total_metric_calls,
       "token_cost" => %{
         "usd" => 0.0,
         "input_tokens" => 0,
@@ -613,9 +624,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
         },
         "dsex_gepa" => %{
           "score" => dsex_score,
-          "source" => "DSEx.Optimize.GEPA",
+          "source" => "DSEx.Optimize.Anything.run/3",
           "candidate_count" => length(dsex_report.candidates),
-          "frontier_size" => length(dsex_report.frontier)
+          "frontier_size" => map_size(dsex_report.instance_frontier)
         },
         "mipro_v2" => %{
           "score" => baseline_score,
@@ -629,20 +640,14 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaReplication do
     }
   end
 
-  defp smoke_evaluator do
-    fn artifact, examples ->
-      scores =
-        Enum.map(examples, fn requirement ->
-          if String.contains?(artifact.text, requirement), do: 1.0, else: 0.0
-        end)
-
-      %{
-        per_example_scores: scores,
-        asi: Enum.reject(examples, &String.contains?(artifact.text, &1)),
-        diagnostics: ["deterministic GEPA replication smoke row"]
-      }
+  defp smoke_evaluator,
+    do: fn candidate, requirement ->
+      if String.contains?(candidate, requirement),
+        do: 1.0,
+        else:
+          {0.0,
+           %{feedback: requirement, diagnostics: ["deterministic GEPA replication smoke row"]}}
     end
-  end
 
   defp timestamp_slug do
     DateTime.utc_now()
