@@ -1,0 +1,758 @@
+{
+  "artifact_type": "dsex_provider_training_dataset",
+  "digests": {
+    "held_out": "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1",
+    "train": "sha256:0fa1c7321f2773485139a544054c619620f048ebd8dd52552e3a2ca57878b1ba"
+  },
+  "held_out": [
+    {
+      "id": "banking77-test-800",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I payed with a card and was charged an extra fee"
+    },
+    {
+      "id": "banking77-test-801",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I was charged a fee after using my card and I shouldn't have been."
+    },
+    {
+      "id": "banking77-test-802",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Is there a reason I was charged a fee for using my card as payment? I've never had an extra fee before."
+    },
+    {
+      "id": "banking77-test-803",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I show another charge on my card from when I used it, why?"
+    },
+    {
+      "id": "banking77-test-804",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why do I get charged additional fees on some payments, but not others?"
+    },
+    {
+      "id": "banking77-test-805",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I used my card for a purchase and was charged a fee"
+    },
+    {
+      "id": "banking77-test-806",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why was I charged for card payment?"
+    },
+    {
+      "id": "banking77-test-807",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "There is an unauthorized fee."
+    },
+    {
+      "id": "banking77-test-808",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I would appreciate that someone let me know when there is an extra charge for payments. I was checking the app earlier and saying a charge on one of my payments that was additional that no one made me aware of before."
+    },
+    {
+      "id": "banking77-test-809",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why was I charged an extra fee when paying with my card?"
+    },
+    {
+      "id": "banking77-test-1080",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I have a strange payment in my statement"
+    },
+    {
+      "id": "banking77-test-1081",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There is a charge on my card that I did not make"
+    },
+    {
+      "id": "banking77-test-1082",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I saw a payment i did not do"
+    },
+    {
+      "id": "banking77-test-1083",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There is a payment that is not mine in the app.  Please advise/"
+    },
+    {
+      "id": "banking77-test-1084",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "An unauthorized payment is in my app"
+    },
+    {
+      "id": "banking77-test-1085",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I did not make this card payment."
+    },
+    {
+      "id": "banking77-test-1086",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "What should I do if I see a payment I didn't make?"
+    },
+    {
+      "id": "banking77-test-1087",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I found an unauthorized card payment"
+    },
+    {
+      "id": "banking77-test-1088",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "there is a transaction on my account that i didnt make"
+    },
+    {
+      "id": "banking77-test-1089",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I don't recall making that payment?"
+    },
+    {
+      "id": "banking77-test-1600",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "My card payment is still on hold, why is it so?"
+    },
+    {
+      "id": "banking77-test-1601",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why is my payment pending?"
+    },
+    {
+      "id": "banking77-test-1602",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "My card payment is still pending."
+    },
+    {
+      "id": "banking77-test-1603",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "How do i finalize a card payment"
+    },
+    {
+      "id": "banking77-test-1604",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why is my card payment showing as pending?"
+    },
+    {
+      "id": "banking77-test-1605",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why has my payment not gone through?"
+    },
+    {
+      "id": "banking77-test-1606",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Please help me to know the status of my card payment as its pending since a while."
+    },
+    {
+      "id": "banking77-test-1607",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I recently made a payment, and it is showing up in my account as \"pending\". What does that mean?"
+    },
+    {
+      "id": "banking77-test-1608",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "What does it mean by pending payment?"
+    },
+    {
+      "id": "banking77-test-1609",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "When will my card payment be done pending?"
+    },
+    {
+      "id": "banking77-test-2080",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I think my card payment has been stopped"
+    },
+    {
+      "id": "banking77-test-2081",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My card payment was reverted.  Why?"
+    },
+    {
+      "id": "banking77-test-2082",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "the app reverted my payment"
+    },
+    {
+      "id": "banking77-test-2083",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My card payment was cancelled."
+    },
+    {
+      "id": "banking77-test-2084",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Why was my payment cancelled?"
+    },
+    {
+      "id": "banking77-test-2085",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I made a payment but the app reverted the payment."
+    },
+    {
+      "id": "banking77-test-2086",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My payment was reverted by the app"
+    },
+    {
+      "id": "banking77-test-2087",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Hello, My money went through for my purchase but now I got contacted from the seller noting that they didn't receive it. Then the money was returned to my account and I'm not sure why this occurred. So if you can resolve this issue please."
+    },
+    {
+      "id": "banking77-test-2088",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Please explain to me the circumstances in which my card payment would be reverted?"
+    },
+    {
+      "id": "banking77-test-2089",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Why has my card payment been cancelled?"
+    }
+  ],
+  "payload_sha256": "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f",
+  "route_codes": [
+    "R17",
+    "R42",
+    "R68",
+    "R93"
+  ],
+  "schema_version": 1,
+  "selection": {
+    "held_out_per_label": 10,
+    "selected_source_labels": [
+      "card_payment_fee_charged",
+      "card_payment_not_recognised",
+      "pending_card_payment",
+      "reverted_card_payment?"
+    ],
+    "strategy": "first rows in canonical source order per selected label",
+    "train_held_out_overlap": [],
+    "train_per_label": 20
+  },
+  "source": {
+    "dataset": "PolyAI/banking77",
+    "license": "cc-by-4.0",
+    "paper": "https://arxiv.org/abs/2003.04807v2",
+    "revision": "90d4e2ee5521c04fc1488f065b8b083658768c57"
+  },
+  "task": "opaque-route adaptation over natural BANKING77 customer queries",
+  "train": [
+    {
+      "id": "banking77-train-2511",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "There was a fee charged when I paid with my card."
+    },
+    {
+      "id": "banking77-train-2512",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I received a fee I should not have."
+    },
+    {
+      "id": "banking77-train-2513",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why am I being a charged for using my card?"
+    },
+    {
+      "id": "banking77-train-2514",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Tell me why there is a fee for a card payment."
+    },
+    {
+      "id": "banking77-train-2515",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I don't understand why I'm being charged for using my card."
+    },
+    {
+      "id": "banking77-train-2516",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I paid with my card so so why was I charged a transaction fee?"
+    },
+    {
+      "id": "banking77-train-2517",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I shouldn't have been charged but I see a fee, why?"
+    },
+    {
+      "id": "banking77-train-2518",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "i made a payment with my card and was charged a fee, why would you do that"
+    },
+    {
+      "id": "banking77-train-2519",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "A fee came along with me paying with card"
+    },
+    {
+      "id": "banking77-train-2520",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I had to pay a fee when buying items with my card."
+    },
+    {
+      "id": "banking77-train-2521",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why is there a fee when I thought there would be no fees?"
+    },
+    {
+      "id": "banking77-train-2522",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why are there fees for using a card?"
+    },
+    {
+      "id": "banking77-train-2523",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I had to pay money for paying with my card."
+    },
+    {
+      "id": "banking77-train-2524",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I'm going on holiday to France for 6 weeks with my family and the cat, Fluffy.  I just purchased \u20ac10,000 from a currency exchange to ensure we don't run short but there appears to be a fee.  What is this for?"
+    },
+    {
+      "id": "banking77-train-2525",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "What are the reasons to be charged a fee on card payments?"
+    },
+    {
+      "id": "banking77-train-2526",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I paid with card and was charged a fee that shouldn't be there!"
+    },
+    {
+      "id": "banking77-train-2527",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why was I charged an extra fee when paying with card?"
+    },
+    {
+      "id": "banking77-train-2528",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I noticed a new fee on my account. I didn't know there were fees for these payments. What is the policy?"
+    },
+    {
+      "id": "banking77-train-2529",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "I don't understand why I was charged an additional fee for this service. Can you clarify?"
+    },
+    {
+      "id": "banking77-train-2530",
+      "route": "R17",
+      "source_label": "card_payment_fee_charged",
+      "utterance": "Why is there a fee for using my card?"
+    },
+    {
+      "id": "banking77-train-3482",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There's a payment with my card that I didn't perform. I don't know that name shown."
+    },
+    {
+      "id": "banking77-train-3483",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "My statement indicates I made a payment to an unfamiliar merchant."
+    },
+    {
+      "id": "banking77-train-3484",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There's a payment with my card that I definitely didn't do myself, never seen that name before."
+    },
+    {
+      "id": "banking77-train-3485",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "Help! In the app there is a payment that I don't remember."
+    },
+    {
+      "id": "banking77-train-3486",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I don't understand where this charge came from."
+    },
+    {
+      "id": "banking77-train-3487",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "there is a charge i dont recognize"
+    },
+    {
+      "id": "banking77-train-3488",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I need to figure out what these charges are on my account. They've been coming out for a couple of days. Can i get all of this money back? Also, I need to freeze my card."
+    },
+    {
+      "id": "banking77-train-3489",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "Someone might have access to my card!  There are some strange payments showing up on my account.  What do I do?"
+    },
+    {
+      "id": "banking77-train-3490",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There are a couple payments with my card shown in the app that i really didn't make myself. What's going on with this, does someone has access to my card?!"
+    },
+    {
+      "id": "banking77-train-3491",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I'm using the app and I noticed a payment that I didn't make."
+    },
+    {
+      "id": "banking77-train-3492",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "A strange card payment, I do not recognize it."
+    },
+    {
+      "id": "banking77-train-3493",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "They is a payment I don't recognize on my statement."
+    },
+    {
+      "id": "banking77-train-3494",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I have an unusual payment in my statement"
+    },
+    {
+      "id": "banking77-train-3495",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I do not recognize the card payment."
+    },
+    {
+      "id": "banking77-train-3496",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "Hi something is going on with the app.  I see some payments I didn't make?"
+    },
+    {
+      "id": "banking77-train-3497",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "If I see a payment in the app that I don't recognize, what should I do?"
+    },
+    {
+      "id": "banking77-train-3498",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I do not recognise the card payment."
+    },
+    {
+      "id": "banking77-train-3499",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "There are a couple payments with my card shown in the app that i really didn't make myself. What's happenning with this, does someone has access to my card?!"
+    },
+    {
+      "id": "banking77-train-3500",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "Just today there was a purchase on my card that wasn't done by me. Can this be reversed and my card be frozen? I can't have this continue!"
+    },
+    {
+      "id": "banking77-train-3501",
+      "route": "R42",
+      "source_label": "card_payment_not_recognised",
+      "utterance": "I need some help now please! There are some transactions on my account that I do not remember purchasing. Can they be reversed? Can you please cancel or freeze my card so I don't keep getting charged?!"
+    },
+    {
+      "id": "banking77-train-5092",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "What does it mean when a payment is pending?"
+    },
+    {
+      "id": "banking77-train-5093",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Could you please tell me why my purchases from this morning say payment is pending?"
+    },
+    {
+      "id": "banking77-train-5094",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "The purchase I made is still pending."
+    },
+    {
+      "id": "banking77-train-5095",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Is there a problem with the payment that I see is still pending?"
+    },
+    {
+      "id": "banking77-train-5096",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "There is a payment that I made that hasn't gone through yet."
+    },
+    {
+      "id": "banking77-train-5097",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "How long does it actually take for a card payment to go through? There's one stuck since a couple days already that doesn't seem to move"
+    },
+    {
+      "id": "banking77-train-5098",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why does my payment appear as pending?"
+    },
+    {
+      "id": "banking77-train-5099",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "How long does a payment usually show as pending? Is it normal that mine is still pending?"
+    },
+    {
+      "id": "banking77-train-5100",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why is my payment in pending status?"
+    },
+    {
+      "id": "banking77-train-5101",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I have a card payment which shows as pending"
+    },
+    {
+      "id": "banking77-train-5102",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I made a payment with my card and it hasn't changed. How long do you think this will take?"
+    },
+    {
+      "id": "banking77-train-5103",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why is the payment showing as pending from things I bought this morning?"
+    },
+    {
+      "id": "banking77-train-5104",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I made a card payment which is showing me pending."
+    },
+    {
+      "id": "banking77-train-5105",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why are my payments not working and show pending?"
+    },
+    {
+      "id": "banking77-train-5106",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I put in a payment a while ago and it has still not cleared and is showing up as \"pending\", how long does it take to clear?"
+    },
+    {
+      "id": "banking77-train-5107",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Why are the things I bought earlier today still showing as pending?"
+    },
+    {
+      "id": "banking77-train-5108",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "Card payment still pending."
+    },
+    {
+      "id": "banking77-train-5109",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "My card payment is just showing up as pending since forever, what's going on with that, it should be going through at some point?"
+    },
+    {
+      "id": "banking77-train-5110",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I have a payment that has not gone through yet"
+    },
+    {
+      "id": "banking77-train-5111",
+      "route": "R68",
+      "source_label": "pending_card_payment",
+      "utterance": "I initiated a payment a while ago and it is still showing as \"pending\", how long will it take to clear?"
+    },
+    {
+      "id": "banking77-train-6722",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I wanted to purchase something online but the payment was returned back to me. This has been going on for a couple of weeks. Please tell me what is going on here?"
+    },
+    {
+      "id": "banking77-train-6723",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I tried to use my debit card, but the payment did not work."
+    },
+    {
+      "id": "banking77-train-6724",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Hi, I had an issue with my card payment and It shows on my account that my payment went through. Then I got contacted from the seller saying \"they did not receive my payment\" then the payment was returned to my account. so I would like to see why it did that please."
+    },
+    {
+      "id": "banking77-train-6725",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I think my card payment has been reverted"
+    },
+    {
+      "id": "banking77-train-6726",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Tell me why my card payment would be reverted."
+    },
+    {
+      "id": "banking77-train-6727",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Why has my card payment been reversed?"
+    },
+    {
+      "id": "banking77-train-6728",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I didn't cancel my card payment."
+    },
+    {
+      "id": "banking77-train-6729",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Can you tell me why the card payment came back?"
+    },
+    {
+      "id": "banking77-train-6730",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "How come the money from the merchant appeared back into my account?"
+    },
+    {
+      "id": "banking77-train-6731",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My payment was terminated"
+    },
+    {
+      "id": "banking77-train-6732",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I think my card payment has been refunded"
+    },
+    {
+      "id": "banking77-train-6733",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I made a payment and it was reverted and wanted to know why?"
+    },
+    {
+      "id": "banking77-train-6734",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Is it on purpose that my payment has been returned to my account?"
+    },
+    {
+      "id": "banking77-train-6735",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "The app reverted the payment I made."
+    },
+    {
+      "id": "banking77-train-6736",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "Why would my payment have been returned to my account?"
+    },
+    {
+      "id": "banking77-train-6737",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I bought something and already paid for it but now I don't see it."
+    },
+    {
+      "id": "banking77-train-6738",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I really wanted to buy something online but seems the card is not working as the payment suddenly came back! What's going on here, I've been trying for a good week or two."
+    },
+    {
+      "id": "banking77-train-6739",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My payment has been cancelled"
+    },
+    {
+      "id": "banking77-train-6740",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "I made a payment but it was returned."
+    },
+    {
+      "id": "banking77-train-6741",
+      "route": "R93",
+      "source_label": "reverted_card_payment?",
+      "utterance": "My card payment has been cancelled"
+    }
+  ]
+}
