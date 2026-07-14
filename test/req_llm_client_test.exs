@@ -841,30 +841,4 @@ defmodule ReqLLMClientTest do
 
     assert %DSEx.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
   end
-
-  test "save/load restores the known OpenAI-compatible API mode option as a keyword" do
-    path =
-      Path.join(System.tmp_dir!(), "dsex-local-openai-#{System.unique_integer([:positive])}.json")
-
-    on_exit(fn -> File.rm(path) end)
-
-    model = %{
-      provider: :openai,
-      id: "default_model",
-      model: "default_model",
-      base_url: "http://127.0.0.1:18826/v1"
-    }
-
-    program =
-      DSEx.predict(DSEx.signature("question -> answer"),
-        lm: DSEx.req_llm(model, use_responses_api: false)
-      )
-
-    :ok = DSEx.save!(program, path)
-    loaded = DSEx.load!(path)
-
-    assert %DSEx.Clients.ReqLLM{opts: opts} = DSEx.ProgramAccess.lm(loaded)
-    assert opts[:use_responses_api] == false
-    assert Keyword.keyword?(opts)
-  end
 end

@@ -256,8 +256,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
           api_key: "local",
           temperature: 0,
           max_tokens: 32,
-          timeout: 120_000,
-          use_responses_api: false
+          timeout: 120_000
         )
 
       server = %{

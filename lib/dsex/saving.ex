@@ -1228,7 +1228,6 @@ defmodule DSEx.Saving do
       "cache" -> :cache
       "rollout_id" -> :rollout_id
       "native_json_schema" -> :native_json_schema
-      "use_responses_api" -> :use_responses_api
       "provider_options" -> :provider_options
       "base_url" -> :base_url
       other -> other
