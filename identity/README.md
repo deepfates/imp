@@ -14,6 +14,12 @@ The complete 2,052-candidate frontier is in
 candidate per row. Each role cell uses `tier/rank` (`A/3` means tier A, rank 3
 for that role); `best_rank` is only a compact sort key, not a universal score.
 
+The current owner-guided naming pass is in
+[`reports/taste-convergence-review.md`](reports/taste-convergence-review.md).
+It ranks the complete 220-name owner-guided frontier, preserves every generated
+candidate, separates master-brand and narrower-role judgments, and holds the
+unrevealed candidate outside the field for a blind comparison.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate
