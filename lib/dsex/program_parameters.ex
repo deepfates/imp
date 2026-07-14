@@ -2,9 +2,9 @@ defmodule DSEx.ProgramParameters do
   @moduledoc """
   Named optimizer lenses and typed parameter snapshots for DSEx programs.
 
-  `predictors/1` remains the compatibility surface used by existing
-  instruction and demonstration optimizers. `snapshot/1`, `diff/2`, and
-  `apply_changes/2` add a bounded data-only contract: IDs are stable strings,
+  `predictors/1` is the canonical lens used by instruction and demonstration
+  optimizers. `snapshot/1`, `diff/2`, and `apply_changes/2` provide a bounded
+  data-only contract: IDs are stable strings,
   values are JSON data, each change carries a content digest guard, and a
   multi-change update is committed atomically.
 

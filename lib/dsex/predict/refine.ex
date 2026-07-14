@@ -4,8 +4,8 @@ defmodule DSEx.Predict.Refine do
 
   With no explicit `:feedback_fn`, Refine uses the wrapped program's LM to ask
   for bounded repair advice after a below-threshold attempt. The advice is
-  passed to the next attempt as `:hint_`. Explicit callbacks remain the
-  compatibility path and take precedence over automatic feedback.
+  passed to the next attempt as `:hint_`. An explicit callback selects custom
+  feedback generation and takes precedence over automatic feedback.
   """
 
   alias DSEx.Predict.Attempt

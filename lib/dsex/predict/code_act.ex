@@ -170,7 +170,7 @@ defmodule DSEx.Predict.CodeAct do
     case finished_state(prediction) do
       true -> extract_final(code_act, inputs, trace, program, value)
       false -> continue_or_extract(code_act, inputs, trace, iteration, program, value)
-      :legacy -> project_legacy(code_act, inputs, trace, prediction, program, value)
+      :direct -> project_direct(code_act, inputs, trace, prediction, program, value)
     end
   end
 
@@ -184,14 +184,17 @@ defmodule DSEx.Predict.CodeAct do
     end
   end
 
-  defp project_legacy(code_act, inputs, trace, prediction, program, value) do
+  defp project_direct(code_act, inputs, trace, prediction, program, value) do
     case ProgramOfThought.project_outputs(code_act.program_of_thought, prediction, value) do
-      {:ok, projected} -> {:ok, put_trace(projected, trace)}
-      {:error, reason} -> legacy_extract(code_act, inputs, trace, program, value, reason)
+      {:ok, projected} ->
+        {:ok, put_trace(projected, trace)}
+
+      {:error, reason} ->
+        extract_on_projection_failure(code_act, inputs, trace, program, value, reason)
     end
   end
 
-  defp legacy_extract(code_act, inputs, trace, program, value, projection_error) do
+  defp extract_on_projection_failure(code_act, inputs, trace, program, value, projection_error) do
     case extract_final(code_act, inputs, trace, program, value) do
       {:ok, _prediction} = ok -> ok
       {:error, _reason} -> {:error, projection_error}
@@ -233,7 +236,7 @@ defmodule DSEx.Predict.CodeAct do
     cond do
       Map.has_key?(fields, :finished) -> Map.fetch!(fields, :finished)
       Map.has_key?(fields, "finished") -> Map.fetch!(fields, "finished")
-      true -> :legacy
+      true -> :direct
     end
   end
 
