@@ -1,357 +1,52 @@
 # DSEx
 
-Program, don't prompt, your LMs on the BEAM.
+Program your LMs on the BEAM.
 
-DSEx lets you describe an LM task as a typed signature, run it as an ordinary
-Elixir program, evaluate it on examples, improve it with optimizers, and save
-the result. It follows the DSPy philosophy of signatures, modules, tools, and
-compilers, but the shape is Elixir: explicit structs, behaviours,
-OTP-friendly clients, supervised runtime boundaries, process-local
-configuration, and local quality gates you can run in CI.
+DSEx turns an LM task into an ordinary Elixir value: a typed input/output
+signature, a callable program, examples, a metric, and optional program
+transformations. The model provider is a runtime dependency, so deterministic
+tests use `DSEx.LM.Static` and a live provider does not change the task shape.
 
-Use DSEx when prompts have grown into application logic and you want them to
-become code: named inputs and outputs, schema validation, traces, metrics,
-examples, retrieval, tools, agents, and repeatable evaluation.
-
-The manual teaches one path all the way through:
-
-1. Declare a typed task and run it against a real LM.
-2. Develop the same task deterministically with `DSEx.LM.Static`.
-3. Add examples, metrics, and optimizers.
-4. Add tools, retrieval, agents, or recursive control only when the task needs
-   them.
-5. Operate the result with explicit credentials, redaction, gates, and live
-   checks.
-
-## A Tiny Program
+Install from Git with `{:dsex, github: "deepfates/dsex", branch: "main"}`.
+In a source checkout, use `{:dsex, path: "."}` while developing against the
+local repository. Then follow the [Learning Path](docs/LEARNING_PATH.md). It is
+the canonical, self-contained route from a signature and `Predict` through
+evaluation, measured optimization, tools/ReAct, retrieval, RLM, persistence,
+observability, and OTP deployment.
 
 ```elixir
-Mix.install([
-  {:dsex, github: "deepfates/dsex", branch: "main"}
-])
-```
-
-When running this snippet from a source checkout, use the local path dependency
-instead:
-
-```elixir
-Mix.install([
-  {:dsex, path: "."}
-])
-```
-
-Then declare and call the program:
-
-```elixir
-
-lm =
-  %{
-    module: DSEx.LM.Static,
-    opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-  }
-
-DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
-
-program =
-  "question -> answer: short_span"
-  |> DSEx.signature(
-    "Answer with the shortest correct span. Do not explain."
-  )
-  |> DSEx.predict()
-
-{:ok, prediction} =
-  DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
-
-DSEx.get(prediction, :answer)
-#=> "Paris"
-```
-
-For the live-model version of the same idea, use ReqLLM and keep the program
-shape unchanged:
-
-```elixir
-lm =
-  DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
-    temperature: 0,
-    api_key: System.fetch_env!("OPENAI_API_KEY")
-  )
-
-DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
-```
-
-The program stays the same. That is the point: your task contract, adapters,
-metrics, and optimizers are ordinary Elixir values, while the LM is just a
-runtime dependency.
-
-For the canonical real-LM walkthrough, open
-`livebooks/01_real_lm_front_door.livemd`. It walks through structured extraction,
-changing modules, ReAct tools, and save/load using `OPENAI_API_KEY` and
-`OPENAI_MODEL`. Livebook 03 covers evaluation and optimization, including the
-live-provider proof path for those workflows.
-
-You can also build the same program without the pipe:
-
-```elixir
-signature =
-  DSEx.signature(
-    "question -> answer: short_span",
-    "Answer with the shortest correct span. Do not explain."
-  )
-
-program = DSEx.predict(signature)
-```
-
-## What You Get
-
-| Area | What to use first | What it gives you |
-| --- | --- | --- |
-| Task contracts | `DSEx.signature/2` | Named inputs/outputs, types, instructions, constraints |
-| Calling models | `DSEx.predict/2` | One LM call with validated structured output |
-| Testing | `DSEx.LM.Static` | Deterministic examples without provider credentials |
-| Providers | `DSEx.req_llm/2` | ReqLLM-backed access to production model APIs |
-| Evaluation | `DSEx.evaluate/4`, `DSEx.Metrics` | Scores, feedback, traces, metric metadata |
-| Optimization | `DSEx.optimize/4`, `DSEx.Optimizer.*` | Better demos, instructions, and program variants |
-| Retrieval | `DSEx.memory/2`, `DSEx.retrieve/3`, `DSEx.knn/3`, `DSEx.rag/3` | Local retrieval and retrieval-augmented programs |
-| Composition | `DSEx.best_of_n/3`, `DSEx.refine/3`, `DSEx.parallel/3` | Scored retries, feedback loops, and supervised batches |
-| Tools | `DSEx.react/3`, `DSEx.tool/4` | Tool-calling programs with validated final submission |
-| Agents | `DSEx.Agent` | Explicit Elixir runtimes with tools and event streams |
-| Advanced loops | CodeAct, program-of-thought, recursive control | Sandboxed code/tool/recurse workflows for harder tasks |
-| Maintainer source-checkout gates | `mix production.check` | Repository release checks for formatting, compile, tests, package shape, Livebook validation, and docs |
-
-## Installation
-
-For local development:
-
-```sh
-git clone https://github.com/deepfates/dsex.git
-cd dsex
-mix deps.get
-mix test
-```
-
-In another project, use the current Git dependency:
-
-```elixir
-def deps do
-  [
-    {:dsex, github: "deepfates/dsex", branch: "main"}
-  ]
-end
-```
-
-## Your First DSEx App
-
-In a new Elixir app, keep the first DSEx program deterministic and testable:
-
-```sh
-mix new qa_bot --sup
-cd qa_bot
-```
-
-Add DSEx to `mix.exs`, then write a normal ExUnit test:
-
-```elixir
-defmodule QaBotTest do
-  use ExUnit.Case
-
-  test "answers through a declared DSEx program" do
-    lm = %{
-      module: DSEx.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
-
-    program =
-      "question -> answer: short_span"
-      |> DSEx.signature("Answer with the shortest correct span.")
-      |> DSEx.predict(lm: lm)
-
-    assert {:ok, prediction} =
-             DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
-
-    assert DSEx.get(prediction, :answer) == "Paris"
-  end
-end
-```
-
-When the test is useful, move the LM dependency to runtime configuration or a
-request-scoped `DSEx.context/2` call:
-
-```elixir
-lm =
-  DSEx.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
-    api_key: System.fetch_env!("OPENAI_API_KEY"),
-    temperature: 0
-  )
-
-DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
-  DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
-end)
-```
-
-## Common Workflows
-
-### Typed Outputs
-
-```elixir
-signature =
-  DSEx.signature(
-    "text -> sentiment: enum[positive,negative], confidence: number",
-    "Classify the sentiment of the text."
-  )
-
-program = DSEx.predict(signature, adapter: DSEx.Adapter.JSON)
-```
-
-The JSON adapter validates the model output and returns retry feedback when a
-field is missing or violates the schema.
-
-### Evaluation
-
-```elixir
-qa_lm = %{
+# learning-path-contract: readme_predict
+lm = %{
   module: DSEx.LM.Static,
   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
 }
 
-qa_program = DSEx.predict("question -> answer", lm: qa_lm)
+program =
+  "question -> answer: short_span"
+  |> DSEx.signature("Answer with the shortest correct span.")
+  |> DSEx.predict(lm: lm)
 
-devset = [
-  DSEx.example(question: "Capital of France?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
-]
-
-metric = DSEx.exact_match(:answer)
-
-report = DSEx.evaluate(qa_program, devset, metric)
-
-report.score
+{:ok, prediction} = DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+DSEx.get(prediction, :answer)
 ```
 
-Metrics can return booleans, numeric scores, or structured maps with feedback
-and metadata. Extractive QA tasks can use `DSEx.extractive_qa/3` to
-record exact match, F1, answer type, and span relation.
+For source development, clone the repository, run `mix deps.get`, and use
+`mix test`. In a source checkout, `mix production.check` is the quality gate.
 
-### Optimization
-
-```elixir
-trainset = [
-  DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
-  |> DSEx.with_inputs(:question)
-]
-
-optimizer =
-  DSEx.Optimizer.RandomSearch.new(metric,
-    candidates: 8,
-    demos_per_candidate: 2
-  )
-
-compiled =
-  DSEx.optimize(
-    qa_program,
-    optimizer,
-    trainset,
-    devset
-  )
-```
-
-DSEx optimizers compile programs into better programs. Reports are persisted as
-data, so you can inspect what changed and why.
-
-### Tools And ReAct
-
-```elixir
-tool_lm = %{
-  module: DSEx.LM.Static,
-  opts: [
-    handler: fn _messages, _opts ->
-      %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
-    end
-  ]
-}
-
-lookup =
-  DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
-    "Paris"
-  end)
-
-react =
-  DSEx.react("question -> answer: short_span", [lookup],
-    lm: tool_lm,
-    tool_policy: [:lookup, :submit]
-  )
-```
-
-Tool policies make side effects explicit. ReAct uses provider tool calls when
-the configured LM supports them and validates final submissions against the
-original signature. For long-running agent runtimes with event streams, see
-the Agents section in `docs/API_GUIDE.md` or Livebook 04.
+The learning-path snippets are executed by
+`test/learning_path_contract_test.exs`; the one live-provider snippet is
+explicitly credential-gated. The supplied
+`examples/deployment` application shows supervised
+artifact loading and bounded concurrent calls.
 
 ## Documentation
 
-Start here:
-
-- [Documentation Guide](docs/README.md)
 - [Learning Path](docs/LEARNING_PATH.md)
 - [API Guide](docs/API_GUIDE.md)
-- [Glossary](docs/GLOSSARY.md)
-- [Philosophy](docs/DSEX_PHILOSOPHY.md)
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md)
+- [Glossary](docs/GLOSSARY.md)
+- [Architecture](docs/ARCHITECTURE.md)
 
-The `livebooks/` directory contains runnable tutorials:
-
-- `01_real_lm_front_door.livemd`: the canonical real-LM program shape.
-- `02_programming_not_prompting.livemd`: the same shape with deterministic
-  local development and inspectable traces.
-- `03_evaluate_and_optimize.livemd`: examples, metrics, optimizers, and
-  artifact improvement.
-- `04_tools_agents_mcp_rlm.livemd`: tools, ReAct, agents, MCP, and RLM when a
-  task needs controlled action.
-- `05_operate_and_live_checks.livemd`: source-checkout gates, live checks,
-  security posture, and persistence.
-
-## Validation
-
-From the source checkout, the everyday local quality gate checks the package
-without spending provider tokens or depending on external datasets:
-
-```sh
-mix production.check
-```
-
-It runs formatting, compilation with warnings as errors, deterministic tests,
-package-boundary checks, Livebook validation, and ExDoc generation.
-
-When you change public examples or teaching material in the source checkout,
-also execute the shipped notebooks end to end:
-
-```sh
-mix livebook.execute.check
-```
-
-Provider-backed source-checkout checks are opt-in because they use live
-credentials:
-
-```sh
-LIVE_PROVIDER=1 mix live.check
-```
-
-Maintainer release-evidence commands live outside the normal product workflow.
-They are documented for reviewers who need to audit DSEx-vs-DSPy parity and
-performance claims.
-
-## Why Elixir?
-
-LM programs need the same things other production systems need: boundaries,
-observability, concurrency, supervised work, deterministic tests, and clear
-data contracts. Elixir is good at those things. DSEx tries to make language
-model behavior feel less like a pile of prompts and more like a system you can
-inspect, test, optimize, and operate.
-
-## Prior Art
-
-DSEx owes a clear conceptual debt to DSPy, Ax, GEPA, and optimize-anything
-style systems. It is not a Python compatibility layer. The goal is the same
-philosophy in an Elixir shape: declarative task contracts, measurable behavior,
-and self-improvement loops built from ordinary language and data.
-
-See [Prior Art](docs/PRIOR_ART.md) for the longer lineage.
+DSEx is inspired by DSPy's goal of declarative, measurable LM programs, with
+Elixir-native structs, behaviours, process-local configuration, supervision,
+and telemetry.

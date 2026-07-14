@@ -1,94 +1,302 @@
 # Learning Path
 
-DSEx is easiest to learn as a sequence of small powers. Each step should leave
-you with something runnable, inspectable, and testable.
+This is the canonical DSEx path. Work through it in order: each local snippet
+is deterministic and executed by `test/learning_path_contract_test.exs`. The
+only provider-backed snippet is labeled credential-gated.
 
-The sequence is deliberately the same everywhere in the docs: declare the
-signature, call a program, make it deterministic, measure it, optimize it, add
-action boundaries, then operate it.
+DSEx follows the DSPy idea that an LM program should be a declarative,
+measurable object rather than a prompt string. Its Elixir realization is a
+struct with explicit fields, behaviours at runtime boundaries, and values that
+fit naturally in ExUnit and OTP applications.
 
-## In 30 Minutes
+## 1. State The Contract
 
-Goal: understand the shape of a DSEx program.
+A signature names the inputs and outputs. `Predict` is the default module: one
+validated model call from that contract to a `DSEx.Prediction`. Start here
+instead of building an agent or assembling provider messages yourself.
 
-1. Read the first example in `README.md`.
-2. Open `livebooks/01_real_lm_front_door.livemd`.
-3. Run the live cells if `OPENAI_API_KEY` and `OPENAI_MODEL` are configured.
-4. Open `livebooks/02_programming_not_prompting.livemd` and run the same shape
-   with `DSEx.LM.Static`.
-5. Inspect `prediction.metadata.trace.messages`.
-6. Change the signature from `question -> answer` to a typed output such as
-   `question -> answer: short_span`.
-7. If you are starting a real app, follow "Your First DSEx App" in `README.md`
-   and put the deterministic program under ExUnit before adding live providers.
+```elixir
+# learning-path-contract: predict
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
 
-You should leave this step knowing that the prompt is generated from a
-signature, demos, inputs, and an adapter. The prompt matters, but it is not the
-API. You should also know that the same DSEx program can move between a real
-provider and `DSEx.LM.Static` without rewriting the task.
+program =
+  "question -> answer: short_span"
+  |> DSEx.signature("Answer with the shortest correct span.")
+  |> DSEx.predict(lm: lm)
 
-When credentials are loaded, each Livebook's proof cells should either return a
-validated result or raise. They are demos, but they are also tests.
+{:ok, prediction} = DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+DSEx.get(prediction, :answer)
+```
 
-## In 2 Hours
+`DSEx.LM.Static` makes the task contract testable without a provider. In an
+application, pass the LM to the program when its dependency should be explicit,
+or use `DSEx.context/2` for a request-scoped override.
 
-Goal: turn a prompt-like task into a measurable program.
+## 2. Measure Before Changing It
 
-1. Read `docs/API_GUIDE.md` through "The Canonical Path".
-2. Open `livebooks/03_evaluate_and_optimize.livemd`.
-3. Build three examples and mark their input fields.
-4. Write one metric.
-5. Evaluate a baseline.
-6. Attach demos with `LabeledFewShot`.
-7. Try `RandomSearch` or `InstructionSearch`.
+An evaluator applies one metric to labeled examples and returns an aggregate
+score plus per-example rows. This is the quality boundary that makes a change
+meaningful. Keep a held-out set for release decisions.
 
-You should leave this step knowing that optimizers improve programs only
-through metrics. If the metric is vague, the improvement loop is vague.
+```elixir
+# learning-path-contract: evaluate
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
 
-## In An Afternoon
+program = DSEx.predict("question -> answer", lm: lm)
 
-Goal: build a useful local workflow.
+devset = [
+  DSEx.example(question: "Capital of France?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
 
-1. Add schema-constrained outputs with `DSEx.Adapter.JSON`.
-2. Add one retrieval or tool boundary.
-3. Open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs
-   controlled action or context exploration.
-4. Run the program against deterministic local examples.
-5. Save and load the program.
-6. From the source checkout, run `mix production.check`.
+report = DSEx.evaluate(program, devset, DSEx.exact_match(:answer))
+report.score
+```
 
-At this point DSEx should feel like ordinary Elixir: structs, functions,
-tests, docs, and explicit dependencies.
+Use `DSEx.exact_match/1` when it represents the product requirement. For a
+different requirement, write a two- or three-arity metric that returns a
+boolean, number, or structured score with feedback. Inspect `report.rows` when
+the aggregate does not explain a failure.
 
-## In A Production App
+## 3. Improve With Measured Lift
 
-Goal: move from local deterministic behavior to live provider behavior without
-rewriting the task.
+An optimizer compiles a program into a candidate program. `LabeledFewShot`
+attaches selected labeled demonstrations; search optimizers such as
+`RandomSearch`, `MIPROv2`, and `GEPA` use the same metric to compare candidate
+programs. The important result is a score change on data that was not used to
+select the candidate.
 
-1. Use `DSEx.req_llm/2` as the provider boundary.
-2. Keep model names and API keys in runtime configuration.
-3. Use `DSEx.context/2` for request-scoped settings.
-4. Keep provider calls out of normal unit tests.
-5. From the source checkout, add opt-in live tests with `LIVE_PROVIDER=1 mix live.check`.
-6. Watch telemetry, traces, retries, and validation failures.
-7. Decide rollout, cost limits, provider-failure behavior, and data-retention
-   policy in the host application.
+```elixir
+# learning-path-contract: optimize
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      if prompt =~ "[[ ## answer ## ]]\nParis", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+    end
+  ]
+}
 
-The production move should change the LM dependency, not the shape of the
-program. That is the main design promise.
+program = DSEx.predict("question -> answer", lm: lm)
 
-## When To Reach For Advanced Pieces
+trainset = [
+  DSEx.example(question: "What is the capital of France?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
 
-Use advanced modules when the simpler flow has a real limitation:
+devset = [
+  DSEx.example(question: "Capital of France?", answer: "Paris")
+  |> DSEx.with_inputs(:question)
+]
 
-- `ChainOfThought` when you need a reasoning field for auditing or scoring.
-- `ReAct` when the model must choose tools before submitting an answer.
-- `ProgramOfThought` when a small sandboxed Elixir expression is the cleanest
-  way to compute the answer.
-- `CodeAct` when the model needs a bounded loop of observations and safe code.
-- `RLM` when a controller needs to explore context through explicit actions
-  instead of stuffing everything into one prompt.
-- `DSEx.Agent` when you want an explicit Elixir runtime with tools, child
-  agents, traces, and event streams.
+metric = DSEx.exact_match(:answer)
+baseline = DSEx.evaluate(program, devset, metric).score
+compiled = DSEx.optimize(program, DSEx.Optimizer.LabeledFewShot.new(k: 1), trainset)
+lifted = DSEx.evaluate(compiled, devset, metric).score
+{baseline, lifted}
+```
 
-Start with the front-door program. Add power only when the task earns it.
+The contract returns `{0.0, 1.0}`. That is a deliberately small proof that the
+program changed and the measurement detected a lift. In a real workflow, split
+train, development, and held-out release data; do not describe an optimization
+as an improvement until the held-out score supports it.
+
+## 4. Give The Program Bounded Actions
+
+ReAct is for tasks that need the model to choose an action, observe its result,
+and then submit typed outputs. A `DSEx.Tool` is a named unary Elixir function;
+the policy is the capability boundary. The reserved `submit` tool validates the
+original signature, so a tool loop cannot bypass the output contract.
+
+```elixir
+# learning-path-contract: react
+Process.put(:learning_path_react_actions, [
+  %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
+  %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+])
+
+try do
+  lm = %{
+    module: DSEx.LM.Static,
+    opts: [
+      handler: fn _messages, _opts ->
+        [action | rest] = Process.get(:learning_path_react_actions)
+        Process.put(:learning_path_react_actions, rest)
+        action
+      end
+    ]
+  }
+
+  lookup = DSEx.tool(:lookup, "Look up a capital", fn %{query: "capital-france"} -> "Paris" end)
+  program = DSEx.react("question -> answer: short_span", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+
+  {:ok, prediction} = DSEx.call(program, %{question: "What is France's capital?"})
+  DSEx.get(prediction, :answer)
+after
+  Process.delete(:learning_path_react_actions)
+end
+```
+
+Keep tool schemas, authorization, timeouts, idempotency, and audit boundaries
+in the host application. Use `ReAct` when the model needs to choose an action;
+call a regular Elixir function directly when the application already knows the
+action.
+
+## 5. Retrieve Context Deliberately
+
+Retrieval supplies context; it does not replace evaluation. `DSEx.memory/2` is
+a deterministic in-memory retriever for tests and local workflows. `DSEx.rag/3`
+retrieves, injects a context field, calls the wrapped program, and records the
+retrieved documents in prediction metadata.
+
+```elixir
+# learning-path-contract: retrieval
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, " ", & &1.content)
+      if prompt =~ "France has capital Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+    end
+  ]
+}
+
+retriever = DSEx.memory([%{id: "france", text: "France has capital Paris"}], k: 1)
+base = DSEx.predict("question, context -> answer", lm: lm)
+program = DSEx.rag(base, retriever, k: 1)
+
+{:ok, prediction} = DSEx.call(program, %{question: "capital France"})
+{DSEx.get(prediction, :answer), prediction.metadata.retrieval.count}
+```
+
+For an external store, implement the `DSEx.Retrieve` behaviour or pass a
+two-argument retriever function that returns `{:ok, docs}`. Evaluate retrieval
+and answer quality together, including cases where the relevant document is
+missing or misleading.
+
+## 6. Use RLM For Large-Context Control
+
+RLM is a recursive controller, not a synonym for RAG. It gives a controller LM
+a constrained persistent Elixir environment and bounded operations such as
+safe evaluation, sub-LM calls, recursion, loading serializable inputs, tools,
+and `submit/1`. Budgets cover iterations, sub-LM calls, recursion depth, time,
+and interpreter work.
+
+```elixir
+# learning-path-contract: rlm
+controller = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "Paris"}} end]
+}
+
+program = DSEx.rlm("question -> answer", lm: controller, max_iterations: 1)
+{:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+{DSEx.get(prediction, :answer), Enum.map(prediction.metadata.rlm_trace, & &1.action)}
+```
+
+Use RLM when a controller must explore or compute over context through those
+bounded actions. Set budgets before exposing production data, and inspect the
+redacted RLM trace before increasing them.
+
+## 7. Persist Programs, Not Secrets
+
+`DSEx.dump/1` and `DSEx.load/1` round-trip a portable program representation.
+`DSEx.save!/2` and `DSEx.load!/1` use JSON artifacts. Provider credentials are
+not persisted; rebind a loaded program with `DSEx.with_lm/2` or a scoped
+`DSEx.context/2`. Functions such as tools and custom metrics require named
+entries in `DSEx.Saving.Registry` before they can be saved.
+
+```elixir
+# learning-path-contract: persistence
+lm = %{
+  module: DSEx.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+path = Path.join(System.tmp_dir!(), "dsex-learning-path-#{System.unique_integer([:positive])}.json")
+
+try do
+  program = DSEx.predict("question -> answer", lm: lm)
+  :ok = DSEx.save!(program, path)
+  loaded = DSEx.load!(path)
+
+  {:ok, prediction} = DSEx.context([lm: lm], fn -> DSEx.call(loaded, %{question: "Capital of France?"}) end)
+  DSEx.get(prediction, :answer)
+after
+  File.rm(path)
+end
+```
+
+Treat an artifact as deployable program state. Review and version it alongside
+the metric and evaluation data that justified promotion.
+
+## 8. Inspect Runtime Behavior
+
+`DSEx.trace/2` captures selected redacted telemetry while a function runs.
+`DSEx.Observability.inspect_artifact/2`, `DSEx.inspect_history/2`, and
+`DSEx.Observability.status/1` provide bounded, redacted views of predictions,
+tool history, RLM traces, optimizer reports, and provider state. Subscribe with
+`DSEx.subscribe_optimizer_progress/1` when an interactive process needs
+optimizer progress events.
+
+```elixir
+# learning-path-contract: observability
+tool = DSEx.tool(:lookup, "Look up a capital", fn %{country: "France"} -> "Paris" end)
+
+trace =
+  DSEx.trace(fn ->
+    DSEx.Tool.call(tool, %{country: "France"})
+  end)
+
+{trace.result, Enum.map(trace.events, &elem(&1, 0))}
+```
+
+Telemetry is an observation boundary, not an authorization boundary. Keep
+redaction enabled unless debugging a controlled local input, and send the
+normalized status data to the application's metrics and alerting system.
+
+## 9. Deploy The Verified Artifact
+
+The supplied `examples/deployment` OTP application
+loads a checksummed artifact during supervised startup, binds credentials only
+at runtime, and executes requests in bounded `Task.Supervisor` workers. It
+returns overloads and timeouts instead of letting one slow provider call block
+the program server. Its behavior is exercised by
+`test/deployment_reference_test.exs`.
+
+For an application deployment, keep the artifact path, model name, API key,
+maximum concurrency, shutdown timeout, retry policy, and retention policy in
+runtime configuration. Evaluate the candidate before promotion, load the
+artifact through a trusted registry, rebind the live LM, and observe status,
+latency, validation errors, and costs after rollout.
+
+## Live Provider Boundary
+
+The local contracts above do not use provider credentials. This snippet is
+credential-gated: execute it only when `OPENAI_API_KEY` and `OPENAI_MODEL` are
+set, and keep it out of ordinary unit tests. The program and metric APIs do not
+change.
+
+```elixir
+# learning-path-credential-gated: live_provider
+lm =
+  DSEx.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
+    api_key: System.fetch_env!("OPENAI_API_KEY"),
+    temperature: 0
+  )
+
+program = DSEx.predict("question -> answer: short_span", lm: lm)
+DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+```
+
+Run the repository's opt-in provider checks with `LIVE_PROVIDER=1 mix
+live.check`. For everyday local validation, run `mix format --check-formatted`
+and `mix test test/learning_path_contract_test.exs`. From a source checkout,
+run `mix production.check` for the full quality gate.
