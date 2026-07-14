@@ -1,0 +1,1432 @@
+{
+  "inputs": {
+    "assessment_sources": [
+      {
+        "path": "identity/research/assessments.flash.jsonl",
+        "record_count": 464,
+        "sha256": "f802cbccb00cdab3051a5349f6f019e11f271312ef9c4acd04a2a865f5e79a48"
+      },
+      {
+        "path": "identity/research/assessments.flash.shard-1.jsonl",
+        "record_count": 794,
+        "sha256": "8a5706023b5fd357ef68a15b2519075b97e086c33c1bbd677e02da110926f2f7"
+      },
+      {
+        "path": "identity/research/assessments.flash.shard-2.jsonl",
+        "record_count": 794,
+        "sha256": "76cb98aafd377ef15305b36838aaecbefe5c638d297f109f3f89fa4cc3074be8"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.jsonl",
+        "record_count": 48,
+        "sha256": "c23448435df9ce58b5af960ed6ce8ad5e3c19fbb078e336203c201b312d0aa3b"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r2-shard-1.jsonl",
+        "record_count": 8,
+        "sha256": "91d90260f8e360902d8bc60a4c115c9afee22e65488d7b9a6030a5a901cb3ce0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r2-shard-2.jsonl",
+        "record_count": 8,
+        "sha256": "f451608de832de81ffc762e8772e55d48cfcd4dcac3b725ace55a22d727ec06f"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r2-shard-3.jsonl",
+        "record_count": 4,
+        "sha256": "d4e2ec86e66f66b2742cd7819f2ac7040da4f9d92836540070a3b11b0e41b6dd"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r2-shard-4.jsonl",
+        "record_count": 4,
+        "sha256": "ff9524753134ad4232e825ea11b72b0849e3a1cae8d85ebd32e0e6c0d068ff38"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r3-shard-2.jsonl",
+        "record_count": 4,
+        "sha256": "bb91cea21ffd161ff080b63ced9a39db3c6db2df7a68b88a5578949b60d7474f"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r3-shard-5.jsonl",
+        "record_count": 4,
+        "sha256": "d7fdc0507a2ec1e8424f37396be5119b3f7124216f400f9066d23a4e030be249"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r3-shard-8.jsonl",
+        "record_count": 4,
+        "sha256": "6cb92fe7e9cee702225b6d3e1db0dee058598004d38b1e6baeb450d274cedd8d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-1.jsonl",
+        "record_count": 54,
+        "sha256": "bc13dd485f2f9ff3fb6d3d7252f9a81846f7ab40aa3119bda0b256f4c7310e58"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-2.jsonl",
+        "record_count": 58,
+        "sha256": "1ce04016aac723ad20c9cd1f160c55404048f16c38ac85c373e41d7b40cba599"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-3.jsonl",
+        "record_count": 34,
+        "sha256": "b58ae4edea506f599d459798532c30a6af0f618d2c5aaae1fd50201946011a50"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-4.jsonl",
+        "record_count": 34,
+        "sha256": "ab6952e691d062d4fed2cdccc4ae3b09156d92981a2b472f54bfb348f3ad9db3"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-5.jsonl",
+        "record_count": 16,
+        "sha256": "5560d36b1f4aa32e8a1b4593c9554407b20ad4566fe26d8bacfac1e0d25f2158"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-6.jsonl",
+        "record_count": 10,
+        "sha256": "83f6e62ed6ebf767fd4f56e22c380947000d3d5d6d6f7cd106ff89fdd5fe3bfa"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-7.jsonl",
+        "record_count": 2,
+        "sha256": "ece62bc34a7ca54521c8824b0b45903252e1a0e3c428b4e7d02f51f4ac2364c4"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-retry-b2-8.jsonl",
+        "record_count": 2,
+        "sha256": "0bd2bb380069ee3809a2cc9c9714ce328db6d6e1b6df8b40fb7445782dd6fd58"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-1.jsonl",
+        "record_count": 100,
+        "sha256": "62782391c60f58113609a5b4a2bcee1f3949e7a7e9d274b834f26ff974043f11"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-2.jsonl",
+        "record_count": 88,
+        "sha256": "a20752aa6b14a02bb74ea8a119bc72908363c1be913050208235e6e38041e292"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-3.jsonl",
+        "record_count": 72,
+        "sha256": "41c3c2fdac41af449275bffa96f5179418838210ec93d73433602f2e0b5f0170"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-4.jsonl",
+        "record_count": 92,
+        "sha256": "d0ef48bf80639c0ab532274eaf8fd0ef92fcb0933b6276d659e71500fa8af79e"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-5.jsonl",
+        "record_count": 76,
+        "sha256": "dc459d7ba977fae0b74c1ac4baa45ca419a7a0172ffda99d2c1b80ac7d68bada"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-6.jsonl",
+        "record_count": 64,
+        "sha256": "a03cf6114254aee499e91b06016592e0f300915daa185e185a052a17ff7db30e"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-7.jsonl",
+        "record_count": 72,
+        "sha256": "f9ed626093fac7e68a3c3f13c446b6a34cac05e68e866a49a25d379d88d55705"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r4-shard-8.jsonl",
+        "record_count": 64,
+        "sha256": "84e70d599f1292bf4c2b906e4636a1fa7641175f089f69823e27594118b78dff"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-1.jsonl",
+        "record_count": 10,
+        "sha256": "296b8fe7b5337b950abb72869b22cd2b74ef41d8d1afabafe4c3bff42881decc"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-2.jsonl",
+        "record_count": 4,
+        "sha256": "6bcec88558063691a289665feadb2f90dad530cdaff5a59e52f6ddb57c064c52"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-3.jsonl",
+        "record_count": 9,
+        "sha256": "f18a2f0040f72d1843da4b9d3ee315ded426791d29f7df54fbef61c0eacf26a5"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-4.jsonl",
+        "record_count": 11,
+        "sha256": "af6e359696ff98f6ba1ec29133e456de6e25fd78d083858f6a641f306e82f286"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-5.jsonl",
+        "record_count": 10,
+        "sha256": "c6dfe4ca00d64d1b30e545cc7167f9b8f2f304205166280cabf8d05e4a8965c0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-6.jsonl",
+        "record_count": 3,
+        "sha256": "5bba0663ed7bf5caad09d65f006371d6dc3885253e2bcf5f9c78ac29da093c76"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-7.jsonl",
+        "record_count": 9,
+        "sha256": "3a15b7358d02f3c0f6557e076e80f9a081703409995ec1c65aa69453d3fa92c9"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry1-shard-8.jsonl",
+        "record_count": 11,
+        "sha256": "22432890fe723687df1ec7d38de289d17eeca5933875935851d9deffba255ac0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-1.jsonl",
+        "record_count": 12,
+        "sha256": "c9c12d09b2ceeb9290688ec9a257046b6c85c5ca05c08247a06c073fba8c9a86"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-2.jsonl",
+        "record_count": 9,
+        "sha256": "d1c9ae1c67cb8ecefaa309bcd4b86b80140d55d9e7d42bb8d2b05f87c4319760"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-3.jsonl",
+        "record_count": 9,
+        "sha256": "a1394e7062d091e66db78f40eff632a5eb3c82323ce2f937b7246b1cde230550"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-4.jsonl",
+        "record_count": 12,
+        "sha256": "75243fcdbff0c2a26213c3aef3254f7bc64d6024cff3b16ae4a7adf2449c8f4d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-5.jsonl",
+        "record_count": 11,
+        "sha256": "299635fa83cdbc3f75b64cba463e593d6fb5f341bf127e5be3bb860bc26381b4"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-6.jsonl",
+        "record_count": 10,
+        "sha256": "1eb242837d7f0da8806de8cefba1e039a7ff63f75bc5bf30d57f565381a87de0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-7.jsonl",
+        "record_count": 9,
+        "sha256": "b0d52d5637b39f692ac137b9fffb90626223315803cc529b504b04f0b420b6db"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-retry2-shard-8.jsonl",
+        "record_count": 8,
+        "sha256": "4090b64ef1336e0ee142c056e69813c04f0fc29058bae6b95cfc615c1c464bf3"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-1.jsonl",
+        "record_count": 37,
+        "sha256": "499b29880d5636779266e629f716ecf92089fc436f36797cf3b05aef0dd47ae6"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-10.jsonl",
+        "record_count": 18,
+        "sha256": "4ab53b20a8d07aaa8805116f0c9daba0cc20d0b65db0f619a47a1b708734830e"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-11.jsonl",
+        "record_count": 30,
+        "sha256": "d65d2657e8d64b76432951d6b6d0e4a363d8c46a44f5cb75200c9953f44871a5"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-12.jsonl",
+        "record_count": 32,
+        "sha256": "6fecd22c6f2d287323607894cf09ec3de1d48eed2618e2c17044fb20976bad89"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-13.jsonl",
+        "record_count": 34,
+        "sha256": "e2ad5b1a9d32473715267bf4bfc70cc7d4ecb46201b53ccb57af0ccd3a72a8e6"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-14.jsonl",
+        "record_count": 28,
+        "sha256": "6a3cf24873d374f2e93a79486ac8734da004fe68dec0bf4f5672ba85f8780988"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-15.jsonl",
+        "record_count": 32,
+        "sha256": "17d4c6c88a8c0b4865d445088d8a62bfc36875c14d50180e172d11e52156dec6"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-16.jsonl",
+        "record_count": 38,
+        "sha256": "e01d3f0551121d8a41bdac723b7bbe9bbc32d9a4ea59d832908449dd2993791a"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-17.jsonl",
+        "record_count": 34,
+        "sha256": "a8556fb4e0868a51f0bbfb3c607202e0f1582fc2c9f8f1ce4f4035f5208ad850"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-18.jsonl",
+        "record_count": 12,
+        "sha256": "7f04cf393e04b4f2e38fe8701fc8b42461483fc0c7558164027424a9c50b8ec2"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-19.jsonl",
+        "record_count": 8,
+        "sha256": "e85399860cb33c072d608187ddb56d69030c060bab6112fc7a2fbbc3e71098f9"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-2.jsonl",
+        "record_count": 43,
+        "sha256": "0491c3a76ac396b22391160f086f8abc9cdb27e3e693dc56df7e99983a112cf1"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-20.jsonl",
+        "record_count": 32,
+        "sha256": "b07524b68aa8a4ea67711a906503dbf3123d770bd9617705c3234ec88e92e664"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-21.jsonl",
+        "record_count": 20,
+        "sha256": "abcdb77f0e78d70a853fcf0b45a7d84f3ed8b9a8a64039f36f630e5836a51e0d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-22.jsonl",
+        "record_count": 32,
+        "sha256": "443db1cd7d6e8113ee25c9e6cd1555987506556c0103fe9a943f78b224815f3c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-23.jsonl",
+        "record_count": 36,
+        "sha256": "ce5933112d148700208c619726ad622c99e4c62c5cfc4be58eaeaa6146d8ecf2"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-24.jsonl",
+        "record_count": 26,
+        "sha256": "f7790941273bc637f4241b2ac5e15d37dfe7e45a12d9ac3ed326e92d5a661b64"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-3.jsonl",
+        "record_count": 12,
+        "sha256": "9d8b51fe1f1e924796e90f96469b61f9c49f2e0f054bc35db0fe5c26b42d4ef2"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-4.jsonl",
+        "record_count": 34,
+        "sha256": "533106d5a6953244da19fa93af7ee6f2b4c8a6819a988443b4f1eacd17991e12"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-5.jsonl",
+        "record_count": 38,
+        "sha256": "6fae3c12cfac58c91cc6b7d8775dbc2a8ae7d8daffada7148ec6803f5588d2eb"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-6.jsonl",
+        "record_count": 22,
+        "sha256": "46b2b1e75e16c468dc5c77f91adc8f5364fa30c2d74155cac1a665a73835b6f4"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-7.jsonl",
+        "record_count": 18,
+        "sha256": "0c82cbafdb6d525bfc9f3d289e59094da790cdf5d4aba086589ba6187cb6a7c6"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-8.jsonl",
+        "record_count": 32,
+        "sha256": "4d3b3cea28c19cbbff51f3b64c11ef49d97b7aba1fac52cea8406e70f23813e7"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r5-shard-9.jsonl",
+        "record_count": 38,
+        "sha256": "ab0ca17b5fc3e8c92c7c085ff185f946a7f09ee77ff3c7eec06203b0655ec2b1"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-01.jsonl",
+        "record_count": 11,
+        "sha256": "740a8d62920483179c4d7aada168bee8547b6595dcc7d7a624392f460bce7290"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-02.jsonl",
+        "record_count": 8,
+        "sha256": "bee1d0678009fd77188d20ca642090b532edc71e68d82709ba8d31b97339d62b"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-03.jsonl",
+        "record_count": 11,
+        "sha256": "2df6965308e96b1a9faa724bb3873904a7f1e59dbbec1379f6205b8950724cc7"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-04.jsonl",
+        "record_count": 12,
+        "sha256": "3416f39d5653e16a8ea1fbdbf43be114d7b533d26d6d142700c7caad364ad96b"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-05.jsonl",
+        "record_count": 11,
+        "sha256": "84321a412afe107c98c5a0cbdd4d995e50e6179b859863ac55ab4c0140c27f30"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-06.jsonl",
+        "record_count": 10,
+        "sha256": "6af55b89179ebb9f3170b5e5ba1721c1bca534900355469cdd6b99bdcfa25390"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-07.jsonl",
+        "record_count": 11,
+        "sha256": "6c480a7a2d75a98b9924cc0539c769d3da68cb3b31a68d8c7c8779fd910a02a5"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-08.jsonl",
+        "record_count": 9,
+        "sha256": "ad26a5850e5d31d250bb3e1c11a0dcd26b8cebe1b456631cd40e0bc4bccca27c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-09.jsonl",
+        "record_count": 11,
+        "sha256": "fc4c5e6b1fdf187490f082c02a587a0194d728974529d919f0c16d20f89ae310"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-10.jsonl",
+        "record_count": 10,
+        "sha256": "12711064cf484109c78f3e6cb9bf3e2b18eb6caa7d93472510e5eb895d7ee0d3"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-11.jsonl",
+        "record_count": 9,
+        "sha256": "795dc76f2f08bab1c858e345be6fe3fc2d5177f5a5eb499b35b17f865373cd61"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-12.jsonl",
+        "record_count": 11,
+        "sha256": "69595b212e5ed77c68f4faf1ec6b5d75d7625e6afcecf095527d012912fa9b41"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-13.jsonl",
+        "record_count": 8,
+        "sha256": "f1807f617e9d06a2c17a35735ba9e09ba31ab9c83fa2ab38636ab7e780f0e5a3"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-14.jsonl",
+        "record_count": 9,
+        "sha256": "9a2c3b5704b17faa513d1fc9497fff74325ed98222cce530a3cb6968413d7000"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-15.jsonl",
+        "record_count": 11,
+        "sha256": "ff7e7713c420024a74a741949fc850f98860358ae6a0e08ab9197fc41041ec58"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-16.jsonl",
+        "record_count": 9,
+        "sha256": "7aae0a51c9f211c8f28f971795e30a2d7cee62a002bb0b73bdb31e07b5843e0e"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-17.jsonl",
+        "record_count": 8,
+        "sha256": "c195688564e8d39c06e4b67a4d33395acd9e60c27cfcf019c9598f475c862dd8"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-18.jsonl",
+        "record_count": 10,
+        "sha256": "9115d474bc7e3f235a5738b6a3bc12de9e22a408c9637659f58815a40b669510"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-19.jsonl",
+        "record_count": 7,
+        "sha256": "6801ae36a11334e591bd212605dc47355f74330bf3efdaff828266116444c687"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-20.jsonl",
+        "record_count": 8,
+        "sha256": "2d9b175bcca3affccfb28ca7347bbea1594ad70fe150062469408342d4ea4491"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-21.jsonl",
+        "record_count": 7,
+        "sha256": "712f6b085a79cecc4f82375fe2a98211bab6ab9c674e25452efbd1b9b6f7e9f0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-22.jsonl",
+        "record_count": 9,
+        "sha256": "5ac83518a4624c30986f2e03ea32712e3242e3a49e0df5f813c5cc1a2b6daa02"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-23.jsonl",
+        "record_count": 10,
+        "sha256": "34b6c04260a7dcaccd0e00d13fafb6bf510c79769c45298112c138222d534b94"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r6-shard-24.jsonl",
+        "record_count": 7,
+        "sha256": "75903451e40e4a790b7fe8600a2dcadccbba9f85292b906bfcf246d6c8efb781"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-01.jsonl",
+        "record_count": 1,
+        "sha256": "4dadb7383d3fc4a2eee92a4820fafbbb8749477ef51d478ea1723c813e5e713a"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-02.jsonl",
+        "record_count": 2,
+        "sha256": "049305528d8b8db63477fdf25e725864c919094fc9216704effb5fd6416ae17a"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-03.jsonl",
+        "record_count": 2,
+        "sha256": "85c908935a85744731ce0c2b29c75fc04d058761c8237992523888c2e982ab5c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-04.jsonl",
+        "record_count": 2,
+        "sha256": "3b0f4b008c35eba0bbe6812c35e23d17fbfd7c25b81587956d40d0d145a54bae"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-05.jsonl",
+        "record_count": 1,
+        "sha256": "7d3293bfa743c662303b30f3e932308f9211b8055d89a938d6c7927891764767"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-06.jsonl",
+        "record_count": 2,
+        "sha256": "ef38da9abde802207aa47b8c268b31e85305f934758ef64ad7b8453ef79546b4"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-07.jsonl",
+        "record_count": 2,
+        "sha256": "3edad04b97d007e04fb2ff763b3cb998845311662e5920530ef5bfb1d421257b"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-08.jsonl",
+        "record_count": 2,
+        "sha256": "cd4ae529faffc6eef0e869b6dd5a54473cf3a82fc58df3d4b1b6014932bef2f6"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-09.jsonl",
+        "record_count": 1,
+        "sha256": "27e2db90f2fdabd6ee9c2246595dacb5959af88621292e0d8e41daa57791936c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-10.jsonl",
+        "record_count": 1,
+        "sha256": "004f1e6067e45b61750c1c55e685b1d3c6cbdef9da043ae72a1cb4d399572f0c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-11.jsonl",
+        "record_count": 1,
+        "sha256": "2b1e02f49b369ecf2ff75d28c05cb897681ade9e743df268ef202ff4714c31be"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-12.jsonl",
+        "record_count": 1,
+        "sha256": "016a0879eb96cf5c6bb0425019589c6d50fba4de345123cfbb8d51dab5c559ef"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-13.jsonl",
+        "record_count": 2,
+        "sha256": "4d624f80e888b4fa1767da10315357608e3b40f93a3bad40e341e32d39cdbb7c"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-14.jsonl",
+        "record_count": 2,
+        "sha256": "54de7539f2317008b84aeed658c1aa85dc993370ce76b31ce0ad04fb2e803be0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-15.jsonl",
+        "record_count": 2,
+        "sha256": "a40c85a4c622e87de80ad65dac6d5fd715fbb9c1c44894ffb32308c9d2a0eb1d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-16.jsonl",
+        "record_count": 2,
+        "sha256": "0b483d46603bfa00c59ded63692a881fbbb069ab48ff01610c997770373660c7"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-17.jsonl",
+        "record_count": 1,
+        "sha256": "080ded2d0d8baeb05eedae9ae0aad9f9d7e4ff9edb5a3455e3dd8f5a3708c72b"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-18.jsonl",
+        "record_count": 1,
+        "sha256": "3c89ebfae3fdd031bcc5288eb0e29462bde0ec0bd0857f33046c3b55eb991891"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-19.jsonl",
+        "record_count": 2,
+        "sha256": "f16add583ba19efd9f22cc3c6e35072478e4cdcaec3f6ba40b5c68ab2bd66398"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-20.jsonl",
+        "record_count": 2,
+        "sha256": "518843c85f29da105380bc3495189258e4a945dd7a1dac22bea96761c332dc4f"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-21.jsonl",
+        "record_count": 1,
+        "sha256": "96a26906ec9d3a080397b38ee880726cc395c346fe872f08ad21fcb79e8bcf26"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-22.jsonl",
+        "record_count": 1,
+        "sha256": "9d8be8f3ac2eb33decfbeaf8b5c764976ee88e87c60699c4d0c21ea5f59b219d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r7-shard-23.jsonl",
+        "record_count": 1,
+        "sha256": "45de31426624a3367cf8a65fed11f48282b1d305abfbe397a28d7dfb8aeee4c7"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-01.jsonl",
+        "record_count": 1,
+        "sha256": "09ab42875c4d50d8eca50766e4c9508b77393ef0ec0fd04e5f197e5c369cb40d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-02.jsonl",
+        "record_count": 1,
+        "sha256": "2a44c3f5506d0e8d66942eea3b7853610fed50a87984c152902135ca31fb071f"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-03.jsonl",
+        "record_count": 1,
+        "sha256": "33fe4d6cbe611e13576e28548335b20fea87ec7431bae0ffc1ffb7a0bc6955a0"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-04.jsonl",
+        "record_count": 1,
+        "sha256": "23ee53ee0188daf0da6304ab19de48cdac9a6805d8dd1bc4877b361eac6fd2c4"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-05.jsonl",
+        "record_count": 1,
+        "sha256": "038bbc52f815576d68b9eb85ff9120db8a2a6ed74db24cdbc2558ce9e95a7ef2"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-06.jsonl",
+        "record_count": 1,
+        "sha256": "224db4b1b5787ea8ec5fdac1c65ddc0a593d9cdc8100859a8f9d4cd29066e6c3"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-07.jsonl",
+        "record_count": 1,
+        "sha256": "66536736c1bb1989f4c11d63f56eb265231a6857e483436a53982d61b3b27f19"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-08.jsonl",
+        "record_count": 1,
+        "sha256": "a65dec6fbcaa89f245411e0c7f0df9582111030d42aa1e7f4670ca433f7b3682"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-09.jsonl",
+        "record_count": 1,
+        "sha256": "f9cec7e859872cd7978c7eea19454a115751c00b846dd6b3ab75a769f700d298"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-10.jsonl",
+        "record_count": 1,
+        "sha256": "acef5ac6877da7cd6a684edcc67f6d1373c82188a24a32ea392974c398595829"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.r8-shard-11.jsonl",
+        "record_count": 1,
+        "sha256": "9022c8a670df6d1426ae739aa252ebbc3835b29e0ba02e553500651c94400e4d"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.shard-2.jsonl",
+        "record_count": 8,
+        "sha256": "66ca1cca0b011b275592e8d114709f4bb0b90daa375fe0bc20fa06b474fd39b9"
+      },
+      {
+        "path": "identity/research/assessments.sonnet.shard-3.jsonl",
+        "record_count": 16,
+        "sha256": "2e34935c92d44a03850157c1256a68c090badc5c8bada3a663455c771d53fa71"
+      },
+      {
+        "path": "identity/research/assessments.terra.jsonl",
+        "record_count": 628,
+        "sha256": "fa451ccd87d9dfc92bc3dcbf59d89a90b487572fb8b874d7b7f68a5ef7c7f450"
+      },
+      {
+        "path": "identity/research/assessments.terra.shard-1.jsonl",
+        "record_count": 712,
+        "sha256": "e962660ae93cb5e7a028685a97233e9356dcca984b19736e70abcf6c48710f01"
+      },
+      {
+        "path": "identity/research/assessments.terra.shard-2.jsonl",
+        "record_count": 712,
+        "sha256": "3bf821c93079c0b644784d21dd356721eb534471bc473c76018bc24a4a962cc6"
+      }
+    ],
+    "expected_candidate_count": 2052,
+    "expected_pair_count": 6156,
+    "expected_profile_ids": [
+      "flash",
+      "sonnet",
+      "terra"
+    ],
+    "registry_sources": [
+      {
+        "path": "identity/registry.jsonl",
+        "record_count": 2346,
+        "sha256": "5fe35952b531c864ef58bb04087f721fcc41f08d70513d423236cf7f9918e933"
+      }
+    ],
+    "run_ledger_sources": [
+      {
+        "event_count": 405,
+        "path": "identity/research/assessment-runs.flash.jsonl",
+        "sha256": "28ea10e5fa25735745f379dcc832b3538241e0c17701305b2ab86752c44ba4a3"
+      },
+      {
+        "event_count": 234,
+        "path": "identity/research/assessment-runs.flash.shard-1.jsonl",
+        "sha256": "c6da2ec0b720b37fab92322e8219f9f11d38e0ae425d08e513cbc04f5eabcb1a"
+      },
+      {
+        "event_count": 241,
+        "path": "identity/research/assessment-runs.flash.shard-2.jsonl",
+        "sha256": "9f24d968282730d6e44055460fb37d9e87051618b048a8ae8be1212790c11e0e"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.jsonl",
+        "sha256": "6f7c45a0092fd0211995fcc62512d6f321f2ff5daf772dd7877db14a1780a9bd"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r2-shard-1.jsonl",
+        "sha256": "cdb0c39931776da870f37bd58212936a2ad687e8fd96e62a6126720c5ca2812e"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r2-shard-2.jsonl",
+        "sha256": "5d993cea99568c38f43ddf87efa9f58b72e9ac2121d161807807d84c8f483847"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r2-shard-3.jsonl",
+        "sha256": "d3067a010d28fa17c0eb1fcbcaf62c309c2819b358468f376c799fd778a8b3eb"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r2-shard-4.jsonl",
+        "sha256": "395acfc8b6ae187fc5d2076493d075fcf190dc147a8db1cfd6d3774e646d25fd"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-1.jsonl",
+        "sha256": "0afa3274e20c41dc716f7598a4077138cbe2316bf2b3572e18448d3835d8161c"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-2.jsonl",
+        "sha256": "c14f0abd557077f95a2afbe86b3541ac41171c9419aa6ff46a154bb83358aea4"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-3.jsonl",
+        "sha256": "7e8a8971d244abd4ef682146d7eab2fa3cc4876958271708909e57ca0d0ddbd8"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-4.jsonl",
+        "sha256": "dc7fd0de093011129ba012d2fd9396684b5879c5c37c8c93d68945058e598cb6"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-5.jsonl",
+        "sha256": "8aa07f107416a6370f07e7c12ae8d2c479d36bcb66f8e5d84abb6829ad3a7e81"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-6.jsonl",
+        "sha256": "8dd005bd7c3387c701c52cb294de2296e82f4e33ffe5b9f5fd52c7cd2f98c416"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-7.jsonl",
+        "sha256": "c3f4fb6e01a8a213100fe6d661075c475fc8bd6e3116775a998a686d09366b37"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r3-shard-8.jsonl",
+        "sha256": "080bb9b880e09b2faa05e0654797e493ecfe92131e07063efe931a4db0e68b1a"
+      },
+      {
+        "event_count": 38,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-1.jsonl",
+        "sha256": "5624fd2cb27f6afc7eafe06b9db0d9221ac0e39f6ebc2d70723d7dc30dbdb6c8"
+      },
+      {
+        "event_count": 36,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-2.jsonl",
+        "sha256": "4d2c65a374c33789444203cf6854e359f2a8fe1b62548031b0256867955f694e"
+      },
+      {
+        "event_count": 24,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-3.jsonl",
+        "sha256": "029001c2283060ebff949b9d60b0e66881338f0df328ece6a3062d4f36a704ec"
+      },
+      {
+        "event_count": 24,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-4.jsonl",
+        "sha256": "89683f8a16c14860e5111cc581b3ef06570df9ee9788b1f65cde5f8c972e052c"
+      },
+      {
+        "event_count": 10,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-5.jsonl",
+        "sha256": "b3a961dd5b133fd7fe17cad2bf788b6630c0f7c9a72f4aa9679c19c6bb6be3d8"
+      },
+      {
+        "event_count": 11,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-6.jsonl",
+        "sha256": "7841f11db71f859df1a45cb8b675880f560210bf80a0f65250049dbe6c9412e1"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-7.jsonl",
+        "sha256": "13fd0d29d2c37c304e913b4f0b3abd21c3dadb57dc8a02daf38df0f0d9541a3f"
+      },
+      {
+        "event_count": 2,
+        "path": "identity/research/assessment-runs.sonnet.r4-retry-b2-8.jsonl",
+        "sha256": "f98056cee2e6664c8fb913da9ce6aec5af6d70054368de5fd98554734ca54855"
+      },
+      {
+        "event_count": 38,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-1.jsonl",
+        "sha256": "53da277d7b53f7ba9b9fde0c3153e69bc988e9473ac41a2c2f357e06476308fc"
+      },
+      {
+        "event_count": 35,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-2.jsonl",
+        "sha256": "62a9b2715a12e0011b49c4721ffa0788c23b2999d634b02a035d19de37d9b2bd"
+      },
+      {
+        "event_count": 37,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-3.jsonl",
+        "sha256": "7ac91ee9d44d01b1a9393a9400f7493b1610b6ab85fad34db105f9dca76c4ab7"
+      },
+      {
+        "event_count": 36,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-4.jsonl",
+        "sha256": "ef469d711d02153cc38d20268c3eada680f3e0a90cc17501190c4d856674e34d"
+      },
+      {
+        "event_count": 37,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-5.jsonl",
+        "sha256": "e1867cc2bfa7e1e552ee14af28959ed86ac08fa7f9743191c7723a807f778237"
+      },
+      {
+        "event_count": 35,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-6.jsonl",
+        "sha256": "97ac87d1e2a2c14b612041aecc68ccccc33d4dc1b39c67a7eaa73ec3689ff04a"
+      },
+      {
+        "event_count": 36,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-7.jsonl",
+        "sha256": "304573fc8a360c17f4467b7d7b51c59553bc6e7fcd888fb2c82452e6ac9ff3b3"
+      },
+      {
+        "event_count": 36,
+        "path": "identity/research/assessment-runs.sonnet.r4-shard-8.jsonl",
+        "sha256": "dea4163d0f26e67af4ee5b71626612c483683e188f9e96c8ef33ce611dc83110"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-1.jsonl",
+        "sha256": "b3ff80b80a4debb5f1d76ce09c1741631e0cbad07f5fd63e1548b4d41835b8d1"
+      },
+      {
+        "event_count": 5,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-2.jsonl",
+        "sha256": "d22e701c2f409c37839cc31cda3c804cea34dd8edadc92c60dc0a2de60fd6f83"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-3.jsonl",
+        "sha256": "b94c1b0d86d370a4c338e55a6aa7d223594a9644c2760e86da5797d5962a4c85"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-4.jsonl",
+        "sha256": "2b21428df082e7794e0d168a7aec311b4f7034529f9f8d282cf9511de49fe599"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-5.jsonl",
+        "sha256": "958bae467ee7916d5ee9d3700668f5955c495c62101041fe4f1ceb7c31d1deaa"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-6.jsonl",
+        "sha256": "e040881a8f0cf7a674d40a0635c1b54d66000579454f793b582068aa7cbe5df5"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-7.jsonl",
+        "sha256": "f6d5ed66a13a6d8fd45930681cae07e161ee1ec8a9451497a02d88ec1e0db1ff"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry1-shard-8.jsonl",
+        "sha256": "e87c5e1cb326d2bfbb78f858abf60f63c16adabc92164e6788761c469dd05ad3"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-1.jsonl",
+        "sha256": "907c9ed3dcbfe78c81cfcc2c911f3a118b84e777069f0f387b4648839b099c67"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-2.jsonl",
+        "sha256": "47153c159ef34aa8e4ea4b85f1dd526041f26b28791ef1e0af6ff3e991110332"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-3.jsonl",
+        "sha256": "ee45a7964bb710c2d343e389d2203950ebf4638102ded6bbb7c43e3b149167d2"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-4.jsonl",
+        "sha256": "6aaeb5a1415324c088b7bed70c3d97acdc953cbeb2efaa080776db9860b600d0"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-5.jsonl",
+        "sha256": "29f2d361312517fd14aab42a56c88bb88f5b030f57bc0f26717ae6ef1690275c"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-6.jsonl",
+        "sha256": "cce725695929831d046be4660db5c51790dc5af2163364ba8b71a85e692de157"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-7.jsonl",
+        "sha256": "819da5fb56be9b9203bc7acb278b46e2f836e15ebd785ab17ae0b4d230e32b7b"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-retry2-shard-8.jsonl",
+        "sha256": "d5214b7f8ee2b618617fa324261af34de7073b26da8293871c928a96989de68b"
+      },
+      {
+        "event_count": 26,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-1.jsonl",
+        "sha256": "0a3cecf0c90aacf0d35fc2082405512ec3993514dfe89a8f33da4bfe708742df"
+      },
+      {
+        "event_count": 11,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-10.jsonl",
+        "sha256": "440cf10f93c68a1cea9a6b45a9e8c5e044ff417904d16cc8632223950fd9cb00"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-11.jsonl",
+        "sha256": "36bbfac5264e1944c2ce7a527a555479c05774c024540315d705ffd728800bcb"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-12.jsonl",
+        "sha256": "2e2527d3390dea08365f50c05024f0b5df6fa1bf4275fd0b5a57416b079246e1"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-13.jsonl",
+        "sha256": "409630cd67569a4e0073ba34f4fe96d22ff8ef85ec9c228dbf373e6bc296a9e2"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-14.jsonl",
+        "sha256": "60bc3f30a2d48c663b654fdea26d5632b0a86413dce303915e04c42dea77c231"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-15.jsonl",
+        "sha256": "335c2d15f6eaa11e7a576173b0357a58db11d18937a19171a06e84923343c412"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-16.jsonl",
+        "sha256": "9cfa6ab4dab0e8589227f0bcbb5f9ee2aad48f05aa27856d8217adcb9fb24240"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-17.jsonl",
+        "sha256": "126a88e8b1b4c377a9f513eda6129c65e5f71f6f95c98fad404f4dd02842c74c"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-18.jsonl",
+        "sha256": "150b617988e1f387e45203030490acab88d1d561c21fee76cd2ff15ed546da3f"
+      },
+      {
+        "event_count": 8,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-19.jsonl",
+        "sha256": "8bd20085f8868b7c61fc56190bbc4da0a5f75ada1feaee7f8ab1c70b983b3fc4"
+      },
+      {
+        "event_count": 26,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-2.jsonl",
+        "sha256": "baa92591d8565e38ea2cb8f4514b6e3b97d878e6c55f26fc6259f3d5974a109b"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-20.jsonl",
+        "sha256": "c8ad09d4541d2dade5c76d358caa947cd26f21a9bc5f8aeea41b5fbaaf44f784"
+      },
+      {
+        "event_count": 11,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-21.jsonl",
+        "sha256": "999a1dee3d6204a7a4081ab06a1145bfcbcc8f9d63c2fd5133eacbee85dbc7bc"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-22.jsonl",
+        "sha256": "b0f931d0ba453633b83155ed982c1a97b7ede30cf71708efde0a75b0dd21e1b1"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-23.jsonl",
+        "sha256": "44f82adcc32a5b50e98c52fe1dbaa8fee49437761b1f7a3efcb480885654788b"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-24.jsonl",
+        "sha256": "03f69f4b6c82e3b2999236e033f8914c3170ead35ae5151f24ace3f84ede804a"
+      },
+      {
+        "event_count": 11,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-3.jsonl",
+        "sha256": "6c88e33b473e32986af76a4c9f55dc53743c93ac1baf9d8bd32465590c54aa19"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-4.jsonl",
+        "sha256": "85c75a6ed92bb171a907365aa7d6dc87cc927713b32ab50373079577c1055cf6"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-5.jsonl",
+        "sha256": "8081b8c313e07d8af4d6341023c3824a7bf32fb6d1dc41cf09fb8c41f751cd12"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-6.jsonl",
+        "sha256": "8802f2514624b089524fb19218d8f2cf98f6b609b3d255dfb07f36ecdd202863"
+      },
+      {
+        "event_count": 11,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-7.jsonl",
+        "sha256": "8210da43114d8fee2e707078d1ee1113dddade8d3cd9cbc7cd58d801755693f4"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-8.jsonl",
+        "sha256": "bc6fab9f7c0d9a5a7e3ba3b0ed2a3e35b9dcf4a41d1e522c8f061b0772c65df8"
+      },
+      {
+        "event_count": 25,
+        "path": "identity/research/assessment-runs.sonnet.r5-shard-9.jsonl",
+        "sha256": "b9b6e27409d7a3e0dec90374c19e4c0ad86511d45c6d3abda7c4e15bdf464eba"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-01.jsonl",
+        "sha256": "566feb61be27bd874d6f3c0de39f0f48d5f5bab00d2d4da3105c400e84abc8dd"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-02.jsonl",
+        "sha256": "dc63fa03be5ee3531bf18faa5be663f4c7f8281dab9ea4f451a8662891dfbe1b"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-03.jsonl",
+        "sha256": "35d50d3d7368e2412b286a65cb3d5ec0b5603fafb8ac8753870724b2355570bc"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-04.jsonl",
+        "sha256": "1768983500189c9bdd8a6a714e263a33d6e5d62d2a87f52fe7e815f0943e04ca"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-05.jsonl",
+        "sha256": "8a2748b56aa80682ccce22022d6f270a6a8be6c71de2017d2897dfabb3afffd9"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-06.jsonl",
+        "sha256": "1d3b0cd59e23eeb1a91d417b40a34af60a1f8f07a06e7a0263dc0853a842fc27"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-07.jsonl",
+        "sha256": "c8e56aee5d1548e58be6c61b3108bc8527b9032f9ff28fdad004b660a3eb5061"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-08.jsonl",
+        "sha256": "1e4cf2efd4deb15bd905612569aa6334e948122b841bebe2938623ba1079475d"
+      },
+      {
+        "event_count": 14,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-09.jsonl",
+        "sha256": "4f643e33d2cc49570eee56ba539a19edb86e76b2cc9994bdf09ae185455f418a"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-10.jsonl",
+        "sha256": "2a88af4f862c3e6de8283d2d428c3926e72759892ebab665307b94dbb7656194"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-11.jsonl",
+        "sha256": "c17b502c733f3494c1d8e038a91af2e9c267e81c1953c57e6f07d957a332b0d0"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-12.jsonl",
+        "sha256": "85766743f45b21d943a06c1af52dcf3e5c7d8720509e4384c391a9bd3dbff090"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-13.jsonl",
+        "sha256": "b9f2dea867c6cb17993ba0386f271f1f2e2682da321b58f565a73f7119707f55"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-14.jsonl",
+        "sha256": "4db007cc8549e14872fa6047fc9b3e88c56cbb70385fdb2151c62bd5bafbf50c"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-15.jsonl",
+        "sha256": "521406fabffed7432a7bbd8a89fb73b2d2c4a1097f15b2c9e60d6360fa59374e"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-16.jsonl",
+        "sha256": "2a0a8dc8f2517d1b520053b1deb885bc0b0b8051fdb597df864b4a0c5d4d9520"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-17.jsonl",
+        "sha256": "179ba722cb6363cef9ea62a0604fbda39eabbdc191ff1795a864cac800d24f2f"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-18.jsonl",
+        "sha256": "f3233af32a9405b70ae612d6d323d043a7657667f06b51dab2548697a5260b35"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-19.jsonl",
+        "sha256": "63ca6ba5dccfe3cd0db014bc40653c3dc2889b6c37cde2d240a788638f71bff5"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-20.jsonl",
+        "sha256": "ea821cdf31fbaff7b77d79c16fd007bdf7d5a8cf917f90f46d4c339fb20a4342"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-21.jsonl",
+        "sha256": "772c84770b904f82b96db2f90223392c3e60ecfae0d2ba3947070cafbd6db734"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-22.jsonl",
+        "sha256": "8beace010941868fc2eb092045071f1d7f03510f02d0757ae852b5eb4eef0b58"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-23.jsonl",
+        "sha256": "0a8882597744fb8b8ff793fac4ac754aed2633c26f9e8c8dcf6ed67521c5939e"
+      },
+      {
+        "event_count": 13,
+        "path": "identity/research/assessment-runs.sonnet.r6-shard-24.jsonl",
+        "sha256": "ce72c8fac39717cc12063f8b996b1e995a290b3cc0cb5ff42c1f7b579b8cf939"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-01.jsonl",
+        "sha256": "ab1418f21bf30bca10918d38fce48226b1a688daeb21e724c718f77e3f95571d"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-02.jsonl",
+        "sha256": "2d7872d4b5823d7475c1501e6aae6ba63e151352d73ca0934c81a02ea24caa23"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-03.jsonl",
+        "sha256": "f1ed2811b4eabb1413585d0a7ade55c10abc829efeb15441054b4cbe9fa43afb"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-04.jsonl",
+        "sha256": "2737a26b6de73a65d12c22f726b3c5bfbaa39fd86f7fa15a72046f2a08a310f0"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-05.jsonl",
+        "sha256": "8a9b2946638f7a93896a967276b92bbc1a66012e0360ba0f599e66b0b951f0f5"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-06.jsonl",
+        "sha256": "da011614097d255cec9422044b8d236c5ad3681a7cf4f2d7b37c23f6c510d1d1"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-07.jsonl",
+        "sha256": "a2d9f9ab603377e5bbab0cb76cc3fe97c209989d0644d5903dfeeaca7abcfe84"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-08.jsonl",
+        "sha256": "a1615e1825c3262f1d76165d0dc0596008c1c6012eafab5d0113eb1193c85dba"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-09.jsonl",
+        "sha256": "ab1ea6f31dec9cf4b53c209cff0f266fc9a8a583154b2cccd544cdca6f9819c0"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-10.jsonl",
+        "sha256": "938c53dd314c9f2012fec56a2d4649d721a9678bddd50fe3ec4898fef39b0b72"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-11.jsonl",
+        "sha256": "28e49313de7ebf0a1f43c4b4b6a01e77ec4763a066c9899403fd8ba67ae2792a"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-12.jsonl",
+        "sha256": "3c27320719a20fb66b5d53640e6c871b73090fd565762e2a6aedbac7274b5b39"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-13.jsonl",
+        "sha256": "b6c9435ffc164b91d60f8fe230383f9c8ea274645c5f10fa4cb69c9a0a517a20"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-14.jsonl",
+        "sha256": "c1316763e0f389014b932c406a350c5eaa05c422537dfc6dc68ba21d8cdf2bd3"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-15.jsonl",
+        "sha256": "767b05416ebc6940581026936a8d6b93331c99da6e9593759877236791ebdbd6"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-16.jsonl",
+        "sha256": "d6856495d877fd68c46f971f734d33d378c355b603eea2df5d5996abc1b9c39f"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-17.jsonl",
+        "sha256": "d8d2a2641c6c289f47b8c4e6f1d6d8297151199af1ef3b69cc93546fd74f29bc"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-18.jsonl",
+        "sha256": "7bc412a5c0d013475a14d9ee99cac85644f1fddf9013eac7dab69cdc0860fd5c"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-19.jsonl",
+        "sha256": "6f9fe7ac085a7ce9e36b6c86801cb01fdb63498171e7752c3e50d3b80254b832"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-20.jsonl",
+        "sha256": "e85b0ba927daeb0496bacb591e1853b707f1e8407f129499802028bfd93bba87"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-21.jsonl",
+        "sha256": "9551e979db47dd5b3b23612792de5cf87c38720914de16fe190282b0b22ac27b"
+      },
+      {
+        "event_count": 4,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-22.jsonl",
+        "sha256": "e4c168fbe2b8ef682496d549cdc0042e5a341277401b5f67a13a127057537c30"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-23.jsonl",
+        "sha256": "4970bc8293881033bb49679276f7f0e91a3eca27fa7e215bbec91e3824f1e27e"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r7-shard-24.jsonl",
+        "sha256": "c167e86690bac342aa151cb13ced740db408ca3a5b34e967cadbefe366087fb4"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-01.jsonl",
+        "sha256": "abefebd446ded1666af340d2e49864b8304bb83e09aaf9b14b680a59ef9c2bff"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-02.jsonl",
+        "sha256": "beafb8817b03bb86b5e61513178782988fd87799206411b8d54c93d656b71135"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-03.jsonl",
+        "sha256": "aaa3674a7998b6ddf7b792e553027cd63ea2e2ed3dab4c6b712e23e20a926352"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-04.jsonl",
+        "sha256": "9e219446c86337afc0dbe5aa275b1f7d87bfe8a64470e10151a1e3da0109206e"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-05.jsonl",
+        "sha256": "220596564f7b304746a85f4d7fe0381247edfa2365718bc963b63f89e25e9fdd"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-06.jsonl",
+        "sha256": "3aead9b273241a029e479c5cf7a268aee4fdfc5bbdcc1e2f2b65407f120e16be"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-07.jsonl",
+        "sha256": "04e115296e18b68d5de78d98ffc3489489b930be05ca54159a38404ca6f1f1e0"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-08.jsonl",
+        "sha256": "b9009426c4ed4c575ef0d0ab3b2d1451fc8a6637950f203379dee844a95497e6"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-09.jsonl",
+        "sha256": "d9d4ef653a3befd259816d30cba64f47865eb9de256a99de5878d7f071cc33a2"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-10.jsonl",
+        "sha256": "7172d5960bee20aff10d1091dff314af44355eae2b20e7164887351d0cc7ce9a"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.r8-shard-11.jsonl",
+        "sha256": "b5619f407895f72a5db47a6eba7abed99c50ce7fd3f02ecffbae194c1f7ba436"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.shard-1.jsonl",
+        "sha256": "3aa13f4f2b9cbb25a16e12ad793bd7dfa46ae27b3a4995da4907fd58f91d7bf4"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.shard-2.jsonl",
+        "sha256": "048a63873ab04a5fcb17cb2b0db02123049edb1ddea1ee8a4352c8a95205f3c0"
+      },
+      {
+        "event_count": 5,
+        "path": "identity/research/assessment-runs.sonnet.shard-3.jsonl",
+        "sha256": "ce924cf4265669cdaeeb43090d05dcdd4042a44cdd24aece0bc12e134adcdb33"
+      },
+      {
+        "event_count": 3,
+        "path": "identity/research/assessment-runs.sonnet.shard-4.jsonl",
+        "sha256": "834faa7575216d42391cbe07f63814b7b8aff15a696c720b2fafe9d7e4821059"
+      },
+      {
+        "event_count": 172,
+        "path": "identity/research/assessment-runs.terra.jsonl",
+        "sha256": "5308e49a9f0f7ed30d3ab463c592614b5d97ccd4aed140ff4d29f163fb10e117"
+      },
+      {
+        "event_count": 186,
+        "path": "identity/research/assessment-runs.terra.shard-1.jsonl",
+        "sha256": "ae36abf3dd0e2ec91fca4a3c21ad2f72f5fc3ef51ffde3cc277fce0be0d538be"
+      },
+      {
+        "event_count": 186,
+        "path": "identity/research/assessment-runs.terra.shard-2.jsonl",
+        "sha256": "b30a1efc971aa33cd598b13757d71e4f2f1b644b4996f95cf68e1b7dad0bf924"
+      }
+    ],
+    "schema": {
+      "path": "identity/schema/assessment.schema.json",
+      "sha256": "885ebdc5d0609e55460b7d5840ca589f8287d5f7168094348aed1830bc4caf5b"
+    }
+  },
+  "kind": "identity_assessment_consolidation_audit",
+  "ledger": {
+    "assessment_reference_count": 6156,
+    "completed_run_count": 109,
+    "event_count": 3094,
+    "events_by_type": {
+      "identity_assessment_batch_completed": 2093,
+      "identity_assessment_batch_failed": 727,
+      "identity_assessment_run_completed": 109,
+      "identity_assessment_run_started": 165
+    },
+    "failure_event_count": 727,
+    "incomplete_run_count": 56,
+    "run_count": 165,
+    "run_id_remap_count": 165,
+    "source_run_id_collision_count": 12,
+    "source_run_id_collision_extra_occurrences": 22,
+    "source_run_id_collision_run_count": 34
+  },
+  "outputs": {
+    "assessments": {
+      "path": "identity/assessments.jsonl",
+      "record_count": 6156,
+      "sha256": "dcf871da655a6af9bd828dc18abf16982d27961effd675fc6d938a9c34f5a7d8"
+    },
+    "run_ledger": {
+      "event_count": 3094,
+      "failure_event_count": 727,
+      "path": "identity/assessment-runs.jsonl",
+      "sha256": "2f9a3b0498dff0d7b995bf8a6c1caf1e274fb97c75391e0d438a25a1af8ab160"
+    }
+  },
+  "profiles": [
+    {
+      "assessment_count": 2052,
+      "model": "openrouter:google/gemini-3.5-flash",
+      "profile_digest": "66d533c569e8b313f85767fcbd568329eca424f1b71089d625536160db3d0903",
+      "profile_id": "flash"
+    },
+    {
+      "assessment_count": 2052,
+      "model": "openrouter:anthropic/claude-sonnet-5",
+      "profile_digest": "7adf178c34c67b601c72ffecd8af8f0ef7bdf45bfe3e1c47fa54404b890c6ae7",
+      "profile_id": "sonnet"
+    },
+    {
+      "assessment_count": 2052,
+      "model": "openai_codex:gpt-5.6-terra",
+      "profile_digest": "5803495fd48b5c26f5b97f434feabd80009a716367f03692883e6d2b05769325",
+      "profile_id": "terra"
+    }
+  ],
+  "schema_version": 1,
+  "validation": {
+    "assessment_ledger_reference_errors": 0,
+    "duplicate_assessment_ids": 0,
+    "duplicate_candidate_profile_pairs": 0,
+    "evidence_digest_conflicts": 0,
+    "ledger_sequence_errors": 0,
+    "missing_candidate_profile_pairs": 0,
+    "profile_digest_conflicts": 0,
+    "profile_model_conflicts": 0,
+    "schema_errors": 0,
+    "unexpected_candidate_ids": 0,
+    "unexpected_profile_ids": 0
+  }
+}
