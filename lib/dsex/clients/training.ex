@@ -602,6 +602,7 @@ defmodule DSEx.Clients.TrainingJob do
 
   defp load_provider("openai"), do: :openai
   defp load_provider("databricks"), do: :databricks
+  defp load_provider("mlx_lm"), do: :mlx_lm
   defp load_provider("local"), do: :local
   defp load_provider(provider), do: provider
 

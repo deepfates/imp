@@ -113,11 +113,38 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
     manifest = read_manifest(Path.expand(first.metadata.manifest, first.result_model))
     assert manifest["status"] == "succeeded"
     assert get_in(manifest, ["artifacts", "adapters.safetensors", "sha256"]) =~ ~r/^[0-9a-f]{64}$/
+    assert {:ok, ^manifest} = MLXLMTrainer.verify_job(first)
+
+    checkpoint = Path.join(context.root, "job.json")
+    TrainingJob.save!(first, checkpoint)
+    assert {:ok, ^manifest} = checkpoint |> TrainingJob.load!() |> MLXLMTrainer.verify_job()
 
     assert {:ok, %TrainingJob{id: id, result_model: result_model}} = train(trainer)
     assert id == first.id
     assert result_model == first.result_model
     refute_received {:run, _, _, _}
+  end
+
+  test "supports a pinned launcher prefix without invoking a shell", context do
+    parent = self()
+
+    runner = fn executable, argv, _opts ->
+      send(parent, {:run, executable, argv})
+      write_adapter!(argv)
+      {:ok, %{exit_status: 0}}
+    end
+
+    trainer =
+      context
+      |> trainer(runner)
+      |> Map.merge(%{
+        executable: "uvx",
+        executable_args: ["--from", "mlx-lm==0.31.3", "mlx_lm.lora"]
+      })
+
+    assert {:ok, %TrainingJob{status: :succeeded}} = train(trainer)
+
+    assert_received {:run, "uvx", ["--from", "mlx-lm==0.31.3", "mlx_lm.lora", "--model" | _rest]}
   end
 
   test "rejects missing artifacts, nonzero exits, timeout secrets, and completed-run tampering",
@@ -156,6 +183,7 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
 
     assert {:ok, job} = train(good)
     File.write!(Path.join(job.result_model, "adapters.safetensors"), "tampered", [:sync])
+    assert {:error, :mlx_lm_adapter_artifact_tampered} = MLXLMTrainer.verify_job(job)
     assert {:error, :mlx_lm_adapter_artifact_tampered} = train(good)
   end
 

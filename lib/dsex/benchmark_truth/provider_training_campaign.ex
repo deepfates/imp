@@ -148,7 +148,8 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
     end
   end
 
-  defp evaluate(program, rows, concurrency) do
+  @doc false
+  def evaluate(program, rows, concurrency) do
     started = System.monotonic_time()
 
     results =
@@ -236,7 +237,8 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
   def evaluation_program(signature, lm),
     do: DSEx.predict(signature, lm: lm, adapter: DSEx.Adapter.Chat)
 
-  defp signature(routes) do
+  @doc false
+  def signature(routes) do
     DSEx.signature(
       %{
         inputs: [%{name: :utterance, type: :string}],
@@ -248,7 +250,8 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
     )
   end
 
-  defp example(row) do
+  @doc false
+  def example(row) do
     DSEx.example(utterance: row["utterance"], route: row["route"])
     |> DSEx.with_inputs(:utterance)
   end

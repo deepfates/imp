@@ -29,6 +29,7 @@ defmodule DSEx.Clients.MLXLMTrainer do
             model_path: nil,
             root: nil,
             executable: "mlx_lm.lora",
+            executable_args: [],
             runner: DSEx.ExternalCommand,
             signature: nil,
             adapter: DSEx.Adapter.Chat,
@@ -56,6 +57,7 @@ defmodule DSEx.Clients.MLXLMTrainer do
           model_path: String.t() | nil,
           root: String.t(),
           executable: String.t(),
+          executable_args: [String.t()],
           runner: runner(),
           signature: DSEx.Signature.t() | nil,
           adapter: module(),
@@ -100,6 +102,31 @@ defmodule DSEx.Clients.MLXLMTrainer do
 
   @doc false
   def default_model, do: {@default_model, @default_revision}
+
+  @doc "Verifies and returns the durable manifest for a completed MLX-LM training job."
+  @spec verify_job(TrainingJob.t()) :: {:ok, map()} | {:error, term()}
+  def verify_job(
+        %TrainingJob{provider: :mlx_lm, status: :succeeded, result_model: adapter_dir} = job
+      )
+      when is_binary(adapter_dir) do
+    manifest_ref = job.metadata[:manifest] || job.metadata["manifest"]
+
+    unless is_binary(manifest_ref),
+      do: raise(ArgumentError, "MLX-LM job manifest path is missing")
+
+    manifest_path = Path.expand(manifest_ref, adapter_dir)
+
+    with {:ok, manifest} <- read_manifest(manifest_path),
+         true <- manifest["status"] == "succeeded",
+         :ok <- verify_artifact_hashes(adapter_dir, manifest["artifacts"]) do
+      {:ok, manifest}
+    else
+      false -> {:error, :mlx_lm_training_not_succeeded}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def verify_job(%TrainingJob{}), do: {:error, :not_a_completed_mlx_lm_job}
 
   @impl true
   def supported_methods(_trainer), do: [:sft]
@@ -440,8 +467,11 @@ defmodule DSEx.Clients.MLXLMTrainer do
     ]
 
     case trainer.runner do
-      runner when is_function(runner, 3) -> runner.(trainer.executable, argv, opts)
-      runner when is_atom(runner) -> runner.run(trainer.executable, argv, opts)
+      runner when is_function(runner, 3) ->
+        runner.(trainer.executable, trainer.executable_args ++ argv, opts)
+
+      runner when is_atom(runner) ->
+        runner.run(trainer.executable, trainer.executable_args ++ argv, opts)
     end
   end
 
@@ -627,6 +657,13 @@ defmodule DSEx.Clients.MLXLMTrainer do
 
       not (is_binary(trainer.executable) and trainer.executable != "") ->
         raise ArgumentError, "executable must be a command name or path"
+
+      not (is_list(trainer.executable_args) and
+               Enum.all?(
+                 trainer.executable_args,
+                 &(is_binary(&1) and not String.contains?(&1, <<0>>))
+               )) ->
+        raise ArgumentError, "executable_args must be a list of argv strings"
 
       not valid_runner?(trainer.runner) ->
         raise ArgumentError, "runner must be a module exporting run/3 or an arity-3 function"

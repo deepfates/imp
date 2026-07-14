@@ -63,6 +63,7 @@ defmodule PublicSurfaceTest do
     DSEx.Evaluate.SemanticF1,
     DSEx.Example,
     DSEx.ExternalCommand,
+    DSEx.ExternalCommand.Handle,
     DSEx.HTTP,
     DSEx.History,
     DSEx.IdentityAssessmentConsolidation,

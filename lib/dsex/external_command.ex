@@ -1,3 +1,11 @@
+defmodule DSEx.ExternalCommand.Handle do
+  @moduledoc "A supervised external process group managed by `DSEx.ExternalCommand`."
+  @enforce_keys [:owner, :os_pid, :ref]
+  defstruct [:owner, :os_pid, :ref]
+
+  @type t :: %__MODULE__{owner: pid(), os_pid: pos_integer() | nil, ref: reference()}
+end
+
 defmodule DSEx.ExternalCommand.Lifecycle do
   @moduledoc false
 
@@ -28,6 +36,49 @@ defmodule DSEx.ExternalCommand.Lifecycle do
           | {:error, :timeout, Capture.t()}
           | {:error, term()}
   def run(executable, argv, opts \\ []) do
+    with {:ok, handle} <- start_owner(executable, argv, opts) do
+      await_result(handle.ref, handle.owner)
+    end
+  end
+
+  @spec start(String.t(), [String.t()], keyword()) ::
+          {:ok, DSEx.ExternalCommand.Handle.t()} | {:error, term()}
+  def start(executable, argv, opts \\ []) do
+    start_owner(executable, argv, opts)
+  end
+
+  @spec stop(DSEx.ExternalCommand.Handle.t(), timeout()) :: :ok | {:error, term()}
+  def stop(%DSEx.ExternalCommand.Handle{} = handle, timeout \\ 10_000) do
+    if Process.alive?(handle.owner) do
+      stop_ref = make_ref()
+      monitor_ref = Process.monitor(handle.owner)
+      send(handle.owner, {:stop, self(), stop_ref})
+
+      receive do
+        {^stop_ref, :stopped} ->
+          receive do
+            {:DOWN, ^monitor_ref, :process, _, _} -> :ok
+          after
+            timeout -> {:error, :command_stop_timeout}
+          end
+
+        {:DOWN, ^monitor_ref, :process, _, _} ->
+          if process_group_alive?(handle.os_pid),
+            do: {:error, :command_owner_exited_before_cleanup},
+            else: :ok
+      after
+        timeout ->
+          Process.demonitor(monitor_ref, [:flush])
+          {:error, :command_stop_timeout}
+      end
+    else
+      if process_group_alive?(handle.os_pid),
+        do: {:error, :command_owner_missing_with_live_process_group},
+        else: :ok
+    end
+  end
+
+  defp start_owner(executable, argv, opts) do
     with :ok <- validate_command(executable, argv),
          {:ok, executable_path} <- resolve_executable(executable),
          {:ok, config} <- validate_opts(opts) do
@@ -38,9 +89,26 @@ defmodule DSEx.ExternalCommand.Lifecycle do
       case Task.Supervisor.start_child(DSEx.UnlinkedTaskSupervisor, fn ->
              port_owner(caller, ref, executable_path, argv, config, started_at)
            end) do
-        {:ok, owner} -> await_result(ref, owner)
+        {:ok, owner} -> await_started(ref, owner)
         {:error, reason} -> {:error, {:command_owner_start_failed, reason}}
       end
+    end
+  end
+
+  defp await_started(ref, owner) do
+    monitor_ref = Process.monitor(owner)
+
+    receive do
+      {^ref, {:started, os_pid}} ->
+        Process.demonitor(monitor_ref, [:flush])
+        {:ok, %DSEx.ExternalCommand.Handle{owner: owner, os_pid: os_pid, ref: ref}}
+
+      {^ref, {:error, _reason} = error} ->
+        Process.demonitor(monitor_ref, [:flush])
+        error
+
+      {:DOWN, ^monitor_ref, :process, ^owner, reason} ->
+        {:error, {:command_owner_failed, DSEx.Redaction.redact(inspect(reason))}}
     end
   end
 
@@ -79,6 +147,8 @@ defmodule DSEx.ExternalCommand.Lifecycle do
         nil -> nil
       end
 
+    send(caller, {ref, {:started, os_pid}})
+
     timer = start_timer(config.timeout, started_at)
     capture = new_capture(config.max_output_bytes)
 
@@ -109,14 +179,22 @@ defmodule DSEx.ExternalCommand.Lifecycle do
       {^port, {:exit_status, status}} ->
         cancel_timer(timer)
         Process.demonitor(caller_ref, [:flush])
+        capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, true)
         send(caller, {ref, {:ok, captured_output(capture, config.secrets, started_at), status}})
 
+      {:stop, reply_to, stop_ref} ->
+        cancel_timer(timer)
+        Process.demonitor(caller_ref, [:flush])
+        _capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, false)
+        send(reply_to, {stop_ref, :stopped})
+        :ok
+
       {:DOWN, ^caller_ref, :process, ^caller, _reason} ->
-        _capture = terminate_group(port, os_pid, capture, config.kill_grace_ms)
+        _capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, false)
         :ok
 
       :command_timeout ->
-        capture = terminate_group(port, os_pid, capture, config.kill_grace_ms)
+        capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, false)
         Process.demonitor(caller_ref, [:flush])
 
         send(caller, {
@@ -126,17 +204,17 @@ defmodule DSEx.ExternalCommand.Lifecycle do
     end
   end
 
-  defp terminate_group(port, nil, capture, _grace_ms) do
-    close_port(port)
+  defp terminate_group(port, nil, capture, _grace_ms, port_exited?) do
+    unless port_exited?, do: close_port(port)
     capture
   end
 
-  defp terminate_group(port, os_pid, capture, grace_ms) do
+  defp terminate_group(port, os_pid, capture, grace_ms, port_exited?) do
     if process_group_alive?(os_pid), do: signal_process_group(os_pid, "TERM")
     term_deadline = System.monotonic_time(:millisecond) + grace_ms
 
     {capture, port_exited?, group_alive?} =
-      await_cleanup(port, os_pid, capture, false, term_deadline)
+      await_cleanup(port, os_pid, capture, port_exited?, term_deadline)
 
     {capture, port_exited?, group_alive?} =
       if group_alive? do
@@ -180,6 +258,8 @@ defmodule DSEx.ExternalCommand.Lifecycle do
         end
     end
   end
+
+  defp process_group_alive?(nil), do: false
 
   defp process_group_alive?(os_pid) do
     case run_signal_command("0", os_pid) do
@@ -415,6 +495,16 @@ defmodule DSEx.ExternalCommand do
           output: String.t(),
           duration_ms: non_neg_integer()
         }
+
+  @doc "Starts a managed process group and returns after its OS group identity is known."
+  @spec start(String.t(), [String.t()], keyword()) ::
+          {:ok, DSEx.ExternalCommand.Handle.t()} | {:error, term()}
+  def start(executable, argv, opts \\ []), do: Lifecycle.start(executable, argv, opts)
+
+  @doc "Synchronously stops a managed process group and verifies that the group is gone."
+  @spec stop(DSEx.ExternalCommand.Handle.t(), timeout()) :: :ok | {:error, term()}
+  def stop(%DSEx.ExternalCommand.Handle{} = handle, timeout \\ 10_000),
+    do: Lifecycle.stop(handle, timeout)
 
   @spec run(String.t(), [String.t()], keyword()) :: {:ok, result()} | {:error, term()}
   def run(executable, argv, opts \\ []) do

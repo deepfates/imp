@@ -260,7 +260,9 @@ trainer =
   DSEx.Clients.MLXLMTrainer.new(
     signature: DSEx.signature("question -> answer"),
     adapter: DSEx.Adapter.Chat,
-    stratify_by: [:route]
+    stratify_by: [:route],
+    executable: "uvx",
+    executable_args: ["--from", "mlx-lm==0.31.3", "mlx_lm.lora"]
   )
 
 {:ok, job} = DSEx.Clients.Trainer.finetune(trainer, deployment_lm, examples)
@@ -279,7 +281,8 @@ separate artifacts. This backend produces and verifies the adapter only; it
 does not fuse or deploy it. The synchronous callback reports success only after
 the adapter config and weights have been hashed into a durable,
 content-addressed manifest. The executable is invoked directly with an argument
-vector, never through a shell.
+vector, never through a shell. `executable_args` supports a pinned launcher such
+as `uvx`; these prefix arguments participate in that direct invocation.
 
 #### External process dependency decision
 
@@ -295,6 +298,33 @@ was against MuonTrap `1.8.0` and Rambo `0.3.4`, not their names or README claims
 `ParitySidecar` precedent: direct executable plus argv, one Port-owned OS process
 group, checked group TERM/KILL, caller-death cleanup, and bounded tail capture.
 This is a deliberate narrow wrapper, not a general process-management library.
+
+Long-running local servers use the managed form. `stop/2` returns only after the
+Port has exited and the OS process group is absent; caller death remains a
+fallback rather than the normal shutdown protocol:
+
+```elixir
+{:ok, handle} =
+  DSEx.ExternalCommand.start("uvx", server_argv,
+    timeout: :infinity,
+    kill_grace_ms: 2_000
+  )
+
+try do
+  evaluate_local_model()
+after
+  :ok = DSEx.ExternalCommand.stop(handle, 10_000)
+end
+```
+
+The source-checkout campaign `mix dsex.benchmark.local_mlx` owns the complete
+local effectiveness proof: immutable dataset and model-tree validation, matched
+base/adapter/fused evaluation, adapter replay verification, fusion, explicit
+deployment-LM rebinding, checksummed save/load, synchronous server cleanup, and
+a verified run envelope. It requires a clean checkout by default and writes a
+new immutable evidence file rather than overwriting prior results. This evidence
+supports a local weight-training effectiveness claim; it does not by itself
+establish BetterTogether parity.
 
 ## Schema Constraints
 
