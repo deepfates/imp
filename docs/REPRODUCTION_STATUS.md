@@ -18,8 +18,8 @@ The registry is an index and gate, not evidence. `T0` means deterministic behavi
 | ProgramOfThought | adaptation | NONE | red | rag_agent | matched_reproduction |
 | Recursive Language Models | adaptation | NONE | red | rlm_contract<br>rlm_paper | dataset_pins<br>historical_models |
 | Assertions and evaluation | adaptation | NONE | red | confidence_calibration | effectiveness_campaign |
-| SemanticF1 auto-evaluation | replication | NONE | red | confidence_calibration | executable_differential<br>natural_data |
-| CompleteAndGrounded auto-evaluation | replication | NONE | red | confidence_calibration | executable_differential<br>natural_data |
+| SemanticF1 auto-evaluation | replication | NONE | red | auto_evaluation_contract | artifact_admission<br>natural_data |
+| CompleteAndGrounded auto-evaluation | replication | NONE | red | auto_evaluation_contract | artifact_admission<br>natural_data |
 | Best-of-N and refinement | adaptation | NONE | red | confidence_calibration | manifest |
 | LabeledFewShot | replication | NONE | red | optimizer_lift | real_manifest |
 | BootstrapFewShot | replication | NONE | red | optimizer_lift<br>instruction_live | campaign_quality |

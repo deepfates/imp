@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "dspy-3.2.1-auto-evaluation-provider-free-differential",
+  "authority": {
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source": "dspy/evaluate/auto_evaluation.py#sha256=fc902532e25c243161a351e0765c61140eda06128845320259e833a378838339",
+    "test": "tests/evaluate/test_auto_evaluation.py#sha256=2ee33255d3de75dce4dbb41ce2cfe6abd277644903203f8a4370d87b78af1467"
+  },
+  "claim_scope": "provider-free behavioral differential for deterministic DSPy 3.2.1 auto-evaluation semantics",
+  "cases": [
+    {
+      "id": "semantic_direct_harmonic_mean",
+      "evaluator": "semantic_f1",
+      "input_shape": "direct",
+      "decompositional": false,
+      "trace": false,
+      "threshold": 0.66,
+      "judgments": {"precision": 0.8, "recall": 0.6},
+      "expected": {"f1": 0.6857142857142857, "score": 0.6857142857142857, "judge_calls": 1}
+    },
+    {
+      "id": "semantic_trace_threshold",
+      "evaluator": "semantic_f1",
+      "input_shape": "example_prediction",
+      "decompositional": false,
+      "trace": true,
+      "threshold": 0.7,
+      "judgments": {"precision": 0.8, "recall": 0.6},
+      "expected": {"f1": 0.6857142857142857, "score": false, "judge_calls": 1}
+    },
+    {
+      "id": "semantic_decompositional_contract",
+      "evaluator": "semantic_f1",
+      "input_shape": "direct",
+      "decompositional": true,
+      "trace": false,
+      "threshold": 0.66,
+      "judgments": {"precision": 1.0, "recall": 1.0},
+      "expected": {"f1": 1.0, "score": 1.0, "judge_calls": 1}
+    },
+    {
+      "id": "semantic_clamped_helper",
+      "evaluator": "semantic_f1_score",
+      "judgments": {"precision": 2.0, "recall": 0.5},
+      "expected": {"f1": 0.6666666666666666, "score": 0.6666666666666666, "judge_calls": 0}
+    },
+    {
+      "id": "complete_grounded_independent_trace",
+      "evaluator": "complete_and_grounded",
+      "input_shape": "example_prediction",
+      "trace": true,
+      "threshold": 0.85,
+      "judgments": {"completeness": 0.9, "groundedness": 0.8},
+      "expected": {"f1": 0.8470588235294118, "score": false, "judge_calls": 2}
+    },
+    {
+      "id": "complete_grounded_zero_direct",
+      "evaluator": "complete_and_grounded",
+      "input_shape": "direct",
+      "trace": false,
+      "threshold": 0.66,
+      "judgments": {"completeness": 0.0, "groundedness": 0.7},
+      "expected": {"f1": 0.0, "score": 0.0, "judge_calls": 2}
+    }
+  ]
+}
