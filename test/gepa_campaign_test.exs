@@ -741,7 +741,11 @@ defmodule GepaCampaignTest do
       opts: [
         handler: fn messages, _opts ->
           send(receiver, {:reflection_call, messages})
-          %{"instruction" => "Use the reflected instruction."}
+
+          %{
+            __dsex_lm_output__: %{"instruction" => "Use the reflected instruction."},
+            __dsex_lm_metadata__: %{provider: "test"}
+          }
         end
       ]
     }

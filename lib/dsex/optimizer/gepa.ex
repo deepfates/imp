@@ -348,7 +348,7 @@ defmodule DSEx.Optimizer.GEPA do
       }
     ]
 
-    case DSEx.LM.generate(lm, messages, []) do
+    case lm |> DSEx.LM.generate(messages, []) |> unwrap_reflection_lm_result() do
       {:ok, %{"instruction" => instruction}} when is_binary(instruction) ->
         instruction
 
@@ -365,6 +365,14 @@ defmodule DSEx.Optimizer.GEPA do
         {:error, {:invalid_reflection_lm_response, other}}
     end
   end
+
+  defp unwrap_reflection_lm_result({:ok, %{__dsex_lm_output__: output}}),
+    do: {:ok, output}
+
+  defp unwrap_reflection_lm_result({:ok, %{"__dsex_lm_output__" => output}}),
+    do: {:ok, output}
+
+  defp unwrap_reflection_lm_result(result), do: result
 
   defp report_candidates(state) do
     accepted =
