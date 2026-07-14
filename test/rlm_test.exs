@@ -30,6 +30,44 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_actions)
   end
 
+  test "RLM unwraps canonical LM envelopes for controller and sub-LM outputs" do
+    actions = [
+      Jason.encode!(%{reasoning: "query", code: ~S|result = llm_query("question")|}),
+      Jason.encode!(%{reasoning: "submit", code: ~S|submit(%{answer: result["answer"]})|})
+    ]
+
+    controller = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:wrapped_rlm_actions)
+          Process.put(:wrapped_rlm_actions, rest)
+          %{__dsex_lm_output__: action, __dsex_lm_metadata__: %{provider: "test"}}
+        end
+      ]
+    }
+
+    sub_lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{
+            "__dsex_lm_output__" => %{"answer" => "wrapped"},
+            "__dsex_lm_metadata__" => %{"provider" => "test"}
+          }
+        end
+      ]
+    }
+
+    Process.put(:wrapped_rlm_actions, actions)
+
+    rlm = DSEx.Predict.RLM.new("question -> answer", lm: controller, sub_lm: sub_lm)
+    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "wrapped"
+  after
+    Process.delete(:wrapped_rlm_actions)
+  end
+
   test "RLM rejects legacy discrete action responses" do
     lm = %{
       module: DSEx.LM.Static,

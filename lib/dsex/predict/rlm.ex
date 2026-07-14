@@ -285,6 +285,10 @@ defmodule DSEx.Predict.RLM do
         "legacy discrete action maps are unsupported; return a map with reasoning and code",
         action}}
 
+  defp normalize_action(%{__dsex_lm_output__: output}), do: normalize_action(output)
+
+  defp normalize_action(%{"__dsex_lm_output__" => output}), do: normalize_action(output)
+
   defp normalize_action(%{submit: _} = action),
     do:
       {:error,
@@ -651,8 +655,12 @@ defmodule DSEx.Predict.RLM do
     end
   end
 
-  defp subquery_value(%DSEx.Prediction{} = prediction), do: DSEx.Prediction.to_map(prediction)
-  defp subquery_value(value), do: value
+  defp subquery_value(value) do
+    case unwrap_lm_output(value) do
+      %DSEx.Prediction{} = prediction -> DSEx.Prediction.to_map(prediction)
+      output -> output
+    end
+  end
 
   defp interpreter_timeout(budget) do
     case Budget.snapshot(budget).remaining_time_ms do
@@ -751,6 +759,7 @@ defmodule DSEx.Predict.RLM do
     ]
 
     with {:ok, raw} <- run_budgeted(state.budget, fn -> DSEx.LM.generate(lm, messages, []) end),
+         raw = unwrap_lm_output(raw),
          {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []) do
       state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
       {:ok, add_trace(prediction, state)}
@@ -762,6 +771,10 @@ defmodule DSEx.Predict.RLM do
 
   defp add_observation(state, observation),
     do: Map.update!(state, :observations, &[trace_term(observation, state.trace_limit) | &1])
+
+  defp unwrap_lm_output(%{__dsex_lm_output__: output}), do: output
+  defp unwrap_lm_output(%{"__dsex_lm_output__" => output}), do: output
+  defp unwrap_lm_output(output), do: output
 
   defp trace(state, iteration, action, input, output) do
     event = %{
