@@ -643,7 +643,7 @@ defmodule DSEx.Optimizer.Playbook do
        usage: load_usage!(state["usage"]),
        trajectories: trajectories,
        checkpoint: seal_checkpoint(payload),
-       rejection_reasons: state["rejection_reasons"],
+       rejection_reasons: decode_reasons(state["rejection_reasons"]),
        parameter: parameter
      }}
   end
@@ -885,7 +885,37 @@ defmodule DSEx.Optimizer.Playbook do
     Map.new(map, fn {key, value} -> {String.to_existing_atom(key), value} end)
   end
 
-  defp encode_reasons(reasons), do: Enum.map(reasons, &inspect/1)
+  defp encode_reasons(reasons) do
+    Enum.map(reasons, fn {kind, lift, threshold} ->
+      %{
+        "kind" => Atom.to_string(kind),
+        "lift" => lift,
+        "threshold" => threshold
+      }
+    end)
+  end
+
+  defp decode_reasons(reasons) when is_list(reasons) do
+    Enum.map(reasons, fn
+      %{"kind" => kind, "lift" => lift, "threshold" => threshold}
+      when kind in ["promotion_lift_below_threshold", "audit_lift_below_threshold"] and
+             is_number(lift) and is_number(threshold) ->
+        {String.to_existing_atom(kind), lift, threshold}
+
+      reason when is_binary(reason) ->
+        reason
+
+      reason ->
+        raise ArgumentError, "invalid checkpoint rejection reason #{inspect(reason)}"
+    end)
+  end
+
+  defp decode_reasons(reasons),
+    do:
+      raise(
+        ArgumentError,
+        "checkpoint rejection reasons must be a list, got: #{inspect(reasons)}"
+      )
 
   defp encode_name(name) when is_atom(name),
     do: %{"type" => "atom", "value" => Atom.to_string(name)}

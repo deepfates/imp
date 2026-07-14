@@ -114,6 +114,11 @@ defmodule DSEx.Optimizer.PlaybookTest do
     assert result.program.playbook == baseline
     assert length(result.rejection_reasons) == 2
     assert PlaybookOptimizer.rollback(result).playbook == baseline
+
+    portable = result.checkpoint |> Jason.encode!() |> Jason.decode!()
+    assert {:ok, restored} = PlaybookOptimizer.restore(portable, wrapped_program(baseline))
+    assert restored.rejection_reasons == result.rejection_reasons
+    assert PlaybookOptimizer.rollback(restored).playbook == baseline
   end
 
   test "rejects source and group overlap before invoking callbacks" do
