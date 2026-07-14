@@ -1244,10 +1244,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     }
   end
 
-  defp load_proposal_policy(_dumped, 1, requested), do: requested
-
-  defp load_proposal_policy(dumped, schema_version, _requested)
-       when schema_version in [3, 4, 5] do
+  defp load_proposal_policy(dumped, 4, _requested) do
     stored = Map.fetch!(dumped, "proposal_policy")
 
     %{
@@ -1257,15 +1254,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     }
   end
 
-  defp load_combee_policy(_dumped, schema_version, requested) when schema_version in [1, 3] do
-    if requested.enabled do
-      raise ArgumentError, "GEPA resume ComBee policy mismatch: legacy checkpoint is disabled"
-    end
-
-    requested
-  end
-
-  defp load_combee_policy(dumped, schema_version, _requested) when schema_version in [4, 5] do
+  defp load_combee_policy(dumped, 4, _requested) do
     dumped |> Map.fetch!("combee_policy") |> ComBee.load_policy!()
   end
 
@@ -1319,24 +1308,7 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     :ok
   end
 
-  defp validate_checkpoint_integrity!(_dumped, 1), do: :ok
-
-  defp validate_checkpoint_integrity!(dumped, 3) do
-    expected =
-      Proposal.checkpoint_integrity(
-        Map.get(dumped, "pending_proposal_batch"),
-        Map.fetch!(dumped, "budget_ledger"),
-        Map.fetch!(dumped, "proposal_policy")
-      )
-
-    unless Map.get(dumped, "pending_proposal_integrity") == expected do
-      raise ArgumentError, "GEPA pending proposal checkpoint integrity mismatch"
-    end
-
-    :ok
-  end
-
-  defp validate_checkpoint_integrity!(dumped, schema_version) when schema_version in [4, 5] do
+  defp validate_checkpoint_integrity!(dumped, 4) do
     expected =
       Proposal.checkpoint_integrity(
         Map.get(dumped, "pending_proposal_batch"),
@@ -2660,19 +2632,11 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp load_state!(
-         %{"schema_version" => schema_version} = dumped,
+         %{"schema_version" => 4} = dumped,
          seed_candidate,
          opts
-       )
-       when schema_version in [1, 3, 4, 5] do
+       ) do
     budget = dumped |> Map.fetch!("budget") |> Budget.load!()
-
-    budget =
-      if schema_version == 1 do
-        %{budget | max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)}
-      else
-        budget
-      end
 
     state = %State{
       iteration: Map.fetch!(dumped, "iteration"),
@@ -2696,10 +2660,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
         dumped
         |> Map.get("pending_proposal_batch")
         |> Proposal.load!(&load_result!/1),
-      proposal_policy:
-        load_proposal_policy(dumped, schema_version, Keyword.fetch!(opts, :proposal_policy)),
-      combee_policy:
-        load_combee_policy(dumped, schema_version, Keyword.fetch!(opts, :combee_policy)),
+      proposal_policy: load_proposal_policy(dumped, 4, Keyword.fetch!(opts, :proposal_policy)),
+      combee_policy: load_combee_policy(dumped, 4, Keyword.fetch!(opts, :combee_policy)),
       combee_reports: dumped |> Map.get("combee_reports", []) |> Enum.map(&ComBee.load_report/1),
       stop_reason: restore(Map.get(dumped, "stop_reason"))
     }
@@ -2723,99 +2685,13 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     end
 
     validate_pending_ledger!(state)
-    validate_checkpoint_integrity!(dumped, schema_version)
+    validate_checkpoint_integrity!(dumped, 4)
 
     %{state | stop_reason: nil}
   rescue
     error in [KeyError, ArgumentError] ->
       reraise ArgumentError,
               [message: "invalid GEPA engine resume state: #{Exception.message(error)}"],
-              __STACKTRACE__
-  end
-
-  defp load_state!(
-         %{"schema_version" => 2, "phase" => "evolution", "candidates" => candidates} = dumped,
-         seed_candidate,
-         opts
-       )
-       when is_list(candidates) and candidates != [] do
-    if Keyword.fetch!(opts, :combee_policy).enabled do
-      raise ArgumentError, "GEPA resume ComBee policy mismatch: legacy checkpoint is disabled"
-    end
-
-    id_to_index =
-      candidates
-      |> Enum.with_index()
-      |> Map.new(fn {candidate, index} -> {Map.fetch!(candidate, "id"), index} end)
-
-    entries =
-      candidates
-      |> Enum.with_index()
-      |> Enum.map(fn {candidate, index} ->
-        scores = Map.fetch!(candidate, "per_example_scores")
-        named_candidate = legacy_named_candidate(candidate, seed_candidate)
-
-        validation =
-          Result.new(List.duplicate(nil, length(scores)), scores,
-            side_information: legacy_side_information(candidate, named_candidate),
-            metadata: %{legacy_checkpoint_migration: true, metric_calls: length(scores)}
-          )
-
-        parent = Map.get(candidate, "parent_id")
-
-        %Entry{
-          id: index,
-          candidate: named_candidate,
-          validation: validation,
-          parent_ids: if(is_binary(parent), do: [Map.fetch!(id_to_index, parent)], else: []),
-          next_component: max(index, 0),
-          discovered_at:
-            Enum.sum(
-              Enum.map(Enum.take(candidates, index + 1), &length(&1["per_example_scores"]))
-            )
-        }
-      end)
-
-    metric_calls = Enum.sum(Enum.map(candidates, &length(&1["per_example_scores"])))
-    full_evaluations = length(candidates)
-    metric_limit = Keyword.get(opts, :max_metric_calls, :infinity)
-    full_limit = Keyword.get(opts, :max_full_evaluations, :infinity)
-
-    budget =
-      Budget.load!(%{
-        "max_metric_calls" => checkpoint_limit(metric_limit),
-        "max_full_evaluations" => checkpoint_limit(full_limit),
-        "max_reflection_calls" =>
-          checkpoint_limit(Keyword.get(opts, :max_reflection_calls, :infinity)),
-        "metric_calls" => metric_calls,
-        "full_evaluations" => full_evaluations,
-        "reflection_calls" => max(length(candidates) - 1, 0)
-      })
-
-    unless hd(entries).candidate == seed_candidate do
-      raise ArgumentError, "legacy GEPA resume state does not match the seed candidate"
-    end
-
-    %State{
-      iteration: length(entries) - 1,
-      candidates: entries,
-      rejected: [],
-      history: [%{status: :legacy_checkpoint_migrated, candidates: length(entries)}],
-      cache: new_evaluation_cache(opts),
-      budget: budget,
-      rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
-      frontier_type: Keyword.get(opts, :frontier_type, :instance),
-      evaluation_policy:
-        opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
-      stopper_state: new_stopper_state(opts),
-      proposal_policy: Keyword.fetch!(opts, :proposal_policy),
-      combee_policy: Keyword.fetch!(opts, :combee_policy),
-      stop_reason: nil
-    }
-  rescue
-    error in [KeyError, ArgumentError] ->
-      reraise ArgumentError,
-              [message: "invalid legacy GEPA resume state: #{Exception.message(error)}"],
               __STACKTRACE__
   end
 
@@ -3032,23 +2908,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp load_runtime_term(term), do: restore(term)
-
-  defp legacy_named_candidate(candidate, seed_candidate) do
-    parameters = candidate |> Map.fetch!("artifact") |> Map.fetch!("parameters")
-
-    Map.new(seed_candidate, fn {component, fallback} ->
-      value = Map.get(parameters, component, Map.get(parameters, to_string(component), fallback))
-      {component, value}
-    end)
-  end
-
-  defp legacy_side_information(candidate, named_candidate) do
-    information = Map.get(candidate, "asi", []) ++ Map.get(candidate, "diagnostics", [])
-    Map.new(named_candidate, fn {component, _text} -> {component, information} end)
-  end
-
-  defp checkpoint_limit(:infinity), do: "infinity"
-  defp checkpoint_limit(limit), do: limit
 
   defp normalize_frontier_type!(type) when type in [:instance, :objective, :hybrid, :cartesian],
     do: type

@@ -169,7 +169,7 @@ That system needs:
 - population, Pareto, archive, and rejected-edit state;
 - incremental edits as well as whole-value replacement;
 - deterministic aggregation over bounded parallel work;
-- resumable checkpoints, schema migration, secret sanitization, and rollback.
+- resumable current-schema checkpoints, strict schema rejection, secret sanitization, and rollback.
 
 This is compatible with the current Elixir design. `DSEx.ProgramParameters`,
 optimizer reports, explicit random state, trajectories, GEPA archives, and
@@ -196,7 +196,7 @@ P0 work on the current finish line:
    reasoning, tools, errors, usage, latency, cache identity, and evaluator
    feedback.
 5. Complete durable optimizer artifacts: inspect, compare, apply, rollback,
-   champion/challenger, migrate, and prove secret absence.
+   champion/challenger, promote and roll back, and prove secret absence.
 
 P1 work after those blockers:
 

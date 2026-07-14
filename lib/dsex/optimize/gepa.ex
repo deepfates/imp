@@ -507,18 +507,6 @@ defmodule DSEx.Optimize.GEPA do
   end
 
   defp load_resume_state!(
-         %{"schema_version" => 1, "phase" => "evolution", "candidates" => states},
-         artifact,
-         examples,
-         generations,
-         seed
-       )
-       when is_list(states) do
-    candidates = validate_resume_candidates!(states, artifact, examples, generations)
-    {candidates, advance_rng(seed_rng(seed), max(length(candidates) - 1, 0))}
-  end
-
-  defp load_resume_state!(
          %{
            "schema_version" => 2,
            "phase" => "evolution",

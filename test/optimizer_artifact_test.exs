@@ -129,14 +129,14 @@ defmodule DSEx.Optimizer.ArtifactTest do
         "evil"
       )
 
-    assert_raise ArgumentError, ~r/checksum mismatch/, fn -> Artifact.migrate(tampered) end
+    assert_raise ArgumentError, ~r/checksum mismatch/, fn -> Artifact.inspect(tampered) end
 
     assert_raise ArgumentError, ~r/unsupported.*schema version/, fn ->
-      artifact |> Map.put("schema_version", 99) |> Artifact.migrate()
+      artifact |> Map.put("schema_version", 99) |> Artifact.inspect()
     end
 
     assert_raise ArgumentError, ~r/unexpected or missing keys/, fn ->
-      artifact |> Map.put("extra", true) |> Artifact.migrate()
+      artifact |> Map.put("extra", true) |> Artifact.inspect()
     end
 
     assert_raise ArgumentError, ~r/no preserved champion/, fn -> Artifact.rollback(artifact) end
@@ -148,7 +148,7 @@ defmodule DSEx.Optimizer.ArtifactTest do
     end
   end
 
-  test "migrates a checksummed v1 champion/challenger artifact" do
+  test "rejects pre-canonical artifact schemas" do
     champion = Artifact.candidate("v1", optimized("legacy"))
 
     payload = %{
@@ -164,13 +164,9 @@ defmodule DSEx.Optimizer.ArtifactTest do
       "payload" => payload
     }
 
-    migrated = Artifact.migrate(legacy)
-
-    assert %{schema_version: 2, revision: 1, champion_id: "v1", rollback_depth: 0} =
-             Artifact.inspect(migrated)
-
-    corrupt = put_in(legacy, ["payload", "provenance", "source"], "changed")
-    assert_raise ArgumentError, ~r/checksum mismatch/, fn -> Artifact.migrate(corrupt) end
+    assert_raise ArgumentError, ~r/unsupported.*schema version/, fn ->
+      Artifact.inspect(legacy)
+    end
   end
 
   test "candidate predictor sets must match the target and no-op artifacts are rejected" do

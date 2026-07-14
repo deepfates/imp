@@ -30,7 +30,6 @@ defmodule DSEx.Optimizer.Artifact do
                   "provenance",
                   "security"
                 ])
-  @legacy_payload_keys MapSet.new(["champion_id", "candidates", "provenance"])
   @candidate_keys MapSet.new([
                     "id",
                     "program",
@@ -151,46 +150,13 @@ defmodule DSEx.Optimizer.Artifact do
     end
   end
 
-  @doc "Reads, migrates, and validates an optimizer artifact."
+  @doc "Reads and validates a current-schema optimizer artifact."
   @spec read!(Path.t()) :: artifact()
   def read!(path) when is_binary(path) do
     path
     |> File.read!()
     |> Jason.decode!()
-    |> migrate()
-  end
-
-  @doc "Validates the current schema or migrates the supported v1 schema."
-  @spec migrate(map()) :: artifact()
-  def migrate(%{"artifact_type" => @artifact_type, "schema_version" => 1} = legacy) do
-    validate_envelope!(legacy)
-    payload = legacy["payload"]
-    exact_keys!(payload, @legacy_payload_keys, "legacy optimizer artifact payload")
-    validate_checksum!(payload, legacy["payload_sha256"])
-
-    seal(%{
-      "revision" => 1,
-      "champion_id" => payload["champion_id"],
-      "candidates" => payload["candidates"],
-      "history" => [],
-      "provenance" => payload["provenance"],
-      "security" => security_proof()
-    })
-  end
-
-  def migrate(
-        %{"artifact_type" => @artifact_type, "schema_version" => @schema_version} = artifact
-      ),
-      do: validate!(artifact)
-
-  def migrate(%{"artifact_type" => @artifact_type, "schema_version" => version}) do
-    raise ArgumentError,
-          "unsupported optimizer artifact schema version: #{Kernel.inspect(version)}"
-  end
-
-  def migrate(other) do
-    raise ArgumentError,
-          "invalid optimizer artifact envelope: #{Kernel.inspect(value_type(other))}"
+    |> validate!()
   end
 
   @doc "Returns an operational summary without rehydrating program callbacks."
