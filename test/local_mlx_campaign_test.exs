@@ -3,22 +3,50 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
 
   alias DSEx.BenchmarkTruth.LocalMLXCampaign
 
-  test "admits only complete matched improvement with adapter, fusion, and save/load equivalence" do
+  test "admits only complete matched improvement with fusion and save/load equivalence" do
     baseline = [row("one", "R17", "R42"), row("two", "R42", "R42")] |> expand_rows() |> result()
     trained = [row("one", "R17", "R17"), row("two", "R42", "R42")] |> expand_rows() |> result()
 
     assert %{
              "admissible" => true,
-             "adapter_fused_equivalent" => true,
+             "official_fusion_completed" => true,
              "save_load_equivalent" => true,
              "row_identity_preserved" => true
-           } = LocalMLXCampaign.acceptance(baseline, trained, trained, trained)
+           } = LocalMLXCampaign.acceptance(baseline, trained, trained)
 
     malformed = put_in(trained, ["rows", Access.at(0), "status"], "error")
-    refute LocalMLXCampaign.acceptance(baseline, trained, malformed, trained)["admissible"]
+    refute LocalMLXCampaign.acceptance(baseline, malformed, trained)["admissible"]
 
     reordered = Map.update!(trained, "rows", &Enum.reverse/1)
-    refute LocalMLXCampaign.acceptance(baseline, trained, trained, reordered)["admissible"]
+    refute LocalMLXCampaign.acceptance(baseline, trained, reordered)["admissible"]
+  end
+
+  test "restores runtime credentials only when portable deployment configuration matches" do
+    runtime_lm =
+      DSEx.req_llm("openai:default_model",
+        api_key: "local",
+        base_url: "http://127.0.0.1:18821/v1"
+      )
+
+    loaded =
+      DSEx.predict("question -> answer", lm: runtime_lm)
+      |> DSEx.Saving.dump()
+      |> DSEx.Saving.load()
+
+    refute Keyword.has_key?(DSEx.ProgramAccess.lm(loaded).opts, :api_key)
+
+    restored = LocalMLXCampaign.restore_runtime_credentials!(loaded, runtime_lm)
+    assert DSEx.ProgramAccess.lm(restored) == runtime_lm
+
+    mismatched =
+      DSEx.req_llm("openai:other_model",
+        api_key: "local",
+        base_url: "http://127.0.0.1:18821/v1"
+      )
+
+    assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
+      LocalMLXCampaign.restore_runtime_credentials!(loaded, mismatched)
+    end
   end
 
   defp row(id, expected, actual) do

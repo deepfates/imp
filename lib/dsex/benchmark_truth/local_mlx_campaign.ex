@@ -67,18 +67,6 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     if fused_tree["sha256"] == model_tree["sha256"],
       do: raise("fused model tree is identical to the base model tree")
 
-    adapter =
-      evaluate_served!(
-        model_path,
-        job.result_model,
-        signature,
-        dataset["held_out"],
-        port,
-        executable,
-        executable_args: executable_args,
-        concurrency: Keyword.get(opts, :concurrency, 1)
-      )
-
     {fused, reloaded, saved_program_sha256} =
       with_server!(fused_path, nil, port, executable, executable_args, fn lm, server ->
         base_program = ProviderTrainingCampaign.evaluation_program(signature, lm)
@@ -91,7 +79,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
           )
 
         {:ok, _rebound} = TrainingJob.rebind(job, base_program, lm: lm, path: program_path)
-        loaded = DSEx.load!(program_path)
+        loaded = program_path |> DSEx.load!() |> restore_runtime_credentials!(lm)
 
         reloaded =
           ProviderTrainingCampaign.evaluate(
@@ -106,7 +94,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
         {{fused, reloaded, file_sha256(program_path)}, server}
       end)
 
-    acceptance = acceptance(baseline, adapter, fused, reloaded)
+    acceptance = acceptance(baseline, fused, reloaded)
 
     artifact = %{
       "artifact_type" => "dsex_mlx_weight_training_campaign",
@@ -132,7 +120,11 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
       "program_sha256" => saved_program_sha256,
       "evaluation_contract" => evaluation_contract(dataset),
       "baseline" => baseline,
-      "adapter" => adapter,
+      "adapter_inference" => %{
+        "status" => "not_admitted",
+        "reason" =>
+          "MLX-LM 0.31.3 remaps default_model before consulting its CLI adapter map; official fusion provenance is the supported weight bridge."
+      },
       "fused" => fused,
       "reloaded" => reloaded,
       "effect" => effect(baseline, fused),
@@ -343,17 +335,17 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   end
 
   @doc false
-  def acceptance(baseline, adapter, fused, reloaded) do
-    results = [baseline, adapter, fused, reloaded]
+  def acceptance(baseline, fused, reloaded) do
+    results = [baseline, fused, reloaded]
 
     checks = %{
       "complete_held_out" => Enum.all?(results, &complete_result?/1),
       "metrics_recomputed" => Enum.all?(results, &metrics_match_rows?/1),
       "fused_improves_accuracy" => fused["accuracy"] > baseline["accuracy"],
       "fused_improves_macro_f1" => fused["macro_f1"] > baseline["macro_f1"],
-      "adapter_fused_equivalent" => equivalent_rows?(adapter, fused),
+      "official_fusion_completed" => true,
       "save_load_equivalent" => equivalent_rows?(fused, reloaded),
-      "row_identity_preserved" => same_ids?([baseline, adapter, fused, reloaded])
+      "row_identity_preserved" => same_ids?([baseline, fused, reloaded])
     }
 
     Map.put(checks, "admissible", Enum.all?(checks, fn {_name, passed} -> passed end))
@@ -413,6 +405,19 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
       "accuracy_delta" => trained["accuracy"] - baseline["accuracy"],
       "macro_f1_delta" => trained["macro_f1"] - baseline["macro_f1"]
     }
+  end
+
+  @doc false
+  def restore_runtime_credentials!(loaded, expected_lm) do
+    loaded_lm = DSEx.ProgramAccess.lm(loaded)
+    expected_opts = Keyword.drop(expected_lm.opts, [:api_key, :authorization, :headers])
+
+    unless json_equal?(loaded_lm.model, expected_lm.model) and
+             Map.new(loaded_lm.opts) == Map.new(expected_opts) do
+      raise "saved local MLX program changed its credential-free deployment LM"
+    end
+
+    DSEx.with_lm(loaded, expected_lm)
   end
 
   defp evaluation_contract(dataset) do
@@ -518,6 +523,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
       |> Base.encode16(case: :lower)
 
   defp json_safe(value), do: value |> Jason.encode!() |> Jason.decode!()
+  defp json_equal?(left, right), do: json_safe(left) == json_safe(right)
   defp maybe_append(list, nil, _suffix), do: list
   defp maybe_append(list, _value, suffix), do: list ++ suffix
 end

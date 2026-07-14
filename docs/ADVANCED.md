@@ -326,6 +326,13 @@ new immutable evidence file rather than overwriting prior results. This evidence
 supports a local weight-training effectiveness claim; it does not by itself
 establish BetterTogether parity.
 
+MLX-LM `0.31.3` does not admit an adapter-served equivalence claim: its server
+remaps `default_model` before consulting the CLI adapter map, so
+`--adapter-path` is not applied to that request. The campaign therefore uses the
+pinned official `mlx_lm.fuse` command as the adapter-to-deployment bridge and
+records adapter hashes, fusion argv, output, and the complete fused tree. It
+does not report the server's base-model output as adapter inference.
+
 ## Schema Constraints
 
 ```elixir
