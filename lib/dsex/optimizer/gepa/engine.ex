@@ -2629,34 +2629,39 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          seed_candidate,
          opts
        ) do
+    require_exact_keys!(
+      dumped,
+      ~w(schema_version iteration candidates rejected history cache budget rng_state merge_due total_merges_tested merge_attempts last_iteration_found_candidate frontier_type evaluation_policy best_outputs_valset stopper_state budget_ledger pending_proposal_batch proposal_policy combee_policy combee_reports stop_reason pending_proposal_integrity),
+      "GEPA engine checkpoint"
+    )
+
     budget = dumped |> Map.fetch!("budget") |> Budget.load!()
 
     state = %State{
       iteration: Map.fetch!(dumped, "iteration"),
       candidates: Enum.map(Map.fetch!(dumped, "candidates"), &load_entry!/1),
-      rejected: restore(Map.get(dumped, "rejected", [])),
-      history: restore(Map.get(dumped, "history", [])),
-      cache: load_evaluation_cache(Map.get(dumped, "cache", []), opts),
+      rejected: dumped |> Map.fetch!("rejected") |> restore(),
+      history: dumped |> Map.fetch!("history") |> restore(),
+      cache: dumped |> Map.fetch!("cache") |> load_evaluation_cache(opts),
       budget: budget,
       rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
-      merge_due: Map.get(dumped, "merge_due", 0),
-      total_merges_tested: Map.get(dumped, "total_merges_tested", 0),
-      merge_attempts:
-        dumped |> Map.get("merge_attempts", %{ancestors: [], descriptions: []}) |> restore(),
-      last_iteration_found_candidate: Map.get(dumped, "last_iteration_found_candidate", false),
-      frontier_type: dumped |> Map.get("frontier_type", :instance) |> normalize_frontier_type!(),
+      merge_due: Map.fetch!(dumped, "merge_due"),
+      total_merges_tested: Map.fetch!(dumped, "total_merges_tested"),
+      merge_attempts: dumped |> Map.fetch!("merge_attempts") |> restore(),
+      last_iteration_found_candidate: Map.fetch!(dumped, "last_iteration_found_candidate"),
+      frontier_type: dumped |> Map.fetch!("frontier_type") |> normalize_frontier_type!(),
       evaluation_policy: load_evaluation_policy(dumped, opts),
-      best_outputs_valset: dumped |> Map.get("best_outputs_valset") |> load_best_outputs!(),
-      stopper_state: dumped |> Map.get("stopper_state") |> load_stopper_state(opts),
-      budget_ledger: dumped |> Map.get("budget_ledger", []) |> BudgetLedger.load!(),
+      best_outputs_valset: dumped |> Map.fetch!("best_outputs_valset") |> load_best_outputs!(),
+      stopper_state: dumped |> Map.fetch!("stopper_state") |> load_stopper_state(opts),
+      budget_ledger: dumped |> Map.fetch!("budget_ledger") |> BudgetLedger.load!(),
       pending_proposal_batch:
         dumped
-        |> Map.get("pending_proposal_batch")
+        |> Map.fetch!("pending_proposal_batch")
         |> Proposal.load!(&load_result!/1),
       proposal_policy: load_proposal_policy(dumped, 4, Keyword.fetch!(opts, :proposal_policy)),
       combee_policy: load_combee_policy(dumped, 4, Keyword.fetch!(opts, :combee_policy)),
-      combee_reports: dumped |> Map.get("combee_reports", []) |> Enum.map(&ComBee.load_report/1),
-      stop_reason: restore(Map.get(dumped, "stop_reason"))
+      combee_reports: dumped |> Map.fetch!("combee_reports") |> Enum.map(&ComBee.load_report/1),
+      stop_reason: dumped |> Map.fetch!("stop_reason") |> restore()
     }
 
     unless hd(state.candidates).candidate == seed_candidate do
@@ -2703,13 +2708,19 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp load_entry!(entry) do
+    require_exact_keys!(
+      entry,
+      ~w(id candidate validation parent_ids next_component discovered_at),
+      "GEPA candidate entry"
+    )
+
     %Entry{
       id: Map.fetch!(entry, "id"),
       candidate: restore(Map.fetch!(entry, "candidate")),
       validation: entry |> Map.fetch!("validation") |> load_result!(),
-      parent_ids: Map.get(entry, "parent_ids", []),
-      next_component: Map.get(entry, "next_component", 0),
-      discovered_at: Map.get(entry, "discovered_at", 0)
+      parent_ids: Map.fetch!(entry, "parent_ids"),
+      next_component: Map.fetch!(entry, "next_component"),
+      discovered_at: Map.fetch!(entry, "discovered_at")
     }
   end
 
@@ -2730,11 +2741,17 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp load_result!(result) do
+    require_exact_keys!(
+      result,
+      ~w(outputs aggregate_score scores objective_scores trajectories side_information metadata),
+      "GEPA evaluation result"
+    )
+
     %Result{
       outputs: Enum.map(Map.fetch!(result, "outputs"), &load_runtime_term/1),
       aggregate_score: Map.fetch!(result, "aggregate_score"),
       scores: Map.fetch!(result, "scores"),
-      objective_scores: restore(Map.get(result, "objective_scores")),
+      objective_scores: result |> Map.fetch!("objective_scores") |> restore(),
       trajectories:
         result
         |> Map.fetch!("trajectories")
@@ -2831,34 +2848,29 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          } = entry,
          cache
        ) do
+    require_exact_keys!(
+      entry,
+      ~w(cache_version candidate_digest example_digest output score objective_scores),
+      "GEPA evaluation-cache entry"
+    )
+
     key = {decode_digest!(candidate_digest), decode_digest!(example_digest)}
 
     Map.put(cache, key, %EvaluationCache.Entry{
       output: load_runtime_term(output),
       score: score,
-      objective_scores: restore(Map.get(entry, "objective_scores"))
+      objective_scores: entry |> Map.fetch!("objective_scores") |> restore()
     })
   end
 
-  defp load_cache_entry(entry, cache) do
-    entry = restore(entry)
-    candidate = fetch_any!(entry, :candidate)
-    batch = fetch_any!(entry, :batch)
-    result = entry |> fetch_any!(:result) |> normalize_string_keys() |> load_result!()
-    EvaluationCache.put(cache, candidate, batch, result)
-  end
+  defp load_cache_entry(entry, _cache),
+    do: raise(ArgumentError, "invalid GEPA evaluation-cache entry: #{inspect(entry)}")
 
   defp decode_digest!(digest) when is_binary(digest) do
     case Base.decode16(digest, case: :mixed) do
       {:ok, decoded} when byte_size(decoded) == 32 -> decoded
       _ -> raise ArgumentError, "invalid GEPA evaluation-cache digest"
     end
-  end
-
-  defp fetch_any!(map, key), do: Map.fetch!(map, key)
-
-  defp normalize_string_keys(map) when is_map(map) do
-    Map.new(map, fn {key, value} -> {to_string(key), value} end)
   end
 
   defp dump_runtime_term(nil), do: nil
@@ -2883,21 +2895,21 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   defp dump_runtime_term(term), do: DSEx.Optimizer.Report.json_safe(term)
 
   defp load_runtime_term(%{"__gepa_type__" => "prediction"} = state) do
+    require_exact_keys!(
+      state,
+      ~w(__gepa_type__ fields completions score metadata),
+      "GEPA runtime prediction"
+    )
+
     DSEx.Prediction.new(restore(Map.fetch!(state, "fields")),
-      completions: restore(Map.get(state, "completions", [])),
-      score: Map.get(state, "score"),
-      metadata: restore(Map.get(state, "metadata", %{}))
+      completions: state |> Map.fetch!("completions") |> restore(),
+      score: Map.fetch!(state, "score"),
+      metadata: state |> Map.fetch!("metadata") |> restore()
     )
   end
 
   defp load_runtime_term(%{"__gepa_type__" => "trajectory", "state" => state}) do
-    if state["type"] == "dsex_optimizer_trajectory" do
-      Trajectory.load!(state)
-    else
-      state = restore(state)
-      state = Map.update!(state, :prediction, &load_runtime_term/1)
-      struct!(Trajectory, state)
-    end
+    Trajectory.load!(state)
   end
 
   defp load_runtime_term(term), do: restore(term)
@@ -2914,19 +2926,22 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
   defp load_evaluation_policy(dumped, opts) do
     policy = opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!()
+    stored = Map.fetch!(dumped, "evaluation_policy")
 
-    case Map.get(dumped, "evaluation_policy") do
-      nil ->
-        policy
-
-      stored ->
-        if stored == Atom.to_string(policy),
-          do: policy,
-          else: raise(ArgumentError, "GEPA resume evaluation policy mismatch: #{inspect(stored)}")
-    end
+    if stored == Atom.to_string(policy),
+      do: policy,
+      else: raise(ArgumentError, "GEPA resume evaluation policy mismatch: #{inspect(stored)}")
   end
 
   defp restore(value), do: DSEx.Optimizer.Report.restore_json_safe(value)
+
+  defp require_exact_keys!(map, keys, context) when is_map(map) do
+    unless MapSet.new(Map.keys(map)) == MapSet.new(keys) do
+      raise ArgumentError, "#{context} has unexpected or missing keys"
+    end
+
+    :ok
+  end
 
   defp dump_rng(rng_state) do
     {:exsss, [first | second]} = :rand.export_seed_s(rng_state)

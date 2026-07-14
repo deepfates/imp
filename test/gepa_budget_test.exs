@@ -45,6 +45,7 @@ defmodule DSEx.Optimizer.GEPA.BudgetTest do
     state = %{
       "max_metric_calls" => 1,
       "max_full_evaluations" => 1,
+      "max_reflection_calls" => 1,
       "metric_calls" => 2,
       "full_evaluations" => 1,
       "reflection_calls" => 0

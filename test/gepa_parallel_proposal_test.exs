@@ -231,6 +231,22 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
     end
   end
 
+  test "current checkpoints reject every missing or unexpected top-level field" do
+    checkpoint = run_engine() |> Engine.dump_state() |> json_round_trip()
+
+    Enum.each(Map.keys(checkpoint), fn key ->
+      assert_raise ArgumentError,
+                   ~r/unexpected or missing keys|invalid GEPA engine resume state/,
+                   fn ->
+                     run_engine(resume_state: Map.delete(checkpoint, key))
+                   end
+    end)
+
+    assert_raise ArgumentError, ~r/unexpected or missing keys/, fn ->
+      run_engine(resume_state: Map.put(checkpoint, "obsolete", true))
+    end
+  end
+
   defp interrupt_checkpoint!(status, phase \\ nil) do
     owner = self()
     expected_status = Atom.to_string(status)

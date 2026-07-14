@@ -77,6 +77,12 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
 
   def load!(%{"integrity" => integrity} = dumped, load_result)
       when is_function(load_result, 1) do
+    require_exact_keys!(
+      dumped,
+      ~w(id phase status contexts deferred_stop_reason integrity),
+      "GEPA pending proposal batch"
+    )
+
     payload = Map.delete(dumped, "integrity")
 
     unless secure_equal?(integrity, digest(payload)) do
@@ -93,7 +99,7 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
       status: status,
       contexts: contexts,
       deferred_stop_reason:
-        payload |> Map.get("deferred_stop_reason") |> DSEx.Optimizer.Report.restore_json_safe()
+        payload |> Map.fetch!("deferred_stop_reason") |> DSEx.Optimizer.Report.restore_json_safe()
     }
 
     expected = new_batch(phase, contexts, batch.deferred_stop_reason).id
@@ -140,8 +146,14 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
   end
 
   defp load_context!(context, load_result) do
+    require_exact_keys!(
+      context,
+      ~w(slot iteration parent_id minibatch_ids parent_result parent_metric_calls parent_ambiguous child_result child_metric_calls child_ambiguous reflection_calls reflection_ambiguous components next_component action error dataset aggregation_reports replacements candidate),
+      "GEPA pending proposal context"
+    )
+
     action =
-      case Map.get(context, "action") do
+      case Map.fetch!(context, "action") do
         nil -> nil
         value -> enum!(value, [:reflect, :child, :skip, :error, :budget_stop], :action)
       end
@@ -152,33 +164,34 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
       parent_id: non_negative!(Map.fetch!(context, "parent_id"), :parent_id),
       minibatch_ids: Enum.map(Map.fetch!(context, "minibatch_ids"), &non_negative!(&1, :id)),
       parent_result:
-        case Map.get(context, "parent_result") do
+        case Map.fetch!(context, "parent_result") do
           nil -> nil
           result -> load_result.(result)
         end,
-      parent_metric_calls: Map.get(context, "parent_metric_calls"),
-      parent_ambiguous: Map.get(context, "parent_ambiguous", false),
+      parent_metric_calls: Map.fetch!(context, "parent_metric_calls"),
+      parent_ambiguous: Map.fetch!(context, "parent_ambiguous"),
       child_result:
-        case Map.get(context, "child_result") do
+        case Map.fetch!(context, "child_result") do
           nil -> nil
           result -> load_result.(result)
         end,
-      child_metric_calls: Map.get(context, "child_metric_calls"),
-      child_ambiguous: Map.get(context, "child_ambiguous", false),
-      reflection_calls: Map.get(context, "reflection_calls"),
-      reflection_ambiguous: Map.get(context, "reflection_ambiguous", false),
-      components: context |> Map.get("components") |> DSEx.Optimizer.Report.restore_json_safe(),
-      next_component: Map.get(context, "next_component"),
+      child_metric_calls: Map.fetch!(context, "child_metric_calls"),
+      child_ambiguous: Map.fetch!(context, "child_ambiguous"),
+      reflection_calls: Map.fetch!(context, "reflection_calls"),
+      reflection_ambiguous: Map.fetch!(context, "reflection_ambiguous"),
+      components:
+        context |> Map.fetch!("components") |> DSEx.Optimizer.Report.restore_json_safe(),
+      next_component: Map.fetch!(context, "next_component"),
       action: action,
-      error: context |> Map.get("error") |> DSEx.Optimizer.Report.restore_json_safe(),
-      dataset: context |> Map.get("dataset") |> DSEx.Optimizer.Report.restore_json_safe(),
+      error: context |> Map.fetch!("error") |> DSEx.Optimizer.Report.restore_json_safe(),
+      dataset: context |> Map.fetch!("dataset") |> DSEx.Optimizer.Report.restore_json_safe(),
       aggregation_reports:
         context
-        |> Map.get("aggregation_reports", [])
+        |> Map.fetch!("aggregation_reports")
         |> Enum.map(&DSEx.Optimizer.GEPA.ComBee.load_report/1),
       replacements:
-        context |> Map.get("replacements") |> DSEx.Optimizer.Report.restore_json_safe(),
-      candidate: context |> Map.get("candidate") |> DSEx.Optimizer.Report.restore_json_safe()
+        context |> Map.fetch!("replacements") |> DSEx.Optimizer.Report.restore_json_safe(),
+      candidate: context |> Map.fetch!("candidate") |> DSEx.Optimizer.Report.restore_json_safe()
     }
   end
 
@@ -209,6 +222,14 @@ defmodule DSEx.Optimizer.GEPA.Proposal do
   defp canonical(list) when is_list(list), do: Enum.map(list, &canonical/1)
   defp canonical(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> canonical()
   defp canonical(value), do: value
+
+  defp require_exact_keys!(map, keys, context) do
+    unless MapSet.new(Map.keys(map)) == MapSet.new(keys) do
+      raise ArgumentError, "#{context} has unexpected or missing keys"
+    end
+
+    :ok
+  end
 
   defp secure_equal?(left, right) when is_binary(left) and is_binary(right),
     do: left == right

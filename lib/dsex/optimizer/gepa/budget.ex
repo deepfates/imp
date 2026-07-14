@@ -134,13 +134,20 @@ defmodule DSEx.Optimizer.GEPA.Budget do
 
   @spec load!(map()) :: t()
   def load!(state) when is_map(state) do
+    expected =
+      ~w(max_metric_calls max_full_evaluations max_reflection_calls metric_calls full_evaluations reflection_calls)
+
+    unless MapSet.new(Map.keys(state)) == MapSet.new(expected) do
+      raise ArgumentError, "GEPA budget state has unexpected or missing keys"
+    end
+
     budget = %__MODULE__{
       max_metric_calls: state |> fetch!("max_metric_calls") |> load_limit!(:max_metric_calls),
       max_full_evaluations:
         state |> fetch!("max_full_evaluations") |> load_limit!(:max_full_evaluations),
       max_reflection_calls:
         state
-        |> Map.get("max_reflection_calls", "infinity")
+        |> fetch!("max_reflection_calls")
         |> load_limit!(:max_reflection_calls),
       metric_calls: state |> fetch!("metric_calls") |> count!(:metric_calls),
       full_evaluations: state |> fetch!("full_evaluations") |> count!(:full_evaluations),
