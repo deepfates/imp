@@ -36,6 +36,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
 
     assert get_in(first.artifact, ["results", "baseline", "latency", "dev_wall_seconds"]) >= 0.0
     assert get_in(first.artifact, ["results", "baseline", "failures"]) == []
+    assert first.artifact["failures"] == []
 
     assert ["cache", false] in get_in(first.artifact, ["results", "baseline", "program", "config"])
 
@@ -69,6 +70,65 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     assert_raise ArgumentError, ~r/checkpoint identity mismatch/, fn ->
       opts |> Keyword.put(:model, "openai:different") |> InstructionOptimizerCampaign.run()
     end
+  end
+
+  test "evaluation row errors are retained as arm and campaign failure evidence" do
+    root = tmp_dir("row-errors")
+    dataset = write_aime_dataset!(root)
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> {:error, :provider_unavailable} end]
+    }
+
+    result =
+      root
+      |> campaign_opts(dataset, lm, arms: [:baseline])
+      |> InstructionOptimizerCampaign.run()
+
+    arm_failures = get_in(result.artifact, ["results", "baseline", "failures"])
+
+    assert Enum.map(arm_failures, &Map.take(&1, ["type", "split", "index"])) == [
+             %{"type" => "evaluation_row_error", "split" => "dev", "index" => 0},
+             %{"type" => "evaluation_row_error", "split" => "dev", "index" => 1},
+             %{"type" => "evaluation_row_error", "split" => "test", "index" => 0},
+             %{"type" => "evaluation_row_error", "split" => "test", "index" => 1}
+           ]
+
+    assert Enum.all?(arm_failures, &(not is_nil(&1["error"])))
+    assert result.artifact["failures"] == Enum.map(arm_failures, &Map.put(&1, "arm", "baseline"))
+
+    checkpoint = result.checkpoint_path |> File.read!() |> Jason.decode!()
+    assert get_in(checkpoint, ["payload", "completed", "baseline", "failures"]) == arm_failures
+  end
+
+  test "completed arm reservation evidence cannot be hidden by empty failure lists" do
+    root = tmp_dir("active-reservations")
+    dataset = write_aime_dataset!(root)
+
+    runner = fn arm, _context, {_progress, _persist} ->
+      %{
+        "arm" => Atom.to_string(arm),
+        "dev" => 1.0,
+        "test" => 1.0,
+        "failures" => [],
+        "budget" => %{
+          "active_reservations" => 2,
+          "reserved" => %{"input_tokens" => 10, "output_tokens" => 20, "usd" => 0.01}
+        }
+      }
+    end
+
+    result =
+      root
+      |> campaign_opts(dataset, static_lm(), arms: [:baseline], arm_runner: runner)
+      |> InstructionOptimizerCampaign.run()
+
+    [failure] = get_in(result.artifact, ["results", "baseline", "failures"])
+    assert failure["type"] == "active_budget_reservations"
+    assert failure["active_reservations"] == 2
+    assert failure["reserved"] == %{"input_tokens" => 10, "output_tokens" => 20, "usd" => 0.01}
+    assert result.artifact["failures"] == [Map.put(failure, "arm", "baseline")]
   end
 
   test "SIMBA finalist validation uses the trainset like pinned DSPy" do

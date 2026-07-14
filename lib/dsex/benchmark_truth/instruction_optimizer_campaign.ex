@@ -161,6 +161,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
 
       reject_if_exhausted!(budget)
       report = Report.fetch(program)
+      budget_snapshot = CampaignBudget.snapshot(budget)
 
       %{
         "arm" => Atom.to_string(arm),
@@ -170,14 +171,14 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
         "selection_split" => "dev",
         "test_scores_used_for_selection" => false,
         "frozen_test_evaluations" => length(progress["test_rows"] || []),
-        "budget" => CampaignBudget.snapshot(budget),
+        "budget" => budget_snapshot,
         "latency" => %{
           "compile_wall_seconds" => progress["compile_wall_seconds"] || 0.0,
           "dev_wall_seconds" => rows_wall_seconds(progress["dev_rows"] || []),
           "test_wall_seconds" => rows_wall_seconds(progress["test_rows"] || []),
           "invocation_wall_seconds" => elapsed_seconds(arm_started)
         },
-        "failures" => [],
+        "failures" => row_failures(progress),
         "optimizer_report" => report && Report.dump(report),
         "program" => progress["program"],
         "scope" => "research_preflight_not_t3"
@@ -295,7 +296,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
         row = %{
           "index" => length(rows),
           "score" => trajectory.score,
-          "error" => Report.json_safe(trajectory.error),
+          "error" => json_safe_error(trajectory.error),
           "wall_seconds" => elapsed_seconds(row_started)
         }
 
@@ -350,7 +351,17 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
   end
 
   defp artifact(context, checkpoint) do
-    results = checkpoint["completed"]
+    results =
+      Map.new(checkpoint["completed"], fn {arm, result} ->
+        {arm, Map.put(result, "failures", result_failures(result))}
+      end)
+
+    failures =
+      results
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.flat_map(fn {arm, result} ->
+        Enum.map(result["failures"], &Map.put(&1, "arm", arm))
+      end)
 
     %{
       "schema_version" => @schema_version,
@@ -371,7 +382,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
       },
       "results" => results,
       "budget_scope" => "per_arm",
-      "failures" => [],
+      "failures" => failures,
       "summary" => %{
         "arms_completed" => Map.keys(results) |> Enum.sort(),
         "all_requested_arms_completed" => map_size(results) == length(context.arms),
@@ -432,6 +443,47 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp rows_wall_seconds(rows),
     do: rows |> Enum.map(&(&1["wall_seconds"] || 0.0)) |> Enum.sum()
+
+  defp row_failures(progress) do
+    for split <- ["dev", "test"],
+        row <- progress[split <> "_rows"] || [],
+        error = row["error"],
+        failure_error?(error) do
+      %{
+        "type" => "evaluation_row_error",
+        "split" => split,
+        "index" => row["index"],
+        "error" => error
+      }
+    end
+  end
+
+  defp result_failures(result) do
+    (result["failures"] || []) ++ reservation_failures(result["budget"] || %{})
+  end
+
+  defp reservation_failures(%{"active_reservations" => count} = budget)
+       when is_integer(count) and count > 0 do
+    [
+      %{
+        "type" => "active_budget_reservations",
+        "active_reservations" => count,
+        "reserved" => budget["reserved"]
+      }
+    ]
+  end
+
+  defp reservation_failures(_budget), do: []
+
+  defp json_safe_error(nil), do: nil
+  defp json_safe_error(error), do: Report.json_safe(error)
+
+  defp failure_error?(nil), do: false
+
+  defp failure_error?(%{"__dsex_type__" => "atom", "value" => "nil"}),
+    do: false
+
+  defp failure_error?(_error), do: true
 
   defp monotonic_time, do: System.monotonic_time()
 
