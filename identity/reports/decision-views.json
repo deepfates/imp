@@ -15984,7 +15984,9 @@
       },
       "candidate_id": "cand-84cb94baa6eb5328",
       "display": "Axima",
-      "dissent": [],
+      "dissent": [
+        "dissent-axima-listener-hold"
+      ],
       "flags": [],
       "normalized": "axima",
       "occurrence_ids": [
@@ -18820,7 +18822,9 @@
       },
       "candidate_id": "cand-55f81605772204ec",
       "display": "beam.run",
-      "dissent": [],
+      "dissent": [
+        "dissent-beam-run-code-contract"
+      ],
       "flags": [],
       "normalized": "beamrun",
       "occurrence_ids": [
@@ -29591,7 +29595,9 @@
       },
       "candidate_id": "cand-54e4df2cff57c575",
       "display": "Caldrin",
-      "dissent": [],
+      "dissent": [
+        "dissent-caldrin-brand-track"
+      ],
       "flags": [],
       "normalized": "caldrin",
       "occurrence_ids": [
@@ -58476,7 +58482,9 @@
       },
       "candidate_id": "cand-91471eb5c738d448",
       "display": "Draftifact",
-      "dissent": [],
+      "dissent": [
+        "dissent-draftifact-descriptor-role"
+      ],
       "flags": [],
       "normalized": "draftifact",
       "occurrence_ids": [
@@ -64345,7 +64353,9 @@
       },
       "candidate_id": "cand-2da72dd6c1840ee6",
       "display": "Epistemic Review Board",
-      "dissent": [],
+      "dissent": [
+        "dissent-epistemic-board-authority"
+      ],
       "flags": [],
       "normalized": "epistemicreviewboard",
       "occurrence_ids": [
@@ -67904,7 +67914,9 @@
       },
       "candidate_id": "cand-58fed07dc08967a0",
       "display": "Evidence Loop",
-      "dissent": [],
+      "dissent": [
+        "dissent-evidence-loop-descriptor-role"
+      ],
       "flags": [],
       "normalized": "evidenceloop",
       "occurrence_ids": [
@@ -70608,7 +70620,9 @@
       },
       "candidate_id": "cand-2fd35f18429f3994",
       "display": "Faultcell",
-      "dissent": [],
+      "dissent": [
+        "dissent-faultcell-runtime-role"
+      ],
       "flags": [],
       "normalized": "faultcell",
       "occurrence_ids": [
@@ -70725,7 +70739,9 @@
       },
       "candidate_id": "cand-d85467fceca0a43c",
       "display": "Faultglass",
-      "dissent": [],
+      "dissent": [
+        "dissent-faultglass-runtime-role"
+      ],
       "flags": [],
       "normalized": "faultglass",
       "occurrence_ids": [
@@ -74044,7 +74060,9 @@
       },
       "candidate_id": "cand-729abad7fdccc7c5",
       "display": "Footlight",
-      "dissent": [],
+      "dissent": [
+        "dissent-footlight-category-fit"
+      ],
       "flags": [],
       "normalized": "footlight",
       "occurrence_ids": [
@@ -78316,7 +78334,9 @@
       },
       "candidate_id": "cand-2d8a2da26c94353a",
       "display": "GenLine",
-      "dissent": [],
+      "dissent": [
+        "dissent-genline-code-contract"
+      ],
       "flags": [],
       "normalized": "genline",
       "occurrence_ids": [
@@ -111617,7 +111637,9 @@
       },
       "candidate_id": "cand-19bfac800e90b7e0",
       "display": "Maybe Better",
-      "dissent": [],
+      "dissent": [
+        "dissent-maybe-better-resurrection"
+      ],
       "flags": [],
       "normalized": "maybebetter",
       "occurrence_ids": [
@@ -113978,7 +114000,9 @@
       },
       "candidate_id": "cand-7bee393771a63c53",
       "display": "Measuremark",
-      "dissent": [],
+      "dissent": [
+        "dissent-measuremark-resurrection"
+      ],
       "flags": [],
       "normalized": "measuremark",
       "occurrence_ids": [
@@ -137310,7 +137334,9 @@
       },
       "candidate_id": "cand-930eaf1684b953a9",
       "display": "Orsel",
-      "dissent": [],
+      "dissent": [
+        "dissent-orsel-brand-track"
+      ],
       "flags": [],
       "normalized": "orsel",
       "occurrence_ids": [
@@ -145151,7 +145177,9 @@
       },
       "candidate_id": "cand-e333e9930ee18f96",
       "display": "Pinned Lineage",
-      "dissent": [],
+      "dissent": [
+        "dissent-pinned-lineage-descriptor-role"
+      ],
       "flags": [],
       "normalized": "pinnedlineage",
       "occurrence_ids": [
@@ -151877,7 +151905,9 @@
       },
       "candidate_id": "cand-d99456fbd5b3f144",
       "display": "Processloom",
-      "dissent": [],
+      "dissent": [
+        "dissent-processloom-runtime-role"
+      ],
       "flags": [],
       "normalized": "processloom",
       "occurrence_ids": [
@@ -155994,7 +156024,9 @@
       },
       "candidate_id": "cand-324a2ac4c9ca9114",
       "display": "Programmatics",
-      "dissent": [],
+      "dissent": [
+        "dissent-programmatics-resurrection"
+      ],
       "flags": [],
       "normalized": "programmatics",
       "occurrence_ids": [
@@ -170116,7 +170148,9 @@
       },
       "candidate_id": "cand-859c19a40950ea4e",
       "display": "Repair Loop",
-      "dissent": [],
+      "dissent": [
+        "dissent-repair-loop-resurrection"
+      ],
       "flags": [],
       "normalized": "repairloop",
       "occurrence_ids": [
@@ -180077,7 +180111,9 @@
       },
       "candidate_id": "cand-fdfcaab989b94113",
       "display": "Run.Pack",
-      "dissent": [],
+      "dissent": [
+        "dissent-run-pack-code-contract"
+      ],
       "flags": [],
       "normalized": "runpack",
       "occurrence_ids": [
@@ -184802,7 +184838,9 @@
       },
       "candidate_id": "cand-43de64b504c70673",
       "display": "ScopeTree",
-      "dissent": [],
+      "dissent": [
+        "dissent-scopetree-runtime-role"
+      ],
       "flags": [],
       "normalized": "scopetree",
       "occurrence_ids": [
@@ -196309,7 +196347,9 @@
       },
       "candidate_id": "cand-b45557be03537f77",
       "display": "Solfa",
-      "dissent": [],
+      "dissent": [
+        "dissent-solfa-cultural-hold"
+      ],
       "flags": [],
       "normalized": "solfa",
       "occurrence_ids": [
@@ -209344,7 +209384,9 @@
       },
       "candidate_id": "cand-32d2781649e7ddc2",
       "display": "Tervel",
-      "dissent": [],
+      "dissent": [
+        "dissent-tervel-brand-track"
+      ],
       "flags": [],
       "normalized": "tervel",
       "occurrence_ids": [
@@ -212177,7 +212219,9 @@
       },
       "candidate_id": "cand-ef093eb04a3f20d0",
       "display": "The Margins",
-      "dissent": [],
+      "dissent": [
+        "dissent-the-margins-resurrection"
+      ],
       "flags": [],
       "normalized": "themargins",
       "occurrence_ids": [
@@ -242921,7 +242965,7 @@
       "wildcard": false
     }
   ],
-  "generated_at": "2026-07-14T00:16:41Z",
+  "generated_at": "2026-07-14T00:43:50Z",
   "scenario_schema_version": 1,
   "scenarios": [
     {
@@ -316982,12 +317026,12 @@
   "selection_made": false,
   "summary": {
     "active_assessments": 6156,
-    "active_dissent": 0,
+    "active_dissent": 22,
     "active_flags": 1682,
     "assessment_events": 6156,
     "candidate_entities": 2052,
     "candidate_occurrences": 2310,
-    "dissent_events": 0,
+    "dissent_events": 22,
     "flag_events": 1682,
     "required_assessment_replicates": 3
   }

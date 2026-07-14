@@ -70,7 +70,7 @@ flowchart TB
     Flash["Gemini 3.5 Flash"]
     Sonnet["Claude Sonnet 5"]
     Terra["GPT-5.6 Terra"]
-    Assessments["assessments.jsonl<br/>target: 6,156 records, 3 per candidate"]
+    Assessments["assessments.jsonl<br/>6,156 canonical records, 3 per candidate"]
     Registry --> EvidenceBundle
     Enrichment --> EvidenceBundle
     International --> EvidenceBundle
@@ -168,7 +168,8 @@ a real identity.
 Collision checks and the deterministic international screen attach observed or
 bounded evidence without converting facts into taste. The package audit has
 8,209 append-only events representing 8,208 current source-candidate checks and
-1,682 candidates with at least one exact registry collision.
+1,682 active flags across 667 candidates with at least one exact registry
+collision.
 
 All 2,052 enrichments have an international screen. At least one dimension is
 explicitly unverified for every candidate, 1,556 require machine-detected
@@ -221,12 +222,14 @@ the process without letting the process tune itself around the expected answer.
 | `registry.jsonl` | Lossless occurrence and entity event log | 2,346 events, 2,052 entities |
 | `enrichments.jsonl` | Speech, code, prose, architecture, and international embodiments | 2,052 records |
 | `research/package-collision-checks.jsonl` | Append-only external registry observations | 8,209 events, 8,208 active checks |
-| `research/package-collision-flags.jsonl` | Candidate-linked exact collision facts | 1,682 active flags |
+| `flags.jsonl` | Canonical candidate-linked factual flags | 1,682 active package-collision flags |
 | `assessments.jsonl` | Three independent evidence-bounded judgments per entity | 6,156 records at checkpoint completion |
 | `assessment-runs.jsonl` | Starts, successes, failures, retries, and model provenance | Consolidated after provider completion |
 | `scenarios.json` | Visible decision policy | 6 scenarios, 5 tiers |
 | `reports/inter-rater-reliability.json` | Jury agreement, scale bias, and mean reliability | 18 axes and 6 scenarios across 3 profiles |
-| `reports/review-pools.json` | Deterministic non-destructive attention views | Leaders, 439 wildcards, Pareto, disagreement, flags, resurrection |
+| `reports/review-pools.json` | Deterministic non-destructive attention views | Raw leaders, 20% wildcard deliberation, Pareto, disagreement, flags, resurrection |
+| `dissent.jsonl` | Append-only minority interpretations and holds | 22 active events; no candidate deletion |
+| `reports/hostile-audit.md` | Adversarial synthesis and human decision gates | Model, architecture, code, international, access, and clearance limits |
 | `reports/*.json` and `reports/*.md` | Reproducible projections and audits | Coverage, saturation, decision, hostile, and integrity reports |
 
 The large corpus is intentional. Reports are derived and replaceable; raw
@@ -252,8 +255,8 @@ low in the project-specific corpus.
 - Exact evidence digests and strict evidence-reference validation.
 - Registry collision adapters with durable retries and terminal states.
 - Deterministic Unicode, script, code-projection, and speech-attention checks.
-- Confidence-aware axis aggregation, explicit scenario weights, tiers, and
-  Pareto views.
+- Equal-profile axis aggregation, explicit scenario weights, tiers, and Pareto
+  views, with provider confidence retained only as metadata.
 - Separate fact, judgment, dissent, and report layers.
 
 ### Reusable by configuration

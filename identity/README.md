@@ -116,10 +116,13 @@ validation.
 
 ### 6. Evaluate Without Erasure
 
-Assessments are independent records with an assessor, audience or scenario,
-axis scores, confidence, evidence, and free-form reasoning. Factual defects are
-flags, not negative scores disguised as facts. Preference, prediction of an
-audience response, and observed evidence remain separate.
+Assessments are independent records with an assessor, optional audience or
+scenario context, axis scores, confidence, evidence, and free-form reasoning.
+The three-profile checkpoint corpus is global: its context objects are empty,
+and the later scenarios reweight those global vectors rather than impersonating
+audience research. Factual defects are flags, not negative scores disguised as
+facts. Preference, predicted audience response, and observed evidence remain
+separate.
 
 Use `mix dsex.identity.assess --plan` to inspect the exact pending work before
 calling providers. The production model lanes are declared explicitly rather
@@ -161,7 +164,7 @@ reports every canonical record resumed with no work planned.
 The corpus supports several views:
 
 - per-axis score distributions;
-- audience- and architecture-specific weighted views;
+- declared product-context sensitivity views over the global score vectors;
 - Pareto frontiers without a universal weighting;
 - provisional tiers within a declared scenario;
 - wildcard, dissent, and resurrection pools;
@@ -177,9 +180,9 @@ Run `mix dsex.identity.reliability` to publish per-axis and per-scenario
 pairwise rank agreement, score bias, error, and two-way ICC(A,1)/ICC(A,k) and
 ICC(C,1)/ICC(C,k). These are descriptive diagnostics, not automatic acceptance
 thresholds. Run `mix dsex.identity.review` to derive deterministic scenario
-leaders, the full wildcard and Pareto pools, model disagreements, flagged
-contenders, and axis-based resurrection candidates without deleting or
-selecting anything.
+score previews, 20-percent-wildcard deliberation pools, the full wildcard and
+Pareto pools, model disagreements, flagged contenders, and axis-based
+resurrection candidates without deleting or selecting anything.
 
 No global winner is computed during divergence.
 
@@ -198,9 +201,10 @@ an unexamined identity strategy or audience with a material product stake.
 ### 8. Decision Checkpoint
 
 Publish the full registry, coverage report, candidate cards, scenario tiers,
-Pareto views, flags, dissent, and saturation audit. Then add the owner's hidden
-candidate as a blind portfolio entry and evaluate it under the same protocol.
-Final selection and rename execution are a later decision.
+Pareto views, flags, dissent, saturation audit, hostile audit, and unresolved
+human gates. Then add the owner's hidden candidate as a blind portfolio entry
+and evaluate it under the same protocol. Final selection and rename execution
+are a later decision.
 
 ## Anti-Convergence Rules
 
@@ -210,8 +214,9 @@ Final selection and rename execution are a later decision.
 - Do not treat an LLM's audience prediction as user research.
 - Do not mix collision facts with taste.
 - Preserve duplicates, minority interpretations, and repaired variants.
-- Keep at least 20 percent of every narrowing view as wildcards or
-  underrepresented-territory representatives.
+- Keep at least 20 percent of every deliberative narrowing pool as wildcards or
+  underrepresented-territory representatives; retain raw rank previews as
+  unmodified diagnostics.
 - Record why a view excludes an entry; views never remove registry records.
 - Keep descriptions technically honest: terms such as safe, proof, typed,
   compiler, autonomous, reliable, standard, and platform carry claims.

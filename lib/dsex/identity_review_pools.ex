@@ -9,6 +9,7 @@ defmodule DSEx.IdentityReviewPools do
     flagged_rank_threshold: 100,
     resurrection_top_k: 25
   ]
+  @wildcard_floor_ratio 0.20
   @limit_keys Keyword.keys(@default_limits)
   @file_defaults @default_limits ++
                    [
@@ -344,12 +345,16 @@ defmodule DSEx.IdentityReviewPools do
     scenarios = canonical_scenarios(decision_views["scenarios"], candidate_index)
     rank_index = rank_index(scenarios)
     leaders = scenario_leaders(scenarios, candidate_index, limits[:scenario_limit])
+    deliberation = scenario_deliberation(scenarios, candidate_index, limits[:scenario_limit])
     leader_ids = leaders |> pool_ids() |> MapSet.new()
     wildcards = wildcard_pool(candidates, rank_index)
     pareto = pareto_pool(candidates, rank_index)
 
-    disagreement =
-      model_disagreement(candidates, assessments, profiles, limits[:disagreement_limit])
+    disagreement_all = model_disagreement(candidates, assessments, profiles)
+    disagreement = Enum.take(disagreement_all, limits[:disagreement_limit])
+
+    frontier_disagreement =
+      Enum.filter(disagreement_all, &MapSet.member?(leader_ids, &1["candidate_id"]))
 
     flagged =
       flagged_contenders(candidates, rank_index, limits[:flagged_rank_threshold])
@@ -382,17 +387,24 @@ defmodule DSEx.IdentityReviewPools do
           "candidate_count" => leaders |> pool_ids() |> Enum.uniq() |> length(),
           "membership_count" => Enum.sum(Enum.map(leaders, & &1["candidate_count"]))
         },
+        "scenario_deliberation" => %{
+          "candidate_count" => deliberation |> pool_ids() |> Enum.uniq() |> length(),
+          "membership_count" => Enum.sum(Enum.map(deliberation, & &1["candidate_count"]))
+        },
         "wildcard_pool" => %{"candidate_count" => length(wildcards)},
         "pareto_pool" => %{"candidate_count" => length(pareto)},
         "model_disagreement" => %{"candidate_count" => length(disagreement)},
+        "frontier_disagreement" => %{"candidate_count" => length(frontier_disagreement)},
         "flagged_contenders" => %{"candidate_count" => length(flagged)},
         "resurrection_pool" => %{"candidate_count" => length(resurrection)}
       },
       "pools" => %{
         "scenario_leaders" => leaders,
+        "scenario_deliberation" => deliberation,
         "wildcard_pool" => wildcards,
         "pareto_pool" => pareto,
         "model_disagreement" => disagreement,
+        "frontier_disagreement" => frontier_disagreement,
         "flagged_contenders" => flagged,
         "resurrection_pool" => resurrection
       }
@@ -465,6 +477,60 @@ defmodule DSEx.IdentityReviewPools do
     end)
   end
 
+  defp scenario_deliberation(scenarios, candidate_index, limit) do
+    Enum.map(scenarios, fn scenario ->
+      ranked =
+        Enum.map(scenario["ranked"], fn row ->
+          candidate = Map.fetch!(candidate_index, row["candidate_id"])
+
+          candidate
+          |> candidate_ref()
+          |> Map.merge(Map.take(row, ~w(rank scenario_score tier pareto)))
+          |> Map.put("selection_basis", "score_rank")
+        end)
+
+      target_count = min(limit, length(ranked))
+      leaders = Enum.take(ranked, target_count)
+      required_wildcards = ceil(target_count * @wildcard_floor_ratio)
+      present_wildcards = Enum.count(leaders, & &1["wildcard"])
+      needed = max(required_wildcards - present_wildcards, 0)
+      leader_ids = leaders |> Enum.map(& &1["candidate_id"]) |> MapSet.new()
+
+      additions =
+        ranked
+        |> Enum.reject(&MapSet.member?(leader_ids, &1["candidate_id"]))
+        |> Enum.filter(& &1["wildcard"])
+        |> Enum.take(needed)
+        |> Enum.map(&Map.put(&1, "selection_basis", "wildcard_floor"))
+
+      drop_ids =
+        leaders
+        |> Enum.reverse()
+        |> Enum.reject(& &1["wildcard"])
+        |> Enum.take(length(additions))
+        |> Enum.map(& &1["candidate_id"])
+        |> MapSet.new()
+
+      candidates =
+        leaders
+        |> Enum.reject(&MapSet.member?(drop_ids, &1["candidate_id"]))
+        |> Kernel.++(additions)
+        |> Enum.sort_by(& &1["rank"])
+
+      actual_wildcards = Enum.count(candidates, & &1["wildcard"])
+
+      %{
+        "scenario_id" => scenario["id"],
+        "scenario_label" => scenario["label"],
+        "candidate_count" => length(candidates),
+        "wildcard_count" => actual_wildcards,
+        "required_wildcard_count" => required_wildcards,
+        "wildcard_floor_met" => actual_wildcards >= required_wildcards,
+        "candidates" => candidates
+      }
+    end)
+  end
+
   defp wildcard_pool(candidates, rank_index) do
     candidates
     |> Enum.filter(&(&1["wildcard"] == true))
@@ -499,7 +565,7 @@ defmodule DSEx.IdentityReviewPools do
     |> Enum.sort_by(&ranked_candidate_sort/1)
   end
 
-  defp model_disagreement(candidates, assessments, profiles, limit) do
+  defp model_disagreement(candidates, assessments, profiles) do
     records_by_candidate = Enum.group_by(assessments, & &1["candidate_id"])
 
     candidates
@@ -538,7 +604,6 @@ defmodule DSEx.IdentityReviewPools do
         row["candidate_id"]
       }
     end)
-    |> Enum.take(limit)
   end
 
   defp flagged_contenders(candidates, rank_index, threshold) do
@@ -620,7 +685,14 @@ defmodule DSEx.IdentityReviewPools do
     %{
       "scenario_leaders" => %{
         "limit_per_scenario" => limits[:scenario_limit],
-        "rule" => "Top candidates in each scenario by score, then display and candidate ID."
+        "rule" =>
+          "Diagnostic top candidates in each scenario by score, then display and candidate ID; not a deliberative narrowing pool."
+      },
+      "scenario_deliberation" => %{
+        "limit_per_scenario" => limits[:scenario_limit],
+        "wildcard_floor_ratio" => @wildcard_floor_ratio,
+        "rule" =>
+          "Start with scenario leaders, then replace the lowest-ranked non-wildcards with the next ranked wildcards until the floor is met."
       },
       "wildcard_pool" => %{
         "rule" =>
@@ -633,6 +705,9 @@ defmodule DSEx.IdentityReviewPools do
         "limit" => limits[:disagreement_limit],
         "rule" =>
           "Largest per-axis profile-score range, then mean axis range, display, and candidate ID."
+      },
+      "frontier_disagreement" => %{
+        "rule" => "Every unique scenario leader, ordered by the same model-disagreement rule."
       },
       "flagged_contenders" => %{
         "best_scenario_rank_threshold" => limits[:flagged_rank_threshold],
@@ -648,7 +723,7 @@ defmodule DSEx.IdentityReviewPools do
   end
 
   defp candidate_ref(candidate),
-    do: Map.take(candidate, ~w(candidate_id display))
+    do: Map.take(candidate, ~w(candidate_id display wildcard))
 
   defp pool_ids(leaders) do
     for scenario <- leaders, candidate <- scenario["candidates"], do: candidate["candidate_id"]

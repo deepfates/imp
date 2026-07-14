@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Dsex.Identity.Evaluate do
       jsonls(
         opts,
         :flags,
-        ["identity/flags.jsonl", "identity/research/package-collision-flags.jsonl"],
+        ["identity/flags.jsonl"],
         optional: true
       )
 

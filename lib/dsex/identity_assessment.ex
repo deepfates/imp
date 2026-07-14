@@ -1160,13 +1160,7 @@ defmodule DSEx.IdentityAssessment do
     %{
       registry: Keyword.get(opts, :registry, "identity/registry.jsonl"),
       enrichments: path_list(Keyword.get(opts, :enrichments, ["identity/enrichments.jsonl"])),
-      flags:
-        path_list(
-          Keyword.get(opts, :flags, [
-            "identity/flags.jsonl",
-            "identity/research/package-collision-flags.jsonl"
-          ])
-        ),
+      flags: path_list(Keyword.get(opts, :flags, ["identity/flags.jsonl"])),
       collisions:
         path_list(
           Keyword.get(opts, :collisions, [

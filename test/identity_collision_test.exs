@@ -7,6 +7,7 @@ defmodule DSEx.IdentityCollisionTest do
 
   test "uses a registry-safe default request cadence" do
     assert IdentityCollision.default_delay_ms() >= 1_000
+    assert IdentityCollision.default_flags_out() == "identity/flags.jsonl"
   end
 
   test "constructs exact registry URLs and escapes a package path segment" do

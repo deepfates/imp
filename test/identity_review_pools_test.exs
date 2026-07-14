@@ -32,6 +32,23 @@ defmodule DSEx.IdentityReviewPoolsTest do
     assert report["counts"]["wildcard_pool"]["candidate_count"] == 3
   end
 
+  test "scenario deliberation meets the wildcard floor without mutating score leaders" do
+    report = compile!()
+
+    assert Enum.map(report["pools"]["scenario_leaders"], fn scenario ->
+             Enum.map(scenario["candidates"], & &1["candidate_id"])
+           end) == [["cand-a"], ["cand-b"]]
+
+    assert Enum.all?(report["pools"]["scenario_deliberation"], fn scenario ->
+             scenario["candidate_count"] == 1 and
+               scenario["wildcard_count"] == 1 and
+               scenario["required_wildcard_count"] == 1 and
+               scenario["wildcard_floor_met"] and
+               hd(scenario["candidates"])["candidate_id"] == "cand-e" and
+               hd(scenario["candidates"])["selection_basis"] == "wildcard_floor"
+           end)
+  end
+
   test "Pareto pool is the union of every scenario membership" do
     report = compile!()
     pool = report["pools"]["pareto_pool"]
@@ -55,6 +72,15 @@ defmodule DSEx.IdentityReviewPoolsTest do
     assert first["max_axis_range"] == 5
     assert first["mean_axis_range"] == 2.5
     assert first["profile_scores"] == %{"profile-a" => 5, "profile-b" => 0}
+  end
+
+  test "frontier disagreement retains every unique scenario leader" do
+    report = compile!()
+
+    assert Enum.map(report["pools"]["frontier_disagreement"], & &1["candidate_id"]) ==
+             ~w(cand-a cand-b)
+
+    assert report["counts"]["frontier_disagreement"]["candidate_count"] == 2
   end
 
   test "flagged contenders use the configured best-rank threshold" do

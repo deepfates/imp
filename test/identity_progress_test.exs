@@ -169,6 +169,14 @@ defmodule DSEx.IdentityProgressTest do
 
     write_jsonl!(Path.join(root, "identity/enrichments.jsonl"), [enrichment])
 
+    write_jsonl!(Path.join(root, "identity/flags.jsonl"), [
+      %{
+        "id" => "flag-test",
+        "candidate_id" => enrichment["candidate_id"],
+        "supersedes" => nil
+      }
+    ])
+
     report =
       IdentityProgress.snapshot(
         root: root,
@@ -190,6 +198,8 @@ defmodule DSEx.IdentityProgressTest do
     assert pipeline["assessments"]["target"] == 1
     assert pipeline["assessments"]["target_assessment_records"] == 3
     assert pipeline["collision_checks"]["target"] == 4
+    assert pipeline["flags"]["active_records"] == 1
+    assert pipeline["flags"]["accepted_candidate_records"] == 1
 
     write_jsonl!(
       Path.join(root, "identity/registry.jsonl"),
