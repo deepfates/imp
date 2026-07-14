@@ -2,7 +2,7 @@ defmodule BenchmarkCatalogTest do
   use ExUnit.Case, async: true
 
   test "catalog names implemented and missing DSPy-derived benchmark families" do
-    catalog = DSEx.BenchmarkCatalog.catalog()
+    catalog = Imp.BenchmarkCatalog.catalog()
     families = catalog.families
     by_id = Map.new(families, &{&1.id, &1})
 
@@ -41,7 +41,7 @@ defmodule BenchmarkCatalogTest do
     assert by_id["factuality_classification"].next_step =~ "generic classification/QA sampler"
     assert by_id["rag_retrieval"].next_step =~ "larger retrieval corpora"
     assert by_id["rlm_recursive_control"].metric =~ "budget"
-    assert by_id["program_composition_orchestration"].next_step =~ "matched DSEx/DSPy"
+    assert by_id["program_composition_orchestration"].next_step =~ "matched Imp/DSPy"
 
     assert "mix benchmark.operations_stress.check" in by_id["adapter_streaming_structured_io"].commands
 
@@ -62,19 +62,19 @@ defmodule BenchmarkCatalogTest do
 
     assert by_id["optimizer_lift"].next_step =~ "multi-seed"
     assert by_id["mipro_tabular"].next_step =~ "Iris"
-    assert "mix dsex.benchmark.gepa_campaign" in by_id["hover_verification"].commands
+    assert "mix imp.benchmark.gepa_campaign" in by_id["hover_verification"].commands
     assert by_id["hover_verification"].next_step =~ "uncapped"
     assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands
     assert "mix benchmark.truth.check" in by_id["hard_math"].commands
-    assert "mix dsex.benchmark.local_mlx" in by_id["finetuning_training"].commands
+    assert "mix imp.benchmark.local_mlx" in by_id["finetuning_training"].commands
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"
   end
 
   test "catalog task writes JSON artifact" do
-    out_dir = Path.join(System.tmp_dir!(), "dsex-catalog-#{System.unique_integer([:positive])}")
+    out_dir = Path.join(System.tmp_dir!(), "imp-catalog-#{System.unique_integer([:positive])}")
     out_path = Path.join(out_dir, "catalog.json")
 
-    Mix.Tasks.Dsex.Benchmark.Catalog.run(["--format", "json", "--out", out_path])
+    Mix.Tasks.Imp.Benchmark.Catalog.run(["--format", "json", "--out", out_path])
 
     assert File.exists?(out_path)
     artifact = out_path |> File.read!() |> Jason.decode!(keys: :atoms)

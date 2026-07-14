@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
+defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Coordinator, Engine, Result}
+  alias Imp.Optimizer.GEPA.{Adapter, Coordinator, Engine, Result}
 
   defmodule FixtureAdapter do
     @behaviour Adapter
@@ -46,7 +46,7 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
   end
 
   defmodule RecordingCallback do
-    @behaviour DSEx.Optimizer.GEPA.Callback
+    @behaviour Imp.Optimizer.GEPA.Callback
 
     @impl true
     def on_iteration_start(event, owner),
@@ -120,7 +120,7 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
   end
 
   test "caller cancellation terminates proposal workers without admission leases" do
-    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    baseline = MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor))
     owner = self()
 
     caller =
@@ -135,8 +135,8 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
 
     assert eventually(fn ->
              not Process.alive?(worker) and
-               MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline and
-               DSEx.Tasks.admission_status() == %{active: 0, queued: 0}
+               MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor)) == baseline and
+               Imp.Tasks.admission_status() == %{active: 0, queued: 0}
            end)
   end
 
@@ -206,11 +206,11 @@ defmodule DSEx.Optimizer.GEPA.ParallelProposalTest do
   test "public validation accepts auto and rejects pre-canonical checkpoints" do
     metric = fn _example, _prediction -> 1.0 end
 
-    assert %DSEx.Optimizer.GEPA{proposal_concurrency: :auto} =
-             DSEx.Optimizer.GEPA.new(metric, proposal_concurrency: :auto)
+    assert %Imp.Optimizer.GEPA{proposal_concurrency: :auto} =
+             Imp.Optimizer.GEPA.new(metric, proposal_concurrency: :auto)
 
     assert_raise ArgumentError, ~r/invalid value for :proposal_concurrency option/, fn ->
-      DSEx.Optimizer.GEPA.new(metric, proposal_concurrency: 0)
+      Imp.Optimizer.GEPA.new(metric, proposal_concurrency: 0)
     end
 
     legacy =

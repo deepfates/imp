@@ -1,24 +1,24 @@
-defmodule DSEx.Optimizer.SIMBA.StatePrimitivesTest do
+defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.SIMBA.{Buckets, Population}
+  alias Imp.Optimizer.SIMBA.{Buckets, Population}
 
   test "finalist selection follows Python half-even rounding" do
-    assert DSEx.Optimizer.SIMBA.finalist_indices(6, 4) == [0, 2, 3, 4, 6]
-    assert DSEx.Optimizer.SIMBA.finalist_indices(0, 6) == [0]
+    assert Imp.Optimizer.SIMBA.finalist_indices(6, 4) == [0, 2, 3, 4, 6]
+    assert Imp.Optimizer.SIMBA.finalist_indices(0, 6) == [0]
   end
 
   test "rollout, rule, and eviction plans expose the production invariants" do
-    assert DSEx.Optimizer.SIMBA.rollout_id_plan(7, 3, true) == [
+    assert Imp.Optimizer.SIMBA.rollout_id_plan(7, 3, true) == [
              %{rollout_id: 7, teacher?: true, force_temperature?: false},
              %{rollout_id: 8, teacher?: false, force_temperature?: true},
              %{rollout_id: 9, teacher?: false, force_temperature?: true}
            ]
 
-    assert DSEx.Optimizer.SIMBA.rule_disposition(0.2, 0.2, 0.2, 0.8) == :skip
-    assert DSEx.Optimizer.SIMBA.rule_disposition(0.5, 0.5, 0.2, 0.8) == :suppress_good
+    assert Imp.Optimizer.SIMBA.rule_disposition(0.2, 0.2, 0.2, 0.8) == :skip
+    assert Imp.Optimizer.SIMBA.rule_disposition(0.5, 0.5, 0.2, 0.8) == :suppress_good
 
-    assert DSEx.Optimizer.SIMBA.eviction_parameters(4, 4) == %{
+    assert Imp.Optimizer.SIMBA.eviction_parameters(4, 4) == %{
              demo_count: 4,
              poisson_mean: 1.0,
              poisson_denominator: 4,
@@ -98,7 +98,7 @@ defmodule DSEx.Optimizer.SIMBA.StatePrimitivesTest do
     parent = self()
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(parent, {:reflection_messages, messages})
@@ -130,7 +130,7 @@ defmodule DSEx.Optimizer.SIMBA.StatePrimitivesTest do
     }
 
     assert {:ok, %{first: "Be precise."}, "Only the first module needs a change."} =
-             DSEx.Optimizer.SIMBA.Reflection.run(prompt_lm, payload)
+             Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload)
 
     assert_receive {:reflection_messages, messages}
     prompt = Enum.map_join(messages, "\n", & &1.content)

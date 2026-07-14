@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.ModuleSelectorTest do
+defmodule Imp.Optimizer.GEPA.ModuleSelectorTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Engine, ModuleSelector, Result}
+  alias Imp.Optimizer.GEPA.{Adapter, Engine, ModuleSelector, Result}
 
   defmodule AdapterFixture do
     @behaviour Adapter

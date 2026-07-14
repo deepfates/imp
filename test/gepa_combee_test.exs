@@ -1,8 +1,8 @@
-defmodule DSEx.Optimizer.GEPA.ComBeeTest do
+defmodule Imp.Optimizer.GEPA.ComBeeTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimizer.GEPA.{Adapter, ComBee, Engine, Result}
-  alias DSEx.Optimizer.GEPA.ComBee.BatchController
+  alias Imp.Optimizer.GEPA.{Adapter, ComBee, Engine, Result}
+  alias Imp.Optimizer.GEPA.ComBee.BatchController
 
   defmodule FixtureAdapter do
     @behaviour Adapter
@@ -33,7 +33,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
   end
 
   defmodule RecordingCallback do
-    @behaviour DSEx.Optimizer.GEPA.Callback
+    @behaviour Imp.Optimizer.GEPA.Callback
 
     @impl true
     def on_combee_aggregation(event, owner),
@@ -106,7 +106,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     records = Enum.map(0..79, &%{"Feedback" => "source-#{&1}"})
 
     first =
-      DSEx.Optimizer.GEPA.fallback_proposal(
+      Imp.Optimizer.GEPA.fallback_proposal(
         %{main: "current"},
         :main,
         records,
@@ -119,7 +119,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       Enum.map(0..79, &%{"ComBeeIntermediateUpdate" => "intermediate-#{&1}"})
 
     final =
-      DSEx.Optimizer.GEPA.fallback_proposal(
+      Imp.Optimizer.GEPA.fallback_proposal(
         %{main: "current"},
         :main,
         final_records,
@@ -178,8 +178,8 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     started = System.monotonic_time(:millisecond)
 
     assert [{:error, :timeout}] =
-             DSEx.Optimizer.GEPA.Coordinator.run([:proposal], 25, fn :proposal ->
-               DSEx.Optimizer.GEPA.Reflection.execute(proposer, parent, context, policy)
+             Imp.Optimizer.GEPA.Coordinator.run([:proposal], 25, fn :proposal ->
+               Imp.Optimizer.GEPA.Reflection.execute(proposer, parent, context, policy)
              end)
 
     assert System.monotonic_time(:millisecond) - started < 60
@@ -202,7 +202,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
   test "terminal failure stops queued dispatch and cancels active siblings" do
     owner = self()
-    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    baseline = MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor))
     records = Enum.map(0..24, &%{id: &1})
     policy = policy(25, max_concurrency: 2, timeout: 1_000)
 
@@ -235,12 +235,12 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     assert eventually(fn ->
              not Process.alive?(worker_one) and
-               MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+               MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor)) == baseline
            end)
   end
 
   test "fatal exits and timeouts fail deterministically without task leaks" do
-    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    baseline = MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor))
     records = Enum.map(0..8, &%{id: &1})
     crash_policy = policy(9, max_concurrency: 3, timeout: 100)
 
@@ -270,12 +270,12 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     assert timeout_report.reflection_calls == 3
 
     assert eventually(fn ->
-             MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+             MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor)) == baseline
            end)
   end
 
   test "caller cancellation terminates nested aggregation workers" do
-    baseline = MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor))
+    baseline = MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor))
     owner = self()
     policy = policy(9, max_concurrency: 3, timeout: :infinity)
 
@@ -305,7 +305,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     assert eventually(fn ->
              Enum.all?(workers, &(not Process.alive?(&1))) and
-               MapSet.new(Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)) == baseline
+               MapSet.new(Task.Supervisor.children(Imp.UnlinkedTaskSupervisor)) == baseline
            end)
   end
 
@@ -475,7 +475,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
   end
 
   test "ComBee composes with bounded speculative proposals and rejects oversubscription" do
-    DSEx.Settings.context([async_max_workers: 4], fn ->
+    Imp.Settings.context([async_max_workers: 4], fn ->
       state =
         Engine.run(
           %FixtureAdapter{},
@@ -524,11 +524,11 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     metric = fn _example, _prediction -> 1.0 end
 
-    assert %DSEx.Optimizer.GEPA{
+    assert %Imp.Optimizer.GEPA{
              combee: %ComBee.Options{duplication_factor: 2},
              max_reflection_calls: 5
            } =
-             DSEx.Optimizer.GEPA.new(metric,
+             Imp.Optimizer.GEPA.new(metric,
                combee: true,
                max_reflection_calls: 5
              )
@@ -667,7 +667,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
           end
 
           if checkpoint["stop_reason"] ==
-               %{"__dsex_type__" => "atom", "value" => "profiling_timeout"} do
+               %{"__imp_type__" => "atom", "value" => "profiling_timeout"} do
             raise "interrupt after profiling timeout"
           end
 
@@ -714,7 +714,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     started =
       Enum.find(checkpoints, fn checkpoint ->
         get_in(checkpoint, ["combee_policy", "batch_controller", "status"]) ==
-          %{"__dsex_type__" => "atom", "value" => "started"} and
+          %{"__imp_type__" => "atom", "value" => "started"} and
           checkpoint["budget_ledger"] != [] and
           get_in(checkpoint, ["pending_proposal_batch", "status"]) == "started"
       end)

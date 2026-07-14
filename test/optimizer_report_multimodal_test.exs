@@ -1,8 +1,8 @@
-defmodule DSEx.Optimizer.ReportMultimodalTest do
+defmodule Imp.Optimizer.ReportMultimodalTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapters.Types.Image
-  alias DSEx.Optimizer.Report
+  alias Imp.Adapters.Types.Image
+  alias Imp.Optimizer.Report
 
   defmodule OrdinaryStruct do
     defstruct []
@@ -28,17 +28,17 @@ defmodule DSEx.Optimizer.ReportMultimodalTest do
     encoded = Report.json_safe(value)
 
     assert get_in(encoded, ["side_information", "prompt", Access.at(0), "image"]) == %{
-             "__dsex_type__" => "image",
+             "__imp_type__" => "image",
              "schema_version" => 1,
              "url" => nil,
              "data" => base64,
              "mime_type" => "image/png",
              "metadata" => %{
-               "detail" => %{"__dsex_type__" => "atom", "value" => "high"},
+               "detail" => %{"__imp_type__" => "atom", "value" => "high"},
                "lineage" => %{
-                 "__dsex_type__" => "tuple",
+                 "__imp_type__" => "tuple",
                  "items" => [
-                   %{"__dsex_type__" => "atom", "value" => "source"},
+                   %{"__imp_type__" => "atom", "value" => "source"},
                    2
                  ]
                }
@@ -63,7 +63,7 @@ defmodule DSEx.Optimizer.ReportMultimodalTest do
     ]
 
     Enum.each(malformed, fn tag ->
-      assert_raise ArgumentError, "malformed DSEx image JSON tag", fn ->
+      assert_raise ArgumentError, "malformed Imp image JSON tag", fn ->
         Report.restore_json_safe(tag)
       end
     end)

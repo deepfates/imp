@@ -1,7 +1,7 @@
-defmodule DSEx.ResearchPortfolioTest do
+defmodule Imp.ResearchPortfolioTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.ResearchPortfolio
+  alias Imp.ResearchPortfolio
 
   @portfolio "benchmarks/research_portfolio.json"
   @claims "benchmarks/claims.json"
@@ -12,8 +12,8 @@ defmodule DSEx.ResearchPortfolioTest do
   end
 
   test "generated documentation agrees with the portfolio" do
-    Mix.Task.reenable("dsex.research_portfolio")
-    Mix.Tasks.Dsex.ResearchPortfolio.run(["--check"])
+    Mix.Task.reenable("imp.research_portfolio")
+    Mix.Tasks.Imp.ResearchPortfolio.run(["--check"])
   end
 
   test "rejects missing claim ownership and weak decision contracts" do

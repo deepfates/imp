@@ -3,8 +3,8 @@ defmodule PropertyInvariantsTest do
   use ExUnitProperties
 
   setup_all do
-    _ = DSEx.Sandbox.eval("warmup_identifier", %{})
-    _ = DSEx.Sandbox.eval("x + 1", %{"x" => 1})
+    _ = Imp.Sandbox.eval("warmup_identifier", %{})
+    _ = Imp.Sandbox.eval("x + 1", %{"x" => 1})
     :ok
   end
 
@@ -38,17 +38,17 @@ defmodule PropertyInvariantsTest do
 
   property "signature dump/load round-trips the serialized contract" do
     check all(spec <- signature_spec(), max_runs: 100) do
-      signature = DSEx.signature(spec)
-      loaded = signature |> DSEx.Signature.dump() |> DSEx.Signature.load()
+      signature = Imp.signature(spec)
+      loaded = signature |> Imp.Signature.dump() |> Imp.Signature.load()
 
-      assert DSEx.Signature.dump(loaded) == DSEx.Signature.dump(signature)
-      assert DSEx.Signature.input_names(loaded) == DSEx.Signature.input_names(signature)
-      assert DSEx.Signature.output_names(loaded) == DSEx.Signature.output_names(signature)
+      assert Imp.Signature.dump(loaded) == Imp.Signature.dump(signature)
+      assert Imp.Signature.input_names(loaded) == Imp.Signature.input_names(signature)
+      assert Imp.Signature.output_names(loaded) == Imp.Signature.output_names(signature)
     end
   end
 
   property "JSON adapter accepts schema-shaped maps and preserves typed outputs" do
-    signature = DSEx.signature("question -> answer: string, score: int, ok: bool")
+    signature = Imp.signature("question -> answer: string, score: int, ok: bool")
 
     check all(
             answer <- string(:printable, min_length: 1, max_length: 40),
@@ -57,7 +57,7 @@ defmodule PropertyInvariantsTest do
             max_runs: 100
           ) do
       assert {:ok, prediction} =
-               DSEx.Adapter.JSON.parse(
+               Imp.Adapter.JSON.parse(
                  signature,
                  %{
                    "answer" => answer,
@@ -67,9 +67,9 @@ defmodule PropertyInvariantsTest do
                  []
                )
 
-      assert DSEx.Prediction.get(prediction, :answer) == answer
-      assert DSEx.Prediction.get(prediction, :score) == score
-      assert DSEx.Prediction.get(prediction, :ok) == ok
+      assert Imp.Prediction.get(prediction, :answer) == answer
+      assert Imp.Prediction.get(prediction, :score) == score
+      assert Imp.Prediction.get(prediction, :ok) == ok
     end
   end
 
@@ -77,16 +77,16 @@ defmodule PropertyInvariantsTest do
     check all(spec <- signature_spec(), max_runs: 50) do
       program =
         spec
-        |> DSEx.predict(
-          lm: DSEx.req_llm("openai:gpt-test", temperature: 0),
-          adapter: DSEx.Adapter.JSON,
-          demos: [DSEx.example(%{question: "q", answer: "a"})],
+        |> Imp.predict(
+          lm: Imp.req_llm("openai:gpt-test", temperature: 0),
+          adapter: Imp.Adapter.JSON,
+          demos: [Imp.example(%{question: "q", answer: "a"})],
           metadata: %{"source" => "property"}
         )
 
-      loaded = program |> DSEx.Saving.dump() |> DSEx.Saving.load()
+      loaded = program |> Imp.Saving.dump() |> Imp.Saving.load()
 
-      assert DSEx.Saving.dump(loaded) == DSEx.Saving.dump(program)
+      assert Imp.Saving.dump(loaded) == Imp.Saving.dump(program)
     end
   end
 
@@ -95,7 +95,7 @@ defmodule PropertyInvariantsTest do
             value <- one_of([boolean(), integer(-5..5), float(min: -5.0, max: 5.0)]),
             max_runs: 100
           ) do
-      result = DSEx.Metrics.normalize_result(value)
+      result = Imp.Metrics.normalize_result(value)
 
       assert is_float(result.score)
       assert result.passed? == result.score > 0
@@ -104,12 +104,12 @@ defmodule PropertyInvariantsTest do
 
   property "sandbox rejects unknown generated identifiers without interning atoms" do
     check all(suffix <- string(:alphanumeric, min_length: 8, max_length: 24), max_runs: 100) do
-      unknown = "dsex_unknown_prop_" <> suffix
+      unknown = "imp_unknown_prop_" <> suffix
 
       refute_existing_atom(unknown)
       before_count = :erlang.system_info(:atom_count)
 
-      assert {:error, {:unknown_variable, ^unknown}} = DSEx.Sandbox.eval(unknown, %{})
+      assert {:error, {:unknown_variable, ^unknown}} = Imp.Sandbox.eval(unknown, %{})
       assert :erlang.system_info(:atom_count) == before_count
       refute_existing_atom(unknown)
     end

@@ -1,15 +1,15 @@
-defmodule DSEx.Optimizer.ParameterContractTest do
+defmodule Imp.Optimizer.ParameterContractTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.Parameter
-  alias DSEx.Optimizer.Parameter.{Change, Set}
-  alias DSEx.Predict.{Assertions, BestOfN, ReAct, ReActV2, Refine}
-  alias DSEx.ProgramParameters
+  alias Imp.Optimizer.Parameter
+  alias Imp.Optimizer.Parameter.{Change, Set}
+  alias Imp.Predict.{Assertions, BestOfN, ReAct, ReActV2, Refine}
+  alias Imp.ProgramParameters
 
   test "parameter and set persistence is deterministic and rejects tampering" do
     instruction = Parameter.new("predictor/main/instruction", :instruction, "Answer exactly.")
     config = Parameter.new("predictor/main/config", :config, %{"temperature" => 0})
-    set = Set.new("program/Elixir.DSEx.Predict.Predict", [config, instruction])
+    set = Set.new("program/Elixir.Imp.Predict.Predict", [config, instruction])
 
     assert set == set |> Set.dump() |> Set.load!()
 
@@ -53,10 +53,10 @@ defmodule DSEx.Optimizer.ParameterContractTest do
   end
 
   test "program instruction, demos, and nested config round-trip through typed changes" do
-    demo = DSEx.example(question: "Capital?", answer: "Paris") |> DSEx.with_inputs(:question)
+    demo = Imp.example(question: "Capital?", answer: "Paris") |> Imp.with_inputs(:question)
 
     source =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         demos: [demo],
         config: [response_format: %{"type" => "json_schema", "schema" => %{"strict" => true}}]
       )
@@ -64,7 +64,7 @@ defmodule DSEx.Optimizer.ParameterContractTest do
     target =
       source
       |> ProgramParameters.put_instruction(:main, "Return one city.")
-      |> ProgramParameters.put_demos(:main, [DSEx.example(question: "2+2?", answer: "4")])
+      |> ProgramParameters.put_demos(:main, [Imp.example(question: "2+2?", answer: "4")])
       |> ProgramParameters.put_config(
         :main,
         response_format: %{"type" => "json_object", "nested" => %{"type" => "kept-string"}}
@@ -76,10 +76,10 @@ defmodule DSEx.Optimizer.ParameterContractTest do
     assert {:ok, applied, snapshot} =
              ProgramParameters.apply_changes_with_snapshot(source, changes)
 
-    predictor = DSEx.ProgramAccess.predict(applied)
+    predictor = Imp.ProgramAccess.predict(applied)
     assert predictor.signature.instructions == "Return one city."
     assert [applied_demo] = predictor.demos
-    assert DSEx.Example.get(applied_demo, :answer) == "4"
+    assert Imp.Example.get(applied_demo, :answer) == "4"
 
     assert predictor.config[:response_format] == %{
              "type" => "json_object",
@@ -94,9 +94,9 @@ defmodule DSEx.Optimizer.ParameterContractTest do
     metric = fn _example, _prediction -> 1.0 end
 
     wrappers = [
-      DSEx.predict("question -> answer") |> BestOfN.new(metric),
-      DSEx.predict("question -> answer") |> Refine.new(metric),
-      DSEx.predict("question -> answer")
+      Imp.predict("question -> answer") |> BestOfN.new(metric),
+      Imp.predict("question -> answer") |> Refine.new(metric),
+      Imp.predict("question -> answer")
       |> Assertions.new([{:valid, fn _prediction -> true end}])
     ]
 
@@ -118,7 +118,7 @@ defmodule DSEx.Optimizer.ParameterContractTest do
     runner = fn %{query: query} -> query end
 
     tool =
-      DSEx.Tool.new(:lookup, "Old description", runner,
+      Imp.Tool.new(:lookup, "Old description", runner,
         schema: %{"type" => "object", "properties" => %{"query" => %{"type" => "string"}}}
       )
 

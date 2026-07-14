@@ -4,7 +4,7 @@ defmodule RLMContractArtifactTest do
   import ExUnit.CaptureIO
 
   @tag timeout: 120_000
-  test "current DSPy and DSEx pass the T1 operational contract without implying T3" do
+  test "current DSPy and Imp pass the T1 operational contract without implying T3" do
     unless File.exists?("tmp/dspy-parity-venv/bin/python") and
              File.dir?("tmp/dspy-current-target/dspy") do
       flunk("run the documented current-DSPy environment setup before this source-checkout gate")
@@ -13,9 +13,9 @@ defmodule RLMContractArtifactTest do
     out = tmp_dir("rlm-contract")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.rlm_contract")
+      Mix.Task.reenable("imp.benchmark.rlm_contract")
 
-      Mix.Tasks.Dsex.Benchmark.RlmContract.run([
+      Mix.Tasks.Imp.Benchmark.RlmContract.run([
         "--cases",
         "test/fixtures/rlm_contract_cases.json",
         "--out",
@@ -34,14 +34,14 @@ defmodule RLMContractArtifactTest do
 
     rows = Map.new(artifact["rows"], &{&1["id"], &1})
     assert Enum.all?(artifact["rows"], & &1["passing"])
-    assert get_in(rows, ["reject_over_budget_batch", "dsex", "subcalls"]) == 0
+    assert get_in(rows, ["reject_over_budget_batch", "imp", "subcalls"]) == 0
 
-    assert rows["dsex_symbolic_recurse_extension"]["disposition"] == "deviation"
-    refute rows["dsex_symbolic_recurse_extension"]["dsex"]["executed"]
+    assert rows["imp_symbolic_recurse_extension"]["disposition"] == "deviation"
+    refute rows["imp_symbolic_recurse_extension"]["imp"]["executed"]
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf(path) end)

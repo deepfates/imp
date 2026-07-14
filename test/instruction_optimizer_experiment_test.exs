@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
+defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{ArtifactFile, InstructionOptimizerExperiment, RunContext}
+  alias Imp.BenchmarkTruth.{ArtifactFile, InstructionOptimizerExperiment, RunContext}
 
   test "economical AIME preflight reserves enough output for structured reasoning" do
     manifest =
@@ -13,19 +13,19 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     assert manifest["budget"]["output_tokens"] >= manifest["provider"]["max_output_tokens"]
   end
 
-  test "derives one matched DSEx run and one all-arm DSPy run" do
+  test "derives one matched Imp run and one all-arm DSPy run" do
     fixture = fixture!("derive")
     derived = derive(fixture)
 
-    assert Keyword.fetch!(derived.dsex_options, :model) == "openai:gpt-test"
+    assert Keyword.fetch!(derived.imp_options, :model) == "openai:gpt-test"
 
-    assert Keyword.fetch!(derived.dsex_options, :split_limits) == %{
+    assert Keyword.fetch!(derived.imp_options, :split_limits) == %{
              "train" => 1,
              "dev" => 1,
              "test" => 1
            }
 
-    assert Keyword.fetch!(derived.dsex_options, :budget) == %{
+    assert Keyword.fetch!(derived.imp_options, :budget) == %{
              "requests" => 40,
              "input_tokens" => 600,
              "output_tokens" => 400,
@@ -67,7 +67,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     assert simba["temperature_for_sampling"] == 0.3
     assert simba["temperature_for_candidates"] == 0.4
     refute Map.has_key?(simba, "sampling_temperature")
-    assert Keyword.fetch!(derived.dsex_options, :arm_configs)["mipro_v2"]["startup_trials"] == 10
+    assert Keyword.fetch!(derived.imp_options, :arm_configs)["mipro_v2"]["startup_trials"] == 10
     assert derived.identity["design"]["mipro_v2"]["deviation"] =~ "native Optuna TPE"
   end
 
@@ -75,9 +75,9 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     fixture = fixture!("execute")
     parent = self()
 
-    dsex_executor = fn options ->
-      send(parent, {:dsex, options})
-      dsex_artifact(options, fixture)
+    imp_executor = fn options ->
+      send(parent, {:imp, options})
+      imp_artifact(options, fixture)
     end
 
     python_executor = fn invocation ->
@@ -92,11 +92,11 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
         out_dir: fixture.out,
         checkpoint_dir: fixture.checkpoints,
         run_context: fixture.context,
-        dsex_executor: dsex_executor,
+        imp_executor: imp_executor,
         python_executor: python_executor
       )
 
-    assert_received {:dsex, dsex_options}
+    assert_received {:imp, imp_options}
     assert_received {:dspy, invocation}
     assert length(invocation.config["arms"]) == 4
     assert invocation.checkpoint_path =~ "dspy.checkpoint.json"
@@ -106,7 +106,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
            |> Map.fetch!("PYTHONPATH")
            |> String.starts_with?(invocation.dspy_pythonpath)
 
-    assert Keyword.fetch!(dsex_options, :campaign_id) == "matched-aime"
+    assert Keyword.fetch!(imp_options, :campaign_id) == "matched-aime"
     refute_received {:dspy, _another}
 
     merged = ArtifactFile.read_run_json!(result.merged.path)
@@ -128,7 +128,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
   test "existing complete artifacts can be merged without invoking either runtime" do
     fixture = fixture!("existing")
     derived = derive(fixture)
-    dsex = dsex_artifact(derived.dsex_options, fixture)
+    imp = imp_artifact(derived.imp_options, fixture)
     dspy = dspy_artifact(derived.python.config, fixture)
 
     result =
@@ -139,9 +139,9 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
         checkpoint_dir: fixture.checkpoints,
         run_context: fixture.context,
         runtimes: [],
-        dsex_artifact: dsex,
+        imp_artifact: imp,
         dspy_artifact: dspy,
-        dsex_executor: fn _ -> flunk("DSEx executor was called") end,
+        imp_executor: fn _ -> flunk("Imp executor was called") end,
         python_executor: fn _ -> flunk("DSPy executor was called") end
       )
 
@@ -167,12 +167,12 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     end
 
     derived = derive(fixture)
-    dsex = dsex_artifact(derived.dsex_options, fixture)
+    imp = imp_artifact(derived.imp_options, fixture)
     dspy = dspy_artifact(derived.python.config, fixture)
     tampered = put_in(dspy, ["config", "provider", "model"], "openai/wrong")
 
     assert_raise ArgumentError, ~r/DSPy artifact identity/, fn ->
-      InstructionOptimizerExperiment.merge_outputs!(derived, dsex, tampered)
+      InstructionOptimizerExperiment.merge_outputs!(derived, imp, tampered)
     end
 
     unsupported = put_in(fixture.manifest, ["arm_configs", "simba", "raw_temperature"], 0.5)
@@ -258,7 +258,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
       "family" => "AIMEBench",
       "model" => %{
         "logical" => "gpt-test",
-        "dsex" => "openai:gpt-test",
+        "imp" => "openai:gpt-test",
         "dspy" => "openai/gpt-test"
       },
       "seed" => 17,
@@ -314,13 +314,13 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
       "dependency_identity" => %{"optuna" => "4.9.0"},
       "source_commits" => %{
         "dspy" => dspy_source,
-        "dsex" => "resolved from campaign git_sha"
+        "imp" => "resolved from campaign git_sha"
       }
     }
 
     context =
       RunContext.new!(
-        source_commits: %{"dsex" => "deepfates/dsex@test-sha", "dspy" => dspy_source},
+        source_commits: %{"imp" => "deepfates/imp@test-sha", "dspy" => dspy_source},
         workspace_state: "synthetic"
       )
 
@@ -336,13 +336,13 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     }
   end
 
-  defp dsex_artifact(options, fixture) do
+  defp imp_artifact(options, fixture) do
     arms = Enum.map(Keyword.fetch!(options, :arms), &Atom.to_string/1)
     configs = options |> Keyword.fetch!(:arm_configs) |> json()
 
     %{
       "schema_version" => 1,
-      "runner" => "dsex-instruction-optimizer-campaign",
+      "runner" => "imp-instruction-optimizer-campaign",
       "evidence_level" => "research_preflight",
       "identity" => %{
         "campaign_id" => Keyword.fetch!(options, :campaign_id),
@@ -358,7 +358,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
           Map.new(fixture.checksums, fn {split, hash} -> {split, "sha256:" <> hash} end),
         "source_commits" => Keyword.fetch!(options, :source_commits)
       },
-      "results" => Map.new(arms, fn arm -> {arm, dsex_score(arm)} end),
+      "results" => Map.new(arms, fn arm -> {arm, imp_score(arm)} end),
       "summary" => %{
         "all_requested_arms_completed" => true,
         "multi_seed" => false,
@@ -391,9 +391,9 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
     }
   end
 
-  defp dsex_score("baseline"), do: %{"dev" => 0.4, "test" => 0.4}
-  defp dsex_score("mipro_v2"), do: %{"dev" => 0.8, "test" => 0.7}
-  defp dsex_score(_), do: %{"dev" => 0.6, "test" => 0.5}
+  defp imp_score("baseline"), do: %{"dev" => 0.4, "test" => 0.4}
+  defp imp_score("mipro_v2"), do: %{"dev" => 0.8, "test" => 0.7}
+  defp imp_score(_), do: %{"dev" => 0.6, "test" => 0.5}
 
   defp dspy_score(%{"name" => "baseline"} = arm),
     do: Map.merge(arm, %{"dev" => %{"score" => 0.4}, "test" => %{"score" => 0.4}})
@@ -408,8 +408,8 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
   defp authority,
     do:
-      DSEx.UpstreamAuthorityRegistry.load!()
-      |> DSEx.UpstreamAuthorityRegistry.authority!(
+      Imp.UpstreamAuthorityRegistry.load!()
+      |> Imp.UpstreamAuthorityRegistry.authority!(
         "t1_instruction_optimizer_differential_contract"
       )
 

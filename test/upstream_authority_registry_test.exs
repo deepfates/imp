@@ -1,13 +1,13 @@
-defmodule DSEx.UpstreamAuthorityRegistryTest do
+defmodule Imp.UpstreamAuthorityRegistryTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.UpstreamAuthorityRegistry, as: Registry
+  alias Imp.UpstreamAuthorityRegistry, as: Registry
 
   test "UpstreamFidelity resolves stable and tracking pins from the canonical registry" do
     registry = Registry.load!()
     stable = Registry.authority!(registry, "dspy_stable_upstream_fidelity")
     tracking = Registry.authority!(registry, "t1_instruction_optimizer_differential_contract")
-    report = DSEx.UpstreamFidelity.report()
+    report = Imp.UpstreamFidelity.report()
 
     assert report.baseline.version == stable["version"]
     assert report.baseline.git_sha == stable["commit"]
@@ -34,7 +34,7 @@ defmodule DSEx.UpstreamAuthorityRegistryTest do
     end
 
     assert_raise ArgumentError, ~r/invalid upstream authority registry/, fn ->
-      DSEx.UpstreamFidelity.report(registry_path: path)
+      Imp.UpstreamFidelity.report(registry_path: path)
     end
   end
 

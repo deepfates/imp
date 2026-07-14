@@ -1,4 +1,4 @@
-defmodule DSEx.Test.TelemetryHelpers do
+defmodule Imp.Test.TelemetryHelpers do
   @moduledoc false
 
   def attach(event_names, opts \\ [])
@@ -6,7 +6,7 @@ defmodule DSEx.Test.TelemetryHelpers do
   def attach(event_names, opts) when is_list(event_names) do
     ref = make_ref()
     pid = Keyword.get(opts, :pid, self())
-    id = "dsex-test-#{System.unique_integer([:positive])}"
+    id = "imp-test-#{System.unique_integer([:positive])}"
 
     :telemetry.attach_many(id, event_names, &__MODULE__.handle_event/4, {ref, pid})
 

@@ -1,10 +1,10 @@
-defmodule DSEx.OptimizerContractTest do
+defmodule Imp.OptimizerContractTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.TrainingResult
+  alias Imp.Optimizer.TrainingResult
 
   defmodule CapturingProgramOptimizer do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct [:owner]
 
     @impl true
@@ -23,7 +23,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule InvalidCapabilities do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -34,7 +34,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule InvalidResult do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -50,7 +50,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule FlippingCapabilities do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -76,7 +76,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule RaisingCapabilities do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -87,7 +87,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule CustomTraining do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct [:result]
 
     @impl true
@@ -112,7 +112,7 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   defmodule MalformedWorkflow do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     defmodule Result do
@@ -132,22 +132,22 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   @canonical_modules [
-    DSEx.Optimizer.LabeledFewShot,
-    DSEx.Optimizer.BootstrapFewShot,
-    DSEx.Optimizer.RandomSearch,
-    DSEx.Optimizer.COPRO,
-    DSEx.Optimizer.MIPROv2,
-    DSEx.Optimizer.SIMBA,
-    DSEx.Optimizer.InferRules,
-    DSEx.Optimizer.SignatureOptimizer,
-    DSEx.Optimizer.GEPA,
-    DSEx.Optimizer.Avatar,
-    DSEx.Optimizer.BetterTogether,
-    DSEx.Optimizer.BootstrapFinetune,
-    DSEx.Optimizer.GRPO,
-    DSEx.Optimizer.Ensemble,
-    DSEx.Optimizer.KNNFewShot,
-    DSEx.Optimizer.Playbook
+    Imp.Optimizer.LabeledFewShot,
+    Imp.Optimizer.BootstrapFewShot,
+    Imp.Optimizer.RandomSearch,
+    Imp.Optimizer.COPRO,
+    Imp.Optimizer.MIPROv2,
+    Imp.Optimizer.SIMBA,
+    Imp.Optimizer.InferRules,
+    Imp.Optimizer.SignatureOptimizer,
+    Imp.Optimizer.GEPA,
+    Imp.Optimizer.Avatar,
+    Imp.Optimizer.BetterTogether,
+    Imp.Optimizer.BootstrapFinetune,
+    Imp.Optimizer.GRPO,
+    Imp.Optimizer.Ensemble,
+    Imp.Optimizer.KNNFewShot,
+    Imp.Optimizer.Playbook
   ]
 
   test "every executable optimizer family declares one canonical contract" do
@@ -173,11 +173,11 @@ defmodule DSEx.OptimizerContractTest do
                :program,
                :training_result,
                :constructed_program,
-               {:workflow_result, DSEx.Optimizer.Playbook.Result}
+               {:workflow_result, Imp.Optimizer.Playbook.Result}
              ]
     end
 
-    assert DSEx.Optimizer.Playbook.__optimizer__().datasets == %{
+    assert Imp.Optimizer.Playbook.__optimizer__().datasets == %{
              trainset: :required,
              promotionset: :required,
              auditset: :required,
@@ -186,13 +186,13 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   test "facade forwards named datasets and invocation options without arity inference" do
-    program = DSEx.predict("question -> answer")
-    trainset = [DSEx.example(question: "train", answer: "a")]
-    validation = [DSEx.example(question: "validation", answer: "a")]
+    program = Imp.predict("question -> answer")
+    trainset = [Imp.example(question: "train", answer: "a")]
+    validation = [Imp.example(question: "validation", answer: "a")]
     optimizer = %CapturingProgramOptimizer{owner: self()}
 
     assert ^program =
-             DSEx.optimize(program, optimizer, trainset, validation, checkpoint_fn: :checkpoint)
+             Imp.optimize(program, optimizer, trainset, validation, checkpoint_fn: :checkpoint)
 
     assert_receive {:optimizer_options, opts}
     assert opts[:trainset] == trainset
@@ -201,32 +201,32 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   test "MIPROv2 cannot receive a trainset as invocation options through optimize/3" do
-    metric = DSEx.exact_match(:answer)
-    optimizer = DSEx.Optimizer.MIPROv2.new(metric)
+    metric = Imp.exact_match(:answer)
+    optimizer = Imp.Optimizer.MIPROv2.new(metric)
 
     assert_raise ArgumentError, ~r/requires a validation set/, fn ->
-      DSEx.optimize(DSEx.predict("question -> answer"), optimizer, [])
+      Imp.optimize(Imp.predict("question -> answer"), optimizer, [])
     end
   end
 
   test "dataset contracts reject nil and scalar values while admitting empty and streaming splits" do
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
     optimizer = %CapturingProgramOptimizer{owner: self()}
 
     assert {:error, {:missing_dataset, :validation}} =
-             DSEx.Optimizer.run(optimizer, program, trainset: [])
+             Imp.Optimizer.run(optimizer, program, trainset: [])
 
     assert {:error, {:invalid_dataset, :trainset, nil}} =
-             DSEx.Optimizer.run(optimizer, program, trainset: nil, validation: [])
+             Imp.Optimizer.run(optimizer, program, trainset: nil, validation: [])
 
     assert {:error, {:invalid_dataset, :validation, :not_a_dataset}} =
-             DSEx.Optimizer.run(optimizer, program,
+             Imp.Optimizer.run(optimizer, program,
                trainset: [],
                validation: :not_a_dataset
              )
 
     assert {:ok, ^program} =
-             DSEx.Optimizer.run(optimizer, program, trainset: [], validation: [])
+             Imp.Optimizer.run(optimizer, program, trainset: [], validation: [])
 
     assert_receive {:optimizer_options, empty_opts}
     assert empty_opts[:trainset] == []
@@ -235,7 +235,7 @@ defmodule DSEx.OptimizerContractTest do
     validation_stream = Stream.map([2], & &1)
 
     assert {:ok, ^program} =
-             DSEx.Optimizer.run(optimizer, program,
+             Imp.Optimizer.run(optimizer, program,
                trainset: train_stream,
                validation: validation_stream
              )
@@ -246,81 +246,80 @@ defmodule DSEx.OptimizerContractTest do
   end
 
   test "GRPO cannot receive a devset in its compile options position" do
-    optimizer = DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end)
+    optimizer = Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end)
 
-    assert_raise ArgumentError, ~r/training optimizer; use DSEx\.train\/4/, fn ->
-      DSEx.optimize(DSEx.predict("question -> answer"), optimizer, [], [])
+    assert_raise ArgumentError, ~r/training optimizer; use Imp\.train\/4/, fn ->
+      Imp.optimize(Imp.predict("question -> answer"), optimizer, [], [])
     end
   end
 
   test "training and program optimization have distinct public result contracts" do
-    metric = DSEx.exact_match(:answer)
-    program = DSEx.predict("question -> answer")
-    trainer = DSEx.Optimizer.BootstrapFinetune.new(metric)
+    metric = Imp.exact_match(:answer)
+    program = Imp.predict("question -> answer")
+    trainer = Imp.Optimizer.BootstrapFinetune.new(metric)
 
-    assert {:error,
-            {:training_not_started, :trainer_required, %DSEx.Predict.Predict{} = compiled}} =
-             DSEx.train(program, trainer, [])
+    assert {:error, {:training_not_started, :trainer_required, %Imp.Predict.Predict{} = compiled}} =
+             Imp.train(program, trainer, [])
 
-    assert DSEx.Optimizer.Report.fetch(compiled).optimizer == :bootstrap_few_shot
+    assert Imp.Optimizer.Report.fetch(compiled).optimizer == :bootstrap_few_shot
 
     assert {:error, {:optimizer_kind_mismatch, :training, :program}} =
-             DSEx.train(program, DSEx.Optimizer.LabeledFewShot.new(), [])
+             Imp.train(program, Imp.Optimizer.LabeledFewShot.new(), [])
   end
 
   test "facade rejects every non-keyword invocation option shape consistently" do
-    program = DSEx.predict("question -> answer")
-    optimizer = DSEx.Optimizer.SIMBA.new(DSEx.exact_match(:answer))
+    program = Imp.predict("question -> answer")
+    optimizer = Imp.Optimizer.SIMBA.new(Imp.exact_match(:answer))
 
     for options <- [%{}, {:bad, :options}, [:not_keyword]] do
-      assert_raise ArgumentError, ~r/DSEx\.optimize\/5 expects keyword/, fn ->
-        DSEx.optimize(program, optimizer, [], [], options)
+      assert_raise ArgumentError, ~r/Imp\.optimize\/5 expects keyword/, fn ->
+        Imp.optimize(program, optimizer, [], [], options)
       end
 
-      assert_raise ArgumentError, ~r/DSEx\.train\/4 expects keyword/, fn ->
-        DSEx.train(program, optimizer, [], options)
+      assert_raise ArgumentError, ~r/Imp\.train\/4 expects keyword/, fn ->
+        Imp.train(program, optimizer, [], options)
       end
     end
   end
 
   test "constructors are explicit and cannot masquerade as dataset optimizers" do
-    program = DSEx.predict("question -> answer")
-    ensemble = DSEx.Optimizer.Ensemble.new(deterministic: true)
+    program = Imp.predict("question -> answer")
+    ensemble = Imp.Optimizer.Ensemble.new(deterministic: true)
 
-    assert {:ok, %DSEx.Optimizer.Ensemble.Program{programs: [^program]}} =
-             DSEx.Optimizer.run(ensemble, [program], [])
+    assert {:ok, %Imp.Optimizer.Ensemble.Program{programs: [^program]}} =
+             Imp.Optimizer.run(ensemble, [program], [])
 
     assert_raise ArgumentError, ~r/kind :constructor/, fn ->
-      DSEx.optimize(program, ensemble, [])
+      Imp.optimize(program, ensemble, [])
     end
   end
 
   test "invalid capability and result declarations fail closed" do
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
     assert {:error, {:invalid_optimizer_capabilities, %{kind: :mystery}}} =
-             DSEx.Optimizer.capabilities(%InvalidCapabilities{})
+             Imp.Optimizer.capabilities(%InvalidCapabilities{})
 
     assert {:error, {:invalid_optimizer_program, %{not: :a_program_struct}}} =
-             DSEx.Optimizer.run(%InvalidResult{}, program, trainset: [])
+             Imp.Optimizer.run(%InvalidResult{}, program, trainset: [])
   end
 
   test "facade resolves stateful capabilities exactly once" do
     key = {FlippingCapabilities, :calls}
     Process.delete(key)
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
-    assert ^program = DSEx.optimize(program, %FlippingCapabilities{}, [])
+    assert ^program = Imp.optimize(program, %FlippingCapabilities{}, [])
     assert Process.get(key) == 1
   end
 
   test "composed execution resolves capabilities exactly once" do
     key = {FlippingCapabilities, :calls}
     Process.delete(key)
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
     assert {:ok, %{kind: :program}, ^program} =
-             DSEx.Optimizer.run_with_datasets(
+             Imp.Optimizer.run_with_datasets(
                %FlippingCapabilities{},
                program,
                %{trainset: []},
@@ -338,9 +337,9 @@ defmodule DSEx.OptimizerContractTest do
     }
 
     assert {:error, {:not_an_optimizer, RunOnly}} =
-             DSEx.Optimizer.run(
+             Imp.Optimizer.run(
                %RunOnly{owner: self()},
-               DSEx.predict("question -> answer"),
+               Imp.predict("question -> answer"),
                [trainset: []],
                forged
              )
@@ -351,31 +350,31 @@ defmodule DSEx.OptimizerContractTest do
   test "workflow results must match their declared result module" do
     assert {:error,
             {:invalid_workflow_result, MalformedWorkflow.Result, %{not: :the_declared_result}}} =
-             DSEx.Optimizer.run(
+             Imp.Optimizer.run(
                %MalformedWorkflow{},
-               DSEx.predict("question -> answer"),
+               Imp.predict("question -> answer"),
                trainset: []
              )
   end
 
   test "BootstrapFinetune distinguishes pending, completed, and failed jobs" do
-    program = DSEx.predict("question -> answer", lm: DSEx.req_llm("openai:gpt-base"))
-    metric = DSEx.exact_match(:answer)
+    program = Imp.predict("question -> answer", lm: Imp.req_llm("openai:gpt-base"))
+    metric = Imp.exact_match(:answer)
 
     trainer_for = fn attrs ->
-      fn _lm, _examples, _opts -> {:ok, DSEx.Clients.TrainingJob.new(attrs)} end
+      fn _lm, _examples, _opts -> {:ok, Imp.Clients.TrainingJob.new(attrs)} end
     end
 
     pending =
-      DSEx.Optimizer.BootstrapFinetune.new(metric,
+      Imp.Optimizer.BootstrapFinetune.new(metric,
         trainer: trainer_for.(%{id: "pending", status: :running})
       )
 
     assert {:ok, %TrainingResult{status: :job_created, job: %{id: "pending"}}} =
-             DSEx.train(program, pending, [])
+             Imp.train(program, pending, [])
 
     completed =
-      DSEx.Optimizer.BootstrapFinetune.new(metric,
+      Imp.Optimizer.BootstrapFinetune.new(metric,
         trainer:
           trainer_for.(%{
             id: "completed",
@@ -387,37 +386,37 @@ defmodule DSEx.OptimizerContractTest do
       )
 
     assert {:ok, %TrainingResult{status: :completed, program: rebound}} =
-             DSEx.train(program, completed, [])
+             Imp.train(program, completed, [])
 
-    assert DSEx.ProgramAccess.lm(rebound).model == "openai:ft:gpt-completed"
+    assert Imp.ProgramAccess.lm(rebound).model == "openai:ft:gpt-completed"
 
     failed =
-      DSEx.Optimizer.BootstrapFinetune.new(metric,
+      Imp.Optimizer.BootstrapFinetune.new(metric,
         trainer: trainer_for.(%{id: "failed", status: :failed})
       )
 
-    assert {:error, {:training_failed, :failed, %{}}} = DSEx.train(program, failed, [])
+    assert {:error, {:training_failed, :failed, %{}}} = Imp.train(program, failed, [])
   end
 
   test "capability callback failures are normalized at the optimizer boundary" do
     assert {:error,
             {:optimizer_capabilities_failed, RaisingCapabilities, "capability probe exploded"}} =
-             DSEx.Optimizer.capabilities(%RaisingCapabilities{})
+             Imp.Optimizer.capabilities(%RaisingCapabilities{})
 
     assert_raise ArgumentError, ~r/capability probe exploded/, fn ->
-      DSEx.optimize(DSEx.predict("question -> answer"), %RaisingCapabilities{}, [])
+      Imp.optimize(Imp.predict("question -> answer"), %RaisingCapabilities{}, [])
     end
   end
 
   test "training result is an explicit lifecycle value" do
-    result = %TrainingResult{program: DSEx.predict("question -> answer"), status: :completed}
+    result = %TrainingResult{program: Imp.predict("question -> answer"), status: :completed}
     assert result.status == :completed
     assert result.job == nil
     assert result.metadata == %{}
   end
 
   test "malformed training lifecycle results fail closed" do
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
     invalid_status = %TrainingResult{
       program: program,
@@ -427,16 +426,16 @@ defmodule DSEx.OptimizerContractTest do
     }
 
     assert {:error, {:invalid_training_status, :unknown}} =
-             DSEx.Optimizer.run(%CustomTraining{result: invalid_status}, program, trainset: [])
+             Imp.Optimizer.run(%CustomTraining{result: invalid_status}, program, trainset: [])
 
     missing_job = %TrainingResult{program: program, status: :job_created, metadata: %{}}
 
     assert {:error, :training_job_required} =
-             DSEx.Optimizer.run(%CustomTraining{result: missing_job}, program, trainset: [])
+             Imp.Optimizer.run(%CustomTraining{result: missing_job}, program, trainset: [])
 
     invalid_metadata = %TrainingResult{program: program, status: :completed, metadata: []}
 
     assert {:error, {:invalid_training_metadata, []}} =
-             DSEx.Optimizer.run(%CustomTraining{result: invalid_metadata}, program, trainset: [])
+             Imp.Optimizer.run(%CustomTraining{result: invalid_metadata}, program, trainset: [])
   end
 end

@@ -1,12 +1,12 @@
-defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
+defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
 
-  alias DSEx.BenchmarkTruth.InstructionOptimizerCampaign
+  alias Imp.BenchmarkTruth.InstructionOptimizerCampaign
 
   defmodule CrashableLM do
-    @behaviour DSEx.LM
+    @behaviour Imp.LM
 
     @impl true
     def generate(_messages, opts) do
@@ -37,7 +37,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.update(calls, &(&1 + 1))
@@ -105,7 +105,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     dataset = write_aime_dataset!(root)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> {:error, :provider_unavailable} end]
     }
 
@@ -209,7 +209,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.update(calls, &(&1 + 1))
@@ -341,13 +341,13 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
   test "checkpointed optimizer predictor config survives JSON loading" do
     program =
       "question -> answer"
-      |> DSEx.chain_of_thought(config: [cache: false, rollout_id: 7])
-      |> DSEx.Saving.dump()
+      |> Imp.chain_of_thought(config: [cache: false, rollout_id: 7])
+      |> Imp.Saving.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> DSEx.Saving.load()
+      |> Imp.Saving.load()
 
-    [predictor] = DSEx.ProgramParameters.predictors(program)
+    [predictor] = Imp.ProgramParameters.predictors(program)
     assert predictor.predictor.config == [cache: false, rollout_id: 7]
   end
 
@@ -366,7 +366,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
       budget: %{requests: 100, input_tokens: 1_000_000, output_tokens: 10_000, usd: 10.0},
       pricing: %{"input_per_million" => 1.0, "output_per_million" => 2.0},
       max_output_tokens: 20,
-      source_commits: %{"dspy" => "pinned", "dsex" => "test"},
+      source_commits: %{"dspy" => "pinned", "imp" => "test"},
       git_sha: "test-sha",
       out_dir: Path.join(root, "results"),
       checkpoint_dir: Path.join(root, "checkpoints"),
@@ -378,7 +378,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
   end
 
   defp static_lm do
-    %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{reasoning: "ok", answer: "1"} end]}
+    %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{reasoning: "ok", answer: "1"} end]}
   end
 
   defp write_aime_dataset!(root) do
@@ -424,7 +424,7 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-instruction-campaign-#{name}-#{System.unique_integer([:positive])}"
+        "imp-instruction-campaign-#{name}-#{System.unique_integer([:positive])}"
       )
 
     File.mkdir_p!(path)

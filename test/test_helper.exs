@@ -1,4 +1,4 @@
-defmodule DSEx.Test.EnvLoader do
+defmodule Imp.Test.EnvLoader do
   @moduledoc false
 
   def load(path \\ ".env") do
@@ -33,7 +33,7 @@ defmodule DSEx.Test.EnvLoader do
   end
 end
 
-DSEx.Test.EnvLoader.load()
+Imp.Test.EnvLoader.load()
 
 external_excludes =
   [

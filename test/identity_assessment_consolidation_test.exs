@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityAssessmentConsolidationTest do
+defmodule Imp.IdentityAssessmentConsolidationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityAssessmentConsolidation
+  alias Imp.IdentityAssessmentConsolidation
 
   @candidates ["cand-0000000000000001", "cand-0000000000000002"]
   @profiles ["flash", "terra"]
@@ -328,7 +328,7 @@ defmodule DSEx.IdentityAssessmentConsolidationTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-assessment-consolidation-#{name}-#{System.unique_integer([:positive])}"
+        "imp-assessment-consolidation-#{name}-#{System.unique_integer([:positive])}"
       )
 
     File.mkdir_p!(path)

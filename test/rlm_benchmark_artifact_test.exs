@@ -7,9 +7,9 @@ defmodule RLMBenchmarkArtifactTest do
     out_dir = tmp_dir("rlm-benchmark")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.rlm")
+      Mix.Task.reenable("imp.benchmark.rlm")
 
-      Mix.Tasks.Dsex.Benchmark.Rlm.run([
+      Mix.Tasks.Imp.Benchmark.Rlm.run([
         "--data",
         "test/fixtures/benchmarks/hotpotqa-small.jsonl",
         "--out",
@@ -30,12 +30,12 @@ defmodule RLMBenchmarkArtifactTest do
 
     rows = Map.new(artifact["rows"], &{&1["id"], &1})
     assert rows["hp-1:rlm"]["passing"]
-    assert get_in(rows, ["hp-1:rlm", "metrics", "dsex_subcalls"]) == 2
+    assert get_in(rows, ["hp-1:rlm", "metrics", "imp_subcalls"]) == 2
     assert get_in(rows, ["hp-1:rlm", "dspy", "trace", "trajectory"]) |> length() == 1
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path

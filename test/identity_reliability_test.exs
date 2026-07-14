@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityReliabilityTest do
+defmodule Imp.IdentityReliabilityTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityReliability
+  alias Imp.IdentityReliability
 
   test "reports perfect rank, absolute, and consistency agreement" do
     report =

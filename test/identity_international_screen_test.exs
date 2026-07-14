@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityInternationalScreenTest do
+defmodule Imp.IdentityInternationalScreenTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityInternationalScreen
+  alias Imp.IdentityInternationalScreen
 
   test "records deterministic signals without claiming international validation" do
     observations = [observation("occ-a", "Form Lab", "form lab")]

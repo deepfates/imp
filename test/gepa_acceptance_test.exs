@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.AcceptanceTest do
+defmodule Imp.Optimizer.GEPA.AcceptanceTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Acceptance, Result}
+  alias Imp.Optimizer.GEPA.{Acceptance, Result}
 
   test "mutation defaults to strict summed-score improvement" do
     before = result([0.4, 0.6])

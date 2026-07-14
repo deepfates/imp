@@ -1,7 +1,7 @@
-defmodule DSEx.Training.FastSlow.ReuseCacheTest do
+defmodule Imp.Training.FastSlow.ReuseCacheTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{CachedTrajectory, Config, ReuseCache}
+  alias Imp.Training.FastSlow.{CachedTrajectory, Config, ReuseCache}
 
   test "claims exact problem-prompt tuples once and clears at the next cycle" do
     theta = digest("theta")

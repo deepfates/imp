@@ -1,10 +1,10 @@
-defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
+defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{BudgetedLM, CampaignBudget}
+  alias Imp.BenchmarkTruth.{BudgetedLM, CampaignBudget}
 
   defmodule CountingLM do
-    @behaviour DSEx.LM
+    @behaviour Imp.LM
     defstruct [:owner]
 
     @impl true
@@ -26,11 +26,11 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
 
     lm = %BudgetedLM{inner: %CountingLM{owner: self()}, budget: budget}
 
-    assert {:ok, %{answer: "ok"}} = DSEx.LM.generate(lm, [%{content: "first"}], max_tokens: 20)
+    assert {:ok, %{answer: "ok"}} = Imp.LM.generate(lm, [%{content: "first"}], max_tokens: 20)
     assert_received :provider_called
 
     assert {:error, {:campaign_budget_exhausted, :requests}} =
-             DSEx.LM.generate(lm, [%{content: "second"}], max_tokens: 20)
+             Imp.LM.generate(lm, [%{content: "second"}], max_tokens: 20)
 
     refute_received :provider_called
     assert CampaignBudget.snapshot(budget)["exhausted"] == "requests"

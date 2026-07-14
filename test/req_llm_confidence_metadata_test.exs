@@ -1,4 +1,4 @@
-defmodule DSEx.ReqLLMConfidenceMetadataTest do
+defmodule Imp.ReqLLMConfidenceMetadataTest do
   use ExUnit.Case, async: true
 
   defmodule ProviderFixture do
@@ -33,10 +33,10 @@ defmodule DSEx.ReqLLMConfidenceMetadataTest do
   end
 
   test "ReqLLM retains only sanitized confidence metadata" do
-    lm = DSEx.Clients.ReqLLM.new("openai:gpt-fixture", req_module: ProviderFixture)
+    lm = Imp.Clients.ReqLLM.new("openai:gpt-fixture", req_module: ProviderFixture)
 
-    assert {:ok, %{__dsex_lm_output__: %{"category" => "Food"}, __dsex_lm_metadata__: metadata}} =
-             DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "classify"}], [])
+    assert {:ok, %{__imp_lm_output__: %{"category" => "Food"}, __imp_lm_metadata__: metadata}} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "classify"}], [])
 
     assert %{
              provider: "openai",

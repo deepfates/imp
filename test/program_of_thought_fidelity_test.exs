@@ -2,7 +2,7 @@ defmodule ProgramOfThoughtFidelityTest do
   use ExUnit.Case, async: true
 
   setup do
-    DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
     :ok
   end
 
@@ -15,10 +15,10 @@ defmodule ProgramOfThoughtFidelityTest do
         %{program: "x * 2"}
       ])
 
-    program = DSEx.program_of_thought("x: int -> answer: int", lm: lm, max_iters: 2)
+    program = Imp.program_of_thought("x: int -> answer: int", lm: lm, max_iters: 2)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 21})
-    assert DSEx.Prediction.get(prediction, :answer) == 42
+    assert {:ok, prediction} = Imp.call(program, %{x: 21})
+    assert Imp.Prediction.get(prediction, :answer) == 42
 
     assert [failed_messages, retry_messages] = collect_messages(2)
     refute rendered(failed_messages) =~ "previous program"
@@ -35,10 +35,10 @@ defmodule ProgramOfThoughtFidelityTest do
   test "ProgramOfThought rejects malformed input pairs before calling the planner" do
     owner = self()
     lm = static_sequence(owner, [%{program: "1 + 1"}])
-    program = DSEx.program_of_thought("x -> answer", lm: lm)
+    program = Imp.program_of_thought("x -> answer", lm: lm)
 
     assert {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}} =
-             DSEx.call(program, [:not_a_pair])
+             Imp.call(program, [:not_a_pair])
 
     refute_received {:lm_messages, _messages}
   end
@@ -53,11 +53,11 @@ defmodule ProgramOfThoughtFidelityTest do
       ])
 
     program =
-      DSEx.program_of_thought("x: int, y: int -> answer: int, explanation: string", lm: lm)
+      Imp.program_of_thought("x: int, y: int -> answer: int, explanation: string", lm: lm)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 2, y: 3})
-    assert DSEx.Prediction.get(prediction, :answer) == 5
-    assert DSEx.Prediction.get(prediction, :explanation) == "computed in the sandbox"
+    assert {:ok, prediction} = Imp.call(program, %{x: 2, y: 3})
+    assert Imp.Prediction.get(prediction, :answer) == 5
+    assert Imp.Prediction.get(prediction, :explanation) == "computed in the sandbox"
 
     assert [_generation, extraction] = collect_messages(2)
     extraction_prompt = rendered(extraction)
@@ -75,19 +75,19 @@ defmodule ProgramOfThoughtFidelityTest do
         %{answer: 42}
       ])
 
-    program = DSEx.program_of_thought("question -> answer: int", lm: lm)
+    program = Imp.program_of_thought("question -> answer: int", lm: lm)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "value"})
-    assert DSEx.Prediction.get(prediction, :answer) == 42
+    assert {:ok, prediction} = Imp.call(program, %{question: "value"})
+    assert Imp.Prediction.get(prediction, :answer) == 42
     assert length(collect_messages(2)) == 2
   end
 
   test "ProgramOfThought exhausts exactly max_iters and preserves the sandbox error contract" do
     owner = self()
     lm = static_sequence(owner, List.duplicate(%{program: "missing + 1"}, 3))
-    program = DSEx.program_of_thought("x -> answer", lm: lm, max_iters: 3)
+    program = Imp.program_of_thought("x -> answer", lm: lm, max_iters: 3)
 
-    assert {:error, {:unknown_variable, "missing"}} = DSEx.call(program, %{x: 1})
+    assert {:error, {:unknown_variable, "missing"}} = Imp.call(program, %{x: 1})
     assert length(collect_messages(3)) == 3
     refute_received {:lm_messages, _messages}
   end
@@ -101,10 +101,10 @@ defmodule ProgramOfThoughtFidelityTest do
         %{program: "x + 1"}
       ])
 
-    program = DSEx.program_of_thought("x -> answer", lm: lm, max_iters: 2)
+    program = Imp.program_of_thought("x -> answer", lm: lm, max_iters: 2)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 1})
-    assert DSEx.Prediction.get(prediction, :answer) == 2
+    assert {:ok, prediction} = Imp.call(program, %{x: 1})
+    assert Imp.Prediction.get(prediction, :answer) == 2
 
     [_initial, retry] = collect_messages(2)
     assert rendered(retry) =~ "invalid_generated_program"
@@ -117,12 +117,12 @@ defmodule ProgramOfThoughtFidelityTest do
 
     loaded =
       "x -> answer"
-      |> DSEx.program_of_thought(lm: lm, max_iters: 2)
-      |> DSEx.dump()
-      |> DSEx.load()
-      |> DSEx.with_lm(lm)
+      |> Imp.program_of_thought(lm: lm, max_iters: 2)
+      |> Imp.dump()
+      |> Imp.load()
+      |> Imp.with_lm(lm)
 
-    assert {:error, {:unknown_variable, "missing"}} = DSEx.call(loaded, %{x: 1})
+    assert {:error, {:unknown_variable, "missing"}} = Imp.call(loaded, %{x: 1})
     assert length(collect_messages(2)) == 2
     refute_received {:lm_messages, _messages}
   end
@@ -137,9 +137,9 @@ defmodule ProgramOfThoughtFidelityTest do
         %{program: "1 + 1"}
       ])
 
-    program = DSEx.code_act("question -> answer", [], lm: lm, max_iters: 3)
+    program = Imp.code_act("question -> answer", [], lm: lm, max_iters: 3)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "recover"})
+    assert {:ok, prediction} = Imp.call(program, %{question: "recover"})
 
     assert Enum.map(prediction.metadata.code_act_trace, & &1.iteration) == [1, 2, 3]
 
@@ -173,10 +173,10 @@ defmodule ProgramOfThoughtFidelityTest do
         %{answer: 12}
       ])
 
-    program = DSEx.code_act("x: int -> answer: int", [], lm: lm, max_iters: 2)
+    program = Imp.code_act("x: int -> answer: int", [], lm: lm, max_iters: 2)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 6})
-    assert DSEx.Prediction.get(prediction, :answer) == 12
+    assert {:ok, prediction} = Imp.call(program, %{x: 6})
+    assert Imp.Prediction.get(prediction, :answer) == 12
 
     assert [%{action: :program, output: {:ok, %{"raw" => 12}}}] =
              prediction.metadata.code_act_trace
@@ -196,10 +196,10 @@ defmodule ProgramOfThoughtFidelityTest do
         %{answer: 8}
       ])
 
-    program = DSEx.code_act("x: int -> answer: int", [], lm: lm, max_iters: 2)
+    program = Imp.code_act("x: int -> answer: int", [], lm: lm, max_iters: 2)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 3})
-    assert DSEx.Prediction.get(prediction, :answer) == 8
+    assert {:ok, prediction} = Imp.call(program, %{x: 3})
+    assert Imp.Prediction.get(prediction, :answer) == 8
     assert Enum.map(prediction.metadata.code_act_trace, & &1.output) == [{:ok, 4}, {:ok, 8}]
     assert length(collect_messages(3)) == 3
   end
@@ -213,10 +213,10 @@ defmodule ProgramOfThoughtFidelityTest do
         %{answer: 4}
       ])
 
-    program = DSEx.code_act("x: int -> answer: int", [], lm: lm, max_iters: 4)
+    program = Imp.code_act("x: int -> answer: int", [], lm: lm, max_iters: 4)
 
-    assert {:ok, prediction} = DSEx.call(program, %{x: 3, max_iters: 1})
-    assert DSEx.Prediction.get(prediction, :answer) == 4
+    assert {:ok, prediction} = Imp.call(program, %{x: 3, max_iters: 1})
+    assert Imp.Prediction.get(prediction, :answer) == 4
 
     [planner, _extractor] = collect_messages(2)
     refute rendered(planner) =~ "max_iters"
@@ -226,10 +226,10 @@ defmodule ProgramOfThoughtFidelityTest do
   test "CodeAct validates an invocation-local max_iters budget before calling the planner" do
     owner = self()
     lm = static_sequence(owner, [%{program: "1 + 1"}])
-    program = DSEx.code_act("question -> answer", [], lm: lm)
+    program = Imp.code_act("question -> answer", [], lm: lm)
 
     assert {:error, {:invalid_code_act_max_iters, -1}} =
-             DSEx.call(program, %{question: "q", max_iters: -1})
+             Imp.call(program, %{question: "q", max_iters: -1})
 
     refute_received {:lm_messages, _messages}
   end
@@ -239,7 +239,7 @@ defmodule ProgramOfThoughtFidelityTest do
     Process.put(key, outputs)
 
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(owner, {:lm_messages, messages})

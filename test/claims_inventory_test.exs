@@ -94,7 +94,7 @@ defmodule ClaimsInventoryTest do
       Enum.find(read_claims!(), &(&1["id"] == "claim.local_mlx_weight_training.effectiveness"))
 
     assert claim["decision"] == "proven_target"
-    assert claim["comparison"] == "dsex_local_baseline"
+    assert claim["comparison"] == "imp_local_baseline"
     assert claim["limitations"] != []
 
     assert [%{"lane" => "local_mlx_weight_training", "evidence" => "full"}] =

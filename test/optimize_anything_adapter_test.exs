@@ -1,10 +1,10 @@
-defmodule DSEx.Optimize.Anything.AdapterTest do
+defmodule Imp.Optimize.Anything.AdapterTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.Anything.Adapter
-  alias DSEx.Optimize.Anything.Adapter.OptimizationState
-  alias DSEx.Optimizer.GEPA.{Evaluation, Result}
+  alias Imp.Optimize.Anything
+  alias Imp.Optimize.Anything.Adapter
+  alias Imp.Optimize.Anything.Adapter.OptimizationState
+  alias Imp.Optimizer.GEPA.{Evaluation, Result}
 
   test "uses explicit mode arities and unwraps only string candidates" do
     parent = self()

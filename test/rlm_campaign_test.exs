@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
+defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.{
+  alias Imp.BenchmarkTruth.{
     CampaignBudget,
     RLMCampaign,
     RLMCheckpoint,
@@ -99,8 +99,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
   end
 
   defmodule GoodRuntime do
-    @behaviour DSEx.BenchmarkTruth.RLMRuntime
-    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+    @behaviour Imp.BenchmarkTruth.RLMRuntime
+    alias Imp.BenchmarkTruth.RLMCampaignTest.UsageFixture
 
     def execute(row, approach, _context) do
       if Map.has_key?(row, "gold") or Map.has_key?(row, "evidence_document_ids"),
@@ -127,12 +127,12 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
   end
 
   defmodule CrashRuntime do
-    @behaviour DSEx.BenchmarkTruth.RLMRuntime
+    @behaviour Imp.BenchmarkTruth.RLMRuntime
     def execute(_row, _approach, _context), do: raise("ambiguous dispatch")
   end
 
   defmodule MalformedRuntime do
-    @behaviour DSEx.BenchmarkTruth.RLMRuntime
+    @behaviour Imp.BenchmarkTruth.RLMRuntime
     def execute(_row, _approach, _context),
       do:
         {:ok,
@@ -145,8 +145,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
   end
 
   defmodule OverBudgetRuntime do
-    @behaviour DSEx.BenchmarkTruth.RLMRuntime
-    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+    @behaviour Imp.BenchmarkTruth.RLMRuntime
+    alias Imp.BenchmarkTruth.RLMCampaignTest.UsageFixture
 
     def execute(_row, approach, _context),
       do:
@@ -169,8 +169,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
   end
 
   defmodule ChargedErrorRuntime do
-    @behaviour DSEx.BenchmarkTruth.RLMRuntime
-    alias DSEx.BenchmarkTruth.RLMCampaignTest.UsageFixture
+    @behaviour Imp.BenchmarkTruth.RLMRuntime
+    alias Imp.BenchmarkTruth.RLMCampaignTest.UsageFixture
 
     def execute(_row, approach, _context) do
       usage = UsageFixture.pricing_derived(7, 0)
@@ -208,7 +208,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     gate = RLMProtocol.evaluate(result.artifact)
     assert Enum.find(gate["checks"], &(&1["id"] == "cost_accounting"))["passing"]
 
-    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) ==
+    assert get_in(result.artifact, ["aggregate", "approaches", "imp:direct", "usd"]) ==
              3.75
 
     resumed = run!(fixture, CrashRuntime)
@@ -230,10 +230,10 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     assert plan["jobs"] == repeated["jobs"]
 
     assert Enum.map(plan["jobs"], & &1["key"]) == [
-             "dsex:direct:oolong:oolong-1",
-             "dsex:direct:s_niah:s_niah-1",
-             "dsex:rlm:oolong:oolong-1",
-             "dsex:rlm:s_niah:s_niah-1"
+             "imp:direct:oolong:oolong-1",
+             "imp:direct:s_niah:s_niah-1",
+             "imp:rlm:oolong:oolong-1",
+             "imp:rlm:s_niah:s_niah-1"
            ]
   end
 
@@ -343,8 +343,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
                row["usage"]["cost_authority"] == "provider_reported"
            end)
 
-    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "calls"]) == 30
-    assert get_in(result.artifact, ["aggregate", "approaches", "dsex:direct", "usd"]) == 7.5
+    assert get_in(result.artifact, ["aggregate", "approaches", "imp:direct", "calls"]) == 30
+    assert get_in(result.artifact, ["aggregate", "approaches", "imp:direct", "usd"]) == 7.5
 
     resumed = run!(fixture, CrashRuntime)
     assert Enum.all?(resumed.artifact["rows"], &(&1["usage"]["requests"] == 2))
@@ -361,7 +361,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
                row["usage"]["cost_authority"] == "pricing_derived"
            end)
 
-    direct = get_in(result.artifact, ["aggregate", "approaches", "dsex:direct"])
+    direct = get_in(result.artifact, ["aggregate", "approaches", "imp:direct"])
     assert direct["completed"] == 0
     assert direct["calls"] == 15
     assert direct["input_tokens"] == 105
@@ -551,8 +551,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     inner = fn _messages, _opts ->
       {:ok,
        %{
-         __dsex_lm_output__: action,
-         __dsex_lm_metadata__: %{
+         __imp_lm_output__: action,
+         __imp_lm_metadata__: %{
            req_llm: %{content: Jason.encode!(action), usage: %{input_tokens: 1}}
          }
        }}
@@ -623,7 +623,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
         "qwen3_coder_480b_a35b" => "paper_qwen_sampling",
         "claude_opus_4_1" => "claude_code_v2.0.0_default"
       },
-      "runtime_matrix" => ~w(dsex standalone_rlm)
+      "runtime_matrix" => ~w(imp standalone_rlm)
     }
 
     gate = RLMProtocol.evaluate(%{"manifest" => %{"paper_protocol" => protocol}})
@@ -707,7 +707,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
       for approach <- ~w(direct rlm),
           id <- ~w(a b c),
           do: %{
-            "runtime" => "dsex",
+            "runtime" => "imp",
             "approach" => approach,
             "family" => "s_niah",
             "example_id" => id,
@@ -795,7 +795,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
       RLMCampaign.plan(fixture.manifest_path,
         families: ["oolong_pairs"],
         approaches: ["direct"],
-        runtime: "dsex",
+        runtime: "imp",
         row_limit: 1
       )
 
@@ -835,7 +835,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     rows =
       for approach <- ~w(base rlm), query <- ~w(q1 q2), size <- [1024, 2048] do
         %{
-          "runtime" => "dsex",
+          "runtime" => "imp",
           "approach" => approach,
           "family" => "oolong_pairs",
           "example_id" => "#{query}@#{size}",
@@ -904,7 +904,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
           "family" => "s_niah",
           "model_family" => "gpt_5",
           "approach" => "direct",
-          "runtime" => "dsex",
+          "runtime" => "imp",
           "status" => "ok",
           "answer" => "x",
           "score" => 1.0,
@@ -949,8 +949,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
       [
         out: fixture.out,
         checkpoint_dir: fixture.checkpoints,
-        runtime: "dsex",
-        runtime_modules: %{"dsex" => runtime}
+        runtime: "imp",
+        runtime_modules: %{"imp" => runtime}
       ]
 
     RLMCampaign.run(fixture.manifest_path, Keyword.merge(defaults, opts))
@@ -1079,7 +1079,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
         {approach,
          %{
            "enabled" => true,
-           "runtimes" => ["dsex"],
+           "runtimes" => ["imp"],
            "budget" => %{
              "requests" => request_limit,
              "input_tokens" => 100_000,
@@ -1092,7 +1092,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
 
     model = %{
       "logical" => "test",
-      "dsex" => "test:test",
+      "imp" => "test:test",
       "dspy" => "test/test",
       "temperature" => 0.0,
       "reasoning" => "none",
@@ -1191,7 +1191,7 @@ defmodule DSEx.BenchmarkTruth.RLMCampaignTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-rlm-#{label}-#{System.unique_integer([:positive, :monotonic])}"
+        "imp-rlm-#{label}-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     File.mkdir_p!(path)

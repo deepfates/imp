@@ -1,16 +1,16 @@
-defmodule DSEx.Playbook.WithContextTest do
+defmodule Imp.Playbook.WithContextTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Playbook
-  alias DSEx.Playbook.{Provenance, WithContext}
-  alias DSEx.Playbook.Operation.Add
-  alias DSEx.ProgramParameters
+  alias Imp.Playbook
+  alias Imp.Playbook.{Provenance, WithContext}
+  alias Imp.Playbook.Operation.Add
+  alias Imp.ProgramParameters
 
   test "injects active guidance once without exposing provenance" do
     test_pid = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(test_pid, {:messages, messages})
@@ -32,11 +32,11 @@ defmodule DSEx.Playbook.WithContextTest do
 
     wrapper =
       "question -> answer"
-      |> DSEx.signature("Answer directly.")
-      |> DSEx.predict(lm: lm)
-      |> DSEx.with_playbook(playbook)
+      |> Imp.signature("Answer directly.")
+      |> Imp.predict(lm: lm)
+      |> Imp.with_playbook(playbook)
 
-    assert {:ok, _prediction} = DSEx.call(wrapper, %{question: "Why?"})
+    assert {:ok, _prediction} = Imp.call(wrapper, %{question: "Why?"})
     assert_receive {:messages, messages}
 
     rendered = inspect(messages, limit: :infinity)
@@ -54,7 +54,7 @@ defmodule DSEx.Playbook.WithContextTest do
 
   test "optimizer updates preserve the playbook and target base instructions" do
     playbook = Playbook.new(id: "optimizer")
-    wrapper = WithContext.new(DSEx.predict("question -> answer"), playbook)
+    wrapper = WithContext.new(Imp.predict("question -> answer"), playbook)
 
     updated = ProgramParameters.put_instruction(wrapper, :main, "Be exact.")
 
@@ -65,7 +65,7 @@ defmodule DSEx.Playbook.WithContextTest do
   end
 
   test "constructor rejects structs that cannot receive predictor context" do
-    assert_raise ArgumentError, ~r/executable DSEx program/, fn ->
+    assert_raise ArgumentError, ~r/executable Imp program/, fn ->
       WithContext.new(%URI{scheme: "https"}, Playbook.new())
     end
   end
@@ -74,7 +74,7 @@ defmodule DSEx.Playbook.WithContextTest do
     test_pid = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(test_pid, {:messages, messages})
@@ -83,12 +83,12 @@ defmodule DSEx.Playbook.WithContextTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
-    wrapper = DSEx.with_playbook(program, Playbook.new(id: "empty"))
+    program = Imp.predict("question -> answer", lm: lm)
+    wrapper = Imp.with_playbook(program, Playbook.new(id: "empty"))
 
-    assert {:ok, _} = DSEx.call(program, %{question: "same"})
+    assert {:ok, _} = Imp.call(program, %{question: "same"})
     assert_receive {:messages, base_messages}
-    assert {:ok, _} = DSEx.call(wrapper, %{question: "same"})
+    assert {:ok, _} = Imp.call(wrapper, %{question: "same"})
     assert_receive {:messages, wrapped_messages}
     assert wrapped_messages == base_messages
   end
@@ -97,12 +97,12 @@ defmodule DSEx.Playbook.WithContextTest do
     {:ok, playbook} =
       Playbook.apply_delta(Playbook.new(id: "portable"), [Add.new("Use concise answers.")])
 
-    wrapper = DSEx.with_playbook(DSEx.predict("question -> answer"), playbook)
-    state = DSEx.Saving.dump(wrapper)
-    restored = DSEx.Saving.load(state)
+    wrapper = Imp.with_playbook(Imp.predict("question -> answer"), playbook)
+    state = Imp.Saving.dump(wrapper)
+    restored = Imp.Saving.load(state)
 
     assert restored == wrapper
-    assert DSEx.Saving.dump(restored) == state
+    assert Imp.Saving.dump(restored) == state
   end
 
   test "loading rejects tampered hashes and extra fields" do
@@ -123,7 +123,7 @@ defmodule DSEx.Playbook.WithContextTest do
       Map.put(
         entry_rehashed,
         "hash",
-        DSEx.Playbook.Canonical.hash(Map.delete(entry_rehashed, "hash"))
+        Imp.Playbook.Canonical.hash(Map.delete(entry_rehashed, "hash"))
       )
 
     assert_raise ArgumentError, ~r/hash_mismatch/, fn -> Playbook.load!(tampered) end

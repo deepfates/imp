@@ -1,7 +1,7 @@
-defmodule DSEx.Confidence.CalibrationTest do
+defmodule Imp.Confidence.CalibrationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Confidence.Calibration
+  alias Imp.Confidence.Calibration
 
   test "reports exact Brier, ECE, reliability, abstention, and prompt drift" do
     records = [

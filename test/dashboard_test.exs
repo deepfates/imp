@@ -58,7 +58,7 @@ defmodule DashboardTest do
         "all_cases_passing" => true,
         "prediction_parity" => true,
         "tool_trace_parity" => true,
-        "dsex_semantic_checks" => %{"all_passing" => true, "passing" => 4, "total" => 4}
+        "imp_semantic_checks" => %{"all_passing" => true, "passing" => 4, "total" => 4}
       }
     })
 
@@ -68,7 +68,7 @@ defmodule DashboardTest do
       "git_sha" => "abc",
       "max_ratio" => 50.0,
       "summary" => %{"total" => 1, "passing" => 1, "all_passing" => true},
-      "cases" => [%{"id" => "adapter_parse", "median_ratio_dsex_over_dspy" => 0.5}]
+      "cases" => [%{"id" => "adapter_parse", "median_ratio_imp_over_dspy" => 0.5}]
     })
 
     write_json!(Path.join(optimizer_dir, "optimizer-lift-parity-20260707T000000Z.json"), %{
@@ -80,7 +80,7 @@ defmodule DashboardTest do
         "passing" => 10,
         "all_passing" => true,
         "direct_comparisons" => 7,
-        "dsex_only_or_deviation" => 3,
+        "imp_only_or_deviation" => 3,
         "full_optimizer_parity" => true
       },
       "rows" => [
@@ -93,7 +93,7 @@ defmodule DashboardTest do
         %{"optimizer" => "GEPA", "comparison_status" => "direct", "passing" => true},
         %{
           "optimizer" => "InstructionSearch",
-          "comparison_status" => "dsex_only",
+          "comparison_status" => "imp_only",
           "passing" => true
         },
         %{
@@ -113,7 +113,7 @@ defmodule DashboardTest do
 
     write_json!(Path.join(gepa_dir, "gepa-replication-20260707T000000Z.json"), %{
       "schema_version" => 1,
-      "runner" => "dsex-gepa-replication",
+      "runner" => "imp-gepa-replication",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "source" => %{"mode" => "input"},
@@ -134,7 +134,7 @@ defmodule DashboardTest do
         "passing" => 12,
         "all_passing" => true,
         "direct_comparisons" => 2,
-        "dsex_only_or_deviation" => 10,
+        "imp_only_or_deviation" => 10,
         "full_rag_tool_agent_parity" => true
       }
     })
@@ -158,7 +158,7 @@ defmodule DashboardTest do
       }
     })
 
-    write_json!(Path.join(results_dir, "dsex-dspy-parity-campaign-test-20260707T000000Z.json"), %{
+    write_json!(Path.join(results_dir, "imp-dspy-parity-campaign-test-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
@@ -176,7 +176,7 @@ defmodule DashboardTest do
         "models" => 1,
         "full_parity_models" => 0,
         "matrix_complete" => false,
-        "dsex_instrumentation" => %{
+        "imp_instrumentation" => %{
           "models_with_complete_instrumentation" => 1,
           "total_models" => 1,
           "complete" => true,
@@ -187,8 +187,8 @@ defmodule DashboardTest do
           "models_with_runtime_shape" => 1,
           "total_models" => 1,
           "complete" => false,
-          "mean_message_chars_ratio_dsex_over_dspy" => 1.05,
-          "mean_raw_chars_ratio_dsex_over_dspy" => 0.25,
+          "mean_message_chars_ratio_imp_over_dspy" => 1.05,
+          "mean_raw_chars_ratio_imp_over_dspy" => 0.25,
           "by_model" => %{
             "gpt-test-mini" => %{
               "complete" => false,
@@ -216,7 +216,7 @@ defmodule DashboardTest do
           "count" => 3,
           "pass_disagreements" => 2,
           "answer_disagreements" => 3,
-          "directions" => %{"dsex_only_pass" => 1, "dspy_only_pass" => 1, "both_fail" => 1}
+          "directions" => %{"imp_only_pass" => 1, "dspy_only_pass" => 1, "both_fail" => 1}
         },
         "prompt_contract" => %{
           "models_with_current_prompt_contract" => 0,
@@ -241,7 +241,7 @@ defmodule DashboardTest do
           "by_model" => %{
             "gpt-test-mini" => %{
               "latency_parity" => false,
-              "ratio_dsex_over_dspy" => 1.62,
+              "ratio_imp_over_dspy" => 1.62,
               "transport" => %{"req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}}
             }
           }
@@ -293,7 +293,7 @@ defmodule DashboardTest do
           "model" => "gpt-test-mini",
           "lane_tags" => ["current_low_cost"],
           "parity" => %{"latency_parity" => false},
-          "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
+          "latency" => %{"latency_ratio_imp_over_dspy" => 1.62},
           "execution" => %{
             "max_concurrency_consistent" => false,
             "max_concurrency" => nil,
@@ -311,7 +311,7 @@ defmodule DashboardTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--profile",
         "telos",
         "--trace-dir",
@@ -486,7 +486,7 @@ defmodule DashboardTest do
                "failures" => [
                  %{
                    "model" => "gpt-test-mini",
-                   "latency" => %{"latency_ratio_dsex_over_dspy" => 1.62},
+                   "latency" => %{"latency_ratio_imp_over_dspy" => 1.62},
                    "transport" => %{
                      "req_llm_pool" => %{"count" => 16, "protocols" => ["http1"]}
                    }
@@ -530,20 +530,20 @@ defmodule DashboardTest do
 
     assert live_gate_check["blocking_requirements"] == live_blockers
 
-    assert dashboard["lanes"]["live_matched_model"]["summary"]["dsex_instrumentation"][
+    assert dashboard["lanes"]["live_matched_model"]["summary"]["imp_instrumentation"][
              "dominant_latency_source"
            ] == "provider_model"
 
-    assert dashboard["lanes"]["live_matched_model"]["summary"]["dsex_instrumentation"][
+    assert dashboard["lanes"]["live_matched_model"]["summary"]["imp_instrumentation"][
              "mean_lm_duration_share"
            ] == 0.98
 
     assert dashboard["lanes"]["live_matched_model"]["summary"]["runtime_shape"][
-             "mean_message_chars_ratio_dsex_over_dspy"
+             "mean_message_chars_ratio_imp_over_dspy"
            ] == 1.05
 
     assert dashboard["lanes"]["live_matched_model"]["summary"]["runtime_shape"][
-             "mean_raw_chars_ratio_dsex_over_dspy"
+             "mean_raw_chars_ratio_imp_over_dspy"
            ] == 0.25
 
     assert dashboard["lanes"]["live_matched_model"]["summary"]["disagreements"][
@@ -551,7 +551,7 @@ defmodule DashboardTest do
            ] == 2
 
     assert dashboard["lanes"]["live_matched_model"]["summary"]["disagreements"]["directions"][
-             "dsex_only_pass"
+             "imp_only_pass"
            ] == 1
 
     refute dashboard["lanes"]["live_matched_model"]["summary"]["prompt_contract"]["complete"]
@@ -570,7 +570,7 @@ defmodule DashboardTest do
            ]
 
     assert dashboard["lanes"]["optimizer_lift"]["summary"][
-             "dsex_only_or_deviation_optimizers"
+             "imp_only_or_deviation_optimizers"
            ] == [
              "BootstrapFinetune",
              "GRPO",
@@ -587,7 +587,7 @@ defmodule DashboardTest do
     error =
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
-          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+          Mix.Tasks.Imp.Benchmark.Dashboard.run([
             "--profile",
             "telos",
             "--trace-dir",
@@ -653,9 +653,9 @@ defmodule DashboardTest do
     File.touch!(newest_path, {{2026, 1, 1}, {0, 0, 1}})
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--instruction-optimizer-dir",
         contract_dir,
         "--out",
@@ -815,9 +815,9 @@ defmodule DashboardTest do
       })
 
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.dashboard")
+        Mix.Task.reenable("imp.benchmark.dashboard")
 
-        Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        Mix.Tasks.Imp.Benchmark.Dashboard.run([
           "--profile",
           "telos",
           "--instruction-optimizer-dir",
@@ -873,7 +873,7 @@ defmodule DashboardTest do
 
     write_json!(Path.join(dirs.gepa_dir, "gepa-replication-forged.json"), %{
       "schema_version" => 1,
-      "runner" => "dsex-gepa-replication",
+      "runner" => "imp-gepa-replication",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "source" => %{"mode" => "input"},
@@ -891,9 +891,9 @@ defmodule DashboardTest do
     })
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--trace-dir",
         dirs.trace_dir,
         "--overhead-dir",
@@ -937,7 +937,7 @@ defmodule DashboardTest do
     error =
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
-          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+          Mix.Tasks.Imp.Benchmark.Dashboard.run([
             "--out",
             out_dir,
             "--claims-file",
@@ -959,7 +959,7 @@ defmodule DashboardTest do
 
     Enum.each([results_dir, out_dir], &File.mkdir_p!/1)
 
-    write_json!(Path.join(results_dir, "dsex-dspy-parity-campaign-test-20260707T000000Z.json"), %{
+    write_json!(Path.join(results_dir, "imp-dspy-parity-campaign-test-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
@@ -972,7 +972,7 @@ defmodule DashboardTest do
     error =
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
-          Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+          Mix.Tasks.Imp.Benchmark.Dashboard.run([
             "--profile",
             "telos",
             "--trace-dir",
@@ -1019,7 +1019,7 @@ defmodule DashboardTest do
     File.touch!(fresh_path, {{2026, 1, 1}, {0, 1, 0}})
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--live-matrix-dir",
         live_matrix_dir,
         "--results-dir",
@@ -1060,7 +1060,7 @@ defmodule DashboardTest do
         "models" => 4,
         "full_parity_models" => 0,
         "matrix_complete" => false,
-        "dsex_instrumentation" => %{"complete" => true},
+        "imp_instrumentation" => %{"complete" => true},
         "runtime_shape" => %{"complete" => true},
         "disagreements" => %{"count" => 0},
         "latency" => %{"complete" => true},
@@ -1114,7 +1114,7 @@ defmodule DashboardTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--live-matrix-dir",
         live_matrix_dir,
         "--out",
@@ -1140,9 +1140,9 @@ defmodule DashboardTest do
     File.mkdir_p!(out_dir)
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--profile",
         "v0.1",
         "--out",
@@ -1172,7 +1172,7 @@ defmodule DashboardTest do
     refute Enum.any?(dashboard["claims"]["claims"], &(&1["release"] == "telos"))
 
     assert_raise Mix.Error, ~r/unknown release profile/, fn ->
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run(["--profile", "unknown", "--out", out_dir])
+      Mix.Tasks.Imp.Benchmark.Dashboard.run(["--profile", "unknown", "--out", out_dir])
     end
   end
 
@@ -1190,7 +1190,7 @@ defmodule DashboardTest do
 
     write_json!(Path.join(legacy_dir, "failure-campaign-legacy.json"), %{
       "schema_version" => 2,
-      "runner" => "dsex-failure-campaign",
+      "runner" => "imp-failure-campaign",
       "summary" => %{"deterministic_complete" => true, "release_complete" => true}
     })
 
@@ -1250,13 +1250,13 @@ defmodule DashboardTest do
       "git_sha" => current_sha,
       "max_ratio" => 50.0,
       "summary" => %{"total" => 1, "passing" => 1, "all_passing" => true},
-      "cases" => [%{"id" => "adapter_parse", "median_ratio_dsex_over_dspy" => 0.5}]
+      "cases" => [%{"id" => "adapter_parse", "median_ratio_imp_over_dspy" => 0.5}]
     })
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--gate-dir",
         gate_dir,
         "--failure-campaign-dir",
@@ -1301,7 +1301,7 @@ defmodule DashboardTest do
     Enum.each([failure_dir, results_dir, out_dir], &File.mkdir_p!/1)
 
     invalid_path = Path.join(failure_dir, "failure-campaign-newest.json")
-    write_json!(invalid_path, %{"schema_version" => 3, "runner" => "dsex-failure-campaign"})
+    write_json!(invalid_path, %{"schema_version" => 3, "runner" => "imp-failure-campaign"})
     File.touch!(invalid_path, {{2099, 1, 1}, {0, 0, 0}})
 
     valid_path =
@@ -1311,9 +1311,9 @@ defmodule DashboardTest do
       )
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--failure-campaign-dir",
         failure_dir,
         "--results-dir",
@@ -1361,9 +1361,9 @@ defmodule DashboardTest do
     File.touch!(deterministic_path, {{2099, 1, 1}, {0, 0, 0}})
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--failure-campaign-dir",
         failure_dir,
         "--results-dir",
@@ -1394,9 +1394,9 @@ defmodule DashboardTest do
     File.mkdir_p!(results_dir)
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--failure-campaign-dir",
         failure_dir,
         "--results-dir",
@@ -1507,7 +1507,7 @@ defmodule DashboardTest do
 
     artifact = %{
       "schema_version" => 3,
-      "runner" => "dsex-failure-campaign",
+      "runner" => "imp-failure-campaign",
       "evidence_tier" => "t0_deterministic_failure_recovery",
       "configuration" => %{"iterations" => 10, "required_flake_iterations" => 10},
       "summary" => %{
@@ -1565,8 +1565,8 @@ defmodule DashboardTest do
     source_sha = Keyword.get(opts, :git_sha, "abc")
 
     context =
-      DSEx.BenchmarkTruth.RunContext.new!(
-        source_commits: %{"dsex" => "deepfates/dsex@#{source_sha}"},
+      Imp.BenchmarkTruth.RunContext.new!(
+        source_commits: %{"imp" => "deepfates/imp@#{source_sha}"},
         workspace_state: "synthetic",
         clock: clock
       )
@@ -1574,7 +1574,7 @@ defmodule DashboardTest do
     path = Path.join(dir, "failure-campaign-test.json")
 
     %{path: written_path} =
-      DSEx.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, context)
+      Imp.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, context)
 
     written_path
   end
@@ -1706,9 +1706,9 @@ defmodule DashboardTest do
 
   defp run_instruction_optimizer_dashboard!(contract_dir, out_dir) do
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--instruction-optimizer-dir",
         contract_dir,
         "--out",
@@ -1728,9 +1728,9 @@ defmodule DashboardTest do
 
   defp run_local_mlx_dashboard!(local_mlx_dir, out_dir) do
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.dashboard")
+      Mix.Task.reenable("imp.benchmark.dashboard")
 
-      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--local-mlx-dir",
         local_mlx_dir,
         "--out",
@@ -1755,12 +1755,12 @@ defmodule DashboardTest do
     clock = fn -> Keyword.get(opts, :generated_at, DateTime.utc_now()) end
 
     artifact =
-      DSEx.BenchmarkTruth.RunContext.new!(
-        source_commits: %{"dsex" => "deepfates/dsex@dashboard-test"},
+      Imp.BenchmarkTruth.RunContext.new!(
+        source_commits: %{"imp" => "deepfates/imp@dashboard-test"},
         workspace_state: "clean",
         clock: clock
       )
-      |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+      |> Imp.BenchmarkTruth.RunContext.finish(payload)
 
     artifact =
       if opts[:tampered], do: put_in(artifact, ["fused", "accuracy"], 1.0), else: artifact
@@ -1778,7 +1778,7 @@ defmodule DashboardTest do
   defp write_gate_evidence!(dir, gate, mix_task, opts \\ []) do
     write_json!(Path.join(dir, "gate-evidence-#{gate}-20260707T000000Z.json"), %{
       "schema_version" => 1,
-      "runner" => "dsex-gate-evidence",
+      "runner" => "imp-gate-evidence",
       "generated_at" => Keyword.get(opts, :generated_at, "2026-07-07T00:00:00Z"),
       "git_sha" => Keyword.get(opts, :git_sha, "abc"),
       "gate" => gate,
@@ -1800,8 +1800,8 @@ defmodule DashboardTest do
       "parity" => %{"latency_parity" => true},
       "proof" => %{
         "prompt_contract_current" => prompt_current?,
-        "prompt_contract" => %{"dsex_req_llm" => if(prompt_current?, do: "v7", else: "v6")},
-        "expected_prompt_contract" => %{"dsex_req_llm" => "v7"},
+        "prompt_contract" => %{"imp_req_llm" => if(prompt_current?, do: "v7", else: "v6")},
+        "expected_prompt_contract" => %{"imp_req_llm" => "v7"},
         "max_concurrency_consistent" => true
       }
     }
@@ -1816,7 +1816,7 @@ defmodule DashboardTest do
         "models" => 1,
         "full_parity_models" => 0,
         "matrix_complete" => false,
-        "dsex_instrumentation" => %{"complete" => true},
+        "imp_instrumentation" => %{"complete" => true},
         "runtime_shape" => %{"complete" => true},
         "disagreements" => %{"count" => 0},
         "prompt_contract" => %{"complete" => true},
@@ -1875,7 +1875,7 @@ defmodule DashboardTest do
           "optimizer_budgets" => %{
             "baseline" => 1,
             "dspy_gepa" => 150,
-            "dsex_gepa" => 150,
+            "imp_gepa" => 150,
             "mipro_v2" => 150
           },
           "dataset" => %{
@@ -1896,7 +1896,7 @@ defmodule DashboardTest do
           },
           "source_commits" => %{
             "dspy" => "stanfordnlp/dspy@abcdef1",
-            "dsex" => "deepfates/dsex@abcdef2",
+            "imp" => "deepfates/imp@abcdef2",
             "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
           },
           "token_cost" => %{
@@ -1918,9 +1918,9 @@ defmodule DashboardTest do
             }
           },
           "results" => %{
-            "baseline" => %{"score" => 0.5, "source" => "DSEx baseline runner artifact"},
+            "baseline" => %{"score" => 0.5, "source" => "Imp baseline runner artifact"},
             "dspy_gepa" => %{"score" => 0.6, "source" => "DSPy GEPA runner artifact"},
-            "dsex_gepa" => %{"score" => 0.61, "source" => "DSEx GEPA runner artifact"},
+            "imp_gepa" => %{"score" => 0.61, "source" => "Imp GEPA runner artifact"},
             "mipro_v2" => %{"score" => 0.55, "source" => "DSPy MIPROv2 runner artifact"},
             "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
           }
@@ -1943,9 +1943,9 @@ defmodule DashboardTest do
             "kind" => "papillon_quality_leakage",
             "model" => "openai/gpt-4.1-mini-2025-04-14",
             "quality_judge" =>
-              "DSEx ChainOfThought JudgeQuality source-faithful pairwise order check",
+              "Imp ChainOfThought JudgeQuality source-faithful pairwise order check",
             "leakage_judge" =>
-              "DSEx ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
+              "Imp ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
             "score_formula" => "(quality + (1 - leakage)) / 2.0"
           })
         else
@@ -1956,7 +1956,7 @@ defmodule DashboardTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)

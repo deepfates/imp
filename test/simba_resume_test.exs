@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.SIMBA.ResumeTest do
+defmodule Imp.Optimizer.SIMBA.ResumeTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimizer.{Report, SIMBA}
+  alias Imp.Optimizer.{Report, SIMBA}
 
   test "JSON checkpoint resume matches an uninterrupted run and rebinds runtime callbacks" do
     uninterrupted_state = start_supervised!({Agent, fn -> counters() end}, id: :simba_full)
@@ -47,7 +47,7 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
     checkpoint = paused.metadata.resume_state |> Jason.encode!() |> Jason.decode!()
     checkpoint_state = checkpoint["payload"]["state"]
 
-    assert checkpoint["type"] == "dsex_simba_run"
+    assert checkpoint["type"] == "imp_simba_run"
     assert checkpoint["schema_version"] == 1
     assert is_binary(checkpoint["payload_sha256"])
     assert checkpoint_state["population"]["policy"]
@@ -116,7 +116,7 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
       List.replace_at(
         trainset,
         0,
-        DSEx.example(question: "different", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "different", answer: "yes") |> Imp.with_inputs(:question)
       )
 
     assert_raise ArgumentError,
@@ -182,7 +182,7 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
 
   defp fixture(state) do
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
@@ -197,7 +197,7 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.update(state, &Map.update!(&1, :prompt_calls, fn count -> count + 1 end))
@@ -211,22 +211,22 @@ defmodule DSEx.Optimizer.SIMBA.ResumeTest do
     }
 
     initial_demo =
-      DSEx.example(question: "seed", answer: "yes") |> DSEx.with_inputs(:question)
+      Imp.example(question: "seed", answer: "yes") |> Imp.with_inputs(:question)
 
-    program = DSEx.predict("question -> answer", lm: task_lm, demos: [initial_demo])
+    program = Imp.predict("question -> answer", lm: task_lm, demos: [initial_demo])
 
     trainset =
       for index <- 1..4 do
-        DSEx.example(question: "train #{index}", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "train #{index}", answer: "yes") |> Imp.with_inputs(:question)
       end
 
     final_set =
       for index <- 1..2 do
-        DSEx.example(question: "final #{index}", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "final #{index}", answer: "yes") |> Imp.with_inputs(:question)
       end
 
     optimizer =
-      SIMBA.new(DSEx.Metrics.exact_match(:answer),
+      SIMBA.new(Imp.Metrics.exact_match(:answer),
         bsize: 2,
         num_candidates: 2,
         max_steps: 3,

@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.EvaluationCacheTest do
+defmodule Imp.Optimizer.GEPA.EvaluationCacheTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Engine, EvaluationCache, Result}
+  alias Imp.Optimizer.GEPA.{Adapter, Engine, EvaluationCache, Result}
 
   defmodule TrackingAdapter do
     defstruct [:owner]

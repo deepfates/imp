@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.EngineTest do
+defmodule Imp.Optimizer.GEPA.EngineTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Engine, EvaluationPolicy, Result, Stopper}
+  alias Imp.Optimizer.GEPA.{Adapter, Engine, EvaluationPolicy, Result, Stopper}
 
   defmodule FirstValidationOnly do
     @behaviour EvaluationPolicy

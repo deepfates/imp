@@ -1,77 +1,77 @@
-defmodule DSEx.SavingSecretSafetyTest do
+defmodule Imp.SavingSecretSafetyTest do
   use ExUnit.Case, async: true
 
   test "dump redacts secrets from portable program data at every nesting level" do
     secret = "sk-saving-secret-1234567890"
 
     demo =
-      DSEx.example(question: "saved example", answer: "saved answer", api_key: secret)
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "saved example", answer: "saved answer", api_key: secret)
+      |> Imp.with_inputs(:question)
 
     program =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         demos: [demo],
         config: [max_tokens: 256, provider_options: [authorization: "Bearer abcdefghijklmnop"]],
         metadata: %{deployment_secret: secret, token_count: 7}
       )
 
-    state = DSEx.dump(program)
+    state = Imp.dump(program)
     encoded = Jason.encode!(state)
 
     refute encoded =~ secret
     refute encoded =~ "Bearer abcdefghijklmnop"
 
-    loaded = DSEx.load(state)
+    loaded = Imp.load(state)
     assert loaded.metadata.deployment_secret == "[REDACTED]"
     assert loaded.metadata.token_count == 7
     assert loaded.config[:max_tokens] == 256
     assert {"authorization", "[REDACTED]"} in loaded.config[:provider_options]
-    assert DSEx.Example.get(hd(loaded.demos), :api_key) == "[REDACTED]"
+    assert Imp.Example.get(hd(loaded.demos), :api_key) == "[REDACTED]"
   end
 
   test "file artifacts redact secrets in nested tool data and preserve registry rebinding" do
     secret = "sk-tool-secret-1234567890"
     runner = fn %{query: query} -> query end
-    registry = DSEx.Saving.Registry.new(lookup: runner)
+    registry = Imp.Saving.Registry.new(lookup: runner)
 
     tool =
-      DSEx.tool(:lookup, "Use credential #{secret}", runner,
+      Imp.tool(:lookup, "Use credential #{secret}", runner,
         schema: %{query: :string, token: :string, note: "Bearer abcdefghijklmnop"}
       )
 
-    program = DSEx.react("question -> answer", [tool], max_iters: 0)
+    program = Imp.react("question -> answer", [tool], max_iters: 0)
 
     path =
-      Path.join(System.tmp_dir!(), "dsex-secret-safe-#{System.unique_integer([:positive])}.json")
+      Path.join(System.tmp_dir!(), "imp-secret-safe-#{System.unique_integer([:positive])}.json")
 
     on_exit(fn -> File.rm(path) end)
 
-    assert :ok = DSEx.save!(program, path, registry: registry)
+    assert :ok = Imp.save!(program, path, registry: registry)
     artifact = File.read!(path)
 
     refute artifact =~ secret
     refute artifact =~ "Bearer abcdefghijklmnop"
 
-    loaded = DSEx.load!(path, registry: registry)
+    loaded = Imp.load!(path, registry: registry)
     assert loaded.tools.lookup.description == "[REDACTED]"
     assert loaded.tools.lookup.schema.note == "[REDACTED]"
     assert loaded.tools.lookup.schema.token == :string
-    assert DSEx.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
+    assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
   end
 
   test "tool closures fail with an actionable registry requirement" do
-    tool = DSEx.tool(:lookup, "lookup", fn args -> args end)
-    program = DSEx.react("question -> answer", [tool])
+    tool = Imp.tool(:lookup, "lookup", fn args -> args end)
+    program = Imp.react("question -> answer", [tool])
 
     assert_raise ArgumentError,
                  ~r/ReAct tool lookup is not present in the supplied saving registry/,
-                 fn -> DSEx.dump(program) end
+                 fn -> Imp.dump(program) end
   end
 
   test "ReqLLM model identities remain exact while credentials stay redacted" do
     hash = String.duplicate("a", 64)
     other_hash = String.duplicate("b", 64)
-    model_path = "/private/tmp/dsex-mlx/#{hash}/fused"
+    model_path = "/private/tmp/imp-mlx/#{hash}/fused"
 
     model = %{
       provider: :openai,
@@ -82,10 +82,10 @@ defmodule DSEx.SavingSecretSafetyTest do
     }
 
     state =
-      DSEx.predict("question -> answer",
-        lm: DSEx.req_llm(model, api_key: "runtime-secret")
+      Imp.predict("question -> answer",
+        lm: Imp.req_llm(model, api_key: "runtime-secret")
       )
-      |> DSEx.dump()
+      |> Imp.dump()
 
     encoded = Jason.encode!(state)
 
@@ -98,11 +98,11 @@ defmodule DSEx.SavingSecretSafetyTest do
     refute encoded =~ "nested-secret"
     refute encoded =~ other_hash
 
-    distinct = put_in(model, [:id], "/private/tmp/dsex-mlx/#{other_hash}/fused")
+    distinct = put_in(model, [:id], "/private/tmp/imp-mlx/#{other_hash}/fused")
 
     distinct_state =
-      DSEx.predict("question -> answer", lm: DSEx.req_llm(distinct))
-      |> DSEx.dump()
+      Imp.predict("question -> answer", lm: Imp.req_llm(distinct))
+      |> Imp.dump()
 
     refute get_in(distinct_state, ["lm", :model, :id]) == get_in(state, ["lm", :model, :id])
   end

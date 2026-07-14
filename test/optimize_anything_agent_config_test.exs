@@ -1,7 +1,7 @@
 defmodule OptimizeAnythingAgentConfigTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.OptimizeAnything.AgentConfig
+  alias Imp.BenchmarkTruth.OptimizeAnything.AgentConfig
 
   test "exposes the complete deterministic benchmark contract" do
     assert AgentConfig.id() == "support-operations-agent-router-v1"

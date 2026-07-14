@@ -8,7 +8,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_actions)
@@ -20,9 +20,9 @@ defmodule RLMPublicSurfaceTest do
 
     Process.put(:rlm_actions, actions)
 
-    rlm = DSEx.Predict.RLM.new("x: int -> answer", lm: lm, max_iterations: 3)
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{x: 1})
-    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    rlm = Imp.Predict.RLM.new("x: int -> answer", lm: lm, max_iterations: 3)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{x: 1})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
 
     assert [%{action: :run, output: "2"}, %{action: :submit}] =
              prediction.metadata.rlm_trace
@@ -37,23 +37,23 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     controller = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:wrapped_rlm_actions)
           Process.put(:wrapped_rlm_actions, rest)
-          %{__dsex_lm_output__: action, __dsex_lm_metadata__: %{provider: "test"}}
+          %{__imp_lm_output__: action, __imp_lm_metadata__: %{provider: "test"}}
         end
       ]
     }
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{
-            "__dsex_lm_output__" => %{"answer" => "wrapped"},
-            "__dsex_lm_metadata__" => %{"provider" => "test"}
+            "__imp_lm_output__" => %{"answer" => "wrapped"},
+            "__imp_lm_metadata__" => %{"provider" => "test"}
           }
         end
       ]
@@ -61,26 +61,26 @@ defmodule RLMPublicSurfaceTest do
 
     Process.put(:wrapped_rlm_actions, actions)
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: controller, sub_lm: sub_lm)
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "wrapped"
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: controller, sub_lm: sub_lm)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "wrapped"
   after
     Process.delete(:wrapped_rlm_actions)
   end
 
   test "RLM rejects legacy discrete action responses" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{"action" => "submit", "answer" => "Paris"} end]
     }
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm)
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
     assert {:error,
             {:invalid_rlm_action,
              "legacy discrete action maps are unsupported; return a map with reasoning and code",
              %{"action" => "submit", "answer" => "Paris"}}} =
-             DSEx.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+             Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
   end
 
   test "RLM executes persistent Elixir code with programmatic sub-LM calls" do
@@ -100,7 +100,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     controller = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:symbolic_rlm_actions)
@@ -111,7 +111,7 @@ defmodule RLMPublicSurfaceTest do
     }
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn [%{content: prompt}], _opts -> String.upcase(prompt) end
       ]
@@ -120,15 +120,15 @@ defmodule RLMPublicSurfaceTest do
     Process.put(:symbolic_rlm_actions, actions)
 
     rlm =
-      DSEx.Predict.RLM.new("context -> answer",
+      Imp.Predict.RLM.new("context -> answer",
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 3,
         max_llm_calls: 2
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{context: "alpha|beta"})
-    assert DSEx.Prediction.get(prediction, :answer) == "ALPHA BETA"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{context: "alpha|beta"})
+    assert Imp.Prediction.get(prediction, :answer) == "ALPHA BETA"
     assert prediction.metadata.rlm.sub_lm_calls == 2
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run, :run, :submit]
 
@@ -144,7 +144,7 @@ defmodule RLMPublicSurfaceTest do
     parent = self()
 
     controller = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           turn = Process.get(:over_budget_turn, 0)
@@ -158,20 +158,20 @@ defmodule RLMPublicSurfaceTest do
     }
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> send(parent, :unexpected_subcall) end]
     }
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 2,
         max_llm_calls: 2
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "repaired"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "repaired"
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run_error, :submit]
     refute_received :unexpected_subcall
   after
@@ -189,7 +189,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:symbolic_recursive_actions)
@@ -202,14 +202,14 @@ submit(%{answer: child[:answer]})|
     Process.put(:symbolic_recursive_actions, actions)
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: lm,
         max_iterations: 2,
         max_recursion_depth: 1
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "parent"})
-    assert DSEx.Prediction.get(prediction, :answer) == "child answer"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "parent"})
+    assert Imp.Prediction.get(prediction, :answer) == "child answer"
     assert Process.get(:symbolic_recursive_actions) == []
     assert prediction.metadata.rlm.sub_lm_calls == 0
   after
@@ -225,14 +225,14 @@ submit(%{answer: child[:answer]})|
 
     Enum.each(actions, fn action ->
       lm = %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [handler: fn _messages, _opts -> action end]
       }
 
-      rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm)
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
       assert {:error, {:invalid_rlm_action, message, ^action}} =
-               DSEx.Predict.RLM.call(rlm, %{question: "q"})
+               Imp.Predict.RLM.call(rlm, %{question: "q"})
 
       assert message =~ "unsupported" or message =~ "submit/1"
     end)
@@ -243,7 +243,7 @@ submit(%{answer: child[:answer]})|
     context = String.duplicate("a", 40) <> hidden
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:rlm_controller_messages, messages)
@@ -252,12 +252,12 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    rlm = DSEx.Predict.RLM.new("context, question -> answer", lm: lm, max_preview_chars: 10)
+    rlm = Imp.Predict.RLM.new("context, question -> answer", lm: lm, max_preview_chars: 10)
 
     assert {:ok, prediction} =
-             DSEx.Predict.RLM.call(rlm, %{context: context, question: "what is inside?"})
+             Imp.Predict.RLM.call(rlm, %{context: context, question: "what is inside?"})
 
-    assert DSEx.Prediction.get(prediction, :answer) == "ok"
+    assert Imp.Prediction.get(prediction, :answer) == "ok"
 
     prompt = Process.get(:rlm_controller_messages) |> Enum.map_join("\n", & &1.content)
     refute prompt =~ hidden
@@ -271,7 +271,7 @@ submit(%{answer: child[:answer]})|
     parent = self()
 
     loop_then_extract_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -286,9 +286,9 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    rlm = DSEx.Predict.RLM.new("x: int -> answer", lm: loop_then_extract_lm, max_iterations: 1)
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{x: 1})
-    assert DSEx.Prediction.get(prediction, :answer) == "extracted"
+    rlm = Imp.Predict.RLM.new("x: int -> answer", lm: loop_then_extract_lm, max_iterations: 1)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{x: 1})
+    assert Imp.Prediction.get(prediction, :answer) == "extracted"
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run, :extract]
     assert_received {:rlm_prompt, controller_prompt}
     assert controller_prompt =~ ~s("remaining_iterations":1)
@@ -296,24 +296,24 @@ submit(%{answer: child[:answer]})|
     assert extract_prompt =~ ~s("exhausted_at_iteration":2)
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
     }
 
     query_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("q")|} end]
     }
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: query_lm,
         sub_lm: sub_lm,
         max_llm_calls: 0
       )
 
     assert {:error, {:rlm_max_llm_calls, 0, _trace}} =
-             DSEx.Predict.RLM.call(rlm, %{question: "q"})
+             Imp.Predict.RLM.call(rlm, %{question: "q"})
   after
     Process.delete(:rlm_prompt)
   end
@@ -322,7 +322,7 @@ submit(%{answer: child[:answer]})|
     parent = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(parent, {:rlm_messages, messages})
@@ -332,7 +332,7 @@ submit(%{answer: child[:answer]})|
     }
 
     exhausted =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: lm,
         max_iterations: 0,
         max_llm_calls: 0,
@@ -340,21 +340,21 @@ submit(%{answer: child[:answer]})|
       )
 
     assert {:error, {:rlm_max_iterations, 0, []}} =
-             DSEx.Predict.RLM.call(exhausted, %{question: "q"})
+             Imp.Predict.RLM.call(exhausted, %{question: "q"})
 
     refute_received {:rlm_messages, _messages}
 
     preview =
-      DSEx.Predict.RLM.new("context, values -> answer",
+      Imp.Predict.RLM.new("context, values -> answer",
         lm: lm,
         max_preview_chars: 0,
         max_observation_chars: 0
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.RLM.call(preview, %{context: "secret", values: [1, 2, 3]})
+             Imp.Predict.RLM.call(preview, %{context: "secret", values: [1, 2, 3]})
 
-    assert DSEx.Prediction.get(prediction, :answer) == "ok"
+    assert Imp.Prediction.get(prediction, :answer) == "ok"
     assert_received {:rlm_messages, messages}
     prompt = Enum.map_join(messages, "\n", & &1.content)
     assert prompt =~ ~s("preview":"")
@@ -364,50 +364,50 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM constructor and call boundaries report invalid inputs clearly" do
-    assert_raise ArgumentError, ~r/DSEx\.Predict\.RLM\.new\/2: expected keyword options/, fn ->
-      DSEx.Predict.RLM.new("question -> answer", %{lm: nil})
+    assert_raise ArgumentError, ~r/Imp\.Predict\.RLM\.new\/2: expected keyword options/, fn ->
+      Imp.Predict.RLM.new("question -> answer", %{lm: nil})
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
+                 ~r/Imp\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of Imp\.Tool structs/,
                  fn ->
-                   DSEx.Predict.RLM.new("question -> answer", tools: :not_tools)
+                   Imp.Predict.RLM.new("question -> answer", tools: :not_tools)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
+                 ~r/Imp\.Predict\.RLM\.new\/2: invalid value for :tools option: expected a list of Imp\.Tool structs/,
                  fn ->
-                   DSEx.Predict.RLM.new("question -> answer", tools: [:not_a_tool])
+                   Imp.Predict.RLM.new("question -> answer", tools: [:not_a_tool])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :max_iterations option: expected non negative integer/,
+                 ~r/Imp\.Predict\.RLM\.new\/2: invalid value for :max_iterations option: expected non negative integer/,
                  fn ->
-                   DSEx.Predict.RLM.new("question -> answer", max_iterations: -1)
+                   Imp.Predict.RLM.new("question -> answer", max_iterations: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :max_preview_chars option: expected non negative integer/,
+                 ~r/Imp\.Predict\.RLM\.new\/2: invalid value for :max_preview_chars option: expected non negative integer/,
                  fn ->
-                   DSEx.Predict.RLM.new("question -> answer", max_preview_chars: -1)
+                   Imp.Predict.RLM.new("question -> answer", max_preview_chars: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RLM\.new\/2: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 ~r/Imp\.Predict\.RLM\.new\/2: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
                  fn ->
-                   DSEx.Predict.RLM.new("question -> answer", tool_policy: %{only: :lookup})
+                   Imp.Predict.RLM.new("question -> answer", tool_policy: %{only: :lookup})
                  end
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: nil)
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: nil)
 
-    assert {:error, {:invalid_rlm_inputs, message}} = DSEx.Predict.RLM.call(rlm, :not_inputs)
+    assert {:error, {:invalid_rlm_inputs, message}} = Imp.Predict.RLM.call(rlm, :not_inputs)
     assert message =~ "expected a map or keyword/list of input pairs"
 
     assert {:error, {:invalid_rlm_inputs, "expected inputs as {key, value} pairs"}} =
-             DSEx.Predict.RLM.call(rlm, [:not_a_pair])
+             Imp.Predict.RLM.call(rlm, [:not_a_pair])
 
     assert {:error, {:missing_input_fields, [:question]}} =
-             DSEx.Predict.RLM.call(rlm, %{})
+             Imp.Predict.RLM.call(rlm, %{})
   end
 
   test "RLM supports persistent assignment and tool calls" do
@@ -418,7 +418,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:rlm_tool_prompt, Enum.map_join(messages, "\n", & &1.content))
@@ -429,14 +429,14 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 4)
+      Imp.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 4)
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert Process.get(:rlm_tool_prompt) =~ "lookup a key"
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run, :run, :submit]
   after
@@ -451,7 +451,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:mixed_rlm_actions)
@@ -462,10 +462,10 @@ submit(%{answer: child[:answer]})|
     }
 
     Process.put(:mixed_rlm_actions, actions)
-    rlm = DSEx.Predict.RLM.new("question -> answer: integer", lm: lm)
+    rlm = Imp.Predict.RLM.new("question -> answer: integer", lm: lm)
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == 42
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == 42
   after
     Process.delete(:mixed_rlm_actions)
   end
@@ -476,7 +476,7 @@ submit(%{answer: child[:answer]})|
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 
     serializable =
-      DSEx.rlm_serializable(
+      Imp.rlm_serializable(
         :context,
         fn ->
           Agent.update(counter, &(&1 + 1))
@@ -492,7 +492,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(parent, {:rlm_serializable_prompt, Enum.map_join(messages, "\n", & &1.content)})
@@ -506,14 +506,14 @@ submit(%{answer: child[:answer]})|
     Process.put(:rlm_actions, actions)
 
     rlm =
-      DSEx.Predict.RLM.new("context, question -> answer",
+      Imp.Predict.RLM.new("context, question -> answer",
         lm: lm,
         max_preview_chars: 6,
         max_observation_chars: 6
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{context: serializable, question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "loaded"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{context: serializable, question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "loaded"
     assert Agent.get(counter, & &1) == 1
 
     assert_received {:rlm_serializable_prompt, first_prompt}
@@ -531,16 +531,16 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM exposes optimizer-visible internal predictors" do
-    lm = %{module: DSEx.LM.Static, opts: []}
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: []}
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
     assert %{
-             action: %DSEx.Predict.Predict{},
-             extract: %DSEx.Predict.Predict{},
-             subquery: %DSEx.Predict.Predict{}
-           } = DSEx.ProgramAccess.internal_predictors(rlm)
+             action: %Imp.Predict.Predict{},
+             extract: %Imp.Predict.Predict{},
+             subquery: %Imp.Predict.Predict{}
+           } = Imp.ProgramAccess.internal_predictors(rlm)
 
-    assert DSEx.ProgramAccess.task_signature(rlm) == rlm.signature
+    assert Imp.ProgramAccess.task_signature(rlm) == rlm.signature
   end
 
   test "RLM feeds invalid submit errors back for another controller attempt" do
@@ -550,7 +550,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           Process.put(:rlm_submit_prompt, Enum.map_join(messages, "\n", & &1.content))
@@ -563,9 +563,9 @@ submit(%{answer: child[:answer]})|
 
     Process.put(:rlm_actions, actions)
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 3)
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "corrected"
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 3)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "corrected"
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:submit_error, :submit]
     assert Process.get(:rlm_submit_prompt) =~ "not_answer"
   after
@@ -577,7 +577,7 @@ submit(%{answer: child[:answer]})|
     parent = self()
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -597,7 +597,7 @@ submit(%{answer: child[:answer]})|
     {:ok, action_queue} = Agent.start_link(fn -> actions end)
 
     controller_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.get_and_update(action_queue, fn [action | rest] -> {action, rest} end)
@@ -606,15 +606,15 @@ submit(%{answer: child[:answer]})|
     }
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: controller_lm,
         sub_lm: sub_lm,
         max_iterations: 3,
         max_llm_calls: 2
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "parent"})
-    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "parent"})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
 
     assert [%{action: :run, output: output}, %{action: :submit}] =
              prediction.metadata.rlm_trace
@@ -631,7 +631,7 @@ submit(%{answer: child[:answer]})|
     {:ok, over_budget_queue} = Agent.start_link(fn -> actions end)
 
     over_budget_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.get_and_update(over_budget_queue, fn [action | rest] -> {action, rest} end)
@@ -640,15 +640,15 @@ submit(%{answer: child[:answer]})|
     }
 
     over_budget =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: over_budget_lm,
         sub_lm: sub_lm,
         max_iterations: 3,
         max_llm_calls: 1
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(over_budget, %{question: "parent"})
-    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(over_budget, %{question: "parent"})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
     assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run_error, :submit]
 
     Agent.stop(over_budget_queue)
@@ -661,7 +661,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_actions)
@@ -671,13 +671,13 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    lookup = DSEx.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 3)
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 3)
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
 
     assert %{action: :run, output: "\"Paris\""} = hd(prediction.metadata.rlm_trace)
   after
@@ -692,7 +692,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_recurse_actions)
@@ -704,9 +704,9 @@ submit(%{answer: child[:answer]})|
 
     Process.put(:rlm_recurse_actions, actions)
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 4)
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "parent"})
-    assert DSEx.Prediction.get(prediction, :answer) == "parent answer"
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 4)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "parent"})
+    assert Imp.Prediction.get(prediction, :answer) == "parent answer"
 
     assert [%{action: :run, output: "%{answer: \"child answer\"}"}, %{action: :submit}] =
              prediction.metadata.rlm_trace
@@ -718,20 +718,20 @@ submit(%{answer: child[:answer]})|
     cases = [
       {
         ~S|lookup(%{})|,
-        [DSEx.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
+        [Imp.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
         [],
         {:rlm_tool_error, {:tool_denied, :lookup}}
       },
       {~S|missing_tool(%{})|, [], :allow, {:function_not_allowed, :missing_tool}},
       {
         ~S|boom(%{})|,
-        [DSEx.Tool.new(:boom, "boom", fn _ -> raise "tool exploded" end)],
+        [Imp.Tool.new(:boom, "boom", fn _ -> raise "tool exploded" end)],
         :allow,
         {:rlm_tool_error, {:tool_error, :boom, "tool exploded"}}
       },
       {
         ~S|lookup(%{})|,
-        [DSEx.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
+        [Imp.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
         fn _name, _args -> raise "policy exploded" end,
         {:rlm_tool_error, {:tool_policy_error, :lookup, "policy exploded"}}
       }
@@ -741,7 +741,7 @@ submit(%{answer: child[:answer]})|
       {:ok, turns} = Agent.start_link(fn -> 0 end)
 
       lm = %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [
           handler: fn _messages, _opts ->
             Agent.get_and_update(turns, fn
@@ -753,15 +753,15 @@ submit(%{answer: child[:answer]})|
       }
 
       rlm =
-        DSEx.Predict.RLM.new("question -> answer",
+        Imp.Predict.RLM.new("question -> answer",
           lm: lm,
           tools: tools,
           tool_policy: tool_policy,
           max_iterations: 2
         )
 
-      assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
-      assert DSEx.Prediction.get(prediction, :answer) == "repaired"
+      assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+      assert Imp.Prediction.get(prediction, :answer) == "repaired"
 
       assert [
                %{action: :run_error, output: {:error, ^expected}},
@@ -775,7 +775,7 @@ submit(%{answer: child[:answer]})|
 
   test "RLM bounds large tool observations and traces without retaining payload content" do
     payload = String.duplicate("private-medical-record-", 20_000)
-    echo = DSEx.tool(:echo, "return a large trusted payload", fn _args -> payload end)
+    echo = Imp.tool(:echo, "return a large trusted payload", fn _args -> payload end)
 
     actions = [
       %{code: ~S|echo(%{})|},
@@ -783,7 +783,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:bounded_trace_actions)
@@ -796,13 +796,13 @@ submit(%{answer: child[:answer]})|
     Process.put(:bounded_trace_actions, actions)
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: lm,
         tools: [echo],
         max_observation_chars: 1_000
       )
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
     trace = prediction.metadata.rlm_trace
     assert :erlang.external_size(trace) < 10_000
     refute inspect(trace) =~ payload
@@ -815,7 +815,7 @@ submit(%{answer: child[:answer]})|
 
   test "RLM enforces wall-clock budget" do
     timeout_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Process.sleep(2)
@@ -824,20 +824,20 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    timeout = DSEx.Predict.RLM.new("question -> answer", lm: timeout_lm, max_time_ms: 0)
+    timeout = Imp.Predict.RLM.new("question -> answer", lm: timeout_lm, max_time_ms: 0)
 
     assert {:error, {:rlm_max_time_ms, 0, _trace}} =
-             DSEx.Predict.RLM.call(timeout, %{question: "q"})
+             Imp.Predict.RLM.call(timeout, %{question: "q"})
   end
 
   test "RLM deadline interrupts a blocked sub-LM effect" do
     controller = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("slow")|} end]
     }
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Process.sleep(250)
@@ -847,14 +847,14 @@ submit(%{answer: child[:answer]})|
     }
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
         max_time_ms: 100
       )
 
-    {elapsed_us, result} = :timer.tc(fn -> DSEx.Predict.RLM.call(rlm, %{question: "q"}) end)
+    {elapsed_us, result} = :timer.tc(fn -> Imp.Predict.RLM.call(rlm, %{question: "q"}) end)
 
     assert {:error, {:rlm_time_budget_exceeded, _trace}} = result
     assert elapsed_us < 500_000
@@ -867,12 +867,12 @@ submit(%{answer: child[:answer]})|
     code = "llm_query_batched(#{inspect(prompts)})"
 
     controller = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{code: code} end]
     }
 
     sub_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn [%{content: prompt}], _opts ->
           send(parent, {:batch_started, run_ref, prompt})
@@ -884,7 +884,7 @@ submit(%{answer: child[:answer]})|
     }
 
     rlm =
-      DSEx.Predict.RLM.new("question -> answer",
+      Imp.Predict.RLM.new("question -> answer",
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
@@ -892,7 +892,7 @@ submit(%{answer: child[:answer]})|
         max_time_ms: 150
       )
 
-    {elapsed_us, result} = :timer.tc(fn -> DSEx.Predict.RLM.call(rlm, %{question: "q"}) end)
+    {elapsed_us, result} = :timer.tc(fn -> Imp.Predict.RLM.call(rlm, %{question: "q"}) end)
 
     assert {:error, _reason} = result
     assert elapsed_us < 400_000

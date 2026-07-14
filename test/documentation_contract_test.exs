@@ -2,10 +2,10 @@ defmodule DocumentationContractTest do
   use ExUnit.Case, async: true
 
   @documented_module_allowlist MapSet.new([
-                                 "DSEx.Optimize",
-                                 "DSEx.Optimizer",
-                                 "DSEx.TaskSupervisor",
-                                 "DSEx.UnlinkedTaskSupervisor"
+                                 "Imp.Optimize",
+                                 "Imp.Optimizer",
+                                 "Imp.TaskSupervisor",
+                                 "Imp.UnlinkedTaskSupervisor"
                                ])
 
   test "coverage matrix describes current evidence instead of closed planning tickets" do
@@ -15,30 +15,30 @@ defmodule DocumentationContractTest do
     refute body =~ "integration gate should"
     refute body =~ "integration gate required"
     refute body =~ "integration gate needed"
-    refute body =~ "DSEx.Embeddings.Hash"
-    refute body =~ "DSEx.MCP.InProcess"
-    refute body =~ "DSEx.MCP.HTTP`"
-    refute body =~ "DSEx.MCP.Stdio`"
-    refute body =~ "DSEx.MCP.StreamableHTTP`"
+    refute body =~ "Imp.Embeddings.Hash"
+    refute body =~ "Imp.MCP.InProcess"
+    refute body =~ "Imp.MCP.HTTP`"
+    refute body =~ "Imp.MCP.Stdio`"
+    refute body =~ "Imp.MCP.StreamableHTTP`"
     refute body =~ "before closing"
     refute body =~ "waiting on live release evidence"
 
     assert body =~ "mix integration.check"
     assert body =~ "mix protocol.training.check"
     assert body =~ "mix protocol.check"
-    assert body =~ "DSEx.Embeddings.BagOfWords"
-    assert Code.ensure_loaded?(DSEx.Embeddings.BagOfWords)
-    assert body =~ "DSEx.MCP.Catalog"
-    assert body =~ "DSEx.MCP.HTTPClient"
-    assert body =~ "DSEx.MCP.StdioClient"
-    assert body =~ "DSEx.MCP.StreamableHTTPClient"
-    assert Code.ensure_loaded?(DSEx.MCP.Catalog)
-    assert Code.ensure_loaded?(DSEx.MCP.HTTPClient)
-    assert Code.ensure_loaded?(DSEx.MCP.StdioClient)
-    assert Code.ensure_loaded?(DSEx.MCP.StreamableHTTPClient)
+    assert body =~ "Imp.Embeddings.BagOfWords"
+    assert Code.ensure_loaded?(Imp.Embeddings.BagOfWords)
+    assert body =~ "Imp.MCP.Catalog"
+    assert body =~ "Imp.MCP.HTTPClient"
+    assert body =~ "Imp.MCP.StdioClient"
+    assert body =~ "Imp.MCP.StreamableHTTPClient"
+    assert Code.ensure_loaded?(Imp.MCP.Catalog)
+    assert Code.ensure_loaded?(Imp.MCP.HTTPClient)
+    assert Code.ensure_loaded?(Imp.MCP.StdioClient)
+    assert Code.ensure_loaded?(Imp.MCP.StreamableHTTPClient)
   end
 
-  test "documented DSEx module references resolve to loadable modules" do
+  test "documented Imp module references resolve to loadable modules" do
     missing =
       documented_module_references()
       |> Enum.reject(&MapSet.member?(@documented_module_allowlist, &1))
@@ -56,8 +56,8 @@ defmodule DocumentationContractTest do
       ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
       |> Enum.map_join("\n", &File.read!/1)
 
-    assert docs =~ "DSEx.HTTP"
-    refute docs =~ "DSEx.HTTP.Hackneyless"
+    assert docs =~ "Imp.HTTP"
+    refute docs =~ "Imp.HTTP.Hackneyless"
   end
 
   test "release criteria are expressed as current product evidence, not historical tickets" do
@@ -65,7 +65,7 @@ defmodule DocumentationContractTest do
 
     refute_closed_ticket_refs(body)
     refute body =~ "The production release scope is tracked under ticket"
-    refute body =~ "tk ready -T dsex"
+    refute body =~ "tk ready -T imp"
 
     assert body =~ ~r/Historical planning tickets are not release\s+criteria/
     assert body =~ "tk ready | rg '^de-'"
@@ -83,7 +83,7 @@ defmodule DocumentationContractTest do
     refute body =~ "regressions have tickets"
   end
 
-  test "adapter fidelity audit names upstream semantics and DSEx evidence" do
+  test "adapter fidelity audit names upstream semantics and Imp evidence" do
     body = File.read!("docs/ADAPTER_FIDELITY.md")
     readme = File.read!("docs/README.md")
 
@@ -91,8 +91,8 @@ defmodule DocumentationContractTest do
     refute readme =~ "ADAPTER_FIDELITY.md"
     assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
     assert body =~ "JSON fallback"
-    assert body =~ "DSEx.Adapter.JSON.lm_opts/2"
-    assert body =~ "DSEx.Clients.ReqLLM"
+    assert body =~ "Imp.Adapter.JSON.lm_opts/2"
+    assert body =~ "Imp.Clients.ReqLLM"
     assert body =~ "Intentional Deviations"
     assert body =~ "semantic: field names, delimiter structure, demo/history turn shape"
   end
@@ -117,10 +117,10 @@ defmodule DocumentationContractTest do
     docs = File.read!("docs/README.md")
 
     assert readme =~ "Program your LMs on the BEAM"
-    assert readme =~ "DSEx.LM.Static"
+    assert readme =~ "Imp.LM.Static"
     assert readme =~ "docs/LEARNING_PATH.md"
     assert readme =~ "test/learning_path_contract_test.exs"
-    assert learning =~ "DSEx.context/2"
+    assert learning =~ "Imp.context/2"
     assert learning =~ "OPENAI_MODEL"
     assert docs =~ "livebooks/01_real_lm_front_door.livemd"
     refute readme =~ "05_real_lm_wow_path"
@@ -130,7 +130,7 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/DSEX_PHILOSOPHY.md")
+    philosophy = File.read!("docs/IMP_PHILOSOPHY.md")
 
     assert readme =~ "canonical, self-contained route"
     assert docs =~ "## Manual Spine"
@@ -151,70 +151,70 @@ defmodule DocumentationContractTest do
     body = File.read!("docs/API_GUIDE.md")
 
     assert body =~ "## Tools And ReAct"
-    assert body =~ "DSEx.react"
-    assert body =~ "DSEx.Agent"
+    assert body =~ "Imp.react"
+    assert body =~ "Imp.Agent"
     assert body =~ "explicit Elixir agent runtime"
   end
 
   test "API guide teaches facade-first composition helpers" do
     body = File.read!("docs/API_GUIDE.md")
 
-    assert body =~ "DSEx.multi_chain_comparison/2"
-    assert body =~ "DSEx.best_of_n/3"
-    assert body =~ "DSEx.refine/3"
-    assert body =~ "DSEx.parallel/3"
-    assert body =~ "DSEx.knn/3"
-    assert body =~ "DSEx.nearest/2"
+    assert body =~ "Imp.multi_chain_comparison/2"
+    assert body =~ "Imp.best_of_n/3"
+    assert body =~ "Imp.refine/3"
+    assert body =~ "Imp.parallel/3"
+    assert body =~ "Imp.knn/3"
+    assert body =~ "Imp.nearest/2"
     assert body =~ "## Composition Helpers"
   end
 
   test "README common workflow snippets compose as one coherent path" do
     typed_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{sentiment: "positive", confidence: 0.9} end]
     }
 
     signature =
-      DSEx.signature(
+      Imp.signature(
         "text -> sentiment: enum[positive,negative], confidence: number",
         "Classify the sentiment of the text."
       )
 
-    typed_program = DSEx.predict(signature, lm: typed_lm, adapter: DSEx.Adapter.JSON)
+    typed_program = Imp.predict(signature, lm: typed_lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, typed_prediction} = DSEx.call(typed_program, %{text: "DSEx is useful."})
-    assert DSEx.get(typed_prediction, :sentiment) == "positive"
-    assert DSEx.get(typed_prediction, :confidence) == 0.9
+    assert {:ok, typed_prediction} = Imp.call(typed_program, %{text: "Imp is useful."})
+    assert Imp.get(typed_prediction, :sentiment) == "positive"
+    assert Imp.get(typed_prediction, :confidence) == 0.9
 
     qa_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
-    qa_program = DSEx.predict("question -> answer", lm: qa_lm)
+    qa_program = Imp.predict("question -> answer", lm: qa_lm)
 
     trainset = [
-      DSEx.example(question: "Eiffel Tower city?", answer: "Paris")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "Eiffel Tower city?", answer: "Paris")
+      |> Imp.with_inputs(:question)
     ]
 
     devset = [
-      DSEx.example(question: "Capital of France?", answer: "Paris")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.with_inputs(:question)
     ]
 
-    metric = DSEx.Metrics.exact_match(:answer)
+    metric = Imp.Metrics.exact_match(:answer)
 
-    assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(qa_program, devset, metric)
+    assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(qa_program, devset, metric)
 
-    optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1)
-    compiled = DSEx.optimize(qa_program, optimizer, trainset, devset)
+    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1)
+    compiled = Imp.optimize(qa_program, optimizer, trainset, devset)
 
-    assert %DSEx.Optimizer.Report{optimizer: :random_search} =
-             DSEx.Optimizer.Report.fetch(compiled)
+    assert %Imp.Optimizer.Report{optimizer: :random_search} =
+             Imp.Optimizer.Report.fetch(compiled)
 
     tool_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
@@ -223,25 +223,25 @@ defmodule DocumentationContractTest do
     }
 
     lookup =
-      DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
+      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
         "Paris"
       end)
 
     agent =
-      DSEx.react("question -> answer: short_span", [lookup],
+      Imp.react("question -> answer: short_span", [lookup],
         lm: tool_lm,
         tool_policy: [:lookup, :submit]
       )
 
-    assert {:ok, agent_prediction} = DSEx.call(agent, %{question: "Capital of France?"})
-    assert DSEx.get(agent_prediction, :answer) == "Paris"
+    assert {:ok, agent_prediction} = Imp.call(agent, %{question: "Capital of France?"})
+    assert Imp.get(agent_prediction, :answer) == "Paris"
   end
 
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
     advanced = File.read!("docs/ADVANCED.md")
 
-    assert api =~ "The normal provider path for inference is `DSEx.req_llm/2`"
+    assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
     assert api =~ "Explicit `lm:` values are checked when the program is built"
     assert api =~ "configured `%{module: module, opts:\nkeyword}` map"
@@ -250,8 +250,8 @@ defmodule DocumentationContractTest do
     refute api =~ "DatabricksTrainer"
 
     assert advanced =~ "## Protocol Clients"
-    assert advanced =~ "DSEx.Retrievers.HTTP.new"
-    assert advanced =~ "DSEx.Clients.OpenAITrainer.new"
+    assert advanced =~ "Imp.Retrievers.HTTP.new"
+    assert advanced =~ "Imp.Clients.OpenAITrainer.new"
     assert advanced =~ ~r/do not\s+train models in-process/
     assert advanced =~ "Network-facing protocol clients share the same transport boundary"
     assert advanced =~ "accepts an HTTP transport module or an arity-4 callback"
@@ -303,32 +303,32 @@ defmodule DocumentationContractTest do
   test "streaming response structs are deliberate public vocabulary" do
     assert match?(
              {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(DSEx.Streaming.Messages)
+             Code.fetch_docs(Imp.Streaming.Messages)
            )
 
     assert match?(
              {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(DSEx.Streaming.Messages.StreamResponse)
+             Code.fetch_docs(Imp.Streaming.Messages.StreamResponse)
            )
 
     assert match?(
              {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(DSEx.Streaming.Messages.StreamListener)
+             Code.fetch_docs(Imp.Streaming.Messages.StreamListener)
            )
   end
 
   test "core LM structs are deliberate public vocabulary" do
     for module <- [
-          DSEx.Core.Message,
-          DSEx.Core.System,
-          DSEx.Core.User,
-          DSEx.Core.Assistant,
-          DSEx.Core.Developer,
-          DSEx.Core.ToolCall,
-          DSEx.Core.ToolResult,
-          DSEx.Core.LMConfig,
-          DSEx.Core.LMRequest,
-          DSEx.Core.LMResponse
+          Imp.Core.Message,
+          Imp.Core.System,
+          Imp.Core.User,
+          Imp.Core.Assistant,
+          Imp.Core.Developer,
+          Imp.Core.ToolCall,
+          Imp.Core.ToolResult,
+          Imp.Core.LMConfig,
+          Imp.Core.LMRequest,
+          Imp.Core.LMResponse
         ] do
       assert match?({:docs_v1, _, _, _, %{"en" => _}, _, _}, Code.fetch_docs(module))
     end
@@ -337,11 +337,11 @@ defmodule DocumentationContractTest do
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
 
-    assert api =~ "Path.join(System.tmp_dir!(), \"dsex-program.json\")"
+    assert api =~ "Path.join(System.tmp_dir!(), \"imp-program.json\")"
     refute api =~ "tmp/program.json"
 
     assert api =~ "This is an external\nservice sketch"
-    assert api =~ "point DSEx at trusted services you own"
+    assert api =~ "point Imp at trusted services you own"
   end
 
   test "API guide ReAct example is executable with a deterministic tool-calling LM" do
@@ -354,7 +354,7 @@ defmodule DocumentationContractTest do
       end)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.get_and_update(actions, fn
@@ -366,7 +366,7 @@ defmodule DocumentationContractTest do
     }
 
     lookup =
-      DSEx.tool(
+      Imp.tool(
         :lookup,
         "lookup facts",
         fn %{query: "capital-france"} -> "Paris" end,
@@ -377,80 +377,80 @@ defmodule DocumentationContractTest do
         }
       )
 
-    program = DSEx.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+    program = Imp.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{question: "What is the capital of France?"})
+             Imp.call(program, %{question: "What is the capital of France?"})
 
-    assert DSEx.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :answer) == "Paris"
   end
 
   test "API guide basic Predict and ChainOfThought examples are executable" do
     predict_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
     program =
       "question -> answer: short_span"
-      |> DSEx.signature("Answer with the shortest correct span. Do not explain.")
-      |> DSEx.predict(lm: predict_lm)
+      |> Imp.signature("Answer with the shortest correct span. Do not explain.")
+      |> Imp.predict(lm: predict_lm)
 
-    assert {:ok, pred} = DSEx.call(program, %{question: "Capital of France?"})
-    assert DSEx.get(pred, :answer) == "Paris"
+    assert {:ok, pred} = Imp.call(program, %{question: "Capital of France?"})
+    assert Imp.get(pred, :answer) == "Paris"
 
     cot_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
     }
 
-    cot = DSEx.chain_of_thought("question -> answer", lm: cot_lm)
+    cot = Imp.chain_of_thought("question -> answer", lm: cot_lm)
 
-    assert {:ok, cot_pred} = DSEx.call(cot, %{question: "2+2?"})
-    assert DSEx.get(cot_pred, :reasoning) == "add two and two"
-    assert DSEx.get(cot_pred, :answer) == "4"
+    assert {:ok, cot_pred} = Imp.call(cot, %{question: "2+2?"})
+    assert Imp.get(cot_pred, :reasoning) == "add two and two"
+    assert Imp.get(cot_pred, :answer) == "4"
   end
 
   test "API guide evaluate and optimize examples are executable through the facade" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
+    program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
-      DSEx.example(question: "Capital of France?", answer: "Paris") |> DSEx.with_inputs(:question)
+      Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
     ]
 
     devset = [
-      DSEx.example(question: "Eiffel Tower city?", answer: "Paris") |> DSEx.with_inputs(:question)
+      Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
     ]
 
-    metric = DSEx.Metrics.exact_match(:answer)
+    metric = Imp.Metrics.exact_match(:answer)
 
-    assert %DSEx.Evaluate.Result{score: 1.0} = DSEx.evaluate(program, devset, metric)
+    assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(program, devset, metric)
 
-    optimizer = DSEx.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-    compiled = DSEx.optimize(program, optimizer, trainset, devset)
+    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+    compiled = Imp.optimize(program, optimizer, trainset, devset)
 
-    assert %DSEx.Optimizer.Report{optimizer: :random_search} =
-             DSEx.Optimizer.Report.fetch(compiled)
+    assert %Imp.Optimizer.Report{optimizer: :random_search} =
+             Imp.Optimizer.Report.fetch(compiled)
   end
 
   test "API guide Save And Load example uses a portable program" do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-doc-save-#{System.unique_integer([:positive])}.json"
+        "imp-doc-save-#{System.unique_integer([:positive])}.json"
       )
 
     on_exit(fn -> File.rm(path) end)
 
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
-    assert :ok = DSEx.Saving.save!(program, path)
-    assert %DSEx.Predict.Predict{} = DSEx.Saving.load!(path)
+    assert :ok = Imp.Saving.save!(program, path)
+    assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
   end
 
   test "API guide RAG example retrieves context, records metadata, and stays portable" do
@@ -460,7 +460,7 @@ defmodule DocumentationContractTest do
     ]
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -472,36 +472,36 @@ defmodule DocumentationContractTest do
       ]
     }
 
-    retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
+    retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
     program =
       "question, context -> answer"
-      |> DSEx.predict(lm: lm)
-      |> DSEx.rag(retriever, k: 1)
+      |> Imp.predict(lm: lm)
+      |> Imp.rag(retriever, k: 1)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "capital France"})
-    assert DSEx.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.call(program, %{question: "capital France"})
+    assert Imp.get(prediction, :answer) == "Paris"
     assert prediction.metadata.retrieval.count == 1
 
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-doc-rag-#{System.unique_integer([:positive])}.json"
+        "imp-doc-rag-#{System.unique_integer([:positive])}.json"
       )
 
     on_exit(fn -> File.rm(path) end)
 
-    assert :ok = DSEx.Saving.save!(program, path)
-    assert %DSEx.Predict.RAG{retriever: %DSEx.Retrieve.Memory{}} = DSEx.Saving.load!(path)
+    assert :ok = Imp.Saving.save!(program, path)
+    assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}} = Imp.Saving.load!(path)
   end
 
   test "API guide Optimize Anything example produces an improving result" do
     result =
-      DSEx.Optimize.Anything.run(
+      Imp.Optimize.Anything.run(
         "mode=slow",
         fn candidate -> if(candidate =~ "mode=fast", do: 1.0, else: 0.0) end,
         config:
-          DSEx.Optimize.Anything.Config.new(
+          Imp.Optimize.Anything.Config.new(
             engine: [max_candidate_proposals: 1, parallel: false],
             reflection: [
               custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
@@ -512,13 +512,13 @@ defmodule DocumentationContractTest do
       )
 
     assert hd(result.validation_scores) == 0.0
-    assert DSEx.Optimize.Anything.Result.best_candidate(result) == "mode=fast"
+    assert Imp.Optimize.Anything.Result.best_candidate(result) == "mode=fast"
     assert Enum.max(result.validation_scores) == 1.0
   end
 
-  test "API guide MCP import example returns ordinary DSEx tools" do
+  test "API guide MCP import example returns ordinary Imp tools" do
     catalog =
-      DSEx.MCP.Catalog.new([
+      Imp.MCP.Catalog.new([
         %{
           name: :lookup,
           description: "lookup",
@@ -527,24 +527,24 @@ defmodule DocumentationContractTest do
         }
       ])
 
-    [tool] = DSEx.MCP.import_tools(catalog)
+    [tool] = Imp.MCP.import_tools(catalog)
 
     assert tool.name == :lookup
-    assert {:ok, [^tool]} = DSEx.Tool.validate_tools([tool])
-    assert {:error, message} = DSEx.Tool.validate_tools([:not_a_tool])
-    assert message =~ "expected a list of DSEx.Tool structs"
-    assert DSEx.Tool.call(tool, %{key: "value"}) == %{key: "value"}
+    assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
+    assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
+    assert message =~ "expected a list of Imp.Tool structs"
+    assert Imp.Tool.call(tool, %{key: "value"}) == %{key: "value"}
   end
 
   test "API guide streaming example collects predictions and parses incremental fields" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
+    program = Imp.predict("question -> answer", lm: lm)
 
-    assert DSEx.Streaming.stream(program, %{question: "q"}) |> Enum.to_list() == [
+    assert Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list() == [
              "P",
              "a",
              "r",
@@ -552,7 +552,7 @@ defmodule DocumentationContractTest do
              "s"
            ]
 
-    assert DSEx.Streaming.incremental_fields(
+    assert Imp.Streaming.incremental_fields(
              ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
              "question -> answer, rationale"
            ) == [
@@ -577,7 +577,7 @@ defmodule DocumentationContractTest do
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()
-      |> then(&Regex.scan(~r/DSEx(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
+      |> then(&Regex.scan(~r/Imp(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
       |> List.flatten()
     end)
     |> Enum.uniq()

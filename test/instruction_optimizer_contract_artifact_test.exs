@@ -4,7 +4,7 @@ defmodule InstructionOptimizerContractArtifactTest do
   import ExUnit.CaptureIO
 
   @tag timeout: 120_000
-  test "pinned DSPy and DSEx pass structural MIPROv2 and SIMBA contracts without implying T3" do
+  test "pinned DSPy and Imp pass structural MIPROv2 and SIMBA contracts without implying T3" do
     unless File.exists?("tmp/dspy-parity-venv/bin/python") and
              File.dir?("tmp/dspy-current-target/dspy") do
       flunk("run the documented current-DSPy environment setup before this source-checkout gate")
@@ -13,8 +13,8 @@ defmodule InstructionOptimizerContractArtifactTest do
     out = tmp_dir("instruction-optimizer-contract")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.instruction_optimizer_contract")
-      Mix.Tasks.Dsex.Benchmark.InstructionOptimizerContract.run(["--out", out])
+      Mix.Task.reenable("imp.benchmark.instruction_optimizer_contract")
+      Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract.run(["--out", out])
     end)
 
     [path] = Path.wildcard(Path.join(out, "instruction-optimizer-contract-*.json"))
@@ -38,7 +38,7 @@ defmodule InstructionOptimizerContractArtifactTest do
   end
 
   test "contract auto modes use a closed mapping independent of VM atom state" do
-    contract = Mix.Tasks.Dsex.Benchmark.InstructionOptimizerContract
+    contract = Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract
 
     assert contract.auto_mode!("light") == :light
     assert contract.auto_mode!("medium") == :medium
@@ -50,7 +50,7 @@ defmodule InstructionOptimizerContractArtifactTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
     path
   end

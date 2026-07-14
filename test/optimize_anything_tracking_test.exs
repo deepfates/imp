@@ -1,9 +1,9 @@
-defmodule DSEx.Optimize.Anything.TrackingTest do
+defmodule Imp.Optimize.Anything.TrackingTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.Anything.Config
-  alias DSEx.Test.LocalHTTP
+  alias Imp.Optimize.Anything
+  alias Imp.Optimize.Anything.Config
+  alias Imp.Test.LocalHTTP
 
   test "runner records a complete MLflow lifecycle over HTTP" do
     tracking_uri = start_mlflow(self())
@@ -66,7 +66,7 @@ defmodule DSEx.Optimize.Anything.TrackingTest do
       tracking: [
         use_mlflow: true,
         mlflow_tracking_uri: tracking_uri,
-        mlflow_experiment_name: "dsex-test"
+        mlflow_experiment_name: "imp-test"
       ]
     )
   end

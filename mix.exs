@@ -1,17 +1,17 @@
-defmodule DSEx.MixProject do
+defmodule Imp.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :dsex,
+      app: :imp,
       version: "0.1.0",
       elixir: "~> 1.19",
-      name: "DSEx",
-      source_url: "https://github.com/deepfates/dsex",
+      name: "Imp",
+      source_url: "https://github.com/deepfates/imp",
       description: "Declarative self-improving language-model programs for Elixir.",
       package: package(),
       docs: [
-        main: "DSEx",
+        main: "Imp",
         extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
         filter_modules: &public_doc_module?/2
       ],
@@ -26,7 +26,7 @@ defmodule DSEx.MixProject do
   def application do
     [
       extra_applications: [:logger, :inets, :ssl],
-      mod: {DSEx.Application, []}
+      mod: {Imp.Application, []}
     ]
   end
 
@@ -71,7 +71,7 @@ defmodule DSEx.MixProject do
           "benchmark.dashboard.telos": :test,
           "benchmark.dashboard.telos.full": :test,
           "benchmark.live_matrix": :test,
-          "dsex.benchmark.hotpotqa_analysis": :test,
+          "imp.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
           "benchmark.optimizer_lift.check": :test,
           "benchmark.instruction_optimizer.contract.check": :test,
@@ -119,25 +119,25 @@ defmodule DSEx.MixProject do
       files: package_files(),
       licenses: ["MIT"],
       links: %{
-        "Source" => "https://github.com/deepfates/dsex"
+        "Source" => "https://github.com/deepfates/imp"
       }
     ]
   end
 
   defp package_files do
     excluded_lib =
-      Path.wildcard("lib/mix/tasks/dsex.benchmark*.ex") ++
-        Path.wildcard("lib/mix/tasks/dsex.identity*.ex") ++
-        Path.wildcard("lib/mix/tasks/dsex.gate_evidence.ex") ++
-        Path.wildcard("lib/mix/tasks/dsex.reproductions.ex") ++
-        Path.wildcard("lib/dsex/benchmark*.ex") ++
-        Path.wildcard("lib/dsex/benchmark_truth/**/*.ex") ++
-        Path.wildcard("lib/dsex/reproduction_registry.ex") ++
-        Path.wildcard("lib/dsex/identity_*.ex") ++
-        Path.wildcard("lib/dsex/identity_progress/**/*.ex") ++
+      Path.wildcard("lib/mix/tasks/imp.benchmark*.ex") ++
+        Path.wildcard("lib/mix/tasks/imp.identity*.ex") ++
+        Path.wildcard("lib/mix/tasks/imp.gate_evidence.ex") ++
+        Path.wildcard("lib/mix/tasks/imp.reproductions.ex") ++
+        Path.wildcard("lib/imp/benchmark*.ex") ++
+        Path.wildcard("lib/imp/benchmark_truth/**/*.ex") ++
+        Path.wildcard("lib/imp/reproduction_registry.ex") ++
+        Path.wildcard("lib/imp/identity_*.ex") ++
+        Path.wildcard("lib/imp/identity_progress/**/*.ex") ++
         [
-          "lib/dsex/optimizer/playbook/campaign.ex",
-          "lib/dsex/optimizer/playbook/equation_search.ex"
+          "lib/imp/optimizer/playbook/campaign.ex",
+          "lib/imp/optimizer/playbook/equation_search.ex"
         ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
@@ -190,9 +190,9 @@ defmodule DSEx.MixProject do
 
     not Enum.any?(
       [
-        "Elixir.DSEx.Benchmark",
-        "Elixir.DSEx.Benchmarks",
-        "Elixir.Mix.Tasks.Dsex.Benchmark"
+        "Elixir.Imp.Benchmark",
+        "Elixir.Imp.Benchmarks",
+        "Elixir.Mix.Tasks.Imp.Benchmark"
       ],
       &String.starts_with?(module_name, &1)
     )
@@ -245,7 +245,7 @@ defmodule DSEx.MixProject do
         "package.clean",
         "test test/package_contract_test.exs",
         "cmd mix hex.build --unpack --output tmp/package-check",
-        "dsex.package.clean_room --package tmp/package-check"
+        "imp.package.clean_room --package tmp/package-check"
       ],
       "package.clean": [&clean_package/1],
       "livebook.check": [
@@ -259,16 +259,16 @@ defmodule DSEx.MixProject do
         "cmd mix hex.audit"
       ],
       "gate.package.evidence": [
-        "dsex.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"
+        "imp.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"
       ],
       "gate.livebook.evidence": [
-        "dsex.gate_evidence --gate livebook_execute --mix-task livebook.execute.check --out tmp/gate-evidence"
+        "imp.gate_evidence --gate livebook_execute --mix-task livebook.execute.check --out tmp/gate-evidence"
       ],
       "gate.protocol.evidence": [
-        "dsex.gate_evidence --gate protocol_gates --mix-task protocol.check --out tmp/gate-evidence"
+        "imp.gate_evidence --gate protocol_gates --mix-task protocol.check --out tmp/gate-evidence"
       ],
       "gate.live_provider.evidence": [
-        "dsex.gate_evidence --gate live_provider_smoke --mix-task live.check --env-file .env --env LIVE_PROVIDER=1 --out tmp/gate-evidence"
+        "imp.gate_evidence --gate live_provider_smoke --mix-task live.check --env-file .env --env LIVE_PROVIDER=1 --out tmp/gate-evidence"
       ]
     ]
 
@@ -301,100 +301,100 @@ defmodule DSEx.MixProject do
         "upstream_fidelity.check"
       ],
       "upstream_fidelity.check": [
-        "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
+        "imp.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
       ],
       "reproduction.check": [
-        "dsex.reproductions --check"
+        "imp.reproductions --check"
       ],
       "research.portfolio.check": [
-        "dsex.research_portfolio --check"
+        "imp.research_portfolio --check"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
-        "dsex.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease,ifbench_instruction_following,hard_math --full --out tmp/benchmark-truth-local",
-        "dsex.benchmark.run --colors tmp/benchmark-truth-local/colors-test-0-6.jsonl --iris tmp/benchmark-truth-local/iris-test-0-6.jsonl --iris-typo tmp/benchmark-truth-local/iris_typo-test-0-3.jsonl --heart-disease tmp/benchmark-truth-local/heart_disease-test-0-4.jsonl --ifbench-instruction-following tmp/benchmark-truth-local/ifbench_instruction_following-test-0-3.jsonl --hard-math tmp/benchmark-truth-local/hard_math-test-0-3.jsonl --max-examples 6 --out tmp/benchmark-truth-local-results",
-        "dsex.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
+        "imp.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease,ifbench_instruction_following,hard_math --full --out tmp/benchmark-truth-local",
+        "imp.benchmark.run --colors tmp/benchmark-truth-local/colors-test-0-6.jsonl --iris tmp/benchmark-truth-local/iris-test-0-6.jsonl --iris-typo tmp/benchmark-truth-local/iris_typo-test-0-3.jsonl --heart-disease tmp/benchmark-truth-local/heart_disease-test-0-4.jsonl --ifbench-instruction-following tmp/benchmark-truth-local/ifbench_instruction_following-test-0-3.jsonl --hard-math tmp/benchmark-truth-local/hard_math-test-0-3.jsonl --max-examples 6 --out tmp/benchmark-truth-local-results",
+        "imp.benchmark.integrity --gsm8k test/fixtures/benchmarks/gsm8k-small.jsonl --hotpotqa test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/benchmark-integrity --require-clean"
       ],
       "benchmark.catalog": [
-        "dsex.benchmark.catalog --format json --out tmp/benchmark-catalog.json"
+        "imp.benchmark.catalog --format json --out tmp/benchmark-catalog.json"
       ],
       "benchmark.trace.check": [
-        "dsex.benchmark.trace --out tmp/golden-trace"
+        "imp.benchmark.trace --out tmp/golden-trace"
       ],
       "benchmark.operations_stress.check": [
-        "dsex.benchmark.operations_stress --out tmp/operations-stress"
+        "imp.benchmark.operations_stress --out tmp/operations-stress"
       ],
       "benchmark.failure_campaign.check": [
-        "dsex.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
+        "imp.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
       ],
       "benchmark.overhead.check": [
-        "dsex.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+        "imp.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
       ],
       "benchmark.search.check": [
-        "dsex.benchmark.search --iterations 10 --max-concurrency 2 --work-ms 10 --out tmp/search-benchmark"
+        "imp.benchmark.search --iterations 10 --max-concurrency 2 --work-ms 10 --out tmp/search-benchmark"
       ],
       "benchmark.optimizer_lift.check": [
-        "dsex.benchmark.optimizer_lift --out tmp/optimizer-lift"
+        "imp.benchmark.optimizer_lift --out tmp/optimizer-lift"
       ],
       "benchmark.instruction_optimizer.contract.check": [
-        "dsex.benchmark.instruction_optimizer_contract --out tmp/instruction-optimizer-contract"
+        "imp.benchmark.instruction_optimizer_contract --out tmp/instruction-optimizer-contract"
       ],
       "benchmark.gepa.contract.check": [
-        "dsex.benchmark.gepa_contract --out tmp/gepa-v011-contract"
+        "imp.benchmark.gepa_contract --out tmp/gepa-v011-contract"
       ],
       "benchmark.gepa_replication.check": [
-        "dsex.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
+        "imp.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
       ],
       "benchmark.fast_slow.check": [
-        "dsex.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
+        "imp.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
       ],
       "benchmark.optimize_anything.check": [
-        "dsex.benchmark.optimize_anything --smoke --out tmp/optimize-anything"
+        "imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything"
       ],
       "benchmark.rag_tool_agent.check": [
-        "dsex.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
+        "imp.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
       ],
       "benchmark.rlm.check": [
-        "dsex.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"
+        "imp.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"
       ],
       "benchmark.rlm.contract.check": [
-        "dsex.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
+        "imp.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
       ],
       "benchmark.live_matrix": [
-        "dsex.benchmark.live_matrix --in benchmarks/results/dsex-dspy-parity-campaign-*.json --out tmp/live-matrix"
+        "imp.benchmark.live_matrix --in benchmarks/results/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
       ],
       "benchmark.hotpotqa_analysis": [
-        "dsex.benchmark.hotpotqa_analysis"
+        "imp.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "dsex.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.full": [
-        "dsex.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.dashboard.telos": [
-        "dsex.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.telos.full": [
-        "dsex.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [
-        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
-        "dsex.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
+        "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+        "imp.benchmark.run --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2 --live"
       ],
       "benchmark.parity.check": [
-        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
-        "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2"
+        "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
+        "imp.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-2.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-2.jsonl --max-examples 2"
       ],
       "benchmark.parity.full": [
-        "dsex.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data",
-        "dsex.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
+        "imp.benchmark.fetch --tasks gsm8k,hotpotqa --full --out benchmarks/data",
+        "imp.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
       ]
     ]
   end
 
   defp benchmark_tasks_available? do
-    File.exists?("lib/mix/tasks/dsex.benchmark.run.ex")
+    File.exists?("lib/mix/tasks/imp.benchmark.run.ex")
   end
 
   defp source_checkout_gates_available? do

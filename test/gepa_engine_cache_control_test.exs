@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.EngineCacheControlTest do
+defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Callback, Engine, Result}
+  alias Imp.Optimizer.GEPA.{Adapter, Callback, Engine, Result}
 
   defmodule TrackingAdapter do
     @behaviour Adapter

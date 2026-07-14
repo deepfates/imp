@@ -1,8 +1,8 @@
-defmodule DSEx.BenchmarkTruth.ParitySidecarTest do
+defmodule Imp.BenchmarkTruth.ParitySidecarTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.ParitySidecar
-  alias DSEx.BenchmarkTruth.ParitySidecar.Output
+  alias Imp.BenchmarkTruth.ParitySidecar
+  alias Imp.BenchmarkTruth.ParitySidecar.Output
 
   @python System.find_executable("python3")
   @kill System.find_executable("kill") || "/bin/kill"
@@ -23,7 +23,7 @@ defmodule DSEx.BenchmarkTruth.ParitySidecarTest do
     assert output.total_bytes == output.captured_bytes
 
     assert {:ok, "tmp/report.json"} =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_dspy_report_path(output.text)
+             Mix.Tasks.Imp.Benchmark.Parity.parse_dspy_report_path(output.text)
 
     [identity, _sentinel] = String.split(output.text, "\n", trim: true)
     [pid, group, session] = String.split(identity, ":")
@@ -145,7 +145,7 @@ defmodule DSEx.BenchmarkTruth.ParitySidecarTest do
     assert byte_size(output.text) <= limit
 
     assert {:ok, "tmp/flood-report.json"} =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_dspy_report_path(output.text)
+             Mix.Tasks.Imp.Benchmark.Parity.parse_dspy_report_path(output.text)
 
     diagnostic = ParitySidecar.diagnostic(output)
     assert diagnostic =~ "sidecar output truncated"
@@ -263,12 +263,12 @@ defmodule DSEx.BenchmarkTruth.ParitySidecarTest do
   end
 
   defp parity_sidecar_owners do
-    Task.Supervisor.children(DSEx.UnlinkedTaskSupervisor)
+    Task.Supervisor.children(Imp.UnlinkedTaskSupervisor)
   end
 
   defp tmp_path(name) do
     path =
-      Path.join(System.tmp_dir!(), "dsex-sidecar-#{name}-#{System.unique_integer([:positive])}")
+      Path.join(System.tmp_dir!(), "imp-sidecar-#{name}-#{System.unique_integer([:positive])}")
 
     on_exit(fn -> File.rm(path) end)
     path

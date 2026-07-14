@@ -1,15 +1,15 @@
 defmodule MultimodalAdapterTest do
   use ExUnit.Case
 
-  alias DSEx.Adapters.Types
+  alias Imp.Adapters.Types
 
   @fixtures Path.join(__DIR__, "fixtures/multimodal")
 
   test "chat adapter preserves typed image inputs as ordered message content" do
-    signature = DSEx.signature("question, image -> answer")
+    signature = Imp.signature("question, image -> answer")
 
     [%{role: :system}, %{role: :user, content: content}] =
-      DSEx.Adapter.Chat.format(
+      Imp.Adapter.Chat.format(
         signature,
         %{
           question: "What landmark is shown?",
@@ -29,10 +29,10 @@ defmodule MultimodalAdapterTest do
   end
 
   test "chat adapter preserves typed images in signature-shaped history" do
-    signature = DSEx.signature("question, image, history -> answer")
+    signature = Imp.signature("question, image, history -> answer")
 
     history =
-      DSEx.history([
+      Imp.history([
         %{
           question: "What was shown before?",
           image: %Types.Image{url: "https://example.com/previous.jpg"},
@@ -41,7 +41,7 @@ defmodule MultimodalAdapterTest do
       ])
 
     messages =
-      DSEx.Adapter.Chat.format(
+      Imp.Adapter.Chat.format(
         signature,
         %{question: "And now?", history: history},
         []
@@ -59,21 +59,21 @@ defmodule MultimodalAdapterTest do
     test_pid = self()
 
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         send(test_pid, {:provider_request, request})
         {200, provider_response}
       end)
 
     lm =
-      DSEx.req_llm("openai:gpt-4-turbo",
+      Imp.req_llm("openai:gpt-4-turbo",
         api_key: "sk-test",
         base_url: base_url <> "/v1"
       )
 
-    program = DSEx.predict("question, image -> answer", lm: lm)
+    program = Imp.predict("question, image -> answer", lm: lm)
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                question: "What landmark is shown?",
                image: %Types.Image{
                  url: "https://example.com/eiffel-tower.jpg",
@@ -81,7 +81,7 @@ defmodule MultimodalAdapterTest do
                }
              })
 
-    assert DSEx.get(prediction, :answer) == "Eiffel Tower"
+    assert Imp.get(prediction, :answer) == "Eiffel Tower"
     assert_received {:provider_request, %{body: body, path: "/v1/chat/completions"}}
 
     request_body = Jason.decode!(body)
@@ -119,7 +119,7 @@ defmodule MultimodalAdapterTest do
   end
 
   test "encodes local file path attachments to OpenAI-compatible file data" do
-    path = Path.join(System.tmp_dir!(), "dsex-types-#{System.unique_integer([:positive])}.txt")
+    path = Path.join(System.tmp_dir!(), "imp-types-#{System.unique_integer([:positive])}.txt")
     File.write!(path, "hello file")
 
     on_exit(fn -> File.rm(path) end)
@@ -151,15 +151,15 @@ defmodule MultimodalAdapterTest do
 
   test "reports malformed typed content at the adapter boundary" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Adapters\.Types\.File expects binary :url, binary :path, or binary :data/,
+                 ~r/Imp\.Adapters\.Types\.File expects binary :url, binary :path, or binary :data/,
                  fn -> Types.to_openai(%Types.File{}) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Adapters\.Types\.Image expects binary :url or binary :data/,
+                 ~r/Imp\.Adapters\.Types\.Image expects binary :url or binary :data/,
                  fn -> Types.to_openai(%Types.Image{url: 123}) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Adapters\.Types\.Document expects binary :text and map :metadata/,
+                 ~r/Imp\.Adapters\.Types\.Document expects binary :text and map :metadata/,
                  fn -> Types.to_openai(%Types.Document{text: nil}) end
 
     assert_raise ArgumentError,
@@ -193,7 +193,7 @@ defmodule MultimodalAdapterTest do
                  end
   end
 
-  test "keeps plain fallback values textual without hiding malformed DSEx structs" do
+  test "keeps plain fallback values textual without hiding malformed Imp structs" do
     assert Types.to_openai(%{arbitrary: :value}) == %{type: "text", text: "%{arbitrary: :value}"}
     assert Types.content_to_openai("hello") == [%{type: "text", text: "hello"}]
 

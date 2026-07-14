@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityReviewPoolsTest do
+defmodule Imp.IdentityReviewPoolsTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityReviewPools
+  alias Imp.IdentityReviewPools
 
   test "projection order is deterministic across unordered inputs" do
     decision_views = decision_views()

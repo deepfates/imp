@@ -1,10 +1,10 @@
-defmodule DSEx.Tracking.MLflowTest do
+defmodule Imp.Tracking.MLflowTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Tracking.MLflow
+  alias Imp.Tracking.MLflow
 
   defmodule RecordingTransport do
-    @behaviour DSEx.Tracking.Transport
+    @behaviour Imp.Tracking.Transport
 
     @impl true
     def request(method, url, headers, body, opts) do
@@ -161,8 +161,8 @@ defmodule DSEx.Tracking.MLflowTest do
       "metrics" => [],
       "params" => [],
       "tags" => [
-        %{"key" => "dsex.summary.best", "value" => "0.9"},
-        %{"key" => "dsex.summary.winner", "value" => "candidate-2"}
+        %{"key" => "imp.summary.best", "value" => "0.9"},
+        %{"key" => "imp.summary.winner", "value" => "candidate-2"}
       ]
     })
   end

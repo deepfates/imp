@@ -1,9 +1,9 @@
-defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
+defmodule Imp.BenchmarkTruth.IFBenchFeedbackTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{IFBenchFeedback, IFBenchTwoStage}
-  alias DSEx.Optimizer.GEPA.{Candidate, ComponentFeedback, Evaluation, ProgramAdapter}
-  alias DSEx.ProgramParameters
+  alias Imp.BenchmarkTruth.{IFBenchFeedback, IFBenchTwoStage}
+  alias Imp.Optimizer.GEPA.{Candidate, ComponentFeedback, Evaluation, ProgramAdapter}
+  alias Imp.ProgramParameters
 
   test "callback keys exactly match the two-stage program predictors" do
     callbacks = IFBenchFeedback.callbacks(&feedback_metric/2)
@@ -23,7 +23,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
     owner = self()
 
     metric = fn example, prediction ->
-      response = DSEx.Prediction.fetch!(prediction, :response)
+      response = Imp.Prediction.fetch!(prediction, :response)
       send(owner, {:evaluated, example, response})
       %{score: if(response == "FINAL", do: 1.0, else: 0.0), feedback: "checked:#{response}"}
     end
@@ -54,14 +54,14 @@ defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
 
   test "stage feedback evaluation does not replace the final program score" do
     metric = fn _example, prediction ->
-      case DSEx.Prediction.fetch!(prediction, :response) do
+      case Imp.Prediction.fetch!(prediction, :response) do
         "DRAFT" -> %{score: 0.0, feedback: "draft feedback"}
         "FINAL" -> %{score: 1.0, feedback: "final feedback"}
       end
     end
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -73,7 +73,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
       ]
     }
 
-    program = IFBenchTwoStage.new(lm, adapter: DSEx.Adapter.Chat)
+    program = IFBenchTwoStage.new(lm, adapter: Imp.Adapter.Chat)
 
     adapter =
       ProgramAdapter.new(program, metric, component_feedback: IFBenchFeedback.callbacks(metric))
@@ -93,7 +93,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
 
     metric = fn _example, prediction, trace ->
       send(owner, {:metric_trace, trace})
-      %{score: 1.0, feedback: "trace:#{DSEx.Prediction.fetch!(prediction, :response)}"}
+      %{score: 1.0, feedback: "trace:#{Imp.Prediction.fetch!(prediction, :response)}"}
     end
 
     callback = IFBenchFeedback.callbacks(metric).generate_response_module
@@ -110,26 +110,26 @@ defmodule DSEx.BenchmarkTruth.IFBenchFeedbackTest do
   end
 
   defp feedback_metric(_example, prediction) do
-    response = DSEx.Prediction.fetch!(prediction, :response)
+    response = Imp.Prediction.fetch!(prediction, :response)
     %{score: 1.0, feedback: "checked:#{response}"}
   end
 
   defp ifbench_example do
-    DSEx.example(
+    Imp.example(
       prompt: "Write alpha and no commas.",
       instruction_id_list: ["keywords:existence", "punctuation:no_comma"],
       kwargs: [%{"keywords" => ["alpha"]}, %{}]
     )
-    |> DSEx.with_inputs(:prompt)
+    |> Imp.with_inputs(:prompt)
   end
 
   defp context(component, example, predictor_output) do
     %ComponentFeedback{
       component: component,
-      predictor_inputs: %{query: DSEx.Example.fetch!(example, :prompt)},
+      predictor_inputs: %{query: Imp.Example.fetch!(example, :prompt)},
       predictor_output: predictor_output,
       example: example,
-      program_output: DSEx.prediction(response: "FINAL PROGRAM OUTPUT"),
+      program_output: Imp.prediction(response: "FINAL PROGRAM OUTPUT"),
       trace: [%{predictor: component}],
       score: 0.5,
       metric_feedback: "final program feedback",

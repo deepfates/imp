@@ -1,3 +1,3 @@
-Mox.defmock(DSEx.Test.LMMock, for: DSEx.LM)
-Mox.defmock(DSEx.Test.RetrieverMock, for: DSEx.Retrieve)
-Mox.defmock(DSEx.Test.TrainerMock, for: DSEx.Clients.Trainer)
+Mox.defmock(Imp.Test.LMMock, for: Imp.LM)
+Mox.defmock(Imp.Test.RetrieverMock, for: Imp.Retrieve)
+Mox.defmock(Imp.Test.TrainerMock, for: Imp.Clients.Trainer)

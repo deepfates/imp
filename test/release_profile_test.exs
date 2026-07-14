@@ -1,7 +1,7 @@
-defmodule DSEx.ReleaseProfileTest do
+defmodule Imp.ReleaseProfileTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.ReleaseProfile
+  alias Imp.BenchmarkTruth.ReleaseProfile
 
   test "canonical profiles are cumulative and v0.1 is the product default" do
     assert ReleaseProfile.default() == "v0.1"

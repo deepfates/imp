@@ -1,4 +1,4 @@
-defmodule DSEx.Test.LocalHTTP do
+defmodule Imp.Test.LocalHTTP do
   @moduledoc false
 
   import Plug.Conn

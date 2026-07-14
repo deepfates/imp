@@ -1,10 +1,10 @@
 defmodule BetterTogetherTest do
   use ExUnit.Case
 
-  alias DSEx.Optimizer.BetterTogether
+  alias Imp.Optimizer.BetterTogether
 
   defmodule SetInstruction do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct [:instruction]
 
     @impl true
@@ -17,11 +17,11 @@ defmodule BetterTogetherTest do
 
     @impl true
     def run(%__MODULE__{instruction: instruction}, program, _opts),
-      do: {:ok, DSEx.Optimizer.InstructionSearch.put_instruction(program, instruction)}
+      do: {:ok, Imp.Optimizer.InstructionSearch.put_instruction(program, instruction)}
   end
 
   defmodule PromptSequence do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -34,19 +34,19 @@ defmodule BetterTogetherTest do
 
     @impl true
     def run(%__MODULE__{}, program, _opts) do
-      instruction = DSEx.Optimizer.InstructionSearch.current_instruction(program)
+      instruction = Imp.Optimizer.InstructionSearch.current_instruction(program)
 
       next =
         if instruction == "Answer neither question.",
           do: "Answer every question.",
           else: "Answer only the France question."
 
-      {:ok, DSEx.Optimizer.InstructionSearch.put_instruction(program, next)}
+      {:ok, Imp.Optimizer.InstructionSearch.put_instruction(program, next)}
     end
   end
 
   defmodule FailingOptimizer do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct []
 
     @impl true
@@ -62,7 +62,7 @@ defmodule BetterTogetherTest do
   end
 
   defmodule SpyOptimizer do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct [:owner]
 
     @impl true
@@ -81,7 +81,7 @@ defmodule BetterTogetherTest do
   end
 
   defmodule CaptureSets do
-    @behaviour DSEx.Optimizer
+    @behaviour Imp.Optimizer
     defstruct [:owner]
 
     @impl true
@@ -101,12 +101,12 @@ defmodule BetterTogetherTest do
     end
   end
 
-  defp metric, do: DSEx.Metrics.exact_match(:answer)
+  defp metric, do: Imp.Metrics.exact_match(:answer)
 
   defp program do
-    DSEx.predict("question -> answer",
+    Imp.predict("question -> answer",
       lm: %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -134,8 +134,8 @@ defmodule BetterTogetherTest do
   end
 
   defp example(question, answer) do
-    DSEx.example(question: question, answer: answer)
-    |> DSEx.Example.with_inputs(:question)
+    Imp.example(question: question, answer: answer)
+    |> Imp.Example.with_inputs(:question)
   end
 
   test "defaults to the upstream p -> w -> p strategy and selects the best prefix" do
@@ -146,9 +146,9 @@ defmodule BetterTogetherTest do
       })
 
     compiled = BetterTogether.compile(better, program(), examples(), examples())
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
-    assert DSEx.Optimizer.InstructionSearch.current_instruction(compiled) ==
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
              "Answer every question."
 
     assert report.best_score == 1.0
@@ -161,17 +161,17 @@ defmodule BetterTogetherTest do
   test "retains and returns the baseline when optimization makes validation worse" do
     original =
       program()
-      |> DSEx.Optimizer.InstructionSearch.put_instruction("Answer every question.")
+      |> Imp.Optimizer.InstructionSearch.put_instruction("Answer every question.")
 
     compiled =
       metric()
       |> BetterTogether.new(%{p: %SetInstruction{instruction: "Answer neither question."}})
       |> BetterTogether.compile(original, examples(), examples(), strategy: :p)
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
-    assert DSEx.Optimizer.InstructionSearch.current_instruction(compiled) ==
-             DSEx.Optimizer.InstructionSearch.current_instruction(original)
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             Imp.Optimizer.InstructionSearch.current_instruction(original)
 
     assert report.metadata.selected_strategy == ""
     assert Enum.map(report.candidates, & &1.score) == [1.0, 0.0]
@@ -183,9 +183,9 @@ defmodule BetterTogetherTest do
       |> BetterTogether.new(%{p: %SetInstruction{instruction: "Answer every question."}})
       |> BetterTogether.compile(program(), examples(), nil, strategy: :p, valset_ratio: 0)
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
-    assert DSEx.Optimizer.InstructionSearch.current_instruction(compiled) ==
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
              "Answer every question."
 
     assert report.best_score == nil
@@ -208,7 +208,7 @@ defmodule BetterTogetherTest do
     assert_receive {:prepared_sets, 3, 1}
     assert length(trainset) == 4
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
     assert report.metadata.trainset_size == 3
     assert report.metadata.validation_size == 1
     assert Enum.all?(report.candidates, &(&1.evaluation.validation_size == 1))
@@ -227,7 +227,7 @@ defmodule BetterTogetherTest do
       )
 
     assert_receive {:prepared_sets, 4, 0}
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
     assert report.metadata.trainset_size == 4
     assert report.metadata.validation_size == 0
   end
@@ -247,7 +247,7 @@ defmodule BetterTogetherTest do
 
     refute_receive :unexpected_later_step
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
     assert report.best_score == 0.5
     assert report.metadata.compilation_error_occurred
     assert report.metadata.stopped_early
@@ -259,10 +259,10 @@ defmodule BetterTogetherTest do
   test "does not claim provider weight training succeeded when no trainer is available" do
     compiled =
       metric()
-      |> BetterTogether.new(%{w: DSEx.Optimizer.BootstrapFinetune.new(metric())})
+      |> BetterTogether.new(%{w: Imp.Optimizer.BootstrapFinetune.new(metric())})
       |> BetterTogether.compile(program(), examples(), examples(), strategy: :w)
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.metadata.compilation_error_occurred
     assert report.metadata.selected_strategy == ""
@@ -277,11 +277,11 @@ defmodule BetterTogetherTest do
     base_program = program()
 
     trainable_program =
-      DSEx.with_lm(base_program, Map.put(DSEx.ProgramAccess.lm(base_program), :model, "base"))
+      Imp.with_lm(base_program, Map.put(Imp.ProgramAccess.lm(base_program), :model, "base"))
 
     trainer = fn _lm, _examples, _opts ->
       {:ok,
-       DSEx.Clients.TrainingJob.new(%{
+       Imp.Clients.TrainingJob.new(%{
          id: "terminal-sft",
          provider: :test,
          model: "base",
@@ -293,15 +293,15 @@ defmodule BetterTogetherTest do
     compiled =
       metric()
       |> BetterTogether.new(%{
-        w: DSEx.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
       })
       |> BetterTogether.compile(trainable_program, examples(), nil,
         strategy: :w,
         valset_ratio: 0
       )
 
-    assert DSEx.ProgramAccess.lm(compiled).model == "trained-model"
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    assert Imp.ProgramAccess.lm(compiled).model == "trained-model"
+    report = Imp.Optimizer.Report.fetch(compiled)
     refute report.metadata.compilation_error_occurred
     assert report.metadata.selected_strategy == "w"
 

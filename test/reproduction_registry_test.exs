@@ -1,22 +1,22 @@
-defmodule DSEx.ReproductionRegistryTest do
+defmodule Imp.ReproductionRegistryTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.ReproductionRegistry
+  alias Imp.ReproductionRegistry
 
   @registry "benchmarks/reproductions.json"
   @authorities "benchmarks/authorities.json"
 
   test "registry covers every authority family and all references resolve" do
     registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
-    authorities = DSEx.EvidenceAuthorities.load!(@authorities)
+    authorities = Imp.EvidenceAuthorities.load!(@authorities)
 
     assert Enum.sort(Enum.uniq(Enum.map(registry["features"], & &1["authority_family"]))) ==
              Enum.sort(Enum.map(authorities["families"], & &1["id"]))
   end
 
   test "generated documentation agrees with the registry" do
-    Mix.Task.reenable("dsex.reproductions")
-    Mix.Tasks.Dsex.Reproductions.run(["--check"])
+    Mix.Task.reenable("imp.reproductions")
+    Mix.Tasks.Imp.Reproductions.run(["--check"])
   end
 
   test "rejects duplicate ownership and omitted authority families" do
@@ -41,7 +41,7 @@ defmodule DSEx.ReproductionRegistryTest do
     registry = read_json!(@registry)
     authorities = read_json!(@authorities)
 
-    bad_task = put_in(registry, ["protocols", "core_trace", "task"], "dsex.not_real")
+    bad_task = put_in(registry, ["protocols", "core_trace", "task"], "imp.not_real")
 
     assert_raise ArgumentError, ~r/does not resolve/, fn ->
       ReproductionRegistry.validate!(bad_task, authorities, File.cwd!())
@@ -82,7 +82,7 @@ defmodule DSEx.ReproductionRegistryTest do
     root =
       Path.join(
         System.tmp_dir!(),
-        "dsex-reproduction-authority-#{System.unique_integer([:positive])}"
+        "imp-reproduction-authority-#{System.unique_integer([:positive])}"
       )
 
     on_exit(fn -> File.rm_rf(root) end)

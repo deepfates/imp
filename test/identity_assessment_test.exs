@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityAssessmentTest do
+defmodule Imp.IdentityAssessmentTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.IdentityAssessment
+  alias Imp.IdentityAssessment
 
   defmodule FakeReqLLM do
     def generate_object(model, messages, schema, opts) do
@@ -559,10 +559,10 @@ defmodule DSEx.IdentityAssessmentTest do
 
   defp render_jsonl(records), do: Enum.map_join(records, "\n", &Jason.encode!/1) <> "\n"
 
-  defp jsonl(path), do: DSEx.IdentityEvaluation.load_jsonl!(path)
+  defp jsonl(path), do: Imp.IdentityEvaluation.load_jsonl!(path)
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)
     path

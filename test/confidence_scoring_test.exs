@@ -1,8 +1,8 @@
-defmodule DSEx.Confidence.ScoringTest do
+defmodule Imp.Confidence.ScoringTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Confidence.Scoring
-  alias DSEx.Confidence.Scoring.{LinearBlend, Sigmoid, Threshold}
+  alias Imp.Confidence.Scoring
+  alias Imp.Confidence.Scoring.{LinearBlend, Sigmoid, Threshold}
 
   test "linear blend matches the upstream interpolation formula" do
     strategy = LinearBlend.new(low_confidence_threshold: 0.5, min_score_on_correct: 0.3)

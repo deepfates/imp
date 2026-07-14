@@ -1,7 +1,7 @@
-defmodule DSEx.OptimizeAnythingSchedulingHeuristicTest do
+defmodule Imp.OptimizeAnythingSchedulingHeuristicTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic, as: Benchmark
+  alias Imp.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic, as: Benchmark
 
   test "publishes the generalization benchmark contract and a measurable baseline" do
     assert Benchmark.id() == "optimize_anything_scheduling_heuristic_v1"

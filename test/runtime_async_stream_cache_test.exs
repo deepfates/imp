@@ -1,16 +1,16 @@
 defmodule RuntimeAsyncStreamCacheTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Streaming.Messages.StreamListener
-  alias DSEx.Streaming.Messages.StreamResponse
+  alias Imp.Streaming.Messages.StreamListener
+  alias Imp.Streaming.Messages.StreamResponse
 
   setup do
-    DSEx.Cache.configure()
-    DSEx.Cache.clear()
+    Imp.Cache.configure()
+    Imp.Cache.clear()
 
     on_exit(fn ->
-      DSEx.Cache.configure()
-      DSEx.Cache.clear()
+      Imp.Cache.configure()
+      Imp.Cache.clear()
     end)
 
     :ok
@@ -20,24 +20,24 @@ defmodule RuntimeAsyncStreamCacheTest do
     parent = self()
 
     task =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, {:started, self()})
         Process.sleep(:infinity)
       end)
 
     assert_receive {:started, pid}
-    assert pid in Task.Supervisor.children(DSEx.Tasks.unlinked_supervisor())
-    assert DSEx.Tasks.cancel(task, 1_000) == nil
+    assert pid in Task.Supervisor.children(Imp.Tasks.unlinked_supervisor())
+    assert Imp.Tasks.cancel(task, 1_000) == nil
     refute Process.alive?(pid)
-    refute pid in Task.Supervisor.children(DSEx.Tasks.unlinked_supervisor())
+    refute pid in Task.Supervisor.children(Imp.Tasks.unlinked_supervisor())
   end
 
   test "enforces TTL and reports synchronous cache usage" do
-    assert :ok = DSEx.Cache.configure(ttl: 10, max_entries: 10)
-    assert DSEx.Cache.put(:ttl_key, :value) == :value
-    assert DSEx.Cache.get(:ttl_key) == :value
+    assert :ok = Imp.Cache.configure(ttl: 10, max_entries: 10)
+    assert Imp.Cache.put(:ttl_key, :value) == :value
+    assert Imp.Cache.get(:ttl_key) == :value
     Process.sleep(15)
-    assert DSEx.Cache.get(:ttl_key, :expired) == :expired
+    assert Imp.Cache.get(:ttl_key, :expired) == :expired
 
     assert %{
              hits: 1,
@@ -46,27 +46,27 @@ defmodule RuntimeAsyncStreamCacheTest do
              expirations: 1,
              size: 0,
              policy: %{enabled: true, ttl: 10, max_entries: 10}
-           } = DSEx.Cache.stats()
+           } = Imp.Cache.stats()
   end
 
   test "enforces capacity and supports disabled bypass policy" do
-    DSEx.Cache.configure(max_entries: 2)
-    DSEx.Cache.put(:one, 1)
+    Imp.Cache.configure(max_entries: 2)
+    Imp.Cache.put(:one, 1)
     Process.sleep(2)
-    DSEx.Cache.put(:two, 2)
+    Imp.Cache.put(:two, 2)
     Process.sleep(2)
-    DSEx.Cache.put(:three, 3)
+    Imp.Cache.put(:three, 3)
 
-    assert DSEx.Cache.get(:one, :evicted) == :evicted
-    assert DSEx.Cache.get(:two) == 2
-    assert DSEx.Cache.get(:three) == 3
-    assert DSEx.Cache.stats().evictions == 1
-    assert DSEx.Cache.stats().size == 2
+    assert Imp.Cache.get(:one, :evicted) == :evicted
+    assert Imp.Cache.get(:two) == 2
+    assert Imp.Cache.get(:three) == 3
+    assert Imp.Cache.stats().evictions == 1
+    assert Imp.Cache.stats().size == 2
 
-    DSEx.Cache.configure(enabled: false)
-    assert DSEx.Cache.fetch_or_store(:disabled, fn -> :computed end) == :computed
-    assert DSEx.Cache.get(:disabled, :not_stored) == :not_stored
-    assert DSEx.Cache.stats().bypasses >= 3
+    Imp.Cache.configure(enabled: false)
+    assert Imp.Cache.fetch_or_store(:disabled, fn -> :computed end) == :computed
+    assert Imp.Cache.get(:disabled, :not_stored) == :not_stored
+    assert Imp.Cache.stats().bypasses >= 3
   end
 
   test "stream listener observes events without changing final results or errors" do

@@ -1,9 +1,9 @@
-defmodule DSEx.Optimizer.GEPA.CallbackTest do
+defmodule Imp.Optimizer.GEPA.CallbackTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Callback, Engine, Result}
+  alias Imp.Optimizer.GEPA.{Adapter, Callback, Engine, Result}
 
   defmodule AdapterFixture do
     defstruct []
@@ -117,7 +117,7 @@ defmodule DSEx.Optimizer.GEPA.CallbackTest do
   @tag capture_log: true
   test "isolates callback failures and reports only redacted failure metadata" do
     telemetry_ref =
-      DSEx.Test.TelemetryHelpers.attach([[:dsex, :optimizer, :gepa, :callback, :exception]])
+      Imp.Test.TelemetryHelpers.attach([[:imp, :optimizer, :gepa, :callback, :exception]])
 
     log =
       capture_log(fn ->
@@ -142,7 +142,7 @@ defmodule DSEx.Optimizer.GEPA.CallbackTest do
 
     assert_receive {
       ^telemetry_ref,
-      [:dsex, :optimizer, :gepa, :callback, :exception],
+      [:imp, :optimizer, :gepa, :callback, :exception],
       %{count: 1},
       metadata
     }
@@ -157,12 +157,12 @@ defmodule DSEx.Optimizer.GEPA.CallbackTest do
 
   test "validates and stores the public callback option" do
     metric = fn _example, _prediction -> 1.0 end
-    optimizer = DSEx.Optimizer.GEPA.new(metric, callbacks: [{PartialRecorder, self()}])
+    optimizer = Imp.Optimizer.GEPA.new(metric, callbacks: [{PartialRecorder, self()}])
 
     assert optimizer.callbacks == [{PartialRecorder, self()}]
 
     assert_raise ArgumentError, ~r/callback modules/, fn ->
-      DSEx.Optimizer.GEPA.new(metric, callbacks: [fn _event -> :ok end])
+      Imp.Optimizer.GEPA.new(metric, callbacks: [fn _event -> :ok end])
     end
   end
 

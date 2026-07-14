@@ -4,51 +4,51 @@ defmodule OTPStateSemanticsTest do
   @moduletag :capture_log
 
   setup do
-    Application.ensure_all_started(:dsex)
-    DSEx.Settings.reset()
-    DSEx.Cache.clear()
+    Application.ensure_all_started(:imp)
+    Imp.Settings.reset()
+    Imp.Cache.clear()
 
     on_exit(fn ->
-      Application.ensure_all_started(:dsex)
-      DSEx.Settings.reset()
-      DSEx.Cache.clear()
+      Application.ensure_all_started(:imp)
+      Imp.Settings.reset()
+      Imp.Cache.clear()
     end)
 
     :ok
   end
 
   test "application start owns settings cache and task supervisor processes" do
-    assert Process.whereis(DSEx.Settings)
-    cache = Process.whereis(DSEx.Cache)
+    assert Process.whereis(Imp.Settings)
+    cache = Process.whereis(Imp.Cache)
     assert cache
-    assert Process.whereis(DSEx.TaskSupervisor)
-    assert :ets.info(DSEx.Cache, :owner) == cache
+    assert Process.whereis(Imp.TaskSupervisor)
+    assert :ets.info(Imp.Cache, :owner) == cache
   end
 
   test "settings and cache APIs start the application for lazy library use" do
-    :ok = Application.stop(:dsex)
-    refute Process.whereis(DSEx.Settings)
+    :ok = Application.stop(:imp)
+    refute Process.whereis(Imp.Settings)
 
-    assert %{adapter: DSEx.Adapter.Chat} = DSEx.Settings.get()
-    assert Process.whereis(DSEx.Settings)
-    assert Process.whereis(DSEx.Cache)
+    assert %{adapter: Imp.Adapter.Chat} = Imp.Settings.get()
+    assert Process.whereis(Imp.Settings)
+    assert Process.whereis(Imp.Cache)
 
-    :ok = Application.stop(:dsex)
-    refute Process.whereis(DSEx.Cache)
+    :ok = Application.stop(:imp)
+    refute Process.whereis(Imp.Cache)
 
-    assert DSEx.Cache.put(:lazy_cache, :ok) == :ok
-    assert DSEx.Cache.get(:lazy_cache) == :ok
-    assert :ets.info(DSEx.Cache, :owner) == Process.whereis(DSEx.Cache)
+    assert Imp.Cache.put(:lazy_cache, :ok) == :ok
+    assert Imp.Cache.get(:lazy_cache) == :ok
+    assert :ets.info(Imp.Cache, :owner) == Process.whereis(Imp.Cache)
   end
 
   test "global settings are mutable while context overrides stay process-local" do
-    DSEx.configure(lm: :global)
+    Imp.configure(lm: :global)
 
     results =
       1..10
       |> Task.async_stream(fn index ->
-        DSEx.context([lm: {:local, index}], fn ->
-          {DSEx.settings().lm, parent_lm_from_child()}
+        Imp.context([lm: {:local, index}], fn ->
+          {Imp.settings().lm, parent_lm_from_child()}
         end)
       end)
       |> Enum.map(fn {:ok, result} -> result end)
@@ -57,29 +57,29 @@ defmodule OTPStateSemanticsTest do
              Enum.map(1..10, &{:local, &1})
 
     assert Enum.all?(results, &(elem(&1, 1) == :global))
-    assert DSEx.settings().lm == :global
+    assert Imp.settings().lm == :global
   end
 
   test "settings contexts snapshot all effective values at entry" do
-    DSEx.configure(lm: :before, callbacks: [:before])
+    Imp.configure(lm: :before, callbacks: [:before])
     parent = self()
 
     mutator =
       Task.async(fn ->
         receive do
           :mutate ->
-            DSEx.configure(lm: :after, callbacks: [:after], added_later: true)
+            Imp.configure(lm: :after, callbacks: [:after], added_later: true)
             send(parent, :mutated)
         end
       end)
 
     captured =
-      DSEx.context([tenant: :outer], fn ->
+      Imp.context([tenant: :outer], fn ->
         send(mutator.pid, :mutate)
         assert_receive :mutated
 
-        DSEx.context([request_id: :inner], fn ->
-          DSEx.settings()
+        Imp.context([request_id: :inner], fn ->
+          Imp.settings()
         end)
       end)
 
@@ -89,23 +89,23 @@ defmodule OTPStateSemanticsTest do
     assert captured.tenant == :outer
     assert captured.request_id == :inner
     refute Map.has_key?(captured, :added_later)
-    assert DSEx.settings().lm == :after
+    assert Imp.settings().lm == :after
   end
 
-  test "DSEx tasks snapshot complete effective settings at submission" do
-    DSEx.configure(lm: :global_before, callbacks: [:before], stable: :before)
+  test "Imp tasks snapshot complete effective settings at submission" do
+    Imp.configure(lm: :global_before, callbacks: [:before], stable: :before)
     parent = self()
 
     task =
-      DSEx.context([lm: :outer], fn ->
-        DSEx.context([tenant: :inner], fn ->
-          DSEx.Tasks.async_nolink(fn ->
+      Imp.context([lm: :outer], fn ->
+        Imp.context([tenant: :inner], fn ->
+          Imp.Tasks.async_nolink(fn ->
             send(parent, {:snapshot_worker_ready, self()})
 
             receive do
               :read_snapshot ->
-                base = DSEx.settings()
-                nested = DSEx.context([tenant: :worker_nested], &DSEx.settings/0)
+                base = Imp.settings()
+                nested = Imp.context([tenant: :worker_nested], &Imp.settings/0)
                 {base, nested}
             end
           end)
@@ -113,7 +113,7 @@ defmodule OTPStateSemanticsTest do
       end)
 
     assert_receive {:snapshot_worker_ready, worker_pid}
-    DSEx.configure(lm: :global_after, callbacks: [:after], stable: :after, added_later: true)
+    Imp.configure(lm: :global_after, callbacks: [:after], stable: :after, added_later: true)
     send(worker_pid, :read_snapshot)
 
     assert {base, nested} = Task.await(task)
@@ -129,64 +129,64 @@ defmodule OTPStateSemanticsTest do
 
   test "async_max_workers requires a positive integer" do
     assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
-      DSEx.configure(async_max_workers: 0)
+      Imp.configure(async_max_workers: 0)
     end
 
     assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
-      DSEx.context([async_max_workers: :many], fn -> :ok end)
+      Imp.context([async_max_workers: :many], fn -> :ok end)
     end
   end
 
   test "supervisor restarts settings with defaults after a crash" do
-    DSEx.configure(lm: :temporary)
-    old = Process.whereis(DSEx.Settings)
+    Imp.configure(lm: :temporary)
+    old = Process.whereis(Imp.Settings)
     ref = Process.monitor(old)
 
     Process.exit(old, :kill)
 
     assert_receive {:DOWN, ^ref, :process, ^old, :killed}
-    new = wait_until(fn -> restarted_pid(DSEx.Settings, old) end)
+    new = wait_until(fn -> restarted_pid(Imp.Settings, old) end)
 
     assert new != old
-    assert DSEx.settings().lm == nil
-    assert DSEx.settings().adapter == DSEx.Adapter.Chat
+    assert Imp.settings().lm == nil
+    assert Imp.settings().adapter == Imp.Adapter.Chat
   end
 
   test "cache table is recreated after owner crash and handles concurrent writes" do
-    DSEx.Cache.put(:restart_probe, :old)
-    old = Process.whereis(DSEx.Cache)
+    Imp.Cache.put(:restart_probe, :old)
+    old = Process.whereis(Imp.Cache)
     ref = Process.monitor(old)
 
     Process.exit(old, :kill)
 
     assert_receive {:DOWN, ^ref, :process, ^old, :killed}
-    new = wait_until(fn -> restarted_pid(DSEx.Cache, old) end)
+    new = wait_until(fn -> restarted_pid(Imp.Cache, old) end)
 
     assert new != old
-    assert :ets.info(DSEx.Cache, :owner) == new
-    assert DSEx.Cache.get(:restart_probe, :missing) == :missing
+    assert :ets.info(Imp.Cache, :owner) == new
+    assert Imp.Cache.get(:restart_probe, :missing) == :missing
 
     values =
       1..50
       |> Task.async_stream(fn index ->
-        DSEx.Cache.put({:concurrent, index}, index)
+        Imp.Cache.put({:concurrent, index}, index)
       end)
       |> Enum.map(fn {:ok, value} -> value end)
 
     assert Enum.sort(values) == Enum.to_list(1..50)
-    assert Enum.map(1..50, &DSEx.Cache.get({:concurrent, &1})) == Enum.to_list(1..50)
+    assert Enum.map(1..50, &Imp.Cache.get({:concurrent, &1})) == Enum.to_list(1..50)
   end
 
   test "cache reports invalid fetch callbacks clearly" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Cache\.fetch_or_store\/2 expects a zero-arity function/,
+                 ~r/Imp\.Cache\.fetch_or_store\/2 expects a zero-arity function/,
                  fn ->
-                   DSEx.Cache.fetch_or_store(:bad_callback, fn value -> value end)
+                   Imp.Cache.fetch_or_store(:bad_callback, fn value -> value end)
                  end
   end
 
   defp parent_lm_from_child do
-    Task.async(fn -> DSEx.settings().lm end)
+    Task.async(fn -> Imp.settings().lm end)
     |> Task.await()
   end
 

@@ -1,13 +1,13 @@
-defmodule DSEx.BenchmarkTruth.HotpotMultiHopTest do
+defmodule Imp.BenchmarkTruth.HotpotMultiHopTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{HotpotMultiHop, HoverBM25}
-  alias DSEx.BenchmarkTruth.HoverBM25.UpstreamPython
-  alias DSEx.{Module, Optimizer.Trace, Prediction, ProgramParameters}
+  alias Imp.BenchmarkTruth.{HotpotMultiHop, HoverBM25}
+  alias Imp.BenchmarkTruth.HoverBM25.UpstreamPython
+  alias Imp.{Module, Optimizer.Trace, Prediction, ProgramParameters}
 
   defp lm(parent) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)

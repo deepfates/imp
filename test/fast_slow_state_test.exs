@@ -1,7 +1,7 @@
-defmodule DSEx.Training.FastSlow.StateTest do
+defmodule Imp.Training.FastSlow.StateTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{Config, DatasetState, Lookahead, OperationIntent, Rollout, State}
+  alias Imp.Training.FastSlow.{Config, DatasetState, Lookahead, OperationIntent, Rollout, State}
 
   test "config enforces K divides G, JSON-only values, and credential exclusion" do
     assert_raise ArgumentError, ~r/g must be divisible by k/, fn -> config(k: 3, g: 4) end

@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.AxContractTest do
+defmodule Imp.BenchmarkTruth.AxContractTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{AxContract, RunContext}
+  alias Imp.BenchmarkTruth.{AxContract, RunContext}
 
   test "provider-free Ax vectors match or declare narrow native deviations" do
     rows = AxContract.compare(upstream())
@@ -43,7 +43,7 @@ defmodule DSEx.BenchmarkTruth.AxContractTest do
     context =
       RunContext.new!(
         source_commits: %{
-          "dsex" => "deepfates/dsex@fixture",
+          "imp" => "deepfates/imp@fixture",
           "ax" => "ax-llm/ax@eb5835e54ba0c5b2fbac380daed1cb87faeefd5e"
         }
       )
@@ -88,7 +88,7 @@ defmodule DSEx.BenchmarkTruth.AxContractTest do
     context =
       RunContext.new!(
         source_commits: %{
-          "dsex" => "deepfates/dsex@fixture",
+          "imp" => "deepfates/imp@fixture",
           "ax" => "ax-llm/ax@eb5835e54ba0c5b2fbac380daed1cb87faeefd5e"
         }
       )

@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityEnrichmentTest do
+defmodule Imp.IdentityEnrichmentTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.{IdentityEnrichment, IdentityInternationalScreen}
+  alias Imp.{IdentityEnrichment, IdentityInternationalScreen}
 
   test "derives conventional Elixir identity surfaces without interning atoms" do
     assert %{

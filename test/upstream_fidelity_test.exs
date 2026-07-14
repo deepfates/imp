@@ -1,8 +1,8 @@
-defmodule DSEx.UpstreamFidelityTest do
+defmodule Imp.UpstreamFidelityTest do
   use ExUnit.Case, async: true
 
   test "ledger is pinned to an immutable stable DSPy baseline" do
-    report = DSEx.UpstreamFidelity.report()
+    report = Imp.UpstreamFidelity.report()
 
     assert report.schema_version == 3
     assert report.baseline.version == "3.2.1"
@@ -19,7 +19,7 @@ defmodule DSEx.UpstreamFidelityTest do
   end
 
   test "status is derived from explicit contracts and executable evidence" do
-    report = DSEx.UpstreamFidelity.report()
+    report = Imp.UpstreamFidelity.report()
     by_id = Map.new(report.surfaces, &{&1.id, &1})
 
     assert by_id["programming.contracts"].status == :conformant
@@ -35,8 +35,8 @@ defmodule DSEx.UpstreamFidelityTest do
     assert weights.status == :elixir_native_equivalent
     assert "Avatar" in weights.upstream
     assert "AvatarOptimizer" in weights.upstream
-    assert DSEx.Predict.Avatar in weights.dsex
-    assert DSEx.Optimizer.Avatar in weights.dsex
+    assert Imp.Predict.Avatar in weights.imp
+    assert Imp.Optimizer.Avatar in weights.imp
 
     assert Enum.any?(weights.invariants, &String.starts_with?(&1, "Avatar runs"))
     assert Enum.any?(weights.invariants, &String.starts_with?(&1, "AvatarOptimizer contrasts"))
@@ -88,8 +88,8 @@ defmodule DSEx.UpstreamFidelityTest do
   end
 
   test "every stable surface has exactly one owning ledger row" do
-    stable_rows = Enum.reject(DSEx.UpstreamFidelity.surfaces(), &(&1.disposition == :tracking))
-    manifest = DSEx.UpstreamFidelity.stable_api_manifest()
+    stable_rows = Enum.reject(Imp.UpstreamFidelity.surfaces(), &(&1.disposition == :tracking))
+    manifest = Imp.UpstreamFidelity.stable_api_manifest()
 
     surfaces = Enum.flat_map(stable_rows, & &1.upstream)
     duplicates = surfaces -- Enum.uniq(surfaces)
@@ -102,7 +102,7 @@ defmodule DSEx.UpstreamFidelityTest do
   end
 
   test "gap and native-equivalent rows carry accountable decisions" do
-    for row <- DSEx.UpstreamFidelity.surfaces() do
+    for row <- Imp.UpstreamFidelity.surfaces() do
       assert row.invariants != []
       assert row.evidence.tests != []
       assert row.evidence.docs != []
@@ -119,12 +119,12 @@ defmodule DSEx.UpstreamFidelityTest do
     root =
       Path.join(
         System.tmp_dir!(),
-        "dsex-missing-conformance-#{System.unique_integer([:positive])}"
+        "imp-missing-conformance-#{System.unique_integer([:positive])}"
       )
 
     File.mkdir_p!(root)
 
-    report = DSEx.UpstreamFidelity.report(root: root)
+    report = Imp.UpstreamFidelity.report(root: root)
 
     assert report.summary.invalid_evidence > 0
     refute report.summary.passing
@@ -137,7 +137,7 @@ defmodule DSEx.UpstreamFidelityTest do
   end
 
   test "source anchors include every research lineage named by the product" do
-    anchors = DSEx.UpstreamFidelity.report().source_anchors
+    anchors = Imp.UpstreamFidelity.report().source_anchors
 
     assert anchors.dspy_paper == "arXiv:2310.03714"
     assert anchors.dsp_paper == "arXiv:2212.14024"
@@ -149,7 +149,7 @@ defmodule DSEx.UpstreamFidelityTest do
   end
 
   test "checked-in readable projection reflects every executable ledger verdict" do
-    report = DSEx.UpstreamFidelity.report()
+    report = Imp.UpstreamFidelity.report()
     body = File.read!("docs/UPSTREAM_SURFACE_MAP.md")
 
     assert body =~ report.baseline.git_sha

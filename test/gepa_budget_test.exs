@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.BudgetTest do
+defmodule Imp.Optimizer.GEPA.BudgetTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Budget, BudgetLedger}
+  alias Imp.Optimizer.GEPA.{Budget, BudgetLedger}
 
   test "authorizes capacity separately from recording observed metric work" do
     budget = Budget.new(max_metric_calls: 5, max_full_evaluations: 2)

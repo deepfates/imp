@@ -1,8 +1,8 @@
 defmodule ReqLLMBatchTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Clients.ReqLLM, as: ReqLLMClient
-  alias DSEx.Clients.ReqLLMBatch
+  alias Imp.Clients.ReqLLM, as: ReqLLMClient
+  alias Imp.Clients.ReqLLMBatch
 
   test "retries transient failures and records explicit terminal and malformed outcomes" do
     checkpoint = checkpoint_path("outcomes")
@@ -191,8 +191,8 @@ defmodule ReqLLMBatchTest do
 
     assert {:ok,
             %{
-              __dsex_lm_output__: %{"answer" => "pong"},
-              __dsex_lm_metadata__: %{req_llm: %{provider: "anthropic", model: "anthropic:test"}}
+              __imp_lm_output__: %{"answer" => "pong"},
+              __imp_lm_metadata__: %{req_llm: %{provider: "anthropic", model: "anthropic:test"}}
             }} =
              dispatcher.(
                %{
@@ -231,7 +231,7 @@ defmodule ReqLLMBatchTest do
 
     Path.join(
       System.tmp_dir!(),
-      "dsex-req-llm-batch-#{name}-#{nonce}.json"
+      "imp-req-llm-batch-#{name}-#{nonce}.json"
     )
   end
 end

@@ -75,30 +75,30 @@ defmodule ProductionHardeningTest do
   end
 
   defmodule RaisingFormatAdapter do
-    @behaviour DSEx.Adapter
+    @behaviour Imp.Adapter
 
     def format(_signature, _inputs, _opts), do: raise("format exploded")
-    def parse(_signature, _raw, _opts), do: {:ok, DSEx.prediction(answer: "unused")}
+    def parse(_signature, _raw, _opts), do: {:ok, Imp.prediction(answer: "unused")}
   end
 
   defmodule RaisingLMOptsAdapter do
-    @behaviour DSEx.Adapter
+    @behaviour Imp.Adapter
 
     def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
 
     def parse(_signature, raw, _opts),
-      do: DSEx.Adapter.Chat.parse(DSEx.signature("q -> answer"), raw, [])
+      do: Imp.Adapter.Chat.parse(Imp.signature("q -> answer"), raw, [])
 
     def lm_opts(_signature, _opts), do: raise("lm opts exploded")
   end
 
   defmodule InvalidLMOptsAdapter do
-    @behaviour DSEx.Adapter
+    @behaviour Imp.Adapter
 
     def format(_signature, _inputs, _opts), do: [%{role: :user, content: "q"}]
 
     def parse(_signature, raw, _opts),
-      do: DSEx.Adapter.Chat.parse(DSEx.signature("q -> answer"), raw, [])
+      do: Imp.Adapter.Chat.parse(Imp.signature("q -> answer"), raw, [])
 
     def lm_opts(_signature, _opts), do: %{response_format: %{type: "json_object"}}
   end
@@ -106,72 +106,72 @@ defmodule ProductionHardeningTest do
   test "ReqLLM-backed LM reports provider failures without caching them" do
     Process.delete(:flaky_count)
 
-    lm = DSEx.req_llm("openai:gpt-test", req_module: FlakyReqLLM)
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = Imp.req_llm("openai:gpt-test", req_module: FlakyReqLLM)
+    program = Imp.predict("question -> answer", lm: lm)
 
     assert {:error, :temporary_unavailable} =
-             DSEx.Predict.Predict.call(program, %{question: "recover?"})
+             Imp.Predict.Predict.call(program, %{question: "recover?"})
 
-    assert {:ok, prediction} = DSEx.Predict.Predict.call(program, %{question: "recover?"})
-    assert DSEx.Prediction.get(prediction, :answer) == "recovered"
+    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "recover?"})
+    assert Imp.Prediction.get(prediction, :answer) == "recovered"
     assert Process.get(:flaky_count) == 2
   end
 
   test "ReqLLM-backed LM supports content-addressed cache async calls and telemetry hooks" do
-    DSEx.Cache.clear()
+    Imp.Cache.clear()
     Process.delete(:stable_count)
 
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :lm, :start],
-        [:dsex, :lm, :stop],
-        [:dsex, :cache, :miss],
-        [:dsex, :cache, :hit]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :lm, :start],
+        [:imp, :lm, :stop],
+        [:imp, :cache, :miss],
+        [:imp, :cache, :hit]
       ])
 
-    lm = DSEx.req_llm("openai:gpt-test", req_module: StableReqLLM)
+    lm = Imp.req_llm("openai:gpt-test", req_module: StableReqLLM)
 
     messages = [%{role: :user, content: "cache me"}]
 
-    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
-    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert Process.get(:stable_count) == 1
 
     task =
-      DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
+      Imp.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "async"}], cache: false)
 
     assert_req_llm_output(Task.await(task), "Answer: recovered")
 
-    assert_received {^ref, [:dsex, :lm, :start], _, %{lm: %{model: "openai:gpt-test"}}}
-    assert_received {^ref, [:dsex, :lm, :stop], %{duration: duration}, %{result: :ok}}
-    assert_received {^ref, [:dsex, :cache, :miss], %{count: 1}, %{key: _}}
-    assert_received {^ref, [:dsex, :cache, :hit], %{count: 1}, %{key: _}}
+    assert_received {^ref, [:imp, :lm, :start], _, %{lm: %{model: "openai:gpt-test"}}}
+    assert_received {^ref, [:imp, :lm, :stop], %{duration: duration}, %{result: :ok}}
+    assert_received {^ref, [:imp, :cache, :miss], %{count: 1}, %{key: _}}
+    assert_received {^ref, [:imp, :cache, :hit], %{count: 1}, %{key: _}}
     assert is_integer(duration)
   after
     Process.delete(:stable_count)
   end
 
   test "ReqLLM cache does not store transient errors" do
-    DSEx.Cache.clear()
+    Imp.Cache.clear()
     Process.delete(:transient_error_count)
 
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :cache, :miss],
-        [:dsex, :cache, :hit]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :cache, :miss],
+        [:imp, :cache, :hit]
       ])
 
-    lm = DSEx.req_llm("openai:gpt-test", req_module: TransientReqLLM)
+    lm = Imp.req_llm("openai:gpt-test", req_module: TransientReqLLM)
 
     messages = [%{role: :user, content: "cache transient"}]
 
-    assert {:error, :temporary_unavailable} = DSEx.LM.generate(lm, messages, cache: true)
-    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
-    assert_req_llm_output(DSEx.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert {:error, :temporary_unavailable} = Imp.LM.generate(lm, messages, cache: true)
+    assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
+    assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert Process.get(:transient_error_count) == 2
 
-    assert_received {^ref, [:dsex, :cache, :miss], _, _}
-    assert_received {^ref, [:dsex, :cache, :hit], _, _}
+    assert_received {^ref, [:imp, :cache, :miss], _, _}
+    assert_received {^ref, [:imp, :cache, :hit], _, _}
   after
     Process.delete(:transient_error_count)
   end
@@ -179,8 +179,8 @@ defmodule ProductionHardeningTest do
   defp assert_req_llm_output(
          {:ok,
           %{
-            __dsex_lm_output__: output,
-            __dsex_lm_metadata__: %{req_llm: %{provider: "openai", model: "openai:gpt-test"}}
+            __imp_lm_output__: output,
+            __imp_lm_metadata__: %{req_llm: %{provider: "openai", model: "openai:gpt-test"}}
           }},
          expected
        ) do
@@ -188,11 +188,11 @@ defmodule ProductionHardeningTest do
   end
 
   test "telemetry span emits redacted exception event for throws" do
-    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :span, :throw, :exception]])
+    ref = Imp.Test.TelemetryHelpers.attach([[:imp, :span, :throw, :exception]])
 
     assert catch_throw(
-             DSEx.Telemetry.span(
-               [:dsex, :span, :throw],
+             Imp.Telemetry.span(
+               [:imp, :span, :throw],
                %{api_key: "sk-test-span-secret-1234567890", operation: :throw_probe},
                fn -> throw(:span_thrown) end
              )
@@ -200,7 +200,7 @@ defmodule ProductionHardeningTest do
 
     assert_received {
       ^ref,
-      [:dsex, :span, :throw, :exception],
+      [:imp, :span, :throw, :exception],
       %{duration: duration},
       %{api_key: "[REDACTED]", operation: :throw_probe, error: "{:throw, :span_thrown}"}
     }
@@ -210,19 +210,19 @@ defmodule ProductionHardeningTest do
 
   @tag capture_log: true
   test "default httpc transport verifies TLS peer certificates" do
-    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer
-    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts([]), :timeout) == 15_000
-    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts(timeout: 123), :timeout) == 123
+    assert Keyword.fetch!(Imp.HTTP.Hackneyless.default_ssl_opts(), :verify) == :verify_peer
+    assert Keyword.fetch!(Imp.HTTP.Hackneyless.http_opts([]), :timeout) == 15_000
+    assert Keyword.fetch!(Imp.HTTP.Hackneyless.http_opts(timeout: 123), :timeout) == 123
 
-    assert Keyword.fetch!(DSEx.HTTP.Hackneyless.http_opts(timeout: 123), :connect_timeout) ==
+    assert Keyword.fetch!(Imp.HTTP.Hackneyless.http_opts(timeout: 123), :connect_timeout) ==
              123
 
     assert Keyword.fetch!(
-             DSEx.HTTP.Hackneyless.http_opts(http_opts: [timeout: 456]),
+             Imp.HTTP.Hackneyless.http_opts(http_opts: [timeout: 456]),
              :timeout
            ) == 456
 
-    dir = Path.join(System.tmp_dir!(), "dsex-tls-#{System.unique_integer([:positive])}")
+    dir = Path.join(System.tmp_dir!(), "imp-tls-#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     cert = Path.join(dir, "cert.pem")
     key = Path.join(dir, "key.pem")
@@ -279,7 +279,7 @@ defmodule ProductionHardeningTest do
       end)
 
     assert {:error, _reason} =
-             DSEx.HTTP.Hackneyless.post(
+             Imp.HTTP.Hackneyless.post(
                "https://localhost:#{port}/",
                [],
                "{}",
@@ -292,22 +292,22 @@ defmodule ProductionHardeningTest do
   end
 
   test "HTTP transport boundary rejects malformed options and unknown transports explicitly" do
-    assert_raise ArgumentError, ~r/DSEx.HTTP.post\/5 expects keyword options/, fn ->
-      DSEx.HTTP.post(PostOnlyTransport, "https://example.test", [], "{}", %{timeout: 1})
+    assert_raise ArgumentError, ~r/Imp.HTTP.post\/5 expects keyword options/, fn ->
+      Imp.HTTP.post(PostOnlyTransport, "https://example.test", [], "{}", %{timeout: 1})
     end
 
-    assert_raise ArgumentError, ~r/DSEx.HTTP.stream\/5 expects keyword options/, fn ->
-      DSEx.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [:timeout])
+    assert_raise ArgumentError, ~r/Imp.HTTP.stream\/5 expects keyword options/, fn ->
+      Imp.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [:timeout])
     end
 
     assert {:error, {:not_http_transport, :not_a_transport}} =
-             DSEx.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
+             Imp.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
 
     assert {:error, {:http_transport_failed, RaisingHTTPTransport, "post exploded"}} =
-             DSEx.HTTP.post(RaisingHTTPTransport, "https://example.test", [], "{}", [])
+             Imp.HTTP.post(RaisingHTTPTransport, "https://example.test", [], "{}", [])
 
     assert {:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}} =
-             DSEx.HTTP.post(
+             Imp.HTTP.post(
                fn _url, _headers, _body, _opts -> raise "post exploded" end,
                "https://example.test",
                [],
@@ -316,8 +316,8 @@ defmodule ProductionHardeningTest do
              )
 
     assert [{:error, _reason}] =
-             DSEx.HTTP.stream(
-               DSEx.HTTP.Hackneyless,
+             Imp.HTTP.stream(
+               Imp.HTTP.Hackneyless,
                "http://127.0.0.1:1/",
                [],
                "{}",
@@ -326,15 +326,15 @@ defmodule ProductionHardeningTest do
              |> Enum.to_list()
 
     assert [{:error, {:not_http_transport, :not_a_transport}}] =
-             DSEx.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
+             Imp.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
              |> Enum.to_list()
 
     assert [{:error, {:http_transport_failed, RaisingStreamTransport, "stream exploded"}}] =
-             DSEx.HTTP.stream(RaisingStreamTransport, "https://example.test", [], "{}", [])
+             Imp.HTTP.stream(RaisingStreamTransport, "https://example.test", [], "{}", [])
              |> Enum.to_list()
 
     assert [{:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}}] =
-             DSEx.HTTP.stream(
+             Imp.HTTP.stream(
                fn _url, _headers, _body, _opts -> raise "post exploded" end,
                "https://example.test",
                [],
@@ -344,32 +344,32 @@ defmodule ProductionHardeningTest do
              |> Enum.to_list()
 
     assert ["ok"] =
-             DSEx.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [])
+             Imp.HTTP.stream(PostOnlyTransport, "https://example.test", [], "{}", [])
              |> Enum.to_list()
 
     assert_raise ArgumentError,
-                 ~r/DSEx.HTTP.Hackneyless.http_opts\/1 expects keyword options/,
-                 fn -> DSEx.HTTP.Hackneyless.http_opts(%{timeout: 1}) end
+                 ~r/Imp.HTTP.Hackneyless.http_opts\/1 expects keyword options/,
+                 fn -> Imp.HTTP.Hackneyless.http_opts(%{timeout: 1}) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.HTTP.Hackneyless.http_opts\/1 :http_opts expects a keyword list/,
-                 fn -> DSEx.HTTP.Hackneyless.http_opts(http_opts: %{timeout: 1}) end
+                 ~r/Imp.HTTP.Hackneyless.http_opts\/1 :http_opts expects a keyword list/,
+                 fn -> Imp.HTTP.Hackneyless.http_opts(http_opts: %{timeout: 1}) end
   end
 
   test "default HTTP transport honors an explicit multipart content type" do
-    boundary = "dsex-test-boundary"
+    boundary = "imp-test-boundary"
     content_type = "multipart/form-data; boundary=#{boundary}"
     body = "--#{boundary}\r\ncontent\r\n--#{boundary}--\r\n"
 
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.headers["content-type"] == content_type
         assert request.body == body
         {200, %{ok: true}}
       end)
 
     assert {:ok, %{status: 200}} =
-             DSEx.HTTP.Hackneyless.post(
+             Imp.HTTP.Hackneyless.post(
                base_url <> "/upload",
                [{"Content-Type", content_type}],
                body,
@@ -378,91 +378,91 @@ defmodule ProductionHardeningTest do
   end
 
   test "LM facade rejects malformed options and unknown providers explicitly" do
-    assert_raise ArgumentError, ~r/DSEx.LM.generate\/3 expects keyword options/, fn ->
-      DSEx.LM.generate(DSEx.LM.Static, [%{role: :user, content: "hello"}], %{handler: nil})
+    assert_raise ArgumentError, ~r/Imp.LM.generate\/3 expects keyword options/, fn ->
+      Imp.LM.generate(Imp.LM.Static, [%{role: :user, content: "hello"}], %{handler: nil})
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.LM.generate\/3 client :opts expects keyword options/,
+                 ~r/Imp.LM.generate\/3 client :opts expects keyword options/,
                  fn ->
-                   DSEx.LM.generate(
-                     %{module: DSEx.LM.Static, opts: %{handler: fn _messages, _opts -> "ok" end}},
+                   Imp.LM.generate(
+                     %{module: Imp.LM.Static, opts: %{handler: fn _messages, _opts -> "ok" end}},
                      [%{role: :user, content: "hello"}],
                      []
                    )
                  end
 
     assert {:error, {:not_an_lm, :not_an_lm}} =
-             DSEx.LM.generate(:not_an_lm, [%{role: :user, content: "hello"}], [])
+             Imp.LM.generate(:not_an_lm, [%{role: :user, content: "hello"}], [])
 
     assert {:error, {:not_an_lm, %{provider: :missing}}} =
-             DSEx.LM.generate(%{provider: :missing}, [%{role: :user, content: "hello"}], [])
+             Imp.LM.generate(%{provider: :missing}, [%{role: :user, content: "hello"}], [])
 
     assert {:ok, "static"} =
-             DSEx.LM.generate(fn _messages, _opts -> {:ok, "static"} end, [], [])
+             Imp.LM.generate(fn _messages, _opts -> {:ok, "static"} end, [], [])
 
     assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
-             DSEx.LM.generate(fn _messages, _opts -> :not_a_valid_lm_result end, [], [])
+             Imp.LM.generate(fn _messages, _opts -> :not_a_valid_lm_result end, [], [])
 
     assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
-             DSEx.LM.generate(
+             Imp.LM.generate(
                fn _messages, _opts -> {:ok, :not_a_valid_lm_result} end,
                [],
                []
              )
 
     assert {:error, {:lm_failed, :anonymous_lm, "lm exploded"}} =
-             DSEx.LM.generate(fn _messages, _opts -> raise "lm exploded" end, [], [])
+             Imp.LM.generate(fn _messages, _opts -> raise "lm exploded" end, [], [])
 
     assert {:ok, "prefix:value"} =
-             DSEx.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
+             Imp.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
   end
 
   test "Predict reports adapter callback boundary failures explicitly" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
 
-    format_program = DSEx.predict("question -> answer", lm: lm, adapter: RaisingFormatAdapter)
+    format_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingFormatAdapter)
 
     assert {:error, {:adapter_format_failed, RaisingFormatAdapter, "format exploded"}} =
-             DSEx.Predict.Predict.call(format_program, %{question: "q"})
+             Imp.Predict.Predict.call(format_program, %{question: "q"})
 
-    lm_opts_program = DSEx.predict("question -> answer", lm: lm, adapter: RaisingLMOptsAdapter)
+    lm_opts_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingLMOptsAdapter)
 
     assert {:error, {:adapter_lm_opts_failed, RaisingLMOptsAdapter, "lm opts exploded"}} =
-             DSEx.Predict.Predict.call(lm_opts_program, %{question: "q"})
+             Imp.Predict.Predict.call(lm_opts_program, %{question: "q"})
 
     invalid_opts_program =
-      DSEx.predict("question -> answer", lm: lm, adapter: InvalidLMOptsAdapter)
+      Imp.predict("question -> answer", lm: lm, adapter: InvalidLMOptsAdapter)
 
     assert {:error, {:invalid_adapter_lm_opts, InvalidLMOptsAdapter, %{response_format: _}}} =
-             DSEx.Predict.Predict.call(invalid_opts_program, %{question: "q"})
+             Imp.Predict.Predict.call(invalid_opts_program, %{question: "q"})
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
                  fn ->
-                   DSEx.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
+                   Imp.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
                  end
   end
 
   test "Static LM validates direct-call options and handler shape" do
-    assert_raise ArgumentError, ~r/DSEx.LM.Static.generate\/2 expects keyword options/, fn ->
-      DSEx.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
+    assert_raise ArgumentError, ~r/Imp.LM.Static.generate\/2 expects keyword options/, fn ->
+      Imp.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
     end
 
-    assert {:error, {:lm_failed, DSEx.LM.Static, message}} =
-             DSEx.LM.generate(DSEx.LM.Static, [], handler: :not_a_function)
+    assert {:error, {:lm_failed, Imp.LM.Static, message}} =
+             Imp.LM.generate(Imp.LM.Static, [], handler: :not_a_function)
 
-    assert message =~ "DSEx.LM.Static.generate/2 expects :handler"
+    assert message =~ "Imp.LM.Static.generate/2 expects :handler"
   end
 
   test "invalid test harness provider mode fails closed" do
-    previous_mode = System.get_env("DSEX_TEST_MODE")
+    previous_mode = System.get_env("IMP_TEST_MODE")
 
     try do
-      System.put_env("DSEX_TEST_MODE", "garbage")
-      assert_raise ArgumentError, ~r/unsupported DSEX_TEST_MODE/, fn -> DSEx.Test.Mode.mode() end
+      System.put_env("IMP_TEST_MODE", "garbage")
+      assert_raise ArgumentError, ~r/unsupported IMP_TEST_MODE/, fn -> Imp.Test.Mode.mode() end
     after
-      restore_env("DSEX_TEST_MODE", previous_mode)
+      restore_env("IMP_TEST_MODE", previous_mode)
     end
   end
 
@@ -471,164 +471,164 @@ defmodule ProductionHardeningTest do
       {:ok, %{status: 200, body: "{}", headers: []}}
     end
 
-    assert {:ok, ^callback} = DSEx.HTTP.validate_transport(callback)
-    assert {:ok, String} = DSEx.HTTP.validate_transport(String)
-    assert {:error, message} = DSEx.HTTP.validate_transport(fn _url -> :ok end)
+    assert {:ok, ^callback} = Imp.HTTP.validate_transport(callback)
+    assert {:ok, String} = Imp.HTTP.validate_transport(String)
+    assert {:error, message} = Imp.HTTP.validate_transport(fn _url -> :ok end)
     assert message =~ "expected an HTTP transport module or arity-4 callback"
-    assert {:ok, nil} = DSEx.LM.validate_lm(nil)
-    assert {:ok, DSEx.LM.Static} = DSEx.LM.validate_lm(DSEx.LM.Static)
-    assert {:ok, DSEx.Adapter.Chat} = DSEx.Adapter.validate_adapter(DSEx.Adapter.Chat)
-    assert {:error, message} = DSEx.LM.validate_lm(%{provider: :missing})
+    assert {:ok, nil} = Imp.LM.validate_lm(nil)
+    assert {:ok, Imp.LM.Static} = Imp.LM.validate_lm(Imp.LM.Static)
+    assert {:ok, Imp.Adapter.Chat} = Imp.Adapter.validate_adapter(Imp.Adapter.Chat)
+    assert {:error, message} = Imp.LM.validate_lm(%{provider: :missing})
     assert message =~ "expected nil, an LM module"
-    assert {:error, message} = DSEx.Adapter.validate_adapter(String)
+    assert {:error, message} = Imp.Adapter.validate_adapter(String)
     assert message =~ "expected an adapter module exporting format/3 and parse/3"
 
-    assert {:ok, ReqLLM} = DSEx.Clients.ReqLLM.validate_req_module(ReqLLM)
-    assert {:error, message} = DSEx.Clients.ReqLLM.validate_req_module("not-a-module")
+    assert {:ok, ReqLLM} = Imp.Clients.ReqLLM.validate_req_module(ReqLLM)
+    assert {:error, message} = Imp.Clients.ReqLLM.validate_req_module("not-a-module")
     assert message =~ "expected a ReqLLM-compatible module atom"
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
+                 ~r/Imp.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
                  fn ->
-                   DSEx.req_llm("openai:gpt-test", req_module: "not-a-module")
+                   Imp.req_llm("openai:gpt-test", req_module: "not-a-module")
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
+                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
                  fn ->
-                   DSEx.predict("question -> answer", lm: %{provider: :missing})
+                   Imp.predict("question -> answer", lm: %{provider: :missing})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
                  fn ->
-                   DSEx.predict("question -> answer", adapter: String)
+                   Imp.predict("question -> answer", adapter: String)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Retrievers.HTTP\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 ~r/Imp.Retrievers.HTTP\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
                  fn ->
-                   DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+                   Imp.Retrievers.HTTP.new("https://retriever.example/search",
                      transport: fn _url -> :ok end
                    )
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.MCP.HTTPClient\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 ~r/Imp.MCP.HTTPClient\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
                  fn ->
-                   DSEx.MCP.HTTPClient.new("https://mcp.example", transport: %{bad: :transport})
+                   Imp.MCP.HTTPClient.new("https://mcp.example", transport: %{bad: :transport})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.OpenAITrainer\.new\/1: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 ~r/Imp.Clients.OpenAITrainer\.new\/1: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
                  fn ->
-                   DSEx.Clients.OpenAITrainer.new(transport: fn _url, _headers -> :ok end)
+                   Imp.Clients.OpenAITrainer.new(transport: fn _url, _headers -> :ok end)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.MCP.StdioClient\.new\/2: invalid value for :timeout/,
+                 ~r/Imp.MCP.StdioClient\.new\/2: invalid value for :timeout/,
                  fn ->
-                   DSEx.MCP.StdioClient.new("/bin/cat", timeout: 0)
+                   Imp.MCP.StdioClient.new("/bin/cat", timeout: 0)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Retrievers.HTTP\.new\/2: invalid value for :body_builder/,
+                 ~r/Imp.Retrievers.HTTP\.new\/2: invalid value for :body_builder/,
                  fn ->
-                   DSEx.Retrievers.HTTP.new("https://retriever.example/search",
+                   Imp.Retrievers.HTTP.new("https://retriever.example/search",
                      body_builder: :not_a_fun
                    )
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.OpenAITrainer\.new\/1: unknown options \[:upload\]/,
+                 ~r/Imp.Clients.OpenAITrainer\.new\/1: unknown options \[:upload\]/,
                  fn ->
-                   DSEx.Clients.OpenAITrainer.new(upload: true)
+                   Imp.Clients.OpenAITrainer.new(upload: true)
                  end
   end
 
   test "saving rejects unsupported program types explicitly" do
-    assert_raise ArgumentError, ~r/unsupported saved DSEx program type/, fn ->
-      DSEx.Saving.load(%{"type" => "unknown"})
+    assert_raise ArgumentError, ~r/unsupported saved Imp program type/, fn ->
+      Imp.Saving.load(%{"type" => "unknown"})
     end
 
     error =
       assert_raise ArgumentError, fn ->
-        DSEx.Saving.dump(%URI{scheme: "https", host: "example.com"})
+        Imp.Saving.dump(%URI{scheme: "https", host: "example.com"})
       end
 
-    assert error.message =~ "unsupported DSEx program for saving: URI"
+    assert error.message =~ "unsupported Imp program for saving: URI"
     assert error.message =~ "data-only program graphs"
     assert error.message =~ "callback-bearing programs require named registries"
   end
 
   test "saving rejects malformed program artifacts with explicit errors" do
-    assert_raise ArgumentError, ~r/saved DSEx program must be a map/, fn ->
-      DSEx.Saving.load(["not", "a", "map"])
+    assert_raise ArgumentError, ~r/saved Imp program must be a map/, fn ->
+      Imp.Saving.load(["not", "a", "map"])
     end
 
     assert_raise ArgumentError, ~r/missing required key "type"/, fn ->
-      DSEx.Saving.load(%{})
+      Imp.Saving.load(%{})
     end
 
     base = %{
       "type" => "predict",
-      "signature" => DSEx.Signature.dump(DSEx.Signature.new("question -> answer")),
+      "signature" => Imp.Signature.dump(Imp.Signature.new("question -> answer")),
       "demos" => [],
       "config" => [],
       "metadata" => %{},
-      "adapter" => "Elixir.DSEx.Adapter.Chat",
+      "adapter" => "Elixir.Imp.Adapter.Chat",
       "lm" => nil
     }
 
     assert_raise ArgumentError, ~r/missing required keys: \["signature"\]/, fn ->
-      base |> Map.delete("signature") |> DSEx.Saving.load()
+      base |> Map.delete("signature") |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/saved DSEx demos must be a list/, fn ->
-      base |> Map.put("demos", %{"bad" => true}) |> DSEx.Saving.load()
+    assert_raise ArgumentError, ~r/saved Imp demos must be a list/, fn ->
+      base |> Map.put("demos", %{"bad" => true}) |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/saved DSEx demo must be a map or keyword list/, fn ->
-      base |> Map.put("demos", ["bad"]) |> DSEx.Saving.load()
+    assert_raise ArgumentError, ~r/saved Imp demo must be a map or keyword list/, fn ->
+      base |> Map.put("demos", ["bad"]) |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/invalid saved DSEx config entry/, fn ->
-      base |> Map.put("config", [:temperature]) |> DSEx.Saving.load()
+    assert_raise ArgumentError, ~r/invalid saved Imp config entry/, fn ->
+      base |> Map.put("config", [:temperature]) |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/invalid saved DSEx LM client/, fn ->
-      base |> Map.put("lm", %{"model" => "missing-provider"}) |> DSEx.Saving.load()
+    assert_raise ArgumentError, ~r/invalid saved Imp LM client/, fn ->
+      base |> Map.put("lm", %{"model" => "missing-provider"}) |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/invalid saved DSEx adapter reference/, fn ->
-      base |> Map.put("adapter", %{"module" => "Elixir.DSEx.Adapter.Chat"}) |> DSEx.Saving.load()
+    assert_raise ArgumentError, ~r/invalid saved Imp adapter reference/, fn ->
+      base |> Map.put("adapter", %{"module" => "Elixir.Imp.Adapter.Chat"}) |> Imp.Saving.load()
     end
 
     assert_raise ArgumentError, ~r/saved req_llm client is missing required key "model"/, fn ->
-      base |> Map.put("lm", %{"provider" => "req_llm"}) |> DSEx.Saving.load()
+      base |> Map.put("lm", %{"provider" => "req_llm"}) |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/saved DSEx program_of_thought is missing required keys/, fn ->
-      DSEx.Saving.load(%{
+    assert_raise ArgumentError, ~r/saved Imp program_of_thought is missing required keys/, fn ->
+      Imp.Saving.load(%{
         "type" => "program_of_thought",
-        "signature" => DSEx.Signature.dump(DSEx.Signature.new("x -> answer")),
-        "output_field" => %{"__dsex_type__" => "atom", "value" => "answer"}
+        "signature" => Imp.Signature.dump(Imp.Signature.new("x -> answer")),
+        "output_field" => %{"__imp_type__" => "atom", "value" => "answer"}
       })
     end
 
     pot_state =
       "x -> answer"
-      |> DSEx.program_of_thought()
-      |> DSEx.Saving.dump()
+      |> Imp.program_of_thought()
+      |> Imp.Saving.dump()
 
     rag_state =
       "x, context -> answer"
-      |> DSEx.predict()
-      |> DSEx.rag(DSEx.Retrieve.Memory.new([%{text: "x"}]))
-      |> DSEx.Saving.dump()
+      |> Imp.predict()
+      |> Imp.rag(Imp.Retrieve.Memory.new([%{text: "x"}]))
+      |> Imp.Saving.dump()
 
     assert_raise ArgumentError, ~r/nested predict must be a saved Predict program/, fn ->
-      pot_state |> Map.put("predict", rag_state) |> DSEx.Saving.load()
+      pot_state |> Map.put("predict", rag_state) |> Imp.Saving.load()
     end
 
     mismatched_instruction =
@@ -637,28 +637,28 @@ defmodule ProductionHardeningTest do
       end)
 
     assert_raise ArgumentError, ~r/planner instructions must match task instructions/, fn ->
-      DSEx.Saving.load(mismatched_instruction)
+      Imp.Saving.load(mismatched_instruction)
     end
 
     bad_planner_outputs =
       update_in(pot_state, ["predict", "signature"], fn _signature ->
-        DSEx.Signature.dump(DSEx.Signature.new("x -> answer"))
+        Imp.Signature.dump(Imp.Signature.new("x -> answer"))
       end)
 
     assert_raise ArgumentError, ~r/planner outputs must be \[:program, :tool, :arguments\]/, fn ->
-      DSEx.Saving.load(bad_planner_outputs)
+      Imp.Saving.load(bad_planner_outputs)
     end
 
     assert_raise ArgumentError, ~r/output_field must name one of the task outputs/, fn ->
       pot_state
-      |> Map.put("output_field", %{"__dsex_type__" => "atom", "value" => "missing"})
-      |> DSEx.Saving.load()
+      |> Map.put("output_field", %{"__imp_type__" => "atom", "value" => "missing"})
+      |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/saved DSEx config must be a map or list/, fn ->
+    assert_raise ArgumentError, ~r/saved Imp config must be a map or list/, fn ->
       base
       |> Map.put("lm", %{"provider" => "req_llm", "model" => "openai:gpt-test", "opts" => 1})
-      |> DSEx.Saving.load()
+      |> Imp.Saving.load()
     end
   end
 
@@ -669,11 +669,11 @@ defmodule ProductionHardeningTest do
 
     state = %{
       "type" => "predict",
-      "signature" => DSEx.Signature.dump(DSEx.Signature.new("question -> answer")),
+      "signature" => Imp.Signature.dump(Imp.Signature.new("question -> answer")),
       "demos" => [],
       "config" => [],
       "metadata" => %{},
-      "adapter" => "Elixir.DSEx.Adapter.Chat",
+      "adapter" => "Elixir.Imp.Adapter.Chat",
       "lm" => %{
         "provider" => "openai",
         "model" => "gpt-test",
@@ -684,7 +684,7 @@ defmodule ProductionHardeningTest do
     }
 
     assert_raise ArgumentError, ~r/saved provider clients must use req_llm/, fn ->
-      DSEx.Saving.load(state)
+      Imp.Saving.load(state)
     end
   after
     previous = Process.get(:previous_openai_api_key)
@@ -701,7 +701,7 @@ defmodule ProductionHardeningTest do
   test "saved adapter loading is allowlisted" do
     state = %{
       "type" => "predict",
-      "signature" => DSEx.Signature.dump(DSEx.Signature.new("question -> answer")),
+      "signature" => Imp.Signature.dump(Imp.Signature.new("question -> answer")),
       "demos" => [],
       "config" => [],
       "metadata" => %{},
@@ -709,8 +709,8 @@ defmodule ProductionHardeningTest do
       "lm" => nil
     }
 
-    assert_raise ArgumentError, ~r/unsupported saved DSEx adapter/, fn ->
-      DSEx.Saving.load(state)
+    assert_raise ArgumentError, ~r/unsupported saved Imp adapter/, fn ->
+      Imp.Saving.load(state)
     end
   end
 
@@ -718,7 +718,7 @@ defmodule ProductionHardeningTest do
     secret = "sk-secretvalue123"
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{answer: "saw #{secret}"}
@@ -726,8 +726,8 @@ defmodule ProductionHardeningTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
-    assert {:ok, prediction} = DSEx.Predict.Predict.call(program, %{question: secret})
+    program = Imp.predict("question -> answer", lm: lm)
+    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: secret})
     trace_text = inspect(prediction.metadata.trace)
     refute trace_text =~ secret
     assert trace_text =~ "[REDACTED]"
@@ -737,7 +737,7 @@ defmodule ProductionHardeningTest do
     secret = "Bearer abcdefghijklmnop"
 
     react_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{
@@ -750,13 +750,13 @@ defmodule ProductionHardeningTest do
       ]
     }
 
-    leak = DSEx.Tool.new(:leak, "leak", fn _args -> secret end)
-    react = DSEx.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
-    assert {:ok, react_prediction} = DSEx.Predict.ReAct.call(react, %{question: "q"})
-    refute inspect(DSEx.Prediction.get(react_prediction, :history)) =~ secret
+    leak = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
+    react = Imp.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
+    assert {:ok, react_prediction} = Imp.Predict.ReAct.call(react, %{question: "q"})
+    refute inspect(Imp.Prediction.get(react_prediction, :history)) =~ secret
 
     code_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_redaction_actions)
@@ -766,18 +766,18 @@ defmodule ProductionHardeningTest do
       ]
     }
 
-    code_tool = DSEx.Tool.new(:leak, "leak", fn _args -> secret end)
+    code_tool = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
 
     Process.put(:code_redaction_actions, [%{tool: "leak", arguments: %{}}, %{program: ~s("done")}])
 
     code_act =
-      DSEx.Predict.CodeAct.new("question -> answer", [code_tool], lm: code_lm, max_iters: 2)
+      Imp.Predict.CodeAct.new("question -> answer", [code_tool], lm: code_lm, max_iters: 2)
 
-    assert {:ok, code_prediction} = DSEx.Predict.CodeAct.call(code_act, %{question: "q"})
+    assert {:ok, code_prediction} = Imp.Predict.CodeAct.call(code_act, %{question: "q"})
     refute inspect(code_prediction.metadata.code_act_trace) =~ secret
 
     rlm_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_redaction_actions)
@@ -792,8 +792,8 @@ defmodule ProductionHardeningTest do
       %{code: ~S|submit(%{answer: "ok"})|}
     ])
 
-    rlm = DSEx.Predict.RLM.new("question -> answer", lm: rlm_lm, max_iterations: 2)
-    assert {:ok, rlm_prediction} = DSEx.Predict.RLM.call(rlm, %{question: "q"})
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: rlm_lm, max_iterations: 2)
+    assert {:ok, rlm_prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
     refute inspect(rlm_prediction.metadata.rlm_trace) =~ secret
   after
     Process.delete(:code_redaction_actions)
@@ -801,20 +801,20 @@ defmodule ProductionHardeningTest do
   end
 
   test "tool telemetry redacts secret-shaped metadata" do
-    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :tool, :start]])
+    ref = Imp.Test.TelemetryHelpers.attach([[:imp, :tool, :start]])
 
-    tool = DSEx.Tool.new(:secret_tool, "echo", fn input -> input end)
+    tool = Imp.Tool.new(:secret_tool, "echo", fn input -> input end)
 
     assert %{"api_key" => "sk-live-secret"} =
-             DSEx.Tool.call(tool, %{"api_key" => "sk-live-secret"})
+             Imp.Tool.call(tool, %{"api_key" => "sk-live-secret"})
 
-    assert_received {^ref, [:dsex, :tool, :start], _, metadata}
+    assert_received {^ref, [:imp, :tool, :start], _, metadata}
     assert metadata.arguments["api_key"] == "[REDACTED]"
   end
 
   test "redaction covers common compound secret keys" do
     redacted =
-      DSEx.Redaction.redact(%{
+      Imp.Redaction.redact(%{
         :access_token => "short-token",
         :client_secret => "short-secret",
         "x-api-key" => "short-key",
@@ -831,25 +831,25 @@ defmodule ProductionHardeningTest do
 
   test "redaction key policy accepts only atom or string key names" do
     assert {:ok, [:api_key, "authorization"]} =
-             DSEx.Redaction.validate_keys([:api_key, "authorization"])
+             Imp.Redaction.validate_keys([:api_key, "authorization"])
 
-    assert {:error, message} = DSEx.Redaction.validate_keys([:api_key, {:tuple, :key}])
+    assert {:error, message} = Imp.Redaction.validate_keys([:api_key, {:tuple, :key}])
     assert message =~ "expected a list of atom or string key names"
 
-    assert {:error, message} = DSEx.Redaction.validate_keys(:api_key)
+    assert {:error, message} = Imp.Redaction.validate_keys(:api_key)
     assert message =~ "expected a list of atom or string key names"
   end
 
   test "examples and predictions do not intern arbitrary external keys" do
     external_key = "external_key_#{System.unique_integer([:positive])}"
 
-    example = DSEx.Example.new(%{external_key => "kept"})
-    prediction = DSEx.Prediction.new(%{external_key => "kept"})
+    example = Imp.Example.new(%{external_key => "kept"})
+    prediction = Imp.Prediction.new(%{external_key => "kept"})
 
-    assert DSEx.Example.to_map(example) == %{external_key => "kept"}
-    assert DSEx.Example.get(example, external_key) == "kept"
-    assert DSEx.Prediction.to_map(prediction) == %{external_key => "kept"}
-    assert DSEx.Prediction.get(prediction, external_key) == "kept"
+    assert Imp.Example.to_map(example) == %{external_key => "kept"}
+    assert Imp.Example.get(example, external_key) == "kept"
+    assert Imp.Prediction.to_map(prediction) == %{external_key => "kept"}
+    assert Imp.Prediction.get(prediction, external_key) == "kept"
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
   end
@@ -858,52 +858,52 @@ defmodule ProductionHardeningTest do
     external_input = "external_input_#{System.unique_integer([:positive])}"
     external_output = "external_output_#{System.unique_integer([:positive])}"
 
-    signature = DSEx.Signature.new("#{external_input} -> #{external_output}")
+    signature = Imp.Signature.new("#{external_input} -> #{external_output}")
 
-    assert DSEx.Signature.input_names(signature) == [external_input]
-    assert DSEx.Signature.output_names(signature) == [external_output]
+    assert Imp.Signature.input_names(signature) == [external_input]
+    assert Imp.Signature.output_names(signature) == [external_output]
 
     assert {:ok, prediction} =
-             DSEx.Adapter.Chat.parse(signature, %{external_output => "ok"}, [])
+             Imp.Adapter.Chat.parse(signature, %{external_output => "ok"}, [])
 
-    assert DSEx.Prediction.get(prediction, external_output) == "ok"
+    assert Imp.Prediction.get(prediction, external_output) == "ok"
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_input) end
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_output) end
   end
 
   test "parallel maps preserve per-input success shape under concurrency" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     results =
-      DSEx.Predict.Parallel.map(program, [
+      Imp.Predict.Parallel.map(program, [
         %{question: "a"},
         %{question: "b"},
         %{question: "c"}
       ])
 
-    assert Enum.all?(results, &match?({:ok, %DSEx.Prediction{}}, &1))
+    assert Enum.all?(results, &match?({:ok, %Imp.Prediction{}}, &1))
   end
 
   test "parallel map reports invalid options clearly" do
-    program = DSEx.predict("question -> answer", lm: %{module: DSEx.LM.Static, opts: []})
+    program = Imp.predict("question -> answer", lm: %{module: Imp.LM.Static, opts: []})
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Parallel\.map\/3: expected keyword options/,
+                 ~r/Imp\.Predict\.Parallel\.map\/3: expected keyword options/,
                  fn ->
-                   DSEx.Predict.Parallel.map(program, [%{question: "a"}], :not_options)
+                   Imp.Predict.Parallel.map(program, [%{question: "a"}], :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Parallel\.map\/3 expects inputs to be an enumerable batch/,
+                 ~r/Imp\.Predict\.Parallel\.map\/3 expects inputs to be an enumerable batch/,
                  fn ->
-                   DSEx.Predict.Parallel.map(program, :not_a_batch)
+                   Imp.Predict.Parallel.map(program, :not_a_batch)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Parallel\.map\/3: invalid value for :max_concurrency option: expected positive integer/,
+                 ~r/Imp\.Predict\.Parallel\.map\/3: invalid value for :max_concurrency option: expected positive integer/,
                  fn ->
-                   DSEx.Predict.Parallel.map(program, [%{question: "a"}], max_concurrency: 0)
+                   Imp.Predict.Parallel.map(program, [%{question: "a"}], max_concurrency: 0)
                  end
   end
 

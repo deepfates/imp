@@ -1,7 +1,7 @@
 defmodule AutoEvaluationFidelityTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Evaluate.{CompleteAndGrounded, SemanticF1}
+  alias Imp.Evaluate.{CompleteAndGrounded, SemanticF1}
 
   test "SemanticF1 computes the clamped harmonic mean locally" do
     lm = static_lm(fn _prompt -> %{reasoning: "judge", precision: 0.8, recall: 0.6} end)
@@ -15,7 +15,7 @@ defmodule AutoEvaluationFidelityTest do
              })
 
     assert_in_delta result.score, 0.6857142857, 1.0e-9
-    assert_in_delta DSEx.Prediction.get(result, :f1), 0.6857142857, 1.0e-9
+    assert_in_delta Imp.Prediction.get(result, :f1), 0.6857142857, 1.0e-9
 
     assert {:ok, clamped} = SemanticF1.f1_score(2.0, 0.5)
     assert_in_delta clamped, 2 / 3, 1.0e-9
@@ -36,8 +36,8 @@ defmodule AutoEvaluationFidelityTest do
              })
 
     assert result.score == false
-    assert DSEx.Prediction.get(result, :score) == false
-    assert is_float(DSEx.Prediction.get(result, :f1))
+    assert Imp.Prediction.get(result, :score) == false
+    assert is_float(Imp.Prediction.get(result, :f1))
   end
 
   test "decompositional SemanticF1 requests key-idea fields" do
@@ -94,13 +94,13 @@ defmodule AutoEvaluationFidelityTest do
     assert {:ok, result} =
              CompleteAndGrounded.new(lm: lm, threshold: 0.85)
              |> CompleteAndGrounded.call(%{
-               example: DSEx.example(question: "q", response: "gold"),
-               pred: DSEx.prediction(response: "answer", context: "context"),
+               example: Imp.example(question: "q", response: "gold"),
+               pred: Imp.prediction(response: "answer", context: "context"),
                trace: :optimizer
              })
 
     assert result.score == false
-    assert_in_delta DSEx.Prediction.get(result, :f1), 0.8470588235, 1.0e-9
+    assert_in_delta Imp.Prediction.get(result, :f1), 0.8470588235, 1.0e-9
     assert_received {:prompt, completeness_prompt}
     assert_received {:prompt, groundedness_prompt}
     assert completeness_prompt =~ "ground_truth"
@@ -110,14 +110,14 @@ defmodule AutoEvaluationFidelityTest do
   test "auto evaluators fail closed on missing or nonnumeric judgment fields" do
     missing = static_lm(fn _prompt -> %{reasoning: "judge", precision: "high", recall: 1} end)
 
-    assert {:error, %{reason: {:error, %DSEx.AdapterParseError{}}}} =
+    assert {:error, %{reason: {:error, %Imp.AdapterParseError{}}}} =
              SemanticF1.new(lm: missing)
              |> SemanticF1.call(%{question: "q", ground_truth: "a", system_response: "a"})
   end
 
   defp static_lm(handler) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           messages |> Enum.map_join("\n", & &1.content) |> handler.()

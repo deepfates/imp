@@ -1,4 +1,4 @@
-defmodule DSEx.FailureCampaignTest do
+defmodule Imp.FailureCampaignTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
@@ -7,13 +7,13 @@ defmodule DSEx.FailureCampaignTest do
 
   test "records ten clean deterministic iterations without claiming live completion" do
     artifact =
-      DSEx.BenchmarkTruth.FailureCampaign.run(
+      Imp.BenchmarkTruth.FailureCampaign.run(
         iterations: @required_iterations,
         max_concurrency: 2
       )
 
     assert artifact["schema_version"] == 3
-    assert artifact["runner"] == "dsex-failure-campaign"
+    assert artifact["runner"] == "imp-failure-campaign"
     refute Map.has_key?(artifact, "generated_at")
 
     assert artifact["summary"] == %{
@@ -70,20 +70,20 @@ defmodule DSEx.FailureCampaignTest do
       artifact,
       "mipro_v2_durable_resume_and_tamper",
       "mipro_v2",
-      "dsex_mipro_v2_run"
+      "imp_mipro_v2_run"
     )
 
     assert_optimizer_evidence(
       artifact,
       "simba_durable_resume_and_tamper",
       "simba",
-      "dsex_simba_run"
+      "imp_simba_run"
     )
   end
 
   test "distinguishes requested success from the ten-iteration flake sample" do
     artifact =
-      DSEx.BenchmarkTruth.FailureCampaign.run(
+      Imp.BenchmarkTruth.FailureCampaign.run(
         iterations: 2,
         max_concurrency: 2,
         iteration_timeout_ms: 15_000
@@ -98,16 +98,16 @@ defmodule DSEx.FailureCampaignTest do
 
   test "validates the per-iteration wall-clock bound" do
     assert_raise ArgumentError, ~r/iteration_timeout_ms must be a positive integer/, fn ->
-      DSEx.BenchmarkTruth.FailureCampaign.run(iteration_timeout_ms: 0)
+      Imp.BenchmarkTruth.FailureCampaign.run(iteration_timeout_ms: 0)
     end
   end
 
   test "mix task writes the deterministic artifact" do
-    out = Path.join(System.tmp_dir!(), "dsex-failure-#{System.unique_integer([:positive])}")
+    out = Path.join(System.tmp_dir!(), "imp-failure-#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf!(out) end)
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.FailureCampaign.run([
+      Mix.Tasks.Imp.Benchmark.FailureCampaign.run([
         "--iterations",
         Integer.to_string(@required_iterations),
         "--max-concurrency",
@@ -119,7 +119,7 @@ defmodule DSEx.FailureCampaignTest do
 
     [path] = Path.wildcard(Path.join(out, "failure-campaign-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
-    assert DSEx.BenchmarkTruth.ArtifactFile.read_run_json!(path) == artifact
+    assert Imp.BenchmarkTruth.ArtifactFile.read_run_json!(path) == artifact
     assert artifact["summary"]["deterministic_complete"]
     assert artifact["summary"]["local_complete"]
     refute artifact["summary"]["live_complete"]

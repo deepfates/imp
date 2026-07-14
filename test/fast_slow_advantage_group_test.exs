@@ -1,7 +1,7 @@
-defmodule DSEx.Training.FastSlow.AdvantageGroupTest do
+defmodule Imp.Training.FastSlow.AdvantageGroupTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{AdvantageGroup, Config, Rollout}
+  alias Imp.Training.FastSlow.{AdvantageGroup, Config, Rollout}
 
   test "normalizes one question-level group across all prompt populations" do
     rollouts = complete_group([0.0, 0.25, 0.75, 1.0])

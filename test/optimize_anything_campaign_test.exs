@@ -1,7 +1,7 @@
 defmodule OptimizeAnythingCampaignTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.OptimizeAnything.{
+  alias Imp.BenchmarkTruth.OptimizeAnything.{
     AgentConfig,
     Artifact,
     Campaign,
@@ -69,7 +69,7 @@ defmodule OptimizeAnythingCampaignTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)
     path

@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.DemoCandidatesTest do
+defmodule Imp.Optimizer.DemoCandidatesTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.DemoCandidates
+  alias Imp.Optimizer.DemoCandidates
 
   defmodule TracedProgram do
     defstruct [:first, :second]
@@ -20,7 +20,7 @@ defmodule DSEx.Optimizer.DemoCandidatesTest do
         %{predictor: :second, inputs: %{hint: "two"}, outputs: %{answer: "yes"}}
       ]
 
-      {:ok, DSEx.Prediction.new(%{answer: "yes"}, metadata: %{optimizer_trace: trace})}
+      {:ok, Imp.Prediction.new(%{answer: "yes"}, metadata: %{optimizer_trace: trace})}
     end
   end
 
@@ -36,7 +36,7 @@ defmodule DSEx.Optimizer.DemoCandidatesTest do
 
   test "bootstraps only metric-accepted predictions and preserves labeled capacity" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           if inspect(messages) =~ "good", do: %{answer: "yes"}, else: %{answer: "no"}
@@ -44,14 +44,14 @@ defmodule DSEx.Optimizer.DemoCandidatesTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
+    program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
-      DSEx.example(question: "good", answer: "yes") |> DSEx.with_inputs(:question),
-      DSEx.example(question: "bad", answer: "yes") |> DSEx.with_inputs(:question)
+      Imp.example(question: "good", answer: "yes") |> Imp.with_inputs(:question),
+      Imp.example(question: "bad", answer: "yes") |> Imp.with_inputs(:question)
     ]
 
-    metric = DSEx.Metrics.exact_match(:answer)
+    metric = Imp.Metrics.exact_match(:answer)
 
     {candidates, metadata} =
       DemoCandidates.build(program, trainset, metric,
@@ -65,38 +65,38 @@ defmodule DSEx.Optimizer.DemoCandidatesTest do
     assert metadata.rejected_count == 1
     assert length(candidates.main) == 3
     assert [[], [labeled], [bootstrapped | _]] = candidates.main
-    assert DSEx.Example.to_map(labeled).answer == "yes"
-    assert DSEx.Example.to_map(bootstrapped).answer == "yes"
+    assert Imp.Example.to_map(labeled).answer == "yes"
+    assert Imp.Example.to_map(bootstrapped).answer == "yes"
   end
 
   test "zero-shot candidate building still produces grounding demos for proposal" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
-    example = DSEx.example(question: "q", answer: "yes") |> DSEx.with_inputs(:question)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
+    example = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
 
     {candidates, _metadata} =
-      DemoCandidates.build(program, [example], DSEx.Metrics.exact_match(:answer),
+      DemoCandidates.build(program, [example], Imp.Metrics.exact_match(:answer),
         candidate_count: 3,
         max_bootstrapped_demos: 3,
         max_labeled_demos: 0
       )
 
     assert [[], [first_demo], [second_demo]] = candidates.main
-    assert DSEx.Example.to_map(first_demo) == %{question: "q", answer: "yes"}
-    assert DSEx.Example.to_map(second_demo) == %{question: "q", answer: "yes"}
+    assert Imp.Example.to_map(first_demo) == %{question: "q", answer: "yes"}
+    assert Imp.Example.to_map(second_demo) == %{question: "q", answer: "yes"}
   end
 
   test "keeps the canonical third candidate in source trainset order" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     trainset =
       Enum.map(["first", "second", "third"], fn question ->
-        DSEx.example(question: question, answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: question, answer: "yes") |> Imp.with_inputs(:question)
       end)
 
     {candidates, metadata} =
-      DemoCandidates.build(program, trainset, DSEx.Metrics.exact_match(:answer),
+      DemoCandidates.build(program, trainset, Imp.Metrics.exact_match(:answer),
         candidate_count: 3,
         max_bootstrapped_demos: 3,
         max_labeled_demos: 0,
@@ -104,40 +104,40 @@ defmodule DSEx.Optimizer.DemoCandidatesTest do
       )
 
     assert [[], [_ | _], demos] = candidates.main
-    assert Enum.map(demos, &DSEx.Example.to_map(&1).question) == ["first", "second", "third"]
+    assert Enum.map(demos, &Imp.Example.to_map(&1).question) == ["first", "second", "third"]
     assert Enum.map(metadata.rounds, &{&1.index, &1.bootstrap_size}) == [{1, 3}, {2, 3}]
   end
 
   test "keeps the final repeated call per predictor without cross-stage fallback" do
     program = %TracedProgram{
-      first: DSEx.predict("question -> hint"),
-      second: DSEx.predict("hint -> answer")
+      first: Imp.predict("question -> hint"),
+      second: Imp.predict("hint -> answer")
     }
 
-    example = DSEx.example(question: "q", answer: "yes") |> DSEx.with_inputs(:question)
+    example = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
 
     {candidates, _metadata} =
-      DemoCandidates.build(program, [example], DSEx.Metrics.exact_match(:answer),
+      DemoCandidates.build(program, [example], Imp.Metrics.exact_match(:answer),
         candidate_count: 3,
         max_bootstrapped_demos: 4,
         max_labeled_demos: 0
       )
 
     assert [[], [first_demo], [second_first_demo]] = candidates.first
-    assert DSEx.Example.to_map(first_demo) == %{question: "q again", hint: "two"}
-    assert DSEx.Example.to_map(second_first_demo) == %{question: "q again", hint: "two"}
+    assert Imp.Example.to_map(first_demo) == %{question: "q again", hint: "two"}
+    assert Imp.Example.to_map(second_first_demo) == %{question: "q again", hint: "two"}
 
     assert [[], [second_demo], [second_second_demo]] = candidates.second
-    assert DSEx.Example.to_map(second_demo) == %{hint: "two", answer: "yes"}
-    assert DSEx.Example.to_map(second_second_demo) == %{hint: "two", answer: "yes"}
+    assert Imp.Example.to_map(second_demo) == %{hint: "two", answer: "yes"}
+    assert Imp.Example.to_map(second_second_demo) == %{hint: "two", answer: "yes"}
   end
 
   test "aborts bootstrapping when the configured error budget is exhausted" do
-    program = %FailingProgram{predict: DSEx.predict("question -> answer")}
-    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+    program = %FailingProgram{predict: Imp.predict("question -> answer")}
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
 
     assert_raise RuntimeError, ~r/bootstrap error budget exhausted/, fn ->
-      DemoCandidates.build(program, [example], DSEx.Metrics.exact_match(:answer),
+      DemoCandidates.build(program, [example], Imp.Metrics.exact_match(:answer),
         candidate_count: 2,
         max_bootstrapped_demos: 1,
         max_labeled_demos: 0,

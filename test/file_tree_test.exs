@@ -1,11 +1,11 @@
-defmodule DSEx.BenchmarkTruth.FileTreeTest do
+defmodule Imp.BenchmarkTruth.FileTreeTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.FileTree
+  alias Imp.BenchmarkTruth.FileTree
 
   setup do
     root =
-      Path.join(System.tmp_dir!(), "dsex-file-tree-#{System.unique_integer([:positive])}")
+      Path.join(System.tmp_dir!(), "imp-file-tree-#{System.unique_integer([:positive])}")
 
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)

@@ -10,7 +10,7 @@ defmodule LiveProviderE2ETest do
     assert is_binary(api_key) and byte_size(api_key) > 0
     assert is_binary(model) and byte_size(model) > 0
 
-    DSEx.req_llm(
+    Imp.req_llm(
       "openai:#{model}",
       Keyword.merge([api_key: api_key, temperature: 0, max_completion_tokens: 120], opts)
     )
@@ -18,23 +18,23 @@ defmodule LiveProviderE2ETest do
 
   test "live provider completes chain-of-thought with required reasoning field" do
     program =
-      DSEx.chain_of_thought("question -> answer",
+      Imp.chain_of_thought("question -> answer",
         lm: live_lm(),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                question:
                  "Return JSON with reasoning and answer. Reason briefly, then set answer to exactly pong."
              })
 
-    assert prediction |> DSEx.Prediction.get(:reasoning, "") |> to_string() |> byte_size() > 0
+    assert prediction |> Imp.Prediction.get(:reasoning, "") |> to_string() |> byte_size() > 0
 
     answer =
       prediction
-      |> DSEx.Prediction.get(:answer, "")
+      |> Imp.Prediction.get(:answer, "")
       |> to_string()
       |> String.downcase()
 
@@ -43,34 +43,34 @@ defmodule LiveProviderE2ETest do
 
   test "live provider extracts structured event details through the front-door API" do
     program =
-      DSEx.predict(
-        DSEx.signature(
+      Imp.predict(
+        Imp.signature(
           "email -> event_name: string, date: string",
           "Extract the event name and date from the email. Return JSON only."
         ),
         lm: live_lm(max_completion_tokens: 120),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                email: "Team Offsite moved to Thursday, June 5. Bring questions for planning."
              })
 
-    event_name = prediction |> DSEx.get(:event_name, "") |> to_string() |> String.downcase()
-    date = prediction |> DSEx.get(:date, "") |> to_string() |> String.downcase()
+    event_name = prediction |> Imp.get(:event_name, "") |> to_string() |> String.downcase()
+    date = prediction |> Imp.get(:date, "") |> to_string() |> String.downcase()
 
     assert event_name =~ "offsite"
     assert date =~ "june" or date =~ "thursday" or date =~ "6/5" or date =~ "06-05"
   end
 
-  test "live provider streams OpenAI-compatible chunks through DSEx.Streaming" do
-    program = DSEx.predict("question -> answer", lm: live_lm(max_completion_tokens: 40))
+  test "live provider streams OpenAI-compatible chunks through Imp.Streaming" do
+    program = Imp.predict("question -> answer", lm: live_lm(max_completion_tokens: 40))
 
     chunks =
       program
-      |> DSEx.Streaming.stream(
+      |> Imp.Streaming.stream(
         %{question: "Stream exactly the word pong, with no punctuation."},
         provider_stream: true
       )
@@ -85,7 +85,7 @@ defmodule LiveProviderE2ETest do
 
   test "live provider uses ReAct function tools and reserved submit" do
     signature =
-      DSEx.Signature.new(
+      Imp.Signature.new(
         "question -> answer",
         """
         Use the lookup tool first with query "capital-france".
@@ -95,7 +95,7 @@ defmodule LiveProviderE2ETest do
       )
 
     lookup =
-      DSEx.Tool.new(
+      Imp.Tool.new(
         :lookup,
         "Lookup a fact by query.",
         fn
@@ -116,33 +116,33 @@ defmodule LiveProviderE2ETest do
       )
 
     agent =
-      DSEx.react(signature, [lookup],
+      Imp.react(signature, [lookup],
         lm: live_lm(max_completion_tokens: 160),
         tool_policy: [:lookup, :submit],
         max_iters: 4
       )
 
     assert {:ok, prediction} =
-             DSEx.call(agent, %{
+             Imp.call(agent, %{
                question: "What is the capital of France?"
              })
 
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
-    history = DSEx.Prediction.get(prediction, :history)
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    history = Imp.Prediction.get(prediction, :history)
     assert Enum.any?(history, &(&1.tool == :lookup and &1.result == "Paris"))
     assert Enum.any?(history, &(&1.tool == :submit))
   end
 
   test "live provider supports orchestration modules over real calls" do
     base =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         lm: live_lm(max_completion_tokens: 50),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     parallel_results =
-      DSEx.parallel(
+      Imp.parallel(
         base,
         [
           %{question: "Return JSON with answer exactly alpha."},
@@ -153,79 +153,79 @@ defmodule LiveProviderE2ETest do
 
     assert [{:ok, alpha}, {:ok, beta}] = parallel_results
 
-    assert alpha |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
+    assert alpha |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
              "alpha"
 
-    assert beta |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~ "beta"
+    assert beta |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~ "beta"
 
     best =
-      DSEx.best_of_n(base, fn _example, prediction ->
-        prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
+      Imp.best_of_n(base, fn _example, prediction ->
+        prediction |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
           "pong"
       end)
 
     assert {:ok, best_prediction} =
-             DSEx.call(best, %{
+             Imp.call(best, %{
                question: "Return JSON with answer exactly pong."
              })
 
-    assert best_prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
+    assert best_prediction |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
              "pong"
 
     refine =
-      DSEx.refine(base, fn _example, prediction ->
-        prediction |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
+      Imp.refine(base, fn _example, prediction ->
+        prediction |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
           "pong"
       end)
 
     assert {:ok, refined} =
-             DSEx.call(refine, %{
+             Imp.call(refine, %{
                question: "Return JSON with answer exactly pong."
              })
 
-    assert refined |> DSEx.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
+    assert refined |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase() =~
              "pong"
   end
 
   test "live provider drives program-of-thought through the sandbox" do
     program =
-      DSEx.program_of_thought("question -> answer",
+      Imp.program_of_thought("question -> answer",
         lm: live_lm(max_completion_tokens: 80),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1]
       )
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                question: "Return JSON with program exactly \"1 + 2\"."
              })
 
-    assert DSEx.Prediction.get(prediction, :answer) == 3
+    assert Imp.Prediction.get(prediction, :answer) == 3
   end
 
   test "live provider drives CodeAct through the BEAM-safe sandbox" do
     program =
-      DSEx.code_act("question -> answer: int", [],
+      Imp.code_act("question -> answer: int", [],
         lm: live_lm(max_completion_tokens: 100),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [json_retries: 1],
         max_iters: 2
       )
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                question:
                  "Return JSON whose program field contains the Elixir source 20 + 22. The decoded program must not itself be a quoted string literal. Do not use a tool."
              })
 
-    assert DSEx.get(prediction, :answer) == 42
+    assert Imp.get(prediction, :answer) == 42
     assert [%{action: :program, output: {:ok, 42}}] = prediction.metadata.code_act_trace
   end
 
   test "live provider drives ReActV2 native submit" do
     program =
-      DSEx.react_v2(
-        DSEx.signature(
+      Imp.react_v2(
+        Imp.signature(
           "question -> answer",
           "Call submit with answer exactly Paris. Do not call any other tool."
         ),
@@ -234,26 +234,26 @@ defmodule LiveProviderE2ETest do
         max_iters: 1
       )
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
-    assert DSEx.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
-    assert DSEx.get(prediction, :termination_reason) in [:submit, :forced_submit]
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+    assert Imp.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
+    assert Imp.get(prediction, :termination_reason) in [:submit, :forced_submit]
   end
 
   test "live provider drives symbolic RLM code with observable budget" do
     program =
-      DSEx.rlm(
-        DSEx.signature(
+      Imp.rlm(
+        Imp.signature(
           "question -> answer",
           "Use the persistent Elixir environment. Return reasoning and code that assigns the answer to a variable, then calls submit with answer exactly Paris."
         ),
         lm: live_lm(max_completion_tokens: 100),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         max_iterations: 2,
         max_llm_calls: 2
       )
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
-    assert DSEx.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+    assert Imp.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
     assert prediction.metadata.rlm.sub_lm_calls <= 2
     assert prediction.metadata.rlm.iterations <= 2
     assert is_list(prediction.metadata.rlm_trace)
@@ -262,21 +262,21 @@ defmodule LiveProviderE2ETest do
 
   test "live provider RLM code invokes a real sub-LM from the environment" do
     program =
-      DSEx.rlm(
-        DSEx.signature(
+      Imp.rlm(
+        Imp.signature(
           "question -> answer",
           "Return reasoning and Elixir code. The code must call llm_query with a prompt asking for the one-word capital of France, assign its result, and submit that exact result as answer."
         ),
         lm: live_lm(max_completion_tokens: 160),
         sub_lm: live_lm(max_completion_tokens: 40),
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         max_iterations: 2,
         max_llm_calls: 1
       )
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
     assert prediction.metadata.rlm.sub_lm_calls == 1, inspect(prediction, pretty: true)
-    assert String.contains?(to_string(DSEx.get(prediction, :answer)), "Paris")
+    assert String.contains?(to_string(Imp.get(prediction, :answer)), "Paris")
     assert Enum.any?(prediction.metadata.rlm_trace, &(&1.action == :submit))
   end
 end

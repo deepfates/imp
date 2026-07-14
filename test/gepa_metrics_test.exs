@@ -3,65 +3,65 @@ defmodule GepaMetricsTest do
 
   test "AIME metric parses integer answers exactly" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "AIME.metric integer exact match",
         "output_key" => "answer"
       })
 
-    example = DSEx.example(problem: "p", answer: "42") |> DSEx.with_inputs(:problem)
+    example = Imp.example(problem: "p", answer: "42") |> Imp.with_inputs(:problem)
 
-    assert metric.(example, DSEx.prediction(answer: "42"))
-    refute metric.(example, DSEx.prediction(answer: "42.0"))
-    refute metric.(example, DSEx.prediction(answer: "forty two"))
+    assert metric.(example, Imp.prediction(answer: "42"))
+    refute metric.(example, Imp.prediction(answer: "42.0"))
+    refute metric.(example, Imp.prediction(answer: "forty two"))
   end
 
   test "HotPotQA metric uses normalized exact match over answer aliases" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "dspy.evaluate.answer_exact_match",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(question: "q", answer: ["The Eiffel Tower", "Eiffel Tower"])
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "q", answer: ["The Eiffel Tower", "Eiffel Tower"])
+      |> Imp.with_inputs(:question)
 
-    assert metric.(example, DSEx.prediction(answer: "eiffel tower"))
-    refute metric.(example, DSEx.prediction(answer: "Paris"))
+    assert metric.(example, Imp.prediction(answer: "eiffel tower"))
+    refute metric.(example, Imp.prediction(answer: "Paris"))
   end
 
   test "HoVer metric checks supporting fact titles against retrieved documents" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "hover_utils.discrete_retrieval_eval",
         "output_key" => "label"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         claim: "c",
         supporting_facts: [%{"key" => "Alpha Page"}, %{"key" => "Beta Page"}],
         label: "SUPPORTED"
       )
-      |> DSEx.with_inputs(:claim)
+      |> Imp.with_inputs(:claim)
 
     assert metric.(
              example,
-             DSEx.prediction(retrieved_docs: ["Alpha Page | text", "Beta Page | text"])
+             Imp.prediction(retrieved_docs: ["Alpha Page | text", "Beta Page | text"])
            )
 
-    refute metric.(example, DSEx.prediction(retrieved_docs: ["Alpha Page | text"]))
+    refute metric.(example, Imp.prediction(retrieved_docs: ["Alpha Page | text"]))
   end
 
   test "IFBench metric scores instruction-following constraints fractionally over upstream variants" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "Repeat this prompt.",
         response: "",
         instruction_id_list: [
@@ -79,10 +79,10 @@ defmodule GepaMetricsTest do
           %{"end_phrase" => "done"}
         ]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
     prediction =
-      DSEx.prediction(
+      Imp.prediction(
         response: """
         alpha beta
         [name] [date]
@@ -94,14 +94,14 @@ defmodule GepaMetricsTest do
 
     assert metric.(example, prediction) == 1.0
 
-    assert metric.(example, DSEx.prediction(response: "alpha beta [name]\n* one\ndone")) == 0.6
+    assert metric.(example, Imp.prediction(response: "alpha beta [name]\n* one\ndone")) == 0.6
   end
 
   test "IFBench reflective metric uses pinned upstream instruction descriptions" do
     bridge =
       Path.join(
         System.tmp_dir!(),
-        "dsex-ifbench-description-#{System.unique_integer([:positive])}.sh"
+        "imp-ifbench-description-#{System.unique_integer([:positive])}.sh"
       )
 
     File.write!(
@@ -112,7 +112,7 @@ defmodule GepaMetricsTest do
     on_exit(fn -> File.rm(bridge) end)
 
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric_with_feedback(
+      Imp.BenchmarkTruth.GepaMetrics.metric_with_feedback(
         %{"upstream_metric" => "IFBench.ifbench_metric.metric"},
         upstream_descriptions: true,
         gepa_root: System.tmp_dir!(),
@@ -121,14 +121,14 @@ defmodule GepaMetricsTest do
       )
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "Use alpha without commas.",
         instruction_id_list: ["keywords:existence", "punctuation:no_comma"],
         kwargs: [%{"keywords" => ["alpha"]}, %{}]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
-    result = metric.(example, DSEx.prediction(response: "alpha"))
+    result = metric.(example, Imp.prediction(response: "alpha"))
 
     assert result.score == 1.0
     assert result.feedback =~ "Include alpha."
@@ -138,32 +138,32 @@ defmodule GepaMetricsTest do
 
   test "IFBench metric applies upstream response variants before checking constraints" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "p",
         response: "",
         instruction_id_list: ["detectable_format:json_format"],
         kwargs: [%{}]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
-    assert metric.(example, DSEx.prediction(response: "prefix\n{\"ok\": true}\nsuffix")) == 1.0
+    assert metric.(example, Imp.prediction(response: "prefix\n{\"ok\": true}\nsuffix")) == 1.0
   end
 
   test "IFBench metric covers remaining active deterministic registry checks" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "p",
         response: "",
         instruction_id_list: [
@@ -177,36 +177,36 @@ defmodule GepaMetricsTest do
           %{"language" => "en"}
         ]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
-    assert metric.(example, DSEx.prediction(response: "\"This has NASA and HTTP words.\"")) == 1.0
-    assert metric.(example, DSEx.prediction(response: "This has NASA words.")) == 1 / 3
+    assert metric.(example, Imp.prediction(response: "\"This has NASA and HTTP words.\"")) == 1.0
+    assert metric.(example, Imp.prediction(response: "This has NASA words.")) == 1 / 3
   end
 
   test "IFBench metric fails closed for unsupported extended registry ids" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "p",
         response: "",
         instruction_id_list: ["ratio:not_a_real_instruction"],
         kwargs: [%{"percentage" => 20}]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
     assert_raise ArgumentError, ~r/unsupported IFBench instruction/, fn ->
-      metric.(example, DSEx.prediction(response: "two words"))
+      metric.(example, Imp.prediction(response: "two words"))
     end
   end
 
   test "IFBench metric supports dependency-light extended registry checks" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
@@ -297,28 +297,28 @@ defmodule GepaMetricsTest do
 
     Enum.each(cases, fn {instruction_id, kwargs, response} ->
       example =
-        DSEx.example(
+        Imp.example(
           prompt: "p",
           response: "",
           instruction_id_list: [instruction_id],
           kwargs: [kwargs]
         )
-        |> DSEx.with_inputs(:prompt)
+        |> Imp.with_inputs(:prompt)
 
-      assert metric.(example, DSEx.prediction(response: response)) == 1.0,
+      assert metric.(example, Imp.prediction(response: response)) == 1.0,
              "expected #{instruction_id} to pass"
     end)
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "p",
         response: "",
         instruction_id_list: ["format:no_whitespace"],
         kwargs: [%{}]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
-    assert metric.(example, DSEx.prediction(response: "has whitespace")) == 0.0
+    assert metric.(example, Imp.prediction(response: "has whitespace")) == 0.0
 
     failing_cases = [
       {"count:conjunctions", %{"small_n" => 3}, "and and but"},
@@ -386,22 +386,22 @@ defmodule GepaMetricsTest do
 
     Enum.each(failing_cases, fn {instruction_id, kwargs, response} ->
       example =
-        DSEx.example(
+        Imp.example(
           prompt: "p",
           response: "",
           instruction_id_list: [instruction_id],
           kwargs: [kwargs]
         )
-        |> DSEx.with_inputs(:prompt)
+        |> Imp.with_inputs(:prompt)
 
-      assert metric.(example, DSEx.prediction(response: response)) == 0.0,
+      assert metric.(example, Imp.prediction(response: response)) == 0.0,
              "expected #{instruction_id} to fail"
     end)
   end
 
   test "IFBench NLP-backed checks can delegate to a source-exact Python bridge" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric",
         "output_key" => "response"
       })
@@ -409,7 +409,7 @@ defmodule GepaMetricsTest do
     bridge =
       Path.join(
         System.tmp_dir!(),
-        "dsex-ifbench-nlp-bridge-#{System.unique_integer([:positive])}.py"
+        "imp-ifbench-nlp-bridge-#{System.unique_integer([:positive])}.py"
       )
 
     File.write!(bridge, """
@@ -426,25 +426,25 @@ defmodule GepaMetricsTest do
     print(json.dumps({"following": True}))
     """)
 
-    previous_bridge = System.get_env("DSEX_IFBENCH_NLP_BRIDGE")
-    previous_python = System.get_env("DSEX_IFBENCH_NLP_PYTHON")
-    System.put_env("DSEX_IFBENCH_NLP_BRIDGE", bridge)
-    System.put_env("DSEX_IFBENCH_NLP_PYTHON", System.find_executable("python3") || "python3")
+    previous_bridge = System.get_env("IMP_IFBENCH_NLP_BRIDGE")
+    previous_python = System.get_env("IMP_IFBENCH_NLP_PYTHON")
+    System.put_env("IMP_IFBENCH_NLP_BRIDGE", bridge)
+    System.put_env("IMP_IFBENCH_NLP_PYTHON", System.find_executable("python3") || "python3")
 
     on_exit(fn ->
       if previous_bridge,
-        do: System.put_env("DSEX_IFBENCH_NLP_BRIDGE", previous_bridge),
-        else: System.delete_env("DSEX_IFBENCH_NLP_BRIDGE")
+        do: System.put_env("IMP_IFBENCH_NLP_BRIDGE", previous_bridge),
+        else: System.delete_env("IMP_IFBENCH_NLP_BRIDGE")
 
       if previous_python,
-        do: System.put_env("DSEX_IFBENCH_NLP_PYTHON", previous_python),
-        else: System.delete_env("DSEX_IFBENCH_NLP_PYTHON")
+        do: System.put_env("IMP_IFBENCH_NLP_PYTHON", previous_python),
+        else: System.delete_env("IMP_IFBENCH_NLP_PYTHON")
 
       File.rm(bridge)
     end)
 
     example =
-      DSEx.example(
+      Imp.example(
         prompt: "p",
         response: "",
         instruction_id_list: [
@@ -455,9 +455,9 @@ defmodule GepaMetricsTest do
         ],
         kwargs: [%{"percentage" => 10}, %{}, %{}, %{}]
       )
-      |> DSEx.with_inputs(:prompt)
+      |> Imp.with_inputs(:prompt)
 
-    assert metric.(example, DSEx.prediction(response: "bridge-ok")) == 1.0
+    assert metric.(example, Imp.prediction(response: "bridge-ok")) == 1.0
   end
 
   test "IFBench registry parity fixtures cover every active upstream instruction id" do
@@ -469,20 +469,20 @@ defmodule GepaMetricsTest do
     assert MapSet.difference(registry_ids, fixture_ids) == MapSet.new()
     assert MapSet.difference(fixture_ids, registry_ids) == MapSet.new()
 
-    if System.get_env("DSEX_IFBENCH_UPSTREAM_PARITY") == "1" do
+    if System.get_env("IMP_IFBENCH_UPSTREAM_PARITY") == "1" do
       run_ifbench_upstream_parity!(fixture_path, fixtures)
     end
   end
 
   test "LiveBenchMath metric ports AMC answer parsing cases" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         question: "Which is right? \\textbf{(A)} 1\\qquad \\textbf{(B)} 2$",
         answer: "B",
         question_d: %{
@@ -492,24 +492,24 @@ defmodule GepaMetricsTest do
           "ground_truth" => "B"
         }
       )
-      |> DSEx.with_inputs(:question)
+      |> Imp.with_inputs(:question)
 
-    assert metric.(example, DSEx.prediction(answer: "<solution>BBBB</solution>"))
-    assert metric.(example, DSEx.prediction(answer: "Therefore \\\\boxed{B}"))
-    assert metric.(example, DSEx.prediction(answer: "The value is 2"))
-    assert metric.(example, DSEx.prediction(answer: "Final line\n(B)"))
-    refute metric.(example, DSEx.prediction(answer: "<solution>AAAA</solution>"))
+    assert metric.(example, Imp.prediction(answer: "<solution>BBBB</solution>"))
+    assert metric.(example, Imp.prediction(answer: "Therefore \\\\boxed{B}"))
+    assert metric.(example, Imp.prediction(answer: "The value is 2"))
+    assert metric.(example, Imp.prediction(answer: "Final line\n(B)"))
+    refute metric.(example, Imp.prediction(answer: "<solution>AAAA</solution>"))
   end
 
   test "LiveBenchMath metric ports AIME last-50-character scoring" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         question: "Solve.",
         answer: "729",
         question_d: %{
@@ -519,21 +519,21 @@ defmodule GepaMetricsTest do
           "ground_truth" => "729"
         }
       )
-      |> DSEx.with_inputs(:question)
+      |> Imp.with_inputs(:question)
 
-    assert metric.(example, DSEx.prediction(answer: "<think>729</think> final answer 729"))
-    refute metric.(example, DSEx.prediction(answer: "729" <> String.duplicate("x", 60)))
+    assert metric.(example, Imp.prediction(answer: "<think>729</think> final answer 729"))
+    refute metric.(example, Imp.prediction(answer: "729" <> String.duplicate("x", 60)))
   end
 
   test "LiveBenchMath metric ports IMO and USAMO proof-rearrangement edit-distance scoring" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         question: "Order the proof steps.",
         answer: "1,2,3,4",
         question_d: %{
@@ -543,25 +543,25 @@ defmodule GepaMetricsTest do
           "ground_truth" => "1,2,3,4"
         }
       )
-      |> DSEx.with_inputs(:question)
+      |> Imp.with_inputs(:question)
 
-    assert metric.(example, DSEx.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
-    assert metric.(example, DSEx.prediction(answer: "Therefore \\\\boxed{1,2,4,3}")) == 0.5
-    assert metric.(example, DSEx.prediction(answer: "Final ordering\n1, 2, 3, 4.")) == 1.0
+    assert metric.(example, Imp.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
+    assert metric.(example, Imp.prediction(answer: "Therefore \\\\boxed{1,2,4,3}")) == 0.5
+    assert metric.(example, Imp.prediction(answer: "Final ordering\n1, 2, 3, 4.")) == 1.0
 
     usamo = put_in(example.fields[:question_d]["subtask"], "usamo_2024_proof_rearrangement")
-    assert metric.(usamo, DSEx.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
+    assert metric.(usamo, Imp.prediction(answer: "Answer: 1, 2, 3, 4")) == 1.0
   end
 
   test "LiveBenchMath AMPS_Hard branch uses the symbolic bridge contract" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         question: "Solve.",
         answer: "\\frac{1}{2}",
         question_d: %{
@@ -571,12 +571,12 @@ defmodule GepaMetricsTest do
           "ground_truth" => "\\frac{1}{2}"
         }
       )
-      |> DSEx.with_inputs(:question)
+      |> Imp.with_inputs(:question)
 
     bridge =
       Path.join(
         System.tmp_dir!(),
-        "dsex-livebench-bridge-#{System.unique_integer([:positive])}.py"
+        "imp-livebench-bridge-#{System.unique_integer([:positive])}.py"
       )
 
     File.write!(bridge, """
@@ -589,29 +589,29 @@ defmodule GepaMetricsTest do
     print(json.dumps({"score": 1, "parsed_answer": "1/2"}))
     """)
 
-    previous_bridge = System.get_env("DSEX_LIVEBENCH_MATH_BRIDGE")
-    System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", bridge)
+    previous_bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE")
+    System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", bridge)
 
     on_exit(fn ->
       if previous_bridge,
-        do: System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", previous_bridge),
-        else: System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+        do: System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", previous_bridge),
+        else: System.delete_env("IMP_LIVEBENCH_MATH_BRIDGE")
 
       File.rm(bridge)
     end)
 
-    assert metric.(example, DSEx.prediction(answer: "\\boxed{1/2}")) == 1.0
+    assert metric.(example, Imp.prediction(answer: "\\boxed{1/2}")) == 1.0
   end
 
   test "LiveBenchMath AMPS_Hard default bridge fails clearly without symbolic dependencies" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "livebench_math.calculate_livebench_score",
         "output_key" => "answer"
       })
 
     example =
-      DSEx.example(
+      Imp.example(
         question: "Solve.",
         answer: "\\frac{1}{2}",
         question_d: %{
@@ -621,27 +621,27 @@ defmodule GepaMetricsTest do
           "ground_truth" => "\\frac{1}{2}"
         }
       )
-      |> DSEx.with_inputs(:question)
+      |> Imp.with_inputs(:question)
 
-    previous_bridge = System.get_env("DSEX_LIVEBENCH_MATH_BRIDGE")
-    System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+    previous_bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE")
+    System.delete_env("IMP_LIVEBENCH_MATH_BRIDGE")
 
     on_exit(fn ->
       if previous_bridge,
-        do: System.put_env("DSEX_LIVEBENCH_MATH_BRIDGE", previous_bridge),
-        else: System.delete_env("DSEX_LIVEBENCH_MATH_BRIDGE")
+        do: System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", previous_bridge),
+        else: System.delete_env("IMP_LIVEBENCH_MATH_BRIDGE")
     end)
 
     assert_raise ArgumentError, ~r/AMPS_Hard scoring bridge failed/, fn ->
-      metric.(example, DSEx.prediction(answer: "\\boxed{1/2}"))
+      metric.(example, Imp.prediction(answer: "\\boxed{1/2}"))
     end
   end
 
-  test "Papillon metric uses DSEx judges for quality and leakage arithmetic" do
+  test "Papillon metric uses Imp judges for quality and leakage arithmetic" do
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
     judge_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
@@ -664,7 +664,7 @@ defmodule GepaMetricsTest do
     }
 
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(
+      Imp.BenchmarkTruth.GepaMetrics.metric(
         %{
           "upstream_metric" => "papillon_utils.compute_overall_score",
           "output_key" => "response"
@@ -673,15 +673,15 @@ defmodule GepaMetricsTest do
       )
 
     example =
-      DSEx.example(
+      Imp.example(
         user_query: "Use my private account details to draft a note.",
         target_response: "A careful useful answer.",
         pii_str: "secret@example.com||555-0100"
       )
-      |> DSEx.with_inputs(:user_query)
+      |> Imp.with_inputs(:user_query)
 
     prediction =
-      DSEx.prediction(
+      Imp.prediction(
         llm_request: "Draft a note for secret@example.com without other private details.",
         response: "A careful useful answer with privacy preserved."
       )
@@ -695,26 +695,26 @@ defmodule GepaMetricsTest do
 
   test "Papillon metric requires an explicit judge LM" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "papillon_utils.compute_overall_score",
         "output_key" => "response"
       })
 
     assert_raise ArgumentError, ~r/requires :judge_lm/, fn ->
-      metric.(DSEx.example(user_query: "q"), DSEx.prediction(response: "r"))
+      metric.(Imp.example(user_query: "q"), Imp.prediction(response: "r"))
     end
   end
 
   test "unknown GEPA metric falls back to normalized output exact match" do
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "unknown",
         "output_key" => "response"
       })
 
-    example = DSEx.example(prompt: "p", response: "Hello, world!") |> DSEx.with_inputs(:prompt)
+    example = Imp.example(prompt: "p", response: "Hello, world!") |> Imp.with_inputs(:prompt)
 
-    assert metric.(example, DSEx.prediction(response: "hello world"))
+    assert metric.(example, Imp.prediction(response: "hello world"))
   end
 
   defp load_ifbench_parity_fixtures(path) do
@@ -760,7 +760,7 @@ defmodule GepaMetricsTest do
   end
 
   defp run_ifbench_upstream_parity!(fixture_path, fixtures) do
-    python = System.get_env("DSEX_IFBENCH_UPSTREAM_PYTHON") || "python3"
+    python = System.get_env("IMP_IFBENCH_UPSTREAM_PYTHON") || "python3"
 
     {output, status} =
       System.cmd(
@@ -784,7 +784,7 @@ defmodule GepaMetricsTest do
     by_id = Map.new(fixtures, &{&1["instruction_id"], &1})
 
     metric =
-      DSEx.BenchmarkTruth.GepaMetrics.metric(%{
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
         "upstream_metric" => "IFBench.ifbench_metric.metric"
       })
 
@@ -795,15 +795,15 @@ defmodule GepaMetricsTest do
       fixture = Map.fetch!(by_id, result["instruction_id"])
 
       example =
-        DSEx.example(
+        Imp.example(
           prompt: fixture["prompt"],
           instruction_id_list: [fixture["instruction_id"]],
           kwargs: [fixture["kwargs"]]
         )
-        |> DSEx.with_inputs(:prompt)
+        |> Imp.with_inputs(:prompt)
 
-      assert metric.(example, DSEx.prediction(response: fixture["response"])) == 1.0,
-             "DSEx disagreed with upstream for #{fixture["instruction_id"]}"
+      assert metric.(example, Imp.prediction(response: fixture["response"])) == 1.0,
+             "Imp disagreed with upstream for #{fixture["instruction_id"]}"
     end)
   end
 end

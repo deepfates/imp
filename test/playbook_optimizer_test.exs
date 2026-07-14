@@ -1,19 +1,19 @@
-defmodule DSEx.Optimizer.PlaybookTest do
+defmodule Imp.Optimizer.PlaybookTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias DSEx.Optimizer.Playbook, as: PlaybookOptimizer
-  alias DSEx.Optimizer.Trajectory
-  alias DSEx.Playbook
-  alias DSEx.Playbook.{Delta, Provenance}
-  alias DSEx.Playbook.Operation.{Add, Revise}
+  alias Imp.Optimizer.Playbook, as: PlaybookOptimizer
+  alias Imp.Optimizer.Trajectory
+  alias Imp.Playbook
+  alias Imp.Playbook.{Delta, Provenance}
+  alias Imp.Playbook.Operation.{Add, Revise}
 
   test "canonical workflow contract validates named splits and invocation checkpointing" do
     optimizer = successful_optimizer()
     program = wrapped_program(baseline_playbook())
 
     assert {:error, {:missing_dataset, :auditset}} =
-             DSEx.Optimizer.run(optimizer, program,
+             Imp.Optimizer.run(optimizer, program,
                trainset: train_rows(),
                promotionset: promotion_rows()
              )
@@ -21,7 +21,7 @@ defmodule DSEx.Optimizer.PlaybookTest do
     owner = self()
 
     assert {:ok, %PlaybookOptimizer.Result{}} =
-             DSEx.Optimizer.run(optimizer, program,
+             Imp.Optimizer.run(optimizer, program,
                trainset: train_rows(),
                promotionset: promotion_rows(),
                auditset: audit_rows(),
@@ -105,7 +105,7 @@ defmodule DSEx.Optimizer.PlaybookTest do
     assert restored.promoted?
     assert restored.program.playbook == result.candidate_playbook
     assert restored.scores == result.scores
-    assert DSEx.Saving.load(DSEx.Saving.dump(restored.program)) == restored.program
+    assert Imp.Saving.load(Imp.Saving.dump(restored.program)) == restored.program
   end
 
   test "rejects a challenger without replicated lift and preserves the baseline" do
@@ -412,7 +412,7 @@ defmodule DSEx.Optimizer.PlaybookTest do
   end
 
   defp wrapped_program(playbook),
-    do: DSEx.with_playbook(DSEx.predict("equation -> coefficients"), playbook)
+    do: Imp.with_playbook(Imp.predict("equation -> coefficients"), playbook)
 
   defp train_rows do
     [

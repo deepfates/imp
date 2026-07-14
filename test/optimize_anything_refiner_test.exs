@@ -1,8 +1,8 @@
-defmodule DSEx.Optimize.Anything.RefinerTest do
+defmodule Imp.Optimize.Anything.RefinerTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything.Refiner
-  alias DSEx.Optimize.Anything.Refiner.Result
+  alias Imp.Optimize.Anything.Refiner
+  alias Imp.Optimize.Anything.Refiner.Result
 
   test "keeps strict improvements and returns the better normalized evaluation" do
     lm = static_lm([~s({"answer":"2"}), ~s({"answer":"3"})])
@@ -88,7 +88,7 @@ defmodule DSEx.Optimize.Anything.RefinerTest do
 
     lm =
       %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [
           handler: fn messages, _opts ->
             send(parent, {:lm_prompt, messages})
@@ -204,7 +204,7 @@ defmodule DSEx.Optimize.Anything.RefinerTest do
     counter = start_supervised!({Agent, fn -> 0 end})
 
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn [%{content: prompt}], _opts ->
           index = Agent.get_and_update(counter, &{&1, &1 + 1})

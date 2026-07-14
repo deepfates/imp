@@ -2,16 +2,16 @@ defmodule AvatarOptimizerTest do
   use ExUnit.Case, async: true
 
   test "rewrites instructions from positive and negative action trajectories" do
-    lookup = DSEx.tool(:lookup, "Look up a country capital", &lookup/1)
-    student = DSEx.avatar("question -> answer", [lookup], lm: avatar_lm(), max_iters: 2)
+    lookup = Imp.tool(:lookup, "Look up a country capital", &lookup/1)
+    student = Imp.avatar("question -> answer", [lookup], lm: avatar_lm(), max_iters: 2)
 
     trainset = [
-      DSEx.example(question: "easy", answer: "Paris") |> DSEx.with_inputs(:question),
-      DSEx.example(question: "hard", answer: "Paris") |> DSEx.with_inputs(:question)
+      Imp.example(question: "easy", answer: "Paris") |> Imp.with_inputs(:question),
+      Imp.example(question: "hard", answer: "Paris") |> Imp.with_inputs(:question)
     ]
 
     optimizer =
-      DSEx.Optimizer.Avatar.new(DSEx.exact_match(:answer),
+      Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
         max_iters: 1,
         comparator_lm: static_lm(%{feedback: "Use the exact country name for lookup."}),
         rewrite_lm:
@@ -21,8 +21,8 @@ defmodule AvatarOptimizerTest do
           })
       )
 
-    compiled = DSEx.optimize(student, optimizer, trainset)
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.optimize(student, optimizer, trainset)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :avatar
     assert report.best_score == 1.0
@@ -38,14 +38,14 @@ defmodule AvatarOptimizerTest do
     assert round.negative_count == 1
     assert round.feedback == "Use the exact country name for lookup."
 
-    assert DSEx.Predict.Avatar.current_instruction(compiled) =~ "exact country names"
-    assert {:ok, prediction} = DSEx.call(compiled, %{question: "hard"})
-    assert DSEx.get(prediction, :answer) == "Paris"
+    assert Imp.Predict.Avatar.current_instruction(compiled) =~ "exact country names"
+    assert {:ok, prediction} = Imp.call(compiled, %{question: "hard"})
+    assert Imp.get(prediction, :answer) == "Paris"
   end
 
   test "missing trajectory class returns executable baseline with diagnostic report" do
     student =
-      DSEx.avatar("question -> answer", [],
+      Imp.avatar("question -> answer", [],
         lm:
           static_lm(fn prompt ->
             if prompt =~ "Do not request another tool.",
@@ -54,22 +54,22 @@ defmodule AvatarOptimizerTest do
           end)
       )
 
-    trainset = [DSEx.example(question: "q", answer: "Paris") |> DSEx.with_inputs(:question)]
+    trainset = [Imp.example(question: "q", answer: "Paris") |> Imp.with_inputs(:question)]
 
     optimizer =
-      DSEx.Optimizer.Avatar.new(DSEx.exact_match(:answer),
+      Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
         max_iters: 2,
         lm: static_lm(%{feedback: "unused", new_instruction: "unused"})
       )
 
-    compiled = DSEx.optimize(student, optimizer, trainset)
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.optimize(student, optimizer, trainset)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.best_score == 1.0
     assert report.metadata.stop_reason == :no_negative_examples
     assert [%{stage: :classification, reason: :no_negative_examples}] = report.errors
-    assert {:ok, prediction} = DSEx.call(compiled, %{question: "q"})
-    assert DSEx.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.call(compiled, %{question: "q"})
+    assert Imp.get(prediction, :answer) == "Paris"
   end
 
   defp avatar_lm do
@@ -100,7 +100,7 @@ defmodule AvatarOptimizerTest do
 
   defp static_lm(handler) when is_function(handler, 1) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts -> handler.(Enum.map_join(messages, "\n", & &1.content)) end
       ]

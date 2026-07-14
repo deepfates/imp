@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityEvaluationTest do
+defmodule Imp.IdentityEvaluationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityEvaluation
+  alias Imp.IdentityEvaluation
 
   test "scenario scoring and Pareto views preserve flags and dissent outside scores" do
     registry = [observation("cand-a", "Alpha"), observation("cand-b", "Beta")]

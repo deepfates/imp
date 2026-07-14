@@ -3,7 +3,7 @@ defmodule BenchmarkTruthTest do
 
   import ExUnit.CaptureIO
 
-  alias DSEx.BenchmarkTruth.Fetcher
+  alias Imp.BenchmarkTruth.Fetcher
 
   @fixtures Path.expand("fixtures/benchmarks", __DIR__)
 
@@ -23,7 +23,7 @@ defmodule BenchmarkTruthTest do
 
     on_exit(fn -> Process.delete(key) end)
 
-    DSEx.BenchmarkTruth.Runner.record_instrumentation(
+    Imp.BenchmarkTruth.Runner.record_instrumentation(
       [:req_llm, :token_usage],
       %{tokens: %{input_tokens: 123, output_tokens: 45}, total_cost: 0.0067},
       %{},
@@ -43,9 +43,9 @@ defmodule BenchmarkTruthTest do
 
     output =
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.rlm_campaign")
+        Mix.Task.reenable("imp.benchmark.rlm_campaign")
 
-        Mix.Tasks.Dsex.Benchmark.RlmCampaign.run([
+        Mix.Tasks.Imp.Benchmark.RlmCampaign.run([
           "--plan",
           "--manifest",
           manifest,
@@ -66,8 +66,8 @@ defmodule BenchmarkTruthTest do
     assert plan["job_count"] == 4
 
     assert Enum.map(plan["jobs"], & &1["key"]) == [
-             "dsex:direct:oolong:17000206",
-             "dsex:rlm:oolong:17000206",
+             "imp:direct:oolong:17000206",
+             "imp:rlm:oolong:17000206",
              "dspy:direct:oolong:17000206",
              "dspy:rlm:oolong:17000206"
            ]
@@ -102,11 +102,11 @@ defmodule BenchmarkTruthTest do
     counted = %{"tasks" => [%{"task" => "gsm8k", "errors" => 2}]}
     listed = %{"tasks" => [%{"task" => "hotpotqa", "errors" => [%{"reason" => "400"}]}]}
 
-    refute Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(clean)
-    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(counted)
-    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(listed)
-    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(%{"tasks" => [%{"errors" => :bad}]})
-    assert Mix.Tasks.Dsex.Benchmark.Parity.runner_errors?(:invalid_report)
+    refute Mix.Tasks.Imp.Benchmark.Parity.runner_errors?(clean)
+    assert Mix.Tasks.Imp.Benchmark.Parity.runner_errors?(counted)
+    assert Mix.Tasks.Imp.Benchmark.Parity.runner_errors?(listed)
+    assert Mix.Tasks.Imp.Benchmark.Parity.runner_errors?(%{"tasks" => [%{"errors" => :bad}]})
+    assert Mix.Tasks.Imp.Benchmark.Parity.runner_errors?(:invalid_report)
   end
 
   test "fetcher normalizes HuggingFace rows and writes manifests" do
@@ -125,7 +125,7 @@ defmodule BenchmarkTruthTest do
       })
 
     [result] =
-      DSEx.BenchmarkTruth.fetch(["gsm8k"],
+      Imp.BenchmarkTruth.fetch(["gsm8k"],
         out_dir: out_dir,
         length: 1,
         page_delay_ms: 0,
@@ -146,7 +146,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("fetch-local-classification")
 
     results =
-      DSEx.BenchmarkTruth.fetch(["colors", "iris", "iris_typo", "heart_disease"],
+      Imp.BenchmarkTruth.fetch(["colors", "iris", "iris_typo", "heart_disease"],
         out_dir: out_dir,
         length: :full
       )
@@ -175,7 +175,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("fetch-local-retrieval")
 
     results =
-      DSEx.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
+      Imp.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
         out_dir: out_dir,
         length: :full
       )
@@ -211,7 +211,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("fetch-local-composition")
 
     [result] =
-      DSEx.BenchmarkTruth.fetch(["composition_orchestration"],
+      Imp.BenchmarkTruth.fetch(["composition_orchestration"],
         out_dir: out_dir,
         length: :full
       )
@@ -241,7 +241,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("fetch-local-ifbench-hard-math")
 
     [ifbench, hard_math] =
-      DSEx.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
+      Imp.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
         out_dir: out_dir,
         length: :full
       )
@@ -273,7 +273,7 @@ defmodule BenchmarkTruthTest do
     parent = self()
 
     [result] =
-      DSEx.BenchmarkTruth.fetch(["gsm8k"],
+      Imp.BenchmarkTruth.fetch(["gsm8k"],
         out_dir: out_dir,
         length: 101,
         page_delay_ms: 0,
@@ -309,9 +309,9 @@ defmodule BenchmarkTruthTest do
   end
 
   test "benchmark prompt contract has one Elixir source of truth" do
-    assert DSEx.BenchmarkTruth.current_prompt_contract() == current_prompt_contract()
-    assert DSEx.BenchmarkTruth.Contract.hotpotqa_instruction() =~ "canonical exact answer span"
-    assert DSEx.BenchmarkTruth.Contract.hotpotqa_instruction() =~ "Do not abbreviate locations"
+    assert Imp.BenchmarkTruth.current_prompt_contract() == current_prompt_contract()
+    assert Imp.BenchmarkTruth.Contract.hotpotqa_instruction() =~ "canonical exact answer span"
+    assert Imp.BenchmarkTruth.Contract.hotpotqa_instruction() =~ "Do not abbreviate locations"
   end
 
   test "HotPotQA normalization flattens title/sentence context" do
@@ -330,7 +330,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("results")
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [
           gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl"),
           hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")
@@ -359,13 +359,13 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("classification-results")
 
     [colors] =
-      DSEx.BenchmarkTruth.fetch(["colors"],
+      Imp.BenchmarkTruth.fetch(["colors"],
         out_dir: out_dir,
         length: :full
       )
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [colors: colors.data_path],
         out_dir: out_dir,
         max_examples: 6,
@@ -388,13 +388,13 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("retrieval-results")
 
     [retrieval, claims] =
-      DSEx.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
+      Imp.BenchmarkTruth.fetch(["retrieval_qa", "claim_verification"],
         out_dir: out_dir,
         length: :full
       )
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [retrieval_qa: retrieval.data_path, claim_verification: claims.data_path],
         out_dir: out_dir,
         max_examples: 3,
@@ -424,17 +424,17 @@ defmodule BenchmarkTruthTest do
   end
 
   test "fixture benchmark truth runner evaluates composition and orchestration scenarios" do
-    Application.ensure_all_started(:dsex)
+    Application.ensure_all_started(:imp)
     out_dir = tmp_dir("composition-results")
 
     [composition] =
-      DSEx.BenchmarkTruth.fetch(["composition_orchestration"],
+      Imp.BenchmarkTruth.fetch(["composition_orchestration"],
         out_dir: out_dir,
         length: :full
       )
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [composition_orchestration: composition.data_path],
         out_dir: out_dir,
         max_examples: 3,
@@ -476,13 +476,13 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("ifbench-hard-math-results")
 
     [ifbench, hard_math] =
-      DSEx.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
+      Imp.BenchmarkTruth.fetch(["ifbench_instruction_following", "hard_math"],
         out_dir: out_dir,
         length: :full
       )
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [
           ifbench_instruction_following: ifbench.data_path,
           hard_math: hard_math.data_path
@@ -523,12 +523,12 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("diagnostic-results")
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [handler: fn _messages, _opts -> %{answer: "wrong answer"} end]
         },
         optimizer_comparisons: false
@@ -561,12 +561,12 @@ defmodule BenchmarkTruthTest do
       "United States Ambassador to Ghana and to Czechoslovakia, and Chief of Protocol of the United States"
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [handler: fn _messages, _opts -> %{answer: verbose_answer} end]
         },
         optimizer_comparisons: false
@@ -587,12 +587,12 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("parse-failure-diagnostics")
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [
             handler: fn _messages, _opts ->
               "[[ ## reasoning ## ]]\nI forgot the answer field.\n[[ ## completed ## ]]"
@@ -616,7 +616,7 @@ defmodule BenchmarkTruthTest do
     improper_reason = [:provider_error | "messages"]
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
@@ -634,13 +634,13 @@ defmodule BenchmarkTruthTest do
     assert File.exists?(result.out_path)
   end
 
-  test "benchmark truth rows include DSEx runtime instrumentation" do
+  test "benchmark truth rows include Imp runtime instrumentation" do
     out_dir = tmp_dir("instrumented-results")
 
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ReqLLMStub)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ReqLLMStub)
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
@@ -672,12 +672,12 @@ defmodule BenchmarkTruthTest do
     """)
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [gsm8k: path],
         out_dir: out_dir,
         max_examples: 1,
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [
             handler: fn _messages, _opts ->
               "[[ ## reasoning ## ]] subtotal plus fees [[ ## answer ## ]] 29.00 [[ ## completed ## ]]"
@@ -698,7 +698,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("offset-results")
 
     result =
-      DSEx.BenchmarkTruth.run(
+      Imp.BenchmarkTruth.run(
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         offset: 1,
@@ -721,7 +721,7 @@ defmodule BenchmarkTruthTest do
     {"id":"bad","question":"q","answer":"Newport","context":"East Lempster, New Hampshire: East Lempster is in Sullivan County.","supporting_facts":{"title":["East Lempster, New Hampshire","Sullivan County, New Hampshire"],"sent_id":[0,2]},"source_task":"hotpotqa"}
     """)
 
-    result = DSEx.BenchmarkTruth.integrity([hotpotqa: path], out_dir: out_dir)
+    result = Imp.BenchmarkTruth.integrity([hotpotqa: path], out_dir: out_dir)
     [task] = result.report["tasks"]
 
     refute result.report["passing"]
@@ -742,7 +742,7 @@ defmodule BenchmarkTruthTest do
     out_dir = tmp_dir("integrity-fixtures")
 
     result =
-      DSEx.BenchmarkTruth.integrity(
+      Imp.BenchmarkTruth.integrity(
         [
           gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl"),
           hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")
@@ -756,14 +756,14 @@ defmodule BenchmarkTruthTest do
 
   test "DSPy runner path parser requires explicit sentinel" do
     assert {:ok, "benchmarks/results/report.json"} =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_dspy_report_path("""
+             Mix.Tasks.Imp.Benchmark.Parity.parse_dspy_report_path("""
              warning: wrote debug.json
              DSPY_REPORT_PATH=benchmarks/results/report.json
              aggregate score: 1.0
              """)
 
     assert :error =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_dspy_report_path("""
+             Mix.Tasks.Imp.Benchmark.Parity.parse_dspy_report_path("""
              warning: this line ends in debug.json
              aggregate score: 1.0
              """)
@@ -996,10 +996,10 @@ defmodule BenchmarkTruthTest do
 
   test "parity task parses reasoning effort option" do
     assert {[reasoning_effort: "low"], [], []} =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_args(["--reasoning-effort", "low"])
+             Mix.Tasks.Imp.Benchmark.Parity.parse_args(["--reasoning-effort", "low"])
 
     generation_opts =
-      Mix.Tasks.Dsex.Benchmark.Parity.generation_opts(
+      Mix.Tasks.Imp.Benchmark.Parity.generation_opts(
         reasoning_effort: "low",
         temperature: 0.0,
         max_tokens: 700
@@ -1012,23 +1012,23 @@ defmodule BenchmarkTruthTest do
 
   test "parity task only auto-selects unambiguous models returned by provider discovery" do
     assert {:ok, "gpt-future-mini"} =
-             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+             Mix.Tasks.Imp.Benchmark.Parity.select_default_openai_model([
                "text-embedding-3-large",
                "gpt-future-mini",
                "gpt-future-audio-preview"
              ])
 
     assert {:error, {:ambiguous_text_generation_models, ["gpt-alpha", "gpt-beta"]}} =
-             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+             Mix.Tasks.Imp.Benchmark.Parity.select_default_openai_model([
                "gpt-beta",
                "gpt-alpha"
              ])
 
     assert {:error, :no_models} =
-             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([])
+             Mix.Tasks.Imp.Benchmark.Parity.select_default_openai_model([])
 
     assert {:error, {:no_text_generation_model, ["text-embedding-3-large", "tts-1"]}} =
-             Mix.Tasks.Dsex.Benchmark.Parity.select_default_openai_model([
+             Mix.Tasks.Imp.Benchmark.Parity.select_default_openai_model([
                "text-embedding-3-large",
                "tts-1"
              ])
@@ -1041,7 +1041,7 @@ defmodule BenchmarkTruthTest do
 
     try do
       assert {[req_llm_pool_protocols: "http2", req_llm_pool_count: 16], [], []} =
-               Mix.Tasks.Dsex.Benchmark.Parity.parse_args([
+               Mix.Tasks.Imp.Benchmark.Parity.parse_args([
                  "--req-llm-pool-protocols",
                  "http2",
                  "--req-llm-pool-count",
@@ -1049,7 +1049,7 @@ defmodule BenchmarkTruthTest do
                ])
 
       pool_opts =
-        Mix.Tasks.Dsex.Benchmark.Parity.configure_req_llm_pool!(
+        Mix.Tasks.Imp.Benchmark.Parity.configure_req_llm_pool!(
           req_llm_pool_protocols: "http2",
           req_llm_pool_count: 16
         )
@@ -1059,9 +1059,9 @@ defmodule BenchmarkTruthTest do
 
       assert Application.get_env(:req_llm, :stream_pool_protocols) == [:http2]
       assert Application.get_env(:req_llm, :stream_pool_count) == 16
-      assert Mix.Tasks.Dsex.Benchmark.Parity.req_llm_pool_config(pool_opts) == nil
+      assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(pool_opts) == nil
 
-      assert Mix.Tasks.Dsex.Benchmark.Parity.req_llm_pool_config(
+      assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(
                req_llm_pool_protocols: "http1",
                req_llm_pool_count: 16
              ) == %{"count" => 16, "protocols" => [:http1]}
@@ -1074,41 +1074,41 @@ defmodule BenchmarkTruthTest do
 
   test "parity task supports explicit matched non-OpenAI provider specs" do
     assert {[model: "anthropic:claude-haiku-4-5", api_key_env: "ANTHROPIC_API_KEY"], [], []} =
-             Mix.Tasks.Dsex.Benchmark.Parity.parse_args([
+             Mix.Tasks.Imp.Benchmark.Parity.parse_args([
                "--model",
                "anthropic:claude-haiku-4-5",
                "--api-key-env",
                "ANTHROPIC_API_KEY"
              ])
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.api_key_env(api_key_env: "ANTHROPIC_API_KEY") ==
+    assert Mix.Tasks.Imp.Benchmark.Parity.api_key_env(api_key_env: "ANTHROPIC_API_KEY") ==
              "ANTHROPIC_API_KEY"
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.dsex_model_spec([], "gpt-5.4-mini") ==
+    assert Mix.Tasks.Imp.Benchmark.Parity.imp_model_spec([], "gpt-5.4-mini") ==
              "openai:gpt-5.4-mini"
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.dsex_model_spec(
+    assert Mix.Tasks.Imp.Benchmark.Parity.imp_model_spec(
              [],
              "anthropic:claude-haiku-4-5"
            ) == "anthropic:claude-haiku-4-5"
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.default_dspy_model(
+    assert Mix.Tasks.Imp.Benchmark.Parity.default_dspy_model(
              "anthropic:claude-haiku-4-5",
              "anthropic:claude-haiku-4-5"
            ) == "anthropic/claude-haiku-4-5"
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.default_dspy_model(
+    assert Mix.Tasks.Imp.Benchmark.Parity.default_dspy_model(
              "openai:gpt-5.4-mini",
              "gpt-5.4-mini"
            ) == "gpt-5.4-mini"
 
-    assert Mix.Tasks.Dsex.Benchmark.Parity.validate_dspy_model!("anthropic/claude-haiku-4-5") ==
+    assert Mix.Tasks.Imp.Benchmark.Parity.validate_dspy_model!("anthropic/claude-haiku-4-5") ==
              "anthropic/claude-haiku-4-5"
 
     assert_raise Mix.Error,
                  ~r/--dspy-model expects a Python DSPy\/LiteLLM model id such as anthropic\/claude-haiku-4-5/,
                  fn ->
-                   Mix.Tasks.Dsex.Benchmark.Parity.validate_dspy_model!(
+                   Mix.Tasks.Imp.Benchmark.Parity.validate_dspy_model!(
                      "anthropic:claude-haiku-4-5"
                    )
                  end
@@ -1120,7 +1120,7 @@ defmodule BenchmarkTruthTest do
     write_parity_report(out_dir, "newer.json", "2026-07-06T00:01:00Z", 1, [true, true])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1130,7 +1130,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
@@ -1149,28 +1149,28 @@ defmodule BenchmarkTruthTest do
            }
 
     assert gsm8k["coverage"]["covered"] == 3
-    assert gsm8k["dsex_passes"] == 3
+    assert gsm8k["imp_passes"] == 3
     assert gsm8k["dspy_passes"] == 3
-    assert gsm8k["row_latency"]["dsex"]["count"] == 3
+    assert gsm8k["row_latency"]["imp"]["count"] == 3
     assert gsm8k["row_latency"]["dspy"]["count"] == 3
-    assert gsm8k["row_latency"]["ratio_dsex_over_dspy"]["mean"] == 2.0
-    assert gsm8k["dsex_instrumentation"]["coverage"]["instrumented_rows"] == 3
-    assert gsm8k["dsex_instrumentation"]["coverage"]["complete"]
-    assert gsm8k["dsex_instrumentation"]["lm_calls"] == 3
-    assert gsm8k["dsex_instrumentation"]["json_fallbacks"] == 0
-    assert gsm8k["dsex_instrumentation"]["parse_retries"] == 0
-    assert gsm8k["dsex_instrumentation"]["lm_duration"]["mean_ms"] == 18.0
-    assert gsm8k["dsex_instrumentation"]["local_overhead_ms"]["mean_ms"] == 2.0
-    assert gsm8k["dsex_instrumentation"]["lm_duration_share"]["mean"] == 0.9
-    assert gsm8k["dsex_instrumentation"]["message_chars"]["mean_chars"] == 101.0
-    assert gsm8k["dsex_instrumentation"]["message_chars"]["p90_chars"] == 102
-    assert gsm8k["dsex_instrumentation"]["raw_chars"]["mean_chars"] == 51.0
+    assert gsm8k["row_latency"]["ratio_imp_over_dspy"]["mean"] == 2.0
+    assert gsm8k["imp_instrumentation"]["coverage"]["instrumented_rows"] == 3
+    assert gsm8k["imp_instrumentation"]["coverage"]["complete"]
+    assert gsm8k["imp_instrumentation"]["lm_calls"] == 3
+    assert gsm8k["imp_instrumentation"]["json_fallbacks"] == 0
+    assert gsm8k["imp_instrumentation"]["parse_retries"] == 0
+    assert gsm8k["imp_instrumentation"]["lm_duration"]["mean_ms"] == 18.0
+    assert gsm8k["imp_instrumentation"]["local_overhead_ms"]["mean_ms"] == 2.0
+    assert gsm8k["imp_instrumentation"]["lm_duration_share"]["mean"] == 0.9
+    assert gsm8k["imp_instrumentation"]["message_chars"]["mean_chars"] == 101.0
+    assert gsm8k["imp_instrumentation"]["message_chars"]["p90_chars"] == 102
+    assert gsm8k["imp_instrumentation"]["raw_chars"]["mean_chars"] == 51.0
     assert gsm8k["dspy_instrumentation"]["coverage"]["instrumented_rows"] == 3
     assert gsm8k["dspy_instrumentation"]["coverage"]["complete"]
     assert gsm8k["dspy_instrumentation"]["lm_calls"] == 3
     assert gsm8k["dspy_instrumentation"]["input_chars"]["mean_chars"] == 81.0
-    assert gsm8k["runtime_shape"]["message_chars_ratio_dsex_over_dspy_mean"] == 0.5
-    assert gsm8k["runtime_shape"]["raw_chars_ratio_dsex_over_dspy_mean"] == 0.5
+    assert gsm8k["runtime_shape"]["message_chars_ratio_imp_over_dspy_mean"] == 0.5
+    assert gsm8k["runtime_shape"]["raw_chars_ratio_imp_over_dspy_mean"] == 0.5
 
     assert gsm8k["runtime_shape"]["coverage"] == %{
              "total_rows" => 3,
@@ -1197,7 +1197,7 @@ defmodule BenchmarkTruthTest do
       generation: %{
         "temperature" => 0.0,
         "max_tokens" => 700,
-        "dsex" => %{
+        "imp" => %{
           "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
           "wire_api" => "openai_responses"
         },
@@ -1209,7 +1209,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1219,7 +1219,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     effective = campaign["generation"]["effective"]
 
@@ -1227,7 +1227,7 @@ defmodule BenchmarkTruthTest do
     assert effective["matched"]
     assert effective["wire_api_complete"]
     refute effective["wire_api_matched"]
-    assert effective["dsex_wire_api_distinct"] == ["openai_responses"]
+    assert effective["imp_wire_api_distinct"] == ["openai_responses"]
     assert effective["dspy_wire_api_distinct"] == ["litellm_chat_completion"]
     refute campaign["parity"]["full_parity"]
   end
@@ -1238,7 +1238,7 @@ defmodule BenchmarkTruthTest do
     rows =
       Enum.map(0..1, fn index ->
         complete_row(index, true)
-        |> Map.put("dsex_instrumentation", %{
+        |> Map.put("imp_instrumentation", %{
           "usage_events" => 1,
           "input_tokens" => 100 + index,
           "output_tokens" => 20 + index,
@@ -1256,7 +1256,7 @@ defmodule BenchmarkTruthTest do
     write_parity_rows(out_dir, "usage.json", rows)
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1266,11 +1266,11 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
 
     assert campaign["usage"]["coverage"] == %{"complete" => true, "total_rows" => 2}
-    assert campaign["usage"]["dsex"]["input_tokens"] == 201
+    assert campaign["usage"]["imp"]["input_tokens"] == 201
     assert campaign["usage"]["dspy"]["input_tokens"] == 181
     assert campaign["usage"]["total"]["requests"] == 4
     assert campaign["usage"]["total"]["output_tokens"] == 78
@@ -1287,11 +1287,11 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 2, "expected" => 10, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "usage" => %{
         "coverage" => %{"complete" => true, "total_rows" => 2},
-        "dsex" => %{"input_tokens" => 60, "output_tokens" => 10, "usd" => 0.03},
+        "imp" => %{"input_tokens" => 60, "output_tokens" => 10, "usd" => 0.03},
         "dspy" => %{"input_tokens" => 40, "output_tokens" => 10, "usd" => 0.02},
         "total" => %{"input_tokens" => 100, "output_tokens" => 20, "usd" => 0.05}
       },
@@ -1299,7 +1299,7 @@ defmodule BenchmarkTruthTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -1332,7 +1332,7 @@ defmodule BenchmarkTruthTest do
       generation: %{
         "temperature" => 0.0,
         "max_tokens" => 700,
-        "dsex" => %{
+        "imp" => %{
           "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
           "wire_api" => "anthropic_messages"
         },
@@ -1352,7 +1352,7 @@ defmodule BenchmarkTruthTest do
       generation: %{
         "temperature" => 0.0,
         "max_tokens" => 700,
-        "dsex" => %{
+        "imp" => %{
           "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
           "wire_api" => "anthropic_messages"
         },
@@ -1364,7 +1364,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1374,7 +1374,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     effective = campaign["generation"]["effective"]
 
@@ -1402,7 +1402,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1412,7 +1412,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
 
     assert campaign["execution"]["max_concurrency_values"] == [4, 8]
@@ -1433,7 +1433,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1445,7 +1445,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
 
     assert campaign["coverage"]["covered"] == 1
@@ -1467,7 +1467,7 @@ defmodule BenchmarkTruthTest do
       generation: %{
         "temperature" => 0.0,
         "max_tokens" => 700,
-        "dsex" => %{
+        "imp" => %{
           "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
           "wire_api" => "openai_chat_completions"
         },
@@ -1479,7 +1479,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1489,17 +1489,17 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
 
     effective =
       campaign_path |> File.read!() |> Jason.decode!() |> get_in(["generation", "effective"])
 
     assert effective["wire_api_complete"]
     assert effective["wire_api_matched"]
-    assert effective["dsex_wire_api_distinct"] == ["openai_chat_completions"]
+    assert effective["imp_wire_api_distinct"] == ["openai_chat_completions"]
     assert effective["dspy_wire_api_distinct"] == ["litellm_chat_completion"]
 
-    assert effective["dsex_wire_endpoint_families"] == ["openai_chat_completions"]
+    assert effective["imp_wire_endpoint_families"] == ["openai_chat_completions"]
     assert effective["dspy_wire_endpoint_families"] == ["openai_chat_completions"]
   end
 
@@ -1515,7 +1515,7 @@ defmodule BenchmarkTruthTest do
       generation: %{
         "temperature" => 0.0,
         "max_tokens" => 700,
-        "dsex" => %{
+        "imp" => %{
           "effective" => %{"temperature" => 0.0, "max_tokens" => 700},
           "wire_api" => "anthropic_messages"
         },
@@ -1527,7 +1527,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1537,14 +1537,14 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
 
     effective =
       campaign_path |> File.read!() |> Jason.decode!() |> get_in(["generation", "effective"])
 
     assert effective["wire_api_complete"]
     assert effective["wire_api_matched"]
-    assert effective["dsex_wire_endpoint_families"] == ["anthropic_messages"]
+    assert effective["imp_wire_endpoint_families"] == ["anthropic_messages"]
     assert effective["dspy_wire_endpoint_families"] == ["anthropic_messages"]
   end
 
@@ -1553,15 +1553,15 @@ defmodule BenchmarkTruthTest do
 
     write_parity_rows(out_dir, "partial-runtime-shape.json", [
       complete_row(0, true)
-      |> put_in(["dsex_instrumentation"], %{"message_chars" => 100, "raw_chars" => 50})
+      |> put_in(["imp_instrumentation"], %{"message_chars" => 100, "raw_chars" => 50})
       |> put_in(["dspy_instrumentation"], %{"message_chars" => 200, "raw_chars" => 100}),
       complete_row(1, true)
-      |> put_in(["dsex_instrumentation"], %{"message_chars" => 300, "raw_chars" => 150})
+      |> put_in(["imp_instrumentation"], %{"message_chars" => 300, "raw_chars" => 150})
       |> put_in(["dspy_instrumentation"], %{"raw_chars" => 300})
     ])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1571,12 +1571,12 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
-    assert gsm8k["runtime_shape"]["message_chars_ratio_dsex_over_dspy_mean"] == 0.5
-    assert gsm8k["runtime_shape"]["raw_chars_ratio_dsex_over_dspy_mean"] == 0.5
+    assert gsm8k["runtime_shape"]["message_chars_ratio_imp_over_dspy_mean"] == 0.5
+    assert gsm8k["runtime_shape"]["raw_chars_ratio_imp_over_dspy_mean"] == 0.5
 
     assert gsm8k["runtime_shape"]["coverage"] == %{
              "total_rows" => 2,
@@ -1591,7 +1591,7 @@ defmodule BenchmarkTruthTest do
 
     write_parity_rows(out_dir, "runtime-shape-provenance.json", [
       complete_row(0, true)
-      |> put_in(["dsex_instrumentation"], %{"message_chars" => 100, "raw_chars" => 50})
+      |> put_in(["imp_instrumentation"], %{"message_chars" => 100, "raw_chars" => 50})
       |> put_in(["dspy_instrumentation"], %{
         "message_chars" => 200,
         "message_chars_source" => "lm_history",
@@ -1600,7 +1600,7 @@ defmodule BenchmarkTruthTest do
         "history_found" => true
       }),
       complete_row(1, true)
-      |> put_in(["dsex_instrumentation"], %{"message_chars" => 300, "raw_chars" => 150})
+      |> put_in(["imp_instrumentation"], %{"message_chars" => 300, "raw_chars" => 150})
       |> put_in(["dspy_instrumentation"], %{
         "message_chars" => 300,
         "message_chars_source" => "row_estimate",
@@ -1611,7 +1611,7 @@ defmodule BenchmarkTruthTest do
     ])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1621,7 +1621,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
@@ -1649,7 +1649,7 @@ defmodule BenchmarkTruthTest do
     write_parity_rows(out_dir, "out-of-range.json", rows)
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1659,7 +1659,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
@@ -1678,20 +1678,20 @@ defmodule BenchmarkTruthTest do
       %{
         "index" => 0,
         "absolute_index" => 0,
-        "dsex_row_present" => true,
+        "imp_row_present" => true,
         "dspy_row_present" => false,
         "row_evidence_complete" => false,
-        "dsex_passed" => true,
+        "imp_passed" => true,
         "dspy_passed" => nil,
         "pass_agreement" => nil,
         "answer_agreement" => nil,
-        "dsex_answer" => "0",
+        "imp_answer" => "0",
         "dspy_answer" => nil
       }
     ])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1701,14 +1701,14 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
     assert gsm8k["coverage"]["covered"] == 0
     assert gsm8k["coverage"]["incomplete_rows"] == 1
     assert [%{"from" => 0, "to" => 1318}] = gsm8k["coverage"]["missing_ranges"]
-    assert gsm8k["dsex_passes"] == 0
+    assert gsm8k["imp_passes"] == 0
     assert gsm8k["dspy_passes"] == 0
     refute campaign["coverage"]["full"]
     refute campaign["parity"]["full_parity"]
@@ -1722,9 +1722,9 @@ defmodule BenchmarkTruthTest do
     failed_row =
       complete_row(0, false)
       |> Map.merge(%{
-        "dsex_answer" => nil,
+        "imp_answer" => nil,
         "dspy_answer" => nil,
-        "dsex_instrumentation" => %{"lm_calls" => 1},
+        "imp_instrumentation" => %{"lm_calls" => 1},
         "dspy_instrumentation" => %{"lm_calls" => 1}
       })
 
@@ -1732,7 +1732,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-06T00:01:00Z",
       "campaign_id" => nil,
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => [
@@ -1740,9 +1740,9 @@ defmodule BenchmarkTruthTest do
           "task" => "gsm8k",
           "offset" => 0,
           "examples" => 1,
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
-          "dsex_errors" => [%{"index" => 0, "reason" => "insufficient_quota"}],
+          "imp_errors" => [%{"index" => 0, "reason" => "insufficient_quota"}],
           "dspy_errors" => [%{"index" => 0, "reason" => "insufficient_quota"}],
           "row_agreement" => [failed_row]
         }
@@ -1756,7 +1756,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1766,13 +1766,13 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
     assert gsm8k["coverage"]["covered"] == 1
     assert gsm8k["coverage"]["runner_error_rows"] == 0
-    assert gsm8k["dsex_passes"] == 1
+    assert gsm8k["imp_passes"] == 1
     assert gsm8k["dspy_passes"] == 1
     assert gsm8k["disagreements"]["count"] == 0
   end
@@ -1784,7 +1784,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-06T00:00:00Z",
       "campaign_id" => nil,
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => [
@@ -1792,13 +1792,13 @@ defmodule BenchmarkTruthTest do
           "task" => "gsm8k",
           "offset" => 0,
           "examples" => 1,
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
-          "dsex_errors" => 1,
+          "imp_errors" => 1,
           "dspy_errors" => 1,
           "row_agreement" => [
             complete_row(0, false)
-            |> Map.put("dsex_answer", nil)
+            |> Map.put("imp_answer", nil)
             |> Map.put("dspy_answer", nil)
           ]
         }
@@ -1809,7 +1809,7 @@ defmodule BenchmarkTruthTest do
     File.write!(Path.join(out_dir, "runner-error-counts.json"), Jason.encode!(report) <> "\n")
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1819,7 +1819,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
@@ -1839,8 +1839,8 @@ defmodule BenchmarkTruthTest do
       provider: "openai-compatible"
     )
 
-    assert_raise Mix.Error, ~r/requires one DSEx provider\/model identity/, fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+    assert_raise Mix.Error, ~r/requires one Imp provider\/model identity/, fn ->
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1851,7 +1851,7 @@ defmodule BenchmarkTruthTest do
     end
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1863,7 +1863,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
 
     assert campaign["provider"] == "req_llm"
@@ -1888,7 +1888,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1900,7 +1900,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
 
     assert campaign["campaign_id"] == "fresh-run"
@@ -1917,7 +1917,7 @@ defmodule BenchmarkTruthTest do
     ])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -1927,17 +1927,17 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     hotpotqa = Enum.find(campaign["tasks"], &(&1["task"] == "hotpotqa"))
 
     assert hotpotqa["score_delta"] == -0.5
 
     assert %{
-             "dsex" => 0.75,
+             "imp" => 0.75,
              "dspy" => 1.0,
              "delta" => -0.25,
-             "coverage" => %{"dsex_rows" => 2, "dspy_rows" => 2, "total_rows" => 2}
+             "coverage" => %{"imp_rows" => 2, "dspy_rows" => 2, "total_rows" => 2}
            } = hotpotqa["supporting_metrics"]["official_hotpotqa_f1"]
   end
 
@@ -1949,18 +1949,18 @@ defmodule BenchmarkTruthTest do
       %{
         "index" => 1,
         "absolute_index" => 1,
-        "dsex_row_present" => true,
+        "imp_row_present" => true,
         "dspy_row_present" => true,
         "row_evidence_complete" => true,
-        "dsex_passed" => true,
+        "imp_passed" => true,
         "dspy_passed" => false,
         "pass_agreement" => false,
         "answer_agreement" => false,
-        "dsex_answer" => "Robert Boyle",
+        "imp_answer" => "Robert Boyle",
         "dspy_answer" => "Boyle",
-        "dsex_duration_ms" => 20.0,
+        "imp_duration_ms" => 20.0,
         "dspy_duration_ms" => 10.0,
-        "dsex_metric_metadata" => %{
+        "imp_metric_metadata" => %{
           "official_hotpotqa_f1" => 1.0,
           "normalized_prediction" => "robert boyle"
         },
@@ -1969,7 +1969,7 @@ defmodule BenchmarkTruthTest do
           "normalized_prediction" => "boyle"
         },
         "diagnostic" => %{
-          "dsex" => %{
+          "imp" => %{
             "question" => "Who discovered the law?",
             "gold_answer" => "Robert Boyle",
             "context_sha256" => String.duplicate("a", 64),
@@ -1982,22 +1982,22 @@ defmodule BenchmarkTruthTest do
       %{
         "index" => 2,
         "absolute_index" => 2,
-        "dsex_row_present" => true,
+        "imp_row_present" => true,
         "dspy_row_present" => true,
         "row_evidence_complete" => true,
-        "dsex_passed" => false,
+        "imp_passed" => false,
         "dspy_passed" => true,
         "pass_agreement" => false,
         "answer_agreement" => false,
-        "dsex_answer" => "yes, because both are magazines",
+        "imp_answer" => "yes, because both are magazines",
         "dspy_answer" => "yes",
-        "dsex_duration_ms" => 20.0,
+        "imp_duration_ms" => 20.0,
         "dspy_duration_ms" => 10.0
       }
     ])
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Parity.Aggregate.run([
+      Mix.Tasks.Imp.Benchmark.Parity.Aggregate.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -2007,7 +2007,7 @@ defmodule BenchmarkTruthTest do
       ])
     end)
 
-    [campaign_path] = Path.wildcard(Path.join(out_dir, "dsex-dspy-parity-campaign-*.json"))
+    [campaign_path] = Path.wildcard(Path.join(out_dir, "imp-dspy-parity-campaign-*.json"))
     campaign = campaign_path |> File.read!() |> Jason.decode!()
     gsm8k = Enum.find(campaign["tasks"], &(&1["task"] == "gsm8k"))
 
@@ -2016,21 +2016,21 @@ defmodule BenchmarkTruthTest do
     assert gsm8k["disagreements"]["answer_disagreements"] == 2
 
     assert gsm8k["disagreements"]["directions"] == %{
-             "dsex_only_pass" => 1,
+             "imp_only_pass" => 1,
              "dspy_only_pass" => 1
            }
 
     [first, second] = gsm8k["disagreements"]["examples"]
     assert first["absolute_index"] == 1
-    assert first["direction"] == "dsex_only_pass"
-    assert first["dsex_answer"] == "Robert Boyle"
+    assert first["direction"] == "imp_only_pass"
+    assert first["imp_answer"] == "Robert Boyle"
     assert first["dspy_answer"] == "Boyle"
     assert first["source_report"] =~ "disagreements.json"
-    assert first["dsex_metric_metadata"]["official_hotpotqa_f1"] == 1.0
-    assert first["diagnostic"]["dsex"]["question"] == "Who discovered the law?"
-    assert first["diagnostic"]["dsex"]["gold_answer"] == "Robert Boyle"
-    assert first["diagnostic"]["dsex"]["context_length"] == 1234
-    refute Map.has_key?(first["diagnostic"]["dsex"], "trace")
+    assert first["imp_metric_metadata"]["official_hotpotqa_f1"] == 1.0
+    assert first["diagnostic"]["imp"]["question"] == "Who discovered the law?"
+    assert first["diagnostic"]["imp"]["gold_answer"] == "Robert Boyle"
+    assert first["diagnostic"]["imp"]["context_length"] == 1234
+    refute Map.has_key?(first["diagnostic"]["imp"], "trace")
 
     assert second["absolute_index"] == 2
     assert second["direction"] == "dspy_only_pass"
@@ -2046,10 +2046,10 @@ defmodule BenchmarkTruthTest do
     {"question":"Which city?","answer":"Paris France","context":"x","source_task":"hotpotqa"}
     """)
 
-    write_hotpotqa_analysis_report(out_dir, "dsex-dspy-parity-directory.json")
+    write_hotpotqa_analysis_report(out_dir, "imp-dspy-parity-directory.json")
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis.run([
+      Mix.Tasks.Imp.Benchmark.HotpotqaAnalysis.run([
         "--in",
         Path.join(out_dir, "*.json"),
         "--out",
@@ -2068,12 +2068,12 @@ defmodule BenchmarkTruthTest do
     assert analysis["coverage"] == %{"covered" => 3, "disagreements" => 3}
 
     assert analysis["summary"]["pass_disagreements"] == 3
-    assert analysis["summary"]["dsex_passes"] == 1
+    assert analysis["summary"]["imp_passes"] == 1
     assert analysis["summary"]["dspy_passes"] == 2
     assert analysis["directions"]["dspy_only_pass"] == 2
 
-    assert analysis["categories"]["dsex_overlong_span"] == 1
-    assert analysis["categories"]["dsex_yes_no_explanation"] == 1
+    assert analysis["categories"]["imp_overlong_span"] == 1
+    assert analysis["categories"]["imp_yes_no_explanation"] == 1
     assert analysis["categories"]["dspy_short_span"] == 1
     assert analysis["answer_types"]["yes_no"] == 1
   end
@@ -2088,10 +2088,10 @@ defmodule BenchmarkTruthTest do
     {"question":"Which city?","answer":"Paris France","context":"x","source_task":"hotpotqa"}
     """)
 
-    write_hotpotqa_analysis_report(out_dir, "dsex-dspy-parity-directory.json")
+    write_hotpotqa_analysis_report(out_dir, "imp-dspy-parity-directory.json")
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis.run([
+      Mix.Tasks.Imp.Benchmark.HotpotqaAnalysis.run([
         "--in",
         out_dir,
         "--out",
@@ -2121,24 +2121,24 @@ defmodule BenchmarkTruthTest do
     {"question":"Who?","answer":"Todd Fisher","context":"x","source_task":"hotpotqa"}
     """)
 
-    write_hotpotqa_analysis_report(out_dir, "dsex-dspy-parity-directory.json",
-      extra_task_fields: %{"dsex_errors" => 1, "dspy_errors" => 1},
+    write_hotpotqa_analysis_report(out_dir, "imp-dspy-parity-directory.json",
+      extra_task_fields: %{"imp_errors" => 1, "dspy_errors" => 1},
       extra_rows: [
         %{
           "index" => 3,
           "absolute_index" => 3,
-          "dsex_passed" => false,
+          "imp_passed" => false,
           "dspy_passed" => false,
           "pass_agreement" => true,
           "answer_agreement" => true,
-          "dsex_answer" => nil,
+          "imp_answer" => nil,
           "dspy_answer" => nil
         }
       ]
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.HotpotqaAnalysis.run([
+      Mix.Tasks.Imp.Benchmark.HotpotqaAnalysis.run([
         "--in",
         out_dir,
         "--out",
@@ -2174,7 +2174,7 @@ defmodule BenchmarkTruthTest do
                remaining: 7405
              }
            ] =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.next_chunk_plan(aggregate, %{
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.next_chunk_plan(aggregate, %{
                gsm8k: "gsm8k.jsonl",
                hotpotqa: "hotpotqa.jsonl"
              })
@@ -2187,14 +2187,14 @@ defmodule BenchmarkTruthTest do
                remaining: 1307
              }
            ] =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.next_chunk_plan(aggregate, %{
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.next_chunk_plan(aggregate, %{
                gsm8k: "gsm8k.jsonl"
              })
   end
 
   test "campaign chunk args preserve endpoint-equivalent DSPy route" do
     args =
-      Mix.Tasks.Dsex.Benchmark.Parity.Campaign.chunk_args(
+      Mix.Tasks.Imp.Benchmark.Parity.Campaign.chunk_args(
         [
           dspy_model: "responses/gpt-5.4-mini",
           api_key_env: "OPENAI_API_KEY",
@@ -2241,10 +2241,10 @@ defmodule BenchmarkTruthTest do
   end
 
   test "campaign halt decision stops after any runner-error chunk" do
-    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 150, true)
-    refute Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, false)
-    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, true)
-    assert Mix.Tasks.Dsex.Benchmark.Parity.Campaign.halt_after_chunk?(100, 90, true)
+    assert Mix.Tasks.Imp.Benchmark.Parity.Campaign.halt_after_chunk?(100, 150, true)
+    refute Mix.Tasks.Imp.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, false)
+    assert Mix.Tasks.Imp.Benchmark.Parity.Campaign.halt_after_chunk?(100, 100, true)
+    assert Mix.Tasks.Imp.Benchmark.Parity.Campaign.halt_after_chunk?(100, 90, true)
   end
 
   test "campaign target coverage shrinks chunk size to the next useful live slice" do
@@ -2256,7 +2256,7 @@ defmodule BenchmarkTruthTest do
     ]
 
     assert 5 =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.planned_chunk_size(
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.planned_chunk_size(
                aggregate,
                two_task_plan,
                chunk_size: 50,
@@ -2264,7 +2264,7 @@ defmodule BenchmarkTruthTest do
              )
 
     assert 50 =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.planned_chunk_size(
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.planned_chunk_size(
                aggregate,
                two_task_plan,
                chunk_size: 50,
@@ -2272,7 +2272,7 @@ defmodule BenchmarkTruthTest do
              )
 
     assert 1 =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.planned_chunk_size(
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.planned_chunk_size(
                %{"coverage" => %{"covered" => 100}},
                two_task_plan,
                chunk_size: 50,
@@ -2280,7 +2280,7 @@ defmodule BenchmarkTruthTest do
              )
 
     assert 2 =
-             Mix.Tasks.Dsex.Benchmark.Parity.Campaign.planned_chunk_size(
+             Mix.Tasks.Imp.Benchmark.Parity.Campaign.planned_chunk_size(
                aggregate,
                [%{task: :gsm8k, path: "gsm8k.jsonl", offset: 1317, remaining: 2}],
                chunk_size: 50,
@@ -2300,14 +2300,14 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 20, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => [
         %{
           "task" => "gsm8k",
-          "dsex_errors" => [],
+          "imp_errors" => [],
           "dspy_errors" => [],
-          "dsex_instrumentation" => %{
+          "imp_instrumentation" => %{
             "coverage" => %{
               "instrumented_rows" => 20,
               "total_rows" => 20,
@@ -2326,19 +2326,19 @@ defmodule BenchmarkTruthTest do
               "raw_chars_comparable_rows" => 20,
               "complete" => true
             },
-            "message_chars_ratio_dsex_over_dspy_mean" => 1.1,
-            "raw_chars_ratio_dsex_over_dspy_mean" => 0.25
+            "message_chars_ratio_imp_over_dspy_mean" => 1.1,
+            "raw_chars_ratio_imp_over_dspy_mean" => 0.25
           },
           "disagreements" => %{
             "count" => 2,
             "pass_disagreements" => 1,
             "answer_disagreements" => 2,
-            "directions" => %{"dsex_only_pass" => 1, "answer_or_evidence_mismatch" => 1},
+            "directions" => %{"imp_only_pass" => 1, "answer_or_evidence_mismatch" => 1},
             "examples" => [
               %{
                 "absolute_index" => 1,
-                "direction" => "dsex_only_pass",
-                "dsex_answer" => "yes",
+                "direction" => "imp_only_pass",
+                "imp_answer" => "yes",
                 "dspy_answer" => "American"
               }
             ]
@@ -2353,7 +2353,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:01:00Z",
       "coverage" => %{"covered" => 2, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2364,12 +2364,12 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:02:00Z",
       "coverage" => %{"covered" => 30, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => [
         %{
           "task" => "gsm8k",
-          "dsex_instrumentation" => %{
+          "imp_instrumentation" => %{
             "coverage" => %{
               "instrumented_rows" => 20,
               "total_rows" => 30,
@@ -2394,7 +2394,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2405,7 +2405,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => []
     })
@@ -2418,7 +2418,7 @@ defmodule BenchmarkTruthTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2464,32 +2464,32 @@ defmodule BenchmarkTruthTest do
     assert mini["cost"]["estimated_full_total_tokens"] == 28_405_344
     assert mini["disagreements"]["count"] == 2
     assert mini["disagreements"]["pass_disagreements"] == 1
-    assert mini["disagreements"]["directions"]["dsex_only_pass"] == 1
+    assert mini["disagreements"]["directions"]["imp_only_pass"] == 1
     assert [%{"task" => "gsm8k", "absolute_index" => 1}] = mini["disagreements"]["examples"]
     assert matrix["summary"]["disagreements"]["count"] == 2
     assert matrix["summary"]["disagreements"]["by_model"]["gpt-5.4-mini"]["count"] == 2
     assert mini["lane_tags"] == ["current_low_cost"]
     assert mini["proof"]["prompt_contract_current"]
-    assert mini["dsex_instrumentation"]["coverage"]["complete"]
-    assert mini["dsex_instrumentation"]["coverage"]["instrumented_rows"] == 20
-    assert mini["dsex_instrumentation"]["lm_calls"] == 20
-    assert mini["dsex_instrumentation"]["json_fallbacks"] == 1
-    assert mini["dsex_instrumentation"]["dominant_latency_source"] == "provider_model"
-    assert mini["dsex_instrumentation"]["max_local_overhead_mean_ms"] == 3.5
+    assert mini["imp_instrumentation"]["coverage"]["complete"]
+    assert mini["imp_instrumentation"]["coverage"]["instrumented_rows"] == 20
+    assert mini["imp_instrumentation"]["lm_calls"] == 20
+    assert mini["imp_instrumentation"]["json_fallbacks"] == 1
+    assert mini["imp_instrumentation"]["dominant_latency_source"] == "provider_model"
+    assert mini["imp_instrumentation"]["max_local_overhead_mean_ms"] == 3.5
     assert mini["runtime_shape"]["complete"]
     assert mini["runtime_shape"]["coverage"]["complete"]
     assert mini["runtime_shape"]["coverage"]["message_chars_comparable_rows"] == 20
     assert mini["runtime_shape"]["tasks_with_runtime_shape"] == 1
-    assert mini["runtime_shape"]["message_chars_ratio_dsex_over_dspy_mean"] == 1.1
-    assert mini["runtime_shape"]["raw_chars_ratio_dsex_over_dspy_mean"] == 0.25
-    assert matrix["summary"]["dsex_instrumentation"]["models_with_complete_instrumentation"] == 1
-    assert matrix["summary"]["dsex_instrumentation"]["total_models"] == 3
-    refute matrix["summary"]["dsex_instrumentation"]["complete"]
+    assert mini["runtime_shape"]["message_chars_ratio_imp_over_dspy_mean"] == 1.1
+    assert mini["runtime_shape"]["raw_chars_ratio_imp_over_dspy_mean"] == 0.25
+    assert matrix["summary"]["imp_instrumentation"]["models_with_complete_instrumentation"] == 1
+    assert matrix["summary"]["imp_instrumentation"]["total_models"] == 3
+    refute matrix["summary"]["imp_instrumentation"]["complete"]
     assert matrix["summary"]["runtime_shape"]["models_with_runtime_shape"] == 1
     assert matrix["summary"]["runtime_shape"]["models_with_complete_runtime_shape"] == 1
     assert matrix["summary"]["runtime_shape"]["total_models"] == 3
-    assert matrix["summary"]["runtime_shape"]["mean_message_chars_ratio_dsex_over_dspy"] == 1.1
-    assert matrix["summary"]["runtime_shape"]["mean_raw_chars_ratio_dsex_over_dspy"] == 0.25
+    assert matrix["summary"]["runtime_shape"]["mean_message_chars_ratio_imp_over_dspy"] == 1.1
+    assert matrix["summary"]["runtime_shape"]["mean_raw_chars_ratio_imp_over_dspy"] == 0.25
     refute matrix["summary"]["runtime_shape"]["complete"]
     assert matrix["summary"]["runtime_shape"]["by_model"]["gpt-5.4-mini"]["complete"]
 
@@ -2542,7 +2542,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2553,7 +2553,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => Map.put(sample_parity(), "max_task_score_gap", 0.010000000000000009),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2564,13 +2564,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2606,7 +2606,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.9, "dspy_score" => 0.9, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2617,7 +2617,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2632,7 +2632,7 @@ defmodule BenchmarkTruthTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2670,7 +2670,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "execution" => %{
         "max_concurrency_values" => [2, 8],
@@ -2681,7 +2681,7 @@ defmodule BenchmarkTruthTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2713,7 +2713,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "source_reports" => [
         %{"path" => "chunk-a.json", "max_concurrency" => 4},
@@ -2728,7 +2728,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "source_reports" => [
         %{"path" => "chunk-c.json", "max_concurrency" => 6},
@@ -2738,7 +2738,7 @@ defmodule BenchmarkTruthTest do
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2775,14 +2775,14 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 0, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "source_reports" => [%{"path" => "failed-chunk.json"}],
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2817,14 +2817,14 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 0, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.0, "dspy_score" => 0.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "source_reports" => [%{"path" => "failed-chunk.json"}],
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2862,7 +2862,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => [
         %{
@@ -2874,8 +2874,8 @@ defmodule BenchmarkTruthTest do
               "raw_chars_comparable_rows" => 1,
               "complete" => true
             },
-            "message_chars_ratio_dsex_over_dspy_mean" => 1.0,
-            "raw_chars_ratio_dsex_over_dspy_mean" => 0.5
+            "message_chars_ratio_imp_over_dspy_mean" => 1.0,
+            "raw_chars_ratio_imp_over_dspy_mean" => 0.5
           }
         },
         %{
@@ -2898,7 +2898,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 20, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2909,7 +2909,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -2920,13 +2920,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 1, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -2988,14 +2988,14 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 300, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.84, "dspy_score" => 0.846, "score_delta" => -0.006},
+      "aggregate" => %{"imp_score" => 0.84, "dspy_score" => 0.846, "score_delta" => -0.006},
       "generation" => matched_effective_generation(),
       "tasks" => [
         %{
           "task" => "hotpotqa",
-          "dsex_errors" => [],
+          "imp_errors" => [],
           "dspy_errors" => [],
-          "dsex_instrumentation" => %{
+          "imp_instrumentation" => %{
             "coverage" => %{
               "instrumented_rows" => 300,
               "total_rows" => 300,
@@ -3009,8 +3009,8 @@ defmodule BenchmarkTruthTest do
               "raw_chars_comparable_rows" => 300,
               "complete" => false
             },
-            "message_chars_ratio_dsex_over_dspy_mean" => 1.05,
-            "raw_chars_ratio_dsex_over_dspy_mean" => 0.27
+            "message_chars_ratio_imp_over_dspy_mean" => 1.05,
+            "raw_chars_ratio_imp_over_dspy_mean" => 0.27
           }
         }
       ]
@@ -3022,13 +3022,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:01:00Z",
       "coverage" => %{"covered" => 12, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.91, "dspy_score" => 0.91, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.91, "dspy_score" => 0.91, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => instrumented_task_pair(6)
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3054,7 +3054,7 @@ defmodule BenchmarkTruthTest do
       "provider" => "req_llm",
       "model" => "gpt-5.4-mini",
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => instrumented_task_pair(6)
     }
@@ -3080,7 +3080,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3109,7 +3109,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3121,7 +3121,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3133,7 +3133,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3141,7 +3141,7 @@ defmodule BenchmarkTruthTest do
     [first | rest] = in_dir |> Path.join("*.json") |> Path.wildcard() |> Enum.sort()
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run(
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run(
         [
           "--in",
           first,
@@ -3192,10 +3192,10 @@ defmodule BenchmarkTruthTest do
           "max_task_score_gap" => 0.018
         },
         "aggregate" => %{
-          "dsex_score" => 0.772,
+          "imp_score" => 0.772,
           "dspy_score" => 0.778,
           "score_delta" => -0.006,
-          "latency_ratio_dsex_over_dspy" => 1.6
+          "latency_ratio_imp_over_dspy" => 1.6
         }
       })
     )
@@ -3212,16 +3212,16 @@ defmodule BenchmarkTruthTest do
           "max_task_score_gap" => 0.021
         },
         "aggregate" => %{
-          "dsex_score" => 0.771,
+          "imp_score" => 0.771,
           "dspy_score" => 0.779,
           "score_delta" => -0.008,
-          "latency_ratio_dsex_over_dspy" => 1.35
+          "latency_ratio_imp_over_dspy" => 1.35
         }
       })
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3236,7 +3236,7 @@ defmodule BenchmarkTruthTest do
 
     assert model["artifact"]["path"] =~ "newer-latency-pass.json"
     assert model["parity"]["latency_parity"]
-    assert model["latency"]["latency_ratio_dsex_over_dspy"] == 1.35
+    assert model["latency"]["latency_ratio_imp_over_dspy"] == 1.35
   end
 
   test "live matrix prefers instrumented rerun over larger uninstrumented coverage" do
@@ -3251,10 +3251,10 @@ defmodule BenchmarkTruthTest do
       "model" => "gpt-5.4-mini",
       "parity" => %{"full_parity" => false, "latency_parity" => true},
       "aggregate" => %{
-        "dsex_score" => 0.8,
+        "imp_score" => 0.8,
         "dspy_score" => 0.8,
         "score_delta" => 0.0,
-        "latency_ratio_dsex_over_dspy" => 1.2
+        "latency_ratio_imp_over_dspy" => 1.2
       }
     }
 
@@ -3279,9 +3279,9 @@ defmodule BenchmarkTruthTest do
         "tasks" => [
           %{
             "task" => "gsm8k",
-            "dsex_errors" => [],
+            "imp_errors" => [],
             "dspy_errors" => [],
-            "dsex_instrumentation" => %{
+            "imp_instrumentation" => %{
               "coverage" => %{
                 "instrumented_rows" => 75,
                 "total_rows" => 75,
@@ -3299,15 +3299,15 @@ defmodule BenchmarkTruthTest do
                 "raw_chars_comparable_rows" => 75,
                 "complete" => true
               },
-              "message_chars_ratio_dsex_over_dspy_mean" => 1.02,
-              "raw_chars_ratio_dsex_over_dspy_mean" => 0.22
+              "message_chars_ratio_imp_over_dspy_mean" => 1.02,
+              "raw_chars_ratio_imp_over_dspy_mean" => 0.22
             }
           },
           %{
             "task" => "hotpotqa",
-            "dsex_errors" => [],
+            "imp_errors" => [],
             "dspy_errors" => [],
-            "dsex_instrumentation" => %{
+            "imp_instrumentation" => %{
               "coverage" => %{
                 "instrumented_rows" => 75,
                 "total_rows" => 75,
@@ -3325,8 +3325,8 @@ defmodule BenchmarkTruthTest do
                 "raw_chars_comparable_rows" => 75,
                 "complete" => true
               },
-              "message_chars_ratio_dsex_over_dspy_mean" => 1.04,
-              "raw_chars_ratio_dsex_over_dspy_mean" => 0.24
+              "message_chars_ratio_imp_over_dspy_mean" => 1.04,
+              "raw_chars_ratio_imp_over_dspy_mean" => 0.24
             }
           }
         ]
@@ -3334,7 +3334,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3349,7 +3349,7 @@ defmodule BenchmarkTruthTest do
 
     assert model["artifact"]["path"] =~ "smaller-instrumented.json"
     assert model["coverage"]["covered"] == 150
-    assert model["dsex_instrumentation"]["coverage"]["complete"]
+    assert model["imp_instrumentation"]["coverage"]["complete"]
     assert model["runtime_shape"]["complete"]
   end
 
@@ -3365,10 +3365,10 @@ defmodule BenchmarkTruthTest do
       "model" => "gpt-5.4-mini",
       "parity" => %{"full_parity" => false, "latency_parity" => true},
       "aggregate" => %{
-        "dsex_score" => 0.84,
+        "imp_score" => 0.84,
         "dspy_score" => 0.84,
         "score_delta" => 0.0,
-        "latency_ratio_dsex_over_dspy" => 1.2
+        "latency_ratio_imp_over_dspy" => 1.2
       }
     }
 
@@ -3377,7 +3377,7 @@ defmodule BenchmarkTruthTest do
         matched_effective_generation(),
         ["value", "prompt_contract"],
         %{
-          "dsex_req_llm" => "dsex-chat-template-v3-dspy-objective",
+          "imp_req_llm" => "imp-chat-template-v3-dspy-objective",
           "python_dspy" => "dspy-signature-chat-20260707"
         }
       )
@@ -3405,7 +3405,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3424,7 +3424,7 @@ defmodule BenchmarkTruthTest do
     assert model["proof"]["prompt_contract"] == current_prompt_contract()
   end
 
-  test "live matrix summarizes latency parity and DSEx transport settings" do
+  test "live matrix summarizes latency parity and Imp transport settings" do
     out_dir = tmp_dir("live-matrix-latency-transport")
     in_dir = Path.join(out_dir, "campaigns")
     matrix_dir = Path.join(out_dir, "matrix")
@@ -3433,7 +3433,7 @@ defmodule BenchmarkTruthTest do
     generation =
       matched_effective_generation()
       |> put_in(
-        ["value", "dsex_transport"],
+        ["value", "imp_transport"],
         %{"req_llm_pool" => %{"count" => 16, "protocols" => [:http1]}}
       )
 
@@ -3446,18 +3446,18 @@ defmodule BenchmarkTruthTest do
       "generation" => generation,
       "parity" => Map.put(sample_parity(), "latency_parity", false),
       "aggregate" => %{
-        "dsex_score" => 0.8,
+        "imp_score" => 0.8,
         "dspy_score" => 0.8,
         "score_delta" => 0.0,
-        "dsex_duration_ms" => 162.0,
+        "imp_duration_ms" => 162.0,
         "dspy_duration_ms" => 100.0,
-        "latency_ratio_dsex_over_dspy" => 1.62
+        "latency_ratio_imp_over_dspy" => 1.62
       },
       "tasks" => instrumented_task_pair(100)
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3479,7 +3479,7 @@ defmodule BenchmarkTruthTest do
              "latency",
              "by_model",
              "claude-haiku-4-5",
-             "ratio_dsex_over_dspy"
+             "ratio_imp_over_dspy"
            ]) == 1.62
 
     assert get_in(matrix, ["summary", "transport", "by_model", "claude-haiku-4-5"]) == %{
@@ -3502,7 +3502,7 @@ defmodule BenchmarkTruthTest do
         matched_effective_generation(),
         ["value", "prompt_contract"],
         %{
-          "dsex_req_llm" => "dsex-chat-template-v6-canonical-answer",
+          "imp_req_llm" => "imp-chat-template-v6-canonical-answer",
           "python_dspy" => "dspy-signature-chat-20260707-canonical-answer"
         }
       )
@@ -3510,7 +3510,7 @@ defmodule BenchmarkTruthTest do
     shared = %{
       "provider" => "req_llm",
       "parity" => sample_parity(),
-      "aggregate" => %{"dsex_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
       "evidence_policy" => current_evidence_policy(),
       "tasks" => instrumented_task_pair(50)
     }
@@ -3538,7 +3538,7 @@ defmodule BenchmarkTruthTest do
     )
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3570,13 +3570,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2000-01-01T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3616,13 +3616,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => mismatched_generation,
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3653,7 +3653,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 190, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3665,13 +3665,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:01:00Z",
       "coverage" => %{"covered" => 120, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3702,7 +3702,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3714,7 +3714,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3726,7 +3726,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3738,13 +3738,13 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 8724, "expected" => 8724, "full" => true},
       "parity" => %{"full_parity" => true, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 1.0, "dspy_score" => 1.0, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
         "--in",
         Path.join(in_dir, "*.json"),
         "--out",
@@ -3786,7 +3786,7 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "coverage" => %{"covered" => 190, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.5, "dspy_score" => 0.5, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
@@ -3798,17 +3798,17 @@ defmodule BenchmarkTruthTest do
       "generated_at" => "2026-07-07T00:01:00Z",
       "coverage" => %{"covered" => 120, "expected" => 8724, "full" => false},
       "parity" => %{"full_parity" => false, "latency_parity" => true},
-      "aggregate" => %{"dsex_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
+      "aggregate" => %{"imp_score" => 0.7, "dspy_score" => 0.7, "score_delta" => 0.0},
       "generation" => matched_effective_generation(),
       "tasks" => []
     })
 
-    previous = System.get_env("DSEX_BENCH_CAMPAIGN_ID")
-    System.put_env("DSEX_BENCH_CAMPAIGN_ID", "fresh-contract")
+    previous = System.get_env("IMP_BENCH_CAMPAIGN_ID")
+    System.put_env("IMP_BENCH_CAMPAIGN_ID", "fresh-contract")
 
     try do
       capture_io(fn ->
-        Mix.Tasks.Dsex.Benchmark.LiveMatrix.run([
+        Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
           "--in",
           Path.join(in_dir, "*.json"),
           "--out",
@@ -3817,8 +3817,8 @@ defmodule BenchmarkTruthTest do
       end)
     after
       if previous,
-        do: System.put_env("DSEX_BENCH_CAMPAIGN_ID", previous),
-        else: System.delete_env("DSEX_BENCH_CAMPAIGN_ID")
+        do: System.put_env("IMP_BENCH_CAMPAIGN_ID", previous),
+        else: System.delete_env("IMP_BENCH_CAMPAIGN_ID")
     end
 
     [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
@@ -3839,7 +3839,7 @@ defmodule BenchmarkTruthTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-benchmark-truth-#{name}-#{System.unique_integer([:positive])}"
+        "imp-benchmark-truth-#{name}-#{System.unique_integer([:positive])}"
       )
 
     File.rm_rf!(path)
@@ -3871,15 +3871,15 @@ defmodule BenchmarkTruthTest do
         %{
           "index" => index,
           "absolute_index" => offset + index,
-          "dsex_passed" => passed?,
+          "imp_passed" => passed?,
           "dspy_passed" => passed?,
           "pass_agreement" => true,
           "answer_agreement" => true,
-          "dsex_answer" => to_string(offset + index),
+          "imp_answer" => to_string(offset + index),
           "dspy_answer" => to_string(offset + index),
-          "dsex_duration_ms" => 20.0,
+          "imp_duration_ms" => 20.0,
           "dspy_duration_ms" => 10.0,
-          "dsex_instrumentation" => %{
+          "imp_instrumentation" => %{
             "lm_calls" => 1,
             "lm_duration_ms" => 18.0,
             "json_fallbacks" => 0,
@@ -3903,7 +3903,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => generated_at,
       "campaign_id" => campaign_id,
-      "dsex" => %{"model" => %{"provider" => provider, "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => provider, "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" =>
         Keyword.get(opts, :generation, %{"temperature" => 0.0, "max_tokens" => 700}),
@@ -3913,7 +3913,7 @@ defmodule BenchmarkTruthTest do
           "offset" => offset,
           "examples" => length(rows),
           "max_concurrency" => Keyword.get(opts, :max_concurrency, 1),
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows
         }
@@ -3928,16 +3928,16 @@ defmodule BenchmarkTruthTest do
     %{
       "index" => index,
       "absolute_index" => index,
-      "dsex_row_present" => true,
+      "imp_row_present" => true,
       "dspy_row_present" => true,
       "row_evidence_complete" => true,
-      "dsex_passed" => passed?,
+      "imp_passed" => passed?,
       "dspy_passed" => passed?,
       "pass_agreement" => true,
       "answer_agreement" => true,
-      "dsex_answer" => to_string(index),
+      "imp_answer" => to_string(index),
       "dspy_answer" => to_string(index),
-      "dsex_duration_ms" => 20.0,
+      "imp_duration_ms" => 20.0,
       "dspy_duration_ms" => 10.0
     }
   end
@@ -3947,7 +3947,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-06T00:00:00Z",
       "campaign_id" => nil,
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => [
@@ -3955,7 +3955,7 @@ defmodule BenchmarkTruthTest do
           "task" => "gsm8k",
           "offset" => 0,
           "examples" => length(rows),
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows
         }
@@ -3970,19 +3970,19 @@ defmodule BenchmarkTruthTest do
     rows =
       rows_spec
       |> Enum.with_index()
-      |> Enum.map(fn {{dsex_passed?, dspy_passed?, dsex_f1, dspy_f1}, index} ->
+      |> Enum.map(fn {{imp_passed?, dspy_passed?, imp_f1, dspy_f1}, index} ->
         %{
           "index" => index,
           "absolute_index" => index,
-          "dsex_passed" => dsex_passed?,
+          "imp_passed" => imp_passed?,
           "dspy_passed" => dspy_passed?,
-          "pass_agreement" => dsex_passed? == dspy_passed?,
-          "answer_agreement" => dsex_passed? and dspy_passed?,
-          "dsex_answer" => "answer #{index}",
+          "pass_agreement" => imp_passed? == dspy_passed?,
+          "answer_agreement" => imp_passed? and dspy_passed?,
+          "imp_answer" => "answer #{index}",
           "dspy_answer" => "answer #{index}",
-          "dsex_duration_ms" => 20.0,
+          "imp_duration_ms" => 20.0,
           "dspy_duration_ms" => 10.0,
-          "dsex_metric_metadata" => %{"official_hotpotqa_f1" => dsex_f1},
+          "imp_metric_metadata" => %{"official_hotpotqa_f1" => imp_f1},
           "dspy_metric_metadata" => %{"official_hotpotqa_f1" => dspy_f1}
         }
       end)
@@ -3991,7 +3991,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-06T00:00:00Z",
       "campaign_id" => nil,
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => [
@@ -3999,7 +3999,7 @@ defmodule BenchmarkTruthTest do
           "task" => "hotpotqa",
           "offset" => 0,
           "examples" => length(rows),
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows
         }
@@ -4015,43 +4015,43 @@ defmodule BenchmarkTruthTest do
       %{
         "index" => 0,
         "absolute_index" => 0,
-        "dsex_passed" => false,
+        "imp_passed" => false,
         "dspy_passed" => true,
         "pass_agreement" => false,
         "answer_agreement" => false,
-        "dsex_answer" => "$10.5 million USD",
+        "imp_answer" => "$10.5 million USD",
         "dspy_answer" => "$10.5 million",
-        "dsex_duration_ms" => 20.0,
+        "imp_duration_ms" => 20.0,
         "dspy_duration_ms" => 10.0,
-        "dsex_metric_metadata" => %{"official_hotpotqa_f1" => 0.8},
+        "imp_metric_metadata" => %{"official_hotpotqa_f1" => 0.8},
         "dspy_metric_metadata" => %{"official_hotpotqa_f1" => 1.0}
       },
       %{
         "index" => 1,
         "absolute_index" => 1,
-        "dsex_passed" => false,
+        "imp_passed" => false,
         "dspy_passed" => true,
         "pass_agreement" => false,
         "answer_agreement" => false,
-        "dsex_answer" => "Both are magazines.",
+        "imp_answer" => "Both are magazines.",
         "dspy_answer" => "yes",
-        "dsex_duration_ms" => 20.0,
+        "imp_duration_ms" => 20.0,
         "dspy_duration_ms" => 10.0,
-        "dsex_metric_metadata" => %{"official_hotpotqa_f1" => 0.0},
+        "imp_metric_metadata" => %{"official_hotpotqa_f1" => 0.0},
         "dspy_metric_metadata" => %{"official_hotpotqa_f1" => 1.0}
       },
       %{
         "index" => 2,
         "absolute_index" => 2,
-        "dsex_passed" => true,
+        "imp_passed" => true,
         "dspy_passed" => false,
         "pass_agreement" => false,
         "answer_agreement" => false,
-        "dsex_answer" => "Paris France",
+        "imp_answer" => "Paris France",
         "dspy_answer" => "Paris",
-        "dsex_duration_ms" => 20.0,
+        "imp_duration_ms" => 20.0,
         "dspy_duration_ms" => 10.0,
-        "dsex_metric_metadata" => %{"official_hotpotqa_f1" => 1.0},
+        "imp_metric_metadata" => %{"official_hotpotqa_f1" => 1.0},
         "dspy_metric_metadata" => %{"official_hotpotqa_f1" => 0.5}
       }
     ]
@@ -4065,7 +4065,7 @@ defmodule BenchmarkTruthTest do
           "task" => "hotpotqa",
           "offset" => 0,
           "examples" => length(rows),
-          "dsex_duration_ms" => 10.0,
+          "imp_duration_ms" => 10.0,
           "dspy_duration_ms" => 20.0,
           "row_agreement" => rows
         },
@@ -4076,7 +4076,7 @@ defmodule BenchmarkTruthTest do
       "schema_version" => 1,
       "generated_at" => "2026-07-06T00:00:00Z",
       "campaign_id" => "analysis-run",
-      "dsex" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
+      "imp" => %{"model" => %{"provider" => "req_llm", "model" => "gpt-test"}},
       "dspy" => %{"model" => %{"model" => "openai/gpt-test"}},
       "generation" => %{"temperature" => 0.0, "max_tokens" => 700},
       "tasks" => [task],
@@ -4117,15 +4117,15 @@ defmodule BenchmarkTruthTest do
       "effective" => %{
         "complete" => true,
         "matched" => true,
-        "dsex_recorded_count" => 1,
+        "imp_recorded_count" => 1,
         "dspy_recorded_count" => 1,
-        "dsex_distinct" => [%{"temperature" => 0.0, "max_tokens" => 700}],
+        "imp_distinct" => [%{"temperature" => 0.0, "max_tokens" => 700}],
         "dspy_distinct" => [%{"temperature" => 0.0, "max_tokens" => 700}],
         "wire_api_complete" => true,
         "wire_api_matched" => true,
-        "dsex_wire_api_recorded_count" => 1,
+        "imp_wire_api_recorded_count" => 1,
         "dspy_wire_api_recorded_count" => 1,
-        "dsex_wire_api_distinct" => ["openai_chat_completions"],
+        "imp_wire_api_distinct" => ["openai_chat_completions"],
         "dspy_wire_api_distinct" => ["openai_chat_completions"]
       }
     }
@@ -4144,7 +4144,7 @@ defmodule BenchmarkTruthTest do
   end
 
   defp current_prompt_contract do
-    DSEx.BenchmarkTruth.Contract.current_prompt_contract()
+    Imp.BenchmarkTruth.Contract.current_prompt_contract()
   end
 
   defp current_evidence_policy do
@@ -4161,9 +4161,9 @@ defmodule BenchmarkTruthTest do
     Enum.map(["gsm8k", "hotpotqa"], fn task ->
       %{
         "task" => task,
-        "dsex_errors" => [],
+        "imp_errors" => [],
         "dspy_errors" => [],
-        "dsex_instrumentation" => %{
+        "imp_instrumentation" => %{
           "coverage" => %{
             "instrumented_rows" => rows_per_task,
             "total_rows" => rows_per_task,
@@ -4181,8 +4181,8 @@ defmodule BenchmarkTruthTest do
             "raw_chars_comparable_rows" => rows_per_task,
             "complete" => true
           },
-          "message_chars_ratio_dsex_over_dspy_mean" => 1.02,
-          "raw_chars_ratio_dsex_over_dspy_mean" => 0.22
+          "message_chars_ratio_imp_over_dspy_mean" => 1.02,
+          "raw_chars_ratio_imp_over_dspy_mean" => 0.22
         }
       }
     end)

@@ -1,8 +1,8 @@
-defmodule DSEx.Optimize.Anything.ProgressTest do
+defmodule Imp.Optimize.Anything.ProgressTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything.Progress
-  alias DSEx.Optimizer.GEPA.Callback
+  alias Imp.Optimize.Anything.Progress
+  alias Imp.Optimizer.GEPA.Callback
 
   test "renders measured evaluation progress through the GEPA callback lifecycle" do
     {:ok, io} = StringIO.open("")

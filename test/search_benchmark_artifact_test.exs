@@ -5,7 +5,7 @@ defmodule SearchBenchmarkArtifactTest do
 
   test "source-checkout search artifact gates semantics but only measures latency" do
     artifact =
-      DSEx.BenchmarkTruth.Search.run(iterations: 2, max_concurrency: 2, work_ms: 1)
+      Imp.BenchmarkTruth.Search.run(iterations: 2, max_concurrency: 2, work_ms: 1)
 
     assert artifact["summary"]["complete"]
     assert artifact["summary"]["passing"] == artifact["summary"]["total"]
@@ -37,9 +37,9 @@ defmodule SearchBenchmarkArtifactTest do
     out_dir = tmp_dir("search-benchmark")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.search")
+      Mix.Task.reenable("imp.benchmark.search")
 
-      Mix.Tasks.Dsex.Benchmark.Search.run([
+      Mix.Tasks.Imp.Benchmark.Search.run([
         "--out",
         out_dir,
         "--iterations",
@@ -59,7 +59,7 @@ defmodule SearchBenchmarkArtifactTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path

@@ -1,7 +1,7 @@
 defmodule DatasetsContractTest do
   use ExUnit.Case
 
-  alias DSEx.Datasets
+  alias Imp.Datasets
 
   test "GSM8K JSONL loader rejects malformed JSON with path and line context" do
     path = tmp_path("bad-gsm8k.jsonl")
@@ -49,23 +49,23 @@ defmodule DatasetsContractTest do
 
   test "dataset split validates train fraction" do
     examples = [
-      DSEx.example(question: "a", answer: "b") |> DSEx.with_inputs(:question)
+      Imp.example(question: "a", answer: "b") |> Imp.with_inputs(:question)
     ]
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 ~r/Imp\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
                  fn ->
                    Datasets.split(examples, train: 1.5)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 ~r/Imp\.Datasets\.split\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
                  fn ->
                    Datasets.split(examples, train: "0.8")
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.Dataset\.new\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
+                 ~r/Imp\.Datasets\.Dataset\.new\/2: invalid value for :train option: expected a number between 0.0 and 1.0/,
                  fn ->
                    Datasets.Dataset.new(examples, train: -0.1)
                  end
@@ -73,39 +73,39 @@ defmodule DatasetsContractTest do
 
   test "dataset APIs report invalid option containers clearly" do
     examples = [
-      DSEx.example(question: "a", answer: "b") |> DSEx.with_inputs(:question)
+      Imp.example(question: "a", answer: "b") |> Imp.with_inputs(:question)
     ]
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.from_records\/3: expected keyword options/,
+                 ~r/Imp\.Datasets\.from_records\/3: expected keyword options/,
                  fn ->
                    Datasets.from_records([%{question: "a"}], [:question], :not_options)
                  end
 
-    assert_raise ArgumentError, ~r/DSEx\.Datasets\.split\/2: expected keyword options/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Datasets\.split\/2: expected keyword options/, fn ->
       Datasets.split(examples, :not_options)
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.Dataset\.new\/2: expected keyword options/,
+                 ~r/Imp\.Datasets\.Dataset\.new\/2: expected keyword options/,
                  fn ->
                    Datasets.Dataset.new(examples, :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.Dataset\.new\/2.*:metadata.*expected.*map/s,
+                 ~r/Imp\.Datasets\.Dataset\.new\/2.*:metadata.*expected.*map/s,
                  fn ->
                    Datasets.Dataset.new(examples, metadata: :not_metadata)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.DataLoader\.load\/3: expected keyword options/,
+                 ~r/Imp\.Datasets\.DataLoader\.load\/3: expected keyword options/,
                  fn ->
                    Datasets.DataLoader.load("missing.jsonl", [:question], :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.DataLoader\.load\/3: invalid value for :format option: expected string/,
+                 ~r/Imp\.Datasets\.DataLoader\.load\/3: invalid value for :format option: expected string/,
                  fn ->
                    Datasets.DataLoader.load("missing.jsonl", [:question], format: :csv)
                  end
@@ -113,33 +113,33 @@ defmodule DatasetsContractTest do
 
   test "dataset APIs report invalid collection and path boundaries clearly" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.from_records\/3 expects records to be an enumerable/,
+                 ~r/Imp\.Datasets\.from_records\/3 expects records to be an enumerable/,
                  fn ->
                    Datasets.from_records(:not_records, [:question])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.split\/2 expects examples to be an enumerable/,
+                 ~r/Imp\.Datasets\.split\/2 expects examples to be an enumerable/,
                  fn ->
                    Datasets.split(:not_examples)
                  end
 
-    assert_raise ArgumentError, ~r/DSEx\.Datasets\.jsonl\/3 expects path to be a binary/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Datasets\.jsonl\/3 expects path to be a binary/, fn ->
       Datasets.jsonl(:not_a_path, [:question])
     end
 
-    assert_raise ArgumentError, ~r/DSEx\.Datasets\.csv\/3 expects path to be a binary/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Datasets\.csv\/3 expects path to be a binary/, fn ->
       Datasets.csv(:not_a_path, [:question])
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.DataLoader\.load\/3 expects path to be a binary/,
+                 ~r/Imp\.Datasets\.DataLoader\.load\/3 expects path to be a binary/,
                  fn ->
                    Datasets.DataLoader.load(:not_a_path, [:question])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets\.DataLoader\.load\/3 supports format/,
+                 ~r/Imp\.Datasets\.DataLoader\.load\/3 supports format/,
                  fn ->
                    Datasets.DataLoader.load("records.tsv", [:question])
                  end
@@ -152,15 +152,15 @@ defmodule DatasetsContractTest do
     File.write!(jsonl_path, ~s({"question":"2+2?","answer":"4"}\n))
     File.write!(csv_path, "question,answer\n2+2?,4\n")
 
-    assert [%DSEx.Example{} = jsonl] =
+    assert [%Imp.Example{} = jsonl] =
              Datasets.DataLoader.load(jsonl_path, [:question], format: "jsonl")
 
-    assert DSEx.Example.get(jsonl, :answer) == "4"
+    assert Imp.Example.get(jsonl, :answer) == "4"
 
-    assert [%DSEx.Example{} = csv] =
+    assert [%Imp.Example{} = csv] =
              Datasets.DataLoader.load(csv_path, [:question], format: "csv")
 
-    assert DSEx.Example.get(csv, :answer) == "4"
+    assert Imp.Example.get(csv, :answer) == "4"
   after
     cleanup_tmp("loader-records.data")
     cleanup_tmp("loader-records.records")
@@ -168,13 +168,13 @@ defmodule DatasetsContractTest do
 
   test "dataset APIs report invalid input and record keys clearly" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets input keys and record keys must be atoms or strings/,
+                 ~r/Imp\.Datasets input keys and record keys must be atoms or strings/,
                  fn ->
                    Datasets.from_records([%{question: "a"}], [123])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Datasets input keys and record keys must be atoms or strings/,
+                 ~r/Imp\.Datasets input keys and record keys must be atoms or strings/,
                  fn ->
                    Datasets.from_records([%{123 => "a"}], [:question],
                      record: Datasets.GSM8K.Record
@@ -210,27 +210,27 @@ defmodule DatasetsContractTest do
 
     File.write!(math_path, ~s({"problem":"1+1","solution":"2","answer":"2"}\n))
 
-    assert [%DSEx.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
-    assert DSEx.Example.to_map(DSEx.Example.inputs(gsm8k)) == %{question: "2+2?"}
-    assert DSEx.Example.get(gsm8k, :canonical_answer) == "4"
-    assert DSEx.Example.get(gsm8k, :source_task) == "gsm8k"
+    assert [%Imp.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
+    assert Imp.Example.to_map(Imp.Example.inputs(gsm8k)) == %{question: "2+2?"}
+    assert Imp.Example.get(gsm8k, :canonical_answer) == "4"
+    assert Imp.Example.get(gsm8k, :source_task) == "gsm8k"
 
-    assert [%DSEx.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
+    assert [%Imp.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
 
-    assert DSEx.Example.to_map(DSEx.Example.inputs(hotpot)) == %{
+    assert Imp.Example.to_map(Imp.Example.inputs(hotpot)) == %{
              question: "q",
              context: ["c1"]
            }
 
-    assert DSEx.Example.get(hotpot, :id) == "hp"
-    assert DSEx.Example.get(hotpot, :supporting_facts) == %{"title" => ["t"], "sent_id" => [0]}
+    assert Imp.Example.get(hotpot, :id) == "hp"
+    assert Imp.Example.get(hotpot, :supporting_facts) == %{"title" => ["t"], "sent_id" => [0]}
 
-    assert [%DSEx.Example{} = math] = Datasets.MATH.load(math_path)
-    assert DSEx.Example.to_map(DSEx.Example.inputs(math)) == %{problem: "1+1"}
+    assert [%Imp.Example{} = math] = Datasets.MATH.load(math_path)
+    assert Imp.Example.to_map(Imp.Example.inputs(math)) == %{problem: "1+1"}
 
     colors = Datasets.Colors.load([%Datasets.Colors.Record{input: "red", label: "warm"}])
-    assert [%DSEx.Example{} = color] = colors
-    assert DSEx.Example.to_map(DSEx.Example.inputs(color)) == %{input: "red"}
+    assert [%Imp.Example{} = color] = colors
+    assert Imp.Example.to_map(Imp.Example.inputs(color)) == %{input: "red"}
   after
     cleanup_tmp("typed-gsm8k.jsonl")
     cleanup_tmp("typed-hotpot.jsonl")
@@ -238,7 +238,7 @@ defmodule DatasetsContractTest do
   end
 
   defp tmp_path(name),
-    do: Path.join(System.tmp_dir!(), "dsex-#{:erlang.phash2(self())}-#{name}")
+    do: Path.join(System.tmp_dir!(), "imp-#{:erlang.phash2(self())}-#{name}")
 
   defp cleanup_tmp(name), do: File.rm(tmp_path(name))
 end

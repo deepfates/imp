@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.StopperTest do
+defmodule Imp.Optimizer.GEPA.StopperTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.Stopper
+  alias Imp.Optimizer.GEPA.Stopper
 
   test "max metric calls and score threshold stop at inclusive limits" do
     policy = Stopper.any([Stopper.max_metric_calls(10), Stopper.score_threshold(0.9)])

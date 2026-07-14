@@ -1,15 +1,15 @@
 defmodule RandomSearchPolicyTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.RandomSearch
-  alias DSEx.Optimizer.Report
-  alias DSEx.Optimizer.SearchPolicy
-  alias DSEx.Optimizer.SearchPolicy.Sampling
+  alias Imp.Optimizer.RandomSearch
+  alias Imp.Optimizer.Report
+  alias Imp.Optimizer.SearchPolicy
+  alias Imp.Optimizer.SearchPolicy.Sampling
 
   defp program do
-    DSEx.predict("question -> answer",
+    Imp.predict("question -> answer",
       lm: %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [handler: fn _messages, _opts -> %{answer: "constant"} end]
       }
     )
@@ -17,18 +17,18 @@ defmodule RandomSearchPolicyTest do
 
   defp trainset do
     Enum.map(1..12, fn index ->
-      DSEx.example(question: "question-#{index}", answer: "answer-#{index}")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "question-#{index}", answer: "answer-#{index}")
+      |> Imp.with_inputs(:question)
     end)
   end
 
   defp devset do
-    [DSEx.example(question: "dev", answer: "constant") |> DSEx.with_inputs(:question)]
+    [Imp.example(question: "dev", answer: "constant") |> Imp.with_inputs(:question)]
   end
 
   defp compile(seed) do
     optimizer =
-      RandomSearch.new(DSEx.Metrics.exact_match(:answer),
+      RandomSearch.new(Imp.Metrics.exact_match(:answer),
         candidates: 8,
         demos_per_candidate: 4,
         seed: seed
@@ -43,7 +43,7 @@ defmodule RandomSearchPolicyTest do
     |> Map.fetch!(:candidates)
     |> Enum.reject(&(&1.index == :baseline))
     |> Enum.map(fn candidate ->
-      Enum.map(candidate.demos, &DSEx.Example.get(&1, :question))
+      Enum.map(candidate.demos, &Imp.Example.get(&1, :question))
     end)
   end
 
@@ -97,7 +97,7 @@ defmodule RandomSearchPolicyTest do
 
   test "seed must be an integer" do
     assert_raise ArgumentError, ~r/invalid value for :seed option: expected integer/, fn ->
-      RandomSearch.new(DSEx.Metrics.exact_match(:answer), seed: 1.5)
+      RandomSearch.new(Imp.Metrics.exact_match(:answer), seed: 1.5)
     end
   end
 end

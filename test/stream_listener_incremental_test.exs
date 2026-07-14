@@ -1,9 +1,9 @@
-defmodule DSEx.StreamListenerIncrementalTest do
+defmodule Imp.StreamListenerIncrementalTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Streaming.Messages.StatusMessage
-  alias DSEx.Streaming.Messages.StreamListener
-  alias DSEx.Streaming.Messages.StreamResponse
+  alias Imp.Streaming.Messages.StatusMessage
+  alias Imp.Streaming.Messages.StreamListener
+  alias Imp.Streaming.Messages.StreamResponse
 
   test "extracts a selected field before the source completes and preserves pull order" do
     owner = self()
@@ -142,7 +142,7 @@ defmodule DSEx.StreamListenerIncrementalTest do
 
     listener =
       StreamListener.new(
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         field: :answer,
         on_chunk: &send(owner, {:field, &1})
       )
@@ -163,7 +163,7 @@ defmodule DSEx.StreamListenerIncrementalTest do
 
     listener =
       StreamListener.new(
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         field: "answer",
         on_chunk: &send(owner, {:field, &1})
       )
@@ -183,7 +183,7 @@ defmodule DSEx.StreamListenerIncrementalTest do
 
     listener =
       StreamListener.new(
-        adapter: DSEx.Adapter.XML,
+        adapter: Imp.Adapter.XML,
         field: :answer,
         on_chunk: &send(owner, {:field, &1})
       )

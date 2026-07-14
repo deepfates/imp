@@ -1,7 +1,7 @@
 defmodule SchemaConstraintsTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Signature.Field
+  alias Imp.Signature.Field
 
   test "validates enum numeric string array object optional and nested constraints" do
     fields = [
@@ -50,7 +50,7 @@ defmodule SchemaConstraintsTest do
       meta: %{count: 2}
     }
 
-    assert :ok = DSEx.Schema.validate_fields(fields, valid)
+    assert :ok = Imp.Schema.validate_fields(fields, valid)
 
     invalid = %{
       status: "bad",
@@ -63,7 +63,7 @@ defmodule SchemaConstraintsTest do
       meta: %{count: 0}
     }
 
-    assert {:error, errors} = DSEx.Schema.validate_fields(fields, invalid)
+    assert {:error, errors} = Imp.Schema.validate_fields(fields, invalid)
 
     assert Enum.map(errors, & &1.rule) == [
              :enum,
@@ -80,7 +80,7 @@ defmodule SchemaConstraintsTest do
 
   test "exports stable JSON schema from signature outputs" do
     signature =
-      DSEx.Signature.new(%{
+      Imp.Signature.new(%{
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},
@@ -96,12 +96,12 @@ defmodule SchemaConstraintsTest do
         ]
       })
 
-    assert DSEx.Signature.json_schema(signature) == %{
+    assert Imp.Signature.json_schema(signature) == %{
              "type" => "object",
              "required" => ["answer", "span", "confidence", "items"],
              "properties" => %{
                "answer" => %{"type" => "string", "enum" => ["yes", "no"]},
-               "span" => %{"type" => "string", "x-dsex-answerShape" => "short_span"},
+               "span" => %{"type" => "string", "x-imp-answerShape" => "short_span"},
                "confidence" => %{"type" => "number", "minimum" => 0, "maximum" => 1},
                "items" => %{"type" => "array", "items" => %{"type" => "integer"}},
                "meta" => %{
@@ -114,7 +114,7 @@ defmodule SchemaConstraintsTest do
 
   test "loaded JSON metadata preserves string-key constraints" do
     original =
-      DSEx.Signature.new(%{
+      Imp.Signature.new(%{
         inputs: [:question],
         outputs: [
           %{name: :score, type: :number, constraints: %{min: 0, max: 1}},
@@ -128,16 +128,16 @@ defmodule SchemaConstraintsTest do
 
     loaded =
       original
-      |> DSEx.Signature.dump()
+      |> Imp.Signature.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> DSEx.Signature.load()
+      |> Imp.Signature.load()
 
     assert {:error, errors} =
-             DSEx.Schema.validate_fields(loaded.outputs, %{score: 2, meta: %{count: 0}})
+             Imp.Schema.validate_fields(loaded.outputs, %{score: 2, meta: %{count: 0}})
 
     assert Enum.map(errors, & &1.rule) == [:max, :min]
-    assert DSEx.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
+    assert Imp.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
   end
 
   test "invalid regex constraints become validation errors instead of crashes" do
@@ -146,14 +146,14 @@ defmodule SchemaConstraintsTest do
     ]
 
     assert {:error, [%{field: :code, rule: :pattern, message: message}]} =
-             DSEx.Schema.validate_fields(fields, %{code: "ABC"})
+             Imp.Schema.validate_fields(fields, %{code: "ABC"})
 
     assert message =~ "invalid regex pattern"
   end
 
   test "JSON adapter returns retry feedback for constraint failures" do
     signature =
-      DSEx.Signature.new(%{
+      Imp.Signature.new(%{
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["Paris"]}},
@@ -161,8 +161,8 @@ defmodule SchemaConstraintsTest do
         ]
       })
 
-    assert {:error, %DSEx.AdapterParseError{} = error} =
-             DSEx.Adapter.JSON.parse(signature, ~s({"answer":"Lyon","confidence":0.2}), [])
+    assert {:error, %Imp.AdapterParseError{} = error} =
+             Imp.Adapter.JSON.parse(signature, ~s({"answer":"Lyon","confidence":0.2}), [])
 
     assert error.message =~ "Validation failed"
     assert error.message =~ "answer"
@@ -179,9 +179,9 @@ defmodule SchemaConstraintsTest do
       )
     ]
 
-    assert :ok = DSEx.Schema.validate_fields(fields, %{flag: false, meta: %{enabled: false}})
+    assert :ok = Imp.Schema.validate_fields(fields, %{flag: false, meta: %{enabled: false}})
 
-    assert {:error, errors} = DSEx.Schema.validate_fields(fields, %{meta: %{enabled: false}})
+    assert {:error, errors} = Imp.Schema.validate_fields(fields, %{meta: %{enabled: false}})
     assert [%{field: :flag, rule: :required}] = errors
   end
 end

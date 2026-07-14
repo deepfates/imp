@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.SearchPrimitivesTest do
+defmodule Imp.Optimizer.SearchPrimitivesTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.{CategoricalTPE, Sampling}
+  alias Imp.Optimizer.{CategoricalTPE, Sampling}
 
   test "seeded sampling is reproducible" do
     first = sample_sequence(17)

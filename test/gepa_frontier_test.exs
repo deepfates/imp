@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.FrontierTest do
+defmodule Imp.Optimizer.GEPA.FrontierTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Frontier, Result}
+  alias Imp.Optimizer.GEPA.{Frontier, Result}
 
   test "instance policy tracks complementary primary-score winners per example" do
     candidates = [

@@ -5,15 +5,15 @@ defmodule HoverBM25ParityTest do
     {corpus_path, index_path} = tmp_retrieval!()
 
     retriever =
-      DSEx.BenchmarkTruth.HoverBM25.new(retrieval(corpus_path, index_path))
+      Imp.BenchmarkTruth.HoverBM25.new(retrieval(corpus_path, index_path))
 
     assert retriever.metadata["ranking_parity"] == "approximate"
-    assert retriever.metadata["implementation"] == "dsex_native_bm25_approximation"
+    assert retriever.metadata["implementation"] == "imp_native_bm25_approximation"
 
     {:ok, prediction} =
-      DSEx.Module.call(retriever, %{claim: "The Eiffel Tower is located in Paris."})
+      Imp.Module.call(retriever, %{claim: "The Eiffel Tower is located in Paris."})
 
-    assert ["Paris | " <> _rest | _] = DSEx.Prediction.get(prediction, :retrieved_docs)
+    assert ["Paris | " <> _rest | _] = Imp.Prediction.get(prediction, :retrieved_docs)
   end
 
   test "HoVer retrieval rejects declared checksums that do not match source bytes" do
@@ -22,14 +22,14 @@ defmodule HoverBM25ParityTest do
     File.write!(corpus_path, File.read!(corpus_path) <> "changed\n")
 
     assert_raise ArgumentError, ~r/corpus_checksum mismatch/, fn ->
-      DSEx.BenchmarkTruth.HoverBM25.new(retrieval)
+      Imp.BenchmarkTruth.HoverBM25.new(retrieval)
     end
   end
 
   test "source-exact HoVer adapter matches pinned upstream bm25s title order" do
-    if System.get_env("DSEX_HOVER_UPSTREAM_PARITY") == "1" do
-      gepa_root = Path.expand(System.get_env("DSEX_GEPA_ROOT") || "tmp/gepa-artifact")
-      python = System.get_env("DSEX_GEPA_PYTHON") || "python3"
+    if System.get_env("IMP_HOVER_UPSTREAM_PARITY") == "1" do
+      gepa_root = Path.expand(System.get_env("IMP_GEPA_ROOT") || "tmp/gepa-artifact")
+      python = System.get_env("IMP_GEPA_PYTHON") || "python3"
 
       corpus_path =
         Path.join(gepa_root, "gepa_artifact/benchmarks/hover/wiki.abstracts.2017.jsonl")
@@ -76,7 +76,7 @@ defmodule HoverBM25ParityTest do
     root =
       Path.join(
         System.tmp_dir!(),
-        "dsex-hover-retrieval-#{System.unique_integer([:positive])}"
+        "imp-hover-retrieval-#{System.unique_integer([:positive])}"
       )
 
     File.mkdir_p!(root)
@@ -105,8 +105,8 @@ defmodule HoverBM25ParityTest do
       "kind" => "bm25s_wiki_abstracts_2017",
       "corpus_path" => corpus_path,
       "index_path" => index_path,
-      "corpus_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(corpus_path),
-      "index_checksum" => "sha256:" <> DSEx.BenchmarkTruth.HoverBM25.checksum_path(index_path)
+      "corpus_checksum" => "sha256:" <> Imp.BenchmarkTruth.HoverBM25.checksum_path(corpus_path),
+      "index_checksum" => "sha256:" <> Imp.BenchmarkTruth.HoverBM25.checksum_path(index_path)
     }
   end
 

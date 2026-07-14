@@ -1,8 +1,8 @@
 defmodule GepaCampaignControlsTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.{GepaCampaign, GepaCampaignBudget, GepaCampaignManifest}
-  alias Mix.Tasks.Dsex.Benchmark.GepaCampaign, as: GepaTask
+  alias Imp.BenchmarkTruth.{GepaCampaign, GepaCampaignBudget, GepaCampaignManifest}
+  alias Mix.Tasks.Imp.Benchmark.GepaCampaign, as: GepaTask
 
   @manifest "benchmarks/config/gepa-paper-campaign-v2.json"
 
@@ -296,7 +296,7 @@ defmodule GepaCampaignControlsTest do
   end
 
   test "manifest plan does not require credentials or upstream environment" do
-    Mix.Task.reenable("dsex.benchmark.gepa_campaign")
+    Mix.Task.reenable("imp.benchmark.gepa_campaign")
 
     output =
       ExUnit.CaptureIO.capture_io(fn ->

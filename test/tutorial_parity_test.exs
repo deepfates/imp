@@ -18,7 +18,7 @@ defmodule TutorialParityTest do
     "Deployment"
   ]
 
-  test "every tutorial and real-world example family has one current DSEx disposition" do
+  test "every tutorial and real-world example family has one current Imp disposition" do
     body = File.read!(@parity_path)
 
     assert body =~ "The executable learning path is the five Livebooks"
@@ -61,12 +61,12 @@ defmodule TutorialParityTest do
 
     assert livebook =~ "## Canonical Deployment Reference"
     assert livebook =~ "examples/deployment"
-    assert livebook =~ "DSEX_MODEL"
-    assert livebook =~ "DSEX_API_KEY"
+    assert livebook =~ "IMP_MODEL"
+    assert livebook =~ "IMP_API_KEY"
 
     assert deployment =~ "## Prepare An Artifact"
-    assert deployment =~ "DSEx.save!"
-    assert deployment =~ "DSEX_ARTIFACT_PATH"
-    assert deployment =~ "DSEX_STATIC_ANSWER=Paris"
+    assert deployment =~ "Imp.save!"
+    assert deployment =~ "IMP_ARTIFACT_PATH"
+    assert deployment =~ "IMP_STATIC_ANSWER=Paris"
   end
 end

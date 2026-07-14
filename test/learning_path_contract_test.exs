@@ -11,7 +11,7 @@ defmodule LearningPathContractTest do
     "retrieval" => {"Paris", 1},
     "rlm" => {"Paris", [:submit]},
     "persistence" => "Paris",
-    "observability" => {"Paris", [[:dsex, :tool, :start], [:dsex, :tool, :stop]]}
+    "observability" => {"Paris", [[:imp, :tool, :start], [:imp, :tool, :stop]]}
   }
 
   test "every local Elixir learning-path snippet executes with its documented result" do

@@ -1,7 +1,7 @@
-defmodule DSEx.RedactionTest do
+defmodule Imp.RedactionTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapters.Types.Image
+  alias Imp.Adapters.Types.Image
 
   defmodule OrdinaryStruct do
     defstruct [:value]
@@ -21,7 +21,7 @@ defmodule DSEx.RedactionTest do
     }
 
     redacted =
-      DSEx.Redaction.redact(%{
+      Imp.Redaction.redact(%{
         side_information: %{prompt: [%{"Image" => image}]}
       })
 
@@ -36,11 +36,11 @@ defmodule DSEx.RedactionTest do
   end
 
   test "ordinary structs and maps retain existing redaction behavior" do
-    assert DSEx.Redaction.redact(%OrdinaryStruct{value: %{api_key: "secret"}}) == %{
+    assert Imp.Redaction.redact(%OrdinaryStruct{value: %{api_key: "secret"}}) == %{
              value: %{api_key: "[REDACTED]"}
            }
 
-    assert DSEx.Redaction.redact(%{label: "keep", nested: %{token: "short"}}) == %{
+    assert Imp.Redaction.redact(%{label: "keep", nested: %{token: "short"}}) == %{
              label: "keep",
              nested: %{token: "[REDACTED]"}
            }

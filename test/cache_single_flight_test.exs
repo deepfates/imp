@@ -1,15 +1,15 @@
-defmodule DSEx.CacheSingleFlightTest do
+defmodule Imp.CacheSingleFlightTest do
   use ExUnit.Case, async: false
 
-  import DSEx.Test.TelemetryHelpers
+  import Imp.Test.TelemetryHelpers
 
   setup do
-    DSEx.Cache.configure()
-    DSEx.Cache.clear()
+    Imp.Cache.configure()
+    Imp.Cache.clear()
 
     on_exit(fn ->
-      DSEx.Cache.configure()
-      DSEx.Cache.clear()
+      Imp.Cache.configure()
+      Imp.Cache.clear()
     end)
 
     :ok
@@ -21,14 +21,14 @@ defmodule DSEx.CacheSingleFlightTest do
 
     telemetry_ref =
       attach([
-        [:dsex, :cache, :miss],
-        [:dsex, :cache, :coalesced]
+        [:imp, :cache, :miss],
+        [:imp, :cache, :coalesced]
       ])
 
     tasks =
       for _index <- 1..caller_count do
         Task.async(fn ->
-          DSEx.Cache.fetch_or_store(:shared_key, fn ->
+          Imp.Cache.fetch_or_store(:shared_key, fn ->
             send(parent, {:computed, self()})
 
             receive do
@@ -41,7 +41,7 @@ defmodule DSEx.CacheSingleFlightTest do
     assert_receive {:computed, producer}
 
     for _index <- 1..caller_count do
-      assert_receive {^telemetry_ref, [:dsex, :cache, :miss], %{count: 1}, %{key: :shared_key}}
+      assert_receive {^telemetry_ref, [:imp, :cache, :miss], %{count: 1}, %{key: :shared_key}}
     end
 
     wait_for_waiters(:shared_key, caller_count - 1)
@@ -53,13 +53,13 @@ defmodule DSEx.CacheSingleFlightTest do
     refute_receive {:computed, _other_producer}
 
     for _index <- 1..(caller_count - 1) do
-      assert_receive {^telemetry_ref, [:dsex, :cache, :coalesced],
-                      %{count: 1, duration: duration}, %{key: :shared_key}}
+      assert_receive {^telemetry_ref, [:imp, :cache, :coalesced], %{count: 1, duration: duration},
+                      %{key: :shared_key}}
 
       assert is_integer(duration) and duration >= 0
     end
 
-    assert %{misses: ^caller_count, writes: 1, size: 1} = DSEx.Cache.stats()
+    assert %{misses: ^caller_count, writes: 1, size: 1} = Imp.Cache.stats()
   end
 
   test "promotes one waiter when the producer is killed" do
@@ -67,13 +67,13 @@ defmodule DSEx.CacheSingleFlightTest do
 
     telemetry_ref =
       attach([
-        [:dsex, :cache, :producer_down],
-        [:dsex, :cache, :retry]
+        [:imp, :cache, :producer_down],
+        [:imp, :cache, :retry]
       ])
 
     producer =
-      Task.Supervisor.async_nolink(DSEx.TaskSupervisor, fn ->
-        DSEx.Cache.fetch_or_store(:crash_key, fn ->
+      Task.Supervisor.async_nolink(Imp.TaskSupervisor, fn ->
+        Imp.Cache.fetch_or_store(:crash_key, fn ->
           send(parent, {:producer_started, self()})
           Process.sleep(:infinity)
         end)
@@ -82,8 +82,8 @@ defmodule DSEx.CacheSingleFlightTest do
     assert_receive {:producer_started, producer_pid}
 
     waiter =
-      Task.Supervisor.async_nolink(DSEx.TaskSupervisor, fn ->
-        DSEx.Cache.fetch_or_store(:crash_key, fn ->
+      Task.Supervisor.async_nolink(Imp.TaskSupervisor, fn ->
+        Imp.Cache.fetch_or_store(:crash_key, fn ->
           send(parent, {:waiter_promoted, self()})
           :recovered
         end)
@@ -92,10 +92,10 @@ defmodule DSEx.CacheSingleFlightTest do
     wait_for_waiters(:crash_key, 1)
     Process.exit(producer_pid, :kill)
 
-    assert_receive {^telemetry_ref, [:dsex, :cache, :producer_down], %{count: 1},
+    assert_receive {^telemetry_ref, [:imp, :cache, :producer_down], %{count: 1},
                     %{key: :crash_key, reason: :killed}}
 
-    assert_receive {^telemetry_ref, [:dsex, :cache, :retry], %{count: 1, duration: duration},
+    assert_receive {^telemetry_ref, [:imp, :cache, :retry], %{count: 1, duration: duration},
                     %{key: :crash_key, reason: :producer_down}}
 
     assert duration >= 0
@@ -103,13 +103,13 @@ defmodule DSEx.CacheSingleFlightTest do
     assert waiter_pid == waiter.pid
     assert {:exit, :killed} = Task.yield(producer, 1_000)
     assert Task.await(waiter, 2_000) == :recovered
-    assert DSEx.Cache.get(:crash_key) == :recovered
+    assert Imp.Cache.get(:crash_key) == :recovered
   end
 
   test "cached values cannot collide with the internal miss marker" do
-    assert DSEx.Cache.put(:sentinel_key, :__missing__) == :__missing__
+    assert Imp.Cache.put(:sentinel_key, :__missing__) == :__missing__
 
-    assert DSEx.Cache.fetch_or_store(:sentinel_key, fn ->
+    assert Imp.Cache.fetch_or_store(:sentinel_key, fn ->
              flunk("cached sentinel-like value was recomputed")
            end) == :__missing__
   end
@@ -117,7 +117,7 @@ defmodule DSEx.CacheSingleFlightTest do
   defp wait_for_waiters(key, count, attempts \\ 100)
 
   defp wait_for_waiters(key, count, attempts) when attempts > 0 do
-    state = :sys.get_state(DSEx.Cache)
+    state = :sys.get_state(Imp.Cache)
 
     waiters = get_in(state, [:flights, key, :waiters])
 

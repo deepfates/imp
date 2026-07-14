@@ -1,7 +1,7 @@
-defmodule DSEx.Training.FastSlow.CheckpointTest do
+defmodule Imp.Training.FastSlow.CheckpointTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{
+  alias Imp.Training.FastSlow.{
     Checkpoint,
     Config,
     Event,
@@ -17,7 +17,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     checkpoint = Checkpoint.dump(config, state)
     decoded = checkpoint |> Jason.encode!() |> Jason.decode!()
 
-    assert decoded["type"] == "dsex_fast_slow_training"
+    assert decoded["type"] == "imp_fast_slow_training"
     assert decoded["schema_version"] == 4
     assert byte_size(decoded["payload_sha256"]) == 64
     assert Checkpoint.load!(decoded, config) == state
@@ -28,7 +28,7 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
     state = populated_state(config)
 
     directory =
-      Path.join(System.tmp_dir!(), "dsex-fast-slow-#{System.unique_integer([:positive])}")
+      Path.join(System.tmp_dir!(), "imp-fast-slow-#{System.unique_integer([:positive])}")
 
     path = Path.join(directory, "state.json")
     on_exit(fn -> File.rm_rf!(directory) end)
@@ -69,19 +69,19 @@ defmodule DSEx.Training.FastSlow.CheckpointTest do
 
   test "legacy schema with incorrect t semantics is rejected explicitly" do
     assert_raise ArgumentError, ~r/schema 1 encoded t as a cycle horizon/, fn ->
-      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 1}, config())
+      Checkpoint.load!(%{"type" => "imp_fast_slow_training", "schema_version" => 1}, config())
     end
   end
 
   test "schema 2 without durable token reuse provenance is rejected explicitly" do
     assert_raise ArgumentError, ~r/schema 2 omitted durable rollout reuse/, fn ->
-      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 2}, config())
+      Checkpoint.load!(%{"type" => "imp_fast_slow_training", "schema_version" => 2}, config())
     end
   end
 
   test "schema 3 without a persisted reuse policy is rejected explicitly" do
     assert_raise ArgumentError, ~r/schema 3 did not persist the rollout reuse policy/, fn ->
-      Checkpoint.load!(%{"type" => "dsex_fast_slow_training", "schema_version" => 3}, config())
+      Checkpoint.load!(%{"type" => "imp_fast_slow_training", "schema_version" => 3}, config())
     end
   end
 

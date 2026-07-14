@@ -1,10 +1,10 @@
 defmodule MultimodalQualityBenchmarkTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.MultimodalCheckpoint, as: Checkpoint
-  alias DSEx.BenchmarkTruth.MultimodalManifest, as: Manifest
-  alias DSEx.BenchmarkTruth.MultimodalRunner, as: Runner
-  alias DSEx.Test.LocalHTTP
+  alias Imp.BenchmarkTruth.MultimodalCheckpoint, as: Checkpoint
+  alias Imp.BenchmarkTruth.MultimodalManifest, as: Manifest
+  alias Imp.BenchmarkTruth.MultimodalRunner, as: Runner
+  alias Imp.Test.LocalHTTP
 
   @manifest "benchmarks/data/multimodal/manifest.json"
   @openai_manifest "benchmarks/data/multimodal/openai-responses-manifest.json"
@@ -475,7 +475,7 @@ defmodule MultimodalQualityBenchmarkTest do
   defp sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
 
   defp tmp_path(name) do
-    dir = Path.join(System.tmp_dir!(), "dsex-multimodal-#{System.unique_integer([:positive])}")
+    dir = Path.join(System.tmp_dir!(), "imp-multimodal-#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     path = Path.join(dir, name)
     on_exit(fn -> File.rm_rf(dir) end)

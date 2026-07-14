@@ -2,7 +2,7 @@ defmodule BenchmarkTest do
   use ExUnit.Case, async: true
 
   test "benchmark fixtures pass with deterministic scores" do
-    results = DSEx.Benchmarks.assert_pass!()
+    results = Imp.Benchmarks.assert_pass!()
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction,
@@ -16,7 +16,7 @@ defmodule BenchmarkTest do
   end
 
   test "benchmark negative controls fail below threshold" do
-    results = DSEx.Benchmarks.assert_negative_controls!()
+    results = Imp.Benchmarks.assert_negative_controls!()
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction_negative,

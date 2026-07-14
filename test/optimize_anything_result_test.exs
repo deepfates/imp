@@ -1,9 +1,9 @@
-defmodule DSEx.Optimize.Anything.ResultTest do
+defmodule Imp.Optimize.Anything.ResultTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything.Result
-  alias DSEx.Optimizer.GEPA.{Budget, Engine}
-  alias DSEx.Optimizer.GEPA.Result, as: EvaluationResult
+  alias Imp.Optimize.Anything.Result
+  alias Imp.Optimizer.GEPA.{Budget, Engine}
+  alias Imp.Optimizer.GEPA.Result, as: EvaluationResult
 
   test "projects candidates, lineage, frontiers, budget, and string best candidate" do
     state = %Engine.State{

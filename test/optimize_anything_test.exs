@@ -1,8 +1,8 @@
 defmodule OptimizeAnythingTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.Anything.{Config, Result}
+  alias Imp.Optimize.Anything
+  alias Imp.Optimize.Anything.{Config, Result}
 
   test "runs the canonical Config and Result surface" do
     result =
@@ -24,7 +24,7 @@ defmodule OptimizeAnythingTest do
     refute function_exported?(Anything, :optimize, 3)
     refute function_exported?(Anything, :save_report!, 2)
     refute function_exported?(Anything, :load_report!, 1)
-    refute Code.ensure_loaded?(DSEx.Optimize.Anything.Report)
-    refute Code.ensure_loaded?(DSEx.Optimize.Anything.Candidate)
+    refute Code.ensure_loaded?(Imp.Optimize.Anything.Report)
+    refute Code.ensure_loaded?(Imp.Optimize.Anything.Candidate)
   end
 end

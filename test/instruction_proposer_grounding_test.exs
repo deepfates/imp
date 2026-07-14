@@ -1,13 +1,13 @@
-defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
+defmodule Imp.Optimizer.InstructionProposerGroundingTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.InstructionProposer
+  alias Imp.Optimizer.InstructionProposer
 
   test "grounded proposer independently controls program, data, demo, and tip context" do
     parent = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
@@ -17,8 +17,8 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer")
-    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
 
     assert ["Candidate instruction"] =
              InstructionProposer.propose(program, [example],
@@ -54,7 +54,7 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
     parent = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, opts ->
           send(parent, {:proposal_rollout, opts[:rollout_id]})
@@ -63,8 +63,8 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer")
-    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
 
     {candidates, report} =
       InstructionProposer.propose_with_report(program, [example],
@@ -95,13 +95,13 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
     lm = fn _messages, _opts ->
       {:ok,
        %{
-         __dsex_lm_output__: %{"instructions" => ["Use the provider proposal."]},
-         __dsex_lm_metadata__: %{req_llm: %{provider: "test"}}
+         __imp_lm_output__: %{"instructions" => ["Use the provider proposal."]},
+         __imp_lm_metadata__: %{req_llm: %{provider: "test"}}
        }}
     end
 
-    program = DSEx.predict("question -> answer")
-    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
 
     assert ["Use the provider proposal."] =
              InstructionProposer.propose(program, [example], lm: lm, count: 1)
@@ -117,7 +117,7 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
     parent = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
@@ -127,11 +127,11 @@ defmodule DSEx.Optimizer.InstructionProposerGroundingTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
     demos =
       Enum.map(["a", "b", "c"], fn question ->
-        [DSEx.example(question: question, answer: question) |> DSEx.with_inputs(:question)]
+        [Imp.example(question: question, answer: question) |> Imp.with_inputs(:question)]
       end)
 
     {candidates, report} =

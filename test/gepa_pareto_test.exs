@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.ParetoTest do
+defmodule Imp.Optimizer.GEPA.ParetoTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.Pareto
+  alias Imp.Optimizer.GEPA.Pareto
 
   test "builds per-instance winner sets instead of vector nondominance" do
     mapping =

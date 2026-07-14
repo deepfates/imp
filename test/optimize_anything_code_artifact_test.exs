@@ -1,7 +1,7 @@
 defmodule OptimizeAnythingCodeArtifactTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.OptimizeAnything.CodeArtifact
+  alias Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact
 
   test "common benchmark contract is complete and JSON-safe" do
     assert is_binary(CodeArtifact.id())

@@ -4,10 +4,10 @@ defmodule PackageContractTest do
   @moduletag :package
 
   @product_files [
-    "lib/dsex.ex",
-    "lib/dsex/clients/req_llm.ex",
-    "lib/dsex/lm/static.ex",
-    "lib/mix/tasks/dsex.package.clean_room.ex",
+    "lib/imp.ex",
+    "lib/imp/clients/req_llm.ex",
+    "lib/imp/lm/static.ex",
+    "lib/mix/tasks/imp.package.clean_room.ex",
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
@@ -28,11 +28,11 @@ defmodule PackageContractTest do
 
   @excluded_prefixes [
     "benchmarks/",
-    "lib/dsex/benchmark_env.ex",
-    "lib/mix/tasks/dsex.benchmark",
-    "lib/mix/tasks/dsex.gate_evidence.ex",
-    "lib/dsex/benchmark_truth",
-    "lib/dsex/identity_progress/",
+    "lib/imp/benchmark_env.ex",
+    "lib/mix/tasks/imp.benchmark",
+    "lib/mix/tasks/imp.gate_evidence.ex",
+    "lib/imp/benchmark_truth",
+    "lib/imp/identity_progress/",
     "scripts/dspy_",
     "test/",
     "tmp/"
@@ -44,14 +44,14 @@ defmodule PackageContractTest do
     "docs/COVERAGE_MATRIX.md",
     "docs/PARITY_VALIDATION_PROGRAM.md",
     "docs/RELEASE_CRITERIA.md",
-    "lib/dsex/benchmarks.ex"
+    "lib/imp/benchmarks.ex"
   ]
 
   @documented_module_allowlist MapSet.new([
-                                 "DSEx.Optimize",
-                                 "DSEx.Optimizer",
-                                 "DSEx.TaskSupervisor",
-                                 "DSEx.UnlinkedTaskSupervisor"
+                                 "Imp.Optimize",
+                                 "Imp.Optimizer",
+                                 "Imp.TaskSupervisor",
+                                 "Imp.UnlinkedTaskSupervisor"
                                ])
 
   test "Hex package ships product code and docs, not local evidence machinery" do
@@ -65,12 +65,12 @@ defmodule PackageContractTest do
   end
 
   test "clean-room package gate is discoverable from the root Mix project" do
-    assert Mix.Task.get("dsex.package.clean_room") == Mix.Tasks.Dsex.Package.CleanRoom
+    assert Mix.Task.get("imp.package.clean_room") == Mix.Tasks.Imp.Package.CleanRoom
 
     assert {:docs_v1, _, _, _, %{"en" => moduledoc}, _, _} =
-             Code.fetch_docs(Mix.Tasks.Dsex.Package.CleanRoom)
+             Code.fetch_docs(Mix.Tasks.Imp.Package.CleanRoom)
 
-    assert moduledoc =~ "mix dsex.package.clean_room"
+    assert moduledoc =~ "mix imp.package.clean_room"
 
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
     assert hd(Keyword.fetch!(aliases, :"package.check")) == "package.clean"
@@ -78,7 +78,7 @@ defmodule PackageContractTest do
   end
 
   test "clean-room output guard accepts siblings but rejects deleting its package input" do
-    guard = &Mix.Tasks.Dsex.Package.CleanRoom.output_contains_package?/2
+    guard = &Mix.Tasks.Imp.Package.CleanRoom.output_contains_package?/2
 
     refute guard.("tmp/package-clean-room", "tmp/package-check")
     assert guard.("tmp/package-check", "tmp/package-check")
@@ -184,9 +184,9 @@ defmodule PackageContractTest do
   test "README starts with a resolvable Git install path and labels source-checkout installs" do
     readme = File.read!("README.md")
 
-    assert readme =~ ~s({:dsex, github: "deepfates/dsex", branch: "main"})
+    assert readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
     assert readme =~ "source checkout"
-    assert readme =~ ~s({:dsex, path: "."})
+    assert readme =~ ~s({:imp, path: "."})
   end
 
   defp assert_release_files(files) do
@@ -206,7 +206,7 @@ defmodule PackageContractTest do
   defp package_tmp_dir do
     Path.join([
       System.tmp_dir!(),
-      "dsex-package-contract-#{System.unique_integer([:positive])}"
+      "imp-package-contract-#{System.unique_integer([:positive])}"
     ])
   end
 
@@ -222,7 +222,7 @@ defmodule PackageContractTest do
       |> Enum.map(&to_string/1)
 
     preferred_envs =
-      DSEx.MixProject.cli()
+      Imp.MixProject.cli()
       |> Keyword.fetch!(:preferred_envs)
       |> Keyword.keys()
       |> Enum.map(&to_string/1)
@@ -246,15 +246,15 @@ defmodule PackageContractTest do
     on_exit(fn -> File.rm_rf(consumer_dir) end)
 
     mix_exs = """
-    defmodule DSExConsumer.MixProject do
+    defmodule ImpConsumer.MixProject do
       use Mix.Project
 
       def project do
         [
-          app: :dsex_consumer,
+          app: :imp_consumer,
           version: "0.1.0",
           elixir: "~> 1.19",
-          deps: [{:dsex, path: #{inspect(package_dir)}}]
+          deps: [{:imp, path: #{inspect(package_dir)}}]
         ]
       end
     end
@@ -265,44 +265,44 @@ defmodule PackageContractTest do
 
     script = """
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
     }
 
-    DSEx.configure(lm: lm, adapter: DSEx.Adapter.Chat)
+    Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
     program =
       "question -> answer: short_span"
-      |> DSEx.signature("Answer with the shortest correct span. Do not explain.")
-      |> DSEx.predict()
+      |> Imp.signature("Answer with the shortest correct span. Do not explain.")
+      |> Imp.predict()
 
     {:ok, prediction} =
-      DSEx.call(program, %{question: "What city is the Eiffel Tower in?"})
+      Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
 
-    unless DSEx.get(prediction, :answer) == "Paris" do
-      raise "unexpected DSEx prediction: \#{inspect(prediction)}"
+    unless Imp.get(prediction, :answer) == "Paris" do
+      raise "unexpected Imp prediction: \#{inspect(prediction)}"
     end
 
     demo =
-      DSEx.example(question: "What city is the Eiffel Tower in?", answer: "Paris")
-      |> DSEx.with_inputs([:question])
+      Imp.example(question: "What city is the Eiffel Tower in?", answer: "Paris")
+      |> Imp.with_inputs([:question])
 
     compiled =
-      DSEx.optimize(
+      Imp.optimize(
         program,
-        DSEx.Optimizer.LabeledFewShot.new(k: 1),
+        Imp.Optimizer.LabeledFewShot.new(k: 1),
         [demo]
       )
 
     {:ok, compiled_prediction} =
-      DSEx.call(compiled, %{question: "What city is the Eiffel Tower in?"})
+      Imp.call(compiled, %{question: "What city is the Eiffel Tower in?"})
 
-    unless DSEx.get(compiled_prediction, :answer) == "Paris" do
+    unless Imp.get(compiled_prediction, :answer) == "Paris" do
       raise "optimized program did not remain executable"
     end
 
-    metric = DSEx.exact_match(:answer)
-    report = DSEx.evaluate(compiled, [demo], metric)
+    metric = Imp.exact_match(:answer)
+    report = Imp.evaluate(compiled, [demo], metric)
 
     unless report.score == 1.0 do
       raise "facade metric/evaluation path failed from package consumer: \#{inspect(report)}"
@@ -310,18 +310,18 @@ defmodule PackageContractTest do
 
     loaded =
       compiled
-      |> DSEx.dump()
-      |> DSEx.load()
+      |> Imp.dump()
+      |> Imp.load()
 
     {:ok, loaded_prediction} =
-      DSEx.call(loaded, %{question: "What city is the Eiffel Tower in?"})
+      Imp.call(loaded, %{question: "What city is the Eiffel Tower in?"})
 
-    unless DSEx.get(loaded_prediction, :answer) == "Paris" do
+    unless Imp.get(loaded_prediction, :answer) == "Paris" do
       raise "saved and loaded program did not remain executable"
     end
 
-    retriever = DSEx.memory([[text: "France capital: Paris."]], k: 1)
-    {:ok, [doc]} = DSEx.retrieve(retriever, "capital France")
+    retriever = Imp.memory([[text: "France capital: Paris."]], k: 1)
+    {:ok, [doc]} = Imp.retrieve(retriever, "capital France")
 
     unless doc.text == "France capital: Paris." do
       raise "memory retriever failed from package consumer: \#{inspect(doc)}"
@@ -337,7 +337,7 @@ defmodule PackageContractTest do
 
     react_lm =
       %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [
           handler: fn _messages, _opts ->
             Agent.get_and_update(queue, fn
@@ -349,50 +349,50 @@ defmodule PackageContractTest do
       }
 
     lookup =
-      DSEx.tool(:lookup, "lookup facts", fn %{query: "capital-france"} -> "Paris" end)
+      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} -> "Paris" end)
 
-    react = DSEx.react("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
+    react = Imp.react("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
 
     {:ok, react_prediction} =
-      DSEx.call(react, %{question: "What city is the Eiffel Tower in?"})
+      Imp.call(react, %{question: "What city is the Eiffel Tower in?"})
 
     Agent.stop(queue)
 
-    unless DSEx.get(react_prediction, :answer) == "Paris" do
+    unless Imp.get(react_prediction, :answer) == "Paris" do
       raise "ReAct tool workflow failed from package consumer"
     end
 
-    metric = DSEx.exact_match(:answer)
+    metric = Imp.exact_match(:answer)
 
     {:ok, best} =
       program
-      |> DSEx.best_of_n(metric, n: 2)
-      |> DSEx.call(%{question: "What city is the Eiffel Tower in?"})
+      |> Imp.best_of_n(metric, n: 2)
+      |> Imp.call(%{question: "What city is the Eiffel Tower in?"})
 
-    unless DSEx.get(best, :answer) == "Paris" do
+    unless Imp.get(best, :answer) == "Paris" do
       raise "BestOfN facade workflow failed from package consumer"
     end
 
     [{:ok, batch_prediction}] =
-      DSEx.parallel(program, [%{question: "What city is the Eiffel Tower in?"}],
+      Imp.parallel(program, [%{question: "What city is the Eiffel Tower in?"}],
         max_concurrency: 1
       )
 
-    unless DSEx.get(batch_prediction, :answer) == "Paris" do
+    unless Imp.get(batch_prediction, :answer) == "Paris" do
       raise "Parallel facade workflow failed from package consumer"
     end
 
     chooser =
-      DSEx.multi_chain_comparison("question -> answer",
+      Imp.multi_chain_comparison("question -> answer",
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [handler: fn _messages, _opts -> %{rationale: "agreement", answer: "Paris"} end]
         },
         m: 2
       )
 
     {:ok, chosen} =
-      DSEx.call(chooser, %{
+      Imp.call(chooser, %{
         question: "What city is the Eiffel Tower in?",
         completions: [
           %{reasoning: "landmark", answer: "Paris"},
@@ -400,19 +400,19 @@ defmodule PackageContractTest do
         ]
       })
 
-    unless DSEx.get(chosen, :answer) == "Paris" do
+    unless Imp.get(chosen, :answer) == "Paris" do
       raise "Multi-chain facade workflow failed from package consumer"
     end
 
-    knn = DSEx.knn(1, [demo], field: "question")
-    [nearest] = DSEx.nearest(knn, %{"question" => "Eiffel Tower city"})
+    knn = Imp.knn(1, [demo], field: "question")
+    [nearest] = Imp.nearest(knn, %{"question" => "Eiffel Tower city"})
 
-    unless DSEx.get(nearest, :answer) == "Paris" do
+    unless Imp.get(nearest, :answer) == "Paris" do
       raise "KNN facade workflow failed from package consumer"
     end
 
-    provider = DSEx.req_llm("openai:gpt-test", api_key: "sk-redacted-test", temperature: 0)
-    dump = DSEx.dump(DSEx.predict("question -> answer", lm: provider))
+    provider = Imp.req_llm("openai:gpt-test", api_key: "sk-redacted-test", temperature: 0)
+    dump = Imp.dump(Imp.predict("question -> answer", lm: provider))
 
     if inspect(dump) =~ "sk-redacted-test" do
       raise "provider credential leaked through save/load boundary"
@@ -434,13 +434,13 @@ defmodule PackageContractTest do
       )
 
     assert status == 0, output
-    refute output =~ ~r/warning: DSEx\..* is undefined/, output
+    refute output =~ ~r/warning: Imp\..* is undefined/, output
   end
 
   defp consumer_tmp_dir do
     Path.join([
       System.tmp_dir!(),
-      "dsex-package-consumer-#{System.unique_integer([:positive])}"
+      "imp-package-consumer-#{System.unique_integer([:positive])}"
     ])
   end
 
@@ -449,7 +449,7 @@ defmodule PackageContractTest do
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()
-      |> then(&Regex.scan(~r/DSEx(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
+      |> then(&Regex.scan(~r/Imp(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
       |> List.flatten()
     end)
     |> Enum.uniq()

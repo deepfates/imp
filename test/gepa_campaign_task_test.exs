@@ -1,7 +1,7 @@
 defmodule GepaCampaignTaskTest do
   use ExUnit.Case, async: false
 
-  alias Mix.Tasks.Dsex.Benchmark.GepaCampaign, as: Task
+  alias Mix.Tasks.Imp.Benchmark.GepaCampaign, as: Task
 
   setup do
     reporter = Task.start_progress_reporter()
@@ -28,7 +28,7 @@ defmodule GepaCampaignTaskTest do
     )
 
     :telemetry.execute(
-      [:dsex, :optimizer, :progress],
+      [:imp, :optimizer, :progress],
       %{completed_generations: 7, metric_calls: 531, candidate_count: 9},
       %{optimizer: :gepa}
     )

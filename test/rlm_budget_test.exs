@@ -1,7 +1,7 @@
 defmodule RLMBudgetTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Predict.RLM.Budget
+  alias Imp.Predict.RLM.Budget
 
   test "atomically reserves calls and shares recursion depth" do
     {:ok, budget} = Budget.start_link(max_lm_calls: 3, max_recursion_depth: 2)

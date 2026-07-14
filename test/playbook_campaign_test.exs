@@ -1,8 +1,8 @@
-defmodule DSEx.Optimizer.Playbook.CampaignTest do
+defmodule Imp.Optimizer.Playbook.CampaignTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.Playbook.Campaign
-  alias DSEx.Optimizer.Playbook.EquationSearch
+  alias Imp.Optimizer.Playbook.Campaign
+  alias Imp.Optimizer.Playbook.EquationSearch
 
   test "accepts all 250 pinned references with exact rational precedence" do
     rows =
@@ -49,15 +49,15 @@ defmodule DSEx.Optimizer.Playbook.CampaignTest do
   end
 
   test "portable audit reload preserves native JSON configuration" do
-    playbook = DSEx.Playbook.new(id: "campaign-persistence")
+    playbook = Imp.Playbook.new(id: "campaign-persistence")
 
     program =
       "equation -> answer"
-      |> DSEx.predict(config: [native_json_schema: true])
-      |> DSEx.with_playbook(playbook)
+      |> Imp.predict(config: [native_json_schema: true])
+      |> Imp.with_playbook(playbook)
 
     restored =
-      program |> DSEx.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> DSEx.Saving.load()
+      program |> Imp.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.Saving.load()
 
     assert restored.program.config == [native_json_schema: true]
     assert restored.playbook == playbook
@@ -65,31 +65,31 @@ defmodule DSEx.Optimizer.Playbook.CampaignTest do
 
   test "portable audit reload rebinds the named BEAM solver tool" do
     runner = &EquationSearch.solve_tool/1
-    registry = DSEx.Saving.Registry.new(solve_equation: runner)
+    registry = Imp.Saving.Registry.new(solve_equation: runner)
 
     tool =
-      DSEx.tool(:solve_equation, "solve exactly", runner,
+      Imp.tool(:solve_equation, "solve exactly", runner,
         schema: %{"type" => "object", "properties" => %{}}
       )
 
-    playbook = DSEx.Playbook.new(id: "campaign-code-act-persistence")
+    playbook = Imp.Playbook.new(id: "campaign-code-act-persistence")
 
     restored =
       "equation -> answer"
-      |> DSEx.code_act([tool], max_iters: 2, tool_policy: [:solve_equation])
-      |> DSEx.with_playbook(playbook)
-      |> DSEx.Saving.dump(registry: registry)
+      |> Imp.code_act([tool], max_iters: 2, tool_policy: [:solve_equation])
+      |> Imp.with_playbook(playbook)
+      |> Imp.Saving.dump(registry: registry)
       |> Jason.encode!()
       |> Jason.decode!()
-      |> DSEx.Saving.load(registry: registry)
+      |> Imp.Saving.load(registry: registry)
 
     restored_tool = restored.program.tools[:solve_equation]
-    assert DSEx.Tool.call(restored_tool, %{equation: "2 ? 3 ? 4 = 14"}) == "2 + 3 * 4 = 14"
+    assert Imp.Tool.call(restored_tool, %{equation: "2 ? 3 ? 4 = 14"}) == "2 + 3 * 4 = 14"
     assert restored.playbook == playbook
   end
 
   test "CodeAct traces project into canonical aligned tool events" do
-    prediction = %DSEx.Prediction{
+    prediction = %Imp.Prediction{
       fields: %{answer: "2 + 3 * 4 = 14"},
       metadata: %{
         code_act_trace: [
@@ -106,7 +106,7 @@ defmodule DSEx.Optimizer.Playbook.CampaignTest do
     trace = Campaign.normalize_code_act_trace(prediction)
 
     trajectory =
-      DSEx.Optimizer.Trajectory.project(:evaluation, %{
+      Imp.Optimizer.Trajectory.project(:evaluation, %{
         index: 0,
         example: %{"id" => "row"},
         prediction: %{"answer" => "2 + 3 * 4 = 14"},

@@ -1,15 +1,15 @@
-defmodule DSEx.BenchmarkTruth.IFBenchTwoStageTest do
+defmodule Imp.BenchmarkTruth.IFBenchTwoStageTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapter.Chat
-  alias DSEx.BenchmarkTruth.IFBenchTwoStage
-  alias DSEx.Metrics
-  alias DSEx.Module
-  alias DSEx.Optimizer.TrajectoryRunner
-  alias DSEx.Predict.ChainOfThought
-  alias DSEx.Prediction
-  alias DSEx.ProgramParameters
-  alias DSEx.Signature
+  alias Imp.Adapter.Chat
+  alias Imp.BenchmarkTruth.IFBenchTwoStage
+  alias Imp.Metrics
+  alias Imp.Module
+  alias Imp.Optimizer.TrajectoryRunner
+  alias Imp.Predict.ChainOfThought
+  alias Imp.Prediction
+  alias Imp.ProgramParameters
+  alias Imp.Signature
 
   test "constructs the two source-faithful ChainOfThought components" do
     program = IFBenchTwoStage.new()
@@ -34,7 +34,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchTwoStageTest do
     test_pid = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -84,7 +84,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchTwoStageTest do
 
   test "captures both named stages in order for optimizer trajectories" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -97,7 +97,7 @@ defmodule DSEx.BenchmarkTruth.IFBenchTwoStageTest do
     }
 
     program = IFBenchTwoStage.new(lm, adapter: Chat)
-    example = DSEx.example(prompt: "Follow this", response: "FINAL") |> DSEx.with_inputs(:prompt)
+    example = Imp.example(prompt: "Follow this", response: "FINAL") |> Imp.with_inputs(:prompt)
 
     [trajectory] =
       TrajectoryRunner.run(

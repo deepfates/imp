@@ -1,11 +1,11 @@
 defmodule MCPImportTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Agent
-  alias DSEx.MCP
+  alias Imp.Agent
+  alias Imp.MCP
 
   defmodule MCPTransport do
-    @behaviour DSEx.HTTP
+    @behaviour Imp.HTTP
 
     @impl true
     def post(url, headers, body, opts) do
@@ -56,7 +56,7 @@ defmodule MCPImportTest do
   end
 
   defmodule MCPErrorTransport do
-    @behaviour DSEx.HTTP
+    @behaviour Imp.HTTP
 
     @impl true
     def post(_url, _headers, body, _opts) do
@@ -98,7 +98,7 @@ defmodule MCPImportTest do
   end
 
   defmodule MCPSSETransport do
-    @behaviour DSEx.HTTP
+    @behaviour Imp.HTTP
 
     @impl true
     def post(url, headers, body, opts) do
@@ -163,25 +163,25 @@ defmodule MCPImportTest do
 
   test "MCP client constructors reject invalid positional boundaries" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.MCP\.Catalog\.new\/1 expects a list of tool schemas/,
+                 ~r/Imp\.MCP\.Catalog\.new\/1 expects a list of tool schemas/,
                  fn ->
                    MCP.Catalog.new(%{tools: []})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.MCP\.HTTPClient\.new\/2 expects url to be a binary/,
+                 ~r/Imp\.MCP\.HTTPClient\.new\/2 expects url to be a binary/,
                  fn ->
                    MCP.HTTPClient.new(:not_a_url)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.MCP\.StreamableHTTPClient\.new\/2 expects url to be a binary/,
+                 ~r/Imp\.MCP\.StreamableHTTPClient\.new\/2 expects url to be a binary/,
                  fn ->
                    MCP.StreamableHTTPClient.new(:not_a_url)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.MCP\.StdioClient\.new\/2 expects command to be a binary executable path/,
+                 ~r/Imp\.MCP\.StdioClient\.new\/2 expects command to be a binary executable path/,
                  fn ->
                    MCP.StdioClient.new(:not_a_command)
                  end
@@ -198,7 +198,7 @@ defmodule MCPImportTest do
         }
       ])
 
-    assert {:error, {:missing_required, [:key]}} = DSEx.Tool.call(tool, %{})
+    assert {:error, {:missing_required, [:key]}} = Imp.Tool.call(tool, %{})
   end
 
   test "imported MCP tools validate string-key JSON schema properties without atomizing keys" do
@@ -219,10 +219,10 @@ defmodule MCPImportTest do
         }
       ])
 
-    assert {:ok, 3} = DSEx.Tool.call(tool, %{external_key => 3})
+    assert {:ok, 3} = Imp.Tool.call(tool, %{external_key => 3})
 
     assert {:error, {:schema_validation, [%{field: ^external_key, rule: :type}]}} =
-             DSEx.Tool.call(tool, %{external_key => "bad"})
+             Imp.Tool.call(tool, %{external_key => "bad"})
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(external_key) end
   end
@@ -292,7 +292,7 @@ defmodule MCPImportTest do
   end
 
   test "HTTP MCP client discovers tools through injectable transport" do
-    ref = DSEx.Test.TelemetryHelpers.attach([[:dsex, :mcp, :http, :start]])
+    ref = Imp.Test.TelemetryHelpers.attach([[:imp, :mcp, :http, :start]])
 
     client =
       MCP.HTTPClient.new("https://mcp.example/tools",
@@ -303,7 +303,7 @@ defmodule MCPImportTest do
     [tool] = MCP.import_tools(client)
 
     assert tool.name == "remote_lookup"
-    assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
+    assert %{"value" => "abc"} = Imp.Tool.call(tool, %{"key" => "abc"})
 
     assert [init_request, initialized_request, list_request, call_request] = receive_requests(4)
 
@@ -313,9 +313,9 @@ defmodule MCPImportTest do
     assert list_request.body["jsonrpc"] == "2.0"
     assert list_request.body["method"] == "tools/list"
     assert call_request.body["method"] == "tools/call"
-    assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "initialize"}}
-    assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "tools/list"}}
-    assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "tools/call"}}
+    assert_received {^ref, [:imp, :mcp, :http, :start], _, %{method: "initialize"}}
+    assert_received {^ref, [:imp, :mcp, :http, :start], _, %{method: "tools/list"}}
+    assert_received {^ref, [:imp, :mcp, :http, :start], _, %{method: "tools/call"}}
   end
 
   test "HTTP MCP client returns JSON-RPC errors as tool errors" do
@@ -325,7 +325,7 @@ defmodule MCPImportTest do
       |> MCP.import_tools()
 
     assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
-             DSEx.Tool.call(tool, %{})
+             Imp.Tool.call(tool, %{})
   end
 
   test "stdio MCP client encodes JSON-RPC lines for process transports" do
@@ -341,7 +341,7 @@ defmodule MCPImportTest do
     script =
       Path.join(
         System.tmp_dir!(),
-        "dsex_mcp_stdio_error_#{System.unique_integer([:positive])}.exs"
+        "imp_mcp_stdio_error_#{System.unique_integer([:positive])}.exs"
       )
 
     File.write!(script, """
@@ -389,7 +389,7 @@ defmodule MCPImportTest do
       |> MCP.import_tools()
 
     assert {:error, {:json_rpc_error, %{"code" => -32_001, "message" => "stdio failed"}}} =
-             DSEx.Tool.call(tool, %{})
+             Imp.Tool.call(tool, %{})
   end
 
   test "streamable HTTP MCP client sends session headers and decodes SSE data" do
@@ -403,7 +403,7 @@ defmodule MCPImportTest do
     [tool] = MCP.import_tools(client)
 
     assert tool.name == "remote_lookup"
-    assert %{"value" => "abc"} = DSEx.Tool.call(tool, %{"key" => "abc"})
+    assert %{"value" => "abc"} = Imp.Tool.call(tool, %{"key" => "abc"})
 
     assert [init_request, list_request, call_request] = receive_requests(3)
     assert {"mcp-session-id", "session-1"} in init_request.headers
@@ -418,7 +418,7 @@ defmodule MCPImportTest do
       |> MCP.import_tools()
 
     assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
-             DSEx.Tool.call(tool, %{})
+             Imp.Tool.call(tool, %{})
   end
 
   defp agent_ref, do: Process.get(:agent_ref)

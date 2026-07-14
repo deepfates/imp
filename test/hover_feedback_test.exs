@@ -1,8 +1,8 @@
-defmodule DSEx.BenchmarkTruth.HoverFeedbackTest do
+defmodule Imp.BenchmarkTruth.HoverFeedbackTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{HoverFeedback, HoverMultiHop}
-  alias DSEx.Optimizer.GEPA.ComponentFeedback
+  alias Imp.BenchmarkTruth.{HoverFeedback, HoverMultiHop}
+  alias Imp.Optimizer.GEPA.ComponentFeedback
 
   test "exports the four source-named callbacks" do
     assert HoverFeedback.callbacks() |> Map.keys() |> Enum.sort() ==
@@ -10,7 +10,7 @@ defmodule DSEx.BenchmarkTruth.HoverFeedbackTest do
   end
 
   test "accepts only the complete source-shaped HoVer predictor graph" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, []} end)
 
     assert {:ok, callbacks} = HoverFeedback.callbacks_for(program)
@@ -18,7 +18,7 @@ defmodule DSEx.BenchmarkTruth.HoverFeedbackTest do
     assert callbacks |> Map.keys() |> Enum.sort() ==
              [:create_query_hop2, :create_query_hop3, :summarize1, :summarize2]
 
-    incompatible = DSEx.predict("claim -> answer", lm: lm)
+    incompatible = Imp.predict("claim -> answer", lm: lm)
 
     assert {:error, {:incompatible_predictors, %{missing: missing, unexpected: [:main]}}} =
              HoverFeedback.callbacks_for(incompatible)
@@ -111,14 +111,14 @@ defmodule DSEx.BenchmarkTruth.HoverFeedbackTest do
       predictor_inputs: predictor_inputs,
       predictor_output: %{},
       example:
-        DSEx.example(
+        Imp.example(
           claim: "claim",
           supporting_facts: [
             %{"key" => "Beta Page"},
             %{key: "Gamma Page"}
           ]
         ),
-      program_output: DSEx.prediction(retrieved_docs: final_docs),
+      program_output: Imp.prediction(retrieved_docs: final_docs),
       trace: [
         %{predictor: :summarize1, inputs: %{claim: "claim", passages: hop1()}, outputs: %{}},
         %{

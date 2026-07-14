@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.AutoEvaluationContractTest do
+defmodule Imp.BenchmarkTruth.AutoEvaluationContractTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.{AutoEvaluationContract, RunContext}
+  alias Imp.BenchmarkTruth.{AutoEvaluationContract, RunContext}
 
   test "canonical manifest executes all pinned provider-free semantics" do
     manifest = AutoEvaluationContract.load_manifest!()
@@ -72,7 +72,7 @@ defmodule DSEx.BenchmarkTruth.AutoEvaluationContractTest do
     context =
       RunContext.new!(
         source_commits: %{
-          "dsex" => "deepfates/dsex@fixture",
+          "imp" => "deepfates/imp@fixture",
           "dspy" => "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c"
         }
       )

@@ -1,4 +1,4 @@
-defmodule DSEx.LogprobsCapabilitiesTest do
+defmodule Imp.LogprobsCapabilitiesTest do
   use ExUnit.Case, async: true
 
   test "extracts the exact joint overlap and resolves enum alternatives" do
@@ -18,7 +18,7 @@ defmodule DSEx.LogprobsCapabilitiesTest do
     ]
 
     assert {:ok, extraction} =
-             DSEx.Logprobs.extract(content, logprobs, "category", [
+             Imp.Logprobs.extract(content, logprobs, "category", [
                "Bars and pubs",
                "Food and dining"
              ])
@@ -38,31 +38,31 @@ defmodule DSEx.LogprobsCapabilitiesTest do
     logprobs = [%{token: content, logprob: -0.2, top_logprobs: []}]
 
     assert {:error, :no_overlapping_logprob_tokens} =
-             DSEx.Logprobs.extract(content, logprobs, :category, [""])
+             Imp.Logprobs.extract(content, logprobs, :category, [""])
   end
 
   test "provider capabilities require returned OpenAI Chat logprobs" do
     assert :ok =
-             DSEx.Capabilities.token_logprobs(%{
+             Imp.Capabilities.token_logprobs(%{
                req_llm: %{provider: "openai", api: "chat_completions", logprobs: [%{}]}
              })
 
     assert {:error, :missing_logprobs} =
-             DSEx.Capabilities.token_logprobs(%{
+             Imp.Capabilities.token_logprobs(%{
                req_llm: %{provider: "openai", api: "chat_completions", logprobs: []}
              })
 
     assert {:error, :openai_responses_unsupported} =
-             DSEx.Capabilities.token_logprobs(%{
+             Imp.Capabilities.token_logprobs(%{
                req_llm: %{provider: "openai", api: "responses", logprobs: [%{}]}
              })
 
     assert {:error, :anthropic_unsupported} =
-             DSEx.Capabilities.token_logprobs(%{req_llm: %{provider: "anthropic"}})
+             Imp.Capabilities.token_logprobs(%{req_llm: %{provider: "anthropic"}})
 
     assert {:error, :gemini_unsupported} =
-             DSEx.Capabilities.token_logprobs(%{req_llm: %{provider: "google"}})
+             Imp.Capabilities.token_logprobs(%{req_llm: %{provider: "google"}})
 
-    assert {:error, :missing_provider_metadata} = DSEx.Capabilities.token_logprobs(%{})
+    assert {:error, :missing_provider_metadata} = Imp.Capabilities.token_logprobs(%{})
   end
 end

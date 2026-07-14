@@ -233,85 +233,85 @@ defmodule ReqLLMClientTest do
     end
   end
 
-  test "ReqLLM constructor validates DSEx-owned options while preserving provider passthrough" do
+  test "ReqLLM constructor validates Imp-owned options while preserving provider passthrough" do
     lm =
-      DSEx.Clients.ReqLLM.new("openai:gpt-test",
+      Imp.Clients.ReqLLM.new("openai:gpt-test",
         opts: [temperature: 0],
         top_p: 0.9,
         req_module: TextStub
       )
 
-    assert %DSEx.Clients.ReqLLM{
+    assert %Imp.Clients.ReqLLM{
              model: "openai:gpt-test",
              opts: [temperature: 0, top_p: 0.9],
              req_module: TextStub
            } = lm
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.new\/2 expects keyword options/,
+                 ~r/Imp.Clients.ReqLLM\.new\/2 expects keyword options/,
                  fn ->
-                   DSEx.Clients.ReqLLM.new("openai:gpt-test", %{temperature: 0})
+                   Imp.Clients.ReqLLM.new("openai:gpt-test", %{temperature: 0})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
+                 ~r/Imp.Clients.ReqLLM\.new\/2: invalid value for :req_module option: expected a ReqLLM-compatible module atom/,
                  fn ->
-                   DSEx.Clients.ReqLLM.new("openai:gpt-test", req_module: "not-a-module")
+                   Imp.Clients.ReqLLM.new("openai:gpt-test", req_module: "not-a-module")
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.new\/2: invalid value for :opts option/,
+                 ~r/Imp.Clients.ReqLLM\.new\/2: invalid value for :opts option/,
                  fn ->
-                   DSEx.Clients.ReqLLM.new("openai:gpt-test", opts: %{temperature: 0})
+                   Imp.Clients.ReqLLM.new("openai:gpt-test", opts: %{temperature: 0})
                  end
   end
 
   test "ReqLLM call surfaces reject malformed option containers before provider work starts" do
-    lm = DSEx.Clients.ReqLLM.new("openai:gpt-test", req_module: TextStub)
+    lm = Imp.Clients.ReqLLM.new("openai:gpt-test", req_module: TextStub)
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.generate\/3 expects keyword options/,
+                 ~r/Imp.Clients.ReqLLM\.generate\/3 expects keyword options/,
                  fn ->
-                   DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], %{
+                   Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], %{
                      cache: false
                    })
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.generate_async\/3 expects keyword options/,
+                 ~r/Imp.Clients.ReqLLM\.generate_async\/3 expects keyword options/,
                  fn ->
-                   DSEx.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "hello"}], %{
+                   Imp.Clients.ReqLLM.generate_async(lm, [%{role: :user, content: "hello"}], %{
                      cache: false
                    })
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Clients.ReqLLM\.stream\/3 expects keyword options/,
+                 ~r/Imp.Clients.ReqLLM\.stream\/3 expects keyword options/,
                  fn ->
-                   DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], %{
+                   Imp.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], %{
                      provider_stream: true
                    })
                  end
 
     assert {:error, :req_llm_model_required} =
-             DSEx.Clients.ReqLLM.generate([%{role: :user, content: "hello"}], [])
+             Imp.Clients.ReqLLM.generate([%{role: :user, content: "hello"}], [])
   end
 
-  test "ReqLLM client drives DSEx prediction and translates JSON/schema options" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
+  test "ReqLLM client drives Imp prediction and translates JSON/schema options" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
 
     program =
-      DSEx.predict("question -> answer, score: int",
+      Imp.predict("question -> answer, score: int",
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [temperature: 0, timeout: 1_000, native_json_schema: true]
       )
 
     assert {:ok, prediction} =
-             DSEx.Predict.Predict.call(program, %{question: "reply with pong and score 7"})
+             Imp.Predict.Predict.call(program, %{question: "reply with pong and score 7"})
 
-    assert DSEx.Prediction.get(prediction, :answer) == "pong"
-    assert DSEx.Prediction.get(prediction, :score) == 7
+    assert Imp.Prediction.get(prediction, :answer) == "pong"
+    assert Imp.Prediction.get(prediction, :score) == 7
 
     assert_received {:req_llm_generate, "openai:gpt-test", messages, opts}
 
@@ -327,47 +327,47 @@ defmodule ReqLLMClientTest do
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
   end
 
-  test "ReqLLM text responses still work with DSEx adapters" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
-    program = DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+  test "ReqLLM text responses still work with Imp adapters" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+    program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "pong?"})
-    assert DSEx.Prediction.get(prediction, :answer) == "pong"
-    assert DSEx.Prediction.get(prediction, :score) == 7
+    assert {:ok, prediction} = Imp.call(program, %{question: "pong?"})
+    assert Imp.Prediction.get(prediction, :answer) == "pong"
+    assert Imp.Prediction.get(prediction, :score) == 7
   end
 
   test "ReqLLM consumes rollout IDs without forwarding them to the provider" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     program =
-      DSEx.predict("question -> answer, score: int",
+      Imp.predict("question -> answer, score: int",
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [cache: false, rollout_id: 17]
       )
 
-    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert {:ok, _prediction} = Imp.call(program, %{question: "pong?"})
     assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
     refute Keyword.has_key?(opts, :rollout_id)
 
     messages = [%{role: :user, content: "same prompt"}]
 
-    refute DSEx.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 17) ==
-             DSEx.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 18)
+    refute Imp.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 17) ==
+             Imp.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 18)
   end
 
   test "ReqLLM client translates local file path attachments into file content parts" do
-    path = Path.join(System.tmp_dir!(), "dsex-req-llm-#{System.unique_integer([:positive])}.md")
+    path = Path.join(System.tmp_dir!(), "imp-req-llm-#{System.unique_integer([:positive])}.md")
     File.write!(path, "# Attachment\n")
 
     on_exit(fn -> File.rm(path) end)
 
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     assert {:ok, _prediction} =
-             DSEx.Clients.ReqLLM.generate(
+             Imp.Clients.ReqLLM.generate(
                lm,
-               [%{role: :user, content: [%DSEx.Adapters.Types.File{path: path}]}],
+               [%{role: :user, content: [%Imp.Adapters.Types.File{path: path}]}],
                []
              )
 
@@ -387,7 +387,7 @@ defmodule ReqLLMClientTest do
 
   test "ReqLLM client pre-normalizes OpenAI reasoning model options" do
     lm =
-      DSEx.req_llm("openai:gpt-5.4-mini",
+      Imp.req_llm("openai:gpt-5.4-mini",
         test_pid: self(),
         req_module: TextStub,
         temperature: 0,
@@ -395,9 +395,9 @@ defmodule ReqLLMClientTest do
         top_p: 0.5
       )
 
-    program = DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+    program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert {:ok, _prediction} = Imp.call(program, %{question: "pong?"})
     assert_received {:req_llm_generate, "openai:gpt-5.4-mini", _messages, opts}
 
     assert Keyword.fetch!(opts, :max_completion_tokens) == 80
@@ -415,7 +415,7 @@ defmodule ReqLLMClientTest do
     }
 
     chat_lm =
-      DSEx.req_llm(chat_model,
+      Imp.req_llm(chat_model,
         test_pid: self(),
         req_module: InlineModelStub,
         temperature: 0,
@@ -423,7 +423,7 @@ defmodule ReqLLMClientTest do
       )
 
     assert {:ok, _output} =
-             DSEx.Clients.ReqLLM.generate(chat_lm, [%{role: :user, content: "pong?"}], [])
+             Imp.Clients.ReqLLM.generate(chat_lm, [%{role: :user, content: "pong?"}], [])
 
     assert_received {:inline_model_generate, ^chat_model, chat_opts}
     assert Keyword.fetch!(chat_opts, :max_tokens) == 80
@@ -432,7 +432,7 @@ defmodule ReqLLMClientTest do
     reasoning_model = %{provider: :openai, id: "gpt-5.4-mini"}
 
     reasoning_lm =
-      DSEx.req_llm(reasoning_model,
+      Imp.req_llm(reasoning_model,
         test_pid: self(),
         req_module: InlineModelStub,
         temperature: 0,
@@ -440,7 +440,7 @@ defmodule ReqLLMClientTest do
       )
 
     assert {:ok, _output} =
-             DSEx.Clients.ReqLLM.generate(reasoning_lm, [%{role: :user, content: "pong?"}], [])
+             Imp.Clients.ReqLLM.generate(reasoning_lm, [%{role: :user, content: "pong?"}], [])
 
     assert_received {:inline_model_generate, ^reasoning_model, reasoning_opts}
     assert Keyword.fetch!(reasoning_opts, :max_completion_tokens) == 80
@@ -449,12 +449,12 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM client preserves provider-native reasoning in prediction metadata" do
-    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
+    lm = Imp.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
 
-    program = DSEx.predict("question -> answer", lm: lm, adapter: DSEx.Adapter.JSON)
+    program = Imp.predict("question -> answer", lm: lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "Capital of France?"})
-    assert DSEx.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+    assert Imp.get(prediction, :answer) == "Paris"
     assert prediction.metadata.native_reasoning == "native plan"
 
     assert [
@@ -470,28 +470,28 @@ defmodule ReqLLMClientTest do
   end
 
   test "manual reasoning fields still work without provider-native thinking" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ManualReasoningStub)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ManualReasoningStub)
 
     program =
-      DSEx.chain_of_thought("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+      Imp.chain_of_thought("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, prediction} = DSEx.call(program, %{question: "pong?"})
+    assert {:ok, prediction} = Imp.call(program, %{question: "pong?"})
     refute Map.has_key?(prediction.metadata, :native_reasoning)
-    assert DSEx.get(prediction, :reasoning) == "manual field"
-    assert DSEx.get(prediction, :answer) == "pong"
+    assert Imp.get(prediction, :reasoning) == "manual field"
+    assert Imp.get(prediction, :answer) == "pong"
   end
 
   test "ReqLLM outbound reasoning values become thinking content parts" do
-    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: TextStub)
+    lm = Imp.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: TextStub)
 
     assert {:ok, _response} =
-             DSEx.Clients.ReqLLM.generate(
+             Imp.Clients.ReqLLM.generate(
                lm,
                [
                  %{
                    role: :user,
                    content: [
-                     %DSEx.Adapters.Types.Reasoning{text: "prior native reasoning"},
+                     %Imp.Adapters.Types.Reasoning{text: "prior native reasoning"},
                      "question"
                    ]
                  }
@@ -509,16 +509,16 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM client translates native JSON schema options for Anthropic" do
-    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ObjectStub)
+    lm = Imp.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ObjectStub)
 
     program =
-      DSEx.predict("question -> answer, score: int",
+      Imp.predict("question -> answer, score: int",
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [native_json_schema: true]
       )
 
-    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert {:ok, _prediction} = Imp.call(program, %{question: "pong?"})
     assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", _messages, opts}
 
     provider_options = Keyword.fetch!(opts, :provider_options)
@@ -530,26 +530,26 @@ defmodule ReqLLMClientTest do
 
   test "ReqLLM client drops OpenAI-only JSON object hints for Anthropic" do
     lm =
-      DSEx.req_llm("anthropic:claude-sonnet-4-6",
+      Imp.req_llm("anthropic:claude-sonnet-4-6",
         test_pid: self(),
         req_module: TextStub,
         response_format: %{type: "json_object"}
       )
 
-    program = DSEx.predict("question -> answer, score: int", lm: lm, adapter: DSEx.Adapter.JSON)
+    program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
 
-    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert {:ok, _prediction} = Imp.call(program, %{question: "pong?"})
     assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", _messages, opts}
 
     refute Keyword.has_key?(opts, :response_format)
     refute Keyword.has_key?(Keyword.get(opts, :provider_options, []), :response_format)
   end
 
-  test "ReqLLM tool calls return DSEx ReAct-compatible tool call payloads" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStub)
+  test "ReqLLM tool calls return Imp ReAct-compatible tool call payloads" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStub)
 
     tool =
-      DSEx.Tool.new(:lookup, "Lookup a fact.", fn %{query: "beam"} -> "ok" end,
+      Imp.Tool.new(:lookup, "Lookup a fact.", fn %{query: "beam"} -> "ok" end,
         schema: %{
           "type" => "object",
           "properties" => %{"query" => %{"type" => "string"}},
@@ -557,10 +557,10 @@ defmodule ReqLLMClientTest do
         }
       )
 
-    program = DSEx.react("question -> answer", [tool], lm: lm, max_iters: 1)
+    program = Imp.react("question -> answer", [tool], lm: lm, max_iters: 1)
 
     assert {:error, {:react_max_iters, history}} =
-             DSEx.Predict.ReAct.call(program, %{question: "lookup beam"})
+             Imp.Predict.ReAct.call(program, %{question: "lookup beam"})
 
     assert [%{tool: :lookup, arguments: %{query: "beam"}, result: "ok"}] = history
 
@@ -570,12 +570,12 @@ defmodule ReqLLMClientTest do
              Keyword.fetch!(opts, :tools)
   end
 
-  test "ReqLLM serializes DSEx and OpenAI-style assistant tool calls" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+  test "ReqLLM serializes Imp and OpenAI-style assistant tool calls" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     calls =
-      DSEx.Adapters.Types.ToolCalls.new([
-        DSEx.Adapters.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
+      Imp.Adapters.Types.ToolCalls.new([
+        Imp.Adapters.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
         %{
           id: "call_translate",
           function: %{name: "translate", arguments: ~s({"text":"world"})}
@@ -583,7 +583,7 @@ defmodule ReqLLMClientTest do
       ])
 
     assert {:ok, _response} =
-             DSEx.Clients.ReqLLM.generate(
+             Imp.Clients.ReqLLM.generate(
                lm,
                [
                  %{role: :assistant, content: "", tool_calls: calls},
@@ -612,19 +612,19 @@ defmodule ReqLLMClientTest do
     assert tool.tool_call_id == "call_lookup"
   end
 
-  test "ReqLLM stream chunks are exposed through DSEx streaming vocabulary" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
-    program = DSEx.predict("question -> answer", lm: lm)
+  test "ReqLLM stream chunks are exposed through Imp streaming vocabulary" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+    program = Imp.predict("question -> answer", lm: lm)
 
     chunks =
       program
-      |> DSEx.Streaming.stream(%{question: "pong"}, provider_stream: true)
+      |> Imp.Streaming.stream(%{question: "pong"}, provider_stream: true)
       |> Enum.to_list()
 
     assert Enum.map(chunks, & &1.chunk) |> Enum.reject(&is_nil/1) == ["po", "ng"]
     assert Enum.any?(chunks, & &1.done)
 
-    assert DSEx.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
+    assert Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
 
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
@@ -634,92 +634,92 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM thinking stream chunks are exposed as reasoning chunks" do
-    lm = DSEx.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = Imp.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
+    program = Imp.predict("question -> answer", lm: lm)
 
     chunks =
       program
-      |> DSEx.Streaming.stream(%{question: "Capital of France?"}, provider_stream: true)
+      |> Imp.Streaming.stream(%{question: "Capital of France?"}, provider_stream: true)
       |> Enum.to_list()
 
     assert [
-             %DSEx.Streaming.Messages.StreamResponse{
+             %Imp.Streaming.Messages.StreamResponse{
                chunk: %{reasoning: "native plan"},
                metadata: %{provider: :anthropic, type: :reasoning}
              },
-             %DSEx.Streaming.Messages.StreamResponse{chunk: "Paris"},
-             %DSEx.Streaming.Messages.StreamResponse{done: true}
+             %Imp.Streaming.Messages.StreamResponse{chunk: "Paris"},
+             %Imp.Streaming.Messages.StreamResponse{done: true}
            ] = chunks
   end
 
-  test "ReqLLM tool-call stream chunks are exposed as normalized DSEx chunks" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStreamStub)
-    program = DSEx.predict("question -> tool_calls", lm: lm)
+  test "ReqLLM tool-call stream chunks are exposed as normalized Imp chunks" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStreamStub)
+    program = Imp.predict("question -> tool_calls", lm: lm)
 
     chunks =
       program
-      |> DSEx.Streaming.stream(%{question: "lookup beam"}, provider_stream: true)
+      |> Imp.Streaming.stream(%{question: "lookup beam"}, provider_stream: true)
       |> Enum.to_list()
 
     assert [
-             %DSEx.Streaming.Messages.StreamResponse{
+             %Imp.Streaming.Messages.StreamResponse{
                chunk: %{
                  tool_calls: [
                    %{id: "call_stream", name: "lookup", arguments: %{"query" => "beam"}}
                  ]
                }
              },
-             %DSEx.Streaming.Messages.StreamResponse{done: true}
+             %Imp.Streaming.Messages.StreamResponse{done: true}
            ] = chunks
   end
 
   test "ReqLLM client reports provider module failures without crashing callers" do
-    lm = DSEx.req_llm("openai:gpt-test", req_module: FailingStub)
+    lm = Imp.req_llm("openai:gpt-test", req_module: FailingStub)
 
     assert {:error, {:req_llm_generate_failed, "transport exploded"}} =
-             DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
 
     assert [
-             %DSEx.Streaming.Messages.StreamResponse{
+             %Imp.Streaming.Messages.StreamResponse{
                chunk: {:error, {:req_llm_stream_failed, "{:throw, :stream_exploded}"}},
                done: true
              }
            ] =
              lm
-             |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+             |> Imp.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
              |> Enum.to_list()
   end
 
   test "ReqLLM stream construction and dropping have no provider or telemetry side effects" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :lm, :stream, :start],
-        [:dsex, :lm, :stream, :stop]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :lm, :stream, :start],
+        [:imp, :lm, :stream, :stop]
       ])
 
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
-    _stream = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    _stream = Imp.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
 
     refute_received {:provider_open, _failure}
     refute_received {:provider_pull, _count}
-    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :stop], _, _}
   end
 
   test "ReqLLM first pull opens once and early halt cleans and cancels once" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :lm, :stream, :start],
-        [:dsex, :lm, :stream, :stop]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :lm, :stream, :start],
+        [:imp, :lm, :stream, :stop]
       ])
 
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
-    stream = DSEx.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    stream = Imp.Clients.ReqLLM.stream(lm, [%{role: :user, content: "hello"}], [])
 
     refute_received {:provider_open, _failure}
     refute_received {:provider_pull, _count}
 
-    assert [%DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false}] =
+    assert [%Imp.Streaming.Messages.StreamResponse{chunk: "partial", done: false}] =
              Enum.take(stream, 1)
 
     assert_received {:provider_open, :raise}
@@ -727,20 +727,20 @@ defmodule ReqLLMClientTest do
     refute_received {:provider_pull, 2}
     assert_received :provider_cleanup
     assert_received :provider_cancelled
-    assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+    assert_received {^ref, [:imp, :lm, :stream, :start], _, _}
+    assert_received {^ref, [:imp, :lm, :stream, :stop], %{count: 1}, _}
     refute_received {:provider_open, _failure}
     refute_received :provider_cleanup
     refute_received :provider_cancelled
-    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :stop], _, _}
   end
 
   test "ReqLLM open failures emit one terminal error with balanced telemetry" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :lm, :stream, :start],
-        [:dsex, :lm, :stream, :stop]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :lm, :stream, :start],
+        [:imp, :lm, :stream, :stop]
       ])
 
     expected = [
@@ -752,39 +752,39 @@ defmodule ReqLLMClientTest do
 
     Enum.each(expected, fn {failure, reason} ->
       lm =
-        DSEx.req_llm("openai:gpt-test",
+        Imp.req_llm("openai:gpt-test",
           test_pid: self(),
           open_failure: failure,
           req_module: OpenFailureStub
         )
 
       assert [
-               %DSEx.Streaming.Messages.StreamResponse{
+               %Imp.Streaming.Messages.StreamResponse{
                  chunk: {:error, ^reason},
                  done: true
                }
              ] =
                lm
-               |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+               |> Imp.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
                |> Enum.to_list()
 
       assert_received {:provider_open, ^failure}
-      assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-      assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+      assert_received {^ref, [:imp, :lm, :stream, :start], _, _}
+      assert_received {^ref, [:imp, :lm, :stream, :stop], %{count: 1}, _}
       refute_received :provider_cleanup
       refute_received :provider_cancelled
     end)
 
     refute_received {:provider_open, _failure}
-    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :stop], _, _}
   end
 
   test "ReqLLM enumeration raise, throw, and exit emit one terminal error and clean once" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :lm, :stream, :start],
-        [:dsex, :lm, :stream, :stop]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :lm, :stream, :start],
+        [:imp, :lm, :stream, :stop]
       ])
 
     expected = [
@@ -795,21 +795,21 @@ defmodule ReqLLMClientTest do
 
     Enum.each(expected, fn {failure, message} ->
       lm =
-        DSEx.req_llm("openai:gpt-test",
+        Imp.req_llm("openai:gpt-test",
           test_pid: self(),
           stream_failure: failure,
           req_module: AdversarialStreamStub
         )
 
       assert [
-               %DSEx.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
-               %DSEx.Streaming.Messages.StreamResponse{
+               %Imp.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
+               %Imp.Streaming.Messages.StreamResponse{
                  chunk: {:error, {:req_llm_stream_failed, ^message}},
                  done: true
                }
              ] =
                lm
-               |> DSEx.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
+               |> Imp.Clients.ReqLLM.stream([%{role: :user, content: "hello"}], [])
                |> Enum.to_list()
 
       assert_received {:provider_open, ^failure}
@@ -817,22 +817,22 @@ defmodule ReqLLMClientTest do
       assert_received {:provider_pull, 2}
       assert_received :provider_cleanup
       assert_received :provider_cancelled
-      assert_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-      assert_received {^ref, [:dsex, :lm, :stream, :stop], %{count: 1}, _}
+      assert_received {^ref, [:imp, :lm, :stream, :start], _, _}
+      assert_received {^ref, [:imp, :lm, :stream, :stop], %{count: 1}, _}
       refute_received :provider_cleanup
       refute_received :provider_cancelled
     end)
 
-    refute_received {^ref, [:dsex, :lm, :stream, :start], _, _}
-    refute_received {^ref, [:dsex, :lm, :stream, :stop], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :start], _, _}
+    refute_received {^ref, [:imp, :lm, :stream, :stop], _, _}
   end
 
   test "stream collection returns a terminal provider error instead of partial output" do
-    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
+    program = Imp.predict("question -> answer", lm: lm)
 
     assert {:error, {:req_llm_stream_failed, "provider enumeration exploded"}} =
-             DSEx.Streaming.collect(program, %{question: "hello"}, provider_stream: true)
+             Imp.Streaming.collect(program, %{question: "hello"}, provider_stream: true)
 
     assert_received :provider_cleanup
     assert_received :provider_cancelled
@@ -841,24 +841,24 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM client reports invalid provider module return shapes" do
-    lm = DSEx.req_llm("openai:gpt-test", req_module: InvalidStub)
+    lm = Imp.req_llm("openai:gpt-test", req_module: InvalidStub)
 
     assert {:error, {:invalid_req_llm_response, ":not_a_req_llm_response"}} =
-             DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
   end
 
   test "save/load preserves ReqLLM-backed programs without serializing credentials" do
     program =
-      DSEx.predict("question -> answer",
-        lm: DSEx.req_llm("openai:gpt-test", api_key: "not-persisted", opts: [temperature: 0])
+      Imp.predict("question -> answer",
+        lm: Imp.req_llm("openai:gpt-test", api_key: "not-persisted", opts: [temperature: 0])
       )
 
-    dumped = DSEx.Saving.dump(program)
+    dumped = Imp.Saving.dump(program)
 
     refute dumped["lm"][:opts] |> List.flatten() |> Enum.member?("not-persisted")
 
-    loaded = DSEx.Saving.load(dumped)
+    loaded = Imp.Saving.load(dumped)
 
-    assert %DSEx.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
+    assert %Imp.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
   end
 end

@@ -1,7 +1,7 @@
-defmodule DSEx.Training.FastSlow.RunnerTest do
+defmodule Imp.Training.FastSlow.RunnerTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Training.FastSlow.{
+  alias Imp.Training.FastSlow.{
     CachedTrajectory,
     Config,
     DatasetState,
@@ -10,9 +10,9 @@ defmodule DSEx.Training.FastSlow.RunnerTest do
   }
 
   defmodule FakeBackend do
-    @behaviour DSEx.Training.FastSlow.Backend
+    @behaviour Imp.Training.FastSlow.Backend
 
-    alias DSEx.Training.FastSlow.{CachedTrajectory, Config, DatasetState, Runner}
+    alias Imp.Training.FastSlow.{CachedTrajectory, Config, DatasetState, Runner}
 
     @impl true
     def prefetch(state, count, intent, context) do
@@ -344,7 +344,7 @@ defmodule DSEx.Training.FastSlow.RunnerTest do
 
   test "rejects backend prefetch cardinality before installing lookahead" do
     defmodule ShortPrefetchBackend do
-      @behaviour DSEx.Training.FastSlow.Backend
+      @behaviour Imp.Training.FastSlow.Backend
 
       defdelegate optimize_fast(state, batches, intent, context), to: FakeBackend
       defdelegate generate_rollout(state, slot, intent, context), to: FakeBackend

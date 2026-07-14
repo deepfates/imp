@@ -5,7 +5,7 @@ defmodule LocalServiceE2ETest do
 
   test "HTTP retriever performs a real local HTTP request and maps documents" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.path == "/retrieve"
         assert %{"query" => "beam", "k" => 2} = Jason.decode!(request.body)
@@ -18,15 +18,15 @@ defmodule LocalServiceE2ETest do
          }}
       end)
 
-    retriever = DSEx.Retrievers.HTTP.new(base_url <> "/retrieve")
+    retriever = Imp.Retrievers.HTTP.new(base_url <> "/retrieve")
 
     assert {:ok, [%{text: "BEAM document", score: 0.9, metadata: %{"source" => "local"}}]} =
-             DSEx.Retrieve.retrieve(retriever, "beam", k: 2)
+             Imp.Retrieve.retrieve(retriever, "beam", k: 2)
   end
 
   test "RAG answers through a real local HTTP retriever service" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.path == "/retrieve"
         payload = Jason.decode!(request.body)
@@ -44,7 +44,7 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -58,18 +58,18 @@ defmodule LocalServiceE2ETest do
       ]
     }
 
-    retriever = DSEx.Retrievers.HTTP.new(base_url <> "/retrieve")
-    program = DSEx.predict("question, context -> answer", lm: lm) |> DSEx.rag(retriever, k: 1)
+    retriever = Imp.Retrievers.HTTP.new(base_url <> "/retrieve")
+    program = Imp.predict("question, context -> answer", lm: lm) |> Imp.rag(retriever, k: 1)
 
     devset = [
-      DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question),
-      DSEx.example(question: "capital Germany", answer: "Berlin") |> DSEx.with_inputs(:question)
+      Imp.example(question: "capital France", answer: "Paris") |> Imp.with_inputs(:question),
+      Imp.example(question: "capital Germany", answer: "Berlin") |> Imp.with_inputs(:question)
     ]
 
     result =
       devset
-      |> DSEx.Evaluate.new(DSEx.Metrics.exact_match(:answer))
-      |> DSEx.Evaluate.run(program)
+      |> Imp.Evaluate.new(Imp.Metrics.exact_match(:answer))
+      |> Imp.Evaluate.run(program)
 
     assert result.score == 1.0
     assert Enum.all?(result.rows, &(&1.prediction.metadata.retrieval.count == 1))
@@ -77,7 +77,7 @@ defmodule LocalServiceE2ETest do
 
   test "streaming collection preserves structured RAG output order through local HTTP retrieval" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.path == "/retrieve"
         assert %{"query" => "streaming capital", "k" => 1} = Jason.decode!(request.body)
@@ -91,7 +91,7 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -103,21 +103,21 @@ defmodule LocalServiceE2ETest do
       ]
     }
 
-    retriever = DSEx.Retrievers.HTTP.new(base_url <> "/retrieve")
+    retriever = Imp.Retrievers.HTTP.new(base_url <> "/retrieve")
 
     program =
-      DSEx.predict("question, context -> answer, citation", lm: lm)
-      |> DSEx.rag(retriever, k: 1)
+      Imp.predict("question, context -> answer, citation", lm: lm)
+      |> Imp.rag(retriever, k: 1)
 
-    assert DSEx.Streaming.collect(program, %{question: "streaming capital"}) == "Lisbonlocal"
+    assert Imp.Streaming.collect(program, %{question: "streaming capital"}) == "Lisbonlocal"
 
-    assert Enum.take(DSEx.Streaming.stream(program, %{question: "streaming capital"}), 6) ==
+    assert Enum.take(Imp.Streaming.stream(program, %{question: "streaming capital"}), 6) ==
              ~w(L i s b o n)
   end
 
   test "HTTP MCP client discovers and calls a local JSON-RPC tool server" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         decoded = Jason.decode!(request.body)
 
         case decoded["method"] do
@@ -154,17 +154,17 @@ defmodule LocalServiceE2ETest do
         end
       end)
 
-    [tool] = base_url |> DSEx.MCP.HTTPClient.new() |> DSEx.MCP.import_tools()
+    [tool] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
 
     assert tool.name == :lookup
-    assert DSEx.Tool.call(tool, %{"key" => "capital"}) == "Paris"
+    assert Imp.Tool.call(tool, %{"key" => "capital"}) == "Paris"
   end
 
   test "stdio MCP client discovers and calls a trusted local executable" do
     script =
       Path.join(
         System.tmp_dir!(),
-        "dsex-mcp-#{System.unique_integer([:positive, :monotonic])}-#{System.system_time(:nanosecond)}.exs"
+        "imp-mcp-#{System.unique_integer([:positive, :monotonic])}-#{System.system_time(:nanosecond)}.exs"
       )
 
     File.write!(script, """
@@ -190,19 +190,19 @@ defmodule LocalServiceE2ETest do
 
     [tool] =
       System.find_executable("elixir")
-      |> DSEx.MCP.StdioClient.new(
+      |> Imp.MCP.StdioClient.new(
         args: ["-pa", Path.join([Mix.Project.build_path(), "lib", "jason", "ebin"]), script],
         timeout: 15_000
       )
-      |> DSEx.MCP.import_tools()
+      |> Imp.MCP.import_tools()
 
     assert tool.name == :echo
-    assert DSEx.Tool.call(tool, %{"text" => "hello"}) == "hello"
+    assert Imp.Tool.call(tool, %{"text" => "hello"}) == "hello"
   end
 
   test "tool programs accept provider JSON string arguments end to end" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         decoded = Jason.decode!(request.body)
 
         case decoded["method"] do
@@ -239,7 +239,7 @@ defmodule LocalServiceE2ETest do
         end
       end)
 
-    [tool] = base_url |> DSEx.MCP.HTTPClient.new() |> DSEx.MCP.import_tools()
+    [tool] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
 
     assert_react_json_tool_arguments(tool)
     assert_rlm_json_tool_arguments(tool)
@@ -248,36 +248,36 @@ defmodule LocalServiceE2ETest do
 
   test "optimized programs save load rebind and evaluate end to end" do
     trainset = [
-      DSEx.example(question: "Capital of France?", answer: "Paris")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.with_inputs(:question)
     ]
 
     devset = [
-      DSEx.example(question: "France capital?", answer: "Paris")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "France capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
     ]
 
-    program = DSEx.predict("question -> answer")
+    program = Imp.predict("question -> answer")
 
     compiled =
-      DSEx.Optimizer.LabeledFewShot.new(k: 1)
-      |> DSEx.Optimizer.LabeledFewShot.compile(program, trainset)
+      Imp.Optimizer.LabeledFewShot.new(k: 1)
+      |> Imp.Optimizer.LabeledFewShot.compile(program, trainset)
 
     path =
-      Path.join(System.tmp_dir!(), "dsex-compiled-#{System.unique_integer([:positive])}.json")
+      Path.join(System.tmp_dir!(), "imp-compiled-#{System.unique_integer([:positive])}.json")
 
-    assert :ok = DSEx.Saving.save!(compiled, path)
+    assert :ok = Imp.Saving.save!(compiled, path)
 
-    loaded = DSEx.Saving.load!(path)
+    loaded = Imp.Saving.load!(path)
     File.rm(path)
 
-    report = DSEx.Optimizer.Report.fetch(loaded)
-    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} = report
-    assert [%{example: %DSEx.Example{} = example, selected?: true}] = report.candidates
-    assert DSEx.Example.get(example, :answer) == "Paris"
+    report = Imp.Optimizer.Report.fetch(loaded)
+    assert %Imp.Optimizer.Report{optimizer: :labeled_few_shot} = report
+    assert [%{example: %Imp.Example{} = example, selected?: true}] = report.candidates
+    assert Imp.Example.get(example, :answer) == "Paris"
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -290,17 +290,17 @@ defmodule LocalServiceE2ETest do
     }
 
     result =
-      DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
+      Imp.context([lm: lm, adapter: Imp.Adapter.Chat], fn ->
         devset
-        |> DSEx.Evaluate.new(DSEx.Metrics.exact_match(:answer))
-        |> DSEx.Evaluate.run(loaded)
+        |> Imp.Evaluate.new(Imp.Metrics.exact_match(:answer))
+        |> Imp.Evaluate.run(loaded)
       end)
 
     assert result.score == 1.0
   end
 
   test "file dataset drives local RAG evaluation and few-shot improvement end to end" do
-    path = Path.join(System.tmp_dir!(), "dsex-rag-#{System.unique_integer([:positive])}.jsonl")
+    path = Path.join(System.tmp_dir!(), "imp-rag-#{System.unique_integer([:positive])}.jsonl")
 
     File.write!(path, """
     {"question":"capital France","answer":"Paris","context":"France has capital Paris."}
@@ -311,18 +311,18 @@ defmodule LocalServiceE2ETest do
 
     on_exit(fn -> File.rm(path) end)
 
-    examples = DSEx.Datasets.hotpotqa(path)
-    dataset = DSEx.Datasets.Dataset.new(examples, train: 0.5)
+    examples = Imp.Datasets.hotpotqa(path)
+    dataset = Imp.Datasets.Dataset.new(examples, train: 0.5)
 
     docs =
       Enum.map(examples, fn example ->
-        %{text: DSEx.Example.get(example, :context), source: DSEx.Example.get(example, :question)}
+        %{text: Imp.Example.get(example, :context), source: Imp.Example.get(example, :question)}
       end)
 
-    retriever = DSEx.Retrieve.Memory.new(docs, k: 1)
+    retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -339,44 +339,44 @@ defmodule LocalServiceE2ETest do
       ]
     }
 
-    base = DSEx.predict("question, context -> answer", lm: lm)
-    rag = DSEx.rag(base, retriever, k: 1)
+    base = Imp.predict("question, context -> answer", lm: lm)
+    rag = Imp.rag(base, retriever, k: 1)
 
-    evaluator = DSEx.Evaluate.new(dataset.dev, DSEx.Metrics.exact_match(:answer))
-    baseline = DSEx.Evaluate.run(evaluator, rag)
+    evaluator = Imp.Evaluate.new(dataset.dev, Imp.Metrics.exact_match(:answer))
+    baseline = Imp.Evaluate.run(evaluator, rag)
 
     assert baseline.score == 1.0
     assert [%{prediction: prediction}] = baseline.rows
     assert prediction.metadata.retrieval.count == 1
 
     compiled =
-      DSEx.Optimizer.LabeledFewShot.new(k: 1)
-      |> DSEx.Optimizer.LabeledFewShot.compile(base, dataset.train)
-      |> DSEx.rag(retriever, k: 1)
+      Imp.Optimizer.LabeledFewShot.new(k: 1)
+      |> Imp.Optimizer.LabeledFewShot.compile(base, dataset.train)
+      |> Imp.rag(retriever, k: 1)
 
-    optimized = DSEx.Evaluate.run(evaluator, compiled)
+    optimized = Imp.Evaluate.run(evaluator, compiled)
 
     assert optimized.score == 1.0
 
-    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
-             DSEx.Optimizer.Report.fetch(compiled.program)
+    assert %Imp.Optimizer.Report{optimizer: :labeled_few_shot} =
+             Imp.Optimizer.Report.fetch(compiled.program)
 
     save_path =
-      Path.join(System.tmp_dir!(), "dsex-rag-compiled-#{System.unique_integer([:positive])}.json")
+      Path.join(System.tmp_dir!(), "imp-rag-compiled-#{System.unique_integer([:positive])}.json")
 
-    assert :ok = DSEx.Saving.save!(compiled, save_path)
-    loaded = DSEx.Saving.load!(save_path)
+    assert :ok = Imp.Saving.save!(compiled, save_path)
+    loaded = Imp.Saving.load!(save_path)
     File.rm(save_path)
 
     reloaded =
-      DSEx.context([lm: lm, adapter: DSEx.Adapter.Chat], fn ->
-        DSEx.Evaluate.run(evaluator, loaded)
+      Imp.context([lm: lm, adapter: Imp.Adapter.Chat], fn ->
+        Imp.Evaluate.run(evaluator, loaded)
       end)
 
     assert reloaded.score == 1.0
 
-    assert %DSEx.Optimizer.Report{optimizer: :labeled_few_shot} =
-             DSEx.Optimizer.Report.fetch(loaded.program)
+    assert %Imp.Optimizer.Report{optimizer: :labeled_few_shot} =
+             Imp.Optimizer.Report.fetch(loaded.program)
   end
 
   defp assert_react_json_tool_arguments(tool) do
@@ -389,10 +389,10 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = action_lm(actions)
-    program = DSEx.react("question -> answer", [tool], lm: lm, max_iters: 3)
+    program = Imp.react("question -> answer", [tool], lm: lm, max_iters: 3)
 
-    assert {:ok, prediction} = DSEx.Predict.ReAct.call(program, %{question: "capital?"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.Predict.ReAct.call(program, %{question: "capital?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
   end
 
   defp assert_rlm_json_tool_arguments(tool) do
@@ -405,10 +405,10 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = action_lm(actions)
-    program = DSEx.rlm("question -> answer", lm: lm, tools: [tool], max_iterations: 3)
+    program = Imp.rlm("question -> answer", lm: lm, tools: [tool], max_iterations: 3)
 
-    assert {:ok, prediction} = DSEx.Predict.RLM.call(program, %{question: "capital?"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.Predict.RLM.call(program, %{question: "capital?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
   end
 
   defp assert_code_act_json_tool_arguments(tool) do
@@ -421,15 +421,15 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = action_lm(actions)
-    program = DSEx.code_act("question -> answer", [tool], lm: lm, max_iters: 3)
+    program = Imp.code_act("question -> answer", [tool], lm: lm, max_iters: 3)
 
-    assert {:ok, prediction} = DSEx.Predict.CodeAct.call(program, %{question: "capital?"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.Predict.CodeAct.call(program, %{question: "capital?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
   end
 
   defp action_lm(actions) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.get_and_update(actions, fn

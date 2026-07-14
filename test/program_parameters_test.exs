@@ -1,7 +1,7 @@
-defmodule DSEx.ProgramParametersTest do
+defmodule Imp.ProgramParametersTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.ProgramParameters
+  alias Imp.ProgramParameters
 
   defmodule TwoStage do
     defstruct [:first, :second]
@@ -21,7 +21,7 @@ defmodule DSEx.ProgramParametersTest do
   end
 
   test "built-in wrappers expose a stable main predictor lens" do
-    program = DSEx.chain_of_thought("question -> answer")
+    program = Imp.chain_of_thought("question -> answer")
 
     assert [%{name: :main}] = ProgramParameters.predictors(program)
 
@@ -33,8 +33,8 @@ defmodule DSEx.ProgramParametersTest do
 
   test "custom programs expose independently mutable named predictors" do
     program = %TwoStage{
-      first: DSEx.predict("question -> hint"),
-      second: DSEx.predict("question, hint -> answer")
+      first: Imp.predict("question -> hint"),
+      second: Imp.predict("question, hint -> answer")
     }
 
     updated =
@@ -49,7 +49,7 @@ defmodule DSEx.ProgramParametersTest do
 
   test "custom predictor names must be unique" do
     assert_raise ArgumentError, ~r/must be unique/, fn ->
-      ProgramParameters.predictors(%DuplicateNames{predictor: DSEx.predict("x -> y")})
+      ProgramParameters.predictors(%DuplicateNames{predictor: Imp.predict("x -> y")})
     end
   end
 end

@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.ConfidenceCalibrationTest do
+defmodule Imp.BenchmarkTruth.ConfidenceCalibrationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.ConfidenceCalibration
+  alias Imp.BenchmarkTruth.ConfidenceCalibration
 
   @data "benchmarks/data/confidence-calibration.jsonl"
   @trec_data "benchmarks/data/confidence-calibration-trec-fine.jsonl"

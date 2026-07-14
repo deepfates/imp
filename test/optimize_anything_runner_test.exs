@@ -1,9 +1,9 @@
-defmodule DSEx.Optimize.Anything.RunnerTest do
+defmodule Imp.Optimize.Anything.RunnerTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapters.Types.Image
-  alias DSEx.Optimize.Anything
-  alias DSEx.Optimize.Anything.{Config, Result}
+  alias Imp.Adapters.Types.Image
+  alias Imp.Optimize.Anything
+  alias Imp.Optimize.Anything.{Config, Result}
 
   test "single-task mode evaluates a string candidate without an example" do
     receiver = self()
@@ -95,14 +95,14 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     receiver = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(receiver, {:seed_prompt, messages})
 
           %{
-            __dsex_lm_output__: "```text\ngenerated seed\n```",
-            __dsex_lm_metadata__: %{provider: "test"}
+            __imp_lm_output__: "```text\ngenerated seed\n```",
+            __imp_lm_metadata__: %{provider: "test"}
           }
         end
       ]
@@ -155,7 +155,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     second = %Image{data: "c2Vjb25k", mime_type: "image/png"}
 
     reflection_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn [%{content: content}], _opts ->
           send(receiver, {:reflection_content, content})
@@ -205,7 +205,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
   test "refiner boosts evaluation and exposes co-evolved prompt history" do
     refiner_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> ~s({"current_candidate":"better"}) end]
     }
 
@@ -338,7 +338,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     run_dir =
       Path.join(
         System.tmp_dir!(),
-        "dsex-best-outputs-#{System.unique_integer([:positive, :monotonic])}"
+        "imp-best-outputs-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     on_exit(fn -> File.rm_rf!(run_dir) end)
@@ -369,7 +369,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     assert decoded["score"] == 0.75
 
     assert decoded["output"] == %{
-             "__dsex_type__" => "tuple",
+             "__imp_type__" => "tuple",
              "items" => [
                0.75,
                %{"current_candidate" => "baseline"},
@@ -382,7 +382,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     run_dir =
       Path.join(
         System.tmp_dir!(),
-        "dsex-disk-cache-#{System.unique_integer([:positive, :monotonic])}"
+        "imp-disk-cache-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     on_exit(fn -> File.rm_rf!(run_dir) end)

@@ -1,10 +1,10 @@
 defmodule MCPRecoveryTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.MCP
+  alias Imp.MCP
 
   defmodule ScriptedTransport do
-    @behaviour DSEx.HTTP
+    @behaviour Imp.HTTP
 
     @impl true
     def post(url, headers, body, opts) do
@@ -77,7 +77,7 @@ defmodule MCPRecoveryTest do
 
   test "safe requests retry bounded transient responses with one JSON-RPC id" do
     telemetry_ref =
-      DSEx.Test.TelemetryHelpers.attach([[:dsex, :mcp, :streamable_http, :attempt]])
+      Imp.Test.TelemetryHelpers.attach([[:imp, :mcp, :streamable_http, :attempt]])
 
     client =
       client(
@@ -103,7 +103,7 @@ defmodule MCPRecoveryTest do
     assert Enum.all?(attempts, &(Keyword.fetch!(&1.opts, :retry) == false))
     assert Enum.all?(attempts, &(Keyword.fetch!(&1.opts, :timeout) == 100))
 
-    assert_receive {^telemetry_ref, [:dsex, :mcp, :streamable_http, :attempt], _,
+    assert_receive {^telemetry_ref, [:imp, :mcp, :streamable_http, :attempt], _,
                     %{method: "tools/list"} = metadata}
 
     refute Map.has_key?(metadata, :url)
@@ -117,7 +117,7 @@ defmodule MCPRecoveryTest do
     client = client(%{"tools/call" => [{:error, :closed}, :ok]})
     [tool] = MCP.import_tools(client)
 
-    assert {:error, :closed} = DSEx.Tool.call(tool, %{"secret_argument" => "do-not-emit"})
+    assert {:error, :closed} = Imp.Tool.call(tool, %{"secret_argument" => "do-not-emit"})
     assert [_attempt] = receive_method_attempts("tools/call", 1)
     refute_receive {:mcp_attempt, _, _, _, %{"method" => "tools/call"}, _}, 50
   end
@@ -132,7 +132,7 @@ defmodule MCPRecoveryTest do
       )
 
     [tool] = MCP.import_tools(client)
-    assert %{"ok" => true} = DSEx.Tool.call(tool, %{})
+    assert %{"ok" => true} = Imp.Tool.call(tool, %{})
 
     attempts = receive_method_attempts("tools/call", 2)
     assert Enum.map(attempts, & &1.request["id"]) |> Enum.uniq() |> length() == 1
@@ -162,7 +162,7 @@ defmodule MCPRecoveryTest do
     assert_receive {:blocking_transport, attempt, port}, 1_000
     attempt_ref = Process.monitor(attempt)
 
-    assert_receive {:import_result, [%DSEx.Tool{name: :recoverable}]}, 500
+    assert_receive {:import_result, [%Imp.Tool{name: :recoverable}]}, 500
     assert_receive {:DOWN, ^attempt_ref, :process, ^attempt, _reason}, 500
     assert_receive {:DOWN, ^caller_ref, :process, ^caller, :normal}, 500
     eventually(fn -> Port.info(port) == nil end)

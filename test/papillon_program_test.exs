@@ -1,30 +1,30 @@
-defmodule DSEx.BenchmarkTruth.PapillonProgramTest do
+defmodule Imp.BenchmarkTruth.PapillonProgramTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.Papillon
-  alias DSEx.ProgramParameters
+  alias Imp.BenchmarkTruth.Papillon
+  alias Imp.ProgramParameters
 
   test "constructs the source-faithful ChainOfThought and Predict stages" do
     program = Papillon.new(static_lm(fn _messages -> "external" end))
 
-    assert %DSEx.Predict.ChainOfThought{} = program.craft_redacted_request
-    assert %DSEx.Predict.Predict{} = program.respond_to_query
+    assert %Imp.Predict.ChainOfThought{} = program.craft_redacted_request
+    assert %Imp.Predict.Predict{} = program.respond_to_query
 
     craft = program.craft_redacted_request.predict.signature
-    assert DSEx.Signature.input_names(craft) == [:user_query]
-    assert DSEx.Signature.output_names(craft) == [:reasoning, :llm_request]
+    assert Imp.Signature.input_names(craft) == [:user_query]
+    assert Imp.Signature.output_names(craft) == [:reasoning, :llm_request]
     assert craft.instructions =~ "privacy-preserving request"
 
     respond = program.respond_to_query.signature
 
-    assert DSEx.Signature.input_names(respond) == [
+    assert Imp.Signature.input_names(respond) == [
              :related_llm_request,
              :related_llm_response,
              :user_query
            ]
 
-    assert DSEx.Signature.output_names(respond) == [:response]
-    refute :reasoning in DSEx.Signature.output_names(respond)
+    assert Imp.Signature.output_names(respond) == [:response]
+    refute :reasoning in Imp.Signature.output_names(respond)
 
     assert Enum.find(respond.inputs, &(&1.name == :related_llm_response)).desc ==
              "information from a powerful LLM responding to a related request"
@@ -54,9 +54,9 @@ defmodule DSEx.BenchmarkTruth.PapillonProgramTest do
     program = Papillon.new(untrusted_lm, lm: trusted_lm)
 
     assert {:ok, prediction} =
-             DSEx.Module.call(program, %{"user_query" => "Recover alice@example.com's account"})
+             Imp.Module.call(program, %{"user_query" => "Recover alice@example.com's account"})
 
-    assert DSEx.Prediction.to_map(prediction) == %{
+    assert Imp.Prediction.to_map(prediction) == %{
              llm_request: "Explain account recovery",
              llm_response: "Use the provider's recovery form",
              response: "Final private answer"
@@ -119,8 +119,8 @@ defmodule DSEx.BenchmarkTruth.PapillonProgramTest do
           {respond_failure, %{user_query: "private"}},
           {missing_input, %{}}
         ] do
-      assert {:ok, prediction} = DSEx.Module.call(program, inputs)
-      assert DSEx.Prediction.to_map(prediction) == empty_fields()
+      assert {:ok, prediction} = Imp.Module.call(program, inputs)
+      assert Imp.Prediction.to_map(prediction) == empty_fields()
     end
   end
 
@@ -136,7 +136,7 @@ defmodule DSEx.BenchmarkTruth.PapillonProgramTest do
 
   defp static_lm(handler) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn messages, _opts -> handler.(messages) end]
     }
   end

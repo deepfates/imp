@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
+defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.LocalMLXCampaign
+  alias Imp.BenchmarkTruth.LocalMLXCampaign
 
   @artifact_path Path.expand(
                    "../benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
@@ -28,25 +28,25 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
 
   test "restores runtime credentials only when portable deployment configuration matches" do
     runtime_lm =
-      DSEx.req_llm("openai:default_model",
+      Imp.req_llm("openai:default_model",
         api_key: "local",
         base_url: "http://127.0.0.1:18821/v1"
       )
 
     loaded =
-      DSEx.predict("question -> answer", lm: runtime_lm)
-      |> DSEx.Saving.dump()
+      Imp.predict("question -> answer", lm: runtime_lm)
+      |> Imp.Saving.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> DSEx.Saving.load()
+      |> Imp.Saving.load()
 
-    refute Keyword.has_key?(DSEx.ProgramAccess.lm(loaded).opts, :api_key)
+    refute Keyword.has_key?(Imp.ProgramAccess.lm(loaded).opts, :api_key)
 
     restored = LocalMLXCampaign.restore_runtime_credentials!(loaded, runtime_lm)
-    assert DSEx.ProgramAccess.lm(restored) == runtime_lm
+    assert Imp.ProgramAccess.lm(restored) == runtime_lm
 
     mismatched =
-      DSEx.req_llm("openai:other_model",
+      Imp.req_llm("openai:other_model",
         api_key: "local",
         base_url: "http://127.0.0.1:18821/v1"
       )
@@ -58,7 +58,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
 
   test "restores an exact MLX path identity after secret-shaped persistence redaction" do
     run_id = String.duplicate("a", 64)
-    model_path = "/private/tmp/dsex-mlx/#{run_id}/fused"
+    model_path = "/private/tmp/imp-mlx/#{run_id}/fused"
 
     runtime_lm =
       local_mlx_lm(model_path,
@@ -67,21 +67,21 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
       )
 
     portable =
-      DSEx.predict("question -> answer", lm: runtime_lm)
-      |> DSEx.Saving.dump()
+      Imp.predict("question -> answer", lm: runtime_lm)
+      |> Imp.Saving.dump()
       |> Jason.encode!()
       |> Jason.decode!()
 
     assert get_in(portable, ["lm", "model", "id"]) == model_path
     assert get_in(portable, ["lm", "model", "model"]) == model_path
 
-    loaded = DSEx.Saving.load(portable)
+    loaded = Imp.Saving.load(portable)
 
     restored = LocalMLXCampaign.restore_runtime_credentials!(loaded, runtime_lm)
-    assert DSEx.ProgramAccess.lm(restored) == runtime_lm
+    assert Imp.ProgramAccess.lm(restored) == runtime_lm
 
     wrong_path =
-      local_mlx_lm("/private/tmp/dsex-mlx/#{String.duplicate("b", 64)}/fused",
+      local_mlx_lm("/private/tmp/imp-mlx/#{String.duplicate("b", 64)}/fused",
         api_key: "local",
         base_url: "http://127.0.0.1:18821/v1"
       )
@@ -205,7 +205,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
   end
 
   test "serves baseline, adapter, and fused lanes with exact model and adapter requests" do
-    root = Path.join(System.tmp_dir!(), "dsex-fake-mlx-#{System.unique_integer([:positive])}")
+    root = Path.join(System.tmp_dir!(), "imp-fake-mlx-#{System.unique_integer([:positive])}")
     script = Path.join(root, "fake_mlx_server.py")
     port = free_port()
     File.mkdir_p!(root)
@@ -322,11 +322,11 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
   defp reenvelope(artifact, mutate, workspace_state \\ "clean") do
     payload = artifact |> Map.drop(["generated_at", "git_sha", "run_context"]) |> mutate.()
 
-    DSEx.BenchmarkTruth.RunContext.new!(
-      source_commits: %{"dsex" => "deepfates/dsex@test-revision"},
+    Imp.BenchmarkTruth.RunContext.new!(
+      source_commits: %{"imp" => "deepfates/imp@test-revision"},
       workspace_state: workspace_state
     )
-    |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+    |> Imp.BenchmarkTruth.RunContext.finish(payload)
   end
 
   defp free_port do
@@ -345,7 +345,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
       extra: %{openai_compatible_backend: :mlx_lm}
     }
 
-    DSEx.req_llm(model, Keyword.delete(opts, :base_url))
+    Imp.req_llm(model, Keyword.delete(opts, :base_url))
   end
 
   defp fake_mlx_server do

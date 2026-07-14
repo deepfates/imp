@@ -3,7 +3,7 @@ defmodule GEPAContractArtifactTest do
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Dsex.Benchmark.GepaContract
+  alias Mix.Tasks.Imp.Benchmark.GepaContract
 
   test "compare matches all provider-free GEPA v0.1.1 structural cases without T3 claims" do
     artifact = GepaContract.compare(upstream_fixture())
@@ -38,7 +38,7 @@ defmodule GEPAContractArtifactTest do
         "git",
         [
           "-c",
-          "user.name=DSEx Contract",
+          "user.name=Imp Contract",
           "-c",
           "user.email=contract@example.invalid",
           "commit",
@@ -58,7 +58,7 @@ defmodule GEPAContractArtifactTest do
     error =
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
-          Mix.Task.reenable("dsex.benchmark.gepa_contract")
+          Mix.Task.reenable("imp.benchmark.gepa_contract")
 
           GepaContract.run([
             "--python",
@@ -166,7 +166,7 @@ defmodule GEPAContractArtifactTest do
 
   defp tmp_dir(name) do
     nonce = Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{nonce}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{nonce}")
     File.mkdir_p!(path)
     path
   end

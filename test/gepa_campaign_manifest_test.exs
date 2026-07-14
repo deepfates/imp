@@ -1,8 +1,8 @@
 defmodule GepaCampaignManifestTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.GepaCampaignManifest
-  alias Mix.Tasks.Dsex.Benchmark.GepaCampaign, as: Task
+  alias Imp.BenchmarkTruth.GepaCampaignManifest
+  alias Mix.Tasks.Imp.Benchmark.GepaCampaign, as: Task
 
   @manifest "benchmarks/config/gepa-paper-campaign-v2.json"
 
@@ -12,7 +12,7 @@ defmodule GepaCampaignManifestTest do
     opts = GepaCampaignManifest.task_options!(manifest, manifest: path)
 
     assert manifest["schema_version"] == 1
-    assert opts.campaign_id == "dsex-gepa-paper-campaign-v1"
+    assert opts.campaign_id == "imp-gepa-paper-campaign-v1"
     assert opts.semantic_progress == nil
   end
 
@@ -21,7 +21,7 @@ defmodule GepaCampaignManifestTest do
     opts = GepaCampaignManifest.task_options!(manifest, manifest: @manifest)
 
     assert manifest["families"] ==
-             DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+             Imp.BenchmarkTruth.GepaReplicationContract.required_families()
 
     assert opts.generations == :metric_budget
     assert opts.seeds == [0, 1]
@@ -63,7 +63,7 @@ defmodule GepaCampaignManifestTest do
     opts = Task.resolve_manifest_options!(manifest: @manifest)
 
     assert opts[:families] ==
-             DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+             Imp.BenchmarkTruth.GepaReplicationContract.required_families()
 
     assert opts[:seeds] == [0, 1]
 
@@ -75,7 +75,7 @@ defmodule GepaCampaignManifestTest do
     opts = Task.resolve_manifest_options!(manifest: @manifest)
 
     names =
-      ~w(DSEX_HOVER_UPSTREAM_BM25 DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS DSEX_GEPA_PYTHON DSEX_GEPA_ROOT)
+      ~w(IMP_HOVER_UPSTREAM_BM25 IMP_IFBENCH_UPSTREAM_DESCRIPTIONS IMP_GEPA_PYTHON IMP_GEPA_ROOT)
 
     previous = Map.new(names, &{&1, System.get_env(&1)})
 
@@ -88,14 +88,14 @@ defmodule GepaCampaignManifestTest do
 
     Enum.each(names, &System.delete_env/1)
 
-    assert_raise Mix.Error, ~r/requires DSEX_HOVER_UPSTREAM_BM25=1/, fn ->
+    assert_raise Mix.Error, ~r/requires IMP_HOVER_UPSTREAM_BM25=1/, fn ->
       Task.verify_manifest_environment!(opts)
     end
 
-    System.put_env("DSEX_HOVER_UPSTREAM_BM25", "1")
-    System.put_env("DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS", "1")
-    System.put_env("DSEX_GEPA_PYTHON", System.find_executable("python3") || "/usr/bin/python3")
-    System.put_env("DSEX_GEPA_ROOT", File.cwd!())
+    System.put_env("IMP_HOVER_UPSTREAM_BM25", "1")
+    System.put_env("IMP_IFBENCH_UPSTREAM_DESCRIPTIONS", "1")
+    System.put_env("IMP_GEPA_PYTHON", System.find_executable("python3") || "/usr/bin/python3")
+    System.put_env("IMP_GEPA_ROOT", File.cwd!())
 
     assert :ok = Task.verify_manifest_environment!(opts)
   end

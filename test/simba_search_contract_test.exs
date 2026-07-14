@@ -1,11 +1,11 @@
-defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
+defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   use ExUnit.Case
 
   test "samples variable trajectories, registers all candidates, and validates finalists" do
     parent = self()
 
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -19,7 +19,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(parent, {:simba_reflection, messages})
@@ -32,15 +32,15 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: task_lm)
+    program = Imp.predict("question -> answer", lm: task_lm)
 
     trainset =
       for question <- ["Capital of France?", "Eiffel Tower city?"] do
-        DSEx.example(question: question, answer: "Paris") |> DSEx.with_inputs(:question)
+        Imp.example(question: question, answer: "Paris") |> Imp.with_inputs(:question)
       end
 
     optimizer =
-      DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer),
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
         bsize: 2,
         num_candidates: 2,
         max_steps: 2,
@@ -49,8 +49,8 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
         seed: 4
       )
 
-    compiled = DSEx.Optimizer.SIMBA.compile(optimizer, program, trainset)
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.Optimizer.SIMBA.compile(optimizer, program, trainset)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :simba
     assert report.candidate_count > 0
@@ -68,7 +68,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
 
     assert_received {:simba_reflection, reflection_messages}
     reflection_prompt = Enum.map_join(reflection_messages, "\n", & &1.content)
-    assert reflection_prompt =~ "defmodule DSEx.Predict.Predict"
+    assert reflection_prompt =~ "defmodule Imp.Predict.Predict"
     assert reflection_prompt =~ "Module main"
     assert reflection_prompt =~ "Input Fields"
     assert reflection_prompt =~ "better_program_trajectory"
@@ -78,7 +78,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     parent = self()
 
     base_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         rollout_id: 17,
         temperature: 0.25,
@@ -90,7 +90,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     teacher_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         temperature: 0.7,
         handler: fn _, opts ->
@@ -101,15 +101,15 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end]
     }
 
-    program = DSEx.predict("question -> answer", lm: base_lm)
+    program = Imp.predict("question -> answer", lm: base_lm)
 
-    example = DSEx.example(question: "q", answer: "yes") |> DSEx.with_inputs(:question)
+    example = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
 
-    DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer),
+    Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
       bsize: 1,
       num_candidates: 2,
       max_steps: 1,
@@ -119,7 +119,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
       max_concurrency: 1,
       seed: 2
     )
-    |> DSEx.Optimizer.SIMBA.compile(program, [example])
+    |> Imp.Optimizer.SIMBA.compile(program, [example])
 
     assert_receive {:teacher_rollout, teacher_opts}
     assert teacher_opts[:rollout_id] == 17
@@ -134,7 +134,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     parent = self()
 
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -148,7 +148,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(parent, {:reflection_payload, messages})
@@ -158,20 +158,20 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     metric = fn example, prediction ->
-      case DSEx.Example.to_map(example).question do
+      case Imp.Example.to_map(example).question do
         "tie" -> 0.5
-        "spread" -> if(DSEx.get(prediction, :answer) == "0", do: 0.0, else: 1.0)
+        "spread" -> if(Imp.get(prediction, :answer) == "0", do: 0.0, else: 1.0)
       end
     end
 
-    program = DSEx.predict("question -> answer", lm: task_lm)
+    program = Imp.predict("question -> answer", lm: task_lm)
 
     trainset =
       Enum.map(["tie", "spread"], fn question ->
-        DSEx.example(question: question, answer: "unused") |> DSEx.with_inputs(:question)
+        Imp.example(question: question, answer: "unused") |> Imp.with_inputs(:question)
       end)
 
-    DSEx.Optimizer.SIMBA.new(metric,
+    Imp.Optimizer.SIMBA.new(metric,
       bsize: 2,
       num_candidates: 3,
       max_steps: 1,
@@ -180,7 +180,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
       max_concurrency: 1,
       seed: 3
     )
-    |> DSEx.Optimizer.SIMBA.compile(program, trainset)
+    |> Imp.Optimizer.SIMBA.compile(program, trainset)
 
     payloads =
       for _ <- 1..2 do
@@ -195,7 +195,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     parent = self()
 
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -209,17 +209,17 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end]
     }
 
-    program = DSEx.predict("text, context -> answer", lm: task_lm)
+    program = Imp.predict("text, context -> answer", lm: task_lm)
 
     example =
-      DSEx.example(text: "ééé", context: [1, 2, 3], answer: "yes")
-      |> DSEx.with_inputs([:text, :context])
+      Imp.example(text: "ééé", context: [1, 2, 3], answer: "yes")
+      |> Imp.with_inputs([:text, :context])
 
-    DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer),
+    Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
       bsize: 1,
       num_candidates: 2,
       max_steps: 1,
@@ -229,7 +229,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
       max_concurrency: 1,
       seed: 0
     )
-    |> DSEx.Optimizer.SIMBA.compile(program, [example])
+    |> Imp.Optimizer.SIMBA.compile(program, [example])
 
     assert_receive {:truncated_demo, prompt}
     assert prompt =~ "éé\n\t\t... <TRUNCATED FOR BREVITY>"
@@ -238,7 +238,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
 
   test "same seed reproduces batches and candidate state" do
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _, opts ->
           %{answer: if(rem(Keyword.get(opts, :rollout_id, 0), 2) == 0, do: "yes", else: "no")}
@@ -247,7 +247,7 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _, _ ->
           %{discussion: "Prefer the successful answer.", module_advice: %{main: "Answer yes."}}
@@ -255,23 +255,23 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: task_lm)
+    program = Imp.predict("question -> answer", lm: task_lm)
 
     examples =
       for index <- 1..4 do
-        DSEx.example(question: "q#{index}", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "q#{index}", answer: "yes") |> Imp.with_inputs(:question)
       end
 
     run = fn seed ->
-      DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer),
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
         bsize: 2,
         num_candidates: 2,
         max_steps: 2,
         prompt_lm: prompt_lm,
         seed: seed
       )
-      |> DSEx.Optimizer.SIMBA.compile(program, examples)
-      |> DSEx.Optimizer.Report.fetch()
+      |> Imp.Optimizer.SIMBA.compile(program, examples)
+      |> Imp.Optimizer.Report.fetch()
       |> then(&%{logs: &1.metadata.trial_logs, candidates: &1.candidates})
     end
 
@@ -279,20 +279,20 @@ defmodule DSEx.Optimizer.SIMBA.SearchContractTest do
   end
 
   test "enforces upstream dataset and prompt-model boundaries" do
-    program = DSEx.predict("question -> answer")
-    example = DSEx.example(question: "q", answer: "a") |> DSEx.with_inputs(:question)
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
 
     assert_raise ArgumentError, ~r/trainset too small/, fn ->
-      DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer),
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
         bsize: 2,
-        prompt_lm: DSEx.LM.Static
+        prompt_lm: Imp.LM.Static
       )
-      |> DSEx.Optimizer.SIMBA.compile(program, [example])
+      |> Imp.Optimizer.SIMBA.compile(program, [example])
     end
 
     assert_raise ArgumentError, ~r/requires :prompt_lm/, fn ->
-      DSEx.Optimizer.SIMBA.new(DSEx.Metrics.exact_match(:answer), bsize: 1)
-      |> DSEx.Optimizer.SIMBA.compile(program, [example])
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer), bsize: 1)
+      |> Imp.Optimizer.SIMBA.compile(program, [example])
     end
   end
 end

@@ -1,10 +1,10 @@
-defmodule DSEx.Optimizer.TrajectoryContractTest do
+defmodule Imp.Optimizer.TrajectoryContractTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias DSEx.Adapters.Types.{ToolCall, ToolCallResults, ToolCalls, ToolResult}
-  alias DSEx.Optimizer.Trajectory
-  alias DSEx.Optimizer.Trajectory.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
+  alias Imp.Adapters.Types.{ToolCall, ToolCallResults, ToolCalls, ToolResult}
+  alias Imp.Optimizer.Trajectory
+  alias Imp.Optimizer.Trajectory.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
 
   @fixture "test/fixtures/optimizer_trajectory_contract.json"
 
@@ -33,7 +33,7 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
   end
 
   test "wire envelope covers multimodal values, accounting, cache, failures, and parameters" do
-    image = %DSEx.Adapters.Types.Image{
+    image = %Imp.Adapters.Types.Image{
       data: "aW1hZ2U=",
       mime_type: "image/png",
       metadata: %{alt: "map"}
@@ -44,8 +44,8 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
         :gepa,
         %{
           index: 0,
-          example: DSEx.example(prompt: ["locate", image]) |> DSEx.with_inputs(:prompt),
-          prediction: DSEx.Prediction.new(reasoning: "visual inspection", answer: "map"),
+          example: Imp.example(prompt: ["locate", image]) |> Imp.with_inputs(:prompt),
+          prediction: Imp.Prediction.new(reasoning: "visual inspection", answer: "map"),
           score: 0.8,
           feedback: %{instruction: "be precise"},
           metric_metadata: %{objectives: %{accuracy: 0.8}},
@@ -85,8 +85,8 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
 
     assert {:ok, restored} = Trajectory.load(Jason.decode!(json))
 
-    assert %DSEx.Adapters.Types.Image{} =
-             DSEx.Example.get(restored.example, :prompt) |> List.last()
+    assert %Imp.Adapters.Types.Image{} =
+             Imp.Example.get(restored.example, :prompt) |> List.last()
 
     assert %Failure{kind: :provider} = restored.error
     assert Enum.map(restored.named_parameters, & &1.name) == [:vision, :few_shot]
@@ -100,7 +100,7 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
       ToolCallResults.new([ToolResult.new(:lookup, "France", id: "call-native")])
 
     prediction =
-      DSEx.Prediction.new(%{
+      Imp.Prediction.new(%{
         answer: "France",
         history: [
           %{tool: :lookup, arguments: %{city: "Paris"}, result: "France"},
@@ -118,7 +118,7 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
            ]
 
     assert Enum.map(trajectory.events, & &1.sequence) == [0, 1, 2, 3]
-    assert trajectory.trace == DSEx.Prediction.get(prediction, :history)
+    assert trajectory.trace == Imp.Prediction.get(prediction, :history)
     assert Trajectory.validate!(trajectory) == trajectory
   end
 
@@ -158,7 +158,7 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
       Trajectory.project(:evaluation, %{
         index: 0,
         example: %{
-          image: %DSEx.Adapters.Types.Image{
+          image: %Imp.Adapters.Types.Image{
             data: payload,
             metadata: %{api_key: "sk-test-secret-1234567890"}
           }
@@ -171,7 +171,7 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
     wire = Trajectory.dump(trajectory)
     assert {:ok, restored} = wire |> Jason.encode!() |> Jason.decode!() |> Trajectory.load()
 
-    assert %DSEx.Adapters.Types.Image{
+    assert %Imp.Adapters.Types.Image{
              data: ^payload,
              metadata: %{"api_key" => "[REDACTED]"}
            } = restored.example["image"]
@@ -290,9 +290,9 @@ defmodule DSEx.Optimizer.TrajectoryContractTest do
     end
   end
 
-  test "the general DSEx persistence facade uses the canonical trajectory codec" do
+  test "the general Imp persistence facade uses the canonical trajectory codec" do
     trajectory = Trajectory.project(:gepa, %{index: 0, score: 1.0, trace: []})
-    assert %Trajectory{} = restored = trajectory |> DSEx.dump() |> DSEx.load()
+    assert %Trajectory{} = restored = trajectory |> Imp.dump() |> Imp.load()
     assert Trajectory.dump(restored) == Trajectory.dump(trajectory)
   end
 

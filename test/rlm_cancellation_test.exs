@@ -1,14 +1,14 @@
 defmodule RLMCancellationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Predict.RLM
-  alias DSEx.Predict.RLM.Budget
+  alias Imp.Predict.RLM
+  alias Imp.Predict.RLM.Budget
 
   test "cancellation terminates an active LM effect when no deadline is configured" do
     parent = self()
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           send(parent, {:effect_started, self()})

@@ -2,7 +2,7 @@ defmodule GRPOContractTest do
   use ExUnit.Case
 
   defmodule SessionTrainer do
-    @behaviour DSEx.Clients.Trainer
+    @behaviour Imp.Clients.Trainer
 
     defstruct [:owner, :mode, artifact: "trained/grpo-model"]
 
@@ -14,7 +14,7 @@ defmodule GRPOContractTest do
       send(trainer.owner, {:start, lm, opts})
 
       {:ok,
-       DSEx.Clients.ReinforcementSession.new(%{
+       Imp.Clients.ReinforcementSession.new(%{
          id: "session-1",
          provider: :fixture,
          model: lm,
@@ -54,7 +54,7 @@ defmodule GRPOContractTest do
   end
 
   defmodule TwoPredictorProgram do
-    @behaviour DSEx.Module
+    @behaviour Imp.Module
 
     defstruct [:first, :second]
 
@@ -68,11 +68,11 @@ defmodule GRPOContractTest do
 
     @impl true
     def call(program, inputs) do
-      with {:ok, first} <- DSEx.Module.call(program.first, inputs),
-           {:ok, second} <- DSEx.Module.call(program.second, inputs) do
+      with {:ok, first} <- Imp.Module.call(program.first, inputs),
+           {:ok, second} <- Imp.Module.call(program.second, inputs) do
         {:ok,
-         DSEx.Prediction.new(
-           Map.merge(DSEx.Prediction.to_map(first), DSEx.Prediction.to_map(second))
+         Imp.Prediction.new(
+           Map.merge(Imp.Prediction.to_map(first), Imp.Prediction.to_map(second))
          )}
       end
     end
@@ -81,13 +81,13 @@ defmodule GRPOContractTest do
   defp trainer(mode \\ :ok), do: %SessionTrainer{owner: self(), mode: mode}
 
   defp program(handler) do
-    lm = %{module: DSEx.LM.Static, opts: [handler: handler], model: "base-model"}
-    DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: handler], model: "base-model"}
+    Imp.predict("question -> answer", lm: lm)
   end
 
   defp trainset do
     for question <- ["alpha", "beta", "gamma", "delta"] do
-      DSEx.example(question: question, answer: question) |> DSEx.with_inputs(:question)
+      Imp.example(question: question, answer: question) |> Imp.with_inputs(:question)
     end
   end
 
@@ -114,7 +114,7 @@ defmodule GRPOContractTest do
     end
 
     optimizer =
-      DSEx.Optimizer.GRPO.new(
+      Imp.Optimizer.GRPO.new(
         fn _example, _prediction -> 1.0 end,
         [
           trainer: trainer(),
@@ -126,7 +126,7 @@ defmodule GRPOContractTest do
         ] ++ opts
       )
 
-    assert {:ok, compiled} = DSEx.Optimizer.GRPO.compile(optimizer, program(handler), trainset())
+    assert {:ok, compiled} = Imp.Optimizer.GRPO.compile(optimizer, program(handler), trainset())
 
     steps = collect_steps([])
     {compiled, steps}
@@ -157,15 +157,15 @@ defmodule GRPOContractTest do
                Enum.all?(batch.group, &(question_from(&1) == question_from(hd(batch.group))))
            end)
 
-    assert DSEx.ProgramAccess.lm(compiled).model == "trained/grpo-model"
-    assert DSEx.ProgramAccess.get_metadata(compiled, :training_artifact).method == :grpo
+    assert Imp.ProgramAccess.lm(compiled).model == "trained/grpo-model"
+    assert Imp.ProgramAccess.get_metadata(compiled, :training_artifact).method == :grpo
     assert_received {:terminate, [10, 11, 30, 31]}
     assert_received {:artifact, :succeeded}
   end
 
   test "keeps predictor identity and predictor-major source ordering" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       model: "base-model",
       opts: [
         handler: fn messages, _opts ->
@@ -179,12 +179,12 @@ defmodule GRPOContractTest do
     }
 
     program = %TwoPredictorProgram{
-      first: DSEx.predict("question -> first_answer", lm: lm),
-      second: DSEx.predict("question -> second_answer", lm: lm)
+      first: Imp.predict("question -> first_answer", lm: lm),
+      second: Imp.predict("question -> second_answer", lm: lm)
     }
 
     optimizer =
-      DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
         trainer: trainer(),
         num_train_steps: 1,
         num_rollouts_per_grpo_step: 2,
@@ -192,7 +192,7 @@ defmodule GRPOContractTest do
       )
 
     assert {:ok, compiled} =
-             DSEx.Optimizer.GRPO.compile(optimizer, program, Enum.take(trainset(), 1))
+             Imp.Optimizer.GRPO.compile(optimizer, program, Enum.take(trainset(), 1))
 
     assert_received {:step, batches}
     assert MapSet.new(Enum.map(batches, & &1.predictor)) == MapSet.new([:first, :second])
@@ -225,7 +225,7 @@ defmodule GRPOContractTest do
     parse_failure = program(fn _messages, _opts -> %{} end)
 
     optimizer =
-      DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
         trainer: trainer(),
         num_train_steps: 1,
         num_rollouts_per_grpo_step: 2,
@@ -235,7 +235,7 @@ defmodule GRPOContractTest do
       )
 
     assert {:ok, _compiled} =
-             DSEx.Optimizer.GRPO.compile(optimizer, parse_failure, Enum.take(trainset(), 1))
+             Imp.Optimizer.GRPO.compile(optimizer, parse_failure, Enum.take(trainset(), 1))
 
     assert_received {:step, parse_batches}
     parse_group = parse_batches |> hd() |> Map.fetch!(:group)
@@ -245,7 +245,7 @@ defmodule GRPOContractTest do
     execution_failure = program(fn _messages, _opts -> raise "rollout failed" end)
 
     assert {:ok, _compiled} =
-             DSEx.Optimizer.GRPO.compile(optimizer, execution_failure, Enum.take(trainset(), 1))
+             Imp.Optimizer.GRPO.compile(optimizer, execution_failure, Enum.take(trainset(), 1))
 
     assert_received {:step, execution_batches}
     execution_group = execution_batches |> hd() |> Map.fetch!(:group)
@@ -254,14 +254,14 @@ defmodule GRPOContractTest do
 
   test "terminates a started session when a training step fails" do
     optimizer =
-      DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
         trainer: trainer(:step_error),
         num_train_steps: 1,
         status_poll_interval_ms: 0
       )
 
     assert {:error, :step_failed} =
-             DSEx.Optimizer.GRPO.compile(
+             Imp.Optimizer.GRPO.compile(
                optimizer,
                program(fn _messages, _opts -> %{answer: "ok"} end),
                Enum.take(trainset(), 1)
@@ -280,7 +280,7 @@ defmodule GRPOContractTest do
     end
 
     optimizer =
-      DSEx.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
         trainer: trainer(),
         validation_fn: validation,
         num_train_steps: 3,
@@ -290,7 +290,7 @@ defmodule GRPOContractTest do
       )
 
     assert {:ok, _compiled} =
-             DSEx.Optimizer.GRPO.compile(
+             Imp.Optimizer.GRPO.compile(
                optimizer,
                program(fn _messages, opts -> %{answer: to_string(opts[:rollout_id])} end),
                Enum.take(trainset(), 1),
@@ -304,12 +304,12 @@ defmodule GRPOContractTest do
   end
 
   test "OpenAI remains SFT-only at the reinforcement boundary" do
-    openai = DSEx.Clients.OpenAITrainer.new(base_url: "https://example.invalid/v1")
+    openai = Imp.Clients.OpenAITrainer.new(base_url: "https://example.invalid/v1")
 
     assert {:error, {:unsupported_training_method, :grpo}} =
-             DSEx.Clients.Trainer.start_reinforcement(
+             Imp.Clients.Trainer.start_reinforcement(
                openai,
-               DSEx.req_llm("gpt-test"),
+               Imp.req_llm("gpt-test"),
                []
              )
   end

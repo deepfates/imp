@@ -1,12 +1,12 @@
-defmodule DSEx.Tracking.SessionTest do
+defmodule Imp.Tracking.SessionTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
 
-  alias DSEx.Tracking.Session
+  alias Imp.Tracking.Session
 
   defmodule FirstBackend do
-    @behaviour DSEx.Tracking.Backend
+    @behaviour Imp.Tracking.Backend
 
     @impl true
     def start(opts) do
@@ -28,7 +28,7 @@ defmodule DSEx.Tracking.SessionTest do
   end
 
   defmodule SecondBackend do
-    @behaviour DSEx.Tracking.Backend
+    @behaviour Imp.Tracking.Backend
 
     @impl true
     def start(opts) do
@@ -50,7 +50,7 @@ defmodule DSEx.Tracking.SessionTest do
   end
 
   defmodule FailingStartBackend do
-    @behaviour DSEx.Tracking.Backend
+    @behaviour Imp.Tracking.Backend
 
     @impl true
     def start(opts) do

@@ -1,10 +1,10 @@
 defmodule GepaCampaignTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.BenchmarkTruth.{GepaCampaign, GepaReplicationContract, HoverBM25}
+  alias Imp.BenchmarkTruth.{GepaCampaign, GepaReplicationContract, HoverBM25}
 
   test "research task defaults match the pinned upstream GEPA runner" do
-    assert Mix.Tasks.Dsex.Benchmark.GepaCampaign.research_defaults() == %{
+    assert Mix.Tasks.Imp.Benchmark.GepaCampaign.research_defaults() == %{
              temperature: 1.0,
              max_tokens: 16_384,
              max_concurrency: 32,
@@ -14,7 +14,7 @@ defmodule GepaCampaignTest do
   end
 
   defmodule OptimizerConfigCallback do
-    @behaviour DSEx.Optimizer.GEPA.Callback
+    @behaviour Imp.Optimizer.GEPA.Callback
 
     @impl true
     def on_optimization_start(event, owner) do
@@ -22,7 +22,7 @@ defmodule GepaCampaignTest do
     end
   end
 
-  test "DSEx GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
+  test "Imp GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
     dataset_root = tmp_dir("gepa-campaign-data")
     upstream_dir = tmp_dir("gepa-campaign-upstream")
     rows_dir = tmp_dir("gepa-campaign-rows")
@@ -43,12 +43,12 @@ defmodule GepaCampaignTest do
         pricing_source: "test provider usage export",
         token_cost:
           explicit_costs(
-            DSEx.BenchmarkTruth.GepaReplicationContract.required_families(),
+            Imp.BenchmarkTruth.GepaReplicationContract.required_families(),
             [0, 1]
           ),
         source_commits: %{
           "dspy" => "stanfordnlp/dspy@abcdef1",
-          "dsex" => "deepfates/dsex@abcdef2",
+          "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
         lm: static_gold_lm()
@@ -62,9 +62,9 @@ defmodule GepaCampaignTest do
     assert length(rows) == 6
 
     assert Enum.all?(rows, fn row ->
-             is_map(get_in(row, ["results", "dsex_gepa"])) and
-               get_in(row, ["results", "dsex_gepa", "source"]) =~ "DSEx GEPA campaign runner" and
-               get_in(row, ["results", "dsex_gepa", "source"]) =~ "abcdef2" and
+             is_map(get_in(row, ["results", "imp_gepa"])) and
+               get_in(row, ["results", "imp_gepa", "source"]) =~ "Imp GEPA campaign runner" and
+               get_in(row, ["results", "imp_gepa", "source"]) =~ "abcdef2" and
                is_map(row["dataset"]) and
                row["dataset"]["scope"] == "full" and
                row["dataset"]["split_counts"] == %{"train" => 2, "dev" => 2, "test" => 2} and
@@ -76,13 +76,13 @@ defmodule GepaCampaignTest do
     hotpot = Enum.find(rows, &(&1["family"] == "HotpotQABench"))
     assert get_in(hotpot, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
     assert get_in(hotpot, ["dataset", "retrieval", "verified"]) == true
-    assert get_in(hotpot, ["dataset", "retrieval", "implementation"]) == "dsex_local_bm25"
+    assert get_in(hotpot, ["dataset", "retrieval", "implementation"]) == "imp_local_bm25"
     assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
     assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
     assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
     assert get_in(hover, ["dataset", "retrieval", "verified"]) == true
-    assert get_in(hover, ["dataset", "retrieval", "implementation"]) == "dsex_local_bm25"
-    assert get_in(hover, ["results", "dsex_gepa", "score"]) == 1.0
+    assert get_in(hover, ["dataset", "retrieval", "implementation"]) == "imp_local_bm25"
+    assert get_in(hover, ["results", "imp_gepa", "score"]) == 1.0
 
     assert get_in(hotpot, ["metadata", "component_feedback", "components"]) == [
              "create_query_hop2",
@@ -105,13 +105,13 @@ defmodule GepaCampaignTest do
              "generate_response_module"
            ]
 
-    Mix.Task.reenable("dsex.benchmark.gepa_replication")
+    Mix.Task.reenable("imp.benchmark.gepa_replication")
 
     assert_raise Mix.Error, ~r/requires --upstream-evidence/, fn ->
-      Mix.Tasks.Dsex.Benchmark.GepaReplication.run([
+      Mix.Tasks.Imp.Benchmark.GepaReplication.run([
         "--from-gepa-artifact",
         upstream_dir,
-        "--dsex-input",
+        "--imp-input",
         result.out_path,
         "--campaign-id",
         "gepa-campaign-test",
@@ -125,7 +125,7 @@ defmodule GepaCampaignTest do
     assert Path.wildcard(Path.join(final_dir, "gepa-replication-*.json")) == []
   end
 
-  test "DSEx GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
+  test "Imp GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
     dataset_root = tmp_dir("gepa-campaign-hover-missing-retrieval")
     rows_dir = tmp_dir("gepa-campaign-hover-missing-rows")
     write_dataset_root!(dataset_root)
@@ -161,7 +161,7 @@ defmodule GepaCampaignTest do
                      token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
                      source_commits: %{
                        "dspy" => "stanfordnlp/dspy@abcdef1",
-                       "dsex" => "deepfates/dsex@abcdef2",
+                       "imp" => "deepfates/imp@abcdef2",
                        "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
                      },
                      lm: static_gold_lm()
@@ -169,7 +169,7 @@ defmodule GepaCampaignTest do
                  end
   end
 
-  test "DSEx GEPA campaign can write resumable partial family rows" do
+  test "Imp GEPA campaign can write resumable partial family rows" do
     dataset_root = tmp_dir("gepa-campaign-partial-data")
     rows_dir = tmp_dir("gepa-campaign-partial-rows")
     write_dataset_root!(dataset_root)
@@ -188,7 +188,7 @@ defmodule GepaCampaignTest do
         token_cost: explicit_costs(["AIMEBench"], [0, 1]),
         source_commits: %{
           "dspy" => "stanfordnlp/dspy@abcdef1",
-          "dsex" => "deepfates/dsex@abcdef2",
+          "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
         lm: static_gold_lm()
@@ -209,7 +209,7 @@ defmodule GepaCampaignTest do
     assert Enum.map(row["token_cost"]["breakdown"], & &1["seed"]) == [0, 1]
   end
 
-  test "DSEx GEPA campaign rejects one fallback cost tuple for multiple seeds" do
+  test "Imp GEPA campaign rejects one fallback cost tuple for multiple seeds" do
     dataset_root = tmp_dir("gepa-campaign-ambiguous-cost-data")
     rows_dir = tmp_dir("gepa-campaign-ambiguous-cost-rows")
     write_dataset_root!(dataset_root)
@@ -225,7 +225,7 @@ defmodule GepaCampaignTest do
     end
   end
 
-  test "DSEx GEPA campaign rejects invalid source identities before filesystem or LM work" do
+  test "Imp GEPA campaign rejects invalid source identities before filesystem or LM work" do
     root = tmp_dir("gepa-campaign-invalid-source")
     dataset_root = Path.join(root, "missing-dataset")
     rows_dir = Path.join(root, "rows")
@@ -239,7 +239,7 @@ defmodule GepaCampaignTest do
       end)
 
     assert_raise ArgumentError,
-                 ~r/source_commits must contain concrete dspy, dsex, and gepa_artifact identities/,
+                 ~r/source_commits must contain concrete dspy, imp, and gepa_artifact identities/,
                  fn ->
                    GepaCampaign.run(
                      dataset_root: dataset_root,
@@ -250,7 +250,7 @@ defmodule GepaCampaignTest do
                      pricing_source: "test provider usage export",
                      source_commits: %{
                        "dspy" => "unknown",
-                       "dsex" => "deepfates/dsex@abcdef2",
+                       "imp" => "deepfates/imp@abcdef2",
                        "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
                      },
                      lm: lm
@@ -261,12 +261,12 @@ defmodule GepaCampaignTest do
     refute File.exists?(rows_dir)
   end
 
-  test "DSEx GEPA campaign rejects unknown partial family names" do
+  test "Imp GEPA campaign rejects unknown partial family names" do
     dataset_root = tmp_dir("gepa-campaign-unknown-family")
     rows_dir = tmp_dir("gepa-campaign-unknown-family-rows")
     write_dataset_root!(dataset_root)
 
-    assert_raise ArgumentError, ~r/unknown DSEx GEPA campaign families: MissingBench/, fn ->
+    assert_raise ArgumentError, ~r/unknown Imp GEPA campaign families: MissingBench/, fn ->
       GepaCampaign.run(
         dataset_root: dataset_root,
         campaign_id: "gepa-campaign-unknown-family-test",
@@ -278,7 +278,7 @@ defmodule GepaCampaignTest do
         token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
         source_commits: %{
           "dspy" => "stanfordnlp/dspy@abcdef1",
-          "dsex" => "deepfates/dsex@abcdef2",
+          "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
         lm: static_gold_lm()
@@ -286,7 +286,7 @@ defmodule GepaCampaignTest do
     end
   end
 
-  test "DSEx GEPA campaign resumes completed seeds without calling the LM again" do
+  test "Imp GEPA campaign resumes completed seeds without calling the LM again" do
     dataset_root = tmp_dir("gepa-campaign-resume-data")
     rows_dir = tmp_dir("gepa-campaign-resume-rows")
     write_dataset_root!(dataset_root)
@@ -324,7 +324,7 @@ defmodule GepaCampaignTest do
     assert Enum.map(completed, & &1["seed"]) == [0, 1]
   end
 
-  test "DSEx GEPA campaign checkpoints and resumes individual baseline splits" do
+  test "Imp GEPA campaign checkpoints and resumes individual baseline splits" do
     dataset_root = tmp_dir("gepa-campaign-split-resume-data")
     rows_dir = tmp_dir("gepa-campaign-split-resume-rows")
     write_dataset_root!(dataset_root)
@@ -366,7 +366,7 @@ defmodule GepaCampaignTest do
     }
   end
 
-  test "DSEx GEPA campaign resumes a committed baseline row prefix without replay or usage loss" do
+  test "Imp GEPA campaign resumes a committed baseline row prefix without replay or usage loss" do
     dataset_root = tmp_dir("gepa-campaign-row-prefix-data")
     rows_dir = tmp_dir("gepa-campaign-row-prefix-rows")
     write_dataset_root!(dataset_root)
@@ -453,7 +453,7 @@ defmodule GepaCampaignTest do
     assert_in_delta resumed_cost["usd"], first_cost["usd"], 1.0e-12
   end
 
-  test "DSEx GEPA campaign refuses to replay an ambiguously dispatched baseline row" do
+  test "Imp GEPA campaign refuses to replay an ambiguously dispatched baseline row" do
     dataset_root = tmp_dir("gepa-campaign-ambiguous-row-data")
     rows_dir = tmp_dir("gepa-campaign-ambiguous-row-rows")
     write_dataset_root!(dataset_root)
@@ -569,7 +569,7 @@ defmodule GepaCampaignTest do
     assert %{report: %{"rows" => [_row]}} = Task.await(task, 5_000)
   end
 
-  test "DSEx GEPA campaign rejects artifact optimizer state at the program resume boundary" do
+  test "Imp GEPA campaign rejects artifact optimizer state at the program resume boundary" do
     dataset_root = tmp_dir("gepa-campaign-generation-resume-data")
     rows_dir = tmp_dir("gepa-campaign-generation-resume-rows")
     write_dataset_root!(dataset_root)
@@ -595,12 +595,12 @@ defmodule GepaCampaignTest do
 
     receiver = self()
 
-    DSEx.Optimize.Anything.run(
+    Imp.Optimize.Anything.run(
       spec["instructions"],
       fn _candidate, _example -> 1.0 end,
       dataset: [:dev_one, :dev_two],
       config:
-        DSEx.Optimize.Anything.Config.new(
+        Imp.Optimize.Anything.Config.new(
           engine: [max_candidate_proposals: 1, parallel: false],
           reflection: [
             custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
@@ -649,7 +649,7 @@ defmodule GepaCampaignTest do
     end
   end
 
-  test "DSEx GEPA campaign rejects checkpoint configuration and dataset mismatches" do
+  test "Imp GEPA campaign rejects checkpoint configuration and dataset mismatches" do
     dataset_root = tmp_dir("gepa-campaign-checkpoint-identity-data")
     rows_dir = tmp_dir("gepa-campaign-checkpoint-identity-rows")
     write_dataset_root!(dataset_root)
@@ -724,7 +724,7 @@ defmodule GepaCampaignTest do
     evidence = row["metric_call_evidence"]
 
     assert evidence["basis"] == "observed_and_enforced"
-    assert evidence["enforced_limits"] == %{"dsex_gepa" => true}
+    assert evidence["enforced_limits"] == %{"imp_gepa" => true}
 
     assert Enum.map(evidence["per_seed"], &{&1["seed"], &1["observed"], &1["limit"]}) ==
              [{17, 4, 4}, {29, 4, 4}]
@@ -737,14 +737,14 @@ defmodule GepaCampaignTest do
     receiver = self()
 
     reflection_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(receiver, {:reflection_call, messages})
 
           %{
-            __dsex_lm_output__: %{"instruction" => "Use the reflected instruction."},
-            __dsex_lm_metadata__: %{provider: "test"}
+            __imp_lm_output__: %{"instruction" => "Use the reflected instruction."},
+            __imp_lm_metadata__: %{provider: "test"}
           }
         end
       ]
@@ -794,7 +794,7 @@ defmodule GepaCampaignTest do
     assert get_in(optimizer_state, ["stop_reason", "items", Access.at(0), "value"]) ==
              "stopper"
 
-    assert Path.wildcard(Path.join(rows_dir, "dsex-gepa-rows-*.json")) == []
+    assert Path.wildcard(Path.join(rows_dir, "imp-gepa-rows-*.json")) == []
   end
 
   test "resumed seed selection uses dev even when another seed has the higher test score" do
@@ -829,19 +829,19 @@ defmodule GepaCampaignTest do
 
     [row] = GepaCampaign.run(opts).report["rows"]
 
-    assert get_in(row, ["results", "dsex_gepa", "seed"]) == 10
-    assert get_in(row, ["results", "dsex_gepa", "score"]) == 0.1
-    assert get_in(row, ["seed_selection", "dsex_gepa", "selection_split"]) == "dev"
-    assert get_in(row, ["seed_selection", "dsex_gepa", "test_scores_used"]) == false
+    assert get_in(row, ["results", "imp_gepa", "seed"]) == 10
+    assert get_in(row, ["results", "imp_gepa", "score"]) == 0.1
+    assert get_in(row, ["seed_selection", "imp_gepa", "selection_split"]) == "dev"
+    assert get_in(row, ["seed_selection", "imp_gepa", "test_scores_used"]) == false
   end
 
-  test "DSEx evidence satisfies the strict contract once converter comparators are supplied" do
+  test "Imp evidence satisfies the strict contract once converter comparators are supplied" do
     dataset_root = tmp_dir("gepa-campaign-contract-data")
     rows_dir = tmp_dir("gepa-campaign-contract-rows")
     write_dataset_root!(dataset_root)
     set_family_budget!(dataset_root, "AIMEBench", 4)
 
-    [dsex_row] =
+    [imp_row] =
       campaign_opts(dataset_root, rows_dir,
         campaign_id: "gepa-campaign-contract",
         seeds: [3, 5],
@@ -851,36 +851,36 @@ defmodule GepaCampaignTest do
       |> GepaCampaign.run()
       |> get_in([:report, "rows"])
 
-    selection = get_in(dsex_row, ["seed_selection", "dsex_gepa"])
-    assert dsex_row["evidence_level"] == "research_campaign"
-    assert dsex_row["metadata"]["budget_complete"]
-    observed_dsex = get_in(dsex_row, ["metric_call_evidence", "observed", "dsex_gepa"])
+    selection = get_in(imp_row, ["seed_selection", "imp_gepa"])
+    assert imp_row["evidence_level"] == "research_campaign"
+    assert imp_row["metadata"]["budget_complete"]
+    observed_imp = get_in(imp_row, ["metric_call_evidence", "observed", "imp_gepa"])
 
     rows =
       Enum.map(GepaReplicationContract.required_families(), fn family ->
         dataset =
           if family in ["HotpotQABench", "hoverBench"] do
-            put_in(dsex_row["dataset"], ["retrieval"], %{
+            put_in(imp_row["dataset"], ["retrieval"], %{
               "verified" => true,
               "implementation" => "upstream_python_bm25s",
               "corpus_checksum" => "sha256:" <> String.duplicate("a", 64),
               "index_checksum" => "sha256:" <> String.duplicate("b", 64)
             })
           else
-            dsex_row["dataset"]
+            imp_row["dataset"]
           end
 
-        dsex_row
+        imp_row
         |> Map.put("family", family)
         |> Map.put("dataset", dataset)
-        |> Map.put("results", contract_results(dsex_row))
+        |> Map.put("results", contract_results(imp_row))
         |> Map.put("seed_selection", Map.new(contract_optimizers(), &{&1, selection}))
         |> Map.put("metric_call_evidence", %{
           "basis" => "observed_and_enforced",
           "source" => "optimizer runtime exports and enforced campaign limits",
           "observed" =>
             Map.merge(Map.new(contract_optimizers(), &{&1, 1}), %{
-              "dsex_gepa" => observed_dsex
+              "imp_gepa" => observed_imp
             }),
           "enforced_limits" => Map.new(contract_optimizers(), &{&1, true})
         })
@@ -892,7 +892,7 @@ defmodule GepaCampaignTest do
 
   defp static_gold_lm do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: &static_gold_handler/2]
     }
   end
@@ -930,7 +930,7 @@ defmodule GepaCampaignTest do
         token_cost: %{"usd" => 0.01, "input_tokens" => 100, "output_tokens" => 50},
         source_commits: %{
           "dspy" => "stanfordnlp/dspy@abcdef1",
-          "dsex" => "deepfates/dsex@abcdef2",
+          "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
         lm: static_gold_lm()
@@ -952,11 +952,11 @@ defmodule GepaCampaignTest do
     File.write!(path, Jason.encode!(%{document | "families" => families}))
   end
 
-  defp contract_optimizers, do: ["baseline", "dspy_gepa", "dsex_gepa", "mipro_v2"]
+  defp contract_optimizers, do: ["baseline", "dspy_gepa", "imp_gepa", "mipro_v2"]
 
-  defp contract_results(dsex_row) do
+  defp contract_results(imp_row) do
     Map.new(contract_optimizers(), fn
-      "dsex_gepa" -> {"dsex_gepa", get_in(dsex_row, ["results", "dsex_gepa"])}
+      "imp_gepa" -> {"imp_gepa", get_in(imp_row, ["results", "imp_gepa"])}
       optimizer -> {optimizer, %{"score" => 0.5, "source" => "upstream runtime #{optimizer}"}}
     end)
   end
@@ -1207,7 +1207,7 @@ defmodule GepaCampaignTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path

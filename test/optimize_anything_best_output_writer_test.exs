@@ -1,8 +1,8 @@
-defmodule DSEx.Optimize.Anything.BestOutputWriterTest do
+defmodule Imp.Optimize.Anything.BestOutputWriterTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything.BestOutputWriter
-  alias DSEx.Optimizer.GEPA.Callback
+  alias Imp.Optimize.Anything.BestOutputWriter
+  alias Imp.Optimizer.GEPA.Callback
 
   test "writes seed outputs and only later strict improvements when tracking is enabled" do
     run_dir = temporary_directory("tracked")
@@ -50,7 +50,7 @@ defmodule DSEx.Optimize.Anything.BestOutputWriterTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-best-outputs-#{label}-#{System.unique_integer([:positive])}"
+        "imp-best-outputs-#{label}-#{System.unique_integer([:positive])}"
       )
 
     on_exit(fn -> File.rm_rf!(path) end)

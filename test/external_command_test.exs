@@ -1,25 +1,25 @@
-defmodule DSEx.ExternalCommandTest do
+defmodule Imp.ExternalCommandTest do
   use ExUnit.Case, async: false
 
   test "passes metacharacters as literal argv without a shell and redacts bounded output" do
-    marker = "dsex-shell-marker-#{System.unique_integer([:positive])}"
+    marker = "imp-shell-marker-#{System.unique_integer([:positive])}"
 
     literal = "value; touch #{marker}"
 
     assert {:ok, result} =
-             DSEx.ExternalCommand.run("printf", ["%s", literal], max_output_bytes: 100)
+             Imp.ExternalCommand.run("printf", ["%s", literal], max_output_bytes: 100)
 
     assert result.exit_status == 0
     assert result.output =~ "; touch #{marker}"
     refute File.exists?(marker)
 
     secret = "sk-local-command-secret-1234567890"
-    assert {:ok, redacted} = DSEx.ExternalCommand.run("printf", ["%s", secret])
+    assert {:ok, redacted} = Imp.ExternalCommand.run("printf", ["%s", secret])
     assert redacted.output == "[REDACTED]"
     refute redacted.output =~ secret
 
     assert {:ok, bounded} =
-             DSEx.ExternalCommand.run("python3", ["-c", "print('x ' * 500, end='')"],
+             Imp.ExternalCommand.run("python3", ["-c", "print('x ' * 500, end='')"],
                max_output_bytes: 64
              )
 
@@ -33,7 +33,7 @@ defmodule DSEx.ExternalCommandTest do
       "import subprocess,time; p=subprocess.Popen(['sleep','30']); print(p.pid, flush=True); time.sleep(30)"
 
     assert {:error, {:timeout, result}} =
-             DSEx.ExternalCommand.run("python3", ["-c", script],
+             Imp.ExternalCommand.run("python3", ["-c", script],
                timeout: 500,
                kill_grace_ms: 100
              )
@@ -45,7 +45,7 @@ defmodule DSEx.ExternalCommandTest do
 
   test "returns a structured nonzero result" do
     assert {:error, {:exit_status, 7, %{exit_status: 7, output: "failed"}}} =
-             DSEx.ExternalCommand.run("python3", [
+             Imp.ExternalCommand.run("python3", [
                "-c",
                "import sys; print('failed', end=''); sys.exit(7)"
              ])
@@ -54,24 +54,24 @@ defmodule DSEx.ExternalCommandTest do
   test "managed start refuses a missing OS process identity" do
     # Fast commands may exit before OTP exposes their PID. `run/3` still handles
     # that race, while the managed API must never claim a cleanup guarantee.
-    results = for _ <- 1..100, do: DSEx.ExternalCommand.start("true", [], timeout: 1_000)
+    results = for _ <- 1..100, do: Imp.ExternalCommand.start("true", [], timeout: 1_000)
 
     Enum.each(results, fn
       {:ok, handle} ->
         assert is_integer(handle.os_pid)
-        assert :ok = DSEx.ExternalCommand.stop(handle, 1_000)
+        assert :ok = Imp.ExternalCommand.stop(handle, 1_000)
 
       {:error, :command_os_pid_unavailable} ->
         :ok
     end)
 
-    assert {:ok, %{exit_status: 0}} = DSEx.ExternalCommand.run("true", [])
+    assert {:ok, %{exit_status: 0}} = Imp.ExternalCommand.run("true", [])
   end
 
   @tag timeout: 5_000
   test "managed stop is a synchronous process-group cleanup barrier" do
     root =
-      Path.join(System.tmp_dir!(), "dsex-managed-command-#{System.unique_integer([:positive])}")
+      Path.join(System.tmp_dir!(), "imp-managed-command-#{System.unique_integer([:positive])}")
 
     child_file = Path.join(root, "child.pid")
     File.rm_rf!(root)
@@ -87,7 +87,7 @@ defmodule DSEx.ExternalCommandTest do
     """
 
     assert {:ok, handle} =
-             DSEx.ExternalCommand.start("python3", ["-c", script, child_file],
+             Imp.ExternalCommand.start("python3", ["-c", script, child_file],
                timeout: :infinity,
                kill_grace_ms: 100
              )
@@ -95,14 +95,14 @@ defmodule DSEx.ExternalCommandTest do
     child_pid = await_pid_file!(child_file)
     assert process_alive?(handle.os_pid)
     assert process_alive?(child_pid)
-    assert :ok = DSEx.ExternalCommand.stop(handle, 2_000)
+    assert :ok = Imp.ExternalCommand.stop(handle, 2_000)
     refute process_alive?(handle.os_pid)
     refute process_alive?(child_pid)
   end
 
   @tag timeout: 5_000
   test "normal leader exit cleans descendants before run returns" do
-    root = Path.join(System.tmp_dir!(), "dsex-exit-command-#{System.unique_integer([:positive])}")
+    root = Path.join(System.tmp_dir!(), "imp-exit-command-#{System.unique_integer([:positive])}")
     child_file = Path.join(root, "child.pid")
     File.rm_rf!(root)
     File.mkdir_p!(root)
@@ -115,7 +115,7 @@ defmodule DSEx.ExternalCommandTest do
     """
 
     assert {:ok, %{exit_status: 0}} =
-             DSEx.ExternalCommand.run("python3", ["-c", script, child_file], kill_grace_ms: 100)
+             Imp.ExternalCommand.run("python3", ["-c", script, child_file], kill_grace_ms: 100)
 
     child_pid = child_file |> File.read!() |> String.to_integer()
     refute process_alive?(child_pid)

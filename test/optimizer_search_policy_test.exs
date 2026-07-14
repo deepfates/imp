@@ -1,8 +1,8 @@
-defmodule DSEx.Optimizer.SearchPolicyTest do
+defmodule Imp.Optimizer.SearchPolicyTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.SearchPolicy
-  alias DSEx.Optimizer.SearchPolicy.{CategoricalTPE, Sampling}
+  alias Imp.Optimizer.SearchPolicy
+  alias Imp.Optimizer.SearchPolicy.{CategoricalTPE, Sampling}
 
   test "categorical policy resumes the exact suggestion sequence from JSON" do
     policy =
@@ -62,9 +62,9 @@ defmodule DSEx.Optimizer.SearchPolicyTest do
   end
 
   test "MIPROv2 and SIMBA population expose restorable concrete policy state" do
-    population = DSEx.Optimizer.SIMBA.Population.new(:baseline, seed: 23)
-    population = DSEx.Optimizer.SIMBA.Population.register(population, :candidate, [1.0])
-    {_source, population} = DSEx.Optimizer.SIMBA.Population.select_source(population, 2, 0.2)
+    population = Imp.Optimizer.SIMBA.Population.new(:baseline, seed: 23)
+    population = Imp.Optimizer.SIMBA.Population.register(population, :candidate, [1.0])
+    {_source, population} = Imp.Optimizer.SIMBA.Population.select_source(population, 2, 0.2)
 
     checkpoint =
       population.policy |> SearchPolicy.dump() |> Jason.encode!() |> Jason.decode!()
@@ -74,7 +74,7 @@ defmodule DSEx.Optimizer.SearchPolicyTest do
     mipro =
       SearchPolicy.new(CategoricalTPE,
         space:
-          DSEx.Optimizer.MIPROv2.categorical_space(
+          Imp.Optimizer.MIPROv2.categorical_space(
             [%{name: :main}],
             %{main: ["base", "candidate"]},
             nil

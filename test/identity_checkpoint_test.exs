@@ -1,7 +1,7 @@
-defmodule DSEx.IdentityCheckpointTest do
+defmodule Imp.IdentityCheckpointTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.IdentityCheckpoint
+  alias Imp.IdentityCheckpoint
 
   @atlas_path Path.expand("../identity/atlas.json", __DIR__)
 

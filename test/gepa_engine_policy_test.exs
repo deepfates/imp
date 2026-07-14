@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.EnginePolicyTest do
+defmodule Imp.Optimizer.GEPA.EnginePolicyTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{
+  alias Imp.Optimizer.GEPA.{
     Adapter,
     Budget,
     CandidateSelector,
@@ -38,7 +38,7 @@ defmodule DSEx.Optimizer.GEPA.EnginePolicyTest do
   end
 
   defmodule RecordingCallback do
-    @behaviour DSEx.Optimizer.GEPA.Callback
+    @behaviour Imp.Optimizer.GEPA.Callback
 
     @impl true
     def on_evaluation_skipped(event, owner), do: send(owner, {:evaluation_skipped, event})

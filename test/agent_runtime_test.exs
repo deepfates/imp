@@ -1,12 +1,12 @@
 defmodule AgentRuntimeTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Agent
-  alias DSEx.Agent.Runtime
+  alias Imp.Agent
+  alias Imp.Agent.Runtime
 
   test "agent forwards typed inputs through tools and child agents with trace capture" do
     normalize =
-      DSEx.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+      Imp.Tool.new(:normalize, "normalize text", fn %{text: text} ->
         String.downcase(text)
       end)
 
@@ -44,20 +44,20 @@ defmodule AgentRuntimeTest do
   end
 
   test "tool constructor reports invalid definitions clearly" do
-    assert_raise ArgumentError, ~r/DSEx\.Tool names must be atoms or strings/, fn ->
-      DSEx.Tool.new(123, "bad", fn input -> input end)
+    assert_raise ArgumentError, ~r/Imp\.Tool names must be atoms or strings/, fn ->
+      Imp.Tool.new(123, "bad", fn input -> input end)
     end
 
-    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4 expects a unary function/, fn ->
-      DSEx.Tool.new(:bad, "bad", :not_a_function)
+    assert_raise ArgumentError, ~r/Imp\.Tool\.new\/4 expects a unary function/, fn ->
+      Imp.Tool.new(:bad, "bad", :not_a_function)
     end
 
-    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4.*expected keyword options/, fn ->
-      DSEx.Tool.new(:bad, "bad", fn input -> input end, :not_options)
+    assert_raise ArgumentError, ~r/Imp\.Tool\.new\/4.*expected keyword options/, fn ->
+      Imp.Tool.new(:bad, "bad", fn input -> input end, :not_options)
     end
 
-    assert_raise ArgumentError, ~r/DSEx\.Tool\.new\/4.*:schema.*expected.*map/s, fn ->
-      DSEx.Tool.new(:bad, "bad", fn input -> input end, schema: :not_a_schema)
+    assert_raise ArgumentError, ~r/Imp\.Tool\.new\/4.*:schema.*expected.*map/s, fn ->
+      Imp.Tool.new(:bad, "bad", fn input -> input end, schema: :not_a_schema)
     end
   end
 
@@ -67,40 +67,40 @@ defmodule AgentRuntimeTest do
 
     assert {:ok, [^child]} = Agent.validate_children([child])
     assert {:error, message} = Agent.validate_children([:not_an_agent])
-    assert message =~ "expected a list of DSEx.Agent structs"
+    assert message =~ "expected a list of Imp.Agent structs"
 
-    assert_raise ArgumentError, ~r/DSEx\.Agent names must be atoms or strings/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Agent names must be atoms or strings/, fn ->
       Agent.new(123, handler)
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3 expects an arity-2 or arity-3 handler/,
+                 ~r/Imp\.Agent\.new\/3 expects an arity-2 or arity-3 handler/,
                  fn ->
                    Agent.new(:bad, fn input -> input end)
                  end
 
-    assert_raise ArgumentError, ~r/DSEx\.Agent\.new\/3.*expected keyword options/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Agent\.new\/3.*expected keyword options/, fn ->
       Agent.new(:bad, handler, :not_options)
     end
 
-    assert_raise ArgumentError, ~r/DSEx\.Agent\.new\/3.*:input_schema.*expected.*map/s, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Agent\.new\/3.*:input_schema.*expected.*map/s, fn ->
       Agent.new(:bad, handler, input_schema: :not_schema)
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3: invalid value for :tools option: expected a list of DSEx\.Tool structs/,
+                 ~r/Imp\.Agent\.new\/3: invalid value for :tools option: expected a list of Imp\.Tool structs/,
                  fn ->
                    Agent.new(:bad, handler, tools: [:not_a_tool])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3: invalid value for :children option: expected a list of DSEx\.Agent structs/,
+                 ~r/Imp\.Agent\.new\/3: invalid value for :children option: expected a list of Imp\.Agent structs/,
                  fn ->
                    Agent.new(:bad, handler, children: [:not_an_agent])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.new\/3: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
+                 ~r/Imp\.Agent\.new\/3: invalid value for :tool_policy option: expected :allow, an atom\/string tool name, a list of tool names, or an arity-2 function/,
                  fn ->
                    Agent.new(:bad, handler, tool_policy: %{allow: [:lookup]})
                  end
@@ -124,24 +124,24 @@ defmodule AgentRuntimeTest do
   end
 
   test "runtime constructor reports invalid options clearly" do
-    assert_raise ArgumentError, ~r/DSEx\.Agent\.Runtime\.new\/1: expected keyword options/, fn ->
+    assert_raise ArgumentError, ~r/Imp\.Agent\.Runtime\.new\/1: expected keyword options/, fn ->
       Runtime.new(%{context: %{}})
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :context/,
+                 ~r/Imp\.Agent\.Runtime\.new\/1: invalid value for :context/,
                  fn ->
                    Runtime.new(context: [])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :event_sink option: expected nil or an arity-1 function/,
+                 ~r/Imp\.Agent\.Runtime\.new\/1: invalid value for :event_sink option: expected nil or an arity-1 function/,
                  fn ->
                    Runtime.new(event_sink: fn _event, _runtime -> :ok end)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Agent\.Runtime\.new\/1: invalid value for :redact_keys option: expected a list of atom or string key names/,
+                 ~r/Imp\.Agent\.Runtime\.new\/1: invalid value for :redact_keys option: expected a list of atom or string key names/,
                  fn ->
                    Runtime.new(redact_keys: [:api_key, 123])
                  end
@@ -149,7 +149,7 @@ defmodule AgentRuntimeTest do
 
   test "arity-3 handlers receive the agent without process dictionary self-reference" do
     normalize =
-      DSEx.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+      Imp.Tool.new(:normalize, "normalize text", fn %{text: text} ->
         String.downcase(text)
       end)
 
@@ -167,7 +167,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "tool policy can deny tool execution with a structured trace" do
-    boom = DSEx.Tool.new(:boom, "blocked", fn _ -> raise "should not run" end)
+    boom = Imp.Tool.new(:boom, "blocked", fn _ -> raise "should not run" end)
 
     agent =
       Agent.new(
@@ -184,7 +184,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "tool policy accepts string tool names consistently" do
-    tool = DSEx.Tool.new(:lookup, "lookup", fn _input -> "ok" end)
+    tool = Imp.Tool.new(:lookup, "lookup", fn _input -> "ok" end)
 
     agent =
       Agent.new(
@@ -198,7 +198,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "tool policy exceptions become structured agent errors" do
-    tool = DSEx.Tool.new(:lookup, "lookup", fn _input -> "should not run" end)
+    tool = Imp.Tool.new(:lookup, "lookup", fn _input -> "should not run" end)
 
     agent =
       Agent.new(
@@ -256,7 +256,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "output schema failures preserve traces accumulated by the handler" do
-    tool = DSEx.Tool.new(:normalize, "normalize", fn %{text: text} -> String.downcase(text) end)
+    tool = Imp.Tool.new(:normalize, "normalize", fn %{text: text} -> String.downcase(text) end)
 
     agent =
       Agent.new(
@@ -323,7 +323,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "runtime redacts sensitive trace keys" do
-    echo = DSEx.Tool.new(:echo, "echo", fn input -> input end)
+    echo = Imp.Tool.new(:echo, "echo", fn input -> input end)
 
     agent =
       Agent.new(
@@ -369,7 +369,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "runtime redacts secret-shaped values under unexpected keys" do
-    echo = DSEx.Tool.new(:echo, "echo", fn input -> input end)
+    echo = Imp.Tool.new(:echo, "echo", fn input -> input end)
 
     agent =
       Agent.new(
@@ -404,7 +404,7 @@ defmodule AgentRuntimeTest do
   end
 
   test "agent returns structured failures for tools children and schemas" do
-    boom = DSEx.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
+    boom = Imp.Tool.new(:boom, "raises", fn _ -> raise "nope" end)
 
     agent =
       Agent.new(
@@ -439,7 +439,7 @@ defmodule AgentRuntimeTest do
 
   test "agent stream_events emits trace events before final output" do
     normalize =
-      DSEx.Tool.new(:normalize, "normalize text", fn %{text: text} ->
+      Imp.Tool.new(:normalize, "normalize text", fn %{text: text} ->
         String.downcase(text)
       end)
 

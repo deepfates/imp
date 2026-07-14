@@ -1,8 +1,8 @@
-defmodule DSEx.Tracking.WandBClientTest do
+defmodule Imp.Tracking.WandBClientTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Tracking.WandB
-  alias DSEx.Tracking.WandB.Backend
+  alias Imp.Tracking.WandB
+  alias Imp.Tracking.WandB.Backend
 
   defp transport(test_pid, opts \\ []) do
     inserted = Keyword.get(opts, :inserted, true)

@@ -1,10 +1,10 @@
-defmodule DSEx.BenchmarkTruth.HoverMultiHopTest do
+defmodule Imp.BenchmarkTruth.HoverMultiHopTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.HoverMultiHop
-  alias DSEx.Module
-  alias DSEx.Optimizer.Trace
-  alias DSEx.Prediction
+  alias Imp.BenchmarkTruth.HoverMultiHop
+  alias Imp.Module
+  alias Imp.Optimizer.Trace
+  alias Imp.Prediction
 
   test "executes the source three-hop graph with limits 7, 7, and 10" do
     owner = self()
@@ -15,7 +15,7 @@ defmodule DSEx.BenchmarkTruth.HoverMultiHopTest do
     end
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -55,23 +55,23 @@ defmodule DSEx.BenchmarkTruth.HoverMultiHopTest do
   end
 
   test "exposes four independently optimizable ChainOfThought predictors" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, []} end)
 
-    assert Enum.map(DSEx.ProgramParameters.predictors(program), & &1.name) == [
+    assert Enum.map(Imp.ProgramParameters.predictors(program), & &1.name) == [
              :summarize1,
              :create_query_hop2,
              :summarize2,
              :create_query_hop3
            ]
 
-    updated = DSEx.ProgramParameters.put_instruction(program, :create_query_hop3, "Bridge again.")
+    updated = Imp.ProgramParameters.put_instruction(program, :create_query_hop3, "Bridge again.")
     assert updated.create_query_hop3.predict.signature.instructions == "Bridge again."
     refute updated.create_query_hop2.predict.signature.instructions == "Bridge again."
   end
 
   test "returns a structured stage error for malformed retrieval passages" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, [%{rank: 1}]} end)
 
     assert {:error, {:hover_multi_hop_failed, :hop1, {:invalid_hover_passage, %{rank: 1}}}} =

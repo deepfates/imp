@@ -1,7 +1,7 @@
-defmodule DSEx.Predict.RLM.InterpreterTest do
+defmodule Imp.Predict.RLM.InterpreterTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Predict.RLM.Interpreter
+  alias Imp.Predict.RLM.Interpreter
 
   test "assignments persist across executions" do
     interpreter = Interpreter.new(%{seed: 2}, %{}, nil)

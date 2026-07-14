@@ -1,13 +1,13 @@
-defmodule DSEx.Optimizer.ArtifactTest do
+defmodule Imp.Optimizer.ArtifactTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.{Artifact, GEPA.EvaluationCache.Codec, Report}
+  alias Imp.Optimizer.{Artifact, GEPA.EvaluationCache.Codec, Report}
 
   setup do
     path =
       Path.join(
         System.tmp_dir!(),
-        "dsex-optimizer-artifact-#{System.unique_integer([:positive])}.json"
+        "imp-optimizer-artifact-#{System.unique_integer([:positive])}.json"
       )
 
     on_exit(fn -> File.rm(path) end)
@@ -51,9 +51,9 @@ defmodule DSEx.Optimizer.ArtifactTest do
            } = Artifact.compare(loaded, "baseline", "candidate-1")
 
     applied = Artifact.apply(loaded, live, "candidate-1")
-    [predictor] = DSEx.ProgramParameters.predictors(applied)
+    [predictor] = Imp.ProgramParameters.predictors(applied)
     assert predictor.predictor.signature.instructions == "improved"
-    assert [%DSEx.Example{}] = predictor.predictor.demos
+    assert [%Imp.Example{}] = predictor.predictor.demos
     assert predictor.predictor.lm == live.predict.lm
     assert predictor.predictor.adapter == live.predict.adapter
 
@@ -101,8 +101,8 @@ defmodule DSEx.Optimizer.ArtifactTest do
 
   test "registry-backed callbacks are names, never serialized functions" do
     metric = fn _example, _prediction -> true end
-    registry = DSEx.Saving.Registry.new(always_pass: metric)
-    program = DSEx.Predict.BestOfN.new(optimized("rank"), metric, n: 1)
+    registry = Imp.Saving.Registry.new(always_pass: metric)
+    program = Imp.Predict.BestOfN.new(optimized("rank"), metric, n: 1)
 
     candidate = Artifact.candidate("ranked", program, registry: registry)
     artifact = Artifact.new(candidate)
@@ -111,7 +111,7 @@ defmodule DSEx.Optimizer.ArtifactTest do
     assert encoded =~ "always_pass"
     refute encoded =~ "#Function"
 
-    assert %DSEx.Predict.BestOfN{} =
+    assert %Imp.Predict.BestOfN{} =
              Artifact.apply(artifact, program, :champion, registry: registry)
 
     assert_raise ArgumentError, ~r/not present in the supplied saving registry/, fn ->
@@ -141,7 +141,7 @@ defmodule DSEx.Optimizer.ArtifactTest do
 
     assert_raise ArgumentError, ~r/no preserved champion/, fn -> Artifact.rollback(artifact) end
 
-    incompatible = DSEx.chain_of_thought("question -> answer, confidence: float")
+    incompatible = Imp.chain_of_thought("question -> answer, confidence: float")
 
     assert_raise ArgumentError, ~r/incompatible signature/, fn ->
       Artifact.apply(artifact, incompatible)
@@ -158,7 +158,7 @@ defmodule DSEx.Optimizer.ArtifactTest do
     }
 
     legacy = %{
-      "artifact_type" => "dsex_optimizer_artifact",
+      "artifact_type" => "imp_optimizer_artifact",
       "schema_version" => 1,
       "payload_sha256" => Codec.checksum(payload),
       "payload" => payload
@@ -173,12 +173,12 @@ defmodule DSEx.Optimizer.ArtifactTest do
     artifact = Artifact.new(Artifact.candidate("base", optimized("base")))
 
     assert_raise ArgumentError, ~r/predictor set is incompatible/, fn ->
-      Artifact.apply(artifact, %DSEx.Optimizer.Ensemble.Program{programs: []})
+      Artifact.apply(artifact, %Imp.Optimizer.Ensemble.Program{programs: []})
     end
 
     ensemble =
-      DSEx.Optimizer.Ensemble.new(deterministic: true)
-      |> DSEx.Optimizer.Ensemble.compile([optimized("nested")])
+      Imp.Optimizer.Ensemble.new(deterministic: true)
+      |> Imp.Optimizer.Ensemble.compile([optimized("nested")])
 
     assert_raise ArgumentError, ~r/expose at least one named predictor/, fn ->
       Artifact.candidate("no-lens", ensemble)
@@ -186,21 +186,21 @@ defmodule DSEx.Optimizer.ArtifactTest do
   end
 
   defp optimized(instruction) do
-    demo = DSEx.example(question: "known", answer: "known") |> DSEx.with_inputs(:question)
+    demo = Imp.example(question: "known", answer: "known") |> Imp.with_inputs(:question)
 
-    DSEx.chain_of_thought("question -> answer")
-    |> DSEx.ProgramParameters.put_instruction(:main, instruction)
-    |> DSEx.ProgramParameters.put_demos(:main, [demo])
+    Imp.chain_of_thought("question -> answer")
+    |> Imp.ProgramParameters.put_instruction(:main, instruction)
+    |> Imp.ProgramParameters.put_demos(:main, [demo])
   end
 
   defp runtime_program(instruction, answer, opts) do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: answer} end, api_key: opts[:api_key]]
     }
 
-    DSEx.chain_of_thought("question -> answer")
-    |> DSEx.ProgramParameters.put_instruction(:main, instruction)
-    |> DSEx.with_lm(lm)
+    Imp.chain_of_thought("question -> answer")
+    |> Imp.ProgramParameters.put_instruction(:main, instruction)
+    |> Imp.with_lm(lm)
   end
 end

@@ -1,12 +1,12 @@
-defmodule DSEx.GEPAFamilyProgramFidelityTest do
+defmodule Imp.GEPAFamilyProgramFidelityTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapter.Chat
-  alias DSEx.Optimizer.GEPA.{Candidate, Evaluation, ProgramAdapter}
-  alias DSEx.Predict.{ChainOfThought, Predict}
-  alias DSEx.Prediction
-  alias DSEx.ProgramParameters
-  alias DSEx.Signature
+  alias Imp.Adapter.Chat
+  alias Imp.Optimizer.GEPA.{Candidate, Evaluation, ProgramAdapter}
+  alias Imp.Predict.{ChainOfThought, Predict}
+  alias Imp.Prediction
+  alias Imp.ProgramParameters
+  alias Imp.Signature
 
   @families [
     %{
@@ -27,9 +27,9 @@ defmodule DSEx.GEPAFamilyProgramFidelityTest do
     lm = static_lm(fn _messages -> %{answer: "42"} end)
 
     for family <- @families do
-      signature = DSEx.signature(family.signature, family.instruction)
-      plain = DSEx.predict(signature, lm: lm, adapter: Chat)
-      cot = DSEx.chain_of_thought(signature, lm: lm, adapter: Chat)
+      signature = Imp.signature(family.signature, family.instruction)
+      plain = Imp.predict(signature, lm: lm, adapter: Chat)
+      cot = Imp.chain_of_thought(signature, lm: lm, adapter: Chat)
 
       assert Signature.output_names(plain.signature) == [:answer]
       assert Signature.output_names(cot.predict.signature) == [:reasoning, :answer]
@@ -66,8 +66,8 @@ defmodule DSEx.GEPAFamilyProgramFidelityTest do
     for family <- @families do
       program =
         family.signature
-        |> DSEx.signature(family.instruction)
-        |> DSEx.chain_of_thought(lm: lm, adapter: Chat)
+        |> Imp.signature(family.instruction)
+        |> Imp.chain_of_thought(lm: lm, adapter: Chat)
 
       assert [%{name: :main, predictor: predictor}] = ProgramParameters.predictors(program)
       assert predictor.signature.instructions == family.instruction
@@ -82,8 +82,8 @@ defmodule DSEx.GEPAFamilyProgramFidelityTest do
       example =
         family.inputs
         |> Map.put(:answer, "42")
-        |> DSEx.Example.new()
-        |> DSEx.Example.with_inputs(Map.keys(family.inputs))
+        |> Imp.Example.new()
+        |> Imp.Example.with_inputs(Map.keys(family.inputs))
 
       metric = fn _example, prediction ->
         if Prediction.get(prediction, :answer) == "42", do: 1.0, else: 0.0
@@ -114,7 +114,7 @@ defmodule DSEx.GEPAFamilyProgramFidelityTest do
 
   defp static_lm(handler) do
     %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn messages, _opts -> handler.(messages) end]
     }
   end

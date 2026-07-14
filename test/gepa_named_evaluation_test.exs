@@ -1,8 +1,8 @@
-defmodule DSEx.Optimizer.GEPANamedEvaluationTest do
+defmodule Imp.Optimizer.GEPANamedEvaluationTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Adapter, Candidate, Evaluation, Result}
-  alias DSEx.Optimizer.Trajectory
+  alias Imp.Optimizer.GEPA.{Adapter, Candidate, Evaluation, Result}
+  alias Imp.Optimizer.Trajectory
 
   defmodule FakeAdapter do
     defstruct []
@@ -118,8 +118,8 @@ defmodule DSEx.Optimizer.GEPANamedEvaluationTest do
 
   test "bridges complete candidate maps through ProgramParameters" do
     program = %TwoStage{
-      prepare: DSEx.predict("input -> normalized"),
-      answer: DSEx.predict("normalized -> answer")
+      prepare: Imp.predict("input -> normalized"),
+      answer: Imp.predict("normalized -> answer")
     }
 
     candidate = %{prepare: "Trim whitespace.", answer: "Use uppercase."}

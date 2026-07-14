@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.MIPROv2.ResumeTest do
+defmodule Imp.Optimizer.MIPROv2.ResumeTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Optimizer.{MIPROv2, Report}
+  alias Imp.Optimizer.{MIPROv2, Report}
 
   setup do
     state = start_supervised!({Agent, fn -> %{proposal_calls: 0, checkpoints: []} end})
@@ -82,7 +82,7 @@ defmodule DSEx.Optimizer.MIPROv2.ResumeTest do
       |> Jason.decode!()
 
     changed_valset = [
-      DSEx.example(question: "different", answer: "yes") |> DSEx.with_inputs(:question)
+      Imp.example(question: "different", answer: "yes") |> Imp.with_inputs(:question)
     ]
 
     assert_raise ArgumentError,
@@ -144,18 +144,18 @@ defmodule DSEx.Optimizer.MIPROv2.ResumeTest do
   defp captured_metric(state) do
     fn example, prediction ->
       _ = Agent.get(state, & &1.proposal_calls)
-      DSEx.Metrics.exact_match(:answer).(example, prediction)
+      Imp.Metrics.exact_match(:answer).(example, prediction)
     end
   end
 
   defp fixture(state) do
     task_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "yes"} end]
     }
 
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           Agent.update(
@@ -168,20 +168,20 @@ defmodule DSEx.Optimizer.MIPROv2.ResumeTest do
       ]
     }
 
-    program = DSEx.predict("question -> answer", lm: task_lm)
+    program = Imp.predict("question -> answer", lm: task_lm)
 
     trainset =
       for index <- 1..3 do
-        DSEx.example(question: "train #{index}", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "train #{index}", answer: "yes") |> Imp.with_inputs(:question)
       end
 
     valset =
       for index <- 1..2 do
-        DSEx.example(question: "val #{index}", answer: "yes") |> DSEx.with_inputs(:question)
+        Imp.example(question: "val #{index}", answer: "yes") |> Imp.with_inputs(:question)
       end
 
     optimizer =
-      MIPROv2.new(DSEx.Metrics.exact_match(:answer),
+      MIPROv2.new(Imp.Metrics.exact_match(:answer),
         auto: nil,
         num_candidates: 3,
         num_trials: 6,

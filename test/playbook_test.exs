@@ -1,10 +1,10 @@
-defmodule DSEx.PlaybookTest do
+defmodule Imp.PlaybookTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias DSEx.Playbook
-  alias DSEx.Playbook.{Delta, Entry, Policy, Provenance}
-  alias DSEx.Playbook.Operation.{Add, Merge, Remove, Revise, UpdateCounters}
+  alias Imp.Playbook
+  alias Imp.Playbook.{Delta, Entry, Policy, Provenance}
+  alias Imp.Playbook.Operation.{Add, Merge, Remove, Revise, UpdateCounters}
 
   test "add and revise retain identity and form both hash chains" do
     root = Playbook.new(id: "pb_test")
@@ -316,7 +316,7 @@ defmodule DSEx.PlaybookTest do
       normalized = Entry.normalize(content)
       assert Entry.normalize(normalized) == normalized
 
-      if normalized != "" and DSEx.Redaction.redact(normalized) == normalized do
+      if normalized != "" and Imp.Redaction.redact(normalized) == normalized do
         assert Entry.new(content).hash == Entry.new(normalized).hash
       end
     end

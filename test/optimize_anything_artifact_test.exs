@@ -3,8 +3,8 @@ defmodule OptimizeAnythingArtifactTest do
 
   import ExUnit.CaptureIO
 
-  alias DSEx.BenchmarkTruth.OptimizeAnything.Artifact
-  alias Mix.Tasks.Dsex.Benchmark.OptimizeAnything, as: OptimizeAnythingTask
+  alias Imp.BenchmarkTruth.OptimizeAnything.Artifact
+  alias Mix.Tasks.Imp.Benchmark.OptimizeAnything, as: OptimizeAnythingTask
 
   test "complete live rows authorize Optimize Anything effectiveness evidence" do
     validation = Artifact.validate_rows(full_rows())
@@ -102,7 +102,7 @@ defmodule OptimizeAnythingArtifactTest do
 
     output =
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.optimize_anything")
+        Mix.Task.reenable("imp.benchmark.optimize_anything")
         OptimizeAnythingTask.run(["--smoke", "--out", out_dir])
       end)
 
@@ -126,7 +126,7 @@ defmodule OptimizeAnythingArtifactTest do
     File.write!(input, Jason.encode!(full_rows()))
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.optimize_anything")
+      Mix.Task.reenable("imp.benchmark.optimize_anything")
       OptimizeAnythingTask.run(["--input", input, "--out", out_dir])
     end)
 
@@ -174,7 +174,7 @@ defmodule OptimizeAnythingArtifactTest do
         "dataset_source" => "fixtures/optimize_anything/#{artifact_class}.jsonl",
         "environment" => "Elixir 1.19 / OTP 28",
         "source_commits" => %{
-          "dsex" => String.duplicate("a", 40),
+          "imp" => String.duplicate("a", 40),
           "gepa" => String.duplicate("b", 40)
         },
         "runs" => [
@@ -202,7 +202,7 @@ defmodule OptimizeAnythingArtifactTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)
     path

@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.MIPROv2.ConfigTest do
+defmodule Imp.Optimizer.MIPROv2.ConfigTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.MIPROv2.Config
+  alias Imp.Optimizer.MIPROv2.Config
 
   test "light auto settings derive candidates, trials, and minibatching" do
     resolved = Config.new() |> Config.resolve(2, Enum.to_list(1..120), Enum.to_list(1..80))

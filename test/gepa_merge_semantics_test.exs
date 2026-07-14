@@ -1,7 +1,7 @@
-defmodule DSEx.Optimizer.GEPA.MergeSemanticsTest do
+defmodule Imp.Optimizer.GEPA.MergeSemanticsTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.Merge
+  alias Imp.Optimizer.GEPA.Merge
 
   @ancestor %{planner: "base planner", writer: "base writer", critic: "base critic"}
   @left %{planner: "left planner", writer: "base writer", critic: "left critic"}

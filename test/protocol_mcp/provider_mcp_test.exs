@@ -5,13 +5,13 @@ defmodule ProtocolMCPProviderTest do
 
   test "protocol MCP gate exercises JSON-RPC HTTP and Streamable HTTP clients" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :mcp, :http, :start],
-        [:dsex, :mcp, :streamable_http, :start]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :mcp, :http, :start],
+        [:imp, :mcp, :streamable_http, :start]
       ])
 
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.headers["mcp-protocol-version"] == "2025-03-26"
 
@@ -50,30 +50,30 @@ defmodule ProtocolMCPProviderTest do
 
     [http_tool] =
       base_url
-      |> then(&DSEx.MCP.HTTPClient.new(&1 <> "/mcp-http"))
-      |> DSEx.MCP.import_tools()
+      |> then(&Imp.MCP.HTTPClient.new(&1 <> "/mcp-http"))
+      |> Imp.MCP.import_tools()
 
     assert http_tool.name == :lookup_http
-    assert DSEx.Tool.call(http_tool, %{"key" => "capital"}) == "Paris"
+    assert Imp.Tool.call(http_tool, %{"key" => "capital"}) == "Paris"
 
     [stream_tool] =
       base_url
       |> then(
-        &DSEx.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream", session_id: "session-live-mcp")
+        &Imp.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream", session_id: "session-live-mcp")
       )
-      |> DSEx.MCP.import_tools()
+      |> Imp.MCP.import_tools()
 
     assert stream_tool.name == :lookup_stream
-    assert DSEx.Tool.call(stream_tool, %{"key" => "runtime"}) == "BEAM"
+    assert Imp.Tool.call(stream_tool, %{"key" => "runtime"}) == "BEAM"
 
-    assert_received {^ref, [:dsex, :mcp, :http, :start], _, %{method: "initialize"}}
+    assert_received {^ref, [:imp, :mcp, :http, :start], _, %{method: "initialize"}}
 
-    assert_received {^ref, [:dsex, :mcp, :streamable_http, :start], _, %{method: "initialize"}}
+    assert_received {^ref, [:imp, :mcp, :streamable_http, :start], _, %{method: "initialize"}}
   end
 
   test "protocol MCP gate exercises trusted stdio client" do
     script =
-      Path.join(System.tmp_dir!(), "dsex-live-mcp-#{System.unique_integer([:positive])}.exs")
+      Path.join(System.tmp_dir!(), "imp-live-mcp-#{System.unique_integer([:positive])}.exs")
 
     File.write!(script, """
     Enum.each(IO.stream(:stdio, :line), fn line ->
@@ -122,11 +122,11 @@ defmodule ProtocolMCPProviderTest do
 
     [tool] =
       System.find_executable("mix")
-      |> DSEx.MCP.StdioClient.new(args: ["run", script], timeout: 15_000)
-      |> DSEx.MCP.import_tools()
+      |> Imp.MCP.StdioClient.new(args: ["run", script], timeout: 15_000)
+      |> Imp.MCP.import_tools()
 
     assert tool.name == :echo_stdio
-    assert DSEx.Tool.call(tool, %{"text" => "trusted"}) == "trusted"
+    assert Imp.Tool.call(tool, %{"text" => "trusted"}) == "trusted"
   end
 
   defp tools_response(id, name) do

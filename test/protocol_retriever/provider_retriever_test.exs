@@ -5,13 +5,13 @@ defmodule ProtocolRetrieverProviderTest do
 
   test "protocol retriever gate exercises Weaviate-compatible HTTP retrieval" do
     ref =
-      DSEx.Test.TelemetryHelpers.attach([
-        [:dsex, :retriever, :start],
-        [:dsex, :retriever, :stop]
+      Imp.Test.TelemetryHelpers.attach([
+        [:imp, :retriever, :start],
+        [:imp, :retriever, :stop]
       ])
 
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.path == "/v1/graphql"
 
@@ -36,23 +36,23 @@ defmodule ProtocolRetrieverProviderTest do
          }}
       end)
 
-    retriever = DSEx.Retrievers.Weaviate.new(base_url, "Passage")
+    retriever = Imp.Retrievers.Weaviate.new(base_url, "Passage")
 
     assert {:ok, [%{text: "Paris is the capital of France.", score: 0.91, metadata: metadata}]} =
-             DSEx.Retrieve.retrieve(retriever, "capital France", k: 2)
+             Imp.Retrieve.retrieve(retriever, "capital France", k: 2)
 
     assert metadata["id"] == "p-live"
-    assert_received {^ref, [:dsex, :retriever, :start], _, start_metadata}
-    assert start_metadata.retriever == DSEx.Retrievers.HTTP
+    assert_received {^ref, [:imp, :retriever, :start], _, start_metadata}
+    assert start_metadata.retriever == Imp.Retrievers.HTTP
     assert start_metadata.method == :post
     refute Map.has_key?(start_metadata, :query)
-    assert_received {^ref, [:dsex, :retriever, :stop], %{duration: duration}, %{result: :ok}}
+    assert_received {^ref, [:imp, :retriever, :stop], %{duration: duration}, %{result: :ok}}
     assert is_integer(duration)
   end
 
   test "protocol retriever gate exercises Databricks-compatible vector-search retrieval" do
     base_url =
-      DSEx.Test.LocalHTTP.start(fn request ->
+      Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
         assert request.path == "/api/2.0/vector-search/indexes/catalog.schema.index/query"
         assert request.headers["authorization"] == "Bearer dbc-live-retriever-test"
@@ -70,14 +70,14 @@ defmodule ProtocolRetrieverProviderTest do
       end)
 
     retriever =
-      DSEx.Retrievers.Databricks.new(
+      Imp.Retrievers.Databricks.new(
         base_url <> "/api/2.0/vector-search/indexes/catalog.schema.index/query",
         token: "dbc-live-retriever-test",
         columns: ["text", "score", "doc_id"]
       )
 
     assert {:ok, [%{text: "OTP supervision is explicit.", score: 0.87, metadata: metadata}]} =
-             DSEx.Retrieve.retrieve(retriever, "beam otp", k: 1)
+             Imp.Retrieve.retrieve(retriever, "beam otp", k: 1)
 
     assert metadata["doc_id"] == "d-live"
   end

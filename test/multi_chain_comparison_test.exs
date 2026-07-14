@@ -6,7 +6,7 @@ defmodule MultiChainComparisonTest do
     program = comparison(parent)
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{
+             Imp.call(program, %{
                question: "choose",
                completions: [
                  %{
@@ -17,7 +17,7 @@ defmodule MultiChainComparisonTest do
                ]
              })
 
-    assert DSEx.get(prediction, :answer) == "alpha"
+    assert Imp.get(prediction, :answer) == "alpha"
     assert_received {:lm_call, messages, _opts}
 
     prompt = messages |> Enum.map(&Map.get(&1, :content, "")) |> Enum.join("\n")
@@ -31,12 +31,12 @@ defmodule MultiChainComparisonTest do
   test "uses temperature 0.7 by default and preserves an explicit config value" do
     parent = self()
 
-    assert {:ok, _prediction} = DSEx.call(comparison(parent), comparison_inputs())
+    assert {:ok, _prediction} = Imp.call(comparison(parent), comparison_inputs())
     assert_received {:lm_call, _messages, default_opts}
     assert default_opts[:temperature] == 0.7
 
     assert {:ok, _prediction} =
-             DSEx.call(comparison(parent, config: [temperature: 0.2]), comparison_inputs())
+             Imp.call(comparison(parent, config: [temperature: 0.2]), comparison_inputs())
 
     assert_received {:lm_call, _messages, explicit_opts}
     assert explicit_opts[:temperature] == 0.2
@@ -46,7 +46,7 @@ defmodule MultiChainComparisonTest do
     parent = self()
 
     assert {:ok, _prediction} =
-             DSEx.call(comparison(parent), %{
+             Imp.call(comparison(parent), %{
                question: "choose",
                completions: [nil, %{reasoning: %{step: 1}, answer: [{:alpha}]}]
              })
@@ -60,7 +60,7 @@ defmodule MultiChainComparisonTest do
 
   defp comparison(parent, opts \\ []) do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, lm_opts ->
           send(parent, {:lm_call, messages, lm_opts})
@@ -69,7 +69,7 @@ defmodule MultiChainComparisonTest do
       ]
     }
 
-    DSEx.multi_chain_comparison("question -> answer", Keyword.merge([lm: lm, m: 2], opts))
+    Imp.multi_chain_comparison("question -> answer", Keyword.merge([lm: lm, m: 2], opts))
   end
 
   defp comparison_inputs do

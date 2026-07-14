@@ -13,11 +13,11 @@ defmodule GepaMergeTaskTest do
       |> Enum.map(fn {family, index} -> write_chunk!(root, family, index) end)
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_merge")
-      Mix.Tasks.Dsex.Benchmark.GepaMerge.run(paths ++ ["--out", out])
+      Mix.Task.reenable("imp.benchmark.gepa_merge")
+      Mix.Tasks.Imp.Benchmark.GepaMerge.run(paths ++ ["--out", out])
     end)
 
-    [path] = Path.wildcard(Path.join(out, "dsex-gepa-merged-*.json"))
+    [path] = Path.wildcard(Path.join(out, "imp-gepa-merged-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
 
     assert artifact["summary"]["partial"] == false
@@ -32,8 +32,8 @@ defmodule GepaMergeTaskTest do
     duplicate = write_chunk!(root, "AIMEBench", 1)
 
     assert_raise Mix.Error, ~r/duplicate GEPA families: AIMEBench/, fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_merge")
-      Mix.Tasks.Dsex.Benchmark.GepaMerge.run([aime, duplicate])
+      Mix.Task.reenable("imp.benchmark.gepa_merge")
+      Mix.Tasks.Imp.Benchmark.GepaMerge.run([aime, duplicate])
     end
   end
 
@@ -54,8 +54,8 @@ defmodule GepaMergeTaskTest do
     )
 
     assert_raise Mix.Error, ~r/canonical campaign contract|summary disagrees/, fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_merge")
-      Mix.Tasks.Dsex.Benchmark.GepaMerge.run([first | rest])
+      Mix.Task.reenable("imp.benchmark.gepa_merge")
+      Mix.Tasks.Imp.Benchmark.GepaMerge.run([first | rest])
     end
 
     File.write!(
@@ -66,8 +66,8 @@ defmodule GepaMergeTaskTest do
     )
 
     assert_raise Mix.Error, ~r/canonical campaign contract|summary disagrees/, fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_merge")
-      Mix.Tasks.Dsex.Benchmark.GepaMerge.run([first | rest])
+      Mix.Task.reenable("imp.benchmark.gepa_merge")
+      Mix.Tasks.Imp.Benchmark.GepaMerge.run([first | rest])
     end
   end
 
@@ -80,7 +80,7 @@ defmodule GepaMergeTaskTest do
     }
 
     source_commits = %{
-      "dsex" => "dsex@abc",
+      "imp" => "imp@abc",
       "dspy" => "dspy@abc",
       "gepa_artifact" => "gepa@abc"
     }
@@ -102,7 +102,7 @@ defmodule GepaMergeTaskTest do
 
     chunk = %{
       "schema_version" => 1,
-      "runner" => "dsex-gepa-campaign",
+      "runner" => "imp-gepa-campaign",
       "generated_at" => "2026-07-13T00:00:00Z",
       "git_sha" => "abcdef1",
       "summary" => %{
@@ -140,10 +140,10 @@ defmodule GepaMergeTaskTest do
     path
   end
 
-  defp required_families, do: DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+  defp required_families, do: Imp.BenchmarkTruth.GepaReplicationContract.required_families()
 
   defp tmp_dir do
-    path = Path.join(System.tmp_dir!(), "dsex-gepa-merge-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-gepa-merge-#{System.unique_integer([:positive])}")
     File.mkdir_p!(path)
     path
   end

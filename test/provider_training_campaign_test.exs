@@ -1,7 +1,7 @@
-defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
+defmodule Imp.BenchmarkTruth.ProviderTrainingCampaignTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.ProviderTrainingCampaign
+  alias Imp.BenchmarkTruth.ProviderTrainingCampaign
 
   test "the pinned dataset verifies its split and payload digests" do
     dataset =
@@ -17,7 +17,7 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
 
   test "training and held-out inference share the chat representation" do
     signature =
-      DSEx.signature(
+      Imp.signature(
         %{
           inputs: [%{name: :utterance, type: :string}],
           outputs: [
@@ -28,8 +28,8 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
       )
 
     example =
-      DSEx.example(utterance: "I do not recognize this payment", route: "R42")
-      |> DSEx.with_inputs(:utterance)
+      Imp.example(utterance: "I do not recognize this payment", route: "R42")
+      |> Imp.with_inputs(:utterance)
 
     messages = ProviderTrainingCampaign.training_messages(signature, example)
     assistant = Enum.find(messages, &(&1.role == :assistant))
@@ -37,41 +37,41 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
     assert List.last(messages).role == :assistant
     assert assistant.content =~ "[[ ## route ## ]]\nR42"
 
-    assert {:ok, prediction} = DSEx.Adapter.Chat.parse(signature, assistant.content, [])
-    assert DSEx.get(prediction, :route) == "R42"
+    assert {:ok, prediction} = Imp.Adapter.Chat.parse(signature, assistant.content, [])
+    assert Imp.get(prediction, :route) == "R42"
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> assistant.content end]
     }
 
     program = ProviderTrainingCampaign.evaluation_program(signature, lm)
 
-    assert program.adapter == DSEx.Adapter.Chat
+    assert program.adapter == Imp.Adapter.Chat
 
     assert {:ok, prediction} =
-             DSEx.call(program, %{utterance: "I do not recognize this payment"})
+             Imp.call(program, %{utterance: "I do not recognize this payment"})
 
-    assert DSEx.get(prediction, :route) == "R42"
+    assert Imp.get(prediction, :route) == "R42"
   end
 
   test "portable provider program requires an identical freshly credentialed deployment LM" do
-    runtime_lm = DSEx.req_llm("openai:ft:gpt-test", api_key: "fresh-secret", temperature: 0)
+    runtime_lm = Imp.req_llm("openai:ft:gpt-test", api_key: "fresh-secret", temperature: 0)
 
     loaded =
-      DSEx.predict("question -> answer", lm: runtime_lm)
-      |> DSEx.Saving.dump()
-      |> DSEx.Saving.load()
+      Imp.predict("question -> answer", lm: runtime_lm)
+      |> Imp.Saving.dump()
+      |> Imp.Saving.load()
 
-    refute Keyword.has_key?(DSEx.ProgramAccess.lm(loaded).opts, :api_key)
+    refute Keyword.has_key?(Imp.ProgramAccess.lm(loaded).opts, :api_key)
 
     restored = ProviderTrainingCampaign.restore_runtime_credentials!(loaded, runtime_lm)
-    assert DSEx.ProgramAccess.lm(restored) == runtime_lm
+    assert Imp.ProgramAccess.lm(restored) == runtime_lm
 
     assert_raise RuntimeError, ~r/changed its credential-free deployment LM/, fn ->
       ProviderTrainingCampaign.restore_runtime_credentials!(
         loaded,
-        DSEx.req_llm("openai:ft:other", api_key: "fresh-secret", temperature: 0)
+        Imp.req_llm("openai:ft:other", api_key: "fresh-secret", temperature: 0)
       )
     end
   end
@@ -105,7 +105,7 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
     acceptance = ProviderTrainingCampaign.acceptance(baseline, trained, trained)
 
     payload = %{
-      "artifact_type" => "dsex_paid_provider_training_campaign",
+      "artifact_type" => "imp_paid_provider_training_campaign",
       "schema_version" => 3,
       "status" => "complete",
       "provider" => "openai",
@@ -185,21 +185,21 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
       "acceptance" => acceptance
     }
 
-    DSEx.BenchmarkTruth.RunContext.new!(
-      source_commits: %{"dsex" => "deepfates/dsex@test"},
+    Imp.BenchmarkTruth.RunContext.new!(
+      source_commits: %{"imp" => "deepfates/imp@test"},
       workspace_state: "clean"
     )
-    |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+    |> Imp.BenchmarkTruth.RunContext.finish(payload)
   end
 
   defp reenvelope(artifact, mutate) do
     payload = artifact |> Map.drop(["generated_at", "git_sha", "run_context"]) |> mutate.()
 
-    DSEx.BenchmarkTruth.RunContext.new!(
-      source_commits: %{"dsex" => "deepfates/dsex@test"},
+    Imp.BenchmarkTruth.RunContext.new!(
+      source_commits: %{"imp" => "deepfates/imp@test"},
       workspace_state: "clean"
     )
-    |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+    |> Imp.BenchmarkTruth.RunContext.finish(payload)
   end
 
   defp row(id, expected, actual),

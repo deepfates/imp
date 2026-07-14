@@ -7,8 +7,8 @@ defmodule OptimizerLiftArtifactTest do
     out_dir = tmp_dir("optimizer-lift")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.optimizer_lift")
-      Mix.Tasks.Dsex.Benchmark.OptimizerLift.run(["--out", out_dir])
+      Mix.Task.reenable("imp.benchmark.optimizer_lift")
+      Mix.Tasks.Imp.Benchmark.OptimizerLift.run(["--out", out_dir])
     end)
 
     [artifact_path] = Path.wildcard(Path.join(out_dir, "optimizer-lift-parity-*.json"))
@@ -34,7 +34,7 @@ defmodule OptimizerLiftArtifactTest do
       assert lane["lift"] == 1.0
       assert lane["lm_calls"] > 0
       assert lane["estimated_cost"]["provider"] == "fixture"
-      assert lane["comparison_status"] == "dsex_release_evidence"
+      assert lane["comparison_status"] == "imp_release_evidence"
     end
 
     assert length(lanes["classification_colors"]["selected"]["demos"]) == 2
@@ -44,7 +44,7 @@ defmodule OptimizerLiftArtifactTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path

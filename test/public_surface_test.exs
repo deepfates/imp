@@ -2,258 +2,258 @@ defmodule PublicSurfaceTest do
   use ExUnit.Case
 
   @public_modules [
-    DSEx,
-    DSEx.Adapter,
-    DSEx.Adapter.Chat,
-    DSEx.Adapter.JSON,
-    DSEx.Adapter.XML,
-    DSEx.Adapter.TwoStep,
-    DSEx.Adapters.Types,
-    DSEx.Adapters.Types.ToolCall,
-    DSEx.Adapters.Types.ToolCallResults,
-    DSEx.Adapters.Types.ToolCalls,
-    DSEx.Adapters.Types.ToolResult,
-    DSEx.Agent,
-    DSEx.Agent.Runtime,
-    DSEx.Cache,
-    DSEx.Capabilities,
-    DSEx.Clients.DatabricksTrainer,
-    DSEx.Clients.HTTPTrainer,
-    DSEx.Clients.MLXLMTrainer,
-    DSEx.Clients.OpenAITrainer,
-    DSEx.Clients.ReinforcementSession,
-    DSEx.Clients.ReqLLM,
-    DSEx.Clients.ReqLLMBatch,
-    DSEx.Clients.Trainer,
-    DSEx.Clients.TrainingJob,
-    DSEx.Confidence,
-    DSEx.Confidence.Calibration,
-    DSEx.Confidence.Scoring,
-    DSEx.Confidence.Scoring.LinearBlend,
-    DSEx.Confidence.Scoring.Sigmoid,
-    DSEx.Confidence.Scoring.Threshold,
-    DSEx.Core,
-    DSEx.Core.Assistant,
-    DSEx.Core.Developer,
-    DSEx.Core.LMConfig,
-    DSEx.Core.LMRequest,
-    DSEx.Core.LMResponse,
-    DSEx.Core.Message,
-    DSEx.Core.System,
-    DSEx.Core.ToolCall,
-    DSEx.Core.ToolResult,
-    DSEx.Core.User,
-    DSEx.Datasets,
-    DSEx.Datasets.Colors,
-    DSEx.Datasets.DataLoader,
-    DSEx.Datasets.Dataset,
-    DSEx.Datasets.GSM8K,
-    DSEx.Datasets.HotPotQA,
-    DSEx.Datasets.MATH,
-    DSEx.Embeddings,
-    DSEx.Embeddings.BagOfWords,
-    DSEx.AdapterParseError,
-    DSEx.Assertion,
-    DSEx.ContextWindowExceededError,
-    DSEx.Error,
-    DSEx.Errors,
-    DSEx.Evaluate,
-    DSEx.Evaluate.CompleteAndGrounded,
-    DSEx.Evaluate.Result,
-    DSEx.Evaluate.SemanticF1,
-    DSEx.Example,
-    DSEx.ExternalCommand,
-    DSEx.ExternalCommand.Handle,
-    DSEx.HTTP,
-    DSEx.History,
-    DSEx.IdentityAssessmentConsolidation,
-    DSEx.IdentityReliability,
-    DSEx.LM,
-    DSEx.LM.Result,
-    DSEx.LMError,
-    DSEx.LM.Static,
-    DSEx.Logprobs,
-    DSEx.MCP,
-    DSEx.MCP.Catalog,
-    DSEx.MCP.HTTPClient,
-    DSEx.MCP.StdioClient,
-    DSEx.MCP.StreamableHTTPClient,
-    DSEx.Metrics,
-    DSEx.Metrics.Result,
-    DSEx.Module,
-    DSEx.Observability,
-    DSEx.Observability.Inspection,
-    DSEx.Observability.ProgressSubscription,
-    DSEx.Observability.Status,
-    DSEx.Observability.Trace,
-    DSEx.Optimize.Anything,
-    DSEx.Optimize.Anything.Config,
-    DSEx.Optimize.Anything.Config.Engine,
-    DSEx.Optimize.Anything.Config.Merge,
-    DSEx.Optimize.Anything.Config.Refiner,
-    DSEx.Optimize.Anything.Config.Reflection,
-    DSEx.Optimize.Anything.Config.Tracking,
-    DSEx.Optimize.Anything.Result,
-    DSEx.Optimizer,
-    DSEx.Optimizer.Artifact,
-    DSEx.Optimizer.Avatar,
-    DSEx.Optimizer.Avatar.EvalResult,
-    DSEx.Optimizer.BetterTogether,
-    DSEx.Optimizer.BootstrapFewShot,
-    DSEx.Optimizer.BootstrapFewShotWithRandomSearch,
-    DSEx.Optimizer.BootstrapFinetune,
-    DSEx.Optimizer.BootstrapRS,
-    DSEx.Optimizer.COPRO,
-    DSEx.Optimizer.Ensemble,
-    DSEx.Optimizer.GEPA,
-    DSEx.Optimizer.GEPA.Adapter,
-    DSEx.Optimizer.GEPA.Acceptance,
-    DSEx.Optimizer.GEPA.Callback,
-    DSEx.Optimizer.GEPA.Candidate,
-    DSEx.Optimizer.GEPA.CandidateSelector,
-    DSEx.Optimizer.GEPA.ComBee,
-    DSEx.Optimizer.GEPA.ComBee.BatchController,
-    DSEx.Optimizer.GEPA.ComBee.BatchController.Options,
-    DSEx.Optimizer.GEPA.ComBee.BatchController.Report,
-    DSEx.Optimizer.GEPA.ComBee.BatchController.Trial,
-    DSEx.Optimizer.GEPA.ComBee.Options,
-    DSEx.Optimizer.GEPA.ComBee.Plan,
-    DSEx.Optimizer.GEPA.ComBee.Policy,
-    DSEx.Optimizer.GEPA.ComBee.Report,
-    DSEx.Optimizer.GEPA.ComponentFeedback,
-    DSEx.Optimizer.GEPA.ConfidenceAdapter,
-    DSEx.Optimizer.GEPA.Evaluation,
-    DSEx.Optimizer.GEPA.EvaluationCache,
-    DSEx.Optimizer.GEPA.EvaluationCache.Entry,
-    DSEx.Optimizer.GEPA.EvaluationCache.Backend,
-    DSEx.Optimizer.GEPA.EvaluationCache.Disk,
-    DSEx.Optimizer.GEPA.EvaluationCache.Memory,
-    DSEx.Optimizer.GEPA.EvaluationPolicy,
-    DSEx.Optimizer.GEPA.Frontier,
-    DSEx.Optimizer.GEPA.Merge,
-    DSEx.Optimizer.GEPA.ModuleSelector,
-    DSEx.Optimizer.GEPA.Pareto,
-    DSEx.Optimizer.GEPA.Result,
-    DSEx.Optimizer.GEPA.Stopper,
-    DSEx.Optimizer.GEPA.Stopper.State,
-    DSEx.Optimizer.GRPO,
-    DSEx.Optimizer.InferRules,
-    DSEx.Optimizer.InstructionProposer,
-    DSEx.Optimizer.InstructionSearch,
-    DSEx.Optimizer.KNNFewShot,
-    DSEx.Optimizer.LabeledFewShot,
-    DSEx.Optimizer.MIPROv2,
-    DSEx.Optimizer.Parameter,
-    DSEx.Optimizer.Parameter.Change,
-    DSEx.Optimizer.Parameter.Set,
-    DSEx.Optimizer.Playbook,
-    DSEx.Optimizer.Playbook.Result,
-    DSEx.Optimizer.Playbook.Usage,
-    DSEx.Optimizer.RandomSearch,
-    DSEx.Optimizer.Report,
-    DSEx.Optimizer.Sampling,
-    DSEx.Optimizer.SIMBA,
-    DSEx.Optimizer.SignatureOptimizer,
-    DSEx.Optimizer.Trajectory,
-    DSEx.Optimizer.Trajectory.Cache,
-    DSEx.Optimizer.Trajectory.DecodeError,
-    DSEx.Optimizer.Trajectory.Event,
-    DSEx.Optimizer.Trajectory.Failure,
-    DSEx.Optimizer.Trajectory.Parameter,
-    DSEx.Optimizer.Trajectory.Timing,
-    DSEx.Optimizer.Trajectory.Usage,
-    DSEx.Optimizer.TrajectoryRunner,
-    DSEx.Optimizer.TrainingResult,
-    DSEx.Playbook,
-    DSEx.Playbook.WithContext,
-    DSEx.Playbook.Delta,
-    DSEx.Playbook.Entry,
-    DSEx.Playbook.Operation.Add,
-    DSEx.Playbook.Operation.Merge,
-    DSEx.Playbook.Operation.Remove,
-    DSEx.Playbook.Operation.Revise,
-    DSEx.Playbook.Operation.UpdateCounters,
-    DSEx.Playbook.Policy,
-    DSEx.Playbook.Provenance,
-    DSEx.Playbook.Tombstone,
-    DSEx.Predict.Aggregation,
-    DSEx.Predict.Assertions,
-    DSEx.Predict.Avatar,
-    DSEx.Predict.Avatar.Action,
-    DSEx.Predict.Avatar.ActionOutput,
-    DSEx.Predict.BestOfN,
-    DSEx.Predict.ChainOfThought,
-    DSEx.Predict.CodeAct,
-    DSEx.Predict.KNN,
-    DSEx.Predict.MultiChainComparison,
-    DSEx.Predict.Parallel,
-    DSEx.Predict.Predict,
-    DSEx.Predict.ProgramOfThought,
-    DSEx.Predict.RAG,
-    DSEx.Predict.RLM,
-    DSEx.Predict.RLM.SandboxSerializable,
-    DSEx.Predict.ReAct,
-    DSEx.Predict.ReActV2,
-    DSEx.Predict.Refine,
-    DSEx.Predict.Search,
-    DSEx.Predict.Search.Candidate,
-    DSEx.Predict.Search.Result,
-    DSEx.Prediction,
-    DSEx.ProgramParameters,
-    DSEx.Redaction,
-    DSEx.Retrieve,
-    DSEx.Retrieve.Memory,
-    DSEx.Retrievers.Databricks,
-    DSEx.Retrievers.HTTP,
-    DSEx.Retrievers.KNN,
-    DSEx.Retrievers.Weaviate,
-    DSEx.Sandbox,
-    DSEx.Saving,
-    DSEx.Saving.Registry,
-    DSEx.Schema,
-    DSEx.Settings,
-    DSEx.Signature,
-    DSEx.Signature.Field,
-    DSEx.Streaming,
-    DSEx.Streaming.Messages,
-    DSEx.Streaming.Messages.StreamListener,
-    DSEx.Streaming.Messages.StreamResponse,
-    DSEx.Streaming.Messages.StatusMessage,
-    DSEx.Streaming.Messages.StatusMessageProvider,
-    DSEx.Tasks,
-    DSEx.Telemetry,
-    DSEx.Tracking.Backend,
-    DSEx.Tracking.MLflow,
-    DSEx.Tracking.Session,
-    DSEx.Tracking.Transport,
-    DSEx.Tracking.Transport.Req,
-    DSEx.Tracking.WandB,
-    DSEx.Tracking.WandB.Backend,
-    DSEx.Tracking.WandB.Transport,
-    DSEx.Training.ChatDataset,
-    DSEx.Training.FastSlow.AdvantageGroup,
-    DSEx.Training.FastSlow.Backend,
-    DSEx.Training.FastSlow.Budget,
-    DSEx.Training.FastSlow.CachedTrajectory,
-    DSEx.Training.FastSlow.Checkpoint,
-    DSEx.Training.FastSlow.Config,
-    DSEx.Training.FastSlow.DatasetState,
-    DSEx.Training.FastSlow.Event,
-    DSEx.Training.FastSlow.Lookahead,
-    DSEx.Training.FastSlow.OperationIntent,
-    DSEx.Training.FastSlow.PromptPopulation,
-    DSEx.Training.FastSlow.ReuseCache,
-    DSEx.Training.FastSlow.Rollout,
-    DSEx.Training.FastSlow.Runner,
-    DSEx.Training.FastSlow.Runner.Context,
-    DSEx.Training.FastSlow.State,
-    DSEx.Training.FastSlow.Terminal,
-    DSEx.Training.FastSlow.Theta,
-    DSEx.Tool
+    Imp,
+    Imp.Adapter,
+    Imp.Adapter.Chat,
+    Imp.Adapter.JSON,
+    Imp.Adapter.XML,
+    Imp.Adapter.TwoStep,
+    Imp.Adapters.Types,
+    Imp.Adapters.Types.ToolCall,
+    Imp.Adapters.Types.ToolCallResults,
+    Imp.Adapters.Types.ToolCalls,
+    Imp.Adapters.Types.ToolResult,
+    Imp.Agent,
+    Imp.Agent.Runtime,
+    Imp.Cache,
+    Imp.Capabilities,
+    Imp.Clients.DatabricksTrainer,
+    Imp.Clients.HTTPTrainer,
+    Imp.Clients.MLXLMTrainer,
+    Imp.Clients.OpenAITrainer,
+    Imp.Clients.ReinforcementSession,
+    Imp.Clients.ReqLLM,
+    Imp.Clients.ReqLLMBatch,
+    Imp.Clients.Trainer,
+    Imp.Clients.TrainingJob,
+    Imp.Confidence,
+    Imp.Confidence.Calibration,
+    Imp.Confidence.Scoring,
+    Imp.Confidence.Scoring.LinearBlend,
+    Imp.Confidence.Scoring.Sigmoid,
+    Imp.Confidence.Scoring.Threshold,
+    Imp.Core,
+    Imp.Core.Assistant,
+    Imp.Core.Developer,
+    Imp.Core.LMConfig,
+    Imp.Core.LMRequest,
+    Imp.Core.LMResponse,
+    Imp.Core.Message,
+    Imp.Core.System,
+    Imp.Core.ToolCall,
+    Imp.Core.ToolResult,
+    Imp.Core.User,
+    Imp.Datasets,
+    Imp.Datasets.Colors,
+    Imp.Datasets.DataLoader,
+    Imp.Datasets.Dataset,
+    Imp.Datasets.GSM8K,
+    Imp.Datasets.HotPotQA,
+    Imp.Datasets.MATH,
+    Imp.Embeddings,
+    Imp.Embeddings.BagOfWords,
+    Imp.AdapterParseError,
+    Imp.Assertion,
+    Imp.ContextWindowExceededError,
+    Imp.Error,
+    Imp.Errors,
+    Imp.Evaluate,
+    Imp.Evaluate.CompleteAndGrounded,
+    Imp.Evaluate.Result,
+    Imp.Evaluate.SemanticF1,
+    Imp.Example,
+    Imp.ExternalCommand,
+    Imp.ExternalCommand.Handle,
+    Imp.HTTP,
+    Imp.History,
+    Imp.IdentityAssessmentConsolidation,
+    Imp.IdentityReliability,
+    Imp.LM,
+    Imp.LM.Result,
+    Imp.LMError,
+    Imp.LM.Static,
+    Imp.Logprobs,
+    Imp.MCP,
+    Imp.MCP.Catalog,
+    Imp.MCP.HTTPClient,
+    Imp.MCP.StdioClient,
+    Imp.MCP.StreamableHTTPClient,
+    Imp.Metrics,
+    Imp.Metrics.Result,
+    Imp.Module,
+    Imp.Observability,
+    Imp.Observability.Inspection,
+    Imp.Observability.ProgressSubscription,
+    Imp.Observability.Status,
+    Imp.Observability.Trace,
+    Imp.Optimize.Anything,
+    Imp.Optimize.Anything.Config,
+    Imp.Optimize.Anything.Config.Engine,
+    Imp.Optimize.Anything.Config.Merge,
+    Imp.Optimize.Anything.Config.Refiner,
+    Imp.Optimize.Anything.Config.Reflection,
+    Imp.Optimize.Anything.Config.Tracking,
+    Imp.Optimize.Anything.Result,
+    Imp.Optimizer,
+    Imp.Optimizer.Artifact,
+    Imp.Optimizer.Avatar,
+    Imp.Optimizer.Avatar.EvalResult,
+    Imp.Optimizer.BetterTogether,
+    Imp.Optimizer.BootstrapFewShot,
+    Imp.Optimizer.BootstrapFewShotWithRandomSearch,
+    Imp.Optimizer.BootstrapFinetune,
+    Imp.Optimizer.BootstrapRS,
+    Imp.Optimizer.COPRO,
+    Imp.Optimizer.Ensemble,
+    Imp.Optimizer.GEPA,
+    Imp.Optimizer.GEPA.Adapter,
+    Imp.Optimizer.GEPA.Acceptance,
+    Imp.Optimizer.GEPA.Callback,
+    Imp.Optimizer.GEPA.Candidate,
+    Imp.Optimizer.GEPA.CandidateSelector,
+    Imp.Optimizer.GEPA.ComBee,
+    Imp.Optimizer.GEPA.ComBee.BatchController,
+    Imp.Optimizer.GEPA.ComBee.BatchController.Options,
+    Imp.Optimizer.GEPA.ComBee.BatchController.Report,
+    Imp.Optimizer.GEPA.ComBee.BatchController.Trial,
+    Imp.Optimizer.GEPA.ComBee.Options,
+    Imp.Optimizer.GEPA.ComBee.Plan,
+    Imp.Optimizer.GEPA.ComBee.Policy,
+    Imp.Optimizer.GEPA.ComBee.Report,
+    Imp.Optimizer.GEPA.ComponentFeedback,
+    Imp.Optimizer.GEPA.ConfidenceAdapter,
+    Imp.Optimizer.GEPA.Evaluation,
+    Imp.Optimizer.GEPA.EvaluationCache,
+    Imp.Optimizer.GEPA.EvaluationCache.Entry,
+    Imp.Optimizer.GEPA.EvaluationCache.Backend,
+    Imp.Optimizer.GEPA.EvaluationCache.Disk,
+    Imp.Optimizer.GEPA.EvaluationCache.Memory,
+    Imp.Optimizer.GEPA.EvaluationPolicy,
+    Imp.Optimizer.GEPA.Frontier,
+    Imp.Optimizer.GEPA.Merge,
+    Imp.Optimizer.GEPA.ModuleSelector,
+    Imp.Optimizer.GEPA.Pareto,
+    Imp.Optimizer.GEPA.Result,
+    Imp.Optimizer.GEPA.Stopper,
+    Imp.Optimizer.GEPA.Stopper.State,
+    Imp.Optimizer.GRPO,
+    Imp.Optimizer.InferRules,
+    Imp.Optimizer.InstructionProposer,
+    Imp.Optimizer.InstructionSearch,
+    Imp.Optimizer.KNNFewShot,
+    Imp.Optimizer.LabeledFewShot,
+    Imp.Optimizer.MIPROv2,
+    Imp.Optimizer.Parameter,
+    Imp.Optimizer.Parameter.Change,
+    Imp.Optimizer.Parameter.Set,
+    Imp.Optimizer.Playbook,
+    Imp.Optimizer.Playbook.Result,
+    Imp.Optimizer.Playbook.Usage,
+    Imp.Optimizer.RandomSearch,
+    Imp.Optimizer.Report,
+    Imp.Optimizer.Sampling,
+    Imp.Optimizer.SIMBA,
+    Imp.Optimizer.SignatureOptimizer,
+    Imp.Optimizer.Trajectory,
+    Imp.Optimizer.Trajectory.Cache,
+    Imp.Optimizer.Trajectory.DecodeError,
+    Imp.Optimizer.Trajectory.Event,
+    Imp.Optimizer.Trajectory.Failure,
+    Imp.Optimizer.Trajectory.Parameter,
+    Imp.Optimizer.Trajectory.Timing,
+    Imp.Optimizer.Trajectory.Usage,
+    Imp.Optimizer.TrajectoryRunner,
+    Imp.Optimizer.TrainingResult,
+    Imp.Playbook,
+    Imp.Playbook.WithContext,
+    Imp.Playbook.Delta,
+    Imp.Playbook.Entry,
+    Imp.Playbook.Operation.Add,
+    Imp.Playbook.Operation.Merge,
+    Imp.Playbook.Operation.Remove,
+    Imp.Playbook.Operation.Revise,
+    Imp.Playbook.Operation.UpdateCounters,
+    Imp.Playbook.Policy,
+    Imp.Playbook.Provenance,
+    Imp.Playbook.Tombstone,
+    Imp.Predict.Aggregation,
+    Imp.Predict.Assertions,
+    Imp.Predict.Avatar,
+    Imp.Predict.Avatar.Action,
+    Imp.Predict.Avatar.ActionOutput,
+    Imp.Predict.BestOfN,
+    Imp.Predict.ChainOfThought,
+    Imp.Predict.CodeAct,
+    Imp.Predict.KNN,
+    Imp.Predict.MultiChainComparison,
+    Imp.Predict.Parallel,
+    Imp.Predict.Predict,
+    Imp.Predict.ProgramOfThought,
+    Imp.Predict.RAG,
+    Imp.Predict.RLM,
+    Imp.Predict.RLM.SandboxSerializable,
+    Imp.Predict.ReAct,
+    Imp.Predict.ReActV2,
+    Imp.Predict.Refine,
+    Imp.Predict.Search,
+    Imp.Predict.Search.Candidate,
+    Imp.Predict.Search.Result,
+    Imp.Prediction,
+    Imp.ProgramParameters,
+    Imp.Redaction,
+    Imp.Retrieve,
+    Imp.Retrieve.Memory,
+    Imp.Retrievers.Databricks,
+    Imp.Retrievers.HTTP,
+    Imp.Retrievers.KNN,
+    Imp.Retrievers.Weaviate,
+    Imp.Sandbox,
+    Imp.Saving,
+    Imp.Saving.Registry,
+    Imp.Schema,
+    Imp.Settings,
+    Imp.Signature,
+    Imp.Signature.Field,
+    Imp.Streaming,
+    Imp.Streaming.Messages,
+    Imp.Streaming.Messages.StreamListener,
+    Imp.Streaming.Messages.StreamResponse,
+    Imp.Streaming.Messages.StatusMessage,
+    Imp.Streaming.Messages.StatusMessageProvider,
+    Imp.Tasks,
+    Imp.Telemetry,
+    Imp.Tracking.Backend,
+    Imp.Tracking.MLflow,
+    Imp.Tracking.Session,
+    Imp.Tracking.Transport,
+    Imp.Tracking.Transport.Req,
+    Imp.Tracking.WandB,
+    Imp.Tracking.WandB.Backend,
+    Imp.Tracking.WandB.Transport,
+    Imp.Training.ChatDataset,
+    Imp.Training.FastSlow.AdvantageGroup,
+    Imp.Training.FastSlow.Backend,
+    Imp.Training.FastSlow.Budget,
+    Imp.Training.FastSlow.CachedTrajectory,
+    Imp.Training.FastSlow.Checkpoint,
+    Imp.Training.FastSlow.Config,
+    Imp.Training.FastSlow.DatasetState,
+    Imp.Training.FastSlow.Event,
+    Imp.Training.FastSlow.Lookahead,
+    Imp.Training.FastSlow.OperationIntent,
+    Imp.Training.FastSlow.PromptPopulation,
+    Imp.Training.FastSlow.ReuseCache,
+    Imp.Training.FastSlow.Rollout,
+    Imp.Training.FastSlow.Runner,
+    Imp.Training.FastSlow.Runner.Context,
+    Imp.Training.FastSlow.State,
+    Imp.Training.FastSlow.Terminal,
+    Imp.Training.FastSlow.Theta,
+    Imp.Tool
   ]
 
   defmodule ExplodingProgram do
-    @behaviour DSEx.Module
+    @behaviour Imp.Module
     defstruct []
 
     @impl true
@@ -261,7 +261,7 @@ defmodule PublicSurfaceTest do
   end
 
   defmodule InvalidPredictionProgram do
-    @behaviour DSEx.Module
+    @behaviour Imp.Module
     defstruct []
 
     @impl true
@@ -269,7 +269,7 @@ defmodule PublicSurfaceTest do
   end
 
   defmodule ErrorProgram do
-    @behaviour DSEx.Module
+    @behaviour Imp.Module
     defstruct []
 
     @impl true
@@ -277,159 +277,159 @@ defmodule PublicSurfaceTest do
   end
 
   setup do
-    DSEx.configure(lm: nil, adapter: DSEx.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
     :ok
   end
 
   test "prediction public surface has executable equivalents" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "4", rationale: "math"} end]
     }
 
-    program = DSEx.predict("question -> answer", lm: lm)
+    program = Imp.predict("question -> answer", lm: lm)
 
-    assert DSEx.majority(["A", "a", "B"]) == "A"
+    assert Imp.majority(["A", "a", "B"]) == "A"
 
-    assert %DSEx.Prediction{} =
-             DSEx.majority([
-               DSEx.Prediction.new(answer: "A"),
-               DSEx.Prediction.new(answer: "A"),
-               DSEx.Prediction.new(answer: "B")
+    assert %Imp.Prediction{} =
+             Imp.majority([
+               Imp.Prediction.new(answer: "A"),
+               Imp.Prediction.new(answer: "A"),
+               Imp.Prediction.new(answer: "B")
              ])
 
-    assert DSEx.majority([%{"answer" => "Paris"}, %{answer: "paris"}, %{answer: "Lyon"}],
+    assert Imp.majority([%{"answer" => "Paris"}, %{answer: "paris"}, %{answer: "Lyon"}],
              field: :answer
            ) == "Paris"
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Aggregation\.majority\/2: expected keyword options/,
+                 ~r/Imp\.Predict\.Aggregation\.majority\/2: expected keyword options/,
                  fn ->
-                   DSEx.majority(["A"], :not_options)
+                   Imp.majority(["A"], :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Aggregation\.majority\/2: invalid value for :normalize option: expected a unary function/,
+                 ~r/Imp\.Predict\.Aggregation\.majority\/2: invalid value for :normalize option: expected a unary function/,
                  fn ->
-                   DSEx.majority(["A"], normalize: :not_a_function)
+                   Imp.majority(["A"], normalize: :not_a_function)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.Aggregation\.majority\/2: invalid value for :field option: expected nil or an atom\/string field name/,
+                 ~r/Imp\.Predict\.Aggregation\.majority\/2: invalid value for :field option: expected nil or an atom\/string field name/,
                  fn ->
-                   DSEx.majority(["A"], field: [])
+                   Imp.majority(["A"], field: [])
                  end
 
-    assert {:ok, pred} = DSEx.call(program, %{question: "2+2?"})
-    assert DSEx.get(pred, :answer) == "4"
+    assert {:ok, pred} = Imp.call(program, %{question: "2+2?"})
+    assert Imp.get(pred, :answer) == "4"
 
-    mcc = DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 2)
+    mcc = Imp.multi_chain_comparison("question -> answer", lm: lm, m: 2)
 
     assert {:ok, compared} =
-             DSEx.call(mcc, %{
+             Imp.call(mcc, %{
                question: "2+2?",
                completions: [%{reasoning: "add", answer: "4"}, %{reasoning: "count", answer: "4"}]
              })
 
-    assert DSEx.get(compared, :answer) == "4"
+    assert Imp.get(compared, :answer) == "4"
 
     assert {:ok, compared_from_strings} =
-             DSEx.call(mcc, %{
+             Imp.call(mcc, %{
                "question" => "2+2?",
                "completions" => [
                  %{"reasoning" => "add", "answer" => "4"},
-                 DSEx.Prediction.new(reasoning: "count", answer: "4")
+                 Imp.Prediction.new(reasoning: "count", answer: "4")
                ]
              })
 
-    assert DSEx.get(compared_from_strings, :answer) == "4"
+    assert Imp.get(compared_from_strings, :answer) == "4"
 
     assert {:error, {:invalid_completions, ~s("not-a-list")}} =
-             DSEx.call(mcc, %{
+             Imp.call(mcc, %{
                question: "2+2?",
                completions: "not-a-list"
              })
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: expected keyword options/,
+                 ~r/Imp\.Predict\.MultiChainComparison\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.multi_chain_comparison("question -> answer", %{m: 2})
+                   Imp.multi_chain_comparison("question -> answer", %{m: 2})
                  end
 
     assert {:error, {:invalid_multi_chain_inputs, message}} =
-             DSEx.call(mcc, :not_inputs)
+             Imp.call(mcc, :not_inputs)
 
     assert message =~ "expected a map or keyword/list of input pairs"
 
     assert {:error, {:invalid_multi_chain_inputs, "expected inputs as {key, value} pairs"}} =
-             DSEx.call(mcc, [:not_a_pair])
+             Imp.call(mcc, [:not_a_pair])
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :m option: expected a positive integer/,
+                 ~r/Imp\.Predict\.MultiChainComparison\.new\/2: invalid value for :m option: expected a positive integer/,
                  fn ->
-                   DSEx.multi_chain_comparison("question -> answer", lm: lm, m: 0)
+                   Imp.multi_chain_comparison("question -> answer", lm: lm, m: 0)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.MultiChainComparison\.new\/2: invalid value for :M option: expected a positive integer/,
+                 ~r/Imp\.Predict\.MultiChainComparison\.new\/2: invalid value for :M option: expected a positive integer/,
                  fn ->
-                   DSEx.multi_chain_comparison("question -> answer", lm: lm, M: "2")
+                   Imp.multi_chain_comparison("question -> answer", lm: lm, M: "2")
                  end
 
-    metric = DSEx.exact_match(:answer)
+    metric = Imp.exact_match(:answer)
 
     assert {:ok, best} =
              program
-             |> DSEx.best_of_n(metric, n: 2)
-             |> DSEx.call(%{question: "2+2?"})
+             |> Imp.best_of_n(metric, n: 2)
+             |> Imp.call(%{question: "2+2?"})
 
-    assert DSEx.get(best, :answer) == "4"
+    assert Imp.get(best, :answer) == "4"
 
     assert {:ok, refined} =
              program
-             |> DSEx.refine(metric, max_attempts: 1)
-             |> DSEx.call(%{question: "2+2?"})
+             |> Imp.refine(metric, max_attempts: 1)
+             |> Imp.call(%{question: "2+2?"})
 
-    assert DSEx.get(refined, :answer) == "4"
-    assert [%{attempt: 1}] = DSEx.get(refined, :refine_history)
+    assert Imp.get(refined, :answer) == "4"
+    assert [%{attempt: 1}] = Imp.get(refined, :refine_history)
 
     assert [{:ok, first}, {:ok, second}] =
-             DSEx.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
+             Imp.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
                max_concurrency: 2
              )
 
-    assert Enum.map([first, second], &DSEx.get(&1, :answer)) == ["4", "4"]
+    assert Enum.map([first, second], &Imp.get(&1, :answer)) == ["4", "4"]
 
     trainset = [
-      DSEx.example(question: "capital France", answer: "Paris") |> DSEx.with_inputs(:question),
-      DSEx.example(question: "capital Germany", answer: "Berlin") |> DSEx.with_inputs(:question)
+      Imp.example(question: "capital France", answer: "Paris") |> Imp.with_inputs(:question),
+      Imp.example(question: "capital Germany", answer: "Berlin") |> Imp.with_inputs(:question)
     ]
 
-    knn = DSEx.knn(1, trainset, field: "question")
-    assert [nearest] = DSEx.nearest(knn, %{question: "France"})
-    assert DSEx.get(nearest, :answer) == "Paris"
+    knn = Imp.knn(1, trainset, field: "question")
+    assert [nearest] = Imp.nearest(knn, %{question: "France"})
+    assert Imp.get(nearest, :answer) == "Paris"
 
-    assert_raise ArgumentError, ~r/DSEx.nearest\/2 expects a DSEx KNN predictor/, fn ->
-      DSEx.nearest(program, %{question: "France"})
+    assert_raise ArgumentError, ~r/Imp.nearest\/2 expects an Imp KNN predictor/, fn ->
+      Imp.nearest(program, %{question: "France"})
     end
 
     rlm_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "4"})|} end]
     }
 
-    rlm = DSEx.rlm("question, logs -> answer", lm: rlm_lm, max_iterations: 2)
+    rlm = Imp.rlm("question, logs -> answer", lm: rlm_lm, max_iterations: 2)
 
     assert {:ok, rlm_pred} =
-             DSEx.Predict.RLM.call(rlm, %{question: "2+2?", logs: "large context"})
+             Imp.Predict.RLM.call(rlm, %{question: "2+2?", logs: "large context"})
 
-    assert DSEx.Prediction.get(rlm_pred, :answer) == "4"
+    assert Imp.Prediction.get(rlm_pred, :answer) == "4"
     assert [%{action: :submit}] = rlm_pred.metadata.rlm_trace
   end
 
   test "rag wraps a program with retrieved context and metadata" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -441,19 +441,19 @@ defmodule PublicSurfaceTest do
       ]
     }
 
-    base = DSEx.predict("question, context -> answer", lm: lm)
-    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
-    rag = DSEx.rag(base, retriever, k: 1)
+    base = Imp.predict("question, context -> answer", lm: lm)
+    retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+    rag = Imp.rag(base, retriever, k: 1)
 
-    assert {:ok, prediction} = DSEx.call(rag, %{question: "capital France"})
-    assert DSEx.Prediction.get(prediction, :answer) == "Paris"
+    assert {:ok, prediction} = Imp.call(rag, %{question: "capital France"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert prediction.metadata.retrieval.count == 1
     assert [%{text: "France has capital Paris"}] = prediction.metadata.retrieval.docs
   end
 
   test "rag query selectors resolve equivalent atom and string input keys" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
-    base = DSEx.predict("question, context -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    base = Imp.predict("question, context -> answer", lm: lm)
 
     parent = self()
 
@@ -464,63 +464,63 @@ defmodule PublicSurfaceTest do
 
     assert {:ok, _prediction} =
              base
-             |> DSEx.rag(retriever, query_field: "question", k: 1)
-             |> DSEx.call(%{question: "capital"})
+             |> Imp.rag(retriever, query_field: "question", k: 1)
+             |> Imp.call(%{question: "capital"})
 
     assert_receive {:retrieved_query, "capital"}
 
     assert {:ok, _prediction} =
              base
-             |> DSEx.rag(retriever, query_field: :question, k: 1)
-             |> DSEx.call(%{"question" => "capital"})
+             |> Imp.rag(retriever, query_field: :question, k: 1)
+             |> Imp.call(%{"question" => "capital"})
 
     assert_receive {:retrieved_query, "capital"}
 
     assert {:ok, _prediction} =
              base
-             |> DSEx.rag(retriever, query_field: ["question", :topic], k: 1)
-             |> DSEx.call(%{"topic" => "France", question: "capital"})
+             |> Imp.rag(retriever, query_field: ["question", :topic], k: 1)
+             |> Imp.call(%{"topic" => "France", question: "capital"})
 
     assert_receive {:retrieved_query, "capital France"}
   end
 
   test "rag treats zero k as explicit no documents and rejects negative k" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "unknown"} end]
     }
 
-    base = DSEx.predict("question, context -> answer", lm: lm)
-    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
-    rag = DSEx.rag(base, retriever, k: 0)
+    base = Imp.predict("question, context -> answer", lm: lm)
+    retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
+    rag = Imp.rag(base, retriever, k: 0)
 
     assert rag.k == 0
-    assert {:ok, prediction} = DSEx.call(rag, %{question: "capital France"})
+    assert {:ok, prediction} = Imp.call(rag, %{question: "capital France"})
     assert prediction.metadata.retrieval.count == 0
     assert prediction.metadata.retrieval.docs == []
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :k option: expected non negative integer/,
+                 ~r/Imp\.Predict\.RAG\.new\/3: invalid value for :k option: expected non negative integer/,
                  fn ->
-                   DSEx.rag(base, retriever, k: -3)
+                   Imp.rag(base, retriever, k: -3)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :query_field option: expected an atom\/string field name or a non-empty list of field names/,
+                 ~r/Imp\.Predict\.RAG\.new\/3: invalid value for :query_field option: expected an atom\/string field name or a non-empty list of field names/,
                  fn ->
-                   DSEx.rag(base, retriever, query_field: [])
+                   Imp.rag(base, retriever, query_field: [])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :context_field option: expected an atom\/string field name/,
+                 ~r/Imp\.Predict\.RAG\.new\/3: invalid value for :context_field option: expected an atom\/string field name/,
                  fn ->
-                   DSEx.rag(base, retriever, context_field: [:context])
+                   Imp.rag(base, retriever, context_field: [:context])
                  end
   end
 
   test "rag can perform multi-hop retrieval by expanding the query with prior passages" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -533,7 +533,7 @@ defmodule PublicSurfaceTest do
       ]
     }
 
-    base = DSEx.predict("question, context -> answer", lm: lm)
+    base = Imp.predict("question, context -> answer", lm: lm)
     parent = self()
 
     retriever = fn query, opts ->
@@ -551,12 +551,12 @@ defmodule PublicSurfaceTest do
       end
     end
 
-    rag = DSEx.rag(base, retriever, k: 1, hops: 2)
+    rag = Imp.rag(base, retriever, k: 1, hops: 2)
 
     assert {:ok, prediction} =
-             DSEx.call(rag, %{question: "Which country has the capital of Eiffel's city?"})
+             Imp.call(rag, %{question: "Which country has the capital of Eiffel's city?"})
 
-    assert DSEx.get(prediction, :answer) == "France"
+    assert Imp.get(prediction, :answer) == "France"
     assert prediction.metadata.retrieval.count == 2
     assert Enum.map(prediction.metadata.retrieval.docs, & &1.id) == ["bridge", "answer"]
     assert Enum.map(prediction.metadata.retrieval.hops, & &1.count) == [1, 1]
@@ -571,56 +571,56 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag reports invalid and failed wrapped program results without crashing" do
-    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+    retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}])
 
-    invalid = DSEx.rag(%InvalidPredictionProgram{}, retriever, k: 1)
+    invalid = Imp.rag(%InvalidPredictionProgram{}, retriever, k: 1)
 
     assert {:error,
             {:invalid_module_prediction, PublicSurfaceTest.InvalidPredictionProgram,
              "%{answer: \"not a prediction\"}"}} =
-             DSEx.call(invalid, %{question: "capital France"})
+             Imp.call(invalid, %{question: "capital France"})
 
-    failed = DSEx.rag(%ErrorProgram{}, retriever, k: 1)
+    failed = Imp.rag(%ErrorProgram{}, retriever, k: 1)
 
-    assert {:error, :wrapped_failed} = DSEx.call(failed, %{question: "capital France"})
+    assert {:error, :wrapped_failed} = Imp.call(failed, %{question: "capital France"})
   end
 
   test "rag reports invalid options inputs and retrieved docs clearly" do
-    base = DSEx.predict("question, context -> answer", lm: %{module: DSEx.LM.Static, opts: []})
-    retriever = DSEx.Retrieve.Memory.new([%{text: "France has capital Paris"}])
+    base = Imp.predict("question, context -> answer", lm: %{module: Imp.LM.Static, opts: []})
+    retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}])
 
-    assert_raise ArgumentError, ~r/DSEx\.Predict\.RAG\.new\/3: expected keyword options/, fn ->
-      DSEx.rag(base, retriever, :not_options)
+    assert_raise ArgumentError, ~r/Imp\.Predict\.RAG\.new\/3: expected keyword options/, fn ->
+      Imp.rag(base, retriever, :not_options)
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Predict\.RAG\.new\/3: invalid value for :hops option: expected positive integer/,
+                 ~r/Imp\.Predict\.RAG\.new\/3: invalid value for :hops option: expected positive integer/,
                  fn ->
-                   DSEx.rag(base, retriever, hops: 0)
+                   Imp.rag(base, retriever, hops: 0)
                  end
 
-    rag = DSEx.rag(base, retriever)
+    rag = Imp.rag(base, retriever)
 
-    assert {:error, {:invalid_rag_inputs, message}} = DSEx.Predict.RAG.call(rag, :not_inputs)
+    assert {:error, {:invalid_rag_inputs, message}} = Imp.Predict.RAG.call(rag, :not_inputs)
     assert message =~ "expected a map or field pair list"
 
     assert {:error, {:invalid_rag_inputs, "expected inputs as {key, value} pairs"}} =
-             DSEx.Predict.RAG.call(rag, [:not_a_pair])
+             Imp.Predict.RAG.call(rag, [:not_a_pair])
 
-    bad_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [:not_a_doc]} end)
+    bad_doc_rag = Imp.rag(base, fn _query, _opts -> {:ok, [:not_a_doc]} end)
 
     assert {:error, {:invalid_retriever_document, :not_a_doc}} =
-             DSEx.Predict.RAG.call(bad_doc_rag, %{question: "capital France"})
+             Imp.Predict.RAG.call(bad_doc_rag, %{question: "capital France"})
 
-    bad_pair_doc_rag = DSEx.rag(base, fn _query, _opts -> {:ok, [[:not_a_pair]]} end)
+    bad_pair_doc_rag = Imp.rag(base, fn _query, _opts -> {:ok, [[:not_a_pair]]} end)
 
     assert {:error, {:invalid_retriever_document, [:not_a_pair]}} =
-             DSEx.Predict.RAG.call(bad_pair_doc_rag, %{question: "capital France"})
+             Imp.Predict.RAG.call(bad_pair_doc_rag, %{question: "capital France"})
   end
 
   test "react and code act execute operational loops" do
     react_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{answer: "pong"}}]}
@@ -628,120 +628,120 @@ defmodule PublicSurfaceTest do
       ]
     }
 
-    agent = DSEx.react("question -> answer", [], lm: react_lm, max_iters: 2)
-    assert {:ok, pred} = DSEx.Predict.ReAct.call(agent, %{question: "ping"})
-    assert DSEx.Prediction.get(pred, :answer) == "pong"
+    agent = Imp.react("question -> answer", [], lm: react_lm, max_iters: 2)
+    assert {:ok, pred} = Imp.Predict.ReAct.call(agent, %{question: "ping"})
+    assert Imp.Prediction.get(pred, :answer) == "pong"
 
     pot_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{program: "n * n"} end]
     }
 
-    code_act = DSEx.code_act("n -> answer", [], lm: pot_lm)
-    assert {:ok, code_pred} = DSEx.Predict.CodeAct.call(code_act, %{n: 5})
-    assert DSEx.Prediction.get(code_pred, :answer) == 25
+    code_act = Imp.code_act("n -> answer", [], lm: pot_lm)
+    assert {:ok, code_pred} = Imp.Predict.CodeAct.call(code_act, %{n: 5})
+    assert Imp.Prediction.get(code_pred, :answer) == 25
   end
 
   test "program of thought and code act default computed values to the task output field" do
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{program: "n * 2"} end]
     }
 
-    pot = DSEx.program_of_thought("n -> doubled", lm: lm)
-    assert {:ok, pot_pred} = DSEx.call(pot, %{n: 3})
-    assert DSEx.Prediction.get(pot_pred, :doubled) == 6
-    refute Map.has_key?(DSEx.Prediction.to_map(pot_pred), :answer)
+    pot = Imp.program_of_thought("n -> doubled", lm: lm)
+    assert {:ok, pot_pred} = Imp.call(pot, %{n: 3})
+    assert Imp.Prediction.get(pot_pred, :doubled) == 6
+    refute Map.has_key?(Imp.Prediction.to_map(pot_pred), :answer)
 
-    code_act = DSEx.code_act("n -> doubled", [], lm: lm)
-    assert {:ok, code_pred} = DSEx.call(code_act, %{n: 3})
-    assert DSEx.Prediction.get(code_pred, :doubled) == 6
-    refute Map.has_key?(DSEx.Prediction.to_map(code_pred), :answer)
+    code_act = Imp.code_act("n -> doubled", [], lm: lm)
+    assert {:ok, code_pred} = Imp.call(code_act, %{n: 3})
+    assert Imp.Prediction.get(code_pred, :doubled) == 6
+    refute Map.has_key?(Imp.Prediction.to_map(code_pred), :answer)
 
     assert_raise ArgumentError, ~r/:output_field must be one of the signature outputs/, fn ->
-      DSEx.program_of_thought("n -> doubled", lm: lm, output_field: :answer)
+      Imp.program_of_thought("n -> doubled", lm: lm, output_field: :answer)
     end
   end
 
   test "optimizer public surface composes programs" do
-    metric = DSEx.Metrics.exact_match(:answer)
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    metric = Imp.Metrics.exact_match(:answer)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
-      DSEx.example(question: "2+2?", answer: "4")
-      |> DSEx.with_inputs(:question),
-      DSEx.example(question: "sqrt 16?", answer: "4")
-      |> DSEx.with_inputs(:question)
+      Imp.example(question: "2+2?", answer: "4")
+      |> Imp.with_inputs(:question),
+      Imp.example(question: "sqrt 16?", answer: "4")
+      |> Imp.with_inputs(:question)
     ]
 
     knn =
-      DSEx.Optimizer.KNNFewShot.new(1, trainset)
-      |> DSEx.Optimizer.KNNFewShot.compile(program)
+      Imp.Optimizer.KNNFewShot.new(1, trainset)
+      |> Imp.Optimizer.KNNFewShot.compile(program)
 
-    assert {:ok, knn_pred} = DSEx.Optimizer.KNNFewShot.Program.call(knn, %{question: "2+2?"})
+    assert {:ok, knn_pred} = Imp.Optimizer.KNNFewShot.Program.call(knn, %{question: "2+2?"})
     assert knn_pred.metadata.knn_few_shot.demo_count == 1
     assert [demo] = knn_pred.metadata.knn_few_shot.demos
-    assert DSEx.Example.get(demo, :question) == "2+2?"
+    assert Imp.Example.get(demo, :question) == "2+2?"
 
     ensemble =
-      DSEx.Optimizer.Ensemble.new(
+      Imp.Optimizer.Ensemble.new(
         reduce_fn: fn preds ->
-          DSEx.Prediction.new(answer: DSEx.Predict.Aggregation.majority(preds, field: :answer))
+          Imp.Prediction.new(answer: Imp.Predict.Aggregation.majority(preds, field: :answer))
         end
       )
-      |> DSEx.Optimizer.Ensemble.compile([program, program])
+      |> Imp.Optimizer.Ensemble.compile([program, program])
 
     assert {:ok, ens_pred} =
-             DSEx.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
+             Imp.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
 
-    assert DSEx.Prediction.get(ens_pred, :answer) == "4"
+    assert Imp.Prediction.get(ens_pred, :answer) == "4"
 
     better =
-      DSEx.Optimizer.BetterTogether.new(metric, %{
-        p: DSEx.Optimizer.LabeledFewShot.new(k: 1)
+      Imp.Optimizer.BetterTogether.new(metric, %{
+        p: Imp.Optimizer.LabeledFewShot.new(k: 1)
       })
 
     compiled =
-      DSEx.Optimizer.BetterTogether.compile(better, program, trainset, trainset, strategy: "p")
+      Imp.Optimizer.BetterTogether.compile(better, program, trainset, trainset, strategy: "p")
 
-    assert {:ok, _} = DSEx.Predict.Predict.call(compiled, %{question: "2+2?"})
+    assert {:ok, _} = Imp.Predict.Predict.call(compiled, %{question: "2+2?"})
   end
 
   test "knn few-shot reports retrieval failures and rejects negative k" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 ~r/Imp\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
                  fn ->
-                   DSEx.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
+                   Imp.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
                  end
 
     empty =
-      DSEx.Optimizer.KNNFewShot.new(0, [
-        DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+      Imp.Optimizer.KNNFewShot.new(0, [
+        Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
       ])
-      |> DSEx.Optimizer.KNNFewShot.compile(program)
+      |> Imp.Optimizer.KNNFewShot.compile(program)
 
-    assert {:ok, prediction} = DSEx.Optimizer.KNNFewShot.Program.call(empty, %{question: "2+2?"})
+    assert {:ok, prediction} = Imp.Optimizer.KNNFewShot.Program.call(empty, %{question: "2+2?"})
     assert prediction.metadata.knn_few_shot.demo_count == 0
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3 expects k to be a non-negative integer/,
+                 ~r/Imp\.Optimizer\.KNNFewShot\.new\/3 expects k to be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.KNNFewShot.new(-2, [
-                     DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+                   Imp.Optimizer.KNNFewShot.new(-2, [
+                     Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
                    ])
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.KNNFewShot\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 ~r/Imp\.Optimizer\.KNNFewShot\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
                  fn ->
-                   DSEx.Optimizer.KNNFewShot.new(
+                   Imp.Optimizer.KNNFewShot.new(
                      1,
                      [
-                       DSEx.example(question: "2+2?", answer: "4") |> DSEx.with_inputs(:question)
+                       Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
                      ],
                      field: ""
                    )
@@ -749,116 +749,116 @@ defmodule PublicSurfaceTest do
   end
 
   test "ensemble captures child failures and reducer failures as structured results" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     ensemble =
-      DSEx.Optimizer.Ensemble.new()
-      |> DSEx.Optimizer.Ensemble.compile([program, %ExplodingProgram{}])
+      Imp.Optimizer.Ensemble.new()
+      |> Imp.Optimizer.Ensemble.compile([program, %ExplodingProgram{}])
 
     assert {:ok, prediction} =
-             DSEx.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
+             Imp.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
 
-    assert [{:ok, %DSEx.Prediction{}}, {:error, {:ensemble_program_failed, "program exploded"}}] =
-             DSEx.Prediction.get(prediction, :outputs)
+    assert [{:ok, %Imp.Prediction{}}, {:error, {:ensemble_program_failed, "program exploded"}}] =
+             Imp.Prediction.get(prediction, :outputs)
 
     reducer =
-      DSEx.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> raise "reducer exploded" end)
-      |> DSEx.Optimizer.Ensemble.compile([program])
+      Imp.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> raise "reducer exploded" end)
+      |> Imp.Optimizer.Ensemble.compile([program])
 
-    assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %DSEx.Prediction{}}]}} =
-             DSEx.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
+    assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %Imp.Prediction{}}]}} =
+             Imp.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
   end
 
   test "composition optimizer constructors reject invalid boundary contracts" do
-    metric = DSEx.Metrics.exact_match(:answer)
+    metric = Imp.Metrics.exact_match(:answer)
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: expected keyword options/,
+                 ~r/Imp\.Optimizer\.Ensemble\.new\/1: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.Ensemble.new(%{size: 1})
+                   Imp.Optimizer.Ensemble.new(%{size: 1})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: invalid value for :reduce_fn option: expected nil or an arity-1 function/,
+                 ~r/Imp\.Optimizer\.Ensemble\.new\/1: invalid value for :reduce_fn option: expected nil or an arity-1 function/,
                  fn ->
-                   DSEx.Optimizer.Ensemble.new(reduce_fn: fn -> %{} end)
+                   Imp.Optimizer.Ensemble.new(reduce_fn: fn -> %{} end)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.Ensemble\.new\/1: .*:size.*non negative integer/s,
+                 ~r/Imp\.Optimizer\.Ensemble\.new\/1: .*:size.*non negative integer/s,
                  fn ->
-                   DSEx.Optimizer.Ensemble.new(size: -1)
+                   Imp.Optimizer.Ensemble.new(size: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.Ensemble\.compile\/2 expects an enumerable of programs/,
+                 ~r/Imp\.Optimizer\.Ensemble\.compile\/2 expects an enumerable of programs/,
                  fn ->
-                   DSEx.Optimizer.Ensemble.new() |> DSEx.Optimizer.Ensemble.compile(:not_programs)
+                   Imp.Optimizer.Ensemble.new() |> Imp.Optimizer.Ensemble.compile(:not_programs)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SignatureOptimizer\.new\/2: expected keyword options/,
+                 ~r/Imp\.Optimizer\.SignatureOptimizer\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.SignatureOptimizer.new(metric, %{candidates: []})
+                   Imp.Optimizer.SignatureOptimizer.new(metric, %{candidates: []})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SignatureOptimizer\.new\/2 expects a metric function with arity 2 or 3/,
+                 ~r/Imp\.Optimizer\.SignatureOptimizer\.new\/2 expects a metric function with arity 2 or 3/,
                  fn ->
-                   DSEx.Optimizer.SignatureOptimizer.new(fn _example -> true end)
+                   Imp.Optimizer.SignatureOptimizer.new(fn _example -> true end)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.BetterTogether\.new\/2 expects optimizers to be an enumerable of key\/value pairs/,
+                 ~r/Imp\.Optimizer\.BetterTogether\.new\/2 expects optimizers to be an enumerable of key\/value pairs/,
                  fn ->
-                   DSEx.Optimizer.BetterTogether.new(metric, :not_optimizers)
+                   Imp.Optimizer.BetterTogether.new(metric, :not_optimizers)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.BetterTogether\.new\/2 expects a metric function with arity 2/,
+                 ~r/Imp\.Optimizer\.BetterTogether\.new\/2 expects a metric function with arity 2/,
                  fn ->
-                   DSEx.Optimizer.BetterTogether.new(fn _example, _prediction, _trace -> true end)
+                   Imp.Optimizer.BetterTogether.new(fn _example, _prediction, _trace -> true end)
                  end
 
-    better = DSEx.Optimizer.BetterTogether.new(metric, %{p: DSEx.Optimizer.LabeledFewShot.new()})
+    better = Imp.Optimizer.BetterTogether.new(metric, %{p: Imp.Optimizer.LabeledFewShot.new()})
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.BetterTogether\.compile\/5: expected keyword options/,
+                 ~r/Imp\.Optimizer\.BetterTogether\.compile\/5: expected keyword options/,
                  fn ->
                    lm = %{
-                     module: DSEx.LM.Static,
+                     module: Imp.LM.Static,
                      opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
                    }
 
-                   program = DSEx.predict("question -> answer", lm: lm)
+                   program = Imp.predict("question -> answer", lm: lm)
 
-                   DSEx.Optimizer.BetterTogether.compile(better, program, [], [], %{
+                   Imp.Optimizer.BetterTogether.compile(better, program, [], [], %{
                      strategy: "p"
                    })
                  end
   end
 
   test "ensemble reducer can return plain prediction fields" do
-    lm = %{module: DSEx.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-    program = DSEx.predict("question -> answer", lm: lm)
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    program = Imp.predict("question -> answer", lm: lm)
 
     ensemble =
-      DSEx.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> %{answer: "4"} end)
-      |> DSEx.Optimizer.Ensemble.compile([program])
+      Imp.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> %{answer: "4"} end)
+      |> Imp.Optimizer.Ensemble.compile([program])
 
     assert {:ok, prediction} =
-             DSEx.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
+             Imp.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
 
-    assert DSEx.Prediction.get(prediction, :answer) == "4"
+    assert Imp.Prediction.get(prediction, :answer) == "4"
   end
 
   test "evaluation metrics, auto-evaluation, streaming messages, datasets, cache, and core structs work" do
-    assert DSEx.Metrics.em("The Answer!", ["answer"])
-    assert DSEx.Metrics.f1("red blue", "red green") > 0
+    assert Imp.Metrics.em("The Answer!", ["answer"])
+    assert Imp.Metrics.f1("red blue", "red green") > 0
 
     lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
           %{reasoning: "judge", precision: 1, recall: 1, f1: 1, completeness: 1, groundedness: 1}
@@ -867,45 +867,45 @@ defmodule PublicSurfaceTest do
     }
 
     assert {:ok, sem} =
-             DSEx.Evaluate.SemanticF1.new(lm: lm)
-             |> DSEx.Evaluate.SemanticF1.call(%{
+             Imp.Evaluate.SemanticF1.new(lm: lm)
+             |> Imp.Evaluate.SemanticF1.call(%{
                question: "q",
                ground_truth: "a",
                system_response: "a"
              })
 
-    assert DSEx.Prediction.get(sem, :f1) == 1
+    assert Imp.Prediction.get(sem, :f1) == 1
 
     provider =
-      %DSEx.Streaming.Messages.StatusMessageProvider{}
-      |> DSEx.Streaming.Messages.StatusMessageProvider.push(
-        %DSEx.Streaming.Messages.StatusMessage{message: "ok"}
-      )
+      %Imp.Streaming.Messages.StatusMessageProvider{}
+      |> Imp.Streaming.Messages.StatusMessageProvider.push(%Imp.Streaming.Messages.StatusMessage{
+        message: "ok"
+      })
 
     assert length(provider.messages) == 1
 
     listener =
-      %DSEx.Streaming.Messages.StreamListener{}
-      |> DSEx.Streaming.Messages.StreamListener.record(:chunk)
+      %Imp.Streaming.Messages.StreamListener{}
+      |> Imp.Streaming.Messages.StreamListener.record(:chunk)
 
     assert listener.events == [:chunk]
 
-    assert %DSEx.Streaming.Messages.StreamResponse{chunk: "ok", done: true} =
-             %DSEx.Streaming.Messages.StreamResponse{chunk: "ok", done: true}
+    assert %Imp.Streaming.Messages.StreamResponse{chunk: "ok", done: true} =
+             %Imp.Streaming.Messages.StreamResponse{chunk: "ok", done: true}
 
     examples =
-      DSEx.Datasets.Colors.load([
+      Imp.Datasets.Colors.load([
         %{input: "red", label: "warm"},
         %{input: "blue", label: "cool"}
       ])
 
-    dataset = DSEx.Datasets.Dataset.new(examples, train: 0.5)
+    dataset = Imp.Datasets.Dataset.new(examples, train: 0.5)
     assert length(dataset.train) == 1
 
-    assert DSEx.Cache.put(:x, 42) == 42
-    assert DSEx.Cache.get(:x) == 42
+    assert Imp.Cache.put(:x, 42) == 42
+    assert Imp.Cache.get(:x) == 42
 
-    assert %DSEx.Core.LMRequest{messages: [%DSEx.Core.User{content: "hi"}]}
+    assert %Imp.Core.LMRequest{messages: [%Imp.Core.User{content: "hi"}]}
   end
 
   test "documented public modules and facade constructors remain available" do
@@ -976,28 +976,28 @@ defmodule PublicSurfaceTest do
     ]
 
     assert Enum.all?(facade_exports, fn {name, arity} ->
-             function_exported?(DSEx, name, arity)
+             function_exported?(Imp, name, arity)
            end)
 
-    assert %DSEx.Clients.ReqLLM{} = DSEx.req_llm("openai:gpt-test")
+    assert %Imp.Clients.ReqLLM{} = Imp.req_llm("openai:gpt-test")
 
-    assert %DSEx.Retrievers.HTTP{} = DSEx.Retrievers.HTTP.new("https://retriever.example")
-    assert %DSEx.MCP.HTTPClient{} = DSEx.MCP.HTTPClient.new("https://mcp.example")
+    assert %Imp.Retrievers.HTTP{} = Imp.Retrievers.HTTP.new("https://retriever.example")
+    assert %Imp.MCP.HTTPClient{} = Imp.MCP.HTTPClient.new("https://mcp.example")
 
-    assert %DSEx.MCP.StreamableHTTPClient{} =
-             DSEx.MCP.StreamableHTTPClient.new("https://mcp.example")
+    assert %Imp.MCP.StreamableHTTPClient{} =
+             Imp.MCP.StreamableHTTPClient.new("https://mcp.example")
 
-    assert %DSEx.Clients.HTTPTrainer{} =
-             DSEx.Clients.OpenAITrainer.new(training_file: "file-test")
+    assert %Imp.Clients.HTTPTrainer{} =
+             Imp.Clients.OpenAITrainer.new(training_file: "file-test")
   end
 
   test "documented product modules are deliberately included in the public surface" do
     public = MapSet.new(@public_modules)
 
     missing =
-      :dsex
+      :imp
       |> Application.spec(:modules)
-      |> Enum.filter(&dsex_module?/1)
+      |> Enum.filter(&imp_module?/1)
       |> Enum.filter(&documented_module?/1)
       |> Enum.reject(&MapSet.member?(public, &1))
       |> Enum.sort()
@@ -1014,10 +1014,10 @@ defmodule PublicSurfaceTest do
     assert undocumented == []
   end
 
-  test "borrowed adapter aliases do not leak into the DSEx product surface" do
+  test "borrowed adapter aliases do not leak into the Imp product surface" do
     borrowed_name = "BA" <> "ML"
 
-    refute Code.ensure_loaded?(Module.concat(DSEx.Adapter, String.to_atom(borrowed_name)))
+    refute Code.ensure_loaded?(Module.concat(Imp.Adapter, String.to_atom(borrowed_name)))
 
     docs =
       ["README.md" | Path.wildcard("docs/*.md")]
@@ -1027,10 +1027,10 @@ defmodule PublicSurfaceTest do
     refute docs =~ borrowed_name
   end
 
-  defp dsex_module?(module) do
+  defp imp_module?(module) do
     module
     |> Atom.to_string()
-    |> String.starts_with?("Elixir.DSEx")
+    |> String.starts_with?("Elixir.Imp")
   end
 
   defp documented_module?(module) do

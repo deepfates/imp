@@ -2,21 +2,21 @@ defmodule OptimizerBehavioralCorpusTest do
   use ExUnit.Case
 
   defmodule ErrorLM do
-    @behaviour DSEx.LM
+    @behaviour Imp.LM
 
     @impl true
     def generate(_messages, _opts), do: {:error, :offline_candidate}
   end
 
-  defp metric, do: DSEx.Metrics.exact_match(:answer)
+  defp metric, do: Imp.Metrics.exact_match(:answer)
 
   defp evaluator(program),
-    do: DSEx.Evaluate.run(DSEx.Evaluate.new(devset(), metric()), program)
+    do: Imp.Evaluate.run(Imp.Evaluate.new(devset(), metric()), program)
 
   defp france_program do
-    DSEx.predict("question -> answer",
+    Imp.predict("question -> answer",
       lm: %{
-        module: DSEx.LM.Static,
+        module: Imp.LM.Static,
         opts: [
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -34,15 +34,15 @@ defmodule OptimizerBehavioralCorpusTest do
 
   defp trainset do
     [
-      DSEx.example(question: "What is the capital of France?", answer: "Paris")
-      |> DSEx.Example.with_inputs(:question)
+      Imp.example(question: "What is the capital of France?", answer: "Paris")
+      |> Imp.Example.with_inputs(:question)
     ]
   end
 
   defp devset do
     [
-      DSEx.example(question: "Capital of France?", answer: "Paris")
-      |> DSEx.Example.with_inputs(:question)
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.Example.with_inputs(:question)
     ]
   end
 
@@ -51,7 +51,7 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     optimizer =
-      DSEx.Optimizer.MIPROv2.new(metric(),
+      Imp.Optimizer.MIPROv2.new(metric(),
         auto: nil,
         num_candidates: 5,
         num_trials: 5,
@@ -61,8 +61,8 @@ defmodule OptimizerBehavioralCorpusTest do
         startup_trials: 2
       )
 
-    compiled = DSEx.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :mipro_v2
     assert report.metadata.algorithm == :mipro_v2
@@ -84,7 +84,7 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.MIPROv2.new(metric(),
+      Imp.Optimizer.MIPROv2.new(metric(),
         auto: nil,
         num_candidates: 1,
         num_trials: 0,
@@ -93,9 +93,9 @@ defmodule OptimizerBehavioralCorpusTest do
         minibatch: false,
         startup_trials: 0
       )
-      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), devset())
+      |> Imp.Optimizer.MIPROv2.compile(program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :mipro_v2
     assert report.best_score == baseline_score
@@ -112,7 +112,7 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/valset must be enumerable/, fn ->
-      DSEx.Optimizer.MIPROv2.new(metric(),
+      Imp.Optimizer.MIPROv2.new(metric(),
         auto: nil,
         num_candidates: 2,
         num_trials: 2,
@@ -120,7 +120,7 @@ defmodule OptimizerBehavioralCorpusTest do
         max_labeled_demos: 1,
         minibatch: false
       )
-      |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
+      |> Imp.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
     end
   end
 
@@ -128,7 +128,7 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
-      DSEx.Optimizer.MIPROv2.new(metric(),
+      Imp.Optimizer.MIPROv2.new(metric(),
         auto: nil,
         num_candidates: 1,
         num_trials: 1,
@@ -136,7 +136,7 @@ defmodule OptimizerBehavioralCorpusTest do
         max_labeled_demos: 1,
         minibatch: false
       )
-      |> DSEx.Optimizer.MIPROv2.compile(program, :not_an_enumerable_trainset, devset())
+      |> Imp.Optimizer.MIPROv2.compile(program, :not_an_enumerable_trainset, devset())
     end
   end
 
@@ -144,21 +144,21 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     optimizer =
-      DSEx.Optimizer.GEPA.new(metric(),
+      Imp.Optimizer.GEPA.new(metric(),
         generations: 2,
         max_metric_calls: 20,
         max_full_evaluations: 5,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
 
-    compiled = DSEx.Optimizer.GEPA.compile(optimizer, program, trainset(), devset())
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.Optimizer.GEPA.compile(optimizer, program, trainset(), devset())
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.best_score == 1.0
     assert report.best_score == evaluator(compiled).score
     assert report.metadata.feedback =~ "Always answer Paris"
-    assert report.metadata.implementation == DSEx.Optimizer.GEPA
+    assert report.metadata.implementation == Imp.Optimizer.GEPA
     assert report.metadata.max_metric_calls == 20
     assert report.metadata.max_full_evaluations == 5
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
@@ -169,13 +169,13 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.GEPA.new(metric(),
+      Imp.Optimizer.GEPA.new(metric(),
         generations: 0,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
-      |> DSEx.Optimizer.GEPA.compile(program, trainset(), devset())
+      |> Imp.Optimizer.GEPA.compile(program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.best_score == baseline_score
@@ -186,18 +186,18 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "GEPA records program call failures as optimizer feedback instead of crashing" do
     broken_program =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         lm: %{module: ErrorLM, opts: []}
       )
 
     compiled =
-      DSEx.Optimizer.GEPA.new(metric(),
+      Imp.Optimizer.GEPA.new(metric(),
         generations: 1,
         feedback_fn: fn _trainset -> "Recover from malformed candidate outputs." end
       )
-      |> DSEx.Optimizer.GEPA.compile(broken_program, trainset(), devset())
+      |> Imp.Optimizer.GEPA.compile(broken_program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.best_score == 0.0
@@ -211,15 +211,15 @@ defmodule OptimizerBehavioralCorpusTest do
     reason = String.duplicate("é", 241)
 
     broken_program =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         lm: fn _messages, _opts -> {:error, reason} end
       )
 
     compiled =
-      DSEx.Optimizer.GEPA.new(metric(), generations: 1)
-      |> DSEx.Optimizer.GEPA.compile(broken_program, trainset(), devset())
+      Imp.Optimizer.GEPA.new(metric(), generations: 1)
+      |> Imp.Optimizer.GEPA.compile(broken_program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert Enum.all?(report.candidates, fn candidate ->
              String.valid?(candidate.instruction) and String.valid?(candidate.mutation)
@@ -228,13 +228,13 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "GEPA reports feedback callback failures and falls back to default feedback" do
     compiled =
-      DSEx.Optimizer.GEPA.new(metric(),
+      Imp.Optimizer.GEPA.new(metric(),
         generations: 1,
         feedback_fn: fn _trainset -> raise "feedback service offline" end
       )
-      |> DSEx.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.metadata.status == :with_errors
@@ -255,13 +255,13 @@ defmodule OptimizerBehavioralCorpusTest do
     exploding_metric = fn _example, _prediction -> raise "metric unavailable" end
 
     compiled =
-      DSEx.Optimizer.GEPA.new(exploding_metric,
+      Imp.Optimizer.GEPA.new(exploding_metric,
         generations: 1,
         feedback_fn: fn _trainset -> "Try to improve." end
       )
-      |> DSEx.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :gepa
     assert report.best_score == 0.0
@@ -279,15 +279,15 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     optimizer =
-      DSEx.Optimizer.SIMBA.new(metric(),
+      Imp.Optimizer.SIMBA.new(metric(),
         bsize: 1,
         num_candidates: 1,
         max_steps: 3,
         max_demos: 1
       )
 
-    compiled = DSEx.Optimizer.SIMBA.compile(optimizer, program, trainset(), devset())
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.Optimizer.SIMBA.compile(optimizer, program, trainset(), devset())
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :simba
     assert report.metadata.algorithm == :stochastic_introspective_minibatch_ascent
@@ -302,10 +302,10 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.SIMBA.new(metric(), bsize: 1, max_steps: 0, max_demos: 0)
-      |> DSEx.Optimizer.SIMBA.compile(program, trainset(), devset())
+      Imp.Optimizer.SIMBA.new(metric(), bsize: 1, max_steps: 0, max_demos: 0)
+      |> Imp.Optimizer.SIMBA.compile(program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :simba
     assert report.best_score == baseline_score
@@ -318,7 +318,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "SIMBA records an explicitly configured reflection model" do
     prompt_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(self(), {:simba_judge, messages})
@@ -328,15 +328,15 @@ defmodule OptimizerBehavioralCorpusTest do
     }
 
     compiled =
-      DSEx.Optimizer.SIMBA.new(metric(),
+      Imp.Optimizer.SIMBA.new(metric(),
         bsize: 1,
         max_steps: 1,
         max_demos: 1,
         prompt_lm: prompt_lm
       )
-      |> DSEx.Optimizer.SIMBA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.SIMBA.compile(france_program(), trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
     refute Map.has_key?(report.metadata, :compatibility)
     assert report.best_score >= 0.0
     refute_received {:simba_judge, _messages}
@@ -346,8 +346,8 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/final_set must be enumerable/, fn ->
-      DSEx.Optimizer.SIMBA.new(metric(), max_steps: 2, max_demos: 1)
-      |> DSEx.Optimizer.SIMBA.compile(program, trainset(), :not_an_enumerable_devset)
+      Imp.Optimizer.SIMBA.new(metric(), max_steps: 2, max_demos: 1)
+      |> Imp.Optimizer.SIMBA.compile(program, trainset(), :not_an_enumerable_devset)
     end
   end
 
@@ -355,8 +355,8 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
-      DSEx.Optimizer.SIMBA.new(metric(), max_steps: 1, max_demos: 1)
-      |> DSEx.Optimizer.SIMBA.compile(program, :not_an_enumerable_trainset, devset())
+      Imp.Optimizer.SIMBA.new(metric(), max_steps: 1, max_demos: 1)
+      |> Imp.Optimizer.SIMBA.compile(program, :not_an_enumerable_trainset, devset())
     end
   end
 
@@ -364,14 +364,14 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     optimizer =
-      DSEx.Optimizer.COPRO.new(metric(),
+      Imp.Optimizer.COPRO.new(metric(),
         breadth: 6,
         depth: 2,
         extra_instructions: ["Always answer Paris when asked about France."]
       )
 
-    compiled = DSEx.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    compiled = Imp.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
     assert report.best_score == 1.0
@@ -387,10 +387,10 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     compiled =
-      DSEx.Optimizer.COPRO.new(metric(), breadth: 0, depth: 0)
-      |> DSEx.Optimizer.COPRO.compile(program, trainset(), devset())
+      Imp.Optimizer.COPRO.new(metric(), breadth: 0, depth: 0)
+      |> Imp.Optimizer.COPRO.compile(program, trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
     assert report.best_score == baseline_score
@@ -406,10 +406,10 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     compiled =
-      DSEx.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
-      |> DSEx.Optimizer.COPRO.compile(program, [:not_an_example], devset())
+      Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
+      |> Imp.Optimizer.COPRO.compile(program, [:not_an_example], devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
     assert report.metadata.status == :ok
@@ -421,123 +421,123 @@ defmodule OptimizerBehavioralCorpusTest do
 
   test "advanced optimizer constructors reject invalid option containers at the boundary" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: expected keyword options/,
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.COPRO.new(metric(), %{depth: 1})
+                   Imp.Optimizer.COPRO.new(metric(), %{depth: 1})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: expected keyword options/,
+                 ~r/Imp\.Optimizer\.MIPROv2\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), %{num_trials: 1})
+                   Imp.Optimizer.MIPROv2.new(metric(), %{num_trials: 1})
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2: expected keyword options/,
+                 ~r/Imp\.Optimizer\.SIMBA\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.SIMBA.new(metric(), %{steps: 1})
+                   Imp.Optimizer.SIMBA.new(metric(), %{steps: 1})
                  end
 
-    assert_raise ArgumentError, ~r/DSEx\.Optimizer\.GEPA\.new\/2: expected keyword options/, fn ->
-      DSEx.Optimizer.GEPA.new(metric(), %{generations: 1})
+    assert_raise ArgumentError, ~r/Imp\.Optimizer\.GEPA\.new\/2: expected keyword options/, fn ->
+      Imp.Optimizer.GEPA.new(metric(), %{generations: 1})
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :depth option: expected non negative integer/,
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2: invalid value for :depth option: expected non negative integer/,
                  fn ->
-                   DSEx.Optimizer.COPRO.new(metric(), depth: -1)
+                   Imp.Optimizer.COPRO.new(metric(), depth: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :breadth option: expected non negative integer/,
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2: invalid value for :breadth option: expected non negative integer/,
                  fn ->
-                   DSEx.Optimizer.COPRO.new(metric(), breadth: -1)
+                   Imp.Optimizer.COPRO.new(metric(), breadth: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/num_trials must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), num_trials: -1)
+                   Imp.Optimizer.MIPROv2.new(metric(), num_trials: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/max_labeled_demos must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), max_labeled_demos: -1)
+                   Imp.Optimizer.MIPROv2.new(metric(), max_labeled_demos: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/startup_trials must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), startup_trials: -1)
+                   Imp.Optimizer.MIPROv2.new(metric(), startup_trials: -1)
                  end
 
     for alias <- [:trials, :demos_per_candidate, :cold_start] do
       assert_raise ArgumentError, ~r/unknown MIPROv2 options/, fn ->
-        DSEx.Optimizer.MIPROv2.new(metric(), [{alias, 1}])
+        Imp.Optimizer.MIPROv2.new(metric(), [{alias, 1}])
       end
     end
 
     assert_raise ArgumentError,
                  ~r/max_steps must be an integer >= 0/,
                  fn ->
-                   DSEx.Optimizer.SIMBA.new(metric(), max_steps: -1)
+                   Imp.Optimizer.SIMBA.new(metric(), max_steps: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/max_demos must be an integer >= 0/,
                  fn ->
-                   DSEx.Optimizer.SIMBA.new(metric(), max_demos: -1)
+                   Imp.Optimizer.SIMBA.new(metric(), max_demos: -1)
                  end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.GEPA\.new\/2: invalid value for :generations option: expected non negative integer/,
+                 ~r/Imp\.Optimizer\.GEPA\.new\/2: invalid value for :generations option: expected non negative integer/,
                  fn ->
-                   DSEx.Optimizer.GEPA.new(metric(), generations: -1)
+                   Imp.Optimizer.GEPA.new(metric(), generations: -1)
                  end
   end
 
   test "advanced optimizer constructors reject invalid callback contracts at the boundary" do
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.COPRO\.new\/2 expects a metric function with arity 2 or 3/,
-                 fn -> DSEx.Optimizer.COPRO.new(fn _example -> true end) end
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> Imp.Optimizer.COPRO.new(fn _example -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.MIPROv2\.new\/2 expects a metric function with arity 2 or 3/,
-                 fn -> DSEx.Optimizer.MIPROv2.new(fn _example -> true end) end
+                 ~r/Imp\.Optimizer\.MIPROv2\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> Imp.Optimizer.MIPROv2.new(fn _example -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.SIMBA\.new\/2 expects a metric function with arity 2 or 3/,
-                 fn -> DSEx.Optimizer.SIMBA.new(fn _example -> true end) end
+                 ~r/Imp\.Optimizer\.SIMBA\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> Imp.Optimizer.SIMBA.new(fn _example -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.GEPA\.new\/2 expects a metric function with arity 2/,
-                 fn -> DSEx.Optimizer.GEPA.new(fn _example, _prediction, _trace -> true end) end
+                 ~r/Imp\.Optimizer\.GEPA\.new\/2 expects a metric function with arity 2/,
+                 fn -> Imp.Optimizer.GEPA.new(fn _example, _prediction, _trace -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.GEPA\.new\/2: invalid value for :feedback_fn option: expected nil or an arity-1 function/,
-                 fn -> DSEx.Optimizer.GEPA.new(metric(), feedback_fn: fn -> "feedback" end) end
+                 ~r/Imp\.Optimizer\.GEPA\.new\/2: invalid value for :feedback_fn option: expected nil or an arity-1 function/,
+                 fn -> Imp.Optimizer.GEPA.new(metric(), feedback_fn: fn -> "feedback" end) end
 
     assert_raise ArgumentError,
-                 ~r/DSEx\.Optimizer\.COPRO\.new\/2: invalid value for :proposer_lm option: expected nil, an LM module/,
-                 fn -> DSEx.Optimizer.COPRO.new(metric(), proposer_lm: %{provider: :missing}) end
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2: invalid value for :proposer_lm option: expected nil, an LM module/,
+                 fn -> Imp.Optimizer.COPRO.new(metric(), proposer_lm: %{provider: :missing}) end
 
     assert_raise ArgumentError,
                  ~r/prompt_lm expected/,
-                 fn -> DSEx.Optimizer.SIMBA.new(metric(), prompt_lm: %{provider: :missing}) end
+                 fn -> Imp.Optimizer.SIMBA.new(metric(), prompt_lm: %{provider: :missing}) end
   end
 
   test "SIMBA rejects deprecated option aliases" do
     for alias <- [:steps, :demos_per_step, :judge_lm] do
       assert_raise ArgumentError, ~r/unknown SIMBA options/, fn ->
-        DSEx.Optimizer.SIMBA.new(metric(), [{alias, 1}])
+        Imp.Optimizer.SIMBA.new(metric(), [{alias, 1}])
       end
     end
   end
 
   test "COPRO can use LM-generated score-informed instruction proposals" do
     proposer_lm = %{
-      module: DSEx.LM.Static,
+      module: Imp.LM.Static,
       opts: [
         handler: fn messages, _opts ->
           send(self(), {:copro_proposer, messages})
@@ -547,10 +547,10 @@ defmodule OptimizerBehavioralCorpusTest do
     }
 
     compiled =
-      DSEx.Optimizer.COPRO.new(metric(), breadth: 1, depth: 1, proposer_lm: proposer_lm)
-      |> DSEx.Optimizer.COPRO.compile(france_program(), trainset(), devset())
+      Imp.Optimizer.COPRO.new(metric(), breadth: 1, depth: 1, proposer_lm: proposer_lm)
+      |> Imp.Optimizer.COPRO.compile(france_program(), trainset(), devset())
 
-    report = DSEx.Optimizer.Report.fetch(compiled)
+    report = Imp.Optimizer.Report.fetch(compiled)
     assert report.best_score == 1.0
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
     assert_received {:copro_proposer, messages}

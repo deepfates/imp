@@ -1,15 +1,15 @@
-defmodule DSEx.Optimizer.GEPA.EvaluationCacheBackendTest do
+defmodule Imp.Optimizer.GEPA.EvaluationCacheBackendTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Adapters.Types.Image
-  alias DSEx.Optimizer.GEPA.EvaluationCache.{Codec, Disk, Memory}
-  alias DSEx.Optimizer.GEPA.Result
+  alias Imp.Adapters.Types.Image
+  alias Imp.Optimizer.GEPA.EvaluationCache.{Codec, Disk, Memory}
+  alias Imp.Optimizer.GEPA.Result
 
   setup do
     run_dir =
       Path.join(
         System.tmp_dir!(),
-        "dsex-gepa-cache-#{System.unique_integer([:positive, :monotonic])}"
+        "imp-gepa-cache-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     on_exit(fn -> File.rm_rf!(run_dir) end)
@@ -190,7 +190,7 @@ defmodule DSEx.Optimizer.GEPA.EvaluationCacheBackendTest do
     example = :example
     Disk.put(cache, candidate, [example], Result.new([:ok], [1.0]))
 
-    atom_name = "dsex_untrusted_atom_#{System.unique_integer([:positive, :monotonic])}"
+    atom_name = "imp_untrusted_atom_#{System.unique_integer([:positive, :monotonic])}"
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(atom_name) end
 
@@ -199,7 +199,7 @@ defmodule DSEx.Optimizer.GEPA.EvaluationCacheBackendTest do
 
     payload =
       Map.put(artifact["payload"], "output", %{
-        "__dsex_type__" => "atom",
+        "__imp_type__" => "atom",
         "value" => atom_name
       })
 

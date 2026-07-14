@@ -4,28 +4,28 @@ defmodule TaskSupervisionTest do
   @moduletag :capture_log
 
   setup do
-    Application.ensure_all_started(:dsex)
-    DSEx.Settings.reset()
+    Application.ensure_all_started(:imp)
+    Imp.Settings.reset()
 
     on_exit(fn ->
-      Application.ensure_all_started(:dsex)
-      DSEx.Settings.reset()
+      Application.ensure_all_started(:imp)
+      Imp.Settings.reset()
     end)
 
     :ok
   end
 
-  test "DSEx starts a supervised task boundary" do
-    assert DSEx.Tasks.supervised?()
-    assert is_pid(Process.whereis(DSEx.Tasks.supervisor()))
-    assert is_pid(Process.whereis(DSEx.Tasks.unlinked_supervisor()))
+  test "Imp starts a supervised task boundary" do
+    assert Imp.Tasks.supervised?()
+    assert is_pid(Process.whereis(Imp.Tasks.supervisor()))
+    assert is_pid(Process.whereis(Imp.Tasks.unlinked_supervisor()))
   end
 
-  test "DSEx.Tasks.async runs under DSEx.TaskSupervisor when the app is started" do
+  test "Imp.Tasks.async runs under Imp.TaskSupervisor when the app is started" do
     parent = self()
 
     task =
-      DSEx.Tasks.async(fn ->
+      Imp.Tasks.async(fn ->
         send(parent, {:task_started, self()})
 
         receive do
@@ -37,29 +37,29 @@ defmodule TaskSupervisionTest do
 
     assert_receive {:task_started, pid}
     assert pid == task.pid
-    assert pid in Task.Supervisor.children(DSEx.Tasks.supervisor())
+    assert pid in Task.Supervisor.children(Imp.Tasks.supervisor())
 
     send(task.pid, :release)
     assert Task.await(task) == :ok
   end
 
-  test "DSEx.Tasks.async starts the OTP application before supervised work" do
-    :ok = Application.stop(:dsex)
-    refute Process.whereis(DSEx.TaskSupervisor)
+  test "Imp.Tasks.async starts the OTP application before supervised work" do
+    :ok = Application.stop(:imp)
+    refute Process.whereis(Imp.TaskSupervisor)
 
-    task = DSEx.Tasks.async(fn -> Process.whereis(DSEx.TaskSupervisor) end)
+    task = Imp.Tasks.async(fn -> Process.whereis(Imp.TaskSupervisor) end)
 
-    assert Task.await(task) == Process.whereis(DSEx.TaskSupervisor)
-    assert Process.whereis(DSEx.Settings)
-    assert Process.whereis(DSEx.Cache)
-    assert Process.whereis(DSEx.UnlinkedTaskSupervisor)
+    assert Task.await(task) == Process.whereis(Imp.TaskSupervisor)
+    assert Process.whereis(Imp.Settings)
+    assert Process.whereis(Imp.Cache)
+    assert Process.whereis(Imp.UnlinkedTaskSupervisor)
   end
 
-  test "DSEx.Tasks.async_nolink runs under the unlinked task supervisor" do
+  test "Imp.Tasks.async_nolink runs under the unlinked task supervisor" do
     parent = self()
 
     task =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, {:task_started, self()})
 
         receive do
@@ -71,19 +71,19 @@ defmodule TaskSupervisionTest do
 
     assert_receive {:task_started, pid}
     assert pid == task.pid
-    assert pid in Task.Supervisor.children(DSEx.Tasks.unlinked_supervisor())
-    refute pid in Task.Supervisor.children(DSEx.Tasks.supervisor())
+    assert pid in Task.Supervisor.children(Imp.Tasks.unlinked_supervisor())
+    refute pid in Task.Supervisor.children(Imp.Tasks.supervisor())
 
     send(task.pid, :release)
     assert Task.await(task) == :ok
   end
 
   test "core admission applies backpressure to excess async work" do
-    DSEx.configure(async_max_workers: 1)
+    Imp.configure(async_max_workers: 1)
     parent = self()
 
     blocker =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, {:blocked, self()})
         receive(do: (:release -> :released))
       end)
@@ -92,7 +92,7 @@ defmodule TaskSupervisionTest do
 
     submitter =
       Task.async(fn ->
-        DSEx.Tasks.async_nolink(fn -> :after_backpressure end) |> Task.await()
+        Imp.Tasks.async_nolink(fn -> :after_backpressure end) |> Task.await()
       end)
 
     assert wait_for_status(%{active: 1, queued: 1})
@@ -103,16 +103,16 @@ defmodule TaskSupervisionTest do
   end
 
   test "crashes and cancellation release async admission" do
-    DSEx.configure(async_max_workers: 1)
+    Imp.configure(async_max_workers: 1)
 
-    crashing = DSEx.Tasks.async_nolink(fn -> raise "expected worker crash" end)
+    crashing = Imp.Tasks.async_nolink(fn -> raise "expected worker crash" end)
     assert catch_exit(Task.await(crashing))
     assert wait_for_active(0)
 
     parent = self()
 
     killed =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, :killable_started)
         Process.sleep(:infinity)
       end)
@@ -123,23 +123,23 @@ defmodule TaskSupervisionTest do
     assert wait_for_active(0)
 
     cancellable =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, :cancellable_started)
         Process.sleep(:infinity)
       end)
 
     assert_receive :cancellable_started
-    assert DSEx.Tasks.cancel(cancellable, 1_000) == nil
+    assert Imp.Tasks.cancel(cancellable, 1_000) == nil
     assert wait_for_active(0)
-    assert DSEx.Tasks.async_nolink(fn -> :after_cancel end) |> Task.await() == :after_cancel
+    assert Imp.Tasks.async_nolink(fn -> :after_cancel end) |> Task.await() == :after_cancel
   end
 
   test "async_stream caps its own fan-out at the effective core limit" do
-    DSEx.configure(async_max_workers: 2)
+    Imp.configure(async_max_workers: 2)
     parent = self()
 
     stream =
-      DSEx.Tasks.async_stream(
+      Imp.Tasks.async_stream(
         1..3,
         fn item ->
           send(parent, {:stream_started, item, self()})
@@ -154,7 +154,7 @@ defmodule TaskSupervisionTest do
     assert_receive {:stream_started, second, second_pid}
     refute_receive {:stream_started, _, _}
     assert MapSet.new([first, second]) == MapSet.new([1, 2])
-    assert DSEx.Tasks.admission_status() == %{active: 2, queued: 0}
+    assert Imp.Tasks.admission_status() == %{active: 2, queued: 0}
 
     send(first_pid, :release)
     assert_receive {:stream_started, 3, third_pid}
@@ -162,67 +162,67 @@ defmodule TaskSupervisionTest do
     send(third_pid, :release)
 
     assert Task.await(runner) == [ok: 1, ok: 2, ok: 3]
-    assert DSEx.Tasks.admission_status() == %{active: 0, queued: 0}
+    assert Imp.Tasks.admission_status() == %{active: 0, queued: 0}
   end
 
   test "async_stream waits for externally saturated capacity" do
-    DSEx.configure(async_max_workers: 1)
+    Imp.configure(async_max_workers: 1)
     parent = self()
 
     blocker =
-      DSEx.Tasks.async_nolink(fn ->
+      Imp.Tasks.async_nolink(fn ->
         send(parent, {:stream_blocker, self()})
         receive(do: (:release -> :ok))
       end)
 
     assert_receive {:stream_blocker, blocker_pid}
 
-    runner = Task.async(fn -> DSEx.Tasks.async_stream([:item], & &1) |> Enum.to_list() end)
+    runner = Task.async(fn -> Imp.Tasks.async_stream([:item], & &1) |> Enum.to_list() end)
     assert wait_for_status(%{active: 1, queued: 1})
     send(blocker_pid, :release)
     assert Task.await(blocker) == :ok
     assert Task.await(runner) == [ok: :item]
   end
 
-  test "DSEx.Tasks reports invalid task boundaries clearly" do
-    assert_raise ArgumentError, ~r/DSEx.Tasks.async\/1 expects a zero-arity function/, fn ->
-      DSEx.Tasks.async(fn value -> value end)
+  test "Imp.Tasks reports invalid task boundaries clearly" do
+    assert_raise ArgumentError, ~r/Imp.Tasks.async\/1 expects a zero-arity function/, fn ->
+      Imp.Tasks.async(fn value -> value end)
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Tasks.async_nolink\/1 expects a zero-arity function/,
+                 ~r/Imp.Tasks.async_nolink\/1 expects a zero-arity function/,
                  fn ->
-                   DSEx.Tasks.async_nolink(:not_a_function)
+                   Imp.Tasks.async_nolink(:not_a_function)
                  end
 
-    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3 expects enumerable input/, fn ->
-      DSEx.Tasks.async_stream(:not_enumerable, fn value -> value end) |> Enum.to_list()
+    assert_raise ArgumentError, ~r/Imp.Tasks.async_stream\/3 expects enumerable input/, fn ->
+      Imp.Tasks.async_stream(:not_enumerable, fn value -> value end) |> Enum.to_list()
     end
 
-    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3 expects an arity-1 function/, fn ->
-      DSEx.Tasks.async_stream([1], fn -> :ok end) |> Enum.to_list()
+    assert_raise ArgumentError, ~r/Imp.Tasks.async_stream\/3 expects an arity-1 function/, fn ->
+      Imp.Tasks.async_stream([1], fn -> :ok end) |> Enum.to_list()
     end
 
-    assert_raise ArgumentError, ~r/DSEx.Tasks.async_stream\/3: expected keyword options/, fn ->
-      DSEx.Tasks.async_stream([1], fn value -> value end, %{ordered: true}) |> Enum.to_list()
+    assert_raise ArgumentError, ~r/Imp.Tasks.async_stream\/3: expected keyword options/, fn ->
+      Imp.Tasks.async_stream([1], fn value -> value end, %{ordered: true}) |> Enum.to_list()
     end
 
     assert_raise ArgumentError,
-                 ~r/DSEx.Tasks.async_stream\/3.*:ordered.*expected.*boolean/s,
+                 ~r/Imp.Tasks.async_stream\/3.*:ordered.*expected.*boolean/s,
                  fn ->
-                   DSEx.Tasks.async_stream([1], fn value -> value end, ordered: :sometimes)
+                   Imp.Tasks.async_stream([1], fn value -> value end, ordered: :sometimes)
                    |> Enum.to_list()
                  end
   end
 
-  test "DSEx.Tasks.async_stream preserves context and accepts Task options" do
-    DSEx.configure(task_marker: :outside)
+  test "Imp.Tasks.async_stream preserves context and accepts Task options" do
+    Imp.configure(task_marker: :outside)
 
     results =
-      DSEx.context([task_marker: :inside], fn ->
+      Imp.context([task_marker: :inside], fn ->
         [1, 2]
-        |> DSEx.Tasks.async_stream(
-          fn value -> {value, DSEx.Settings.fetch!(:task_marker)} end,
+        |> Imp.Tasks.async_stream(
+          fn value -> {value, Imp.Settings.fetch!(:task_marker)} end,
           ordered: true,
           max_concurrency: 2,
           timeout: 1_000,
@@ -235,26 +235,26 @@ defmodule TaskSupervisionTest do
     assert results == [ok: {1, :inside}, ok: {2, :inside}]
   end
 
-  test "parallel prediction uses the DSEx task boundary" do
+  test "parallel prediction uses the Imp task boundary" do
     program =
-      DSEx.predict("question -> answer",
+      Imp.predict("question -> answer",
         lm: %{
-          module: DSEx.LM.Static,
+          module: Imp.LM.Static,
           opts: [handler: fn _messages, _opts -> %{answer: inspect(self())} end]
         }
       )
 
     results =
-      DSEx.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}], max_concurrency: 2)
+      Imp.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}], max_concurrency: 2)
 
     assert [{:ok, first}, {:ok, second}] = results
-    assert DSEx.get(first, :answer) != DSEx.get(second, :answer)
+    assert Imp.get(first, :answer) != Imp.get(second, :answer)
   end
 
   defp wait_for_active(expected, attempts \\ 100)
 
   defp wait_for_active(expected, attempts) when attempts > 0 do
-    case DSEx.Tasks.admission_status() do
+    case Imp.Tasks.admission_status() do
       %{active: ^expected} ->
         true
 
@@ -269,7 +269,7 @@ defmodule TaskSupervisionTest do
   defp wait_for_status(expected, attempts \\ 100)
 
   defp wait_for_status(expected, attempts) when attempts > 0 do
-    if DSEx.Tasks.admission_status() == expected do
+    if Imp.Tasks.admission_status() == expected do
       true
     else
       Process.sleep(5)

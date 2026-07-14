@@ -1,7 +1,7 @@
-defmodule DSEx.EvidenceAuthoritiesTest do
+defmodule Imp.EvidenceAuthoritiesTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.EvidenceAuthorities
+  alias Imp.EvidenceAuthorities
 
   test "checked-in authority documentation is generated from the validated ledger" do
     ledger = EvidenceAuthorities.load!()

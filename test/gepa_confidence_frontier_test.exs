@@ -1,13 +1,13 @@
-defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
+defmodule Imp.Optimizer.GEPA.ConfidenceFrontierTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.{Candidate, ConfidenceAdapter, Evaluation, Frontier}
+  alias Imp.Optimizer.GEPA.{Candidate, ConfidenceAdapter, Evaluation, Frontier}
 
   defmodule MultiComponentProgram do
     defstruct []
 
     def optimizer_predictors(_program) do
-      predictor = DSEx.predict("input -> category")
+      predictor = Imp.predict("input -> category")
       [first: predictor, second: predictor]
     end
 
@@ -57,15 +57,15 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
 
   test "confidently wrong predictions cannot survive the confidence frontier" do
     lm =
-      DSEx.Clients.ReqLLM.new(%{provider: :openai, id: "gpt-fixture"},
+      Imp.Clients.ReqLLM.new(%{provider: :openai, id: "gpt-fixture"},
         req_module: OpenAIChatFixture,
         test_pid: self()
       )
 
     program =
-      DSEx.predict("input -> category",
+      Imp.predict("input -> category",
         lm: lm,
-        adapter: DSEx.Adapter.JSON,
+        adapter: Imp.Adapter.JSON,
         config: [native_json_schema: true]
       )
 
@@ -79,7 +79,7 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
     seed = Candidate.from_program(program)
     correct_candidate = Map.put(seed, :main, "Return the correct label")
     wrong_candidate = Map.put(seed, :main, "Return the wrong label")
-    batch = [DSEx.example(input: "lunch", answer: "Food") |> DSEx.with_inputs(:input)]
+    batch = [Imp.example(input: "lunch", answer: "Food") |> Imp.with_inputs(:input)]
 
     correct = Evaluation.evaluate(adapter, batch, correct_candidate, capture_traces: true)
     wrong = Evaluation.evaluate(adapter, batch, wrong_candidate, capture_traces: true)
@@ -131,9 +131,9 @@ defmodule DSEx.Optimizer.GEPA.ConfidenceFrontierTest do
   end
 
   test "confidence adapter rejects unsupported LM transports before evaluation" do
-    program = DSEx.predict("input -> category", lm: DSEx.LM.Static)
+    program = Imp.predict("input -> category", lm: Imp.LM.Static)
 
-    assert_raise ArgumentError, ~r/requires an explicit DSEx.Clients.ReqLLM OpenAI model/, fn ->
+    assert_raise ArgumentError, ~r/requires an explicit Imp.Clients.ReqLLM OpenAI model/, fn ->
       ConfidenceAdapter.new(program, field: :category, enum: ["Food", "Drinks"])
     end
   end

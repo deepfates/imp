@@ -4,7 +4,7 @@ defmodule OperationsStressTest do
   import ExUnit.CaptureIO
 
   test "operations stress artifact covers structured I/O and runtime operations" do
-    artifact = DSEx.BenchmarkTruth.OperationsStress.run(max_concurrency: 4)
+    artifact = Imp.BenchmarkTruth.OperationsStress.run(max_concurrency: 4)
 
     assert artifact["summary"]["complete"]
     assert artifact["summary"]["passing"] == 10
@@ -40,7 +40,7 @@ defmodule OperationsStressTest do
     out_dir = tmp_dir("operations-stress")
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.OperationsStress.run(["--out", out_dir, "--max-concurrency", "2"])
+      Mix.Tasks.Imp.Benchmark.OperationsStress.run(["--out", out_dir, "--max-concurrency", "2"])
     end)
 
     [path] = Path.wildcard(Path.join(out_dir, "operations-stress-*.json"))
@@ -51,7 +51,7 @@ defmodule OperationsStressTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path

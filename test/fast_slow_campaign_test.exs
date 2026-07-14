@@ -1,15 +1,15 @@
-defmodule DSEx.FastSlowCampaignTest do
+defmodule Imp.FastSlowCampaignTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimizer.GEPA.EvaluationCache.Codec
-  alias Mix.Tasks.Dsex.Benchmark.FastSlow
+  alias Imp.Optimizer.GEPA.EvaluationCache.Codec
+  alias Mix.Tasks.Imp.Benchmark.FastSlow
 
   test "runs the canonical Fast-Slow protocol campaign end to end" do
     artifact = FastSlow.build_artifact()
 
     assert artifact == FastSlow.build_artifact()
     assert artifact["schema_version"] == 1
-    assert artifact["artifact_type"] == "dsex_fast_slow_protocol_campaign"
+    assert artifact["artifact_type"] == "imp_fast_slow_protocol_campaign"
 
     assert artifact["artifact_sha256"] ==
              Codec.digest(Map.delete(artifact, "artifact_sha256"))
@@ -113,7 +113,7 @@ defmodule DSEx.FastSlowCampaignTest do
       )
 
     on_exit(fn -> File.rm(path) end)
-    Mix.Task.reenable("dsex.benchmark.fast_slow")
+    Mix.Task.reenable("imp.benchmark.fast_slow")
     FastSlow.run(["--out", path])
 
     written = Jason.decode!(File.read!(path))

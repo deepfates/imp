@@ -1,8 +1,8 @@
-defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
+defmodule Imp.BenchmarkTruth.HotpotFeedbackTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.BenchmarkTruth.HotpotFeedback
-  alias DSEx.Optimizer.GEPA.ComponentFeedback
+  alias Imp.BenchmarkTruth.HotpotFeedback
+  alias Imp.Optimizer.GEPA.ComponentFeedback
 
   test "exposes the four source component callbacks" do
     assert HotpotFeedback.callbacks() |> Map.keys() |> Enum.sort() ==
@@ -64,7 +64,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
       |> Map.update!("supporting_facts", &stringify_map/1)
       |> Map.update!("context", &stringify_map/1)
 
-    feedback = %{context(:summarize1) | example: DSEx.Example.new(fields)}
+    feedback = %{context(:summarize1) | example: Imp.Example.new(fields)}
 
     assert %{feedback_text: text} = HotpotFeedback.summarize1(feedback)
     assert text != ""
@@ -72,7 +72,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
 
   test "fails closed on ambiguous atom and string keys" do
     fields = Map.put(example_fields(), "answer", "conflicting")
-    feedback = %{context(:final_answer) | example: %DSEx.Example{fields: fields}}
+    feedback = %{context(:final_answer) | example: %Imp.Example{fields: fields}}
 
     assert_raise ArgumentError, ~r/ambiguous atom\/string keys for :answer/, fn ->
       HotpotFeedback.final_answer(feedback)
@@ -84,7 +84,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
       example_fields()
       |> put_in([:supporting_facts, :sent_id], [0, 99])
 
-    feedback = %{context(:summarize2) | example: DSEx.Example.new(malformed)}
+    feedback = %{context(:summarize2) | example: Imp.Example.new(malformed)}
 
     assert_raise ArgumentError, ~r/sentence index 99 is out of bounds/, fn ->
       HotpotFeedback.summarize2(feedback)
@@ -92,7 +92,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
   end
 
   test "fails closed without full program hop outputs" do
-    prediction = DSEx.Prediction.new(answer: "answer")
+    prediction = Imp.Prediction.new(answer: "answer")
     feedback = %{context(:create_query_hop2) | program_output: prediction}
 
     assert_raise ArgumentError, ~r/missing required field :hop1_docs/, fn ->
@@ -116,7 +116,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
       component: component,
       predictor_inputs: predictor_inputs(component),
       predictor_output: %{},
-      example: DSEx.Example.new(Map.put(example_fields(), :answer, answer)),
+      example: Imp.Example.new(Map.put(example_fields(), :answer, answer)),
       program_output: program_output(predicted_answer, opts),
       trace: [],
       score: 1.0,
@@ -138,7 +138,7 @@ defmodule DSEx.BenchmarkTruth.HotpotFeedbackTest do
         :error -> fields
       end
 
-    DSEx.Prediction.new(fields)
+    Imp.Prediction.new(fields)
   end
 
   defp predictor_inputs(:create_query_hop2),

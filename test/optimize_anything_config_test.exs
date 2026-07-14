@@ -1,9 +1,9 @@
-defmodule DSEx.Optimize.Anything.ConfigTest do
+defmodule Imp.Optimize.Anything.ConfigTest do
   use ExUnit.Case, async: true
 
-  alias DSEx.Optimize.Anything.Config
-  alias DSEx.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
-  alias DSEx.Optimizer.GEPA.Stopper
+  alias Imp.Optimize.Anything.Config
+  alias Imp.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
+  alias Imp.Optimizer.GEPA.Stopper
 
   test "defaults mirror released settings without choosing an external model" do
     config = Config.new()
@@ -148,7 +148,7 @@ defmodule DSEx.Optimize.Anything.ConfigTest do
 
     persisted = config |> Config.to_map() |> Jason.encode!() |> Jason.decode!()
 
-    assert persisted["type"] == "dsex_optimize_anything_config"
+    assert persisted["type"] == "imp_optimize_anything_config"
     assert persisted["schema_version"] == 1
     assert Config.from_map(persisted) == config
   end

@@ -6,7 +6,7 @@ defmodule GoldenTraceTest do
   @fixtures "test/fixtures/golden_trace/cases.json"
   @python "tmp/dspy-parity-venv/bin/python"
 
-  test "golden trace task compares DSEx and DSPy with provider-free fixtures" do
+  test "golden trace task compares Imp and DSPy with provider-free fixtures" do
     unless File.exists?(@python) do
       flunk("missing #{@python}; run the documented DSPy parity environment setup")
     end
@@ -14,7 +14,7 @@ defmodule GoldenTraceTest do
     out_dir = tmp_dir("golden-trace")
 
     capture_io(fn ->
-      Mix.Tasks.Dsex.Benchmark.Trace.run([
+      Mix.Tasks.Imp.Benchmark.Trace.run([
         "--fixtures",
         @fixtures,
         "--out",
@@ -31,10 +31,10 @@ defmodule GoldenTraceTest do
     assert report["summary"]["prediction_parity"]
     assert report["summary"]["error_status_parity"]
     assert report["summary"]["tool_trace_parity"]
-    assert report["summary"]["dsex_semantic_checks"]["all_passing"]
+    assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
     assert report["fixtures"]["cases"] == 8
-    assert report["dsex"]["runner"] == "dsex-golden-trace"
+    assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 
     assert report["cases"]
@@ -56,10 +56,10 @@ defmodule GoldenTraceTest do
            ]
 
     assert Enum.any?(report["cases"], &(&1["adapter"] == "json"))
-    assert Enum.all?(report["cases"], &(&1["dsex"]["history"] != []))
+    assert Enum.all?(report["cases"], &(&1["imp"]["history"] != []))
     assert Enum.all?(report["cases"], &(&1["dspy"]["history"] != []))
 
-    assert Enum.map(report["dsex_semantic_checks"], & &1["id"]) == [
+    assert Enum.map(report["imp_semantic_checks"], & &1["id"]) == [
              "streaming_incremental_fields",
              "save_load_redacts_req_llm_credentials",
              "req_llm_cache_hit_reuses_success",
@@ -68,7 +68,7 @@ defmodule GoldenTraceTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     on_exit(fn -> File.rm_rf!(path) end)

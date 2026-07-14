@@ -1,8 +1,8 @@
-defmodule DSEx.Predict.SearchTest do
+defmodule Imp.Predict.SearchTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Predict.Search
-  alias DSEx.Predict.Search.Candidate
+  alias Imp.Predict.Search
+  alias Imp.Predict.Search.Candidate
 
   test "requires unique explicit candidate identities" do
     candidates = [Candidate.new(:same, :a), Candidate.new(:same, :b)]
@@ -203,10 +203,10 @@ defmodule DSEx.Predict.SearchTest do
     handler_id = {__MODULE__, self(), make_ref()}
 
     events = [
-      [:dsex, :predict, :search, :start],
-      [:dsex, :predict, :search, :stop],
-      [:dsex, :predict, :search, :candidate, :start],
-      [:dsex, :predict, :search, :candidate, :stop]
+      [:imp, :predict, :search, :start],
+      [:imp, :predict, :search, :stop],
+      [:imp, :predict, :search, :candidate, :start],
+      [:imp, :predict, :search, :candidate, :stop]
     ]
 
     :ok = :telemetry.attach_many(handler_id, events, &__MODULE__.handle_telemetry/4, self())
@@ -220,18 +220,17 @@ defmodule DSEx.Predict.SearchTest do
 
     assert result.best.value == :answer
 
-    assert_receive {:search_telemetry, [:dsex, :predict, :search, :start], _,
-                    %{mode: :sequential}}
+    assert_receive {:search_telemetry, [:imp, :predict, :search, :start], _, %{mode: :sequential}}
 
-    assert_receive {:search_telemetry, [:dsex, :predict, :search, :candidate, :start], _,
+    assert_receive {:search_telemetry, [:imp, :predict, :search, :candidate, :start], _,
                     %{candidate_id: "local-1"}}
 
-    assert_receive {:search_telemetry, [:dsex, :predict, :search, :candidate, :stop],
+    assert_receive {:search_telemetry, [:imp, :predict, :search, :candidate, :stop],
                     %{duration: duration}, %{status: :ok}}
 
     assert duration > 0
 
-    assert_receive {:search_telemetry, [:dsex, :predict, :search, :stop], %{duration: _},
+    assert_receive {:search_telemetry, [:imp, :predict, :search, :stop], %{duration: _},
                     %{result: :ok}}
   end
 

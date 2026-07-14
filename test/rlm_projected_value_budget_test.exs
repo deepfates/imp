@@ -1,9 +1,9 @@
-defmodule DSEx.Predict.RLM.ProjectedValueBudgetTest do
+defmodule Imp.Predict.RLM.ProjectedValueBudgetTest do
   use ExUnit.Case, async: true
 
   import Bitwise
 
-  alias DSEx.Predict.RLM.Interpreter
+  alias Imp.Predict.RLM.Interpreter
 
   test "projects string concatenation and replacement before constructing results" do
     interpreter = new_interpreter(100)

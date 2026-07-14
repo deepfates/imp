@@ -3,15 +3,15 @@ defmodule GepaReplicationArtifactTest do
 
   import ExUnit.CaptureIO
 
-  alias DSEx.BenchmarkTruth.GepaReplicationContract
-  alias Mix.Tasks.Dsex.Benchmark.GepaReplication, as: GepaReplicationTask
+  alias Imp.BenchmarkTruth.GepaReplicationContract
+  alias Mix.Tasks.Imp.Benchmark.GepaReplication, as: GepaReplicationTask
 
   test "GEPA replication task validates required paper-family fields and writes artifact" do
     out_dir = tmp_dir("gepa-replication")
     input_path = write_rows!("complete-gepa", full_rows())
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+      Mix.Task.reenable("imp.benchmark.gepa_replication")
 
       GepaReplicationTask.run([
         "--input",
@@ -41,7 +41,7 @@ defmodule GepaReplicationArtifactTest do
     assert Enum.all?(artifact["rows"], fn row ->
              is_map(row["results"]["baseline"]) and
                is_map(row["results"]["dspy_gepa"]) and
-               is_map(row["results"]["dsex_gepa"]) and
+               is_map(row["results"]["imp_gepa"]) and
                is_map(row["results"]["mipro_v2"]) and
                is_map(row["token_cost"]) and
                is_map(row["seed_variance"]) and
@@ -67,7 +67,7 @@ defmodule GepaReplicationArtifactTest do
 
     assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.gepa_replication")
+        Mix.Task.reenable("imp.benchmark.gepa_replication")
 
         GepaReplicationTask.run([
           "--input",
@@ -125,7 +125,7 @@ defmodule GepaReplicationArtifactTest do
       Enum.map(full_rows(), fn row ->
         row
         |> Map.delete("metric_call_evidence")
-        |> Map.put("metric_calls", get_in(row, ["optimizer_budgets", "dsex_gepa"]))
+        |> Map.put("metric_calls", get_in(row, ["optimizer_budgets", "imp_gepa"]))
       end)
 
     validation = GepaReplicationContract.validate_rows(rows)
@@ -145,7 +145,7 @@ defmodule GepaReplicationArtifactTest do
 
     unenforced =
       unenforced_row
-      |> put_in(["metric_call_evidence", "enforced_limits", "dsex_gepa"], false)
+      |> put_in(["metric_call_evidence", "enforced_limits", "imp_gepa"], false)
 
     rows = [configured, unenforced | rest]
     validation = GepaReplicationContract.validate_rows(rows)
@@ -161,9 +161,9 @@ defmodule GepaReplicationArtifactTest do
     rows =
       Enum.map(full_rows(), fn row ->
         row
-        |> put_in(["seed_selection", "dsex_gepa", "method"], "best_test")
-        |> put_in(["seed_selection", "dsex_gepa", "selection_split"], "test")
-        |> put_in(["seed_selection", "dsex_gepa", "test_scores_used"], true)
+        |> put_in(["seed_selection", "imp_gepa", "method"], "best_test")
+        |> put_in(["seed_selection", "imp_gepa", "selection_split"], "test")
+        |> put_in(["seed_selection", "imp_gepa", "test_scores_used"], true)
       end)
 
     validation = GepaReplicationContract.validate_rows(rows)
@@ -201,7 +201,7 @@ defmodule GepaReplicationArtifactTest do
 
     assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.gepa_replication")
+        Mix.Task.reenable("imp.benchmark.gepa_replication")
 
         GepaReplicationTask.run([
           "--input",
@@ -235,7 +235,7 @@ defmodule GepaReplicationArtifactTest do
 
     assert_raise Mix.Error, ~r/GEPA replication artifact is incomplete/, fn ->
       capture_io(fn ->
-        Mix.Task.reenable("dsex.benchmark.gepa_replication")
+        Mix.Task.reenable("imp.benchmark.gepa_replication")
 
         GepaReplicationTask.run([
           "--input",
@@ -256,22 +256,22 @@ defmodule GepaReplicationArtifactTest do
            ]
   end
 
-  test "GEPA replication task converts upstream GEPA artifact outputs plus DSEx rows" do
+  test "GEPA replication task converts upstream GEPA artifact outputs plus Imp rows" do
     artifact_dir = tmp_dir("gepa-artifact-output")
     out_dir = tmp_dir("gepa-artifact-converted")
     write_upstream_gepa_results!(artifact_dir, "gpt-41-mini")
-    dsex_rows = converter_dsex_rows("gpt-41-mini", "gepa-conversion-test")
-    dsex_input = write_rows!("dsex-gepa-rows", dsex_rows)
+    imp_rows = converter_imp_rows("gpt-41-mini", "gepa-conversion-test")
+    imp_input = write_rows!("imp-gepa-rows", imp_rows)
     evidence_path = write_upstream_evidence!(artifact_dir, "gpt-41-mini")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+      Mix.Task.reenable("imp.benchmark.gepa_replication")
 
       GepaReplicationTask.run([
         "--from-gepa-artifact",
         artifact_dir,
-        "--dsex-input",
-        dsex_input,
+        "--imp-input",
+        imp_input,
         "--upstream-evidence",
         evidence_path,
         "--campaign-id",
@@ -289,19 +289,19 @@ defmodule GepaReplicationArtifactTest do
     assert artifact["summary"]["full_gepa_replication"]
     assert artifact["source"]["input"] == artifact_dir
 
-    assert Enum.zip(artifact["rows"], dsex_rows)
-           |> Enum.all?(fn {row, dsex} ->
+    assert Enum.zip(artifact["rows"], imp_rows)
+           |> Enum.all?(fn {row, imp} ->
              get_in(row, ["results", "baseline", "source"]) =~ "gepa-artifact Baseline" and
                get_in(row, ["results", "dspy_gepa", "source"]) =~ "gepa-artifact GEPA" and
                get_in(row, ["results", "mipro_v2", "source"]) =~
                  "gepa-artifact MIPROv2-Heavy" and
-               row["metric_calls"] == dsex["metric_calls"] and
-               get_in(row, ["results", "dsex_gepa"]) ==
-                 get_in(dsex, ["results", "dsex_gepa"]) and
-               get_in(row, ["metric_call_evidence", "observed", "dsex_gepa"]) ==
-                 get_in(dsex, ["metric_call_evidence", "observed", "dsex_gepa"]) and
-               get_in(row, ["seed_selection", "dsex_gepa"]) ==
-                 get_in(dsex, ["seed_selection", "dsex_gepa"])
+               row["metric_calls"] == imp["metric_calls"] and
+               get_in(row, ["results", "imp_gepa"]) ==
+                 get_in(imp, ["results", "imp_gepa"]) and
+               get_in(row, ["metric_call_evidence", "observed", "imp_gepa"]) ==
+                 get_in(imp, ["metric_call_evidence", "observed", "imp_gepa"]) and
+               get_in(row, ["seed_selection", "imp_gepa"]) ==
+                 get_in(imp, ["seed_selection", "imp_gepa"])
            end)
   end
 
@@ -367,11 +367,11 @@ defmodule GepaReplicationArtifactTest do
     end
   end
 
-  test "GEPA replication smoke runner exercises DSEx GEPA without authorizing research claims" do
+  test "GEPA replication smoke runner exercises Imp GEPA without authorizing research claims" do
     out_dir = tmp_dir("gepa-replication-smoke")
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+      Mix.Task.reenable("imp.benchmark.gepa_replication")
 
       GepaReplicationTask.run([
         "--smoke",
@@ -389,12 +389,12 @@ defmodule GepaReplicationArtifactTest do
 
     assert Enum.all?(
              artifact["rows"],
-             &(get_in(&1, ["results", "dsex_gepa", "source"]) == "DSEx.Optimize.Anything.run/3")
+             &(get_in(&1, ["results", "imp_gepa", "source"]) == "Imp.Optimize.Anything.run/3")
            )
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "dsex-#{name}-#{System.unique_integer([:positive])}")
+    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)
     File.mkdir_p!(path)
     path
@@ -422,7 +422,7 @@ defmodule GepaReplicationArtifactTest do
 
   defp full_artifact(rows) do
     %{
-      "runner" => "dsex-gepa-replication",
+      "runner" => "imp-gepa-replication",
       "source" => %{"mode" => "input"},
       "summary" => %{
         "all_passing" => true,
@@ -466,19 +466,19 @@ defmodule GepaReplicationArtifactTest do
     end)
   end
 
-  defp converter_dsex_rows(model, campaign_id) do
+  defp converter_imp_rows(model, campaign_id) do
     Enum.map(full_rows(), fn row ->
       row
       |> Map.put("model", model)
       |> Map.put("campaign_id", campaign_id)
-      |> update_in(["optimizer_budgets"], &Map.take(&1, ["dsex_gepa"]))
-      |> update_in(["metric_call_evidence", "observed"], &Map.take(&1, ["dsex_gepa"]))
+      |> update_in(["optimizer_budgets"], &Map.take(&1, ["imp_gepa"]))
+      |> update_in(["metric_call_evidence", "observed"], &Map.take(&1, ["imp_gepa"]))
       |> update_in(
         ["metric_call_evidence", "enforced_limits"],
-        &Map.take(&1, ["dsex_gepa"])
+        &Map.take(&1, ["imp_gepa"])
       )
-      |> update_in(["seed_selection"], &Map.take(&1, ["dsex_gepa"]))
-      |> update_in(["results"], &Map.take(&1, ["dsex_gepa", "simba"]))
+      |> update_in(["seed_selection"], &Map.take(&1, ["imp_gepa"]))
+      |> update_in(["results"], &Map.take(&1, ["imp_gepa", "simba"]))
     end)
   end
 
@@ -550,10 +550,10 @@ defmodule GepaReplicationArtifactTest do
     args = [
       "--from-gepa-artifact",
       artifact_dir,
-      "--dsex-input",
+      "--imp-input",
       write_rows!(
-        "dsex-gepa-adversarial",
-        converter_dsex_rows("gpt-41-mini", "gepa-adversarial-test")
+        "imp-gepa-adversarial",
+        converter_imp_rows("gpt-41-mini", "gepa-adversarial-test")
       ),
       "--campaign-id",
       "gepa-adversarial-test",
@@ -566,7 +566,7 @@ defmodule GepaReplicationArtifactTest do
     args = if evidence_path, do: args ++ ["--upstream-evidence", evidence_path], else: args
 
     capture_io(fn ->
-      Mix.Task.reenable("dsex.benchmark.gepa_replication")
+      Mix.Task.reenable("imp.benchmark.gepa_replication")
       GepaReplicationTask.run(args)
     end)
   end
@@ -590,7 +590,7 @@ defmodule GepaReplicationArtifactTest do
       "optimizer_budgets" => %{
         "baseline" => 1,
         "dspy_gepa" => budget,
-        "dsex_gepa" => budget,
+        "imp_gepa" => budget,
         "mipro_v2" => budget
       },
       "metric_call_evidence" => %{
@@ -599,13 +599,13 @@ defmodule GepaReplicationArtifactTest do
         "observed" => %{
           "baseline" => 1,
           "dspy_gepa" => budget - 3,
-          "dsex_gepa" => budget - 2,
+          "imp_gepa" => budget - 2,
           "mipro_v2" => budget - 1
         },
         "enforced_limits" => %{
           "baseline" => true,
           "dspy_gepa" => true,
-          "dsex_gepa" => true,
+          "imp_gepa" => true,
           "mipro_v2" => true
         }
       },
@@ -627,7 +627,7 @@ defmodule GepaReplicationArtifactTest do
       },
       "source_commits" => %{
         "dspy" => "stanfordnlp/dspy@abcdef1",
-        "dsex" => "deepfates/dsex@abcdef2",
+        "imp" => "deepfates/imp@abcdef2",
         "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
       },
       "token_cost" => %{
@@ -641,7 +641,7 @@ defmodule GepaReplicationArtifactTest do
       "seed_selection" => %{
         "baseline" => seed_selection("predeclared", nil, 0),
         "dspy_gepa" => seed_selection("best_dev", "dev", 1),
-        "dsex_gepa" => seed_selection("best_dev", "dev", 1),
+        "imp_gepa" => seed_selection("best_dev", "dev", 1),
         "mipro_v2" => seed_selection("best_dev", "dev", 1)
       },
       "train_dev_test_gap" => %{
@@ -655,9 +655,9 @@ defmodule GepaReplicationArtifactTest do
         }
       },
       "results" => %{
-        "baseline" => %{"score" => 0.5, "source" => "DSEx baseline runner artifact"},
+        "baseline" => %{"score" => 0.5, "source" => "Imp baseline runner artifact"},
         "dspy_gepa" => %{"score" => 0.6, "source" => "DSPy GEPA runner artifact"},
-        "dsex_gepa" => %{"score" => 0.61, "source" => "DSEx GEPA runner artifact"},
+        "imp_gepa" => %{"score" => 0.61, "source" => "Imp GEPA runner artifact"},
         "mipro_v2" => %{"score" => 0.55, "source" => "DSPy MIPROv2 runner artifact"},
         "simba" => %{"score" => 0.56, "source" => "optional SIMBA comparator artifact"}
       }
@@ -679,10 +679,9 @@ defmodule GepaReplicationArtifactTest do
       Map.put(row, "metric_judge", %{
         "kind" => "papillon_quality_leakage",
         "model" => "openai/gpt-4.1-mini-2025-04-14",
-        "quality_judge" =>
-          "DSEx ChainOfThought JudgeQuality source-faithful pairwise order check",
+        "quality_judge" => "Imp ChainOfThought JudgeQuality source-faithful pairwise order check",
         "leakage_judge" =>
-          "DSEx ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
+          "Imp ChainOfThought JudgeLeakage source-faithful pii leaked-count check",
         "score_formula" => "(quality + (1 - leakage)) / 2.0"
       })
     else

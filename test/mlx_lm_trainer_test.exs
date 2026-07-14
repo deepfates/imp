@@ -1,13 +1,13 @@
-defmodule DSEx.Clients.MLXLMTrainerTest do
+defmodule Imp.Clients.MLXLMTrainerTest do
   use ExUnit.Case, async: false
 
-  alias DSEx.Clients.{MLXLMTrainer, Trainer, TrainingJob}
-  alias DSEx.Training.ChatDataset
+  alias Imp.Clients.{MLXLMTrainer, Trainer, TrainingJob}
+  alias Imp.Training.ChatDataset
 
   @revision "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
 
   setup do
-    root = Path.join(System.tmp_dir!(), "dsex-mlx-test-#{System.unique_integer([:positive])}")
+    root = Path.join(System.tmp_dir!(), "imp-mlx-test-#{System.unique_integer([:positive])}")
     model_path = Path.join([root, "model", @revision])
     File.mkdir_p!(model_path)
     on_exit(fn -> File.rm_rf!(root) end)
@@ -19,7 +19,7 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
       MLXLMTrainer.new(
         root: Path.join(context.root, "runs"),
         model_path: context.model_path,
-        signature: DSEx.signature("question -> answer")
+        signature: Imp.signature("question -> answer")
       )
 
     assert MLXLMTrainer.mlx_lm_version() == "0.31.3"
@@ -47,7 +47,7 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
   end
 
   test "actual adapter JSONL and stratified split hashes are deterministic" do
-    signature = DSEx.signature("question -> answer", "Answer exactly.")
+    signature = Imp.signature("question -> answer", "Answer exactly.")
 
     examples = [
       example("q1", "a1", "easy"),
@@ -57,10 +57,10 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
     ]
 
     opts = [validation_fraction: 0.5, stratify_by: :difficulty, seed: 17]
-    assert {:ok, first} = ChatDataset.build(examples, signature, DSEx.Adapter.Chat, opts)
+    assert {:ok, first} = ChatDataset.build(examples, signature, Imp.Adapter.Chat, opts)
 
     assert {:ok, second} =
-             ChatDataset.build(Enum.reverse(examples), signature, DSEx.Adapter.Chat, opts)
+             ChatDataset.build(Enum.reverse(examples), signature, Imp.Adapter.Chat, opts)
 
     assert first == second
     assert first.train_count == 2
@@ -219,7 +219,7 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
       root: Path.join(context.root, "runs"),
       model_path: context.model_path,
       model_revision: @revision,
-      signature: DSEx.signature("question -> answer"),
+      signature: Imp.signature("question -> answer"),
       runner: runner,
       validation_fraction: 0.5,
       iters: 2,
@@ -243,8 +243,8 @@ defmodule DSEx.Clients.MLXLMTrainerTest do
       )
 
   defp example(question, answer, difficulty) do
-    DSEx.example(question: question, answer: answer, difficulty: difficulty)
-    |> DSEx.with_inputs([:question])
+    Imp.example(question: question, answer: answer, difficulty: difficulty)
+    |> Imp.with_inputs([:question])
   end
 
   defp write_adapter!(argv) do
