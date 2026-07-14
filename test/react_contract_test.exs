@@ -419,6 +419,98 @@ defmodule ReActContractTest do
     assert [%{tool: :lookup, result: "observed"}] = DSEx.Prediction.get(prediction, :history)
   end
 
+  test "DSPy 3.2.1 mode truncates the oldest events across three context attempts" do
+    Process.put(:react_context_responses, [
+      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "first"}}]}},
+      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "second"}}]}},
+      {:error, %DSEx.ContextWindowExceededError{message: "too long"}},
+      {:error, %DSEx.ContextWindowExceededError{message: "still too long"}},
+      {:ok, %{tool_calls: [%{name: :submit, arguments: %{}}]}},
+      {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
+    ])
+
+    lm = fn messages, _opts ->
+      [next | rest] = Process.get(:react_context_responses)
+      Process.put(:react_context_responses, rest)
+      send(self(), {:react_context_messages, messages})
+      next
+    end
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        max_iters: 3
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    assert [%{tool: :submit, result: "Completed."}] = DSEx.Prediction.get(prediction, :history)
+    assert Process.get(:react_context_responses) == []
+
+    messages = for _ <- 1..6, do: receive(do: ({:react_context_messages, value} -> value))
+    assert inspect(Enum.at(messages, 2)) =~ "first"
+    refute inspect(Enum.at(messages, 3)) =~ "first"
+    assert inspect(Enum.at(messages, 3)) =~ "second"
+    refute inspect(Enum.at(messages, 4)) =~ "second"
+  end
+
+  test "DSPy 3.2.1 mode reports an overflow when no trajectory can be truncated" do
+    error = %DSEx.ContextWindowExceededError{message: "input alone is too long"}
+    lm = fn _messages, _opts -> {:error, error} end
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        max_iters: 1
+      )
+
+    assert {:error, {:react_trajectory_not_truncatable, ^error}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "DSPy 3.2.1 mode also truncates extraction trajectory retries" do
+    Process.put(:react_extraction_context_responses, [
+      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "first"}}]}},
+      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "second"}}]}},
+      {:ok, %{tool_calls: [%{name: :submit, arguments: %{}}]}},
+      {:error, %DSEx.ContextWindowExceededError{message: "too long"}},
+      {:error, %DSEx.ContextWindowExceededError{message: "still too long"}},
+      {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
+    ])
+
+    lm = fn messages, _opts ->
+      [next | rest] = Process.get(:react_extraction_context_responses)
+      Process.put(:react_extraction_context_responses, rest)
+      send(self(), {:react_extraction_context_messages, messages})
+      next
+    end
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+
+    agent =
+      DSEx.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        max_iters: 3
+      )
+
+    assert {:ok, prediction} = DSEx.Predict.ReAct.call(agent, %{question: "q"})
+    assert DSEx.Prediction.get(prediction, :answer) == "done"
+    assert [%{tool: :submit, result: "Completed."}] = DSEx.Prediction.get(prediction, :history)
+
+    messages =
+      for _ <- 1..6, do: receive(do: ({:react_extraction_context_messages, value} -> value))
+
+    assert inspect(Enum.at(messages, 3)) =~ "first"
+    refute inspect(Enum.at(messages, 4)) =~ "first"
+    assert inspect(Enum.at(messages, 4)) =~ "second"
+    refute inspect(Enum.at(messages, 5)) =~ "second"
+  end
+
   test "DSPy 3.2.1 mode makes unknown tools recoverable observations" do
     Process.put(:react_actions, [
       %{tool_calls: [%{name: "missing", arguments: %{}}]},

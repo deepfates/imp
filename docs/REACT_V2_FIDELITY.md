@@ -26,10 +26,11 @@ extraction pass. Both modes accept the pinned implementation's invocation-local
 
 The contracts are not identical. DSPy emits one action per iteration and
 formats a flat trajectory through the active adapter. DSEx accepts
-provider-native parallel tool calls and stores a redacted event list. DSPy's
-three-attempt context-window recovery drops the oldest action before retrying;
-DSEx does not yet implement that truncation policy. Provider-native mode also
-keeps DSEx's deliberate fail-fast policy instead of observation-and-continue.
+provider-native parallel tool calls and stores a redacted event list. In DSPy
+compatibility mode, action and extraction calls each receive at most three
+attempts after a context-window error, dropping the oldest completed event
+before each retry. Provider-native mode keeps DSEx's deliberate fail-fast
+policy instead of observation-and-continue.
 
 DSEx implements ReActV2 as a distinct module rather than an alias for the
 existing fail-fast `DSEx.Predict.ReAct`.
@@ -91,8 +92,7 @@ justify supporting them.
 The provider-free golden cases establish local control-flow contracts, not live
 behavioral parity. A matched-model campaign is still required for ReAct action
 selection and extraction quality, CodeAct task quality under the restricted
-runtime, and ProgramOfThought regeneration/extraction quality. ReAct context
-window truncation also remains a concrete implementation gap.
+runtime, and ProgramOfThought regeneration/extraction quality.
 
 The stable fidelity baseline remains DSPy 3.2.1. ReActV2 is prerelease tracking
 implemented from the pinned 3.3.0b1 source because the release goal explicitly

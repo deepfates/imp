@@ -41,6 +41,8 @@ defmodule DSEx.Predict.ReAct do
 
   @behaviour DSEx.Module
 
+  @trajectory_call_attempts 3
+
   defstruct [
     :signature,
     :react,
@@ -191,22 +193,31 @@ defmodule DSEx.Predict.ReAct do
     tool_descriptions =
       agent.tools |> Map.values() |> Enum.map(&%{name: &1.name, description: &1.description})
 
-    call_inputs = Map.merge(inputs, %{history: history, tools: tool_descriptions})
+    case call_action(agent, inputs, history, tool_descriptions) do
+      {:ok, prediction, effective_history} ->
+        handle_action_prediction(agent, inputs, effective_history, remaining, prediction)
 
-    case DSEx.Predict.Predict.call(agent.react, call_inputs) do
-      {:ok, prediction} ->
-        handle_action_prediction(agent, inputs, history, remaining, prediction)
-
-      {:error, reason} when agent.mode == :dspy_3_2_1 ->
+      {:error, reason, effective_history} when agent.mode == :dspy_3_2_1 ->
         if action_parse_failure?(reason) do
-          extract_final(agent, inputs, history, :parse_failure)
+          extract_final(agent, inputs, effective_history, :parse_failure)
         else
           {:error, reason}
         end
 
-      {:error, reason} ->
+      {:error, reason, _effective_history} ->
         {:error, reason}
     end
+  end
+
+  defp call_action(agent, inputs, history, tool_descriptions) do
+    call = fn effective_history ->
+      call_inputs =
+        Map.merge(inputs, %{history: effective_history, tools: tool_descriptions})
+
+      DSEx.Predict.Predict.call(agent.react, call_inputs)
+    end
+
+    call_with_trajectory_truncation(agent.mode, call, history)
   end
 
   defp handle_action_prediction(agent, inputs, history, remaining, prediction) do
@@ -366,17 +377,75 @@ defmodule DSEx.Predict.ReAct do
   defp action_parse_failure?(%{reason: {:error, {:missing_output_fields, _fields}}}), do: true
   defp action_parse_failure?(%DSEx.AdapterParseError{}), do: true
   defp action_parse_failure?({:missing_output_fields, _fields}), do: true
+  defp action_parse_failure?({:react_context_window_exceeded_after_truncation, _reason}), do: true
+  defp action_parse_failure?({:react_trajectory_not_truncatable, _reason}), do: true
   defp action_parse_failure?(_reason), do: false
 
   defp extract_final(agent, inputs, history, reason) do
     extractor = extraction_program(agent)
 
-    with {:ok, prediction} <-
-           DSEx.Predict.ChainOfThought.call(extractor, Map.put(inputs, :history, history)) do
-      final = project_extraction(agent.signature, prediction)
-      validate_final(agent.signature, final, history, reason)
+    call = fn effective_history ->
+      DSEx.Predict.ChainOfThought.call(extractor, Map.put(inputs, :history, effective_history))
+    end
+
+    case call_with_trajectory_truncation(agent.mode, call, history) do
+      {:ok, prediction, effective_history} ->
+        final = project_extraction(agent.signature, prediction)
+        validate_final(agent.signature, final, effective_history, reason)
+
+      {:error, error, _effective_history} ->
+        {:error, error}
     end
   end
+
+  defp call_with_trajectory_truncation(:dspy_3_2_1, call, history),
+    do: retry_trajectory_call(call, history, @trajectory_call_attempts)
+
+  defp call_with_trajectory_truncation(_mode, call, history) do
+    case call.(history) do
+      {:ok, prediction} -> {:ok, prediction, history}
+      {:error, reason} -> {:error, reason, history}
+    end
+  end
+
+  defp retry_trajectory_call(call, history, attempts_left) do
+    case call.(history) do
+      {:ok, prediction} ->
+        {:ok, prediction, history}
+
+      {:error, reason} when attempts_left > 1 ->
+        if context_window_exceeded?(reason) do
+          case history do
+            [_oldest | rest] ->
+              retry_trajectory_call(call, rest, attempts_left - 1)
+
+            [] ->
+              {:error, {:react_trajectory_not_truncatable, reason}, history}
+          end
+        else
+          {:error, reason, history}
+        end
+
+      {:error, reason} ->
+        if context_window_exceeded?(reason) do
+          case history do
+            [_oldest | rest] ->
+              {:error, {:react_context_window_exceeded_after_truncation, reason}, rest}
+
+            [] ->
+              {:error, {:react_trajectory_not_truncatable, reason}, history}
+          end
+        else
+          {:error, reason, history}
+        end
+    end
+  end
+
+  defp context_window_exceeded?(%DSEx.ContextWindowExceededError{}), do: true
+  defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?({:lm_failed, _lm, reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(_reason), do: false
 
   defp project_extraction(signature, prediction) do
     fields =
