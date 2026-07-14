@@ -519,10 +519,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
 
   defp failure_recovery_lane(dir, canonical_results_dir, max_age_hours) do
     with {:ok, path, artifact} <-
-           latest_verified_failure_artifact([
-             Path.join(dir, "failure-campaign-*.json"),
-             Path.join(canonical_results_dir, "failure-campaign-*.json")
-           ]) do
+           latest_verified_failure_artifact(
+             [
+               Path.join(dir, "failure-campaign-*.json"),
+               Path.join(canonical_results_dir, "failure-campaign-*.json")
+             ],
+             max_age_hours
+           ) do
       authority = failure_recovery_authority(artifact)
       deterministic = authority["deterministic_complete"]
       live = authority["live_complete"]
@@ -584,7 +587,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     error -> {:error, {:unverifiable, path, Exception.message(error)}}
   end
 
-  defp latest_verified_failure_artifact(globs) do
+  defp latest_verified_failure_artifact(globs, max_age_hours) do
     paths =
       globs
       |> Enum.flat_map(&Path.wildcard/1)
@@ -596,20 +599,34 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         {:error, :missing}
 
       paths ->
-        paths
-        |> Enum.reduce_while(nil, fn path, first_error ->
-          case read_verified_failure_artifact(path) do
-            {:ok, artifact} ->
-              {:halt, {:ok, path, artifact}}
+        {valid, first_error} =
+          Enum.reduce(paths, {[], nil}, fn path, {valid, first_error} ->
+            case read_verified_failure_artifact(path) do
+              {:ok, artifact} ->
+                {[{path, artifact} | valid], first_error}
 
-            {:error, {:unverifiable, ^path, reason}} ->
-              {:cont, first_error || {:error, path, reason}}
-          end
-        end)
-        |> case do
-          {:ok, path, artifact} -> {:ok, path, artifact}
-          {:error, path, reason} -> {:error, {:unverifiable, path, reason}}
-          nil -> {:error, :missing}
+              {:error, {:unverifiable, ^path, reason}} ->
+                {valid, first_error || {:error, path, reason}}
+            end
+          end)
+
+        case valid do
+          [] ->
+            case first_error do
+              {:error, path, reason} -> {:error, {:unverifiable, path, reason}}
+              nil -> {:error, :missing}
+            end
+
+          valid ->
+            {path, artifact} =
+              Enum.max_by(valid, fn {path, artifact} ->
+                live = failure_recovery_authority(artifact)["live_complete"] == true
+                freshness = if(live, do: :strict, else: :source_checkout)
+                admitted = fresh?(artifact, path, max_age_hours, freshness)
+                {admitted, live, mtime_unix!(path)}
+              end)
+
+            {:ok, path, artifact}
         end
     end
   end

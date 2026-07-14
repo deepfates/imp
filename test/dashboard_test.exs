@@ -1334,6 +1334,57 @@ defmodule DashboardTest do
     assert lane["fresh"]
   end
 
+  test "failure recovery prefers admitted live evidence over newer deterministic evidence" do
+    root = tmp_dir("dashboard-failure-live-preference")
+    failure_dir = Path.join(root, "failure")
+    results_dir = Path.join(root, "results")
+    out_dir = Path.join(root, "out")
+    Enum.each([failure_dir, results_dir, out_dir], &File.mkdir_p!/1)
+
+    current_sha = dashboard_git_sha()
+
+    deterministic_path =
+      write_failure_campaign!(failure_dir,
+        generated_at: DateTime.utc_now(),
+        git_sha: current_sha
+      )
+
+    live_path =
+      write_failure_campaign!(results_dir,
+        generated_at: DateTime.utc_now(),
+        git_sha: current_sha,
+        live: true,
+        reported_release_complete: true
+      )
+
+    File.touch!(live_path, {{2020, 1, 1}, {0, 0, 0}})
+    File.touch!(deterministic_path, {{2099, 1, 1}, {0, 0, 0}})
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--failure-campaign-dir",
+        failure_dir,
+        "--results-dir",
+        results_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "1"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+
+    lane =
+      dashboard_path |> File.read!() |> Jason.decode!() |> get_in(["lanes", "failure_recovery"])
+
+    assert lane["artifact"]["path"] == live_path
+    assert lane["status"] == "full"
+    assert lane["full_evidence"]
+  end
+
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
 
   defp run_failure_dashboard!(root, out_name, failure_dir) do
