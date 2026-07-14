@@ -116,7 +116,7 @@ defmodule DSEx.Optimizer.Playbook do
         auditset: :required,
         validation: :unsupported
       },
-      result: :workflow_result
+      result: {:workflow_result, Result}
     }
 
   @impl true

@@ -2,6 +2,9 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   @behaviour DSEx.Optimizer
   @moduledoc "Creates provider training jobs from bootstrapped demonstrations."
 
+  alias DSEx.Clients.TrainingJob
+  alias DSEx.Optimizer.TrainingResult
+
   defstruct [:metric, :trainer, max_demos: 32]
 
   @option_schema [
@@ -38,20 +41,47 @@ defmodule DSEx.Optimizer.BootstrapFinetune do
   def run(%__MODULE__{} = optimizer, program, opts) do
     with :ok <- DSEx.Optimizer.reject_options(DSEx.Optimizer.invocation_options(opts)) do
       case compile(optimizer, program, DSEx.Optimizer.fetch_dataset!(opts, :trainset)) do
-        %{program: compiled, job: job} ->
-          {:ok,
-           %DSEx.Optimizer.TrainingResult{
-             program: compiled,
-             job: job,
-             status: :job_created,
-             metadata: %{method: :sft}
-           }}
+        %{program: compiled, job: %TrainingJob{} = job} ->
+          training_result(compiled, job)
+
+        %{program: _compiled, job: job} ->
+          {:error, {:invalid_training_job, job}}
 
         %{program: compiled, error: reason} ->
           {:error, {:training_not_started, reason, compiled}}
       end
     end
   end
+
+  defp training_result(compiled, %TrainingJob{status: :succeeded} = job) do
+    case TrainingJob.rebind(job, compiled) do
+      {:ok, rebound} ->
+        {:ok,
+         %TrainingResult{
+           program: rebound,
+           job: job,
+           status: :completed,
+           metadata: %{method: :sft}
+         }}
+
+      {:error, reason} ->
+        {:error, {:training_rebind_failed, reason}}
+    end
+  end
+
+  defp training_result(compiled, %TrainingJob{status: status} = job)
+       when status in [:created, :pending, :running] do
+    {:ok,
+     %TrainingResult{
+       program: compiled,
+       job: job,
+       status: :job_created,
+       metadata: %{method: :sft}
+     }}
+  end
+
+  defp training_result(_compiled, %TrainingJob{status: status} = job),
+    do: {:error, {:training_failed, status, job.metadata}}
 
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     boot =

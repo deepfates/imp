@@ -214,6 +214,24 @@ defmodule BetterTogetherTest do
     assert Enum.all?(report.candidates, &(&1.evaluation.validation_size == 1))
   end
 
+  test "preserves an explicitly empty validation split instead of carving a holdout" do
+    trainset = examples() ++ [example("France?", "Paris"), example("Germany?", "Berlin")]
+
+    compiled =
+      metric()
+      |> BetterTogether.new(%{capture: %CaptureSets{owner: self()}})
+      |> BetterTogether.compile(program(), trainset, [],
+        strategy: :capture,
+        valset_ratio: 0.25,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_receive {:prepared_sets, 4, 0}
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    assert report.metadata.trainset_size == 4
+    assert report.metadata.validation_size == 0
+  end
+
   test "stops after the first failed step and reports the evaluated prefixes" do
     better =
       BetterTogether.new(metric(), %{
@@ -253,6 +271,43 @@ defmodule BetterTogetherTest do
 
     assert report.metadata.provider_training_semantics ==
              :completed_training_results_only
+  end
+
+  test "composes a terminal successful weight step with the rebound program" do
+    base_program = program()
+
+    trainable_program =
+      DSEx.with_lm(base_program, Map.put(DSEx.ProgramAccess.lm(base_program), :model, "base"))
+
+    trainer = fn _lm, _examples, _opts ->
+      {:ok,
+       DSEx.Clients.TrainingJob.new(%{
+         id: "terminal-sft",
+         provider: :test,
+         model: "base",
+         status: :succeeded,
+         result_model: "trained-model"
+       })}
+    end
+
+    compiled =
+      metric()
+      |> BetterTogether.new(%{
+        w: DSEx.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+      })
+      |> BetterTogether.compile(trainable_program, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0
+      )
+
+    assert DSEx.ProgramAccess.lm(compiled).model == "trained-model"
+    report = DSEx.Optimizer.Report.fetch(compiled)
+    refute report.metadata.compilation_error_occurred
+    assert report.metadata.selected_strategy == "w"
+
+    assert Enum.any?(report.candidates, fn candidate ->
+             get_in(candidate, [:compile_metadata, :training_status]) == :completed
+           end)
   end
 
   test "rejects empty training data and invalid holdout ratios during preparation" do

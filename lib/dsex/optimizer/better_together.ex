@@ -151,16 +151,16 @@ defmodule DSEx.Optimizer.BetterTogether do
       raise ArgumentError, "DSEx.Optimizer.BetterTogether.compile/5: trainset cannot be empty"
     end
 
-    case optional_enumerable_to_list!(valset, "valset") do
-      [_ | _] = provided ->
-        {trainset, provided}
-
-      [] when ratio == 0 ->
+    case valset do
+      nil when ratio == 0 ->
         {trainset, nil}
 
-      [] ->
+      nil ->
         Enum.split(trainset, floor(ratio * length(trainset)))
         |> then(fn {validation, training} -> {training, validation} end)
+
+      provided ->
+        {trainset, enumerable_to_list!(provided, "valset")}
     end
   end
 
@@ -172,9 +172,6 @@ defmodule DSEx.Optimizer.BetterTogether do
             "DSEx.Optimizer.BetterTogether.compile/5: #{name} must be enumerable, got: #{inspect(value)}"
     end
   end
-
-  defp optional_enumerable_to_list!(nil, _name), do: []
-  defp optional_enumerable_to_list!(value, name), do: enumerable_to_list!(value, name)
 
   defp evaluator(_metric, nil, _opts), do: nil
   defp evaluator(_metric, [], _opts), do: nil
@@ -334,58 +331,25 @@ defmodule DSEx.Optimizer.BetterTogether do
   defp valid_strategy_step?(_step), do: false
 
   defp compile_step(optimizer, program, trainset, valset) do
-    with {:ok, capabilities} <- DSEx.Optimizer.capabilities(optimizer) do
-      compile_declared_step(capabilities, optimizer, program, trainset, valset)
-    end
-  end
+    datasets =
+      if is_nil(valset),
+        do: %{trainset: trainset},
+        else: %{trainset: trainset, validation: valset}
 
-  defp compile_declared_step(
-         %{kind: :program} = capabilities,
-         optimizer,
-         program,
-         trainset,
-         valset
-       ) do
-    opts = step_options(capabilities, trainset, valset)
+    case DSEx.Optimizer.run_with_datasets(optimizer, program, datasets, [:program, :training]) do
+      {:ok, %{kind: :program}, compiled} ->
+        {:ok, compiled, %{optimizer: optimizer.__struct__, kind: :program}}
 
-    case DSEx.Optimizer.run(optimizer, program, opts, capabilities) do
-      {:ok, compiled} -> {:ok, compiled, %{optimizer: optimizer.__struct__, kind: :program}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp compile_declared_step(
-         %{kind: :training} = capabilities,
-         optimizer,
-         program,
-         trainset,
-         valset
-       ) do
-    opts = step_options(capabilities, trainset, valset)
-
-    case DSEx.Optimizer.run(optimizer, program, opts, capabilities) do
-      {:ok, %DSEx.Optimizer.TrainingResult{status: :completed, program: compiled} = result} ->
-        {:ok, compiled,
+      {:ok, %{kind: :training}, %DSEx.Optimizer.TrainingResult{status: :completed} = result} ->
+        {:ok, result.program,
          %{optimizer: optimizer.__struct__, kind: :training, training_status: result.status}}
 
-      {:ok, %DSEx.Optimizer.TrainingResult{status: status}} ->
+      {:ok, %{kind: :training}, %DSEx.Optimizer.TrainingResult{status: status}} ->
         {:error, {:training_step_incomplete, optimizer.__struct__, status}}
 
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  defp compile_declared_step(%{kind: kind}, optimizer, _program, _trainset, _valset),
-    do: {:error, {:unsupported_optimizer_kind, optimizer.__struct__, kind}}
-
-  defp step_options(capabilities, trainset, valset) do
-    opts = [trainset: trainset]
-
-    if Map.get(capabilities.datasets, :validation, :unsupported) == :unsupported or
-         is_nil(valset),
-       do: opts,
-       else: Keyword.put(opts, :validation, valset)
   end
 
   defp fetch_optimizer(optimizers, key) do

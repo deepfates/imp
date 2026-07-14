@@ -102,6 +102,35 @@ defmodule DSEx.OptimizerContractTest do
     def run(%__MODULE__{result: result}, _program, _opts), do: {:ok, result}
   end
 
+  defmodule RunOnly do
+    defstruct [:owner]
+
+    def run(%__MODULE__{owner: owner}, program, _opts) do
+      send(owner, :forged_optimizer_executed)
+      {:ok, program}
+    end
+  end
+
+  defmodule MalformedWorkflow do
+    @behaviour DSEx.Optimizer
+    defstruct []
+
+    defmodule Result do
+      defstruct [:value]
+    end
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :workflow,
+        datasets: %{trainset: :required},
+        result: {:workflow_result, Result}
+      }
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts), do: {:ok, %{not: :the_declared_result}}
+  end
+
   @canonical_modules [
     DSEx.Optimizer.LabeledFewShot,
     DSEx.Optimizer.BootstrapFewShot,
@@ -140,7 +169,12 @@ defmodule DSEx.OptimizerContractTest do
                is_atom(name) and requirement in [:required, :optional, :unsupported]
              end)
 
-      assert result in [:program, :training_result, :constructed_program, :workflow_result]
+      assert result in [
+               :program,
+               :training_result,
+               :constructed_program,
+               {:workflow_result, DSEx.Optimizer.Playbook.Result}
+             ]
     end
 
     assert DSEx.Optimizer.Playbook.__optimizer__().datasets == %{
@@ -278,6 +312,91 @@ defmodule DSEx.OptimizerContractTest do
 
     assert ^program = DSEx.optimize(program, %FlippingCapabilities{}, [])
     assert Process.get(key) == 1
+  end
+
+  test "composed execution resolves capabilities exactly once" do
+    key = {FlippingCapabilities, :calls}
+    Process.delete(key)
+    program = DSEx.predict("question -> answer")
+
+    assert {:ok, %{kind: :program}, ^program} =
+             DSEx.Optimizer.run_with_datasets(
+               %FlippingCapabilities{},
+               program,
+               %{trainset: []},
+               [:program, :training]
+             )
+
+    assert Process.get(key) == 1
+  end
+
+  test "caller-supplied capability maps cannot execute a run-only struct" do
+    forged = %{
+      kind: :program,
+      datasets: %{trainset: :required},
+      result: :program
+    }
+
+    assert {:error, {:not_an_optimizer, RunOnly}} =
+             DSEx.Optimizer.run(
+               %RunOnly{owner: self()},
+               DSEx.predict("question -> answer"),
+               [trainset: []],
+               forged
+             )
+
+    refute_receive :forged_optimizer_executed
+  end
+
+  test "workflow results must match their declared result module" do
+    assert {:error,
+            {:invalid_workflow_result, MalformedWorkflow.Result, %{not: :the_declared_result}}} =
+             DSEx.Optimizer.run(
+               %MalformedWorkflow{},
+               DSEx.predict("question -> answer"),
+               trainset: []
+             )
+  end
+
+  test "BootstrapFinetune distinguishes pending, completed, and failed jobs" do
+    program = DSEx.predict("question -> answer", lm: DSEx.req_llm("openai:gpt-base"))
+    metric = DSEx.exact_match(:answer)
+
+    trainer_for = fn attrs ->
+      fn _lm, _examples, _opts -> {:ok, DSEx.Clients.TrainingJob.new(attrs)} end
+    end
+
+    pending =
+      DSEx.Optimizer.BootstrapFinetune.new(metric,
+        trainer: trainer_for.(%{id: "pending", status: :running})
+      )
+
+    assert {:ok, %TrainingResult{status: :job_created, job: %{id: "pending"}}} =
+             DSEx.train(program, pending, [])
+
+    completed =
+      DSEx.Optimizer.BootstrapFinetune.new(metric,
+        trainer:
+          trainer_for.(%{
+            id: "completed",
+            provider: :openai,
+            model: "openai:gpt-base",
+            status: :succeeded,
+            result_model: "ft:gpt-completed"
+          })
+      )
+
+    assert {:ok, %TrainingResult{status: :completed, program: rebound}} =
+             DSEx.train(program, completed, [])
+
+    assert DSEx.ProgramAccess.lm(rebound).model == "openai:ft:gpt-completed"
+
+    failed =
+      DSEx.Optimizer.BootstrapFinetune.new(metric,
+        trainer: trainer_for.(%{id: "failed", status: :failed})
+      )
+
+    assert {:error, {:training_failed, :failed, %{}}} = DSEx.train(program, failed, [])
   end
 
   test "capability callback failures are normalized at the optimizer boundary" do

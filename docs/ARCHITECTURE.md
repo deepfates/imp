@@ -281,8 +281,8 @@ capability declaration contains:
 - `kind`: `:program`, `:training`, `:constructor`, or `:workflow`;
 - `datasets`: named splits mapped to `:required`, `:optional`, or
   `:unsupported`;
-- `result`: `:program`, `:training_result`, `:constructed_program`, or
-  `:workflow_result`.
+- `result`: `:program`, `:training_result`, `:constructed_program`, or a
+  `{:workflow_result, module}` contract.
 
 `DSEx.Optimizer.run/3` validates the capability shape, keyword invocation
 options, declared dataset presence or absence, and the outer result shape. The
@@ -314,8 +314,10 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 - `BetterTogether`
 - `BootstrapFinetune`, `GRPO` run through `DSEx.train/3` or `DSEx.train/4` only
   when an explicit trainer backend is supplied. Bootstrap fine-tuning returns
-  a `:job_created` training result containing its provider job; GRPO returns a completed
-  training result containing the rebound program. A missing trainer is an error;
+  a `:job_created` training result for asynchronous work or a completed result
+  containing the rebound program when the trainer returns terminal success;
+  terminal failures remain errors. GRPO returns a completed training result
+  containing the rebound program. A missing trainer is an error;
   DSEx does not silently select a local training fallback. The optional
   `DSEx.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
   enforce job and terminal artifact identity, support idempotent bounded-retry

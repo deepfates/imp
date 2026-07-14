@@ -30,7 +30,10 @@ defmodule DSEx.Optimizer do
           required(:kind) => kind(),
           required(:datasets) => %{required(atom()) => requirement()},
           required(:result) =>
-            :program | :training_result | :constructed_program | :workflow_result
+            :program
+            | :training_result
+            | :constructed_program
+            | {:workflow_result, module()}
         }
 
   @callback __optimizer__() :: capabilities()
@@ -62,19 +65,7 @@ defmodule DSEx.Optimizer do
   @spec run(struct(), term(), keyword()) :: {:ok, term()} | {:error, term()}
   def run(optimizer, program, opts), do: run(optimizer, program, opts, :any)
 
-  @doc false
-  @spec run(struct(), term(), keyword(), kind() | :any | capabilities()) ::
-          {:ok, term()} | {:error, term()}
-  def run(optimizer, program, opts, capabilities) when is_map(capabilities) and is_list(opts) do
-    if Keyword.keyword?(opts) do
-      with :ok <- validate_capabilities(capabilities) do
-        execute(optimizer, program, opts, capabilities)
-      end
-    else
-      {:error, {:invalid_optimizer_options, opts}}
-    end
-  end
-
+  @spec run(struct(), term(), keyword(), kind() | :any) :: {:ok, term()} | {:error, term()}
   def run(optimizer, program, opts, expected_kind) when is_list(opts) do
     if Keyword.keyword?(opts) do
       with {:ok, capabilities} <- capabilities(optimizer),
@@ -88,6 +79,24 @@ defmodule DSEx.Optimizer do
 
   def run(_optimizer, _program, opts, _expected_kind),
     do: {:error, {:invalid_optimizer_options, opts}}
+
+  @doc "Runs an optimizer once against the named datasets available to a composed workflow."
+  @spec run_with_datasets(struct(), term(), map(), [kind()] | :any) ::
+          {:ok, capabilities(), term()} | {:error, term()}
+  def run_with_datasets(optimizer, program, available_datasets, allowed_kinds \\ :any)
+
+  def run_with_datasets(optimizer, program, available_datasets, allowed_kinds)
+      when is_map(available_datasets) do
+    with {:ok, capabilities} <- capabilities(optimizer),
+         :ok <- validate_allowed_kind(capabilities.kind, allowed_kinds),
+         opts <- select_available_datasets(capabilities.datasets, available_datasets),
+         {:ok, result} <- execute(optimizer, program, opts, capabilities) do
+      {:ok, capabilities, result}
+    end
+  end
+
+  def run_with_datasets(_optimizer, _program, available_datasets, _allowed_kinds),
+    do: {:error, {:invalid_available_datasets, available_datasets}}
 
   @doc false
   def fetch_dataset!(opts, key), do: Keyword.fetch!(opts, key)
@@ -124,8 +133,7 @@ defmodule DSEx.Optimizer do
     expected = %{
       program: :program,
       training: :training_result,
-      constructor: :constructed_program,
-      workflow: :workflow_result
+      constructor: :constructed_program
     }
 
     cond do
@@ -137,7 +145,10 @@ defmodule DSEx.Optimizer do
       end) ->
         {:error, {:invalid_optimizer_capabilities, %{datasets: datasets}}}
 
-      Map.get(expected, kind) != result ->
+      kind == :workflow and not valid_workflow_result_contract?(result) ->
+        {:error, {:invalid_optimizer_capabilities, %{kind: kind, result: result}}}
+
+      kind != :workflow and Map.get(expected, kind) != result ->
         {:error, {:invalid_optimizer_capabilities, %{kind: kind, result: result}}}
 
       true ->
@@ -161,6 +172,24 @@ defmodule DSEx.Optimizer do
 
   defp validate_kind(actual, expected),
     do: {:error, {:optimizer_kind_mismatch, expected, actual}}
+
+  defp validate_allowed_kind(_actual, :any), do: :ok
+
+  defp validate_allowed_kind(actual, allowed) when is_list(allowed) do
+    if actual in allowed,
+      do: :ok,
+      else: {:error, {:optimizer_kind_mismatch, allowed, actual}}
+  end
+
+  defp validate_allowed_kind(actual, allowed), do: validate_kind(actual, allowed)
+
+  defp select_available_datasets(requirements, available) do
+    Enum.reduce(requirements, [], fn {name, requirement}, opts ->
+      if requirement != :unsupported and Map.has_key?(available, name),
+        do: Keyword.put(opts, name, Map.fetch!(available, name)),
+        else: opts
+    end)
+  end
 
   defp validate_dataset(key, :required, opts) do
     case Keyword.fetch(opts, key) do
@@ -215,7 +244,12 @@ defmodule DSEx.Optimizer do
       else: {:error, {:invalid_optimizer_program, program}}
   end
 
-  defp validate_result(%{result: :workflow_result}, {:ok, _result}), do: :ok
+  defp validate_result(%{result: {:workflow_result, module}}, {:ok, result}) do
+    if is_struct(result, module),
+      do: :ok,
+      else: {:error, {:invalid_workflow_result, module, result}}
+  end
+
   defp validate_result(_capabilities, {:error, _reason}), do: :ok
 
   defp validate_result(capabilities, result),
@@ -225,4 +259,9 @@ defmodule DSEx.Optimizer do
     do: Code.ensure_loaded?(module) and function_exported?(module, :call, 2)
 
   defp executable_program?(_value), do: false
+
+  defp valid_workflow_result_contract?({:workflow_result, module}) when is_atom(module),
+    do: Code.ensure_loaded?(module) and function_exported?(module, :__struct__, 0)
+
+  defp valid_workflow_result_contract?(_result), do: false
 end

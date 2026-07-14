@@ -637,7 +637,8 @@ returns its validated declaration:
 - `datasets` maps named splits such as `trainset`, `validation`,
   `promotionset`, and `auditset` to `:required`, `:optional`, or
   `:unsupported`.
-- `result` declares the expected result shape.
+- `result` declares the expected result shape; workflows name their concrete
+  result module.
 
 Use `DSEx.optimize/3` when a program optimizer does not require validation,
 `DSEx.optimize/4` when supplying validation, and `DSEx.optimize/5` when also
@@ -797,9 +798,11 @@ optimizer = DSEx.Optimizer.BootstrapFinetune.new(metric, trainer: trainer)
 
 `DSEx.train/3` and `DSEx.train/4` return
 `{:ok, %DSEx.Optimizer.TrainingResult{}}` or
-`{:error, reason}`. Bootstrap fine-tuning reports `status: :job_created` with its
-provider job; GRPO reports `status: :completed` after its synchronous trainer
-workflow returns the rebound program. Both require an explicitly configured
+`{:error, reason}`. Bootstrap fine-tuning reports `status: :job_created` for an
+asynchronous provider job and `status: :completed` with a rebound program when
+the trainer returns a successful terminal job. Terminal failures remain errors.
+GRPO reports `status: :completed` after its synchronous trainer workflow returns
+the rebound program. Both require an explicitly configured
 trainer. DSEx does not silently fall back to local training when no trainer is
 configured. `DSEx.Clients.MLXLMTrainer` is an optional, explicit local SFT
 backend, not a fallback. A training optimizer that declares optional validation
