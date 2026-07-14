@@ -36,7 +36,7 @@ defmodule DSEx.ExternalCommand.Lifecycle do
           | {:error, :timeout, Capture.t()}
           | {:error, term()}
   def run(executable, argv, opts \\ []) do
-    with {:ok, handle} <- start_owner(executable, argv, opts) do
+    with {:ok, handle} <- start_owner(executable, argv, opts, false) do
       await_result(handle.ref, handle.owner)
     end
   end
@@ -44,7 +44,7 @@ defmodule DSEx.ExternalCommand.Lifecycle do
   @spec start(String.t(), [String.t()], keyword()) ::
           {:ok, DSEx.ExternalCommand.Handle.t()} | {:error, term()}
   def start(executable, argv, opts \\ []) do
-    start_owner(executable, argv, opts)
+    start_owner(executable, argv, opts, true)
   end
 
   @spec stop(DSEx.ExternalCommand.Handle.t(), timeout()) :: :ok | {:error, term()}
@@ -78,7 +78,7 @@ defmodule DSEx.ExternalCommand.Lifecycle do
     end
   end
 
-  defp start_owner(executable, argv, opts) do
+  defp start_owner(executable, argv, opts, require_os_pid?) do
     with :ok <- validate_command(executable, argv),
          {:ok, executable_path} <- resolve_executable(executable),
          {:ok, config} <- validate_opts(opts) do
@@ -87,7 +87,15 @@ defmodule DSEx.ExternalCommand.Lifecycle do
       started_at = System.monotonic_time(:millisecond)
 
       case Task.Supervisor.start_child(DSEx.UnlinkedTaskSupervisor, fn ->
-             port_owner(caller, ref, executable_path, argv, config, started_at)
+             port_owner(
+               caller,
+               ref,
+               executable_path,
+               argv,
+               config,
+               started_at,
+               require_os_pid?
+             )
            end) do
         {:ok, owner} -> await_started(ref, owner)
         {:error, reason} -> {:error, {:command_owner_start_failed, reason}}
@@ -125,7 +133,7 @@ defmodule DSEx.ExternalCommand.Lifecycle do
     end
   end
 
-  defp port_owner(caller, ref, executable, argv, config, started_at) do
+  defp port_owner(caller, ref, executable, argv, config, started_at, require_os_pid?) do
     caller_ref = Process.monitor(caller)
 
     port_opts =
@@ -147,12 +155,18 @@ defmodule DSEx.ExternalCommand.Lifecycle do
         nil -> nil
       end
 
-    send(caller, {ref, {:started, os_pid}})
+    if require_os_pid? and is_nil(os_pid) do
+      close_port(port)
+      Process.demonitor(caller_ref, [:flush])
+      send(caller, {ref, {:error, :command_os_pid_unavailable}})
+    else
+      send(caller, {ref, {:started, os_pid}})
 
-    timer = start_timer(config.timeout, started_at)
-    capture = new_capture(config.max_output_bytes)
+      timer = start_timer(config.timeout, started_at)
+      capture = new_capture(config.max_output_bytes)
 
-    collect(port, os_pid, caller, caller_ref, ref, timer, config, started_at, capture)
+      collect(port, os_pid, caller, caller_ref, ref, timer, config, started_at, capture)
+    end
   rescue
     error ->
       send(caller, {

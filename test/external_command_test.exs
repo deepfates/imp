@@ -51,6 +51,23 @@ defmodule DSEx.ExternalCommandTest do
              ])
   end
 
+  test "managed start refuses a missing OS process identity" do
+    # Fast commands may exit before OTP exposes their PID. `run/3` still handles
+    # that race, while the managed API must never claim a cleanup guarantee.
+    results = for _ <- 1..100, do: DSEx.ExternalCommand.start("true", [], timeout: 1_000)
+
+    Enum.each(results, fn
+      {:ok, handle} ->
+        assert is_integer(handle.os_pid)
+        assert :ok = DSEx.ExternalCommand.stop(handle, 1_000)
+
+      {:error, :command_os_pid_unavailable} ->
+        :ok
+    end)
+
+    assert {:ok, %{exit_status: 0}} = DSEx.ExternalCommand.run("true", [])
+  end
+
   @tag timeout: 5_000
   test "managed stop is a synchronous process-group cleanup barrier" do
     root =

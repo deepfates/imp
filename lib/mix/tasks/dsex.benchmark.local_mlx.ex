@@ -43,5 +43,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.LocalMlx do
     Mix.shell().info(
       Jason.encode!(%{path: result.path, acceptance: result.artifact["acceptance"]}, pretty: true)
     )
+
+    unless result.artifact["acceptance"]["admissible"] do
+      Mix.raise("local MLX campaign completed but failed admission")
+    end
   end
 end

@@ -7,6 +7,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   @mlx_lm_version "0.31.3"
   @model "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
   @revision "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+  @dataset_payload_sha256 "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f"
+  @model_tree_sha256 "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947"
   @host "127.0.0.1"
 
   def run!(opts) when is_list(opts) do
@@ -27,6 +29,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     ensure_fresh_root!(root)
     dataset = load_dataset!(dataset_path)
     model_tree = FileTree.inventory!(model_path)
+    require_canonical_inputs!(dataset, model_tree)
     signature = ProviderTrainingCampaign.signature(dataset["route_codes"])
     examples = Enum.map(dataset["train"], &ProviderTrainingCampaign.example/1)
 
@@ -206,6 +209,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   end
 
   defp with_server!(model_path, adapter_path, port, executable, prefix, fun) do
+    assert_port_available!(port)
+
     argv =
       (prefix ++
          [
@@ -233,7 +238,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     base_url = "http://#{@host}:#{port}/v1"
 
     try do
-      model_id = await_model!(handle, base_url, started + 120_000)
+      model_ids = await_models!(handle, base_url, model_path, started + 120_000)
+      model_id = "default_model"
 
       model = %{
         provider: :openai,
@@ -256,6 +262,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
         "command" => %{"executable" => resolve_executable!(executable), "argv" => argv},
         "base_url" => base_url,
         "model_id" => model_id,
+        "advertised_model_ids" => model_ids,
+        "explicit_model_path" => model_path,
         "ready_ms" => System.monotonic_time(:millisecond) - started,
         "cleanup" => "synchronous_process_group_absence_verified"
       }
@@ -270,28 +278,35 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     end
   end
 
-  defp await_model!(handle, base_url, deadline) do
+  defp await_models!(handle, base_url, expected_model_path, deadline) do
     if Process.alive?(handle.owner),
-      do: await_model_request!(handle, base_url, deadline),
+      do: await_models_request!(handle, base_url, expected_model_path, deadline),
       else: raise("MLX server exited before readiness")
   end
 
-  defp await_model_request!(handle, base_url, deadline) do
+  defp await_models_request!(handle, base_url, expected_model_path, deadline) do
     case Req.get(base_url <> "/models", receive_timeout: 1_000, retry: false) do
-      {:ok, %{status: 200, body: %{"data" => [%{"id" => id} | _]}}} when is_binary(id) -> id
-      _result -> retry_model!(handle, base_url, deadline)
+      {:ok, %{status: 200, body: %{"data" => data}}} when is_list(data) ->
+        ids = Enum.map(data, & &1["id"])
+
+        if expected_model_path in ids and Process.alive?(handle.owner),
+          do: ids,
+          else: retry_models!(handle, base_url, expected_model_path, deadline)
+
+      _result ->
+        retry_models!(handle, base_url, expected_model_path, deadline)
     end
   rescue
-    _error -> retry_model!(handle, base_url, deadline)
+    _error -> retry_models!(handle, base_url, expected_model_path, deadline)
   end
 
-  defp retry_model!(handle, base_url, deadline) do
+  defp retry_models!(handle, base_url, expected_model_path, deadline) do
     if System.monotonic_time(:millisecond) >= deadline do
-      raise "MLX server did not become ready at #{base_url}"
+      raise "MLX server did not advertise #{expected_model_path} at #{base_url}"
     end
 
     Process.sleep(100)
-    await_model!(handle, base_url, deadline)
+    await_models!(handle, base_url, expected_model_path, deadline)
   end
 
   defp await_closed!(port, deadline) do
@@ -431,6 +446,21 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     dataset = path |> File.read!() |> Jason.decode!()
     unless ProviderTrainingCampaign.valid_dataset?(dataset), do: raise("invalid pinned dataset")
     dataset
+  end
+
+  defp require_canonical_inputs!(dataset, model_tree) do
+    unless dataset["payload_sha256"] == @dataset_payload_sha256,
+      do: raise("dataset does not match the canonical Banking77 campaign payload")
+
+    unless model_tree["sha256"] == @model_tree_sha256,
+      do: raise("model snapshot does not match the canonical pinned inventory")
+  end
+
+  defp assert_port_available!(port) do
+    case :gen_tcp.listen(port, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: false]) do
+      {:ok, socket} -> :gen_tcp.close(socket)
+      {:error, reason} -> raise "MLX campaign port #{port} is unavailable: #{inspect(reason)}"
+    end
   end
 
   defp ensure_fresh_root!(root) do
