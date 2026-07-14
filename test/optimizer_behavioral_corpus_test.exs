@@ -51,7 +51,15 @@ defmodule OptimizerBehavioralCorpusTest do
     baseline_score = evaluator(program).score
 
     optimizer =
-      DSEx.Optimizer.MIPROv2.new(metric(), trials: 5, demos_per_candidate: 1, cold_start: 2)
+      DSEx.Optimizer.MIPROv2.new(metric(),
+        auto: nil,
+        num_candidates: 5,
+        num_trials: 5,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 1,
+        minibatch: false,
+        startup_trials: 2
+      )
 
     compiled = DSEx.Optimizer.MIPROv2.compile(optimizer, program, trainset(), devset())
     report = DSEx.Optimizer.Report.fetch(compiled)
@@ -60,6 +68,7 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.algorithm == :mipro_v2
     assert report.metadata.sampler == :joint_categorical_parzen
     assert report.metadata.upstream_sampler == :optuna_multivariate_tpe
+    refute Map.has_key?(report.metadata, :compatibility)
     refute report.metadata.exact_sampler_sequence_parity
     assert report.best_score >= baseline_score
     assert report.best_score == evaluator(compiled).score
@@ -76,9 +85,13 @@ defmodule OptimizerBehavioralCorpusTest do
 
     compiled =
       DSEx.Optimizer.MIPROv2.new(metric(),
-        trials: 0,
-        demos_per_candidate: 0,
-        cold_start: 0
+        auto: nil,
+        num_candidates: 1,
+        num_trials: 0,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        startup_trials: 0
       )
       |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), devset())
 
@@ -99,7 +112,14 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/valset must be enumerable/, fn ->
-      DSEx.Optimizer.MIPROv2.new(metric(), trials: 2, demos_per_candidate: 1)
+      DSEx.Optimizer.MIPROv2.new(metric(),
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 2,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 1,
+        minibatch: false
+      )
       |> DSEx.Optimizer.MIPROv2.compile(program, trainset(), :not_an_enumerable_devset)
     end
   end
@@ -108,7 +128,14 @@ defmodule OptimizerBehavioralCorpusTest do
     program = france_program()
 
     assert_raise ArgumentError, ~r/trainset must be enumerable/, fn ->
-      DSEx.Optimizer.MIPROv2.new(metric(), trials: 1, demos_per_candidate: 1)
+      DSEx.Optimizer.MIPROv2.new(metric(),
+        auto: nil,
+        num_candidates: 1,
+        num_trials: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 1,
+        minibatch: false
+      )
       |> DSEx.Optimizer.MIPROv2.compile(program, :not_an_enumerable_trainset, devset())
     end
   end
@@ -402,7 +429,7 @@ defmodule OptimizerBehavioralCorpusTest do
     assert_raise ArgumentError,
                  ~r/DSEx\.Optimizer\.MIPROv2\.new\/2: expected keyword options/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), %{trials: 1})
+                   DSEx.Optimizer.MIPROv2.new(metric(), %{num_trials: 1})
                  end
 
     assert_raise ArgumentError,
@@ -430,20 +457,26 @@ defmodule OptimizerBehavioralCorpusTest do
     assert_raise ArgumentError,
                  ~r/num_trials must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), trials: -1)
+                   DSEx.Optimizer.MIPROv2.new(metric(), num_trials: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/max_labeled_demos must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), demos_per_candidate: -1)
+                   DSEx.Optimizer.MIPROv2.new(metric(), max_labeled_demos: -1)
                  end
 
     assert_raise ArgumentError,
                  ~r/startup_trials must be a non-negative integer/,
                  fn ->
-                   DSEx.Optimizer.MIPROv2.new(metric(), cold_start: -1)
+                   DSEx.Optimizer.MIPROv2.new(metric(), startup_trials: -1)
                  end
+
+    for alias <- [:trials, :demos_per_candidate, :cold_start] do
+      assert_raise ArgumentError, ~r/unknown MIPROv2 options/, fn ->
+        DSEx.Optimizer.MIPROv2.new(metric(), [{alias, 1}])
+      end
+    end
 
     assert_raise ArgumentError,
                  ~r/max_steps must be an integer >= 0/,

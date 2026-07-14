@@ -24,8 +24,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
     max_errors: :infinity,
     max_concurrency: 1,
     timeout: 5_000,
-    startup_trials: 10,
-    compatibility: []
+    startup_trials: 10
   ]
 
   @runtime_keys [
@@ -38,7 +37,6 @@ defmodule DSEx.Optimizer.MIPROv2 do
     :timeout,
     :startup_trials
   ]
-  @legacy_keys [:trials, :demos_per_candidate, :cold_start]
   @compile_runtime_keys [:resume_state, :checkpoint_fn, :max_trials]
 
   def new(metric, opts \\ []) do
@@ -47,7 +45,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "DSEx.Optimizer.MIPROv2.new/2: expected keyword options")
 
-    {config_opts, runtime_opts, compatibility} = normalize_options(opts)
+    {config_opts, runtime_opts} = normalize_options(opts)
 
     %__MODULE__{
       metric: metric,
@@ -59,8 +57,7 @@ defmodule DSEx.Optimizer.MIPROv2 do
       max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
       max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
       timeout: Keyword.get(runtime_opts, :timeout, 5_000),
-      startup_trials: Keyword.get(runtime_opts, :startup_trials, 10),
-      compatibility: compatibility
+      startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
     }
     |> validate_runtime!()
   end
@@ -245,7 +242,6 @@ defmodule DSEx.Optimizer.MIPROv2 do
           search_policy: SearchPolicy.dump(state.policy),
           full_evaluations: Enum.map(state.full_evaluations, &Map.drop(&1, [:program])),
           evaluation_calls: state.evaluation_calls,
-          compatibility: optimizer.compatibility,
           resumed: resumed?,
           run_status: run_status,
           completed_trials: length(state.trials),
@@ -621,30 +617,13 @@ defmodule DSEx.Optimizer.MIPROv2 do
   end
 
   defp normalize_options(opts) do
-    unknown = Keyword.keys(opts) -- (Config.option_keys() ++ @runtime_keys ++ @legacy_keys)
+    unknown = Keyword.keys(opts) -- (Config.option_keys() ++ @runtime_keys)
     if unknown != [], do: raise(ArgumentError, "unknown MIPROv2 options: #{inspect(unknown)}")
 
-    legacy = Keyword.take(opts, @legacy_keys)
     runtime = Keyword.take(opts, @runtime_keys)
     config = Keyword.take(opts, Config.option_keys())
 
-    config =
-      if legacy == [] do
-        config
-      else
-        trials = Keyword.get(legacy, :trials, 12)
-
-        config
-        |> Keyword.put(:auto, nil)
-        |> Keyword.put_new(:num_candidates, max(1, trials))
-        |> Keyword.put_new(:num_trials, trials)
-        |> Keyword.put_new(:minibatch, false)
-        |> Keyword.put_new(:max_bootstrapped_demos, 0)
-        |> Keyword.put_new(:max_labeled_demos, Keyword.get(legacy, :demos_per_candidate, 4))
-      end
-
-    runtime = Keyword.put_new(runtime, :startup_trials, Keyword.get(legacy, :cold_start, 10))
-    {config, runtime, Enum.map(Keyword.keys(legacy), &{:deprecated_option, &1})}
+    {config, runtime}
   end
 
   defp validate_compile_options!(opts) do

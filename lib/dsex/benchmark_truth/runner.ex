@@ -698,7 +698,15 @@ defmodule DSEx.BenchmarkTruth.Runner do
        end},
       {"MIPROv2",
        fn program, trainset, devset ->
-         DSEx.Optimizer.MIPROv2.new(metric, trials: 2, demos_per_candidate: k, cold_start: 1)
+         DSEx.Optimizer.MIPROv2.new(metric,
+           auto: nil,
+           num_candidates: 2,
+           num_trials: 2,
+           max_bootstrapped_demos: 0,
+           max_labeled_demos: k,
+           minibatch: false,
+           startup_trials: 1
+         )
          |> DSEx.Optimizer.MIPROv2.compile(program, trainset, devset)
        end},
       {"SIMBA",

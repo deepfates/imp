@@ -141,7 +141,7 @@ program/optimizer LM callbacks therefore provide the executable behavior after
 resume; closure captures such as process handles or credentials may be rebound
 without embedding them in the artifact.
 
-Resume validates a compatibility digest covering the program/predictor shape,
+Resume validates a run-configuration digest covering the program/predictor shape,
 resolved datasets, search configuration, and relevant runtime identities, then
 validates a SHA-256 payload checksum and structural invariants. A different
 dataset, program shape, or search budget is rejected. These checks detect

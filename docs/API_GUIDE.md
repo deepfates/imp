@@ -662,6 +662,21 @@ Use:
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
+For a manually sized MIPROv2 run, configure the canonical `Config` options and
+the runtime `startup_trials` setting explicitly:
+
+```elixir
+mipro =
+  DSEx.Optimizer.MIPROv2.new(metric,
+    auto: nil,
+    num_candidates: 4,
+    num_trials: 8,
+    max_bootstrapped_demos: 2,
+    max_labeled_demos: 2,
+    startup_trials: 2
+  )
+```
+
 MIPROv2 and SIMBA can pause at durable run boundaries and resume from the
 JSON-safe checkpoint attached to the optimizer report:
 
@@ -712,7 +727,7 @@ Checkpoints do not serialize executable callbacks or live LM clients. Resume
 with the original program shape, datasets, and search configuration, while
 supplying the current metric and LM callbacks through the runtime optimizer and
 program. This deliberately allows callback captures such as process handles or
-credentials to be rebound. Compatibility hashes and payload checksums reject
+credentials to be rebound. Run-configuration hashes and payload checksums reject
 accidental mismatch or mutation, but they are not signatures, authentication,
 encryption, or a sandbox. Checkpoints can contain instructions, demos, outputs,
 and error details: store them as sensitive data, accept them only from a trusted

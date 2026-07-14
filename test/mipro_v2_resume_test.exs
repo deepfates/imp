@@ -109,7 +109,7 @@ defmodule DSEx.Optimizer.MIPROv2.ResumeTest do
     end
   end
 
-  test "compatibility excludes runtime callback captures", %{state: state} do
+  test "run configuration matching excludes runtime callback captures", %{state: state} do
     {program, optimizer, trainset, valset} = fixture(state)
     optimizer = %{optimizer | metric: captured_metric(state)}
 

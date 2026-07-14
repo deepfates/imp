@@ -580,7 +580,14 @@ defmodule CompletionSurfaceTest do
     compiled =
       [
         DSEx.Optimizer.COPRO.new(metric, breadth: 3, depth: 1),
-        DSEx.Optimizer.MIPROv2.new(metric, trials: 3, demos_per_candidate: 1),
+        DSEx.Optimizer.MIPROv2.new(metric,
+          auto: nil,
+          num_candidates: 3,
+          num_trials: 3,
+          max_bootstrapped_demos: 0,
+          max_labeled_demos: 1,
+          minibatch: false
+        ),
         DSEx.Optimizer.SIMBA.new(metric, bsize: 2, max_steps: 2, max_demos: 1),
         DSEx.Optimizer.GEPA.new(metric, generations: 2),
         DSEx.Optimizer.SignatureOptimizer.new(metric)
