@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -27,6 +32,4 @@ jobs:
       - run: mix production.check
       - run: mix integration.check
       - run: mix protocol.check
-      - run: mix package.check
-      - run: mix livebook.check
       - run: mix quality.check

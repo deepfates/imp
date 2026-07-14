@@ -11,11 +11,14 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
 
       mix imp.package.clean_room
       mix imp.package.clean_room --package tmp/package-check
+      mix imp.package.clean_room --lock mix.lock
       mix imp.package.clean_room --skip-release --output tmp/persistence-proof
 
-  Dependency resolution is forced offline with `HEX_OFFLINE=1`. Run `mix
-  deps.get` in the source checkout first so Hex dependencies are present in the
-  local cache. `--package` must name an unpacked package directory.
+  Dependency resolution is forced offline with `HEX_OFFLINE=1` and uses the
+  source checkout's `mix.lock` by default. Run `mix deps.get` in that checkout
+  first so every locked Hex dependency is present in the local cache. Use
+  `--lock` to supply a different lockfile. `--package` must name an unpacked
+  package directory.
   """
 
   use Mix.Task
@@ -26,7 +29,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
   def run(args) do
     {opts, argv, invalid} =
       OptionParser.parse(args,
-        strict: [package: :string, output: :string, skip_release: :boolean]
+        strict: [package: :string, lock: :string, output: :string, skip_release: :boolean]
       )
 
     if argv != [] or invalid != [] do
@@ -40,10 +43,11 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     File.mkdir_p!(output)
 
     package_dir = prepare_package!(opts[:package], output, root)
-    prove_persistence!(package_dir, output)
+    lockfile = prepare_lock!(opts[:lock], root)
+    prove_persistence!(package_dir, lockfile, output)
 
     unless opts[:skip_release] do
-      prove_release!(package_dir, output)
+      prove_release!(package_dir, lockfile, output)
     end
 
     Mix.shell().info("clean-room package proof passed: #{Path.relative_to(output, root)}")
@@ -87,12 +91,22 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     package_dir
   end
 
-  defp prove_persistence!(package_dir, output) do
+  defp prepare_lock!(path, root) do
+    lockfile = Path.expand(path || "mix.lock", root)
+
+    unless File.regular?(lockfile) do
+      Mix.raise("offline clean-room proof requires a lockfile: #{lockfile}")
+    end
+
+    lockfile
+  end
+
+  defp prove_persistence!(package_dir, lockfile, output) do
     consumer_dir = Path.join(output, "consumer")
     artifact = Path.join(output, "program.json")
     tampered = Path.join(output, "program.tampered.json")
 
-    write_consumer!(consumer_dir, package_dir)
+    write_consumer!(consumer_dir, package_dir, lockfile)
     offline_mix!(consumer_dir, ["deps.get"])
     offline_mix!(consumer_dir, ["compile", "--warnings-as-errors"])
 
@@ -112,7 +126,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     artifact
   end
 
-  defp prove_release!(package_dir, output) do
+  defp prove_release!(package_dir, lockfile, output) do
     source = Path.join(package_dir, "examples/deployment")
 
     unless File.regular?(Path.join(source, "mix.exs")) do
@@ -123,6 +137,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     release_dir = Path.join(output, "release")
     artifact = Path.join(output, "release-program.json")
     File.cp_r!(source, deployment_dir)
+    File.cp!(lockfile, Path.join(deployment_dir, "mix.lock"))
 
     offline_mix!(
       Path.join(output, "consumer"),
@@ -154,8 +169,9 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     run!(executable, ["eval", expression], deployment_dir, release_env)
   end
 
-  defp write_consumer!(consumer_dir, package_dir) do
+  defp write_consumer!(consumer_dir, package_dir, lockfile) do
     File.mkdir_p!(Path.join(consumer_dir, "lib"))
+    File.cp!(lockfile, Path.join(consumer_dir, "mix.lock"))
 
     File.write!(
       Path.join(consumer_dir, "mix.exs"),

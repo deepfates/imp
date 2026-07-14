@@ -71,6 +71,8 @@ defmodule PackageContractTest do
              Code.fetch_docs(Mix.Tasks.Imp.Package.CleanRoom)
 
     assert moduledoc =~ "mix imp.package.clean_room"
+    assert moduledoc =~ "--lock"
+    assert moduledoc =~ "source checkout's `mix.lock`"
 
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
     assert hd(Keyword.fetch!(aliases, :"package.check")) == "package.clean"
