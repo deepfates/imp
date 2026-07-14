@@ -122,13 +122,19 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp run_dsex_arm(arm, context, {progress, persist}) do
     arm_started = monotonic_time()
+    arm_key = Atom.to_string(arm)
+
+    budget_checkpoint = fn snapshot ->
+      persist_budget_snapshot!(context.checkpoint_path, arm_key, snapshot)
+    end
 
     {:ok, budget} =
       CampaignBudget.start_link(
         limits: context.budget,
         pricing: context.pricing,
         default_max_output_tokens: context.max_output_tokens,
-        initial: progress["budget"] || %{}
+        initial: progress["budget"] || %{},
+        on_change: budget_checkpoint
       )
 
     telemetry_id = CampaignBudget.attach_req_llm(budget)
@@ -553,12 +559,45 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaign do
     end
   end
 
-  defp write_checkpoint!(path, checkpoint),
+  defp persist_budget_snapshot!(path, arm_key, snapshot) do
+    checkpoint_transaction(path, fn ->
+      case File.read(path) do
+        {:ok, json} ->
+          envelope = Jason.decode!(json)
+          payload = Map.fetch!(envelope, "payload")
+          checksum = Map.fetch!(envelope, "payload_sha256")
+
+          unless checksum == term_sha256(payload),
+            do: raise(ArgumentError, "campaign checkpoint checksum mismatch")
+
+          in_progress = Map.get(payload["in_progress"], arm_key, %{}) || %{}
+
+          updated =
+            put_in(payload, ["in_progress", arm_key], Map.put(in_progress, "budget", snapshot))
+
+          write_checkpoint_unlocked!(path, updated)
+
+        {:error, reason} ->
+          raise ArgumentError,
+                "cannot durably update instruction optimizer budget checkpoint: #{inspect(reason)}"
+      end
+    end)
+  end
+
+  defp write_checkpoint!(path, checkpoint) do
+    checkpoint_transaction(path, fn -> write_checkpoint_unlocked!(path, checkpoint) end)
+  end
+
+  defp write_checkpoint_unlocked!(path, checkpoint),
     do:
       write_json_atomic!(path, %{
         "payload_sha256" => term_sha256(checkpoint),
         "payload" => checkpoint
       })
+
+  defp checkpoint_transaction(path, function) do
+    :global.trans({__MODULE__, Path.expand(path)}, function)
+  end
 
   defp write_json_atomic!(path, value) do
     File.mkdir_p!(Path.dirname(path))

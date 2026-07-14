@@ -56,7 +56,7 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
   test "observed provider usage is reconciled into the checkpointable snapshot" do
     {:ok, budget} =
       CampaignBudget.start_link(
-        limits: %{requests: 3, input_tokens: 100, output_tokens: 100, usd: 2.0},
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
         pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
         default_max_output_tokens: 10
       )
@@ -73,7 +73,7 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
   test "restores observed usage and request counts without restoring active reservations" do
     {:ok, budget} =
       CampaignBudget.start_link(
-        limits: %{requests: 3, input_tokens: 100, output_tokens: 100, usd: 2.0},
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
         pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
         default_max_output_tokens: 10,
         initial: %{
@@ -99,5 +99,129 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
 
     :ok = CampaignBudget.record_usage(budget, %{input_tokens: 11, output_tokens: 1, usd: 0.1})
     assert CampaignBudget.snapshot(budget)["exhausted"] == "input_tokens"
+  end
+
+  test "reconciles an unresolved reservation once when its checkpoint is resumed" do
+    {:ok, first} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10
+      )
+
+    assert {:ok, reservation} =
+             CampaignBudget.reserve(first, [%{content: "unresolved"}], max_tokens: 10)
+
+    checkpoint = CampaignBudget.snapshot(first)
+    assert checkpoint["active_reservations"] == 1
+    assert Enum.all?(checkpoint["reservations"], &(&1["bounds"] == checkpoint["reserved"]))
+    :ok = GenServer.stop(first)
+
+    {:ok, resumed} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10,
+        initial: checkpoint
+      )
+
+    resumed_snapshot = CampaignBudget.snapshot(resumed)
+    assert resumed_snapshot["active_reservations"] == 0
+    assert resumed_snapshot["requests"] == 1
+    assert resumed_snapshot["usage"]["input_tokens"] == checkpoint["reserved"]["input_tokens"]
+
+    :ok = GenServer.stop(resumed)
+
+    {:ok, second_resume} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10,
+        initial: resumed_snapshot
+      )
+
+    assert CampaignBudget.snapshot(second_resume)["usage"] == resumed_snapshot["usage"]
+    assert :ok = CampaignBudget.release(second_resume, reservation)
+  end
+
+  test "conservatively reconciles aggregate usage without false reservation attribution" do
+    {:ok, first} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10
+      )
+
+    assert {:ok, _reservation} =
+             CampaignBudget.reserve(first, [%{content: "observed"}], max_tokens: 10)
+
+    :ok = CampaignBudget.record_usage(first, %{input_tokens: 7, output_tokens: 3, usd: 0.25})
+    checkpoint = CampaignBudget.snapshot(first)
+    refute Enum.any?(checkpoint["reservations"], &Map.has_key?(&1, "usage_recorded"))
+    :ok = GenServer.stop(first)
+
+    {:ok, resumed} =
+      CampaignBudget.start_link(
+        limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10,
+        initial: checkpoint
+      )
+
+    resumed_snapshot = CampaignBudget.snapshot(resumed)
+
+    assert resumed_snapshot["usage"]["input_tokens"] ==
+             checkpoint["usage"]["input_tokens"] + checkpoint["reserved"]["input_tokens"]
+
+    assert resumed_snapshot["usage"]["output_tokens"] ==
+             checkpoint["usage"]["output_tokens"] + checkpoint["reserved"]["output_tokens"]
+
+    assert_in_delta resumed_snapshot["usage"]["usd"],
+                    checkpoint["usage"]["usd"] + checkpoint["reserved"]["usd"],
+                    1.0e-12
+  end
+
+  test "two concurrent reservations reconcile all bounds without guessing which call used telemetry" do
+    {:ok, first} =
+      CampaignBudget.start_link(
+        limits: %{requests: 4, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10
+      )
+
+    reservations =
+      ["call-a", "call-b"]
+      |> Enum.map(fn label ->
+        Task.async(fn -> CampaignBudget.reserve(first, [%{content: label}], max_tokens: 10) end)
+      end)
+      |> Enum.map(&Task.await(&1, 5_000))
+
+    assert Enum.all?(reservations, &match?({:ok, _}, &1))
+    :ok = CampaignBudget.record_usage(first, %{input_tokens: 4, output_tokens: 2, usd: 0.1})
+    checkpoint = CampaignBudget.snapshot(first)
+    assert length(checkpoint["reservations"]) == 2
+    refute Enum.any?(checkpoint["reservations"], &Map.has_key?(&1, "usage_recorded"))
+    :ok = GenServer.stop(first)
+
+    {:ok, resumed} =
+      CampaignBudget.start_link(
+        limits: %{requests: 4, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10,
+        initial: checkpoint
+      )
+
+    resumed_snapshot = CampaignBudget.snapshot(resumed)
+    assert resumed_snapshot["active_reservations"] == 0
+
+    assert resumed_snapshot["usage"]["input_tokens"] ==
+             checkpoint["usage"]["input_tokens"] + checkpoint["reserved"]["input_tokens"]
+
+    assert resumed_snapshot["usage"]["output_tokens"] ==
+             checkpoint["usage"]["output_tokens"] + checkpoint["reserved"]["output_tokens"]
+
+    assert_in_delta resumed_snapshot["usage"]["usd"],
+                    checkpoint["usage"]["usd"] + checkpoint["reserved"]["usd"],
+                    1.0e-12
   end
 end

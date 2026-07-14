@@ -1,7 +1,35 @@
 defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias DSEx.BenchmarkTruth.InstructionOptimizerCampaign
+
+  defmodule CrashableLM do
+    @behaviour DSEx.LM
+
+    @impl true
+    def generate(_messages, opts) do
+      owner = Keyword.fetch!(opts, :owner)
+      calls = Keyword.fetch!(opts, :calls)
+      count = Agent.get_and_update(calls, &{&1 + 1, &1 + 1})
+      send(owner, {:crashable_provider_call, count})
+
+      if Keyword.get(opts, :emit_usage, false) do
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{tokens: %{input_tokens: 7, output_tokens: 3}, total_cost: 0.25},
+          %{}
+        )
+      end
+
+      if Keyword.get(opts, :crash_at) == count do
+        Process.exit(self(), :kill)
+      end
+
+      {:ok, %{reasoning: "computed", answer: "1"}}
+    end
+  end
 
   test "baseline preflight checkpoints dev and frozen test work without replay" do
     root = tmp_dir("baseline")
@@ -205,6 +233,109 @@ defmodule DSEx.BenchmarkTruth.InstructionOptimizerCampaignTest do
     end
 
     assert Agent.get(calls, & &1) == 0
+  end
+
+  test "bootstrap crash persists usage and resumes without double-spend or second replay" do
+    root = tmp_dir("bootstrap-crash")
+    dataset = write_aime_dataset!(root)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    crashing_lm = %{
+      module: CrashableLM,
+      opts: [owner: self(), calls: calls, crash_at: 1, emit_usage: true]
+    }
+
+    opts = campaign_opts(root, dataset, crashing_lm, arms: [:bootstrap_few_shot])
+    {pid, monitor} = spawn_monitor(fn -> InstructionOptimizerCampaign.run(opts) end)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, :killed}, 5_000
+
+    checkpoint_path = Path.join(root, "checkpoints/preflight-test-AIMEBench-17.json")
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    budget = get_in(checkpoint, ["payload", "in_progress", "bootstrap_few_shot", "budget"])
+
+    assert budget["requests"] == 1
+    assert budget["usage"] == %{"input_tokens" => 7, "output_tokens" => 3, "usd" => 0.25}
+    assert budget["active_reservations"] == 1
+    refute Enum.any?(budget["reservations"], &Map.has_key?(&1, "usage_recorded"))
+
+    event = [:req_llm, :token_usage]
+
+    stale_ids =
+      :telemetry.list_handlers(event)
+      |> Enum.filter(fn
+        %{config: {server, _id}} when is_pid(server) -> not Process.alive?(server)
+        _handler -> false
+      end)
+      |> Enum.map(& &1.id)
+
+    assert stale_ids != []
+
+    log =
+      capture_log(fn ->
+        :telemetry.execute(
+          event,
+          %{tokens: %{input_tokens: 1, output_tokens: 1}, cost: 0.01},
+          %{}
+        )
+      end)
+
+    refute log =~ "noproc"
+
+    remaining_ids = :telemetry.list_handlers(event) |> Enum.map(& &1.id)
+    refute Enum.any?(stale_ids, &(&1 in remaining_ids))
+
+    resumed_lm = Map.update!(crashing_lm, :opts, &Keyword.delete(&1, :crash_at))
+
+    resumed = InstructionOptimizerCampaign.run(Keyword.put(opts, :lm, resumed_lm))
+    assert resumed.artifact["summary"]["all_requested_arms_completed"]
+    assert get_in(resumed.artifact, ["results", "bootstrap_few_shot", "budget", "requests"]) == 6
+
+    resumed_usage = get_in(resumed.artifact, ["results", "bootstrap_few_shot", "budget", "usage"])
+    assert resumed_usage["input_tokens"] == 42 + budget["reserved"]["input_tokens"]
+    assert resumed_usage["output_tokens"] == 18 + budget["reserved"]["output_tokens"]
+    assert resumed_usage["usd"] == 1.5 + budget["reserved"]["usd"]
+
+    assert Agent.get(calls, & &1) == 6
+    second = InstructionOptimizerCampaign.run(Keyword.put(opts, :lm, resumed_lm))
+    assert second.artifact["results"] == resumed.artifact["results"]
+    assert Agent.get(calls, & &1) == 6
+  end
+
+  test "budget exhaustion remains durable and blocks every resume" do
+    root = tmp_dir("budget-exhaustion")
+    dataset = write_aime_dataset!(root)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    lm = %{
+      module: CrashableLM,
+      opts: [owner: self(), calls: calls, emit_usage: true]
+    }
+
+    opts =
+      campaign_opts(root, dataset, lm, arms: [:baseline])
+      |> Keyword.put(:budget, %{
+        requests: 2,
+        input_tokens: 100_000,
+        output_tokens: 10_000,
+        usd: 10.0
+      })
+
+    assert_raise RuntimeError, ~r/campaign budget exhausted: requests/, fn ->
+      InstructionOptimizerCampaign.run(opts)
+    end
+
+    checkpoint_path = Path.join(root, "checkpoints/preflight-test-AIMEBench-17.json")
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    budget = get_in(checkpoint, ["payload", "in_progress", "baseline", "budget"])
+    assert budget["requests"] == 2
+    assert budget["exhausted"] == "requests"
+    assert budget["active_reservations"] == 0
+
+    assert_raise RuntimeError, ~r/campaign budget exhausted: requests/, fn ->
+      InstructionOptimizerCampaign.run(opts)
+    end
+
+    assert Agent.get(calls, & &1) == 2
   end
 
   test "checkpointed optimizer predictor config survives JSON loading" do
