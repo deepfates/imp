@@ -161,6 +161,22 @@ defmodule AuthorityInventoryTest do
     assert MapSet.difference(claimed_tokens, mapped_tokens) == MapSet.new()
   end
 
+  test "weight authority records partial local evidence without claiming family parity" do
+    family =
+      read_json!(@authority_path)["families"]
+      |> Enum.find(&(&1["id"] == "family.optimizer_weights"))
+
+    assert "local_weight_training" in family["surface_tokens"]
+    assert family["dataset_protocol"]["status"] == "partial"
+    assert family["local_differential"]["status"] == "partial"
+
+    assert family["local_differential"]["artifacts"] == [
+             "benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"
+           ]
+
+    assert family["notes"] =~ "not paid-provider"
+  end
+
   test "every upstream map row, coverage concept, and parity lane is mapped" do
     families = read_json!(@authority_path)["families"]
 

@@ -31,6 +31,7 @@ defmodule BenchmarkCatalogTest do
 
     assert by_id["ifbench_instruction_following"].status == "provider_free_implemented"
     assert by_id["hard_math"].status == "provider_free_implemented"
+    assert by_id["finetuning_training"].status == "protocol_plus_local_effectiveness"
     assert by_id["privacy_delegation"].status == "missing"
     assert by_id["livebench_math"].status == "deferred"
 
@@ -65,6 +66,7 @@ defmodule BenchmarkCatalogTest do
     assert by_id["hover_verification"].next_step =~ "uncapped"
     assert "mix benchmark.truth.check" in by_id["ifbench_instruction_following"].commands
     assert "mix benchmark.truth.check" in by_id["hard_math"].commands
+    assert "mix dsex.benchmark.local_mlx" in by_id["finetuning_training"].commands
     assert by_id["ifbench_instruction_following"].metric =~ "constraint"
   end
 

@@ -248,7 +248,7 @@
       "id": "family.optimizer_weights",
       "name": "Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble",
       "kind": "optimizer",
-      "surface_tokens": ["Avatar", "AvatarOptimizer", "BootstrapFinetune", "GRPO", "BetterTogether", "Ensemble", "training_protocol"],
+      "surface_tokens": ["Avatar", "AvatarOptimizer", "BootstrapFinetune", "GRPO", "BetterTogether", "Ensemble", "training_protocol", "local_weight_training"],
       "upstream_surface_ids": ["optimization.weights"],
       "coverage_matrix_concepts": ["Avatar, AvatarOptimizer, BetterTogether, and Ensemble", "BootstrapFinetune and GRPO provider jobs"],
       "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
@@ -259,9 +259,9 @@
         {"surface": "GRPO algorithm", "locator": "https://arxiv.org/abs/2402.03300v3", "revision": "v3", "title": "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models"}
       ],
       "upstream_tests": {"status": "partial", "references": ["tests/teleprompt/test_bootstrap_finetune.py#sha256=2e96b40f24ec9633139e6a6ed19f0ffc4add95fb82d88779a1b54b705927f4f3", "tests/teleprompt/test_grpo.py#sha256=29a8d0e827e90ff199c207fa1cd97f7fe4f0a54b25a41a68b9b26b718ab43d32", "tests/teleprompt/test_bettertogether.py#sha256=b6869bb8edfbcebe5efcf3e3c075fe4ef1c47ea97059e4b8cd80ca17dd06e9a8", "tests/teleprompt/test_ensemble.py#sha256=280a644c4469d22d32720f2f925cb45c65e6e5305d7e84c10c5dcab69ad78fbb", "No dedicated Avatar/AvatarOptimizer test was found in the pinned tree."]},
-      "dataset_protocol": {"status": "partial", "references": ["provider-compatible local training protocol"], "immutable_digests": []},
-      "local_differential": {"status": "gap", "artifacts": []},
-      "notes": "There is no single primary authority for this composite DSPy family. BetterTogether/BootstrapFinetune composition and GRPO are pinned separately; Avatar and Ensemble are source-defined. Local protocol gates do not prove paid training completion, trained-model rebinding, or matched effectiveness."
+      "dataset_protocol": {"status": "partial", "references": ["provider-compatible local training protocol", "benchmarks/data/provider-training-banking77-v1.json"], "immutable_digests": ["sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f"]},
+      "local_differential": {"status": "partial", "artifacts": ["benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"]},
+      "notes": "There is no single primary authority for this composite DSPy family. BetterTogether/BootstrapFinetune composition and GRPO are pinned separately; Avatar and Ensemble are source-defined. The pinned local MLX campaign proves scoped weight-training effectiveness and fused-program rebinding, but not paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."
     },
     {
       "id": "family.optimizer_fast_slow",

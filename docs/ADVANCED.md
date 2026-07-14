@@ -326,6 +326,12 @@ new immutable evidence file rather than overwriting prior results. This evidence
 supports a local weight-training effectiveness claim; it does not by itself
 establish BetterTogether parity.
 
+The canonical clean campaign at commit `ada199b` improved held-out Banking77
+accuracy from `0.15` to `0.85` and macro-F1 from `0.0769` to `0.8430` across 40
+rows. The fused and save/load-rebound programs produced identical row outcomes.
+`LocalMLXCampaign.validate_artifact/1` independently verifies the checked-in
+artifact before the dashboard admits this narrow claim.
+
 MLX-LM `0.31.3` does not admit an adapter-served equivalence claim: its server
 remaps `default_model` before consulting the CLI adapter map, so
 `--adapter-path` is not applied to that request. The campaign therefore uses the

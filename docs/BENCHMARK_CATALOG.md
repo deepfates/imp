@@ -68,7 +68,7 @@ The sampling harness must preserve:
 | LiveBench-Math | GEPA benchmark lineage includes date-versioned LiveBench-Math. | Deferred. | None | Adopt only with a frozen dated snapshot to avoid moving-target evidence. |
 | Long-form writing / STORM-style research | DSPy-related paper list includes writing Wikipedia-like articles from scratch. | Out of current product proof. | None | Track as deferred; do not block production unless DSEx claims long-form writing optimization. |
 | Extreme multi-label classification | DSPy-related paper list includes in-context learning for XML classification. | Out of current product proof. | None | Track as deferred; useful after core classification sampler exists. |
-| Finetuning / BetterTogether / GRPO | DSPy paper list and docs include finetuning plus prompt optimization. | Protocol-compatible trainer lifecycle exists; paid provider training is not claimed. | `mix protocol.training.check`, optimizer deviation notes | Add explicit external-provider training benchmark only if DSEx claims paid training parity. |
+| Finetuning / BetterTogether / GRPO | DSPy paper list and docs include finetuning plus prompt optimization. | Protocol-compatible lifecycle plus pinned local MLX LoRA effectiveness and fused save/load rebinding; paid-provider and matched DSPy parity remain unproved. | `mix protocol.training.check`, `mix dsex.benchmark.local_mlx`, `mix benchmark.optimizer_lift.check` | Retain paid-provider and BetterTogether parity as explicit gaps until matched campaigns pass. |
 
 ## Prioritized Additions
 

@@ -74,7 +74,7 @@ open.
 | MIPROv2 | optimizer | 3.3.0b1 @ b2829b7ae3b6 | pinned | absent | partial | partial |
 | SIMBA | optimizer | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | absent | protocol_defined | partial |
 | GEPA prompt and program optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | partial |
-| Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | gap |
+| Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | partial |
 | Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
 | Optimize Anything arbitrary artifact optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | present |
 | Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | partial | present |

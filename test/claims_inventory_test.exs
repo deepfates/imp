@@ -66,6 +66,21 @@ defmodule ClaimsInventoryTest do
              claim["requirements"]
   end
 
+  test "local MLX effectiveness claim remains narrow and independently gated" do
+    claim =
+      Enum.find(read_claims!(), &(&1["id"] == "claim.local_mlx_weight_training.effectiveness"))
+
+    assert claim["decision"] == "proven_target"
+    assert claim["comparison"] == "dsex_local_baseline"
+    assert claim["limitations"] != []
+
+    assert [%{"lane" => "local_mlx_weight_training", "evidence" => "full"}] =
+             claim["requirements"]
+
+    refute "BetterTogether" in claim["surface"]
+    refute "GRPO" in claim["surface"]
+  end
+
   defp read_claims! do
     @claims_path
     |> File.read!()

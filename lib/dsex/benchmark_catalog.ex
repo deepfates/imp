@@ -340,11 +340,15 @@ defmodule DSEx.BenchmarkCatalog do
       source_lineage: "DSPy paper list and docs include finetuning plus prompt optimization.",
       task_shape: "training examples -> provider training job -> improved program",
       metric: "provider job lifecycle plus downstream lift",
-      tiers: ["protocol", "external_live"],
-      status: "protocol_implemented",
-      commands: ["mix protocol.training.check", "mix benchmark.optimizer_lift.check"],
+      tiers: ["protocol", "local_effectiveness", "external_live"],
+      status: "protocol_plus_local_effectiveness",
+      commands: [
+        "mix protocol.training.check",
+        "mix dsex.benchmark.local_mlx",
+        "mix benchmark.optimizer_lift.check"
+      ],
       next_step:
-        "Add paid external-provider training benchmark only if DSEx claims paid training parity."
+        "Retain paid-provider and BetterTogether parity as explicit gaps until matched campaigns pass."
     }
   ]
 

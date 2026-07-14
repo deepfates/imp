@@ -99,6 +99,13 @@ and authored comparator scores cannot authorize the claim. This lane proves
 the scoped DSEx-native effectiveness statement, not paper-scale upstream
 parity.
 
+Local MLX weight-training effectiveness uses the `local_mlx_weight_training`
+lane. Full evidence requires a clean, independently validated campaign over the
+pinned Banking77 split and Qwen MLX snapshot, successful official fusion,
+positive held-out accuracy and macro-F1 lift, and exact fused/save-load row
+equivalence. This proves the local training and deployment substrate only; it
+does not authorize paid-provider, BetterTogether, GRPO, or DSPy-matched parity.
+
 When `benchmark.dashboard.full` fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
 work queue: either produce the missing evidence, narrow or remove the claim, or

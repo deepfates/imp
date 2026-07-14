@@ -237,6 +237,29 @@
       ]
     },
     {
+      "id": "claim.local_mlx_weight_training.effectiveness",
+      "decision": "proven_target",
+      "release": "v0.1",
+      "scope": "Pinned local MLX LoRA training, official fused deployment, and portable-program rebinding on the canonical Banking77 holdout.",
+      "limitations": ["Does not establish paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."],
+      "statement": "DSEx can execute a fresh Elixir-owned local MLX training lifecycle whose officially fused model improves the pinned held-out task and whose credential-free saved program reproduces the fused outputs after explicit runtime rebinding.",
+      "category": "optimizer",
+      "surface": ["BootstrapFinetune", "training_protocol", "local_weight_training", "save_load"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dsex_local_baseline",
+      "release_blocking": true,
+      "sources": ["docs/ADVANCED.md", "docs/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "requirements": [
+        {
+          "id": "local_mlx_weight_training.full",
+          "kind": "optimizer_effectiveness",
+          "lane": "local_mlx_weight_training",
+          "evidence": "full",
+          "threshold": "independently validated clean campaign shows positive held-out accuracy and macro-F1 lift plus exact fused/save-load equivalence"
+        }
+      ]
+    },
+    {
       "id": "claim.protocols.production_boundaries",
       "decision": "proven_target",
       "release": "v0.1",
