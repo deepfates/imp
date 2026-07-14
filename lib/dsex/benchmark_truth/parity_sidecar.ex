@@ -1,13 +1,8 @@
 defmodule DSEx.BenchmarkTruth.ParitySidecar do
   @moduledoc false
 
-  @termination_grace_ms 500
-  @kill_grace_ms 500
-  @process_group_probe_ms 20
-  @signal_command_timeout_ms 500
-  @default_output_limit_bytes 256 * 1024
-  @signal_output_limit_bytes 4 * 1024
-  @redacted "[REDACTED]"
+  alias DSEx.ExternalCommand.Lifecycle
+  alias DSEx.ExternalCommand.Lifecycle.Capture
 
   defmodule Output do
     @moduledoc false
@@ -28,22 +23,26 @@ defmodule DSEx.BenchmarkTruth.ParitySidecar do
 
   @spec run(binary(), [binary()], keyword()) :: result()
   def run(executable, args, opts \\ []) when is_binary(executable) and is_list(args) do
-    caller = self()
-    ref = make_ref()
-    timeout = validate_timeout!(Keyword.get(opts, :timeout, :infinity))
+    opts =
+      opts
+      |> Keyword.update(:timeout, :infinity, &validate_timeout!/1)
+      |> Keyword.update(:max_output_bytes, 256 * 1024, &validate_output_limit!/1)
+      |> Keyword.update(:secrets, [], &validate_secrets!/1)
+      |> Keyword.put_new(:kill_grace_ms, 500)
 
-    output_limit =
-      validate_output_limit!(Keyword.get(opts, :max_output_bytes, @default_output_limit_bytes))
+    case Lifecycle.run(executable, args, opts) do
+      {:ok, %Capture{} = capture, status} ->
+        {:ok, from_capture(capture), status}
 
-    secrets = validate_secrets!(Keyword.get(opts, :secrets, []))
-    executable = resolve_executable!(executable)
+      {:error, :timeout, %Capture{} = capture} ->
+        {:error, :timeout, from_capture(capture)}
 
-    {:ok, worker} =
-      Task.Supervisor.start_child(DSEx.UnlinkedTaskSupervisor, fn ->
-        port_owner(caller, ref, executable, args, timeout, output_limit, secrets)
-      end)
+      {:error, {:executable_not_found, command}} ->
+        raise ArgumentError, "executable not found: #{command}"
 
-    await_result(ref, worker)
+      {:error, reason} ->
+        raise "sidecar lifecycle failed: #{inspect(reason)}"
+    end
   end
 
   @doc false
@@ -57,258 +56,15 @@ defmodule DSEx.BenchmarkTruth.ParitySidecar do
     end
   end
 
-  defp await_result(ref, pid) do
-    monitor_ref = Process.monitor(pid)
-
-    receive do
-      {^ref, result} ->
-        Process.demonitor(monitor_ref, [:flush])
-        result
-
-      {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
-        raise "DSPy sidecar owner exited before returning a result: #{inspect(reason)}"
-    end
-  end
-
-  defp port_owner(caller, ref, executable, args, timeout, output_limit, secrets) do
-    caller_ref = Process.monitor(caller)
-
-    port =
-      Port.open(
-        {:spawn_executable, executable},
-        [
-          :binary,
-          :exit_status,
-          :stderr_to_stdout,
-          :use_stdio,
-          {:args, args},
-          {:env, [{~c"DSEX_BEAM_PORT_OWNER", ~c"1"}]}
-        ]
-      )
-
-    {:os_pid, os_pid} = Port.info(port, :os_pid)
-    timer = start_timer(timeout)
-    collect(port, os_pid, caller, caller_ref, ref, timer, new_capture(output_limit), secrets)
-  end
-
-  defp collect(port, os_pid, caller, caller_ref, ref, timer, capture, secrets) do
-    receive do
-      {^port, {:data, data}} ->
-        collect(
-          port,
-          os_pid,
-          caller,
-          caller_ref,
-          ref,
-          timer,
-          capture(capture, data),
-          secrets
-        )
-
-      {^port, {:exit_status, status}} ->
-        cancel_timer(timer)
-        Process.demonitor(caller_ref, [:flush])
-        send(caller, {ref, {:ok, output(capture, secrets), status}})
-
-      {:DOWN, ^caller_ref, :process, ^caller, _reason} ->
-        _capture = terminate(port, os_pid, capture)
-        :ok
-
-      :sidecar_timeout ->
-        capture = terminate(port, os_pid, capture)
-        Process.demonitor(caller_ref, [:flush])
-        send(caller, {ref, {:error, :timeout, output(capture, secrets)}})
-    end
-  end
-
-  defp terminate(port, os_pid, capture) do
-    if process_group_alive?(os_pid), do: signal_process_group!(os_pid, "TERM")
-
-    term_deadline = System.monotonic_time(:millisecond) + @termination_grace_ms
-
-    {capture, port_exited, group_alive} =
-      await_cleanup(port, os_pid, capture, false, term_deadline)
-
-    {capture, port_exited, group_alive} =
-      if group_alive do
-        signal_process_group!(os_pid, "KILL")
-        kill_deadline = System.monotonic_time(:millisecond) + @kill_grace_ms
-        await_cleanup(port, os_pid, capture, port_exited, kill_deadline)
-      else
-        {capture, port_exited, group_alive}
-      end
-
-    if group_alive do
-      close_port(port)
-      raise "process group #{os_pid} survived checked KILL past the cleanup deadline"
-    end
-
-    unless port_exited, do: close_port(port)
-    capture
-  end
-
-  defp await_cleanup(port, os_pid, capture, port_exited, deadline) do
-    group_alive = process_group_alive?(os_pid)
-    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
-
-    cond do
-      not group_alive and port_exited ->
-        {capture, true, false}
-
-      remaining == 0 ->
-        {capture, port_exited, group_alive}
-
-      true ->
-        receive do
-          {^port, {:data, data}} ->
-            await_cleanup(port, os_pid, capture(capture, data), port_exited, deadline)
-
-          {^port, {:exit_status, _status}} ->
-            await_cleanup(port, os_pid, capture, true, deadline)
-        after
-          min(remaining, @process_group_probe_ms) ->
-            await_cleanup(port, os_pid, capture, port_exited, deadline)
-        end
-    end
-  end
-
-  defp process_group_alive?(os_pid) do
-    case run_signal_command("0", os_pid) do
-      {_output, 0} -> true
-      {_output, 1} -> false
-      {output, status} -> raise_signal_error("probe", os_pid, status, output)
-    end
-  end
-
-  defp signal_process_group!(os_pid, signal) do
-    case run_signal_command(signal, os_pid) do
-      {_output, 0} ->
-        :ok
-
-      {output, status} ->
-        if process_group_alive?(os_pid) do
-          raise_signal_error(signal, os_pid, status, output)
-        else
-          :gone
-        end
-    end
-  end
-
-  defp run_signal_command(signal, os_pid) do
-    kill = System.find_executable("kill") || "/bin/kill"
-
-    port =
-      Port.open(
-        {:spawn_executable, kill},
-        [
-          :binary,
-          :exit_status,
-          :stderr_to_stdout,
-          :use_stdio,
-          {:args, ["-#{signal}", "-#{os_pid}"]}
-        ]
-      )
-
-    deadline = System.monotonic_time(:millisecond) + @signal_command_timeout_ms
-    await_signal_command(port, new_capture(@signal_output_limit_bytes), deadline)
-  end
-
-  defp await_signal_command(port, capture, deadline) do
-    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
-
-    receive do
-      {^port, {:data, data}} ->
-        await_signal_command(port, capture(capture, data), deadline)
-
-      {^port, {:exit_status, status}} ->
-        {capture.tail, status}
-    after
-      remaining ->
-        close_port(port)
-        raise "process-group signal command exceeded #{@signal_command_timeout_ms}ms"
-    end
-  end
-
-  defp raise_signal_error(signal, os_pid, status, output) do
-    detail = output |> String.replace_invalid("?") |> String.trim()
-    suffix = if detail == "", do: "", else: ": #{detail}"
-
-    raise "process-group #{signal} for #{os_pid} failed with status #{status}#{suffix}"
-  end
-
-  defp close_port(port) do
-    Port.close(port)
-  rescue
-    ArgumentError -> :ok
-  end
-
-  defp resolve_executable!(executable) do
-    cond do
-      Path.type(executable) == :absolute and File.regular?(executable) -> executable
-      resolved = System.find_executable(executable) -> resolved
-      true -> raise ArgumentError, "executable not found: #{executable}"
-    end
-  end
-
-  defp new_capture(limit), do: %{tail: "", total_bytes: 0, limit_bytes: limit}
-
-  defp capture(capture, data) do
-    data_bytes = byte_size(data)
-    limit = capture.limit_bytes
-
-    tail =
-      cond do
-        data_bytes >= limit ->
-          data
-          |> binary_part(data_bytes - limit, limit)
-          |> :binary.copy()
-
-        byte_size(capture.tail) + data_bytes <= limit ->
-          capture.tail <> data
-
-        true ->
-          retained_bytes = limit - data_bytes
-          offset = byte_size(capture.tail) - retained_bytes
-          binary_part(capture.tail, offset, retained_bytes) <> data
-      end
-
-    %{capture | tail: tail, total_bytes: capture.total_bytes + data_bytes}
-  end
-
-  defp output(capture, secrets) do
-    text = capture.tail |> String.replace_invalid("?") |> redact_diagnostic(secrets)
-    captured_bytes = byte_size(capture.tail)
-
+  defp from_capture(capture) do
     %Output{
-      text: text,
-      truncated: capture.total_bytes > captured_bytes,
+      text: capture.text,
+      truncated: capture.truncated,
       total_bytes: capture.total_bytes,
-      captured_bytes: captured_bytes,
+      captured_bytes: capture.captured_bytes,
       limit_bytes: capture.limit_bytes
     }
   end
-
-  defp redact_diagnostic(text, secrets) do
-    text
-    |> redact_exact_secrets(secrets)
-    |> String.replace(~r/\bsk-[A-Za-z0-9_-]{8,}\b/, @redacted)
-    |> String.replace(
-      ~r/\bBearer\s+[A-Za-z0-9._~+\/=\-]{12,}\b/i,
-      "Bearer #{@redacted}"
-    )
-  end
-
-  defp redact_exact_secrets(text, secrets) do
-    secrets
-    |> Enum.sort_by(&byte_size/1, :desc)
-    |> Enum.reduce(text, fn secret, redacted -> String.replace(redacted, secret, @redacted) end)
-  end
-
-  defp start_timer(:infinity), do: nil
-  defp start_timer(timeout), do: Process.send_after(self(), :sidecar_timeout, timeout)
-
-  defp cancel_timer(nil), do: :ok
-  defp cancel_timer(timer), do: Process.cancel_timer(timer, async: true, info: false)
 
   defp validate_timeout!(:infinity), do: :infinity
   defp validate_timeout!(timeout) when is_integer(timeout) and timeout > 0, do: timeout

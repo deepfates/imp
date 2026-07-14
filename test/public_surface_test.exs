@@ -18,6 +18,7 @@ defmodule PublicSurfaceTest do
     DSEx.Cache,
     DSEx.Clients.DatabricksTrainer,
     DSEx.Clients.HTTPTrainer,
+    DSEx.Clients.MLXLMTrainer,
     DSEx.Clients.OpenAITrainer,
     DSEx.Clients.ReinforcementSession,
     DSEx.Clients.ReqLLM,
@@ -53,6 +54,7 @@ defmodule PublicSurfaceTest do
     DSEx.Evaluate.Result,
     DSEx.Evaluate.SemanticF1,
     DSEx.Example,
+    DSEx.ExternalCommand,
     DSEx.HTTP,
     DSEx.History,
     DSEx.LM,
@@ -204,6 +206,7 @@ defmodule PublicSurfaceTest do
     DSEx.Tracking.WandB,
     DSEx.Tracking.WandB.Backend,
     DSEx.Tracking.WandB.Transport,
+    DSEx.Training.ChatDataset,
     DSEx.Training.FastSlow.Backend,
     DSEx.Training.FastSlow.Runner,
     DSEx.Tool

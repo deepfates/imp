@@ -215,8 +215,8 @@ client is built, before an MCP, retriever, or provider-training call can reach
 the network.
 
 Provider training is also explicit. `BootstrapFinetune` and `GRPO` build
-provider training jobs only when a real trainer backend is supplied; they do not
-train models in-process and do not pretend to have a local training backend.
+training jobs only when a real trainer backend is supplied; they
+do not train models in-process.
 Trainer options accept `nil`, a trainer module, a configured trainer struct, or
 an arity-3 callback so tests and applications can inject the training boundary
 without ambient provider state.
@@ -230,6 +230,71 @@ trainer = DSEx.Clients.OpenAITrainer.new(training_file: "file-provider-id")
 `provider: :databricks` when you need to inspect the returned trainer. The
 OpenAI trainer submits a fine-tuning job for an already uploaded provider file;
 it does not upload examples itself.
+
+### Optional local MLX-LM SFT
+
+Apple Silicon hosts can install the separately versioned trainer executable:
+
+```bash
+uv tool install 'mlx-lm[train]==0.31.3'
+```
+
+`DSEx.Clients.MLXLMTrainer` accepts only a local Hugging Face snapshot whose
+directory name is the exact configured revision. The successful proof used this
+pinned model artifact; do not replace its revision with `main`:
+
+| Model artifact | Revision |
+| --- | --- |
+| `mlx-community/Qwen2.5-0.5B-Instruct-4bit` | `a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3` |
+
+Download a snapshot into the normal Hugging Face cache before training, then
+pass the signature and actual DSEx adapter used by the program:
+
+```bash
+hf download mlx-community/Qwen2.5-0.5B-Instruct-4bit \
+  --revision a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3
+```
+
+```elixir
+trainer =
+  DSEx.Clients.MLXLMTrainer.new(
+    signature: DSEx.signature("question -> answer"),
+    adapter: DSEx.Adapter.Chat,
+    stratify_by: [:route]
+  )
+
+{:ok, job} = DSEx.Clients.Trainer.finetune(trainer, deployment_lm, examples)
+```
+
+The proven 80-example configuration produced 72 training and 8 validation rows
+stratified by `route`, with prompt masking, 8 LoRA layers, batch size 1,
+gradient accumulation 4, 216 iterations, learning rate `1.0e-4`, maximum
+sequence length 512, and seed 0. These are the trainer defaults except
+`stratify_by`, which remains generic and must be set to `[:route]` by this
+campaign. MLX-LM receives gradient accumulation through its pinned 0.31.3
+`--grad-accumulation-steps` option.
+
+The model snapshot used for training and the returned adapter directory are
+separate artifacts. This backend produces and verifies the adapter only; it
+does not fuse or deploy it. The synchronous callback reports success only after
+the adapter config and weights have been hashed into a durable,
+content-addressed manifest. The executable is invoked directly with an argument
+vector, never through a shell.
+
+#### External process dependency decision
+
+DSEx intentionally does not add MuonTrap or Rambo for this backend. The review
+was against MuonTrap `1.8.0` and Rambo `0.3.4`, not their names or README claims:
+
+| Candidate | Decision | Blocking gap |
+| --- | --- | --- |
+| [MuonTrap 1.8.0](https://github.com/fhunleth/muontrap/tree/v1.8.0) | Do not buy for MLX-LM | Its non-cgroup path escalates TERM to KILL for the immediate child; complete descendant cleanup is implemented only through Linux cgroups, which does not cover Apple Silicon/macOS training hosts. |
+| [Rambo 0.3.4](https://github.com/jayjun/rambo/tree/0.3.4) | Do not buy for MLX-LM | Timeout closes its shim and Rust `kill_on_drop(true)` targets the direct child; captured stdout/stderr are accumulated without a byte bound and there is no TERM grace period. |
+
+`DSEx.ExternalCommand` therefore follows the repository's exercised
+`ParitySidecar` precedent: direct executable plus argv, one Port-owned OS process
+group, checked group TERM/KILL, caller-death cleanup, and bounded tail capture.
+This is a deliberate narrow wrapper, not a general process-management library.
 
 ## Schema Constraints
 
