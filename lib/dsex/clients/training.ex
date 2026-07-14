@@ -324,8 +324,7 @@ defmodule DSEx.Clients.TrainingJob do
   def rebind(%__MODULE__{} = job, program, opts \\ []) do
     with :ok <- validate_rebind_opts(opts),
          :ok <- require_artifact(job),
-         {:ok, lm} <-
-           rebound_lm(DSEx.ProgramAccess.lm(program), job.provider, job.result_model) do
+         {:ok, lm} <- deployment_lm(job, program, opts) do
       rebound =
         program
         |> DSEx.ProgramAccess.put_lm(lm)
@@ -531,9 +530,22 @@ defmodule DSEx.Clients.TrainingJob do
   defp provider_model_spec(:openai, model), do: "openai:" <> model
   defp provider_model_spec(_provider, model), do: model
 
+  defp deployment_lm(job, program, opts) do
+    case Keyword.fetch(opts, :lm) do
+      {:ok, lm} when not is_nil(lm) ->
+        case DSEx.LM.validate_lm(lm) do
+          {:ok, lm} -> {:ok, lm}
+          {:error, message} -> {:error, {:invalid_training_deployment_lm, message}}
+        end
+
+      _missing_or_nil ->
+        rebound_lm(DSEx.ProgramAccess.lm(program), job.provider, job.result_model)
+    end
+  end
+
   defp validate_rebind_opts(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and
-         Enum.all?(Keyword.keys(opts), &(&1 == :path)) and
+         Enum.all?(Keyword.keys(opts), &(&1 in [:path, :lm])) and
          (is_nil(opts[:path]) or is_binary(opts[:path])) do
       :ok
     else

@@ -361,6 +361,42 @@ defmodule ProviderTrainingLifecycleTest do
              {:unknown, "provider-paused"}
   end
 
+  test "rebind accepts an explicit portable deployment LM distinct from the artifact" do
+    base_lm = DSEx.req_llm("openai:gpt-base", api_key: "secret")
+
+    deployment_lm =
+      DSEx.req_llm(%{provider: :openai, id: "local-fused-model"},
+        api_key: "local",
+        base_url: "http://127.0.0.1:8189/v1"
+      )
+
+    job =
+      DSEx.Clients.TrainingJob.new(%{
+        id: "local-job",
+        provider: :mlx_lm,
+        model: "qwen-base",
+        status: :succeeded,
+        result_model: "/artifacts/adapters"
+      })
+
+    program = DSEx.predict("question -> answer", lm: base_lm)
+
+    assert {:ok, rebound} =
+             DSEx.Clients.TrainingJob.rebind(job, program, lm: deployment_lm)
+
+    assert DSEx.ProgramAccess.lm(rebound) == deployment_lm
+
+    assert DSEx.ProgramAccess.get_metadata(rebound, :training_artifact) == %{
+             provider: :mlx_lm,
+             job_id: "local-job",
+             base_model: "qwen-base",
+             result_model: "/artifacts/adapters"
+           }
+
+    assert {:error, {:invalid_training_deployment_lm, _message}} =
+             DSEx.Clients.TrainingJob.rebind(job, program, lm: %{not: :an_lm})
+  end
+
   test "training success without a provider artifact cannot be rebound or reported as success" do
     job = DSEx.Clients.TrainingJob.new(%{id: "job_no_artifact", status: "succeeded"})
 
