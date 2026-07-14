@@ -205,7 +205,7 @@ defmodule LiveProviderE2ETest do
 
   test "live provider drives CodeAct through the BEAM-safe sandbox" do
     program =
-      DSEx.code_act("question -> answer", [],
+      DSEx.code_act("question -> answer: int", [],
         lm: live_lm(max_completion_tokens: 100),
         adapter: DSEx.Adapter.JSON,
         config: [json_retries: 1],
@@ -214,10 +214,12 @@ defmodule LiveProviderE2ETest do
 
     assert {:ok, prediction} =
              DSEx.call(program, %{
-               question: "Return JSON with program exactly \"20 + 22\" and no tool."
+               question:
+                 "Return JSON whose program field contains the Elixir source 20 + 22. The decoded program must not itself be a quoted string literal. Do not use a tool."
              })
 
     assert DSEx.get(prediction, :answer) == 42
+    assert [%{action: :program, output: {:ok, 42}}] = prediction.metadata.code_act_trace
   end
 
   test "live provider drives ReActV2 native submit" do
