@@ -399,19 +399,26 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
 
   @doc false
   def load_policy!(dumped) when is_map(dumped) do
+    require_exact_keys!(
+      dumped,
+      ~w(enabled identity duplication_factor max_concurrency_requested max_concurrency timeout_requested timeout seed trainset_size effective_batch_size batch_controller_options batch_controller),
+      "ComBee policy"
+    )
+
     policy = %Policy{
       enabled: Map.fetch!(dumped, "enabled"),
       identity: Map.fetch!(dumped, "identity"),
-      duplication_factor: Map.get(dumped, "duplication_factor"),
-      max_concurrency_requested: load_special(Map.get(dumped, "max_concurrency_requested")),
-      max_concurrency: Map.get(dumped, "max_concurrency"),
-      timeout_requested: load_special(Map.get(dumped, "timeout_requested")),
-      timeout: load_special(Map.get(dumped, "timeout")),
-      seed: Map.get(dumped, "seed"),
-      trainset_size: Map.get(dumped, "trainset_size"),
-      effective_batch_size: Map.get(dumped, "effective_batch_size"),
-      batch_controller_options: load_batch_options(Map.get(dumped, "batch_controller_options")),
-      batch_controller: load_batch_report(Map.get(dumped, "batch_controller"))
+      duplication_factor: Map.fetch!(dumped, "duplication_factor"),
+      max_concurrency_requested: load_special(Map.fetch!(dumped, "max_concurrency_requested")),
+      max_concurrency: Map.fetch!(dumped, "max_concurrency"),
+      timeout_requested: load_special(Map.fetch!(dumped, "timeout_requested")),
+      timeout: load_special(Map.fetch!(dumped, "timeout")),
+      seed: Map.fetch!(dumped, "seed"),
+      trainset_size: Map.fetch!(dumped, "trainset_size"),
+      effective_batch_size: Map.fetch!(dumped, "effective_batch_size"),
+      batch_controller_options:
+        load_batch_options(Map.fetch!(dumped, "batch_controller_options")),
+      batch_controller: load_batch_report(Map.fetch!(dumped, "batch_controller"))
     }
 
     unless policy.identity == identity(policy_identity_payload(policy)) do
@@ -645,14 +652,20 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   defp load_batch_options(nil), do: nil
 
   defp load_batch_options(options) do
+    require_exact_keys!(
+      options,
+      ~w(mode measurements candidate_batch_sizes min_batch_size max_batch_size slope_threshold_ratio profiling_timeout),
+      "ComBee batch controller options"
+    )
+
     BatchController.options!(
-      mode: options |> Map.get("mode", "offline_measurements") |> String.to_existing_atom(),
-      measurements: Enum.map(options["measurements"], &List.to_tuple/1),
-      candidate_batch_sizes: Map.get(options, "candidate_batch_sizes"),
-      min_batch_size: options["min_batch_size"],
-      max_batch_size: options["max_batch_size"],
-      slope_threshold_ratio: options["slope_threshold_ratio"],
-      profiling_timeout: options |> Map.get("profiling_timeout", "infinity") |> load_special()
+      mode: options |> Map.fetch!("mode") |> String.to_existing_atom(),
+      measurements: options |> Map.fetch!("measurements") |> Enum.map(&List.to_tuple/1),
+      candidate_batch_sizes: Map.fetch!(options, "candidate_batch_sizes"),
+      min_batch_size: Map.fetch!(options, "min_batch_size"),
+      max_batch_size: Map.fetch!(options, "max_batch_size"),
+      slope_threshold_ratio: Map.fetch!(options, "slope_threshold_ratio"),
+      profiling_timeout: options |> Map.fetch!("profiling_timeout") |> load_special()
     )
   end
 
@@ -683,13 +696,21 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   defp load_batch_report(nil), do: nil
 
   defp load_batch_report(report) do
+    expected_keys =
+      BatchController.Report.__struct__()
+      |> Map.delete(:__struct__)
+      |> Map.keys()
+      |> Enum.map(&Atom.to_string/1)
+
+    require_exact_keys!(report, expected_keys, "ComBee batch controller report")
+
     values =
       Map.new(report, fn {key, value} ->
         {String.to_existing_atom(key), DSEx.Optimizer.Report.restore_json_safe(value)}
       end)
 
     values =
-      Map.update(values, :trials, [], fn trials ->
+      Map.update!(values, :trials, fn trials ->
         Enum.map(trials, fn
           %BatchController.Trial{} = trial -> trial
           trial when is_map(trial) -> struct!(BatchController.Trial, trial)
@@ -708,4 +729,12 @@ defmodule DSEx.Optimizer.GEPA.ComBee do
   defp load_special("auto"), do: :auto
   defp load_special("infinity"), do: :infinity
   defp load_special(value), do: value
+
+  defp require_exact_keys!(map, keys, context) do
+    unless MapSet.new(Map.keys(map)) == MapSet.new(keys) do
+      raise ArgumentError, "#{context} has unexpected or missing keys"
+    end
+
+    :ok
+  end
 end

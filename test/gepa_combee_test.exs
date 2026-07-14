@@ -450,7 +450,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       )
     end
 
-    legacy_policy =
+    stale_policy =
       checkpoint["combee_policy"]
       |> update_in(["batch_controller_options"], fn options ->
         Map.drop(options, ["mode", "candidate_batch_sizes", "profiling_timeout"])
@@ -469,10 +469,9 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
         ])
       end)
 
-    migrated = ComBee.load_policy!(legacy_policy)
-    assert migrated.identity == checkpoint["combee_policy"]["identity"]
-    assert migrated.batch_controller.mode == :offline_measurements
-    assert is_binary(migrated.batch_controller.identity)
+    assert_raise ArgumentError, ~r/unexpected or missing keys/, fn ->
+      ComBee.load_policy!(stale_policy)
+    end
   end
 
   test "ComBee composes with bounded speculative proposals and rejects oversubscription" do
