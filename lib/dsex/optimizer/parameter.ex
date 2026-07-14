@@ -130,7 +130,7 @@ defmodule DSEx.Optimizer.Parameter do
   defp json_value?(value) when is_boolean(value) or is_integer(value) or is_binary(value),
     do: true
 
-  defp json_value?(value) when is_float(value), do: value == value
+  defp json_value?(value) when is_float(value), do: true
 
   defp json_value?(value) when is_list(value), do: Enum.all?(value, &json_value?/1)
 

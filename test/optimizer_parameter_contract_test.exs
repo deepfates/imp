@@ -3,6 +3,7 @@ defmodule DSEx.Optimizer.ParameterContractTest do
 
   alias DSEx.Optimizer.Parameter
   alias DSEx.Optimizer.Parameter.{Change, Set}
+  alias DSEx.Predict.{Assertions, BestOfN, ReAct, ReActV2, Refine}
   alias DSEx.ProgramParameters
 
   test "parameter and set persistence is deterministic and rejects tampering" do
@@ -93,10 +94,10 @@ defmodule DSEx.Optimizer.ParameterContractTest do
     metric = fn _example, _prediction -> 1.0 end
 
     wrappers = [
-      DSEx.predict("question -> answer") |> DSEx.Predict.BestOfN.new(metric),
-      DSEx.predict("question -> answer") |> DSEx.Predict.Refine.new(metric),
+      DSEx.predict("question -> answer") |> BestOfN.new(metric),
+      DSEx.predict("question -> answer") |> Refine.new(metric),
       DSEx.predict("question -> answer")
-      |> DSEx.Predict.Assertions.new([{:valid, fn _prediction -> true end}])
+      |> Assertions.new([{:valid, fn _prediction -> true end}])
     ]
 
     for wrapper <- wrappers do
@@ -122,8 +123,8 @@ defmodule DSEx.Optimizer.ParameterContractTest do
       )
 
     programs = [
-      DSEx.Predict.ReAct.new("question -> answer", [tool]),
-      DSEx.Predict.ReActV2.new("question -> answer", [tool])
+      ReAct.new("question -> answer", [tool]),
+      ReActV2.new("question -> answer", [tool])
     ]
 
     for program <- programs do
@@ -153,19 +154,13 @@ defmodule DSEx.Optimizer.ParameterContractTest do
       changed_submit = %{original_submit | description: "Override submit"}
 
       assert_raise ArgumentError, ~r/submit is reserved/, fn ->
-        apply(program.__struct__, :with_tools, [
-          program,
-          %{program.tools | submit: changed_submit}
-        ])
+        with_tools(program, %{program.tools | submit: changed_submit})
       end
 
       changed_runner = %{program.tools.lookup | run: fn _input -> :replaced end}
 
       assert_raise ArgumentError, ~r/preserve tool names and runners/, fn ->
-        apply(program.__struct__, :with_tools, [
-          program,
-          %{program.tools | lookup: changed_runner}
-        ])
+        with_tools(program, %{program.tools | lookup: changed_runner})
       end
 
       provider_lookup =
@@ -179,4 +174,8 @@ defmodule DSEx.Optimizer.ParameterContractTest do
              }
     end
   end
+
+  defp with_tools(%ReAct{} = program, tools), do: ReAct.with_tools(program, tools)
+
+  defp with_tools(%ReActV2{} = program, tools), do: ReActV2.with_tools(program, tools)
 end
