@@ -384,7 +384,7 @@ matches the pinned paper artifact: GEPA leaves `teacher_lm` unset, so reflection
 uses the configured task LM, while Papillon separately fixes its judge to
 GPT-4.1-mini. The manifest also binds the six families, full dataset hash,
 seeds, metric-call budgets, source commits, request policy, output paths, and
-required source-exact environment. It rejects every CLI override. Legacy CLI
+required source-exact environment. It rejects every CLI override. Direct CLI
 mode remains available for partial operator runs, but it is not the canonical
 paper-reproduction contract.
 

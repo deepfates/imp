@@ -572,6 +572,10 @@ defmodule DSEx.Saving do
       "tool_policy",
       "max_iterations",
       "max_llm_calls",
+      "max_recursion_depth",
+      "max_interpreter_steps",
+      "max_interpreter_value_bytes",
+      "max_interpreter_effects",
       "max_time_ms",
       "max_preview_chars",
       "max_observation_chars",
@@ -592,22 +596,22 @@ defmodule DSEx.Saving do
       max_llm_calls: require_non_negative_integer!(state["max_llm_calls"], "RLM max_llm_calls"),
       max_recursion_depth:
         require_non_negative_integer!(
-          Map.get(state, "max_recursion_depth", 1),
+          Map.fetch!(state, "max_recursion_depth"),
           "RLM max_recursion_depth"
         ),
       max_interpreter_steps:
         require_positive_integer!(
-          Map.get(state, "max_interpreter_steps", 10_000),
+          Map.fetch!(state, "max_interpreter_steps"),
           "RLM max_interpreter_steps"
         ),
       max_interpreter_value_bytes:
         require_positive_integer!(
-          Map.get(state, "max_interpreter_value_bytes", 16_000_000),
+          Map.fetch!(state, "max_interpreter_value_bytes"),
           "RLM max_interpreter_value_bytes"
         ),
       max_interpreter_effects:
         require_positive_integer!(
-          Map.get(state, "max_interpreter_effects", 100),
+          Map.fetch!(state, "max_interpreter_effects"),
           "RLM max_interpreter_effects"
         ),
       max_time_ms:
@@ -626,20 +630,12 @@ defmodule DSEx.Saving do
   end
 
   def load(%{"type" => "semantic_f1"} = state) do
-    require_keys!(state, ["type", "predict"])
+    require_keys!(state, ["type", "predict", "threshold", "decompositional"])
 
     %DSEx.Evaluate.SemanticF1{
       predict: require_chain_of_thought!(load(state["predict"]), "SemanticF1"),
-      threshold: require_threshold!(Map.get(state, "threshold", 0.66), "SemanticF1 threshold"),
-      decompositional: Map.get(state, "decompositional", false) == true
-    }
-  end
-
-  def load(%{"type" => "complete_and_grounded"} = state) do
-    require_keys!(state, ["type", "predict"])
-
-    %DSEx.Evaluate.CompleteAndGrounded{
-      predict: require_chain_of_thought!(load(state["predict"]), "CompleteAndGrounded")
+      threshold: require_threshold!(Map.fetch!(state, "threshold"), "SemanticF1 threshold"),
+      decompositional: Map.fetch!(state, "decompositional") == true
     }
   end
 

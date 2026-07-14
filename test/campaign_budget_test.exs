@@ -70,7 +70,7 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
            }
   end
 
-  test "restores observed usage and request counts without restoring active reservations" do
+  test "restores observed usage and request counts from current checkpoint state" do
     {:ok, budget} =
       CampaignBudget.start_link(
         limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
@@ -79,7 +79,7 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
         initial: %{
           "requests" => 2,
           "usage" => %{"input_tokens" => 7, "output_tokens" => 3, "usd" => 0.25},
-          "active_reservations" => 9
+          "reservations" => []
         }
       )
 
@@ -87,6 +87,33 @@ defmodule DSEx.BenchmarkTruth.CampaignBudgetTest do
     assert snapshot["requests"] == 2
     assert snapshot["usage"]["input_tokens"] == 7
     assert snapshot["active_reservations"] == 0
+  end
+
+  test "rejects pre-canonical checkpoint state without reservation identities" do
+    previous = Process.flag(:trap_exit, true)
+
+    try do
+      assert {:error, {%ArgumentError{message: message}, _stacktrace}} =
+               CampaignBudget.start_link(
+                 limits: %{requests: 3, input_tokens: 100_000, output_tokens: 100, usd: 2.0},
+                 pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+                 default_max_output_tokens: 10,
+                 initial: %{
+                   "requests" => 2,
+                   "usage" => %{"input_tokens" => 7, "output_tokens" => 3, "usd" => 0.25},
+                   "active_reservations" => 1,
+                   "reserved" => %{
+                     "input_tokens" => 1,
+                     "output_tokens" => 1,
+                     "usd" => 0.01
+                   }
+                 }
+               )
+
+      assert message =~ "initial campaign reservations must be a list"
+    after
+      Process.flag(:trap_exit, previous)
+    end
   end
 
   test "marks an unexpected provider overrun as exhausted" do

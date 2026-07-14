@@ -35,8 +35,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   cost flags are valid only for a single-family, single-seed run.
 
   Manifest mode is immutable: `--manifest` cannot be combined with any other
-  CLI option. Legacy CLI invocation remains available for operator and partial
-  runs; canonical future research runs use the source-controlled manifest.
+  CLI option. Direct CLI invocation remains available for exploratory and partial
+  runs; canonical claim-bearing research runs use the source-controlled manifest.
   `--manifest ... --plan` emits the immutable six-family shard plan and hard
   ceilings without starting the application, reading credentials, or making
   provider/network calls.

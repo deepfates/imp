@@ -205,40 +205,16 @@ defmodule DSEx.BenchmarkTruth.CampaignBudget do
     |> Enum.sort_by(& &1["id"])
   end
 
+  defp initial_reservations!(initial) when map_size(initial) == 0, do: []
+
   defp initial_reservations!(initial) do
     case Map.get(initial, "reservations", Map.get(initial, :reservations)) do
-      nil ->
-        legacy_reservations(initial)
-
       reservations when is_list(reservations) ->
         Enum.map(reservations, &normalize_reservation!/1)
 
       other ->
         raise ArgumentError,
               "initial campaign reservations must be a list, got: #{inspect(other)}"
-    end
-  end
-
-  defp legacy_reservations(initial) do
-    count = Map.get(initial, "active_reservations", Map.get(initial, :active_reservations, 0))
-
-    cond do
-      count == 0 ->
-        []
-
-      is_integer(count) and count > 0 ->
-        [
-          %{
-            "id" => "legacy-reservation",
-            "bounds" =>
-              initial
-              |> Map.get("reserved", Map.get(initial, :reserved, empty_usage()))
-              |> normalize_usage!()
-          }
-        ]
-
-      true ->
-        raise ArgumentError, "initial campaign active_reservations must be a non-negative integer"
     end
   end
 
