@@ -25,6 +25,9 @@ jobs:
           cache-dependency-path: |
             scripts/setup_dspy_parity_env.sh
             scripts/setup_reference_test_env.sh
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.8.3
       - run: mix local.hex --force
       - run: mix deps.get
       - name: Install pinned reference runtimes

@@ -8,7 +8,7 @@ defmodule GateContractTest do
              "format --check-formatted",
              "clean",
              "compile --warnings-as-errors",
-             "test --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
+             "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
              "benchmark.failure_campaign.check",
              "package.check",
              "livebook.check",

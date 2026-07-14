@@ -279,6 +279,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
       "dspy" =>
         Map.take(dspy, [
           "dspy_version",
+          "deno_version",
           "python_version",
           "upstream_source_sha256",
           "upstream_source_path"

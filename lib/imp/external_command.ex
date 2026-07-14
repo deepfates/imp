@@ -13,6 +13,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
   @default_kill_grace 1_000
   @default_max_output 32_768
   @group_probe_ms 20
+  @minimum_kill_barrier_ms 1_000
   @signal_timeout_ms 500
   @signal_output_bytes 4_096
 
@@ -233,7 +234,10 @@ defmodule Imp.ExternalCommand.Lifecycle do
     {capture, port_exited?, group_alive?} =
       if group_alive? do
         signal_process_group(os_pid, "KILL")
-        kill_deadline = System.monotonic_time(:millisecond) + grace_ms
+
+        kill_deadline =
+          System.monotonic_time(:millisecond) + max(grace_ms, @minimum_kill_barrier_ms)
+
         await_cleanup(port, os_pid, capture, port_exited?, kill_deadline)
       else
         {capture, port_exited?, false}
@@ -351,7 +355,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
           :exit_status,
           :stderr_to_stdout,
           :use_stdio,
-          {:args, ["-#{signal}", "-#{os_pid}"]}
+          {:args, ["-#{signal}", "--", "-#{os_pid}"]}
         ]
       )
 

@@ -28,6 +28,7 @@ defmodule RLMContractArtifactTest do
 
     assert artifact["evidence_tier"] == "t1_operational_contract"
     assert artifact["dspy"]["dspy_version"] == "3.3.0b1"
+    assert artifact["dspy"]["deno_version"] == "2.8.3"
     assert artifact["summary"]["operational_contract_complete"]
     refute artifact["summary"]["paper_protocol_complete"]
     assert artifact["summary"]["required_matched_passing"] == 12

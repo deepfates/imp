@@ -14,12 +14,18 @@ transport behavior.
 Run from a clean source checkout tree before shipping ordinary product changes:
 
 ```sh
+scripts/setup_reference_test_env.sh
 mix production.check
 mix integration.check
 mix protocol.check
 mix package.check
 mix quality.check
 ```
+
+The reference setup requires Python 3.12 and Deno 2.8.3. It installs the
+pinned DSPy and GEPA Python sources used by deterministic source-checkout
+contracts; these runtimes are maintainer dependencies and are not part of the
+Imp package or an Imp production release.
 
 When changing public examples, notebooks, or learning-material control flow in
 the source checkout, also run the slower executable Livebook proof:

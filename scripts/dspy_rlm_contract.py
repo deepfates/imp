@@ -281,6 +281,15 @@ def git_sha() -> str:
     return result.stdout.strip() if result.returncode == 0 else "unknown"
 
 
+def deno_version() -> str:
+    result = subprocess.run(["deno", "--version"], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        return "unavailable"
+    first_line = result.stdout.splitlines()[0] if result.stdout else ""
+    fields = first_line.split()
+    return fields[1] if len(fields) >= 2 and fields[0] == "deno" else "unknown"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", required=True, type=Path)
@@ -295,6 +304,7 @@ def main() -> int:
         "evidence_tier": "t1_operational_contract",
         "scope": SCOPE_NOTE,
         "dspy_version": getattr(dspy, "__version__", "unknown"),
+        "deno_version": deno_version(),
         "upstream_source_path": str(source_path),
         "upstream_source_sha256": sha256(source_path),
         "python_version": platform.python_version(),

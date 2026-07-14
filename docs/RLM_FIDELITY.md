@@ -61,8 +61,9 @@ Imp and DSPy 3.3.0b1 using deterministic controller and sub-LM responses. It
 gates typed submission, persistent state, transformations, subqueries inside
 programmatic loops, ordered batches, exact and atomic call accounting, repair,
 extraction fallback, and trajectory retention. The artifact records the
-installed DSPy source SHA256. Imp `recurse/2` is declared as an extension rather
-than fabricated as upstream behavior.
+installed DSPy source SHA256 and the pinned Deno 2.8.3 sandbox runtime. Imp
+`recurse/2` is declared as an extension rather than fabricated as upstream
+behavior.
 
 The T1 artifact proves operational semantics only.
 

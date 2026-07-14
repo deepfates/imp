@@ -6,10 +6,11 @@ Python implementation details mechanically.
 
 ## Development
 
-Use Elixir 1.19 and OTP 28, then run:
+Use Elixir 1.19, OTP 28, Python 3.12, and Deno 2.8.3, then run:
 
 ```sh
 mix deps.get
+scripts/setup_reference_test_env.sh
 mix production.check
 mix integration.check
 mix protocol.check
