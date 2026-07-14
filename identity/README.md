@@ -25,6 +25,12 @@ The separate
 records current namespace and public-market observations for the top 20. It
 does not silently convert collision evidence into rank or legal clearance.
 
+The
+[`reports/rename-surface-audit.md`](reports/rename-surface-audit.md) maps the
+package, API, runtime, tooling, evidence, and repository contracts that the
+eventual decision must migrate together. It recommends a clean pre-release
+rename while preserving immutable identity and benchmark provenance.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate
