@@ -15,6 +15,10 @@ defmodule DSEx.Predict.CodeAct do
 
   Unknown, denied, or crashing tools return structured errors with the redacted
   trace accumulated so far.
+
+  A call may override the constructor's iteration budget with `:max_iters` or
+  `"max_iters"`. The control value is validated and is never exposed as a task
+  input to the planner.
   """
 
   @behaviour DSEx.Module
@@ -66,8 +70,10 @@ defmodule DSEx.Predict.CodeAct do
   @spec call(t(), map() | [{term(), term()}]) :: {:ok, Prediction.t()} | {:error, term()}
   @impl true
   def call(%__MODULE__{} = code_act, inputs) when is_list(inputs) or is_map(inputs) do
-    with {:ok, inputs} <- normalize_inputs(inputs) do
-      run_loop(code_act, inputs, [], 1)
+    with {:ok, inputs} <- normalize_inputs(inputs),
+         {max_iters, inputs} <- pop_max_iters(inputs, code_act.max_iters),
+         :ok <- validate_call_max_iters(max_iters) do
+      run_loop(%{code_act | max_iters: max_iters}, inputs, [], 1)
     end
   end
 
@@ -82,6 +88,22 @@ defmodule DSEx.Predict.CodeAct do
   rescue
     _error -> {:error, {:invalid_code_act_inputs, "expected inputs as {key, value} pairs"}}
   end
+
+  defp pop_max_iters(inputs, default) do
+    max_iters =
+      cond do
+        Map.has_key?(inputs, :max_iters) -> Map.fetch!(inputs, :max_iters)
+        Map.has_key?(inputs, "max_iters") -> Map.fetch!(inputs, "max_iters")
+        true -> default
+      end
+
+    {max_iters, Map.drop(inputs, [:max_iters, "max_iters"])}
+  end
+
+  defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
+
+  defp validate_call_max_iters(max_iters),
+    do: {:error, {:invalid_code_act_max_iters, max_iters}}
 
   defp run_loop(%__MODULE__{} = code_act, _inputs, trace, iteration)
        when iteration > code_act.max_iters do

@@ -32,6 +32,10 @@ defmodule DSEx.Predict.ReAct do
   action parse failure, empty tool calls, or iteration exhaustion. Tool-policy
   failures and malformed provider calls remain fail-fast in both modes.
 
+  Like upstream ReAct, a call may override the constructor's iteration budget
+  with an invocation-local `:max_iters` or `"max_iters"` input. The control
+  value is validated and removed before task inputs are sent to the LM.
+
   Tool call history is redacted before it is attached to the final prediction.
   """
 
@@ -140,8 +144,10 @@ defmodule DSEx.Predict.ReAct do
 
   @impl true
   def call(%__MODULE__{} = agent, inputs) when is_list(inputs) or is_map(inputs) do
-    with {:ok, inputs} <- normalize_inputs(inputs) do
-      run_loop(agent, inputs, [], agent.max_iters)
+    with {:ok, inputs} <- normalize_inputs(inputs),
+         {max_iters, inputs} <- pop_max_iters(inputs, agent.max_iters),
+         :ok <- validate_call_max_iters(max_iters) do
+      run_loop(agent, inputs, [], max_iters)
     end
   end
 
@@ -156,6 +162,22 @@ defmodule DSEx.Predict.ReAct do
   rescue
     _error -> {:error, {:invalid_react_inputs, "expected inputs as {key, value} pairs"}}
   end
+
+  defp pop_max_iters(inputs, default) do
+    max_iters =
+      cond do
+        Map.has_key?(inputs, :max_iters) -> Map.fetch!(inputs, :max_iters)
+        Map.has_key?(inputs, "max_iters") -> Map.fetch!(inputs, "max_iters")
+        true -> default
+      end
+
+    {max_iters, Map.drop(inputs, [:max_iters, "max_iters"])}
+  end
+
+  defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
+
+  defp validate_call_max_iters(max_iters),
+    do: {:error, {:invalid_react_max_iters, max_iters}}
 
   defp run_loop(%{mode: :dspy_3_2_1} = agent, inputs, history, 0) do
     extract_final(agent, inputs, history, :max_iters)

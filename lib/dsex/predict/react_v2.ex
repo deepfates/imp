@@ -116,7 +116,8 @@ defmodule DSEx.Predict.ReActV2 do
       react.react
       | config:
           Keyword.merge(react.react.config,
-            tool_choice: %{type: "function", function: %{name: "submit"}}
+            tool_choice: %{type: "function", function: %{name: "submit"}},
+            reasoning_effort: nil
           )
     }
 

@@ -32,6 +32,17 @@ defmodule ProgramOfThoughtFidelityTest do
     assert succeeded == %{iteration: 2, action: :program, input: "x * 2", output: {:ok, 42}}
   end
 
+  test "ProgramOfThought rejects malformed input pairs before calling the planner" do
+    owner = self()
+    lm = static_sequence(owner, [%{program: "1 + 1"}])
+    program = DSEx.program_of_thought("x -> answer", lm: lm)
+
+    assert {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}} =
+             DSEx.call(program, [:not_a_pair])
+
+    refute_received {:lm_messages, _messages}
+  end
+
   test "ProgramOfThought extracts declared outputs when code output is intermediate" do
     owner = self()
 
@@ -191,6 +202,36 @@ defmodule ProgramOfThoughtFidelityTest do
     assert DSEx.Prediction.get(prediction, :answer) == 8
     assert Enum.map(prediction.metadata.code_act_trace, & &1.output) == [{:ok, 4}, {:ok, 8}]
     assert length(collect_messages(3)) == 3
+  end
+
+  test "CodeAct honors an invocation-local max_iters budget and strips it from planner inputs" do
+    owner = self()
+
+    lm =
+      static_sequence(owner, [
+        %{program: "x + 1", finished: false},
+        %{answer: 4}
+      ])
+
+    program = DSEx.code_act("x: int -> answer: int", [], lm: lm, max_iters: 4)
+
+    assert {:ok, prediction} = DSEx.call(program, %{x: 3, max_iters: 1})
+    assert DSEx.Prediction.get(prediction, :answer) == 4
+
+    [planner, _extractor] = collect_messages(2)
+    refute rendered(planner) =~ "max_iters"
+    refute_received {:lm_messages, _messages}
+  end
+
+  test "CodeAct validates an invocation-local max_iters budget before calling the planner" do
+    owner = self()
+    lm = static_sequence(owner, [%{program: "1 + 1"}])
+    program = DSEx.code_act("question -> answer", [], lm: lm)
+
+    assert {:error, {:invalid_code_act_max_iters, -1}} =
+             DSEx.call(program, %{question: "q", max_iters: -1})
+
+    refute_received {:lm_messages, _messages}
   end
 
   defp static_sequence(owner, outputs) do

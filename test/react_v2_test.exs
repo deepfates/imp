@@ -76,6 +76,8 @@ defmodule ReActV2Test do
     assert_received {:lm_call, _normal_opts}
     assert_received {:lm_call, forced_opts}
     assert get_in(Map.new(forced_opts), [:tool_choice, :function, :name]) == "submit"
+    assert Keyword.has_key?(forced_opts, :reasoning_effort)
+    assert Keyword.get(forced_opts, :reasoning_effort) == nil
   end
 
   test "accepts atom and string per-call max_iters overrides" do

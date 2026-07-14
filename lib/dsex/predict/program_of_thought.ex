@@ -99,8 +99,8 @@ defmodule DSEx.Predict.ProgramOfThought do
   @spec call(t(), map() | [{term(), term()}]) :: {:ok, Prediction.t()} | {:error, term()}
   @impl true
   def call(%__MODULE__{} = pot, inputs) do
-    with {:ok, prediction} <- predict_step(pot, inputs),
-         {:ok, normalized_inputs} <- normalize_inputs(inputs) do
+    with {:ok, normalized_inputs} <- normalize_inputs(inputs),
+         {:ok, prediction} <- predict_step(pot, normalized_inputs) do
       execute_attempt(pot, normalized_inputs, prediction, 1, [])
     end
   end

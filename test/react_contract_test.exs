@@ -71,6 +71,46 @@ defmodule ReActContractTest do
     refute_received :react_lm_called
   end
 
+  test "invocation-local max_iters overrides the constructor budget without reaching the LM inputs" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:react_messages, messages})
+          %{tool_calls: [%{name: :lookup, arguments: %{}}]}
+        end
+      ]
+    }
+
+    lookup = DSEx.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
+    agent = DSEx.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 4)
+
+    assert {:error, {:react_max_iters, [%{tool: :lookup, result: "observed"}]}} =
+             DSEx.Predict.ReAct.call(agent, %{question: "q", max_iters: 1})
+
+    assert_receive {:react_messages, messages}
+    refute inspect(messages) =~ "max_iters"
+    refute_received {:react_messages, _messages}
+  end
+
+  test "invocation-local max_iters is validated before calling the model" do
+    parent = self()
+
+    lm = %{
+      module: DSEx.LM.Static,
+      opts: [handler: fn _messages, _opts -> send(parent, :react_lm_called) end]
+    }
+
+    agent = DSEx.Predict.ReAct.new("question -> answer", [], lm: lm)
+
+    assert {:error, {:invalid_react_max_iters, "1"}} =
+             DSEx.Predict.ReAct.call(agent, %{"max_iters" => "1", question: "q"})
+
+    refute_received :react_lm_called
+  end
+
   test "constructor and call boundaries report invalid inputs clearly" do
     assert_raise ArgumentError, ~r/DSEx\.Predict\.ReAct\.new\/3: expected keyword options/, fn ->
       DSEx.Predict.ReAct.new("question -> answer", [], %{lm: nil})
