@@ -73,7 +73,7 @@ defmodule DSEx.UpstreamFidelityTest do
     refute by_id["optimization.instructions"].release_blocking
     assert by_id["optimization.gepa"].status == :conformant
     assert by_id["product.learning_path"].status == :conformant
-    assert by_id["product.release"].status == :gap
+    assert by_id["product.release"].status == :conformant
 
     assert report.summary.invalid_evidence == 0
     assert report.summary.manifest_missing == 0
@@ -81,10 +81,10 @@ defmodule DSEx.UpstreamFidelityTest do
     assert report.summary.gaps > 0
     assert report.summary.non_blocking_gaps > 0
     assert report.summary.release_blockers < report.summary.gaps
-    refute report.summary.passing
+    assert report.summary.passing
     refute "optimization.instructions" in report.blocking_ids
     refute "optimization.weights" in report.blocking_ids
-    assert "product.release" in report.blocking_ids
+    assert report.blocking_ids == []
   end
 
   test "every stable surface has exactly one owning ledger row" do

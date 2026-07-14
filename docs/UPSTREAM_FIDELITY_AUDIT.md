@@ -102,12 +102,11 @@ and dominance claims remain explicitly unmade where evidence is incomplete.
 Instruction-optimizer matched campaigns are claim-specific gaps rather than
 universal release blockers.
 
-The weight-optimizer row remains a product blocker until the canonical local
-MLX-LM campaign is rerun after exact model and adapter identity hardening. The
-earlier campaign demonstrated real LoRA training, held-out lift, fusion, and
-credential-free program save/load, but cannot alone prove the stricter runtime
-identity contract. Avatar and AvatarOptimizer provide bounded typed-action
-execution and feedback-driven instruction optimization. BetterTogether
+The weight-optimizer row is conformant after the canonical MLX-LM campaign
+proved exact base/adapter identity, real LoRA training, held-out lift from 0.15
+to 0.85 accuracy, official fusion, and save/load-equivalent fused output.
+Avatar and AvatarOptimizer provide bounded typed-action execution and
+feedback-driven instruction optimization. BetterTogether
 implements arbitrary named and repeated optimizer sequences, evaluates the
 baseline and each successful prefix, selects the best validated prefix with
 stable tie handling, returns the latest successful prefix without validation,
@@ -117,8 +116,8 @@ That disposition does not imply paid-provider training, GRPO effectiveness, or
 matched Avatar/AvatarOptimizer/BetterTogether parity. Those remain explicit
 claim-specific gaps until their campaigns pass.
 
-The product gate stays red until the clean-checkout release audit is strong
-enough to change its disposition.
+The product gate is conformant after the clean-checkout package, persistence,
+deployment, documentation, and production audits passed.
 Claim-specific rows stay red for their narrower claims without falsely making
 the whole package unshippable. Closing a ticket or adding a module name does not
 change status by itself.

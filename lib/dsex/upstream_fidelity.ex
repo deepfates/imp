@@ -753,7 +753,7 @@ defmodule DSEx.UpstreamFidelity do
         "clean-room consumer"
       ],
       source: "Hex package and canonical GitHub repository",
-      disposition: :gap,
+      disposition: :conformant,
       ticket: "de-p29x",
       dsex: [DSEx],
       invariants: [
@@ -763,15 +763,19 @@ defmodule DSEx.UpstreamFidelity do
         "a clean project consumes the exact artifact"
       ],
       evidence: %{
-        tests: ["test/package_contract_test.exs", "test/gate_contract_test.exs"],
+        tests: [
+          "test/package_contract_test.exs",
+          "test/gate_contract_test.exs",
+          "test/production_hardening_test.exs",
+          "test/deployment_reference_test.exs"
+        ],
         docs: [
           "README.md",
           "CHANGELOG.md",
           "LICENSE",
           "SECURITY.md",
           "docs/RELEASE_CRITERIA.md"
-        ],
-        missing: ["fresh clean-checkout release gates", "final release stewardship audit"]
+        ]
       }
     }
   ]

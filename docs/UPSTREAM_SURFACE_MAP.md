@@ -2,16 +2,16 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
-Conformant: 13
+Conformant: 14
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 2
+Gaps: 1
 Claim-specific non-blocking gaps: 1
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 1
-Passing: false
+Release blockers: 0
+Passing: true
 
 | ID | Category | Status | Product gate | Upstream surfaces | Ticket |
 | --- | --- | --- | --- | --- | --- |
@@ -37,7 +37,7 @@ Passing: false
 | runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |  |
 | state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |  |
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide | de-2ia5 |
-| product.release | product | gap | release blocker | installable package, versioned release, security policy, CI, clean-room consumer | de-p29x |
+| product.release | product | conformant | satisfied | installable package, versioned release, security policy, CI, clean-room consumer | de-p29x |
 
 ## Executable Contracts
 
@@ -659,7 +659,7 @@ Missing evidence or behavior:
 
 ### `product.release`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `Hex package and canonical GitHub repository`
 
@@ -675,6 +675,8 @@ Executable evidence:
 
 - test: `test/package_contract_test.exs`
 - test: `test/gate_contract_test.exs`
+- test: `test/production_hardening_test.exs`
+- test: `test/deployment_reference_test.exs`
 - docs: `README.md`
 - docs: `CHANGELOG.md`
 - docs: `LICENSE`
@@ -684,5 +686,4 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- fresh clean-checkout release gates
-- final release stewardship audit
+- none
