@@ -111,24 +111,26 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
       )
 
     result =
-      DSEx.BenchmarkTruth.GepaCampaign.run(
-        dataset_root: fetch!(opts, :dataset_root),
-        campaign_id: fetch!(opts, :campaign_id),
-        model: model,
-        reflection_model: reflection_model,
-        out_dir: Keyword.get(opts, :out, "benchmarks/results"),
-        families: families,
-        max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
-        seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
-        generations: Keyword.get(opts, :generations, :metric_budget),
-        pricing_source: fetch!(opts, :pricing_source),
-        token_cost: token_cost(opts),
-        run_context: run_context,
-        execution: execution_identity(opts),
-        reporter: &report_progress/1,
-        lm: DSEx.req_llm(model, req_llm_opts),
-        reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts)
-      )
+      with_progress_reporter(fn reporter ->
+        DSEx.BenchmarkTruth.GepaCampaign.run(
+          dataset_root: fetch!(opts, :dataset_root),
+          campaign_id: fetch!(opts, :campaign_id),
+          model: model,
+          reflection_model: reflection_model,
+          out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+          families: families,
+          max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
+          seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
+          generations: Keyword.get(opts, :generations, :metric_budget),
+          pricing_source: fetch!(opts, :pricing_source),
+          token_cost: token_cost(opts),
+          run_context: run_context,
+          execution: execution_identity(opts),
+          reporter: reporter,
+          lm: DSEx.req_llm(model, req_llm_opts),
+          reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts)
+        )
+      end)
 
     Mix.shell().info("DSEx GEPA rows: #{result.out_path}")
   end
@@ -241,6 +243,82 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
     }
   end
 
+  @doc false
+  def start_progress_reporter do
+    {:ok, state} =
+      Agent.start_link(fn ->
+        %{optimizer: nil, usage: empty_usage()}
+      end)
+
+    handler_id = {__MODULE__, state}
+
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        [[:dsex, :optimizer, :progress], [:req_llm, :token_usage]],
+        &__MODULE__.handle_progress_telemetry/4,
+        state
+      )
+
+    %{handler_id: handler_id, state: state}
+  end
+
+  @doc false
+  def stop_progress_reporter(%{handler_id: handler_id, state: state}) do
+    :telemetry.detach(handler_id)
+
+    if Process.alive?(state), do: Agent.stop(state)
+    :ok
+  end
+
+  @doc false
+  def handle_progress_telemetry([:dsex, :optimizer, :progress], measurements, _metadata, state) do
+    Agent.update(state, &Map.put(&1, :optimizer, optimizer_snapshot(measurements)))
+  end
+
+  def handle_progress_telemetry([:req_llm, :token_usage], measurements, _metadata, state) do
+    Agent.update(state, fn progress ->
+      Map.update!(progress, :usage, &add_usage(&1, measurements))
+    end)
+  end
+
+  @doc false
+  def report_progress(%{state: state}, %{event: :seed_start} = event) do
+    Agent.update(state, fn _ -> %{optimizer: nil, usage: empty_usage()} end)
+    report_progress(event)
+  end
+
+  def report_progress(%{state: state}, %{event: :seed_checkpoint, phase: :optimizer} = event) do
+    snapshot = Agent.get(state, & &1)
+    Mix.shell().info(format_optimizer_progress(event, snapshot))
+  end
+
+  def report_progress(_reporter, event), do: report_progress(event)
+
+  @doc false
+  def format_optimizer_progress(event, snapshot) do
+    optimizer = snapshot.optimizer || %{}
+    usage = snapshot.usage
+    iteration = optimizer[:iteration] || event.completed_generations
+    candidates = optimizer[:candidates] || event.completed_generations + 1
+    metric_calls = optimizer[:metric_calls] || "unknown"
+
+    "[GEPA] #{event.family} seed=#{event.seed} optimizer checkpoint " <>
+      "iteration=#{iteration} metric_calls=#{metric_calls} candidates=#{candidates} " <>
+      "usage_usd=#{format_usd(usage.usd)} input_tokens=#{usage.input_tokens} " <>
+      "output_tokens=#{usage.output_tokens}"
+  end
+
+  defp with_progress_reporter(fun) do
+    reporter = start_progress_reporter()
+
+    try do
+      fun.(fn event -> report_progress(reporter, event) end)
+    after
+      stop_progress_reporter(reporter)
+    end
+  end
+
   defp report_progress(%{event: :family_start} = event) do
     counts = event.split_counts
 
@@ -276,6 +354,37 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   end
 
   defp report_progress(_event), do: :ok
+
+  defp optimizer_snapshot(measurements) do
+    %{
+      iteration: Map.get(measurements, :completed_generations),
+      metric_calls: Map.get(measurements, :metric_calls),
+      candidates: Map.get(measurements, :candidate_count)
+    }
+  end
+
+  defp empty_usage, do: %{usd: 0.0, input_tokens: 0, output_tokens: 0}
+
+  defp add_usage(usage, measurements) do
+    tokens = Map.get(measurements, :tokens, %{})
+
+    %{
+      usd: usage.usd + first_numeric(measurements, [:total_cost, :cost]),
+      input_tokens: usage.input_tokens + trunc(first_numeric(tokens, [:input_tokens, :input])),
+      output_tokens: usage.output_tokens + trunc(first_numeric(tokens, [:output_tokens, :output]))
+    }
+  end
+
+  defp first_numeric(values, keys) do
+    Enum.find_value(keys, 0.0, fn key ->
+      case Map.get(values, key) do
+        value when is_number(value) and value >= 0 -> value
+        _other -> nil
+      end
+    end)
+  end
+
+  defp format_usd(usd), do: :erlang.float_to_binary(usd / 1, decimals: 6)
 
   defp format_score(score) when is_float(score), do: :erlang.float_to_binary(score, decimals: 4)
   defp format_score(score), do: to_string(score)
