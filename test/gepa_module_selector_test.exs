@@ -165,7 +165,7 @@ defmodule DSEx.Optimizer.GEPA.ModuleSelectorTest do
     end
   end
 
-  test "reflection budget exhaustion between components never emits a partial candidate" do
+  test "sequential reflection reserves every component before dispatch" do
     owner = self()
 
     state =
@@ -184,11 +184,10 @@ defmodule DSEx.Optimizer.GEPA.ModuleSelectorTest do
       )
 
     assert state.stop_reason == {:budget_exhausted, :reflection_calls, 2, 1}
-    assert state.budget.reflection_calls == 1
+    assert state.budget.reflection_calls == 0
     assert length(state.candidates) == 1
     assert state.history == []
-    assert_receive {:proposed, _first_component}
-    refute_receive {:proposed, _second_component}
+    refute_receive {:proposed, _component}
   end
 
   test "round-robin cursor and component order survive JSON checkpoint resume" do

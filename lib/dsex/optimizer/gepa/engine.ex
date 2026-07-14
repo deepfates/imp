@@ -138,7 +138,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       )
 
     state =
-      if proposal_policy.resolved == 1 and not combee_policy.enabled do
+      if proposal_policy.resolved == 1 and not combee_policy.enabled and
+           is_nil(state.pending_proposal_batch) do
         run_sequential_loop(
           adapter,
           trainset,
@@ -196,6 +197,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
       %ComBee.BatchController.Report{mode: :runtime, status: status}
       when status in [:pending, :profiling] ->
+        deadline = profile_deadline(state.combee_policy.batch_controller)
+
         profile_runtime_trials(
           adapter,
           trainset,
@@ -203,7 +206,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           proposer,
           max_iterations,
           state,
-          opts
+          opts,
+          deadline
         )
 
       %ComBee.BatchController.Report{mode: :runtime} = report ->
@@ -222,13 +226,17 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          proposer,
          max_iterations,
          state,
-         opts
+         opts,
+         deadline
        ) do
     report = state.combee_policy.batch_controller
 
     cond do
       state.stop_reason != nil ->
         profile_stopped(state, opts, report, state.stop_reason)
+
+      profile_deadline_elapsed?(deadline) ->
+        profile_stopped(state, opts, report, :profiling_timeout)
 
       is_nil(ComBee.BatchController.next_batch_size(report)) ->
         finish_profile(state, opts)
@@ -246,7 +254,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
         before_budget = state.budget
         started_at = System.monotonic_time(:microsecond)
-        deadline = profile_deadline(started_report)
         trial_opts = Keyword.put(opts, :combee_policy, state.combee_policy)
 
         result =
@@ -287,7 +294,8 @@ defmodule DSEx.Optimizer.GEPA.Engine do
                 proposer,
                 max_iterations,
                 trial_state,
-                Keyword.put(trial_opts, :combee_policy, trial_state.combee_policy)
+                Keyword.put(trial_opts, :combee_policy, trial_state.combee_policy),
+                deadline
               )
             else
               reason =
@@ -352,6 +360,11 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     Coordinator.deadline(remaining)
   end
 
+  defp profile_deadline_elapsed?(:infinity), do: false
+
+  defp profile_deadline_elapsed?(deadline),
+    do: System.monotonic_time(:millisecond) >= deadline
+
   defp run_sequential_loop(
          adapter,
          trainset,
@@ -398,6 +411,23 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     cond do
       state.stop_reason != nil or state.iteration >= max_iterations ->
         state
+
+      match?(
+        %Proposal.Batch{phase: :reflection, status: :started},
+        state.pending_proposal_batch
+      ) ->
+        state = recover_interrupted_reflection(state, opts)
+
+        run_parallel_loop(
+          adapter,
+          trainset,
+          valset,
+          proposer,
+          minibatch_size,
+          max_iterations,
+          state,
+          opts
+        )
 
       match?(%Proposal.Batch{status: :started}, state.pending_proposal_batch) ->
         raise ArgumentError,
@@ -1066,6 +1096,40 @@ defmodule DSEx.Optimizer.GEPA.Engine do
     state
   end
 
+  defp recover_interrupted_reflection(state, opts) do
+    %Proposal.Batch{phase: :reflection, status: :started, contexts: contexts} =
+      state.pending_proposal_batch
+
+    {contexts, state} =
+      Enum.map_reduce(contexts, state, fn context, state ->
+        id = reservation_id(:reflection, context.iteration)
+
+        if Map.has_key?(state.budget_ledger.reservations, id) do
+          {budget, ledger} =
+            BudgetLedger.commit_ambiguous(state.budget_ledger, state.budget, id)
+
+          context = %{
+            context
+            | action: :error,
+              error: {:interrupted_reflection, :ambiguous_external_effects},
+              reflection_calls: nil,
+              reflection_ambiguous: false
+          }
+
+          {context, %{state | budget: budget, budget_ledger: ledger}}
+        else
+          {context, state}
+        end
+      end)
+
+    batch =
+      Proposal.new_batch(:child, contexts, state.pending_proposal_batch.deferred_stop_reason)
+
+    state = %{state | pending_proposal_batch: batch}
+    checkpoint!(state, opts)
+    state
+  end
+
   defp commit_reservation(state, id, actual) do
     try do
       {budget, ledger} = BudgetLedger.commit(state.budget_ledger, state.budget, id, actual)
@@ -1214,7 +1278,14 @@ defmodule DSEx.Optimizer.GEPA.Engine do
   end
 
   defp validate_pending_ledger!(%State{pending_proposal_batch: batch, budget_ledger: ledger}) do
-    parent_ids = Enum.map(batch.contexts, &reservation_id(:parent, &1.iteration))
+    parent_ids =
+      if batch.phase == :parent do
+        Enum.map(batch.contexts, &reservation_id(:parent, &1.iteration))
+      else
+        batch.contexts
+        |> Enum.filter(&(not is_nil(&1.parent_metric_calls) or &1.parent_ambiguous))
+        |> Enum.map(&reservation_id(:parent, &1.iteration))
+      end
 
     reflection_ids =
       if batch.phase in [:reflection, :child] do
@@ -1481,9 +1552,12 @@ defmodule DSEx.Optimizer.GEPA.Engine do
          {:ok, replacements, aggregation_reports, state} <-
            propose_components_with_budget(
              proposer,
-             parent.candidate,
+             parent,
              components,
              reflective_dataset,
+             minibatch_ids,
+             parent_result,
+             next_component,
              iteration,
              state,
              opts
@@ -2192,38 +2266,84 @@ defmodule DSEx.Optimizer.GEPA.Engine do
 
   defp propose_components_with_budget(
          proposer,
-         candidate,
+         parent,
          components,
          dataset,
+         minibatch_ids,
+         parent_result,
+         next_component,
          iteration,
          state,
          opts
        ) do
-    Enum.reduce_while(
-      components,
-      {:ok, %{}, [], state},
-      fn component, {:ok, replacements, reports, state} ->
-        case propose_component_with_budget(
-               proposer,
-               candidate,
-               component,
-               dataset,
-               iteration,
-               state,
-               opts
-             ) do
-          {:ok, text, report, state} ->
-            {:cont,
-             {:ok, Map.put(replacements, component, text), append_report(reports, report), state}}
+    reservation = reflection_call_reservation(components, dataset, state.combee_policy)
+    id = reservation_id(:reflection, iteration)
 
-          {:error, {:budget_exhausted, _, _, _} = reason, _report, state} ->
-            {:halt, {:error, reason, state}}
+    with {:ok, ledger} <-
+           BudgetLedger.reserve(state.budget_ledger, state.budget, id, %{
+             reflection_calls: reservation
+           }) do
+      context = %Proposal.Context{
+        slot: 0,
+        iteration: iteration,
+        parent_id: parent.id,
+        minibatch_ids: minibatch_ids,
+        parent_result: parent_result,
+        action: :reflect,
+        components: components,
+        next_component: next_component,
+        dataset: dataset
+      }
 
-          {:error, reason, _report, state} ->
-            {:halt, {:error, {:component_proposal_error, reason, components}, state}}
-        end
-      end
-    )
+      state = %{
+        state
+        | budget_ledger: ledger,
+          pending_proposal_batch: Proposal.new_batch(:reflection, [context])
+      }
+
+      checkpoint!(state, opts)
+      state = mark_batch_started!(state, opts)
+
+      result =
+        Enum.reduce_while(
+          components,
+          {:ok, %{}, [], state},
+          fn component, {:ok, replacements, reports, state} ->
+            case propose_component_with_budget(
+                   proposer,
+                   parent.candidate,
+                   component,
+                   dataset,
+                   iteration,
+                   state,
+                   opts
+                 ) do
+              {:ok, text, report, state} ->
+                {:cont,
+                 {:ok, Map.put(replacements, component, text), append_report(reports, report),
+                  state}}
+
+              {:error, {:budget_exhausted, _, _, _} = reason, _report, state} ->
+                {:halt, {:error, reason, state}}
+
+              {:error, reason, _report, state} ->
+                {:halt, {:error, {:component_proposal_error, reason, components}, state}}
+            end
+          end
+        )
+
+      finish_sequential_reflection(result, id, opts)
+    else
+      {:error, reason} -> {:error, reason, state}
+    end
+  end
+
+  defp finish_sequential_reflection(result, id, opts) do
+    state = elem(result, tuple_size(result) - 1)
+    {_reservation, ledger} = BudgetLedger.release(state.budget_ledger, id)
+    state = %{state | budget_ledger: ledger, pending_proposal_batch: nil}
+    checkpoint!(state, opts)
+    put_elem(result, tuple_size(result) - 1, state)
   end
 
   defp propose_component_with_budget(

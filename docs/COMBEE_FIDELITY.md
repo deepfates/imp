@@ -89,13 +89,14 @@ returns `status: :degenerate` and selects the smallest safe batch. It never
 guesses a larger batch after a degenerate fit.
 
 Runtime trials are strictly ordered and never overlap. `:profiling_timeout` is
-one absolute monotonic deadline shared by all candidates and every nested GEPA
-phase. Completed-trial elapsed time is carried across resume. Before each trial,
-DSEx checkpoints controller status `:started`; the normal GEPA phase checkpoints
-then persist reservations before dispatch. A clean budget refusal records a
-failed trial and all observed call deltas but does not admit its delay to the
-fit. Timeout, caller death, crash, or resume from `:started` fails closed because
-provider effects are ambiguous.
+one absolute monotonic deadline shared by all candidates, checkpoint/callback
+overhead, and every nested GEPA phase. Completed-trial elapsed time is carried
+across resume. Before each trial, DSEx checkpoints controller status `:started`;
+the normal GEPA phase checkpoints then persist reservations before dispatch. A
+clean budget refusal records a failed trial and all observed call deltas but
+does not admit its delay to the fit. Timeout, caller death, crash, or resume from
+a profiling report marked `:started` fails closed because provider effects are
+ambiguous.
 
 ## Offline measurement mode
 
@@ -171,8 +172,11 @@ DSEx.Optimizer.GEPA.new(metric,
   identity-bound runtime/offline report, pending aggregation reports, and budget
   reservations. Resume rejects drift in seed, duplication, timeout,
   concurrency, candidate schedule, safety range, fit threshold, profiling
-  timeout, or offline measurements. A profiling or proposal checkpoint marked
-  `started` remains non-resumable because provider effects are ambiguous.
+  timeout, or offline measurements. A profiling checkpoint marked `started`
+  remains non-resumable. A started reflection phase resumes without replay:
+  DSEx charges every reserved reflection call, converts the interrupted proposal
+  to a rejected iteration, and continues from a prepared child phase. Started
+  parent and child phases remain non-resumable.
 
 `on_combee_batch_selected` fires after a runtime fit completes or immediately
 for an offline fit. Runtime reports use `measurement_source: :runtime_trials`
@@ -191,8 +195,10 @@ and resume from the last completed checkpoint. If the checkpoint predates the
 hung reflection, that provider call is an ambiguous external spend and may be
 replayed; account for it outside the checkpoint ledger. Both sequential and
 parallel-proposal runs checkpoint prepared and started proposal phases with
-budget reservations. Resume rejects started work because provider effects are
-ambiguous. If an enclosing proposal is interrupted after the started
+budget reservations. Resume from a started reflection phase charges the full
+reflection reservation and does not replay provider work; the interrupted
+proposal is rejected deterministically. Started parent and child phases remain
+non-resumable. If an enclosing reflection is interrupted after the started
 checkpoint, the full reservation is the conservative spend bound.
 
 ## Matched natural-data preflight

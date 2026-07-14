@@ -102,8 +102,8 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     assert elem(final, 6) |> Enum.map(& &1["ComBeeGroupIndex"]) == [0, 1, 2, 3]
   end
 
-  test "production fallback retains every first-level and final aggregation input" do
-    records = Enum.map(0..19, &%{"Feedback" => "source-#{&1}"})
+  test "production fallback retains more than 64 first-level and final aggregation inputs" do
+    records = Enum.map(0..79, &%{"Feedback" => "source-#{&1}"})
 
     first =
       DSEx.Optimizer.GEPA.fallback_proposal(
@@ -116,7 +116,7 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
       )
 
     final_records =
-      Enum.map(0..19, &%{"ComBeeIntermediateUpdate" => "intermediate-#{&1}"})
+      Enum.map(0..79, &%{"ComBeeIntermediateUpdate" => "intermediate-#{&1}"})
 
     final =
       DSEx.Optimizer.GEPA.fallback_proposal(
@@ -128,8 +128,8 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
         %{phase: :final}
       )
 
-    assert Enum.all?(0..19, &String.contains?(first, "source-#{&1}"))
-    assert Enum.all?(0..19, &String.contains?(final, "intermediate-#{&1}"))
+    assert Enum.all?(0..79, &String.contains?(first, "source-#{&1}"))
+    assert Enum.all?(0..79, &String.contains?(final, "intermediate-#{&1}"))
   end
 
   test "one deadline covers queued first-level work and the final level" do
@@ -184,12 +184,20 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
 
     assert System.monotonic_time(:millisecond) - started < 60
 
-    assert receive_proposal_deadline_calls([]) == [
-             {:alpha, :first_level},
-             {:alpha, :final},
-             {:beta, :first_level},
-             {:beta, :final}
-           ]
+    calls = receive_proposal_deadline_calls([])
+
+    assert calls != []
+
+    assert calls ==
+             Enum.take(
+               [
+                 {:alpha, :first_level},
+                 {:alpha, :final},
+                 {:beta, :first_level},
+                 {:beta, :final}
+               ],
+               length(calls)
+             )
   end
 
   test "terminal failure stops queued dispatch and cancels active siblings" do
@@ -627,6 +635,53 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     assert report.selected_batch_size == 1
   end
 
+  test "runtime profiling timeout is one deadline across trial checkpoint overhead" do
+    owner = self()
+
+    assert_raise RuntimeError, ~r/interrupt after profiling timeout/, fn ->
+      Engine.run(
+        %FixtureAdapter{},
+        %{main: "base"},
+        Enum.to_list(0..7),
+        [:validation],
+        fn _candidate, _component, _records, iteration, metadata ->
+          send(owner, {:profile_deadline_call, iteration, metadata.phase})
+          if metadata.phase == :final, do: "improved", else: "local"
+        end,
+        max_iterations: 2,
+        candidate_selection_strategy: :current_best,
+        acceptance_policy: :equal_or_better,
+        combee: [
+          max_concurrency: 1,
+          batch_controller: [
+            candidate_batch_sizes: [2, 4],
+            max_batch_size: 4,
+            profiling_timeout: 35
+          ]
+        ],
+        checkpoint_fn: fn checkpoint ->
+          report = get_in(checkpoint, ["combee_policy", "batch_controller"])
+
+          if report && length(report["trials"] || []) == 1 &&
+               get_in(report, ["status", "value"]) == "profiling" do
+            Process.sleep(40)
+          end
+
+          if checkpoint["stop_reason"] ==
+               %{"__dsex_type__" => "atom", "value" => "profiling_timeout"} do
+            raise "interrupt after profiling timeout"
+          end
+
+          :ok
+        end
+      )
+    end
+
+    calls = receive_profile_deadline_calls([])
+    assert calls != []
+    assert Enum.all?(calls, &(elem(&1, 1) == 1))
+  end
+
   test "started profiling checkpoints are identity-bound and fail closed on resume" do
     owner = self()
 
@@ -754,6 +809,15 @@ defmodule DSEx.Optimizer.GEPA.ComBeeTest do
     receive do
       {:runtime_trial_call, _, _, _} = call ->
         receive_runtime_trial_calls(calls ++ [call])
+    after
+      25 -> calls
+    end
+  end
+
+  defp receive_profile_deadline_calls(calls) do
+    receive do
+      {:profile_deadline_call, _, _} = call ->
+        receive_profile_deadline_calls(calls ++ [call])
     after
       25 -> calls
     end

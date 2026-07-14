@@ -128,13 +128,13 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
            end)
   end
 
-  test "sequential proposals checkpoint prepared and started reservations" do
+  test "interrupted sequential reflection resumes with conservative spend and no replay" do
     owner = self()
 
     prepared =
       interrupt_sequential_checkpoint!(owner, "prepared", "reflection")
 
-    assert [%{"reflection_calls" => 3}] =
+    assert [%{"reflection_calls" => 1}] =
              Enum.filter(prepared["budget_ledger"], &String.starts_with?(&1["id"], "reflection:"))
 
     assert prepared["budget"]["reflection_calls"] == 0
@@ -142,12 +142,29 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
     started =
       interrupt_sequential_checkpoint!(owner, "started", "reflection")
 
-    assert [%{"reflection_calls" => 3}] =
+    assert [%{"reflection_calls" => 1}] =
              Enum.filter(started["budget_ledger"], &String.starts_with?(&1["id"], "reflection:"))
 
-    assert_raise ArgumentError, ~r/ambiguous external effects/, fn ->
-      run_sequential_engine(resume_state: started)
-    end
+    resumed_prepared = run_sequential_engine(resume_state: prepared)
+    assert resumed_prepared.budget.reflection_calls == 1
+    assert resumed_prepared.iteration == 1
+
+    resumed_started =
+      run_sequential_engine(
+        resume_state: started,
+        proposer: fn _, _, _, _, _ ->
+          send(owner, :replayed_ambiguous_reflection)
+          "must-not-run"
+        end
+      )
+
+    assert resumed_started.budget.reflection_calls == 1
+    assert resumed_started.iteration == 1
+
+    assert [%{reason: {:proposal_error, {:interrupted_reflection, :ambiguous_external_effects}}}] =
+             resumed_started.rejected
+
+    refute_receive :replayed_ambiguous_reflection
   end
 
   defp interrupt_sequential_checkpoint!(owner, status, phase) do
@@ -171,6 +188,13 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
   end
 
   defp run_sequential_engine(overrides) do
+    {proposer, overrides} =
+      Keyword.pop(
+        overrides,
+        :proposer,
+        fn _candidate, _component, _records, _iteration, _metadata -> "proposal" end
+      )
+
     opts =
       Keyword.merge(
         [
@@ -178,8 +202,7 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
           minibatch_size: 4,
           proposal_concurrency: 1,
           candidate_selection_strategy: :current_best,
-          acceptance_policy: :equal_or_better,
-          combee: [max_concurrency: 2]
+          acceptance_policy: :equal_or_better
         ],
         overrides
       )
@@ -189,9 +212,7 @@ defmodule DSEx.Optimizer.GEPATimeoutTest do
       %{main: "base"},
       Enum.to_list(0..3),
       [:validation],
-      fn _candidate, _component, _records, _iteration, metadata ->
-        if metadata.phase == :final, do: "proposal", else: "local"
-      end,
+      proposer,
       opts
     )
   end
