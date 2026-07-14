@@ -150,7 +150,7 @@ DSEx.Optimizer.GEPA.new(metric,
 - `proposal_timeout` is distinct from trajectory evaluation timeout. When it
   is omitted, it inherits `timeout` so existing callers receive bounded
   reflection calls.
-- Legacy single-call reflection and both ComBee levels run under
+- Single-call reflection and both ComBee levels run under
   `DSEx.UnlinkedTaskSupervisor`. Each proposal receives one absolute monotonic
   deadline. Nested component aggregation, queued first-level groups, and the
   final level consume the same remaining time. A finite ComBee timeout is an

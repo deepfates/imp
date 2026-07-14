@@ -284,7 +284,7 @@ defmodule DSEx.Optimizer.GEPA.ModuleSelectorTest do
     assert hd(resumed.candidates).next_component == 3
   end
 
-  test "default single-component selection preserves the legacy proposer and history contract" do
+  test "default single-component selection uses the canonical component-list contract" do
     state =
       Engine.run(
         %AdapterFixture{},
@@ -299,7 +299,8 @@ defmodule DSEx.Optimizer.GEPA.ModuleSelectorTest do
       )
 
     assert List.last(state.candidates).candidate == %{main: "main!"}
-    assert %{component: :main, components: [:main]} = List.last(state.history)
+    assert %{components: [:main]} = List.last(state.history)
+    refute Map.has_key?(List.last(state.history), :component)
     assert List.last(state.candidates).next_component == 1
   end
 end
