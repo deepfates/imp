@@ -1011,7 +1011,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
            operation: :mutation,
            iteration: context.iteration,
            parent_id: parent.id,
-           component: legacy_component(context.components),
            components: context.components,
            candidate: context.candidate
          }) do
@@ -1554,7 +1553,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
              operation: :mutation,
              iteration: iteration,
              parent_id: parent.id,
-             component: legacy_component(components),
              components: components,
              candidate: proposed_candidate
            }) do
@@ -1902,7 +1900,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
           status: :accepted,
           candidate_id: entry.id,
           parent_ids: [parent.id],
-          component: legacy_component(components),
           components: components,
           minibatch_parent_score: parent_result.aggregate_score,
           minibatch_candidate_score: proposed_result.aggregate_score,
@@ -1952,7 +1949,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       iteration: iteration,
       status: :rejected,
       parent_ids: [parent.id],
-      component: legacy_component(components),
       components: components,
       candidate: candidate,
       reason: reason,
@@ -2420,9 +2416,6 @@ defmodule DSEx.Optimizer.GEPA.Engine do
       state
     end
   end
-
-  defp legacy_component([component]), do: component
-  defp legacy_component(components), do: components
 
   defp frontier_candidates(candidates),
     do: Enum.map(candidates, &{&1.id, &1.validation})
