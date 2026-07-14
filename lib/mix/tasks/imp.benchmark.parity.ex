@@ -32,6 +32,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
     Imp.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
+    python = python_executable!(opts)
     configure_req_llm_pool!(opts)
     Mix.Task.run("app.start")
 
@@ -66,7 +67,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
         dspy_model,
         campaign_id,
         runner_order,
-        out_dir
+        out_dir,
+        python
       )
     end)
   end
@@ -83,7 +85,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
          dspy_model,
          campaign_id,
          runner_order,
-         out_dir
+         out_dir,
+         python
        ) do
     imp_model = imp_model_spec(opts, model)
     dspy_model = validate_dspy_model!(dspy_model || default_dspy_model(imp_model, model))
@@ -109,7 +112,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
 
           dspy_path =
             run_dspy!(
-              python(opts),
+              python,
               tasks,
               Keyword.get(opts, :offset, 0),
               max_examples,
@@ -127,7 +130,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
         :dspy_first ->
           dspy_path =
             run_dspy!(
-              python(opts),
+              python,
               tasks,
               Keyword.get(opts, :offset, 0),
               max_examples,
@@ -478,6 +481,37 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
           else: "python3"
 
     if String.contains?(path, "/"), do: Path.expand(path), else: path
+  end
+
+  @doc false
+  def python_executable!(opts) do
+    requested = python(opts)
+
+    if String.contains?(requested, "/") do
+      resolved = Path.expand(requested)
+
+      if executable_file?(resolved) do
+        resolved
+      else
+        invalid_python!(requested)
+      end
+    else
+      case System.find_executable(requested) do
+        nil -> invalid_python!(requested)
+        resolved -> resolved
+      end
+    end
+  end
+
+  defp executable_file?(path) do
+    case File.stat(path) do
+      {:ok, %{type: :regular, mode: mode}} -> Bitwise.band(mode, 0o111) != 0
+      _other -> false
+    end
+  end
+
+  defp invalid_python!(path) do
+    Mix.raise("--python must name an executable: #{inspect(path)}")
   end
 
   defp run_dspy!(
