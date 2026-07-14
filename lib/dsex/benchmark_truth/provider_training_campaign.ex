@@ -196,7 +196,7 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
       suffix: Keyword.get(opts, :suffix, "dsex-route-v1"),
       hyperparameters: [n_epochs: Keyword.get(opts, :epochs, 3)],
       example_encoder: training_encoder(signature),
-      idempotency_key: Keyword.get(opts, :idempotency_key, "dsex-banking77-route-v2")
+      idempotency_key: Keyword.get(opts, :idempotency_key)
     ]
 
     call_opts =
