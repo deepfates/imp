@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "screen_id": "finalist-preliminary-screen-01",
+  "observed_at": "2026-07-14T04:33:33Z",
+  "kind": "preliminary_namespace_and_market_observation",
+  "selection_made": false,
+  "ranking_changed": false,
+  "legal_clearance": false,
+  "scope": {
+    "ranking_projection": "identity/preferences/master-brand-ranking-01.json",
+    "bands": ["finalist", "semifinalist"],
+    "candidate_count": 20
+  },
+  "weighting_policy": {
+    "primary_decision_evidence": [
+      "owner_taste_fit",
+      "project_semantic_truth",
+      "identity_architecture",
+      "master_brand_durability"
+    ],
+    "material_screening_evidence": [
+      "active_direct_same_category_use",
+      "exact_intended_elixir_package_namespace",
+      "demonstrated_spoken_or_code_identity_failure"
+    ],
+    "supporting_context_not_automatic_veto": [
+      "adjacent_ecosystem_package_record",
+      "github_repository_name_count",
+      "domain_registration",
+      "distant_industry_use"
+    ],
+    "separate_human_or_qualified_gates": [
+      "listener_recovery",
+      "accessibility",
+      "international_and_cultural_review",
+      "trademark_and_legal_clearance"
+    ],
+    "policy": "Screening observations do not silently rerank or delete a candidate. Directness, activity, audience overlap, jurisdiction, and intended identity layer determine materiality."
+  },
+  "method": {
+    "registry_semantics": "HTTP 200 means an exact public package record was observed. HTTP 404 means no exact public record was returned; it is not a guarantee that the name can be registered or legally used.",
+    "github_semantics": "Counts are exact repository-name matches among the first 100 GitHub search results for '<name> in:name'; they are context, not ownership or clearance.",
+    "market_semantics": "Market observations are targeted public-web findings, not exhaustive company, common-law, domain, or trademark searches.",
+    "registries": {
+      "hex": "https://hex.pm/api/packages/{name}",
+      "crates": "https://crates.io/api/v1/crates/{name}",
+      "npm": "https://registry.npmjs.org/{name}",
+      "pypi": "https://pypi.org/pypi/{name}/json",
+      "github": "https://api.github.com/search/repositories?q={name}%20in%3Aname&per_page=100"
+    }
+  },
+  "technical_observations": [
+    {"rank": 1, "surface": "DSX", "normalized": "dsx", "hex": 404, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 37},
+    {"rank": 2, "surface": "Attune", "normalized": "attune", "hex": 404, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 89},
+    {"rank": 3, "surface": "Enact", "normalized": "enact", "hex": 404, "crates": 404, "npm": 200, "pypi": 200, "github_exact_in_first_100": 57},
+    {"rank": 4, "surface": "Accord", "normalized": "accord", "hex": 404, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 24},
+    {"rank": 5, "surface": "Praxon", "normalized": "praxon", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 5},
+    {"rank": 6, "surface": "Transduce", "normalized": "transduce", "hex": 404, "crates": 200, "npm": 200, "pypi": 404, "github_exact_in_first_100": 10},
+    {"rank": 7, "surface": "Declare", "normalized": "declare", "hex": 404, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 12},
+    {"rank": 8, "surface": "Axima", "normalized": "axima", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 2},
+    {"rank": 9, "surface": "Cadence", "normalized": "cadence", "hex": 404, "crates": 200, "npm": 200, "pypi": 404, "github_exact_in_first_100": 35},
+    {"rank": 10, "surface": "Signatura", "normalized": "signatura", "hex": 404, "crates": 404, "npm": 200, "pypi": 404, "github_exact_in_first_100": 16},
+    {"rank": 11, "surface": "Workrite", "normalized": "workrite", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 0},
+    {"rank": 12, "surface": "Modulate", "normalized": "modulate", "hex": 404, "crates": 404, "npm": 200, "pypi": 404, "github_exact_in_first_100": 30},
+    {"rank": 13, "surface": "Reclare", "normalized": "reclare", "hex": 404, "crates": 404, "npm": 200, "pypi": 404, "github_exact_in_first_100": 1},
+    {"rank": 14, "surface": "Recurra", "normalized": "recurra", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 13},
+    {"rank": 15, "surface": "Trellis", "normalized": "trellis", "hex": 200, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 32},
+    {"rank": 16, "surface": "Reify", "normalized": "reify", "hex": 404, "crates": 200, "npm": 200, "pypi": 200, "github_exact_in_first_100": 33},
+    {"rank": 17, "surface": "Empiric", "normalized": "empiric", "hex": 404, "crates": 404, "npm": 200, "pypi": 200, "github_exact_in_first_100": 2},
+    {"rank": 18, "surface": "Scriptile", "normalized": "scriptile", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 0},
+    {"rank": 19, "surface": "Metraxis", "normalized": "metraxis", "hex": 404, "crates": 404, "npm": 404, "pypi": 404, "github_exact_in_first_100": 0},
+    {"rank": 20, "surface": "Variate", "normalized": "variate", "hex": 404, "crates": 404, "npm": 200, "pypi": 404, "github_exact_in_first_100": 7}
+  ],
+  "market_observations": [
+    {
+      "surface": "DSX",
+      "impact": "material",
+      "directness": "adjacent_ai_infrastructure",
+      "observation": "NVIDIA uses NVIDIA DSX for an AI-factory design, build, and operations platform.",
+      "source": "https://docs.nvidia.com/dsx"
+    },
+    {
+      "surface": "Attune",
+      "impact": "material",
+      "directness": "same_developer_tools_audience",
+      "observation": "Attune is an active developer-tools company for faster builds and also describes itself as an applied AI software-engineering company.",
+      "source": "https://www.attune.inc/"
+    },
+    {
+      "surface": "Enact",
+      "impact": "material",
+      "directness": "direct_same_category",
+      "observation": "The enact Python project describes itself as a framework for generative software that integrates ML models and supports inspecting and improving such programs.",
+      "source": "https://pypi.org/project/enact/"
+    },
+    {
+      "surface": "Enact",
+      "impact": "material",
+      "directness": "direct_adjacent_category",
+      "observation": "Enact is also used by an AI-tools registry and protocol for portable AI-ready tools.",
+      "source": "https://enact.tools/"
+    },
+    {
+      "surface": "Accord",
+      "impact": "context",
+      "directness": "software_different_category",
+      "observation": "Accord is an active AI-enabled revenue platform with an MCP server; the audience overlap is technical but the product category differs.",
+      "source": "https://inaccord.com/blog-posts/introducing-the-accord-mcp-server"
+    },
+    {
+      "surface": "Praxon",
+      "impact": "material",
+      "directness": "direct_same_category",
+      "observation": "Praxon AI presents itself as production AI, and an exact-name GitHub repository describes an open-source multi-LLM AI-agent platform.",
+      "source": "https://praxonai.com/",
+      "additional_source": "https://github.com/vaibhav4046/praxon"
+    },
+    {
+      "surface": "Transduce",
+      "impact": "context",
+      "directness": "technical_term_and_library",
+      "observation": "Exact-name JavaScript and Clojure transducer libraries exist; no direct generative-programming product was observed in the targeted search.",
+      "source": "https://github.com/transduce/transduce"
+    },
+    {
+      "surface": "Declare",
+      "impact": "context",
+      "directness": "generic_software_and_ai_language",
+      "observation": "Declare is used by a custom software and AI-development business and by an AI-usage declaration format; these increase genericity more than direct product confusion.",
+      "source": "https://www.dclr.ng/",
+      "additional_source": "https://ai-declaration.org/"
+    },
+    {
+      "surface": "Axima",
+      "impact": "context",
+      "directness": "exact_software_company_different_category",
+      "observation": "Axima is the name of an established Italian IT, ERP, infrastructure, and custom-software company; no direct LM-programming product was observed in the targeted search.",
+      "source": "https://axima.it/"
+    },
+    {
+      "surface": "Workrite",
+      "impact": "context",
+      "directness": "exact_software_product_different_category",
+      "observation": "WorkRite is an established workplace compliance and training software product; its category differs but the exact software use is material for later legal review.",
+      "source": "https://marketplace.microsoft.com/en-us/marketplace/apps/aad.posturiteworkrite?tab=overview"
+    },
+    {
+      "surface": "Recurra",
+      "impact": "material",
+      "directness": "exact_active_ai_product",
+      "observation": "Recurra is an active AI sales-practice and coaching product, with additional exact-name subscription software products also observed.",
+      "source": "https://recurra.ai/",
+      "additional_source": "https://recurra.io/"
+    },
+    {
+      "surface": "Scriptile",
+      "impact": "context",
+      "directness": "exact_older_software_product",
+      "observation": "Scriptile Visual Suite is an exact-name graphics and game-development tool; it is a distant category but not a blank market field.",
+      "source": "https://www.msx.org/news/development/en/scriptile-visual-suite"
+    },
+    {
+      "surface": "Metraxis",
+      "impact": "unknown",
+      "directness": "no_obvious_exact_result_in_targeted_search",
+      "observation": "No exact package, exact GitHub repository, or obvious exact software or AI product was observed. This negative result is non-exhaustive and does not establish availability or legal clearance."
+    }
+  ],
+  "summary": {
+    "hex_exact_records_observed": ["Trellis"],
+    "no_exact_records_observed_across_four_package_registries": ["Praxon", "Axima", "Workrite", "Recurra", "Scriptile", "Metraxis"],
+    "material_direct_or_same_audience_public_uses": ["DSX", "Attune", "Enact", "Praxon", "Recurra"],
+    "cleanest_lightweight_namespace_result": "Metraxis",
+    "interpretation": "Namespace cleanliness and intrinsic identity quality are different axes. Metraxis remains rank 19 because its semantic opacity is not erased by a clean preliminary search."
+  }
+}

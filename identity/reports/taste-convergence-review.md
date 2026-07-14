@@ -9,8 +9,12 @@ challenge it before availability and speech screening: `Attune`, `Enact`,
 `Accord`, `Praxon`, `Transduce`, `Declare`, and `Axima`.
 
 No name has been selected. The owner's held-out candidate has not been seen,
-and none of the taste-wave names has received current package, repository,
-domain, trademark, international, or listener screening.
+and no candidate has received qualified trademark, international, cultural,
+accessibility, or listener review.
+
+The top 20 now have a separate preliminary namespace and public-market overlay.
+It does not alter this intrinsic ranking; see
+[`finalist-preliminary-screen.md`](finalist-preliminary-screen.md).
 
 The central decision is architectural, not merely lexical:
 
@@ -149,3 +153,5 @@ TRACE, Truss, Typrax, Union, Uqra, Veracta, Weir.
   preserves all 72 generated names and their preliminary concerns.
 - [`candidate-tier-index.tsv`](candidate-tier-index.tsv) remains the complete
   frozen 2,052-candidate census and earlier role-specific model projection.
+- [`finalist-preliminary-screen.md`](finalist-preliminary-screen.md) records
+  current screening evidence without collapsing it into the intrinsic rank.

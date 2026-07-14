@@ -20,6 +20,11 @@ It ranks the complete 220-name owner-guided frontier, preserves every generated
 candidate, separates master-brand and narrower-role judgments, and holds the
 unrevealed candidate outside the field for a blind comparison.
 
+The separate
+[`reports/finalist-preliminary-screen.md`](reports/finalist-preliminary-screen.md)
+records current namespace and public-market observations for the top 20. It
+does not silently convert collision evidence into rank or legal clearance.
+
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed
 ideas, collisions, adverse connotations, and candidates that fail a later gate
