@@ -177,7 +177,8 @@ defmodule DSEx.Saving do
       "metric" => dump_callback!(refine.metric, "Refine metric"),
       "feedback" => dump_optional_callback(refine.feedback_fn, "Refine feedback"),
       "max_attempts" => refine.max_attempts,
-      "threshold" => refine.threshold
+      "threshold" => refine.threshold,
+      "fail_count" => refine.fail_count
     }
   end
 
@@ -463,6 +464,11 @@ defmodule DSEx.Saving do
       max_attempts:
         require_non_negative_integer!(Map.fetch!(state, "max_attempts"), "Refine max_attempts"),
       threshold: require_threshold!(Map.get(state, "threshold", 1.0), "Refine threshold"),
+      fail_count:
+        require_optional_non_negative_integer!(
+          Map.get(state, "fail_count"),
+          "Refine fail_count"
+        ),
       feedback_fn: load_optional_callback(state["feedback"], 1, "Refine feedback")
     )
   end

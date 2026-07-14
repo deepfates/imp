@@ -278,25 +278,30 @@ Missing evidence or behavior:
 
 Status: `conformant`
 
-Upstream source: `dspy/predict/best_of_n.py; refine.py; assertions paper`
+Upstream source: `dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`
 
 DSEx modules: `DSEx.Predict.BestOfN`, `DSEx.Predict.Refine`, `DSEx.Predict.Assertions`
 Semantic invariants:
 
 - metrics select or refine predictions
-- feedback is retained and fed into retries
+- below-threshold attempts ask the wrapped LM for redacted advice
+- advice is propagated as hint_ and explicit feedback callbacks remain compatible
+- fail_count bounds provider failures per invocation
+- threshold stopping is inclusive and the best successful prediction is retained
+- portable state retains callbacks, threshold, and fail_count with an old-artifact default
 - strict assertions fail explicitly
 
 Executable evidence:
 
 - test: `test/refine_feedback_test.exs`
+- test: `test/saving_best_of_n_refine_test.exs`
 - test: `test/assertions_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
 
 Missing evidence or behavior:
 
-- none
+- matched-model advice quality and token-cost evidence
 
 ### `evaluation.metrics`
 

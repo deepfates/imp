@@ -35,11 +35,12 @@ defmodule SavingBestOfNRefineTest do
       |> DSEx.Predict.Refine.new(context.metric,
         max_attempts: 5,
         threshold: nil,
+        fail_count: 2,
         feedback_fn: context.feedback
       )
       |> json_round_trip(context.registry)
 
-    assert %DSEx.Predict.Refine{max_attempts: 5, threshold: nil} = restored
+    assert %DSEx.Predict.Refine{max_attempts: 5, threshold: nil, fail_count: 2} = restored
     assert restored.metric == context.metric
     assert restored.feedback_fn == context.feedback
   end
@@ -53,12 +54,12 @@ defmodule SavingBestOfNRefineTest do
     refine_state =
       DSEx.Predict.Refine.new(DSEx.predict("question -> answer"), context.metric, max_attempts: 4)
       |> DSEx.dump(registry: context.registry)
-      |> Map.delete("threshold")
+      |> Map.drop(["threshold", "fail_count"])
 
     assert %DSEx.Predict.BestOfN{n: 2, threshold: 1.0} =
              DSEx.load(best_state, registry: context.registry)
 
-    assert %DSEx.Predict.Refine{max_attempts: 4, threshold: 1.0} =
+    assert %DSEx.Predict.Refine{max_attempts: 4, threshold: 1.0, fail_count: nil} =
              DSEx.load(refine_state, registry: context.registry)
   end
 
@@ -72,6 +73,16 @@ defmodule SavingBestOfNRefineTest do
       assert_raise ArgumentError, ~r/saved #{label} must be a number or nil/, fn ->
         DSEx.load(Map.put(state, "threshold", "0.5"), registry: context.registry)
       end
+    end
+  end
+
+  test "loading rejects invalid fail counts", context do
+    state =
+      DSEx.Predict.Refine.new(DSEx.predict("q -> a"), context.metric)
+      |> DSEx.dump(registry: context.registry)
+
+    assert_raise ArgumentError, ~r/saved Refine fail_count must be a non-negative integer/, fn ->
+      DSEx.load(Map.put(state, "fail_count", -1), registry: context.registry)
     end
   end
 

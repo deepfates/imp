@@ -22,6 +22,52 @@ defmodule RefineFeedbackTest do
     def call(%__MODULE__{}, _inputs), do: {:error, :provider_unavailable}
   end
 
+  defmodule CountingErrorProgram do
+    defstruct [:agent]
+
+    def call(%__MODULE__{agent: agent}, _inputs) do
+      Agent.update(agent, &(&1 + 1))
+      {:error, :provider_unavailable}
+    end
+  end
+
+  defmodule ScriptedProgram do
+    defstruct [:agent]
+
+    def call(%__MODULE__{agent: agent}, _inputs) do
+      event = Agent.get_and_update(agent, fn [event | rest] -> {event, rest} end)
+
+      case event do
+        {:error, reason} -> {:error, reason}
+        {:ok, answer} -> {:ok, DSEx.Prediction.new(%{answer: answer})}
+      end
+    end
+  end
+
+  defmodule MultiPredictorProgram do
+    defstruct [:owner, :first, :second]
+
+    def optimizer_predictors(program), do: [first: program.first, second: program.second]
+
+    def update_optimizer_predictor(program, :first, update),
+      do: %{program | first: update.(program.first)}
+
+    def update_optimizer_predictor(program, :second, update),
+      do: %{program | second: update.(program.second)}
+
+    def call(%__MODULE__{owner: owner}, inputs) do
+      hint = Map.get(Map.new(inputs), :hint_)
+      send(owner, {:predictor_hints, hint})
+
+      answer =
+        if is_map(hint) and Map.get(hint, "first") == "first advice",
+          do: "fixed",
+          else: "bad"
+
+      {:ok, DSEx.Prediction.new(%{answer: answer})}
+    end
+  end
+
   defmodule InvalidResultProgram do
     defstruct []
 
@@ -50,6 +96,136 @@ defmodule RefineFeedbackTest do
 
     assert DSEx.Prediction.get(prediction, :answer) == "fixed"
     assert [%{attempt: 1}, %{attempt: 2}] = DSEx.Prediction.get(prediction, :refine_history)
+  end
+
+  test "Refine asks the wrapped LM for redacted advice and propagates it" do
+    parent = self()
+
+    lm = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+
+      if prompt =~ "program_inputs" do
+        send(parent, {:feedback_prompt, prompt})
+
+        {:ok,
+         %{discussion: "main produced the wrong answer", advice: %{"main" => "repair the answer"}}}
+      else
+        if prompt =~ "repair the answer" do
+          {:ok, %{answer: "fixed"}}
+        else
+          {:ok, %{answer: "bad"}}
+        end
+      end
+    end
+
+    program = DSEx.Predict.Predict.new("question -> answer", lm: lm)
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) == "fixed" end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(program, metric, max_attempts: 2)
+             |> DSEx.Predict.Refine.call(%{question: "q", api_key: "sk-live-secret"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "fixed"
+    assert_receive {:feedback_prompt, prompt}
+
+    for field <- [
+          "program_code",
+          "modules_defn",
+          "module_names",
+          "program_inputs",
+          "program_trajectory",
+          "program_outputs",
+          "reward_code",
+          "target_threshold",
+          "reward_value",
+          "metric_contract"
+        ] do
+      assert prompt =~ field
+    end
+
+    assert prompt =~ "[REDACTED]"
+    refute prompt =~ "sk-live-secret"
+  end
+
+  test "Refine counts failures after a success instead of using the attempt index" do
+    {:ok, events} = Agent.start_link(fn -> [{:ok, 0.6}, {:error, :temporary}, {:ok, 0.9}] end)
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%ScriptedProgram{agent: events}, metric,
+               max_attempts: 3,
+               fail_count: 1,
+               feedback_fn: fn _history -> nil end
+             )
+             |> DSEx.Predict.Refine.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :answer) == 0.9
+    assert Enum.map(DSEx.Prediction.get(prediction, :refine_history), & &1.attempt) == [1, 3]
+  end
+
+  test "Refine allows interleaved failures until the actual failure allowance is exceeded" do
+    {:ok, events} =
+      Agent.start_link(fn -> [{:error, :first}, {:ok, 0.2}, {:error, :second}, {:ok, 0.9}] end)
+
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(%ScriptedProgram{agent: events}, metric,
+               max_attempts: 4,
+               fail_count: 2,
+               feedback_fn: fn _history -> nil end
+             )
+             |> DSEx.Predict.Refine.call(%{})
+
+    assert DSEx.Prediction.get(prediction, :answer) == 0.9
+    assert Enum.map(DSEx.Prediction.get(prediction, :refine_history), & &1.attempt) == [2, 4]
+  end
+
+  test "Refine maps automatic advice to predictor names with N/A fallback" do
+    parent = self()
+
+    lm = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+
+      if prompt =~ "program_inputs",
+        do:
+          {:ok,
+           %{
+             discussion: "first needs repair; second is not to blame",
+             advice: %{"first" => "first advice"}
+           }},
+        else: {:ok, %{answer: "unused"}}
+    end
+
+    program = %MultiPredictorProgram{
+      owner: parent,
+      first: DSEx.predict("question -> first", lm: lm),
+      second: DSEx.predict("question -> second", lm: lm)
+    }
+
+    metric = fn _example, prediction -> DSEx.Prediction.get(prediction, :answer) == "fixed" end
+
+    assert {:ok, prediction} =
+             DSEx.Predict.Refine.new(program, metric, max_attempts: 2)
+             |> DSEx.Predict.Refine.call(%{question: "q"})
+
+    assert DSEx.Prediction.get(prediction, :answer) == "fixed"
+    assert_receive {:predictor_hints, nil}
+    assert_receive {:predictor_hints, %{"first" => "first advice", "second" => "N/A"}}
+  end
+
+  test "Refine bounds provider failures with fail_count" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+    metric = fn _example, _prediction -> true end
+
+    assert {:error, {:refine_fail_count_exceeded, :provider_unavailable}, []} =
+             DSEx.Predict.Refine.new(%CountingErrorProgram{agent: calls}, metric,
+               max_attempts: 3,
+               fail_count: 1
+             )
+             |> DSEx.Predict.Refine.call(%{})
+
+    assert Agent.get(calls, & &1) == 2
   end
 
   test "Refine with zero attempts does not call the wrapped program" do
@@ -283,6 +459,12 @@ defmodule RefineFeedbackTest do
                  ~r/DSEx\.Predict\.Refine\.new\/3: invalid value for :max_attempts option: expected non negative integer/,
                  fn ->
                    DSEx.Predict.Refine.new(%HintProgram{}, metric, max_attempts: -1)
+                 end
+
+    assert_raise ArgumentError,
+                 ~r/DSEx\.Predict\.Refine\.new\/3: expected :fail_count option to match at least one given type/,
+                 fn ->
+                   DSEx.Predict.Refine.new(%HintProgram{}, metric, fail_count: -1)
                  end
   end
 end

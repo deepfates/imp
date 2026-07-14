@@ -306,21 +306,30 @@ defmodule DSEx.UpstreamFidelity do
       id: "composition.refinement",
       category: :programming_model,
       upstream: ["BestOfN", "Refine", "Assertions"],
-      source: "dspy/predict/best_of_n.py; refine.py; assertions paper",
+      source:
+        "dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
       disposition: :conformant,
       dsex: [DSEx.Predict.BestOfN, DSEx.Predict.Refine, DSEx.Predict.Assertions],
       invariants: [
         "metrics select or refine predictions",
-        "feedback is retained and fed into retries",
+        "below-threshold attempts ask the wrapped LM for redacted advice",
+        "advice is propagated as hint_ and explicit feedback callbacks remain compatible",
+        "fail_count bounds provider failures per invocation",
+        "threshold stopping is inclusive and the best successful prediction is retained",
+        "portable state retains callbacks, threshold, and fail_count with an old-artifact default",
         "strict assertions fail explicitly"
       ],
       evidence: %{
         tests: [
           "test/refine_feedback_test.exs",
+          "test/saving_best_of_n_refine_test.exs",
           "test/assertions_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"]
+        docs: ["docs/API_GUIDE.md"],
+        missing: [
+          "matched-model advice quality and token-cost evidence"
+        ]
       }
     },
     %{

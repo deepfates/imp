@@ -405,16 +405,28 @@ threshold can cancel work that has not completed, but already completed
 speculation remains in outcomes and projected-budget accounting. Result and
 provenance order always follows candidate order, not task completion order.
 
-`DSEx.Predict.BestOfN` and `DSEx.Predict.Refine` both delegate attempt
-execution and metric selection to this engine in sequential, first-tie mode.
-BestOfN creates one projected `attempts: 1` candidate per rollout, stops at its
-threshold, selects the highest-scoring prediction, and optionally computes
-comparison feedback over successful predictions. Refine also creates one
-candidate per rollout, but uses prior successful outcomes to build ordered
-history and inject the next `hint_`; after exhaustion it returns the best score
-rather than simply the last attempt. Their facade constructors intentionally
-do not expose Search concurrency or budget options, because Refine feedback is
-causal and both public modules retain their existing sequential semantics.
+`DSEx.Predict.BestOfN` delegates attempt execution and metric selection to this
+engine in sequential, first-tie mode. It creates one projected `attempts: 1`
+candidate per rollout, stops at its threshold, selects the highest-scoring
+prediction, and optionally computes comparison feedback over successful
+predictions.
+
+`DSEx.Predict.Refine` keeps the same sequential, first-tie semantics but owns its
+causal retry loop so it can enforce the DSPy `fail_count` boundary. After each
+below-threshold success it asks the wrapped program's LM with the DSPy
+`OfferFeedback` field contract: program and predictor definitions, inputs,
+trajectory, outputs, reward contract, threshold, reward value, and module
+names. The returned per-predictor advice becomes the next attempt's `hint_`.
+Feedback inputs are redacted before the advice call. An explicit unary
+`feedback_fn` takes precedence and receives
+the ordered successful-attempt history, preserving the callback API. Threshold
+comparison is inclusive, and exhaustion returns the highest-scoring successful
+prediction rather than simply the last attempt. Automatic advice is keyed by
+predictor name with an `N/A` fallback; program and module definitions are
+redacted Elixir metadata representations, not claims of Python source-string
+identity. The portable Refine artifact persists the program, metric callback,
+explicit feedback callback, attempt count, threshold, and `fail_count`, while
+old artifacts without the optional field load with the default budget.
 
 ## Chain Of Thought
 
