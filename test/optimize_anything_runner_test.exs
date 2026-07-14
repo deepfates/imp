@@ -99,7 +99,11 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
       opts: [
         handler: fn messages, _opts ->
           send(receiver, {:seed_prompt, messages})
-          "```text\ngenerated seed\n```"
+
+          %{
+            __dsex_lm_output__: "```text\ngenerated seed\n```",
+            __dsex_lm_metadata__: %{provider: "test"}
+          }
         end
       ]
     }

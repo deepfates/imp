@@ -304,6 +304,8 @@ defmodule DSEx.Optimize.Anything.Runner do
   end
 
   defp lm_text!({:ok, text}) when is_binary(text), do: text
+  defp lm_text!({:ok, %{__dsex_lm_output__: output}}), do: lm_text!({:ok, output})
+  defp lm_text!({:ok, %{"__dsex_lm_output__" => output}}), do: lm_text!({:ok, output})
   defp lm_text!({:ok, %{"instruction" => text}}) when is_binary(text), do: text
   defp lm_text!({:ok, %{instruction: text}}) when is_binary(text), do: text
   defp lm_text!({:ok, %{"new_instruction" => text}}) when is_binary(text), do: text
