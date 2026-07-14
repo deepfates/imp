@@ -122,7 +122,39 @@ defmodule Imp.ExternalCommandTest do
   end
 
   defp process_alive?(pid) do
-    case System.cmd("kill", ["-0", Integer.to_string(pid)], stderr_to_stdout: true) do
+    case linux_process_state(pid) do
+      {:ok, state} -> state not in ["Z", "X", "x"]
+      :unavailable -> signal_alive?(Integer.to_string(pid))
+      :gone -> false
+    end
+  end
+
+  defp linux_process_state(pid) do
+    if :os.type() == {:unix, :linux} and File.dir?("/proc") do
+      case File.read("/proc/#{pid}/stat") do
+        {:ok, stat} ->
+          case stat |> :binary.matches(") ") |> Enum.reverse() do
+            [{closing, 2} | _] ->
+              state = stat |> binary_part(closing + 2, byte_size(stat) - closing - 2)
+              {:ok, state |> String.split() |> hd()}
+
+            [] ->
+              :gone
+          end
+
+        {:error, :enoent} ->
+          :gone
+
+        {:error, _reason} ->
+          :unavailable
+      end
+    else
+      :unavailable
+    end
+  end
+
+  defp signal_alive?(target) do
+    case System.cmd("kill", ["-0", target], stderr_to_stdout: true) do
       {_output, 0} -> true
       {_output, _status} -> false
     end

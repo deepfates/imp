@@ -253,8 +253,60 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
     end
   end
 
-  defp process_alive?(pid), do: signal_status(Integer.to_string(pid)) == 0
-  defp process_group_alive?(pid), do: signal_status("-#{pid}") == 0
+  defp process_alive?(pid) do
+    if :os.type() == {:unix, :linux} and File.dir?("/proc") do
+      case linux_process_identity(pid) do
+        {:ok, state, _group} -> state not in ["Z", "X", "x"]
+        :gone -> false
+        :unavailable -> signal_status(Integer.to_string(pid)) == 0
+      end
+    else
+      signal_status(Integer.to_string(pid)) == 0
+    end
+  end
+
+  defp process_group_alive?(pid) do
+    if :os.type() == {:unix, :linux} and File.dir?("/proc") do
+      "/proc/[0-9]*/stat"
+      |> Path.wildcard()
+      |> Enum.any?(fn path ->
+        case path |> Path.basename() |> Integer.parse() do
+          {member_pid, ""} ->
+            case linux_process_identity(member_pid) do
+              {:ok, state, group} -> group == pid and state not in ["Z", "X", "x"]
+              _other -> false
+            end
+
+          _other ->
+            false
+        end
+      end)
+    else
+      signal_status("-#{pid}") == 0
+    end
+  end
+
+  defp linux_process_identity(pid) do
+    case File.read("/proc/#{pid}/stat") do
+      {:ok, stat} ->
+        with [{closing, 2} | _] <- stat |> :binary.matches(") ") |> Enum.reverse(),
+             [state, _parent, group | _] <-
+               stat
+               |> binary_part(closing + 2, byte_size(stat) - closing - 2)
+               |> String.split(),
+             {group, ""} <- Integer.parse(group) do
+          {:ok, state, group}
+        else
+          _other -> :gone
+        end
+
+      {:error, :enoent} ->
+        :gone
+
+      {:error, _reason} ->
+        :unavailable
+    end
+  end
 
   defp signal_status(target) do
     {_output, status} = System.cmd(@kill, ["-0", target], stderr_to_stdout: true)

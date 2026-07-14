@@ -171,7 +171,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
     error ->
       send(caller, {
         ref,
-        {:error, {:command_start_failed, Imp.Redaction.redact(Exception.message(error))}}
+        {:error, {:command_lifecycle_failed, Imp.Redaction.redact(Exception.message(error))}}
       })
   end
 
@@ -276,10 +276,55 @@ defmodule Imp.ExternalCommand.Lifecycle do
   defp process_group_alive?(nil), do: false
 
   defp process_group_alive?(os_pid) do
+    if linux_proc_available?() do
+      linux_process_group_alive?(os_pid)
+    else
+      signal_process_group_alive?(os_pid)
+    end
+  end
+
+  defp signal_process_group_alive?(os_pid) do
     case run_signal_command("0", os_pid) do
       {_output, 0} -> true
       {_output, 1} -> false
       {output, status} -> raise_signal_error("probe", os_pid, status, output)
+    end
+  end
+
+  defp linux_proc_available? do
+    :os.type() == {:unix, :linux} and File.regular?("/proc/self/stat")
+  end
+
+  defp linux_process_group_alive?(os_pid) do
+    "/proc/[0-9]*/stat"
+    |> Path.wildcard()
+    |> Enum.any?(fn path ->
+      case File.read(path) do
+        {:ok, stat} ->
+          case linux_process_identity(stat) do
+            {:ok, state, process_group} ->
+              process_group == os_pid and state not in ["Z", "X", "x"]
+
+            :error ->
+              false
+          end
+
+        {:error, _reason} ->
+          false
+      end
+    end)
+  end
+
+  defp linux_process_identity(stat) do
+    with [{closing, 2} | _] <- stat |> :binary.matches(") ") |> Enum.reverse(),
+         [state, _parent, process_group | _] <-
+           stat
+           |> binary_part(closing + 2, byte_size(stat) - closing - 2)
+           |> String.split(),
+         {process_group, ""} <- Integer.parse(process_group) do
+      {:ok, state, process_group}
+    else
+      _other -> :error
     end
   end
 
