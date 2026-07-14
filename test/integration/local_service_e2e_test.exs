@@ -399,8 +399,8 @@ defmodule LocalServiceE2ETest do
     {:ok, actions} =
       Agent.start_link(fn ->
         [
-          %{action: "tool", name: "lookup", arguments: ~s({"key":"capital"})},
-          %{action: "submit", result: %{answer: "Paris"}}
+          %{code: ~S|lookup(%{key: "capital"})|},
+          %{code: ~S|submit(%{answer: "Paris"})|}
         ]
       end)
 

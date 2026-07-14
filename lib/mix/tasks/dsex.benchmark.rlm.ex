@@ -139,65 +139,63 @@ defmodule Mix.Tasks.Dsex.Benchmark.Rlm do
         metadata: %{source: "hotpotqa_fixture", id: example["id"]}
       )
 
+    prompts = Enum.map(supporting_subquestions(example), & &1.question)
+
     actions = [
-      %{action: "load", name: "context"},
-      %{
-        action: "llm_query_batched",
-        signature: "question -> answer",
-        inputs: supporting_subquestions(example)
-      },
-      %{action: "submit", result: %{answer: answer}}
+      %{code: ~S|context = load("context")|},
+      %{code: "results = llm_query_batched(#{inspect(prompts)})"},
+      %{code: "submit(#{inspect(%{answer: answer})})"}
     ]
 
-    controller_lm = %{
-      module: DSEx.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          [action | rest] = Process.get(:rlm_benchmark_actions)
-          Process.put(:rlm_benchmark_actions, rest)
-          action
-        end
-      ]
-    }
+    {:ok, action_queue} = Agent.start_link(fn -> actions end)
 
-    sub_lm = %{
-      module: DSEx.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          send(parent, {:rlm_benchmark_subcall, messages})
-          %{answer: "supporting fact"}
-        end
-      ]
-    }
+    try do
+      controller_lm = %{
+        module: DSEx.LM.Static,
+        opts: [
+          handler: fn _messages, _opts ->
+            Agent.get_and_update(action_queue, fn [action | rest] -> {action, rest} end)
+          end
+        ]
+      }
 
-    Process.put(:rlm_benchmark_actions, actions)
+      sub_lm = %{
+        module: DSEx.LM.Static,
+        opts: [
+          handler: fn messages, _opts ->
+            send(parent, {:rlm_benchmark_subcall, messages})
+            %{answer: "supporting fact"}
+          end
+        ]
+      }
 
-    rlm =
-      DSEx.rlm("context, question -> answer",
-        lm: controller_lm,
-        sub_lm: sub_lm,
-        max_iterations: 4,
-        max_llm_calls: 4,
-        max_preview_chars: 80
-      )
+      rlm =
+        DSEx.rlm("context, question -> answer",
+          lm: controller_lm,
+          sub_lm: sub_lm,
+          max_iterations: 4,
+          max_llm_calls: 4,
+          max_preview_chars: 80
+        )
 
-    {latency_us, {:ok, prediction}} =
-      :timer.tc(fn ->
-        DSEx.call(rlm, %{context: context, question: example["question"]})
-      end)
+      {latency_us, {:ok, prediction}} =
+        :timer.tc(fn ->
+          DSEx.call(rlm, %{context: context, question: example["question"]})
+        end)
 
-    subcalls = drain_subcalls(0)
-    trace = prediction.metadata.rlm_trace
-    Process.delete(:rlm_benchmark_actions)
+      subcalls = drain_subcalls(0)
+      trace = prediction.metadata.rlm_trace
+      Agent.stop(action_queue)
 
-    measured_row("rlm", example, DSEx.get(prediction, :answer), latency_us, %{
-      "lm_calls" => length(trace),
-      "subcalls" => subcalls,
-      "trace_shape" => Enum.map(trace, &to_string(&1.action)),
-      "trace" => normalize(trace)
-    })
-  after
-    Process.delete(:rlm_benchmark_actions)
+      measured_row("rlm", example, DSEx.get(prediction, :answer), latency_us, %{
+        "lm_calls" => length(trace),
+        "subcalls" => subcalls,
+        "trace_shape" => Enum.map(trace, &to_string(&1.action)),
+        "trace" => normalize(trace)
+      })
+    after
+      if Process.alive?(action_queue), do: Agent.stop(action_queue)
+    end
   end
 
   defp supporting_subquestions(example) do

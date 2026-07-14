@@ -18,9 +18,6 @@ not as RAG and not as a JSON action loop. The semantic references are DSPy
 - Invalid code and submissions remain observable and repairable; exhausted
   iterations use a separate extraction pass.
 
-Legacy discrete RLM action maps remain compatibility inputs. They are not the
-primary implementation and do not define the fidelity claim.
-
 ## BEAM-Native Design
 
 Controller source uses a deliberately constrained Elixir-shaped language.

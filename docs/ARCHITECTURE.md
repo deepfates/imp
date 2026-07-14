@@ -333,7 +333,6 @@ Metric-driven optimizers live under `DSEx.Optimizer.*`:
 Arbitrary artifact optimization lives under `DSEx.Optimize.*`:
 
 - `DSEx.Optimize.Anything`
-- `DSEx.Optimize.GEPA`
 
 ## Agents, Tools, MCP
 
@@ -361,7 +360,8 @@ interpreter instance persists for the complete call, so assignments and
 subquery results survive across turns. Code can call `llm_query/1` and
 `llm_query_batched/1` from comprehensions, invoke `recurse/2`, load lazy values,
 call registered tools, inspect bounded output, and terminate through
-`submit/1`. Older discrete action maps remain compatibility shims.
+`submit/1`. The controller surface is code plus typed interpreter effects; map-
+shaped discrete actions are rejected.
 
 The implementation is BEAM-native and does not call `Code.eval_*`. It parses
 Elixir syntax with atom-safe identifier handling, interprets an explicit AST

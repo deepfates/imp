@@ -355,12 +355,12 @@ defmodule DSExTest do
   test "RLM controller LM resolves settings dynamically" do
     first = %{
       module: DSEx.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "first"}} end]
+      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "first"})|} end]
     }
 
     second = %{
       module: DSEx.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "second"}} end]
+      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "second"})|} end]
     }
 
     DSEx.configure(lm: first)

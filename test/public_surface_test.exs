@@ -417,7 +417,7 @@ defmodule PublicSurfaceTest do
 
     rlm_lm = %{
       module: DSEx.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "4"}} end]
+      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "4"})|} end]
     }
 
     rlm = DSEx.rlm("question, logs -> answer", lm: rlm_lm, max_iterations: 2)

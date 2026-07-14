@@ -788,8 +788,8 @@ defmodule ProductionHardeningTest do
     }
 
     Process.put(:rlm_redaction_actions, [
-      %{action: "assign", name: "token", value: secret},
-      %{action: "submit", result: %{answer: "ok"}}
+      %{code: "token = #{inspect(secret)}"},
+      %{code: ~S|submit(%{answer: "ok"})|}
     ])
 
     rlm = DSEx.Predict.RLM.new("question -> answer", lm: rlm_lm, max_iterations: 2)

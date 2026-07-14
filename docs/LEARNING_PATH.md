@@ -193,7 +193,7 @@ and interpreter work.
 # learning-path-contract: rlm
 controller = %{
   module: DSEx.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{action: "submit", result: %{answer: "Paris"}} end]
+  opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "Paris"})|} end]
 }
 
 program = DSEx.rlm("question -> answer", lm: controller, max_iterations: 1)
