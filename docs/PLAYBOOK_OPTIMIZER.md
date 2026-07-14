@@ -52,6 +52,10 @@ pinned Dynamic Cheatsheet repository. The source Arrow file, canonical JSONL,
 builder, and provenance manifest live under `benchmarks/data/playbook/`.
 The metric parses only ordered integer/operator equations and evaluates them
 with exact rational arithmetic, accepting any valid operator assignment.
+The baseline parameter contains a concise task contract and an inactive bounded
+capacity entry. A delta must compress that reserve while revising the active
+strategy, so the retained parameter cannot grow and inactive capacity never
+enters model context.
 
 Inspect the zero-network plan:
 

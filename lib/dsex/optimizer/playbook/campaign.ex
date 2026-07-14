@@ -35,9 +35,12 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
 
   @baseline_strategy """
   Complete each equation by replacing every question mark with one arithmetic operator. Keep the given numbers in their original order, use ordinary operator precedence, and return only one completed equation with the stated right-hand value. Work carefully and check that the expression is valid before answering. Do not add numbers, omit numbers, reorder numbers, or introduce parentheses.
-
-  Treat the right-hand side as a hard arithmetic constraint. Every placeholder must become exactly one operator from addition, subtraction, multiplication, or division. Preserve every printed integer and the equality sign exactly. Before returning, independently recompute the complete left-hand expression under standard precedence and compare it with the requested value. If the check fails, reconsider the operator choices rather than changing the numbers or output format. The final response must contain the equation alone, without explanation, markdown, alternatives, or intermediate work.
   """
+
+  @capacity_reserve String.duplicate(
+                      "Reserved bounded parameter capacity for a future validated strategy revision. ",
+                      10
+                    )
 
   @doc "Runs one bounded natural equation-balancing playbook campaign."
   def run(config, api_key) when is_map(config) and is_binary(api_key) and api_key != "" do
@@ -177,6 +180,10 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
                 Delta.new(
                   [
                     Revise.new("equation-strategy", strategy,
+                      expected_revision: 1,
+                      provenance: provenance
+                    ),
+                    Revise.new("optimizer-capacity", "Validated strategy capacity released.",
                       expected_revision: 1,
                       provenance: provenance
                     )
@@ -369,6 +376,16 @@ defmodule DSEx.Optimizer.Playbook.Campaign do
           provenance:
             Provenance.new(
               source_ids: ["dynamic-cheatsheet:task-contract"],
+              digests: [dataset.sha256]
+            )
+        ),
+        Add.new(@capacity_reserve,
+          id: "optimizer-capacity",
+          section: "Optimizer capacity",
+          status: :inactive,
+          provenance:
+            Provenance.new(
+              source_ids: ["dsex:bounded-context-capacity"],
               digests: [dataset.sha256]
             )
         )
