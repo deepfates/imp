@@ -21,6 +21,7 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "reproduction.check",
+             "research.portfolio.check",
              "benchmark.truth.check",
              "benchmark.trace.check",
              "benchmark.operations_stress.check",

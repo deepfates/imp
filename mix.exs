@@ -283,6 +283,7 @@ defmodule DSEx.MixProject do
     [
       "evidence.check": [
         "reproduction.check",
+        "research.portfolio.check",
         "benchmark.truth.check",
         "benchmark.trace.check",
         "benchmark.operations_stress.check",
@@ -304,6 +305,9 @@ defmodule DSEx.MixProject do
       ],
       "reproduction.check": [
         "dsex.reproductions --check"
+      ],
+      "research.portfolio.check": [
+        "dsex.research_portfolio --check"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
