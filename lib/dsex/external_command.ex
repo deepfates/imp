@@ -155,7 +155,7 @@ defmodule DSEx.ExternalCommand.Lifecycle do
         nil -> nil
       end
 
-    if require_os_pid? and is_nil(os_pid) do
+    if require_os_pid? and not valid_os_pid?(os_pid) do
       close_port(port)
       Process.demonitor(caller_ref, [:flush])
       send(caller, {ref, {:error, :command_os_pid_unavailable}})
@@ -472,6 +472,8 @@ defmodule DSEx.ExternalCommand.Lifecycle do
     do: Enum.all?(secrets, &(is_nil(&1) or (is_binary(&1) and &1 != "")))
 
   defp valid_secrets?(_secrets), do: false
+
+  defp valid_os_pid?(os_pid), do: is_integer(os_pid) and os_pid > 0
 
   defp encode_env(env) do
     encoded =

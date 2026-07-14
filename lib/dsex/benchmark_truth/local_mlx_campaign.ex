@@ -7,6 +7,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   @mlx_lm_version "0.31.3"
   @model "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
   @revision "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+  @dataset_file_sha256 "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18"
   @dataset_payload_sha256 "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f"
   @train_digest "sha256:0fa1c7321f2773485139a544054c619620f048ebd8dd52552e3a2ca57878b1ba"
   @held_out_digest "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1"
@@ -14,6 +15,63 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   @evaluation_contract_sha256 "e95d621cbb3afd8806e9554fcafce6b54bc615e031c3b0acbdcadaca039870c8"
   @banking77_revision "90d4e2ee5521c04fc1488f065b8b083658768c57"
   @host "127.0.0.1"
+  @model_tree_files [
+    %{
+      "bytes" => 605,
+      "link_target" => "../../blobs/482ced4679301bf287ebb310bdd1790eb4514232",
+      "path" => "added_tokens.json",
+      "sha256" => "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b"
+    },
+    %{
+      "bytes" => 783,
+      "link_target" => "../../blobs/e3c0e76e4e54c951f36d49e3042347b58382136e",
+      "path" => "config.json",
+      "sha256" => "b045e57ea90b8f1b35f89f954b176a5c1faa02bd0af2c89bcec191239d66cef4"
+    },
+    %{
+      "bytes" => 1_671_853,
+      "link_target" => "../../blobs/31349551d90c7606f325fe0f11bbb8bd5fa0d7c7",
+      "path" => "merges.txt",
+      "sha256" => "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    %{
+      "bytes" => 278_064_920,
+      "link_target" =>
+        "../../blobs/ddffab9cbc7bf6dde941c6724841eeca8981fcfa81ca20ff8efff1396326d153",
+      "path" => "model.safetensors",
+      "sha256" => "ddffab9cbc7bf6dde941c6724841eeca8981fcfa81ca20ff8efff1396326d153"
+    },
+    %{
+      "bytes" => 44_209,
+      "link_target" => "../../blobs/8831428421e282132532f717fcaba43f8c7f5445",
+      "path" => "model.safetensors.index.json",
+      "sha256" => "54001cb4c11197119c206dde28e7be08e5872aab6c6d271aed339ec77e84f870"
+    },
+    %{
+      "bytes" => 613,
+      "link_target" => "../../blobs/ac23c0aaa2434523c494330aeb79c58395378103",
+      "path" => "special_tokens_map.json",
+      "sha256" => "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+    },
+    %{
+      "bytes" => 7_031_673,
+      "link_target" => "../../blobs/d24314ef7f0afd1b678c2e24c767e19f24f86b0e",
+      "path" => "tokenizer.json",
+      "sha256" => "a8506e7111b80c6d8635951a02eab0f4e1a8e4e5772da83846579e97b16f61bf"
+    },
+    %{
+      "bytes" => 7_308,
+      "link_target" => "../../blobs/482ccbc1096b0e9400e86e33f189681c2aebdab9",
+      "path" => "tokenizer_config.json",
+      "sha256" => "f7c61e32b7a17d19bf8e7037dcb74079a833e53ea9801f24008cac68458f03b7"
+    },
+    %{
+      "bytes" => 2_776_833,
+      "link_target" => "../../blobs/4783fe10ac3adce15ac8f358ef5462739852c569",
+      "path" => "vocab.json",
+      "sha256" => "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  ]
 
   def run!(opts) when is_list(opts) do
     cwd = Keyword.get(opts, :cwd, File.cwd!())
@@ -26,6 +84,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     executable_args = ["--from", "mlx-lm==#{@mlx_lm_version}"]
 
     validate_port!(port)
+    assert_port_available!(port)
 
     context =
       RunContext.capture_git!(cwd: cwd, require_clean: Keyword.get(opts, :require_clean, true))
@@ -33,7 +92,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     ensure_fresh_root!(root)
     dataset = load_dataset!(dataset_path)
     model_tree = FileTree.inventory!(model_path)
-    require_canonical_inputs!(dataset, model_tree)
+    require_canonical_inputs!(dataset_path, dataset, model_tree)
     signature = ProviderTrainingCampaign.signature(dataset["route_codes"])
     examples = Enum.map(dataset["train"], &ProviderTrainingCampaign.example/1)
 
@@ -65,6 +124,19 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     TrainingJob.save!(job, job_path)
     verified_job = TrainingJob.load!(job_path)
     manifest = verify_replay!(trainer, examples, job, verified_job)
+
+    adapter_inference =
+      evaluate_served!(
+        model_path,
+        job.result_model,
+        signature,
+        dataset["held_out"],
+        port,
+        executable,
+        executable_args: executable_args,
+        concurrency: Keyword.get(opts, :concurrency, 1)
+      )
+
     fuse = fuse!(executable, executable_args, model_path, job.result_model, fused_path)
     fused_tree = FileTree.inventory!(fused_path)
 
@@ -124,11 +196,12 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
       "program_sha256" => saved_program_sha256,
       "evaluation_contract" => evaluation_contract(dataset),
       "baseline" => baseline,
-      "adapter_inference" => %{
-        "status" => "not_admitted",
-        "reason" =>
-          "MLX-LM 0.31.3 remaps default_model before consulting its CLI adapter map; official fusion provenance is the supported weight bridge."
-      },
+      "adapter_inference" =>
+        Map.merge(adapter_inference, %{
+          "status" => "observed_not_admitted",
+          "reason" =>
+            "Adapter inference is recorded as a lane check; official fusion provenance remains the supported weight bridge."
+        }),
       "fused" => fused,
       "reloaded" => reloaded,
       "effect" => effect(baseline, fused),
@@ -163,9 +236,11 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
          }},
         {:artifact_contract,
          verified["artifact_type"] == "dsex_mlx_weight_training_campaign" and
-           verified["schema_version"] == 1 and verified["status"] == "complete" and
+           verified["schema_version"] == 1 and verified["status"] in ["complete", "rejected"] and
            verified["runner"] == "elixir" and
-           verified["evidence_level"] == "local_weight_effectiveness"},
+           verified["evidence_level"] == "local_weight_effectiveness" and
+           verified["status"] ==
+             if(verified["acceptance"]["admissible"], do: "complete", else: "rejected")},
         {:canonical_dataset, canonical_dataset_evidence?(verified["dataset"])},
         {:canonical_model, canonical_model_evidence?(verified["model"])},
         {:pinned_runtime, pinned_runtime?(verified["runtime"])},
@@ -175,9 +250,11 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
          valid_evaluation_contract?(verified["evaluation_contract"], verified["dataset"])},
         {:server_identity_and_cleanup, valid_server_evidence?(verified)},
         {:adapter_claim_scoped,
-         get_in(verified, ["adapter_inference", "status"]) == "not_admitted"},
-        {:recomputed_acceptance,
-         expected_acceptance["admissible"] and verified["acceptance"] == expected_acceptance},
+         get_in(verified, ["adapter_inference", "status"]) in [
+           "not_admitted",
+           "observed_not_admitted"
+         ]},
+        {:recomputed_acceptance, verified["acceptance"] == expected_acceptance},
         {:recomputed_effect, json_equal?(verified["effect"], expected_effect)},
         {:portable_program_digest, sha256?(verified["program_sha256"])}
       ]
@@ -190,6 +267,22 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   end
 
   def validate_artifact(_artifact), do: {:error, [:invalid_artifact]}
+
+  @doc false
+  def exercise_server_lane_for_test!(opts) when is_list(opts) do
+    model_path = Path.expand(Keyword.fetch!(opts, :model_path))
+    adapter_path = Keyword.get(opts, :adapter_path)
+    port = Keyword.fetch!(opts, :port)
+    executable = Keyword.fetch!(opts, :executable)
+    prefix = Keyword.get(opts, :executable_args, [])
+
+    with_server!(model_path, adapter_path, port, executable, prefix, fn lm, server ->
+      case DSEx.Clients.ReqLLM.generate(lm, [%{role: :user, content: "probe"}], []) do
+        {:ok, _response} -> server
+        {:error, reason} -> raise "fake MLX lane request failed: #{inspect(reason)}"
+      end
+    end)
+  end
 
   defp train!(trainer, examples) do
     case Trainer.finetune(trainer, nil, examples) do
@@ -277,10 +370,12 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     base_url = "http://#{@host}:#{port}/v1"
 
     try do
-      {model_ids, advertised_model_path} =
-        await_models!(handle, base_url, model_path, started + 120_000)
+      expected_model_path = resolved_path!(model_path)
 
-      model_id = "default_model"
+      {model_ids, advertised_model_path} =
+        await_models!(handle, base_url, expected_model_path, started + 120_000)
+
+      model_id = advertised_model_path
 
       model = %{
         provider: :openai,
@@ -290,13 +385,16 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
         extra: %{openai_compatible_backend: :mlx_lm}
       }
 
-      lm =
-        DSEx.req_llm(model,
-          api_key: "local",
-          temperature: 0,
-          max_tokens: 32,
-          timeout: 120_000
-        )
+      lm_opts = [
+        api_key: "local",
+        temperature: 0,
+        max_tokens: 32,
+        timeout: 120_000
+      ]
+
+      lm_opts = maybe_add_adapter_request(lm_opts, adapter_path)
+
+      lm = DSEx.req_llm(model, lm_opts)
 
       server = %{
         "command" => %{"executable" => resolve_executable!(executable), "argv" => argv},
@@ -305,6 +403,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
         "advertised_model_ids" => model_ids,
         "advertised_model_path" => advertised_model_path,
         "explicit_model_path" => model_path,
+        "resolved_model_path" => expected_model_path,
+        "adapter_path" => adapter_path,
         "ready_ms" => System.monotonic_time(:millisecond) - started,
         "cleanup" => "synchronous_process_group_absence_verified"
       }
@@ -329,7 +429,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     case Req.get(base_url <> "/models", receive_timeout: 1_000, retry: false) do
       {:ok, %{status: 200, body: %{"data" => data}}} when is_list(data) ->
         ids = Enum.map(data, & &1["id"])
-        advertised_path = Enum.find(ids, &same_file_identity?(&1, expected_model_path))
+        advertised_path = Enum.find(ids, &(&1 == expected_model_path))
 
         if is_binary(advertised_path) and Process.alive?(handle.owner),
           do: {ids, advertised_path},
@@ -350,19 +450,6 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     Process.sleep(100)
     await_models!(handle, base_url, expected_model_path, deadline)
   end
-
-  defp same_file_identity?(advertised, expected) when is_binary(advertised) do
-    with :absolute <- Path.type(advertised),
-         {:ok, left} <- File.stat(advertised),
-         {:ok, right} <- File.stat(expected) do
-      left.inode == right.inode and left.major_device == right.major_device and
-        left.minor_device == right.minor_device
-    else
-      _other -> false
-    end
-  end
-
-  defp same_file_identity?(_advertised, _expected), do: false
 
   defp await_closed!(port, deadline) do
     case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 100) do
@@ -498,7 +585,8 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   end
 
   defp canonical_dataset_evidence?(dataset) when is_map(dataset) do
-    dataset["payload_sha256"] == @dataset_payload_sha256 and
+    dataset["file_sha256"] == @dataset_file_sha256 and
+      dataset["payload_sha256"] == @dataset_payload_sha256 and
       dataset["train_digest"] == @train_digest and
       dataset["held_out_digest"] == @held_out_digest and dataset["train_rows"] == 80 and
       dataset["held_out_rows"] == 40 and
@@ -515,6 +603,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     model["repository"] == @model and model["revision"] == @revision and
       get_in(model, ["tree", "schema_version"]) == 1 and
       get_in(model, ["tree", "sha256"]) == @model_tree_sha256 and
+      get_in(model, ["tree", "files"]) == @model_tree_files and
       valid_tree_inventory?(model["tree"])
   end
 
@@ -586,12 +675,34 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     fused = get_in(artifact, ["fused", "server"]) || %{}
     reloaded = get_in(artifact, ["reloaded", "server"]) || %{}
 
-    baseline["cleanup"] == "synchronous_process_group_absence_verified" and
-      fused["cleanup"] == "synchronous_process_group_absence_verified" and
-      reloaded == fused and baseline["model_id"] == "default_model" and
-      fused["model_id"] == "default_model" and
-      baseline["explicit_model_path"] == baseline["advertised_model_path"] and
-      fused["explicit_model_path"] == fused["advertised_model_path"]
+    adapter = get_in(artifact, ["adapter_inference", "server"]) || %{}
+    adapter_status = get_in(artifact, ["adapter_inference", "status"])
+
+    current =
+      baseline["cleanup"] == "synchronous_process_group_absence_verified" and
+        fused["cleanup"] == "synchronous_process_group_absence_verified" and
+        reloaded == fused and
+        baseline["model_id"] == baseline["advertised_model_path"] and
+        fused["model_id"] == fused["advertised_model_path"] and
+        baseline["resolved_model_path"] == baseline["advertised_model_path"] and
+        fused["resolved_model_path"] == fused["advertised_model_path"] and
+        baseline["adapter_path"] == nil and fused["adapter_path"] == nil and
+        adapter_status == "observed_not_admitted" and
+        adapter["cleanup"] == "synchronous_process_group_absence_verified" and
+        adapter["model_id"] == adapter["advertised_model_path"] and
+        adapter["resolved_model_path"] == adapter["advertised_model_path"] and
+        adapter["adapter_path"] == get_in(artifact, ["training", "job", "result_model"])
+
+    legacy =
+      baseline["cleanup"] == "synchronous_process_group_absence_verified" and
+        fused["cleanup"] == "synchronous_process_group_absence_verified" and
+        reloaded == fused and baseline["model_id"] == "default_model" and
+        fused["model_id"] == "default_model" and
+        baseline["explicit_model_path"] == baseline["advertised_model_path"] and
+        fused["explicit_model_path"] == fused["advertised_model_path"] and
+        adapter_status == "not_admitted"
+
+    current or legacy
   end
 
   defp valid_tree_inventory?(%{"files" => files, "sha256" => digest}) when is_list(files) do
@@ -651,12 +762,14 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     dataset
   end
 
-  defp require_canonical_inputs!(dataset, model_tree) do
-    unless dataset["payload_sha256"] == @dataset_payload_sha256,
-      do: raise("dataset does not match the canonical Banking77 campaign payload")
+  defp require_canonical_inputs!(dataset_path, dataset, model_tree) do
+    unless file_sha256(dataset_path) == @dataset_file_sha256 and
+             dataset["payload_sha256"] == @dataset_payload_sha256,
+           do: raise("dataset does not match the canonical Banking77 campaign payload")
 
-    unless model_tree["sha256"] == @model_tree_sha256,
-      do: raise("model snapshot does not match the canonical pinned inventory")
+    unless model_tree["sha256"] == @model_tree_sha256 and
+             model_tree["files"] == @model_tree_files,
+           do: raise("model snapshot does not match the canonical pinned inventory")
   end
 
   defp assert_port_available!(port) do
@@ -691,6 +804,16 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
     ])
   end
 
+  defp resolved_path!(path) do
+    case System.cmd("realpath", [Path.expand(path)], stderr_to_stdout: true) do
+      {resolved, 0} ->
+        String.trim(resolved)
+
+      {output, status} ->
+        raise "could not resolve model path (status #{status}): #{String.trim(output)}"
+    end
+  end
+
   defp absolute(cwd, path),
     do: if(Path.type(path) == :absolute, do: path, else: Path.join(cwd, path))
 
@@ -706,6 +829,28 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
 
   defp json_safe(value), do: value |> Jason.encode!() |> Jason.decode!()
   defp json_equal?(left, right), do: json_safe(left) == json_safe(right)
+  defp maybe_add_adapter_request(opts, nil), do: opts
+
+  defp maybe_add_adapter_request(opts, adapter_path) do
+    Keyword.put(opts, :req_http_options,
+      finch_request: fn req, finch_request, finch_name, finch_options ->
+        body =
+          finch_request.body
+          |> Jason.decode!()
+          |> Map.put("adapters", adapter_path)
+          |> Jason.encode!()
+
+        case Finch.request(%{finch_request | body: body}, finch_name, finch_options) do
+          {:ok, response} ->
+            {req, Req.Response.new(response)}
+
+          {:error, reason} ->
+            raise "MLX request transport failed: #{inspect(reason)}"
+        end
+      end
+    )
+  end
+
   defp maybe_append(list, nil, _suffix), do: list
   defp maybe_append(list, _value, suffix), do: list ++ suffix
 end

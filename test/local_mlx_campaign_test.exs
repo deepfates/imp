@@ -68,6 +68,9 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
     cases = [
       {[:canonical_dataset],
        &put_in(&1, ["dataset", "payload_sha256"], "sha256:" <> String.duplicate("0", 64))},
+      {[:canonical_dataset], &put_in(&1, ["dataset", "file_sha256"], String.duplicate("0", 64))},
+      {[:canonical_model],
+       &put_in(&1, ["model", "tree", "files", Access.at(0), "sha256"], String.duplicate("0", 64))},
       {[:recomputed_acceptance, :recomputed_effect], &put_in(&1, ["fused", "accuracy"], 1.0)},
       {[:official_fusion, :recomputed_acceptance],
        &put_in(&1, ["fusion", "result", "exit_status"], 1)},
@@ -89,6 +92,135 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
              |> LocalMLXCampaign.validate_artifact()
 
     assert :clean_run in errors
+  end
+
+  test "accepts a written rejected artifact as valid evidence for Mix to reject" do
+    artifact = @artifact_path |> File.read!() |> Jason.decode!()
+    baseline = artifact["baseline"]
+    acceptance = LocalMLXCampaign.acceptance(baseline, baseline, baseline)
+
+    rejected =
+      artifact
+      |> reenvelope(fn value ->
+        value
+        |> Map.put("status", "rejected")
+        |> Map.put("fused", baseline)
+        |> Map.put("reloaded", baseline)
+        |> Map.put("effect", %{"accuracy_delta" => 0.0, "macro_f1_delta" => 0.0})
+        |> Map.put("acceptance", acceptance)
+      end)
+
+    assert rejected["status"] == "rejected"
+    refute rejected["acceptance"]["admissible"]
+    assert {:ok, ^rejected} = LocalMLXCampaign.validate_artifact(rejected)
+  end
+
+  test "validates the newly emitted observed adapter lane contract" do
+    artifact = @artifact_path |> File.read!() |> Jason.decode!()
+    base_server = get_in(artifact, ["baseline", "server"])
+    model_id = base_server["advertised_model_path"]
+
+    current_server =
+      Map.merge(base_server, %{
+        "adapter_path" => nil,
+        "model_id" => model_id,
+        "resolved_model_path" => model_id
+      })
+
+    adapter_server =
+      Map.put(current_server, "adapter_path", artifact["training"]["job"]["result_model"])
+
+    current =
+      artifact
+      |> put_in(["baseline", "server"], current_server)
+      |> put_in(["fused", "server"], current_server)
+      |> put_in(["reloaded", "server"], current_server)
+      |> put_in(
+        ["adapter_inference"],
+        %{
+          "status" => "observed_not_admitted",
+          "reason" => "test",
+          "server" => adapter_server
+        }
+      )
+      |> reenvelope(& &1)
+
+    assert {:ok, ^current} = LocalMLXCampaign.validate_artifact(current)
+  end
+
+  test "serves baseline, adapter, and fused lanes with exact model and adapter requests" do
+    root = Path.join(System.tmp_dir!(), "dsex-fake-mlx-#{System.unique_integer([:positive])}")
+    script = Path.join(root, "fake_mlx_server.py")
+    port = free_port()
+    File.mkdir_p!(root)
+    File.write!(script, fake_mlx_server())
+    File.chmod!(script, 0o755)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    executable = System.find_executable("python3")
+    assert is_binary(executable)
+
+    lanes = [
+      {"baseline", nil},
+      {"adapter", Path.join(root, "adapter")},
+      {"fused", nil}
+    ]
+
+    for {name, adapter_path} <- lanes do
+      model_path = Path.join(root, name)
+      File.mkdir_p!(model_path)
+      if adapter_path, do: File.mkdir_p!(adapter_path)
+
+      server =
+        LocalMLXCampaign.exercise_server_lane_for_test!(
+          model_path: model_path,
+          adapter_path: adapter_path,
+          port: port,
+          executable: executable,
+          executable_args: [script]
+        )
+
+      {expected_model, 0} = System.cmd("realpath", [model_path])
+      expected_model = String.trim(expected_model)
+      assert server["model_id"] == expected_model
+      assert server["advertised_model_ids"] == ["wrong-first-model", expected_model]
+      assert server["adapter_path"] == adapter_path
+    end
+
+    requests =
+      root
+      |> Path.join("requests.jsonl")
+      |> File.read!()
+      |> String.split("\n", trim: true)
+      |> Enum.map(&Jason.decode!/1)
+
+    expected_models =
+      Enum.map(lanes, fn {name, _adapter} ->
+        {model, 0} = System.cmd("realpath", [Path.join(root, name)])
+        String.trim(model)
+      end)
+
+    assert Enum.map(requests, & &1["model"]) == expected_models
+
+    assert Enum.map(requests, &Map.get(&1, "adapters")) == [nil, Path.join(root, "adapter"), nil]
+  end
+
+  test "rejects an occupied selected port before inspecting campaign inputs" do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false])
+    {:ok, {_address, port}} = :inet.sockname(socket)
+    on_exit(fn -> :gen_tcp.close(socket) end)
+
+    assert_raise RuntimeError, ~r/MLX campaign port #{port} is unavailable/, fn ->
+      LocalMLXCampaign.run!(
+        cwd: File.cwd!(),
+        dataset: "missing-dataset.json",
+        root: Path.join(System.tmp_dir!(), "unused-#{System.unique_integer([:positive])}"),
+        artifact: Path.join(System.tmp_dir!(), "unused-artifact.json"),
+        model_path: "missing-model",
+        port: port,
+        require_clean: false
+      )
+    end
   end
 
   defp row(id, expected, actual) do
@@ -139,5 +271,66 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
       workspace_state: workspace_state
     )
     |> DSEx.BenchmarkTruth.RunContext.finish(payload)
+  end
+
+  defp free_port do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false])
+    {:ok, {_address, port}} = :inet.sockname(socket)
+    :gen_tcp.close(socket)
+    port
+  end
+
+  defp fake_mlx_server do
+    """
+    import http.server
+    import json
+    import os
+    import pathlib
+    import sys
+
+    args = sys.argv[1:]
+    model = os.path.realpath(args[args.index("--model") + 1])
+    port = int(args[args.index("--port") + 1])
+    log_path = pathlib.Path(model).parent / "requests.jsonl"
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def send_json(self, status, value):
+            encoded = json.dumps(value).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def do_GET(self):
+            if self.path.startswith("/v1/models"):
+                self.send_json(200, {"object": "list", "data": [
+                    {"id": "wrong-first-model"}, {"id": model}
+                ]})
+            else:
+                self.send_json(404, {"error": "not found"})
+
+        def do_POST(self):
+            length = int(self.headers["Content-Length"])
+            body = json.loads(self.rfile.read(length).decode())
+            with log_path.open("a") as log:
+                log.write(json.dumps(body) + "\\n")
+            self.send_json(200, {
+                "id": "chatcmpl-fake",
+                "object": "chat.completion",
+                "model": body["model"],
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "pong"},
+                    "finish_reason": "stop"
+                }],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+            })
+
+    http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    """
   end
 end
