@@ -28,10 +28,6 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
     epochs = Keyword.get(opts, :epochs, 3)
     max_cost_usd = Keyword.get(opts, :max_cost_usd, 5.0)
 
-    if Keyword.get(opts, :training_file) do
-      raise ArgumentError, "canonical provider campaign requires a fresh training-file upload"
-    end
-
     context =
       RunContext.capture_git!(cwd: cwd, require_clean: Keyword.get(opts, :require_clean, true))
 
@@ -43,6 +39,12 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
     encoder = training_encoder(signature)
     {:ok, training_jsonl} = OpenAITrainer.encode_jsonl(examples, encoder)
     upload = upload_evidence(training_jsonl, length(examples), epochs, max_cost_usd)
+
+    recovered_receipt =
+      case Keyword.get(opts, :training_file) do
+        nil -> nil
+        file_id -> verify_uploaded_training_file!(file_id, api_key, upload)
+      end
 
     state =
       if File.exists?(checkpoint_path) do
@@ -60,15 +62,37 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
             load_state!(state_path, dataset, model, upload)
           end
 
-        job = submit!(base_program, signature, dataset["train"], api_key, opts)
+        state =
+          if recovered_receipt do
+            state
+            |> Map.put("provider_training_file", recovered_receipt["id"])
+            |> Map.put("provider_file_receipt", recovered_receipt)
+            |> write_json!(state_path)
+
+            load_state!(state_path, dataset, model, upload)
+          else
+            state
+          end
+
+        submit_opts =
+          if recovered_receipt,
+            do: Keyword.put(opts, :training_file, recovered_receipt["id"]),
+            else: opts
+
+        job = submit!(base_program, signature, dataset["train"], api_key, submit_opts)
         TrainingJob.save!(job, checkpoint_path)
         assert_secret_absent!([checkpoint_path], api_key)
+        training_file = provider_training_file(job)
+
+        receipt =
+          recovered_receipt || verify_uploaded_training_file!(training_file, api_key, upload)
 
         state =
           state
           |> Map.put("status", "submitted")
           |> Map.put("job", public_job(job))
-          |> Map.put("provider_training_file", provider_training_file(job))
+          |> Map.put("provider_training_file", training_file)
+          |> Map.put("provider_file_receipt", receipt)
           |> append_history(job, 0)
 
         write_json!(state_path, state)
@@ -589,6 +613,7 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
   defp valid_upload_evidence?(artifact) do
     upload = artifact["upload"] || %{}
     file_id = artifact["provider_training_file"]
+    receipt = artifact["provider_file_receipt"] || %{}
     pricing = upload["pricing"] || %{}
 
     upload["mode"] == "fresh_upload" and upload["rows"] == 80 and upload["epochs"] == 3 and
@@ -599,7 +624,10 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
       upload["training_cost_upper_bound_usd"] <= upload["max_cost_usd"] and
       pricing["currency"] == "USD" and
       pricing["training_usd_per_million_tokens"] == @training_usd_per_million and
-      pricing["source"] == @pricing_source and is_binary(file_id) and file_id != ""
+      pricing["source"] == @pricing_source and is_binary(file_id) and file_id != "" and
+      receipt["id"] == file_id and receipt["bytes"] == @training_jsonl_bytes and
+      receipt["sha256"] == @training_jsonl_sha256 and receipt["purpose"] == "fine-tune" and
+      receipt["status"] == "processed"
   end
 
   defp valid_job_evidence?(job) when is_map(job) do
@@ -633,6 +661,41 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaign do
   end
 
   defp valid_accounting?(_accounting), do: false
+
+  defp verify_uploaded_training_file!(file_id, api_key, upload) do
+    base_url =
+      String.trim_trailing(System.get_env("OPENAI_BASE_URL") || "https://api.openai.com/v1", "/")
+
+    headers = [{"authorization", "Bearer #{api_key}"}]
+
+    with {:ok, %{status: 200, body: metadata}} <-
+           Req.get("#{base_url}/files/#{file_id}", headers: headers, retry: false),
+         {:ok, %{status: 200, body: content}} <-
+           Req.get("#{base_url}/files/#{file_id}/content", headers: headers, retry: false),
+         true <- is_binary(content),
+         true <- metadata["id"] == file_id,
+         true <-
+           metadata["filename"] ==
+             "dsex-training-#{String.slice(upload["jsonl_sha256"], 0, 16)}.jsonl",
+         true <- metadata["bytes"] == upload["jsonl_bytes"],
+         true <- metadata["purpose"] == "fine-tune",
+         true <- metadata["status"] == "processed",
+         true <- sha256(content) == upload["jsonl_sha256"] do
+      %{
+        "id" => file_id,
+        "filename" => metadata["filename"],
+        "bytes" => metadata["bytes"],
+        "purpose" => metadata["purpose"],
+        "status" => metadata["status"],
+        "created_at" => metadata["created_at"],
+        "sha256" => upload["jsonl_sha256"],
+        "verification" => "provider_metadata_and_downloaded_content"
+      }
+    else
+      other ->
+        raise "provider training file verification failed: #{other |> DSEx.Redaction.redact() |> inspect()}"
+    end
+  end
 
   defp complete_result?(%{"rows" => rows, "total" => 40}) when length(rows) == 40,
     do: Enum.all?(rows, &(is_binary(&1["id"]) and is_boolean(&1["correct"])))

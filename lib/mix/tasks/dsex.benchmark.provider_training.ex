@@ -16,6 +16,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.ProviderTraining do
     epochs: :integer,
     suffix: :string,
     max_cost_usd: :float,
+    training_file: :string,
     allow_dirty: :boolean,
     env_file: :keep
   ]
@@ -47,6 +48,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.ProviderTraining do
       epochs: Keyword.get(opts, :epochs, 3),
       suffix: Keyword.get(opts, :suffix, "dsex-route-v1"),
       max_cost_usd: Keyword.get(opts, :max_cost_usd, 5.0),
+      training_file: Keyword.get(opts, :training_file),
       require_clean: not Keyword.get(opts, :allow_dirty, false),
       api_key: System.fetch_env!("OPENAI_API_KEY")
     ]

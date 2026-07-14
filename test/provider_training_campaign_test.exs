@@ -134,6 +134,13 @@ defmodule DSEx.BenchmarkTruth.ProviderTrainingCampaignTest do
         }
       },
       "provider_training_file" => "file-test",
+      "provider_file_receipt" => %{
+        "id" => "file-test",
+        "bytes" => 55_601,
+        "sha256" => "7421adbb4673d81408969b76c5d95fb655bba68eb59863b2e88c107c018a25ff",
+        "purpose" => "fine-tune",
+        "status" => "processed"
+      },
       "job" => %{
         "id" => "ftjob-test",
         "provider" => "openai",
