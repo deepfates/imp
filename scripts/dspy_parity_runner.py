@@ -487,16 +487,17 @@ def history_entry_text(entry: Dict[str, Any]) -> str:
         entry.get("kwargs"),
         entry.get("inputs"),
     ]
-    return "\n".join(json_text(field) for field in fields if field is not None)
+    return "\n".join(structured_text(field) for field in fields if field is not None)
 
 
-def json_text(value: Any) -> str:
+def structured_text(value: Any) -> str:
     if isinstance(value, str):
         return value
-    try:
-        return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
-    except TypeError:
-        return repr(value)
+    if isinstance(value, dict):
+        return "\n".join(structured_text(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return "\n".join(structured_text(item) for item in value)
+    return str(value)
 
 
 def history_instrumentation(history_entry: Optional[Dict[str, Any]]) -> Dict[str, Optional[int]]:
