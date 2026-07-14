@@ -387,7 +387,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Trace do
     calls = Agent.get(counter, & &1)
     Agent.stop(counter)
 
-    pass? = first == {:ok, "Answer: cached"} and second == first and calls == 1
+    pass? = generated_content(first) == "Answer: cached" and second == first and calls == 1
 
     %{
       "id" => "req_llm_cache_hit_reuses_success",
@@ -396,6 +396,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Trace do
       "evidence" => %{"calls" => calls, "first" => inspect(first), "second" => inspect(second)}
     }
   end
+
+  defp generated_content({:ok, content}) when is_binary(content), do: content
+
+  defp generated_content({:ok, %{__dsex_lm_output__: content}}) when is_binary(content),
+    do: content
+
+  defp generated_content(_result), do: nil
 
   defp provider_stream_chunk_replay_check do
     lm =
