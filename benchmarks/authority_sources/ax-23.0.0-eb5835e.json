@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/ax-llm/ax",
+  "commit": "eb5835e54ba0c5b2fbac380daed1cb87faeefd5e",
+  "source_paths": [
+    "src/ax/ai/mock/api.ts",
+    "src/ax/ai/openai/usage.ts",
+    "src/ax/dsp/extract.ts",
+    "src/ax/dsp/extract/streamingText.ts",
+    "src/ax/dsp/functions.ts",
+    "src/ax/dsp/generate.ts",
+    "src/ax/dsp/jsonSchema.ts",
+    "src/ax/dsp/optimizers/gepaComponents.ts",
+    "src/ax/dsp/optimizers/gepaSelection.ts",
+    "src/ax/dsp/parser.ts",
+    "src/ax/dsp/sig.ts"
+  ],
+  "files": [
+    {"path": "src/ax/ai/mock/api.ts", "sha256": "dbde7db31c744389b630d842f11f63ec45741a4b0748439996916fc26b7a8144"},
+    {"path": "src/ax/ai/openai/usage.ts", "sha256": "8a8f4adca391ec793e772592af557396e54ccc6fa17a4e1606673893e7b8ea14"},
+    {"path": "src/ax/dsp/extract.ts", "sha256": "50ce2f9b553866db57e52afd5acdb590c9a835836b4ff9b242162cda923cd5e6"},
+    {"path": "src/ax/dsp/extract/streamingText.ts", "sha256": "ead8472e84d89d7b0f4208c5f51577ed6877de062ac35819bc70cc7102f0319e"},
+    {"path": "src/ax/dsp/functions.ts", "sha256": "5b98bac2e594581eaf1de140bff2d62067d4876c2b755c32a04c773aa129e595"},
+    {"path": "src/ax/dsp/generate.ts", "sha256": "ea6e0b34cfe3afe733754aa841bfaf20d1fd542c13c0612fb60a5630f2b6d52c"},
+    {"path": "src/ax/dsp/jsonSchema.ts", "sha256": "3abe999e9cd35cf54e46c644f928f0c15f25ce84fadfe4a2db55e5de27a2a4c6"},
+    {"path": "src/ax/dsp/optimizers/gepaComponents.ts", "sha256": "1f0038024e35e0696a4d7c3a9b7e1975f1756ff46aa872872da83b0a1396fc76"},
+    {"path": "src/ax/dsp/optimizers/gepaSelection.ts", "sha256": "4179ec23d017ad730145bb68b4f8277f36c4a936a7a5e495adcd0bf6d3008e4b"},
+    {"path": "src/ax/dsp/parser.ts", "sha256": "e8d08410af2b5a1398826a93434b39141b5e73036efd7a6211a93281b011ebd1"},
+    {"path": "src/ax/dsp/sig.ts", "sha256": "1fc569b97fe7d317a4a9f5ea8a345a2e7c20c79e24f923f28f5e9b1d1d6f0d32"}
+  ]
+}

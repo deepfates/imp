@@ -168,21 +168,46 @@ defmodule DSEx.EvidenceAuthorities do
       {repository["repository"], repository["commit"], repository["source_manifest"]}
     end)
     |> Enum.each(fn {{repository, commit, reference}, families} ->
-      manifest_path = Path.join(project_root, reference["path"])
-      bytes = File.read!(manifest_path)
-      actual_sha256 = sha256(bytes)
-
-      unless actual_sha256 == reference["sha256"] do
-        raise ArgumentError,
-              "authority source manifest digest mismatch for #{reference["path"]}: " <>
-                "expected #{reference["sha256"]}, got #{actual_sha256}"
-      end
-
-      manifest = Jason.decode!(bytes)
-      validate_source_manifest!(manifest, repository, commit, reference, families)
+      validate_source_manifest_reference!(
+        project_root,
+        repository,
+        commit,
+        reference,
+        families
+      )
     end)
 
+    ax = get_in(ledger, ["pinned_sources", "ax_typescript"])
+
+    unless is_map(ax) and ax["role"] == "independent_implementation_comparator" and
+             valid_manifest_reference?(ax["source_manifest"]) do
+      raise ArgumentError, "invalid Ax independent comparator authority"
+    end
+
+    validate_source_manifest_reference!(
+      project_root,
+      ax["repository"],
+      ax["commit"],
+      ax["source_manifest"],
+      [%{"upstream_repository" => ax}]
+    )
+
     ledger
+  end
+
+  defp validate_source_manifest_reference!(project_root, repository, commit, reference, families) do
+    manifest_path = Path.join(project_root, reference["path"])
+    bytes = File.read!(manifest_path)
+    actual_sha256 = sha256(bytes)
+
+    unless actual_sha256 == reference["sha256"] do
+      raise ArgumentError,
+            "authority source manifest digest mismatch for #{reference["path"]}: " <>
+              "expected #{reference["sha256"]}, got #{actual_sha256}"
+    end
+
+    manifest = Jason.decode!(bytes)
+    validate_source_manifest!(manifest, repository, commit, reference, families)
   end
 
   defp validate_source_manifest!(manifest, repository, commit, reference, families) do

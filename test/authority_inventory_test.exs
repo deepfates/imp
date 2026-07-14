@@ -148,6 +148,8 @@ defmodule AuthorityInventoryTest do
 
     assert pins["ax_typescript"]["role"] == "independent_implementation_comparator"
     assert pins["ax_typescript"]["commit"] == "eb5835e54ba0c5b2fbac380daed1cb87faeefd5e"
+    assert pins["ax_typescript"]["source_manifest"]["file_count"] == 11
+    assert length(pins["ax_typescript"]["source_paths"]) == 11
     assert pins["req_llm"]["role"] == "beam_runtime_dependency"
     assert pins["req_llm"]["commit"] == "33840077c2f1332eb6dff2d268dff02393014da4"
   end

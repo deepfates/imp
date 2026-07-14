@@ -144,6 +144,10 @@ independent implementation comparator, and ReqLLM `v1.17.1` as the BEAM runtime
 dependency. Comparator pins help detect accidental design assumptions; they do
 not create scientific parity claims.
 
+Ax's selected implementation files are bound by
+`benchmarks/authority_sources/ax-23.0.0-eb5835e.json`; the executable scope and
+intentional native deviations are documented in `docs/AX_DIFFERENTIAL.md`.
+
 ## Consumption Rules
 
 Consumers should join claim tokens to `families[].surface_tokens`, then inspect
