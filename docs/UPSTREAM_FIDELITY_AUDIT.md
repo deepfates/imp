@@ -27,6 +27,7 @@ changed upstream surface and give each one a semantic contract and owner.
 - GEPA: `arXiv:2507.19457` and <https://github.com/gepa-ai/gepa>
 - Recursive Language Models: `arXiv:2512.24601`
 - optimize_anything: `arXiv:2605.19633`
+- Learning, Fast and Slow: `arXiv:2605.12484v2`
 
 Paper-derived features also require the canonical reproduction protocol tracked
 by `de-c7ui`. Unit tests can establish control-flow and data-contract semantics;
@@ -46,13 +47,16 @@ row records:
 - a rationale for every Elixir-native equivalent;
 - an open owner ticket for every gap.
 
-`tracking` is reserved for prerelease upstream behavior and is not release
-blocking until that behavior becomes stable or DSEx publicly adopts it.
+`tracking` is reserved for prerelease or research-horizon behavior and is not
+release blocking until that behavior becomes stable or DSEx publicly adopts a
+corresponding product claim.
 
 A missing evidence file, missing DSEx module, unowned gap, or unexplained native
-equivalent becomes `invalid_evidence`. Neither `gap` nor `invalid_evidence` can
-pass the release gate. Symbol presence, prose, fixtures, and smoke artifacts do
-not independently establish conformance.
+equivalent becomes `invalid_evidence`. Every gap remains visible and owned, but
+only rows marked as product release blockers fail the product gate. A
+claim-specific gap instead prohibits the corresponding fidelity, parity, or
+effectiveness claim until its evidence passes. Symbol presence, prose, fixtures,
+and smoke artifacts do not independently establish conformance.
 
 ## Commands
 
@@ -91,20 +95,30 @@ explicit Elixir-native equivalents. ReAct specifically uses provider-native
 function calls, a reserved `submit` tool, and fail-fast tool errors rather than
 claiming DSPy's action-field, finish-tool, observation-and-continue semantics.
 
-Multimodal quality, RLM research evidence, instruction, GEPA, and weight
-optimizer fidelity, the learning path, and release stewardship remain blocking
-gaps. The weight-optimizer row includes implemented `DSEx.Predict.Avatar` and
-`DSEx.Optimizer.Avatar` surfaces with bounded typed-action execution and
-feedback-driven instruction optimization. BetterTogether implements arbitrary
-named and repeated optimizer sequences, evaluates the baseline and each
-successful prefix, selects the best validated prefix with stable tie handling,
-returns the latest successful prefix without validation, and stops on the first
-failed step.
+Multimodal image and native-PDF quality, the BEAM-native RLM controller,
+source-faithful GEPA engine, Fast-Slow orchestration, and the learning path have
+executable product evidence. Their broader paper-scale, audio, external CISPO,
+and dominance claims remain explicitly unmade where evidence is incomplete.
+Instruction-optimizer matched campaigns are claim-specific gaps rather than
+universal release blockers.
 
-That row remains red only because external-provider weight-training execution,
-BetterTogether provider lifecycle completion and trained-model rebinding, and
-matched Avatar/AvatarOptimizer/BetterTogether effectiveness are not proven.
+The weight-optimizer row remains a product blocker until the canonical local
+MLX-LM campaign is rerun after exact model and adapter identity hardening. The
+earlier campaign demonstrated real LoRA training, held-out lift, fusion, and
+credential-free program save/load, but cannot alone prove the stricter runtime
+identity contract. Avatar and AvatarOptimizer provide bounded typed-action
+execution and feedback-driven instruction optimization. BetterTogether
+implements arbitrary named and repeated optimizer sequences, evaluates the
+baseline and each successful prefix, selects the best validated prefix with
+stable tie handling, returns the latest successful prefix without validation,
+and stops on the first failed step.
 
-The gate stays red until those rows are implemented and their evidence is
-strong enough to change their disposition. Closing a ticket or adding a module
-name does not change status by itself.
+That disposition does not imply paid-provider training, GRPO effectiveness, or
+matched Avatar/AvatarOptimizer/BetterTogether parity. Those remain explicit
+claim-specific gaps until their campaigns pass.
+
+The product gate stays red until the clean-checkout release audit is strong
+enough to change its disposition.
+Claim-specific rows stay red for their narrower claims without falsely making
+the whole package unshippable. Closing a ticket or adding a module name does not
+change status by itself.

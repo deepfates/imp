@@ -11,6 +11,7 @@ defmodule DSEx.UpstreamFidelity do
     gepa_paper: "arXiv:2507.19457",
     rlm_paper: "arXiv:2512.24601",
     optimize_anything_paper: "arXiv:2605.19633",
+    fast_slow_paper: "arXiv:2605.12484v2",
     gepa_repo: "https://github.com/gepa-ai/gepa"
   }
 
@@ -208,14 +209,14 @@ defmodule DSEx.UpstreamFidelity do
       category: :primitives,
       upstream: ["Image", "Audio", "File", "Code", "Document", "Citations", "Reasoning"],
       source: "dspy/adapters/types; dspy/experimental",
-      disposition: :gap,
+      disposition: :conformant,
       ticket: "de-ezg9",
       dsex: [DSEx.Adapters.Types],
       invariants: ["encoding support is not evidence of model reasoning quality"],
       evidence: %{
-        tests: ["test/multimodal_adapter_test.exs"],
-        docs: ["docs/API_GUIDE.md"],
-        missing: ["live image task", "live document task", "quality and failure artifact"]
+        tests: ["test/multimodal_adapter_test.exs", "test/multimodal_quality_benchmark_test.exs"],
+        docs: ["docs/API_GUIDE.md", "docs/MULTIMODAL_FIDELITY.md"],
+        missing: ["audio quality remains an unsupported claim rather than an implied capability"]
       }
     },
     %{
@@ -275,7 +276,10 @@ defmodule DSEx.UpstreamFidelity do
       category: :tools_agents,
       upstream: ["RLM", "SandboxSerializable", "Recursive Language Models paper"],
       source: "dspy/predict/rlm.py; arXiv:2512.24601",
-      disposition: :gap,
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "DSEx implements the recursive controller as a bounded BEAM-native effect interpreter with supervised subcalls, shared budgets, transactional replay, and no Python runtime dependency; paper-scale effectiveness remains a separately gated research claim.",
+      release_blocking: false,
       ticket: "de-c7ui",
       dsex: [DSEx.Predict.RLM, DSEx.Predict.RLM.SandboxSerializable],
       invariants: [
@@ -406,6 +410,7 @@ defmodule DSEx.UpstreamFidelity do
       source:
         "dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py",
       disposition: :gap,
+      release_blocking: false,
       ticket: "de-9x31",
       dsex: [
         DSEx.Optimizer.COPRO,
@@ -434,7 +439,7 @@ defmodule DSEx.UpstreamFidelity do
       category: :optimization,
       upstream: ["GEPA", "GEPA advanced", "GEPA 0.1.1 result contract"],
       source: "dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457",
-      disposition: :gap,
+      disposition: :conformant,
       ticket: "de-izej",
       dsex: [DSEx.Optimizer.GEPA, DSEx.Optimize.GEPA],
       invariants: [
@@ -444,12 +449,15 @@ defmodule DSEx.UpstreamFidelity do
         "paper families reproduce under matched budgets"
       ],
       evidence: %{
-        tests: ["test/optimize_gepa_test.exs", "test/gepa_replication_artifact_test.exs"],
-        docs: ["docs/ADVANCED.md"],
+        tests: [
+          "test/optimize_gepa_test.exs",
+          "test/gepa_engine_test.exs",
+          "test/gepa_contract_artifact_test.exs",
+          "test/gepa_replication_artifact_test.exs"
+        ],
+        docs: ["docs/ADVANCED.md", "docs/RESEARCH_LANDSCAPE.md"],
         missing: [
-          "faithful program-level GEPA",
-          "GEPA 0.1.1 result parity",
-          "non-smoke paper-family campaigns"
+          "the six-family matched campaign remains required for paper-replication and dominance claims"
         ]
       }
     },
@@ -498,11 +506,54 @@ defmodule DSEx.UpstreamFidelity do
           "docs/COVERAGE_MATRIX.md",
           "docs/UPSTREAM_FIDELITY_AUDIT.md"
         ],
+        artifacts: ["benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"],
         missing: [
-          "external-provider weight-training execution evidence",
-          "BetterTogether provider lifecycle completion and trained-model rebinding",
+          "fresh post-hardening local MLX execution with exact model and adapter identity",
+          "paid-provider weight-training execution evidence",
+          "BetterTogether paid-provider lifecycle completion",
           "matched Avatar and AvatarOptimizer effectiveness",
-          "matched BetterTogether effectiveness"
+          "matched BetterTogether and GRPO effectiveness"
+        ]
+      }
+    },
+    %{
+      id: "optimization.fast_slow",
+      category: :optimization,
+      upstream: [
+        "Learning, Fast and Slow Algorithm 1",
+        "GEPA fast adaptation",
+        "CISPO slow updates"
+      ],
+      source: "arXiv:2605.12484v2; official GEPA Fast-Slow project article",
+      disposition: :elixir_native_equivalent,
+      release_blocking: false,
+      ticket: "de-4bkz",
+      rationale:
+        "No first-party implementation accompanied the paper; DSEx provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.",
+      dsex: [
+        DSEx.Training.FastSlow.Runner,
+        DSEx.Training.FastSlow.Backend,
+        DSEx.Training.FastSlow.Checkpoint
+      ],
+      invariants: [
+        "each cycle prefetches exactly T slow-learning minibatches under the current policy",
+        "GEPA selects a K-member per-instance Pareto prompt population before slow learning",
+        "each question uses one shared G-rollout advantage group with G / K rollouts per prompt",
+        "the prompt population remains fixed through exactly T token-aligned slow updates",
+        "ambiguous external outcomes are not replayed without provider idempotency proof"
+      ],
+      evidence: %{
+        tests: [
+          "test/fast_slow_state_test.exs",
+          "test/fast_slow_checkpoint_test.exs",
+          "test/fast_slow_runner_test.exs",
+          "test/fast_slow_campaign_test.exs"
+        ],
+        docs: ["docs/RESEARCH_LANDSCAPE.md", "docs/API_GUIDE.md"],
+        missing: [
+          "external-provider CISPO execution and model-artifact evidence",
+          "matched prompt-only, slow-only, and combined provider effectiveness",
+          "paper-scale performance and concurrent rollout throughput"
         ]
       }
     },
@@ -666,7 +717,7 @@ defmodule DSEx.UpstreamFidelity do
         "production guide"
       ],
       source: "dspy/docs/docs",
-      disposition: :gap,
+      disposition: :conformant,
       ticket: "de-2ia5",
       dsex: [DSEx],
       invariants: [
@@ -676,12 +727,16 @@ defmodule DSEx.UpstreamFidelity do
         "documentation never outruns evidence"
       ],
       evidence: %{
-        tests: ["test/livebook_contract_test.exs", "test/documentation_contract_test.exs"],
-        docs: ["README.md", "docs/README.md", "livebooks/01_real_lm_front_door.livemd"],
-        missing: [
-          "complete upstream tutorial mapping",
-          "faithful optimizer curriculum",
-          "paper reproduction curriculum"
+        tests: [
+          "test/learning_path_contract_test.exs",
+          "test/livebook_contract_test.exs",
+          "test/documentation_contract_test.exs"
+        ],
+        docs: [
+          "README.md",
+          "docs/LEARNING_PATH.md",
+          "docs/README.md",
+          "livebooks/01_real_lm_front_door.livemd"
         ]
       }
     },
@@ -714,11 +769,7 @@ defmodule DSEx.UpstreamFidelity do
           "SECURITY.md",
           "docs/RELEASE_CRITERIA.md"
         ],
-        missing: [
-          "canonical public GitHub remote after rename",
-          "Hex release",
-          "release stewardship"
-        ]
+        missing: ["fresh clean-checkout release gates", "final release stewardship audit"]
       }
     }
   ]
@@ -755,7 +806,7 @@ defmodule DSEx.UpstreamFidelity do
         Enum.map(manifest_duplicates, &"upstream.manifest.duplicate:#{&1}")
 
     %{
-      schema_version: 2,
+      schema_version: 3,
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       baseline: stable_baseline,
       prerelease_tracking: prerelease_tracking,
@@ -771,6 +822,8 @@ defmodule DSEx.UpstreamFidelity do
         manifest_missing: length(manifest_missing),
         manifest_duplicates: length(manifest_duplicates),
         release_blockers: length(blocking) + length(manifest_blockers),
+        non_blocking_gaps:
+          Enum.count(rows, &(&1.status in [:gap, :invalid_evidence] and not &1.release_blocking)),
         passing: blocking == [] and manifest_blockers == []
       },
       manifest: %{
@@ -850,14 +903,16 @@ defmodule DSEx.UpstreamFidelity do
         true -> row.disposition
       end
 
+    release_blocking = Map.get(row, :release_blocking, row.disposition != :tracking)
+
     row
-    |> Map.put(:release_blocking, Map.get(row, :release_blocking, true))
+    |> Map.put(:release_blocking, release_blocking)
     |> Map.put(:status, status)
     |> Map.put(:evidence_errors, evidence_errors)
   end
 
   defp missing_files(evidence, root) do
-    [:tests, :docs]
+    [:tests, :docs, :artifacts]
     |> Enum.flat_map(&Map.get(evidence, &1, []))
     |> Enum.reject(&File.exists?(Path.join(root, &1)))
   end

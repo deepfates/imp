@@ -53,7 +53,9 @@ defmodule Mix.Tasks.Dsex.UpstreamFidelity do
       |> Enum.map(fn surface ->
         ticket = Map.get(surface, :ticket, "")
         upstream = Enum.join(surface.upstream, ", ")
-        "| #{surface.id} | #{surface.category} | #{surface.status} | #{upstream} | #{ticket} |"
+        gate = gate_label(surface)
+
+        "| #{surface.id} | #{surface.category} | #{surface.status} | #{gate} | #{upstream} | #{ticket} |"
       end)
       |> Enum.join("\n")
 
@@ -71,14 +73,15 @@ defmodule Mix.Tasks.Dsex.UpstreamFidelity do
     Elixir-native equivalents: #{report.summary.elixir_native_equivalent}
     Tracking: #{report.summary.tracking}
     Gaps: #{report.summary.gaps}
+    Claim-specific non-blocking gaps: #{report.summary.non_blocking_gaps}
     Invalid evidence: #{report.summary.invalid_evidence}
     Missing manifest surfaces: #{report.summary.manifest_missing}
     Duplicate manifest owners: #{report.summary.manifest_duplicates}
     Release blockers: #{report.summary.release_blockers}
     Passing: #{report.summary.passing}
 
-    | ID | Category | Status | Upstream surfaces | Ticket |
-    | --- | --- | --- | --- | --- |
+    | ID | Category | Status | Product gate | Upstream surfaces | Ticket |
+    | --- | --- | --- | --- | --- | --- |
     #{rows}
 
     ## Executable Contracts
@@ -91,10 +94,23 @@ defmodule Mix.Tasks.Dsex.UpstreamFidelity do
   defp render(_report, other),
     do: Mix.raise("--format must be json or markdown, got: #{inspect(other)}")
 
+  defp gate_label(%{status: status, release_blocking: true})
+       when status in [:gap, :invalid_evidence],
+       do: "release blocker"
+
+  defp gate_label(%{status: status}) when status in [:gap, :invalid_evidence],
+    do: "claim-specific gap"
+
+  defp gate_label(%{status: :tracking}), do: "tracked"
+  defp gate_label(_surface), do: "satisfied"
+
   defp render_surface(surface) do
     invariants = Enum.map_join(surface.invariants, "\n", &"- #{&1}")
     tests = Enum.map_join(surface.evidence.tests, "\n", &"- test: `#{&1}`")
     docs = Enum.map_join(surface.evidence.docs, "\n", &"- docs: `#{&1}`")
+
+    artifacts =
+      Enum.map_join(Map.get(surface.evidence, :artifacts, []), "\n", &"- artifact: `#{&1}`")
 
     missing =
       case Map.get(surface.evidence, :missing, []) do
@@ -124,6 +140,7 @@ defmodule Mix.Tasks.Dsex.UpstreamFidelity do
 
     #{tests}
     #{docs}
+    #{artifacts}
 
     Missing evidence or behavior:
 

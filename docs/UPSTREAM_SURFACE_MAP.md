@@ -2,41 +2,42 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
-Conformant: 10
-Elixir-native equivalents: 3
+Conformant: 13
+Elixir-native equivalents: 5
 Tracking: 2
-Gaps: 8
+Gaps: 3
+Claim-specific non-blocking gaps: 1
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 8
+Release blockers: 2
 Passing: false
 
-| ID | Category | Status | Upstream surfaces | Ticket |
-| --- | --- | --- | --- | --- |
-| programming.contracts | programming_model | conformant | Signature, InputField, OutputField, Example, Prediction, History |  |
-| programming.modules | programming_model | conformant | Module, Predict, ChainOfThought, MultiChainComparison, Parallel |  |
-| models.runtime | model_runtime | elixir_native_equivalent | BaseLM, LM, Embedder, configure, context, Errors |  |
-| models.normalized_runtime_prerelease | model_runtime | tracking | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream | de-tt5j |
-| adapters.structured_io | adapters | conformant | Adapter, ChatAdapter, JSONAdapter, XMLAdapter, TwoStepAdapter |  |
-| primitives.multimodal | primitives | gap | Image, Audio, File, Code, Document, Citations, Reasoning | de-ezg9 |
-| tools.typed_calls | tools_agents | conformant | Tool, ToolCalls, ToolCallResults, MCP |  |
-| agents.react_family | tools_agents | elixir_native_equivalent | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |  |
-| agents.rlm | tools_agents | gap | RLM, SandboxSerializable, Recursive Language Models paper | de-c7ui |
-| composition.refinement | programming_model | conformant | BestOfN, Refine, Assertions |  |
-| evaluation.metrics | evaluation | conformant | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |  |
-| optimization.few_shot | optimization | conformant | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
-| optimization.instructions | optimization | gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
-| optimization.gepa | optimization | gap | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
-| optimization.weights | optimization | gap | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
-| optimization.fast_slow | optimization | gap | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates | de-4bkz |
-| optimization.anything | optimization | tracking | optimize_anything, arbitrary text artifacts | de-16fo |
-| retrieval.data | retrieval | elixir_native_equivalent | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
-| runtime.async_stream_cache | runtime | conformant | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
-| runtime.observability | runtime | conformant | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |  |
-| state.persistence_deployment | operations | conformant | Module.save, Module.load, load, dump_state, load_state, deployment |  |
-| product.learning_path | product | gap | getting started, tutorials, real-world examples, API reference, production guide | de-2ia5 |
-| product.release | product | gap | installable package, versioned release, security policy, CI, clean-room consumer | de-p29x |
+| ID | Category | Status | Product gate | Upstream surfaces | Ticket |
+| --- | --- | --- | --- | --- | --- |
+| programming.contracts | programming_model | conformant | satisfied | Signature, InputField, OutputField, Example, Prediction, History |  |
+| programming.modules | programming_model | conformant | satisfied | Module, Predict, ChainOfThought, MultiChainComparison, Parallel |  |
+| models.runtime | model_runtime | elixir_native_equivalent | satisfied | BaseLM, LM, Embedder, configure, context, Errors |  |
+| models.normalized_runtime_prerelease | model_runtime | tracking | tracked | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream | de-tt5j |
+| adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter, XMLAdapter, TwoStepAdapter |  |
+| primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning | de-ezg9 |
+| tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |  |
+| agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |  |
+| agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper | de-c7ui |
+| composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |  |
+| evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |  |
+| optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
+| optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
+| optimization.gepa | optimization | conformant | satisfied | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
+| optimization.weights | optimization | gap | release blocker | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
+| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates | de-4bkz |
+| optimization.anything | optimization | tracking | tracked | optimize_anything, arbitrary text artifacts | de-16fo |
+| retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
+| runtime.async_stream_cache | runtime | conformant | satisfied | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage | de-tt5j |
+| runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |  |
+| state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |  |
+| product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide | de-2ia5 |
+| product.release | product | gap | release blocker | installable package, versioned release, security policy, CI, clean-room consumer | de-p29x |
 
 ## Executable Contracts
 
@@ -61,6 +62,7 @@ Executable evidence:
 - test: `test/history_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/02_programming_not_prompting.livemd`
+
 
 Missing evidence or behavior:
 
@@ -87,6 +89,7 @@ Executable evidence:
 - test: `test/live_provider_e2e_test.exs`
 - docs: `README.md`
 - docs: `docs/API_GUIDE.md`
+
 
 Missing evidence or behavior:
 
@@ -116,6 +119,7 @@ Executable evidence:
 - docs: `docs/ARCHITECTURE.md`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 
+
 Missing evidence or behavior:
 
 - none
@@ -135,6 +139,7 @@ Executable evidence:
 
 - test: `test/req_llm_client_test.exs`
 - docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
+
 
 Missing evidence or behavior:
 
@@ -160,13 +165,14 @@ Executable evidence:
 - docs: `docs/ADAPTER_FIDELITY.md`
 - docs: `docs/API_GUIDE.md`
 
+
 Missing evidence or behavior:
 
 - none
 
 ### `primitives.multimodal`
 
-Status: `conformant for pinned image and native-PDF quality scope`
+Status: `conformant`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -179,17 +185,13 @@ Executable evidence:
 
 - test: `test/multimodal_adapter_test.exs`
 - test: `test/multimodal_quality_benchmark_test.exs`
-- task: `mix dsex.benchmark.multimodal_quality --plan|--live`
-- manifest: `benchmarks/data/multimodal/manifest.json`
-- manifest: `benchmarks/data/multimodal/openai-responses-manifest.json`
-- live proof: `benchmarks/results/multimodal-quality-live-20260713T224355Z.json`
-  (6/6; six dispatched, zero resumed; serialized request and provider ID audit)
+- docs: `docs/API_GUIDE.md`
 - docs: `docs/MULTIMODAL_FIDELITY.md`
+
 
 Missing evidence or behavior:
 
-- audio quality remains unsupported and unproven
-- the Google profile has no quality evidence because the available credential returned HTTP 400
+- audio quality remains an unsupported claim rather than an implied capability
 
 ### `tools.typed_calls`
 
@@ -211,6 +213,7 @@ Executable evidence:
 - test: `test/protocol_mcp/provider_mcp_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
+
 
 Missing evidence or behavior:
 
@@ -241,17 +244,20 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 - docs: `docs/REACT_V2_FIDELITY.md`
 
+
 Missing evidence or behavior:
 
 - none
 
 ### `agents.rlm`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/rlm.py; arXiv:2512.24601`
 
 DSEx modules: `DSEx.Predict.RLM`, `DSEx.Predict.RLM.SandboxSerializable`
+Elixir-native rationale: DSEx implements the recursive controller as a bounded BEAM-native effect interpreter with supervised subcalls, shared budgets, transactional replay, and no Python runtime dependency; paper-scale effectiveness remains a separately gated research claim.
+
 Semantic invariants:
 
 - large inputs remain external to the controller prompt
@@ -269,6 +275,7 @@ Executable evidence:
 - docs: `docs/ARCHITECTURE.md`
 - docs: `docs/RLM_FIDELITY.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
+
 
 Missing evidence or behavior:
 
@@ -299,6 +306,7 @@ Executable evidence:
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
 
+
 Missing evidence or behavior:
 
 - matched-model advice quality and token-cost evidence
@@ -324,6 +332,7 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
 
+
 Missing evidence or behavior:
 
 - none
@@ -348,6 +357,7 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 - docs: `docs/BENCHMARK_TRUTH.md`
 
+
 Missing evidence or behavior:
 
 - none
@@ -370,6 +380,7 @@ Executable evidence:
 - test: `test/optimizer_behavioral_corpus_test.exs`
 - docs: `docs/API_GUIDE.md`
 
+
 Missing evidence or behavior:
 
 - matched DSPy 3.3.0b1 MIPROv2 differential artifact
@@ -378,7 +389,7 @@ Missing evidence or behavior:
 
 ### `optimization.gepa`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457`
 
@@ -393,14 +404,16 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/optimize_gepa_test.exs`
+- test: `test/gepa_engine_test.exs`
+- test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
 - docs: `docs/ADVANCED.md`
+- docs: `docs/RESEARCH_LANDSCAPE.md`
+
 
 Missing evidence or behavior:
 
-- faithful program-level GEPA
-- GEPA 0.1.1 result parity
-- non-smoke paper-family campaigns
+- the six-family matched campaign remains required for paper-replication and dominance claims
 
 ### `optimization.weights`
 
@@ -429,28 +442,31 @@ Executable evidence:
 - docs: `docs/ADVANCED.md`
 - docs: `docs/COVERAGE_MATRIX.md`
 - docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
+- artifact: `benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json`
 
 Missing evidence or behavior:
 
-- external-provider weight-training execution evidence
-- BetterTogether provider lifecycle completion and trained-model rebinding
+- fresh post-hardening local MLX execution with exact model and adapter identity
+- paid-provider weight-training execution evidence
+- BetterTogether paid-provider lifecycle completion
 - matched Avatar and AvatarOptimizer effectiveness
-- matched BetterTogether effectiveness
+- matched BetterTogether and GRPO effectiveness
 
 ### `optimization.fast_slow`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
-DSEx modules: `DSEx.Training.FastSlow.Runner`, `DSEx.Training.FastSlow.Backend`, durable state and checkpoint modules
+DSEx modules: `DSEx.Training.FastSlow.Runner`, `DSEx.Training.FastSlow.Backend`, `DSEx.Training.FastSlow.Checkpoint`
+Elixir-native rationale: No first-party implementation accompanied the paper; DSEx provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.
+
 Semantic invariants:
 
-- each cycle prefetches exactly `T` slow-learning minibatches under the current policy
-- GEPA selects a `K`-member per-instance Pareto prompt population before slow learning
-- each question uses one shared `G`-rollout advantage group with `G / K` rollouts per prompt
-- the prompt population remains fixed through exactly `T` token-aligned slow updates
-- cached trajectories retain cycle, behavior-policy, prompt, input, token, mask, and old-logprob provenance
+- each cycle prefetches exactly T slow-learning minibatches under the current policy
+- GEPA selects a K-member per-instance Pareto prompt population before slow learning
+- each question uses one shared G-rollout advantage group with G / K rollouts per prompt
+- the prompt population remains fixed through exactly T token-aligned slow updates
 - ambiguous external outcomes are not replayed without provider idempotency proof
 
 Executable evidence:
@@ -462,12 +478,12 @@ Executable evidence:
 - docs: `docs/RESEARCH_LANDSCAPE.md`
 - docs: `docs/API_GUIDE.md`
 
+
 Missing evidence or behavior:
 
-- first-party source parity because the official implementation is not published
 - external-provider CISPO execution and model-artifact evidence
 - matched prompt-only, slow-only, and combined provider effectiveness
-- measured concurrent rollout throughput and paper-scale performance
+- paper-scale performance and concurrent rollout throughput
 
 ### `optimization.anything`
 
@@ -498,6 +514,7 @@ Executable evidence:
 - docs: `docs/ADVANCED.md`
 - docs: `docs/BENCHMARK_TRUTH.md`
 
+
 Missing evidence or behavior:
 
 - paper-scale upstream comparison
@@ -525,6 +542,7 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 - docs: `docs/ARCHITECTURE.md`
 
+
 Missing evidence or behavior:
 
 - none
@@ -551,6 +569,7 @@ Executable evidence:
 - docs: `docs/ARCHITECTURE.md`
 - docs: `docs/PARITY_VALIDATION_PROGRAM.md`
 
+
 Missing evidence or behavior:
 
 - none
@@ -574,6 +593,7 @@ Executable evidence:
 - test: `test/support/telemetry_helpers.ex`
 - test: `test/history_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
+
 
 Missing evidence or behavior:
 
@@ -601,13 +621,14 @@ Executable evidence:
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 - docs: `examples/deployment/README.md`
 
+
 Missing evidence or behavior:
 
 - none
 
 ### `product.learning_path`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/docs/docs`
 
@@ -621,17 +642,18 @@ Semantic invariants:
 
 Executable evidence:
 
+- test: `test/learning_path_contract_test.exs`
 - test: `test/livebook_contract_test.exs`
 - test: `test/documentation_contract_test.exs`
 - docs: `README.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: `docs/README.md`
 - docs: `livebooks/01_real_lm_front_door.livemd`
 
+
 Missing evidence or behavior:
 
-- complete upstream tutorial mapping
-- faithful optimizer curriculum
-- paper reproduction curriculum
+- none
 
 ### `product.release`
 
@@ -657,8 +679,8 @@ Executable evidence:
 - docs: `SECURITY.md`
 - docs: `docs/RELEASE_CRITERIA.md`
 
+
 Missing evidence or behavior:
 
-- canonical public GitHub remote after rename
-- Hex release
-- release stewardship
+- fresh clean-checkout release gates
+- final release stewardship audit

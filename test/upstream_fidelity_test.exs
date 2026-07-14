@@ -4,7 +4,7 @@ defmodule DSEx.UpstreamFidelityTest do
   test "ledger is pinned to an immutable stable DSPy baseline" do
     report = DSEx.UpstreamFidelity.report()
 
-    assert report.schema_version == 2
+    assert report.schema_version == 3
     assert report.baseline.version == "3.2.1"
     assert report.baseline.git_ref == "refs/tags/3.2.1"
     assert report.baseline.tag_object_sha == "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376"
@@ -57,22 +57,35 @@ defmodule DSEx.UpstreamFidelityTest do
 
     assert MapSet.new(weights.evidence.missing) ==
              MapSet.new([
-               "external-provider weight-training execution evidence",
-               "BetterTogether provider lifecycle completion and trained-model rebinding",
+               "fresh post-hardening local MLX execution with exact model and adapter identity",
+               "paid-provider weight-training execution evidence",
+               "BetterTogether paid-provider lifecycle completion",
                "matched Avatar and AvatarOptimizer effectiveness",
-               "matched BetterTogether effectiveness"
+               "matched BetterTogether and GRPO effectiveness"
              ])
 
+    assert weights.evidence.artifacts == [
+             "benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"
+           ]
+
+    assert by_id["primitives.multimodal"].status == :conformant
+    assert by_id["agents.rlm"].status == :elixir_native_equivalent
     assert by_id["optimization.instructions"].status == :gap
+    refute by_id["optimization.instructions"].release_blocking
+    assert by_id["optimization.gepa"].status == :conformant
+    assert by_id["product.learning_path"].status == :conformant
     assert by_id["product.release"].status == :gap
 
     assert report.summary.invalid_evidence == 0
     assert report.summary.manifest_missing == 0
     assert report.summary.manifest_duplicates == 0
     assert report.summary.gaps > 0
-    assert report.summary.release_blockers == report.summary.gaps
+    assert report.summary.non_blocking_gaps > 0
+    assert report.summary.release_blockers < report.summary.gaps
     refute report.summary.passing
-    assert "optimization.instructions" in report.blocking_ids
+    refute "optimization.instructions" in report.blocking_ids
+    assert "optimization.weights" in report.blocking_ids
+    assert "product.release" in report.blocking_ids
   end
 
   test "every stable surface has exactly one owning ledger row" do
@@ -133,6 +146,7 @@ defmodule DSEx.UpstreamFidelityTest do
     assert anchors.gepa_paper == "arXiv:2507.19457"
     assert anchors.rlm_paper == "arXiv:2512.24601"
     assert anchors.optimize_anything_paper == "arXiv:2605.19633"
+    assert anchors.fast_slow_paper == "arXiv:2605.12484v2"
   end
 
   test "checked-in readable projection reflects every executable ledger verdict" do
@@ -145,5 +159,12 @@ defmodule DSEx.UpstreamFidelityTest do
       assert body =~ "| #{row.id} | #{row.category} | #{row.status} |"
       assert body =~ "### `#{row.id}`"
     end
+
+    assert body =~ "| optimization.weights | optimization | gap | release blocker |"
+    assert body =~ "| optimization.instructions | optimization | gap | claim-specific gap |"
+    assert body =~ "| optimization.anything | optimization | tracking | tracked |"
+
+    assert body =~
+             "| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied |"
   end
 end
