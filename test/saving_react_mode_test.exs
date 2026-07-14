@@ -20,16 +20,15 @@ defmodule DSEx.SavingReActModeTest do
     assert DSEx.Tool.call(loaded.tools.submit, %{answer: "ignored"}) == "Completed."
   end
 
-  test "loads legacy ReAct state as provider-native mode" do
-    legacy_state =
+  test "rejects ReAct state missing the current mode field" do
+    stale_state =
       DSEx.react("question -> answer", [])
       |> DSEx.Saving.dump()
       |> Map.delete("mode")
 
-    loaded = DSEx.Saving.load(legacy_state)
-
-    assert loaded.mode == :provider_native
-    assert DSEx.Tool.call(loaded.tools.submit, %{answer: "Paris"}) == %{answer: "Paris"}
+    assert_raise ArgumentError, ~r/missing required keys: \["mode"\]/, fn ->
+      DSEx.Saving.load(stale_state)
+    end
   end
 
   test "rejects unknown persisted mode strings without creating atoms" do

@@ -10,7 +10,7 @@ defmodule DSEx.Saving do
   alias DSEx.Optimizer.Trajectory
 
   @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
-  @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k"]
+  @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k", "hops"]
   @program_of_thought_required_keys ["type", "signature", "predict", "output_field"]
   @artifact_type "dsex_program_artifact"
   @artifact_schema_version 1
@@ -84,7 +84,9 @@ defmodule DSEx.Saving do
     raise ArgumentError, "unsupported saved DSEx artifact schema version: #{inspect(version)}"
   end
 
-  defp load_artifact!(state), do: load(state)
+  defp load_artifact!(_state) do
+    raise ArgumentError, "saved DSEx file is not a checksummed program artifact envelope"
+  end
 
   defp dump_state(%DSEx.Predict.Predict{} = program) do
     program
@@ -365,7 +367,7 @@ defmodule DSEx.Saving do
       query_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "query_field")),
       context_field: DSEx.Optimizer.Report.restore_json_safe(Map.fetch!(state, "context_field")),
       k: Map.fetch!(state, "k"),
-      hops: Map.get(state, "hops", 1)
+      hops: Map.fetch!(state, "hops")
     )
   end
 
@@ -444,29 +446,37 @@ defmodule DSEx.Saving do
   end
 
   def load(%{"type" => "best_of_n"} = state) do
-    require_keys!(state, ["type", "program", "metric", "feedback", "n"])
+    require_keys!(state, ["type", "program", "metric", "feedback", "n", "threshold"])
 
     DSEx.Predict.BestOfN.new(
       load(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "BestOfN metric"),
       n: require_non_negative_integer!(Map.fetch!(state, "n"), "BestOfN n"),
-      threshold: require_threshold!(Map.get(state, "threshold", 1.0), "BestOfN threshold"),
+      threshold: require_threshold!(Map.fetch!(state, "threshold"), "BestOfN threshold"),
       feedback_fn: load_optional_callback(state["feedback"], 1, "BestOfN feedback")
     )
   end
 
   def load(%{"type" => "refine"} = state) do
-    require_keys!(state, ["type", "program", "metric", "feedback", "max_attempts"])
+    require_keys!(state, [
+      "type",
+      "program",
+      "metric",
+      "feedback",
+      "max_attempts",
+      "threshold",
+      "fail_count"
+    ])
 
     DSEx.Predict.Refine.new(
       load(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "Refine metric"),
       max_attempts:
         require_non_negative_integer!(Map.fetch!(state, "max_attempts"), "Refine max_attempts"),
-      threshold: require_threshold!(Map.get(state, "threshold", 1.0), "Refine threshold"),
+      threshold: require_threshold!(Map.fetch!(state, "threshold"), "Refine threshold"),
       fail_count:
         require_optional_non_negative_integer!(
-          Map.get(state, "fail_count"),
+          Map.fetch!(state, "fail_count"),
           "Refine fail_count"
         ),
       feedback_fn: load_optional_callback(state["feedback"], 1, "Refine feedback")
@@ -496,9 +506,18 @@ defmodule DSEx.Saving do
   end
 
   def load(%{"type" => "react"} = state) do
-    require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
+    require_keys!(state, [
+      "type",
+      "signature",
+      "react",
+      "tools",
+      "max_iters",
+      "tool_policy",
+      "mode"
+    ])
+
     tools = load_tools!(state["tools"], "ReAct")
-    mode = load_react_mode!(Map.get(state, "mode", "provider_native"))
+    mode = load_react_mode!(Map.fetch!(state, "mode"))
     submit = load_react_submit_tool(mode)
 
     %DSEx.Predict.ReAct{

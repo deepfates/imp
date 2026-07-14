@@ -462,12 +462,14 @@ defmodule ProductionAdapterPersistenceTest do
     assert %DSEx.Predict.Predict{} = DSEx.Saving.load!(path)
   end
 
-  test "load accepts legacy unwrapped program state" do
+  test "file load rejects an unwrapped program state" do
     path = Path.join(System.tmp_dir!(), "dsex-legacy-#{System.unique_integer([:positive])}.json")
     on_exit(fn -> File.rm(path) end)
     File.write!(path, Jason.encode!(DSEx.Saving.dump(DSEx.predict("question -> answer"))))
 
-    assert %DSEx.Predict.Predict{} = DSEx.Saving.load!(path)
+    assert_raise ArgumentError, ~r/not a checksummed program artifact envelope/, fn ->
+      DSEx.Saving.load!(path)
+    end
   end
 
   test "portable structural program types round-trip and remain executable" do
@@ -871,7 +873,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert %DSEx.Predict.RAG{k: 0} = DSEx.Saving.load(state)
   end
 
-  test "save/load preserves multi-hop RAG settings and defaults old artifacts to one hop" do
+  test "save/load preserves multi-hop RAG settings and rejects missing current fields" do
     rag =
       "question, context -> answer"
       |> DSEx.predict()
@@ -884,8 +886,11 @@ defmodule ProductionAdapterPersistenceTest do
     assert state["hops"] == 2
     assert %DSEx.Predict.RAG{hops: 2} = DSEx.Saving.load(state)
 
-    legacy_state = Map.delete(state, "hops")
-    assert %DSEx.Predict.RAG{hops: 1} = DSEx.Saving.load(legacy_state)
+    stale_state = Map.delete(state, "hops")
+
+    assert_raise ArgumentError, ~r/missing required keys: \["hops"\]/, fn ->
+      DSEx.Saving.load(stale_state)
+    end
   end
 
   test "save/load preserves ProgramOfThought programs" do

@@ -45,7 +45,7 @@ defmodule SavingBestOfNRefineTest do
     assert restored.feedback_fn == context.feedback
   end
 
-  test "legacy callback predictor payloads default missing thresholds to 1.0", context do
+  test "callback predictor payloads require all current fields", context do
     best_state =
       DSEx.Predict.BestOfN.new(DSEx.predict("question -> answer"), context.metric, n: 2)
       |> DSEx.dump(registry: context.registry)
@@ -56,11 +56,13 @@ defmodule SavingBestOfNRefineTest do
       |> DSEx.dump(registry: context.registry)
       |> Map.drop(["threshold", "fail_count"])
 
-    assert %DSEx.Predict.BestOfN{n: 2, threshold: 1.0} =
-             DSEx.load(best_state, registry: context.registry)
+    assert_raise ArgumentError, ~r/missing required keys: \["threshold"\]/, fn ->
+      DSEx.load(best_state, registry: context.registry)
+    end
 
-    assert %DSEx.Predict.Refine{max_attempts: 4, threshold: 1.0, fail_count: nil} =
-             DSEx.load(refine_state, registry: context.registry)
+    assert_raise ArgumentError, ~r/missing required keys: \["threshold", "fail_count"\]/, fn ->
+      DSEx.load(refine_state, registry: context.registry)
+    end
   end
 
   test "loading rejects invalid thresholds", context do
