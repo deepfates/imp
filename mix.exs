@@ -132,6 +132,7 @@ defmodule DSEx.MixProject do
         Path.wildcard("lib/dsex/benchmark_truth/**/*.ex") ++
         Path.wildcard("lib/dsex/reproduction_registry.ex") ++
         Path.wildcard("lib/dsex/identity_*.ex") ++
+        Path.wildcard("lib/dsex/identity_progress/**/*.ex") ++
         [
           "lib/dsex/optimizer/playbook/campaign.ex",
           "lib/dsex/optimizer/playbook/equation_search.ex"
@@ -238,10 +239,12 @@ defmodule DSEx.MixProject do
         "test --include live test/live_provider_test.exs test/live_provider_e2e_test.exs"
       ],
       "package.check": [
+        "package.clean",
         "test test/package_contract_test.exs",
         "cmd mix hex.build --unpack --output tmp/package-check",
         "dsex.package.clean_room --package tmp/package-check"
       ],
+      "package.clean": [&clean_package/1],
       "livebook.check": [
         "test.livebooks --path livebooks"
       ],
@@ -386,4 +389,9 @@ defmodule DSEx.MixProject do
   end
 
   defp clean_docs(_args), do: File.rm_rf!("doc")
+
+  defp clean_package(_args) do
+    File.rm_rf!("tmp/package-check")
+    File.rm_rf!("tmp/package-clean-room")
+  end
 end

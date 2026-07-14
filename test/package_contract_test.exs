@@ -32,6 +32,7 @@ defmodule PackageContractTest do
     "lib/mix/tasks/dsex.benchmark",
     "lib/mix/tasks/dsex.gate_evidence.ex",
     "lib/dsex/benchmark_truth",
+    "lib/dsex/identity_progress/",
     "scripts/dspy_",
     "test/",
     "tmp/"
@@ -70,6 +71,10 @@ defmodule PackageContractTest do
              Code.fetch_docs(Mix.Tasks.Dsex.Package.CleanRoom)
 
     assert moduledoc =~ "mix dsex.package.clean_room"
+
+    aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
+    assert hd(Keyword.fetch!(aliases, :"package.check")) == "package.clean"
+    assert is_list(Keyword.fetch!(aliases, :"package.clean"))
   end
 
   test "clean-room output guard accepts siblings but rejects deleting its package input" do
@@ -429,6 +434,7 @@ defmodule PackageContractTest do
       )
 
     assert status == 0, output
+    refute output =~ ~r/warning: DSEx\..* is undefined/, output
   end
 
   defp consumer_tmp_dir do
