@@ -457,7 +457,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaign do
   end
 
   defp assert_port_available!(port) do
-    case :gen_tcp.listen(port, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: false]) do
+    case :gen_tcp.listen(port, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: true]) do
       {:ok, socket} -> :gen_tcp.close(socket)
       {:error, reason} -> raise "MLX campaign port #{port} is unavailable: #{inspect(reason)}"
     end
