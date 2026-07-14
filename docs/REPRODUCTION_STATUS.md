@@ -31,7 +31,7 @@ The registry is an index and gate, not evidence. `T0` means deterministic behavi
 | SignatureOptimizer | native_extension | NONE | red | optimizer_lift | upstream_equivalent |
 | MIPROv2 | replication | T1 | yellow | instruction_contract<br>instruction_live | t3_effectiveness<br>rng_sequences |
 | SIMBA | replication | T1 | yellow | instruction_contract<br>instruction_live | primary_paper<br>t3_effectiveness |
-| GEPA | replication | NONE | red | gepa_contract<br>gepa_live | campaign_manifest<br>campaign_completion |
+| GEPA | replication | NONE | red | gepa_contract<br>gepa_live | campaign_completion |
 | Avatar actor | adaptation | NONE | red | provider_training | effectiveness_campaign |
 | AvatarOptimizer | replication | NONE | red | provider_training | upstream_tests |
 | BootstrapFinetune and training protocol | adaptation | T2 | yellow | local_mlx<br>provider_training | paid_provider<br>matched_dspy |

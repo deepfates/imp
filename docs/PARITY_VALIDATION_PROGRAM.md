@@ -304,8 +304,11 @@ For source-checkout campaigns, use `mix dsex.benchmark.gepa_replication
 `dsex_gepa` result plus provenance fields; the converter does not synthesize
 DSEx scores.
 
-Produce that DSEx input with `mix dsex.benchmark.gepa_campaign`. The command is
-path-driven: the dataset root must include a `families.json` contract and
+Produce canonical DSEx input with `mix dsex.benchmark.gepa_campaign --manifest
+benchmarks/config/gepa-paper-campaign-v1.json`. The immutable manifest binds the
+full dataset hash, model roles, families, seeds, budgets, source commits,
+request policy, source-exact environment, and output/checkpoint paths. Legacy
+partial runs remain path-driven: the dataset root must include a `families.json` contract and
 `train.jsonl` / `dev.jsonl` / `test.jsonl` files for every GEPA family. The
 runner records DSEx GEPA candidate/frontier metadata, seed variance, split
 digests, dataset scope, split counts, source commits, and explicit provider

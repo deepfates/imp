@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "campaign_id": "dsex-gepa-paper-campaign-v1",
+  "dataset": {
+    "root": "../data/gepa-campaign-full",
+    "families_manifest_sha256": "dc66389d266bc3695fef9c8d0bcfcef0a79c4bebab0ec70bab1d961800e0c87d",
+    "scope": "full",
+    "provenance": {
+      "repository": "https://github.com/gepa-ai/gepa-artifact",
+      "commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+    }
+  },
+  "models": {
+    "task": "openai:gpt-4.1-mini-2025-04-14",
+    "reflection": "openai:gpt-4.1-mini-2025-04-14",
+    "judge": "openai:gpt-4.1-mini-2025-04-14"
+  },
+  "families": [
+    "AIMEBench",
+    "HotpotQABench",
+    "hoverBench",
+    "IFBench",
+    "LiveBenchMathBench",
+    "Papillon"
+  ],
+  "optimizer": {
+    "seeds": [0, 1],
+    "generations": "metric_budget",
+    "metric_call_budgets": {
+      "AIMEBench": 1839,
+      "HotpotQABench": 6871,
+      "hoverBench": 7051,
+      "IFBench": 3593,
+      "LiveBenchMathBench": 1839,
+      "Papillon": 2426
+    }
+  },
+  "execution": {
+    "max_concurrency": 32
+  },
+  "environment": {
+    "hover_upstream_bm25": true,
+    "ifbench_upstream_descriptions": true,
+    "python_env": "DSEX_GEPA_PYTHON",
+    "gepa_root_env": "DSEX_GEPA_ROOT"
+  },
+  "request": {
+    "provider": "req_llm",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 1.0,
+    "max_tokens": 16384,
+    "optimizer_timeout_ms": 300000,
+    "max_retries": 0
+  },
+  "pricing": {
+    "source": "ReqLLM usage telemetry with provider pricing metadata",
+    "cost_accounting": "req_llm_telemetry"
+  },
+  "source_commits": {
+    "dspy": "gepa-ai/dspy@62dc3b634d7dc0c4889abcf905cb4c391ea6b396",
+    "gepa_artifact": "gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+  },
+  "output": {
+    "out_dir": "../results",
+    "checkpoint_dir": "../results/gepa-checkpoints",
+    "artifact_naming": "timestamped_no_overwrite",
+    "checkpoint_reuse": "matching_campaign_contract_only"
+  }
+}

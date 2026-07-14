@@ -363,19 +363,12 @@ mix dsex.benchmark.gepa_dataset \
   --gepa-root path/to/gepa-artifact \
   --out benchmarks/data/gepa-campaign
 
+DSEX_HOVER_UPSTREAM_BM25=1 \
+DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS=1 \
+DSEX_GEPA_PYTHON=path/to/pinned/python \
+DSEX_GEPA_ROOT=path/to/gepa-artifact \
 mix dsex.benchmark.gepa_campaign \
-  --dataset-root benchmarks/data/gepa-campaign \
-  --campaign-id gepa-full-YYYYMMDD \
-  --model openai:gpt-4.1-mini-2025-04-14 \
-  --reflection-model openai:gpt-5 \
-  --temperature 1.0 \
-  --pricing-source "provider usage export 2026-07-09" \
-  --input-tokens 123456 \
-  --output-tokens 23456 \
-  --usd 1.23 \
-  --dspy-source stanfordnlp/dspy@<sha> \
-  --gepa-artifact-source gepa-ai/gepa-artifact@<sha> \
-  --out benchmarks/results
+  --manifest benchmarks/config/gepa-paper-campaign-v1.json
 
 mix dsex.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
@@ -385,11 +378,15 @@ mix dsex.benchmark.gepa_replication \
   --artifact-model gpt-41-mini
 ```
 
-`--model` constructs the task LM and the Papillon judge LM. The separately
-constructed `--reflection-model` client is passed to GEPA for reflective
-proposals; it is not recorded as Papillon judge provenance. The campaign
-defaults to the pinned upstream artifact's `temperature: 1.0`; any override is
-recorded in the execution identity and creates a distinct campaign contract.
+The canonical manifest independently binds the task, reflection, and Papillon
+judge model roles, even when they share the same dated model identifier. This
+matches the pinned paper artifact: GEPA leaves `teacher_lm` unset, so reflection
+uses the configured task LM, while Papillon separately fixes its judge to
+GPT-4.1-mini. The manifest also binds the six families, full dataset hash,
+seeds, metric-call budgets, source commits, request policy, output paths, and
+required source-exact environment. It rejects every CLI override. Legacy CLI
+mode remains available for partial operator runs, but it is not the canonical
+paper-reproduction contract.
 
 For long full-scope runs, execute one or more families at a time with
 `--families AIMEBench,HotpotQABench`. These partial campaign artifacts are

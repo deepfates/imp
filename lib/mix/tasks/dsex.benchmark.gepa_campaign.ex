@@ -3,6 +3,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   Produce DSEx GEPA rows for the GEPA paper-replication evidence lane.
 
       mix dsex.benchmark.gepa_campaign \\
+        --manifest benchmarks/config/gepa-paper-campaign-v1.json
+
+      mix dsex.benchmark.gepa_campaign \\
         --dataset-root path/to/gepa-family-splits \\
         --campaign-id gepa-full-YYYYMMDD \\
         --model openai:gpt-4.1-mini-2025-04-14 \\
@@ -30,6 +33,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   `--token-cost-file` accepts JSON keyed first by family and then by seed, with
   each leaf containing `usd`, `input_tokens`, and `output_tokens`. The scalar
   cost flags are valid only for a single-family, single-seed run.
+
+  Manifest mode is immutable: `--manifest` cannot be combined with any other
+  CLI option. Legacy CLI invocation remains available for operator and partial
+  runs; canonical future research runs use the source-controlled manifest.
   """
 
   use Mix.Task
@@ -55,9 +62,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   def run(args) do
     defaults = research_defaults()
 
-    {opts, _argv, invalid} =
+    {opts, argv, invalid} =
       OptionParser.parse(args,
         strict: [
+          manifest: :string,
           dataset_root: :string,
           campaign_id: :string,
           model: :string,
@@ -83,7 +91,10 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
+    opts = resolve_manifest_options!(opts, argv)
+
     Mix.Task.run("app.start")
+    verify_manifest_environment!(opts)
 
     api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
@@ -95,7 +106,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         [
           api_key: api_key,
           temperature: Keyword.get(opts, :temperature, defaults.temperature),
-          max_retries: defaults.max_retries
+          max_retries: Keyword.get(opts, :max_retries, defaults.max_retries)
         ],
         generation_opts(opts)
       )
@@ -118,6 +129,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
           model: model,
           reflection_model: reflection_model,
           out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+          checkpoint_dir:
+            Keyword.get(
+              opts,
+              :checkpoint_dir,
+              Path.join(Keyword.get(opts, :out, "benchmarks/results"), "gepa-checkpoints")
+            ),
           families: families,
           max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
           seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
@@ -128,7 +145,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
           execution: execution_identity(opts),
           reporter: reporter,
           lm: DSEx.req_llm(model, req_llm_opts),
-          reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts)
+          reflection_lm: DSEx.req_llm(reflection_model, req_llm_opts),
+          judge_lm: DSEx.req_llm(Keyword.get(opts, :judge_model, model), req_llm_opts),
+          judge_model: Keyword.get(opts, :judge_model, model)
         )
       end)
 
@@ -136,6 +155,30 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   end
 
   defp fetch!(opts, key), do: Keyword.get(opts, key) || Mix.raise("--#{dash(key)} is required")
+
+  @doc false
+  def resolve_manifest_options!(opts, argv \\ []) do
+    case Keyword.get(opts, :manifest) do
+      nil ->
+        opts
+
+      path ->
+        if Keyword.get_values(opts, :manifest) != [path] or argv != [] do
+          Mix.raise(
+            "--manifest must be provided exactly once and cannot use positional arguments"
+          )
+        end
+
+        path
+        |> DSEx.BenchmarkTruth.GepaCampaignManifest.load!()
+        |> DSEx.BenchmarkTruth.GepaCampaignManifest.task_options!(opts)
+        |> Map.to_list()
+    end
+  rescue
+    error in [ArgumentError, File.Error, Jason.DecodeError] -> Mix.raise(Exception.message(error))
+  end
+
+  defp parse_seeds(value) when is_list(value), do: value
 
   defp parse_seeds(value) do
     value
@@ -145,6 +188,8 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   end
 
   defp parse_families(nil), do: DSEx.BenchmarkTruth.GepaReplicationContract.required_families()
+
+  defp parse_families(value) when is_list(value), do: value
 
   defp parse_families(value) do
     value
@@ -181,7 +226,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
   end
 
   defp execution_identity(opts) do
-    %{
+    identity = %{
       "lm" => %{
         "provider" => "req_llm",
         "temperature" => Keyword.get(opts, :temperature, research_defaults().temperature),
@@ -192,7 +237,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
             :optimizer_timeout_ms,
             research_defaults().optimizer_timeout_ms
           ),
-        "max_retries" => research_defaults().max_retries
+        "max_retries" => Keyword.get(opts, :max_retries, research_defaults().max_retries)
       },
       "retrieval" => %{
         "hover_upstream_bm25" => truthy_env?("DSEX_HOVER_UPSTREAM_BM25"),
@@ -203,6 +248,62 @@ defmodule Mix.Tasks.Dsex.Benchmark.GepaCampaign do
         "upstream_descriptions" => truthy_env?("DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS")
       }
     }
+
+    case Keyword.get(opts, :manifest_identity) do
+      nil ->
+        identity
+
+      manifest ->
+        identity
+        |> Map.put("manifest", manifest)
+        |> Map.put("manifest_environment", Keyword.fetch!(opts, :manifest_environment))
+    end
+  end
+
+  @doc false
+  def verify_manifest_environment!(opts) do
+    case Keyword.get(opts, :manifest_environment) do
+      nil ->
+        :ok
+
+      requirements ->
+        require_truthy_environment!(
+          requirements,
+          "hover_upstream_bm25",
+          "DSEX_HOVER_UPSTREAM_BM25"
+        )
+
+        require_truthy_environment!(
+          requirements,
+          "ifbench_upstream_descriptions",
+          "DSEX_IFBENCH_UPSTREAM_DESCRIPTIONS"
+        )
+
+        require_named_environment!(requirements, "python_env")
+        require_named_environment!(requirements, "gepa_root_env", directory?: true)
+    end
+  end
+
+  defp require_truthy_environment!(requirements, key, env_name) do
+    if requirements[key] == true and not truthy_env?(env_name) do
+      Mix.raise("canonical GEPA manifest requires #{env_name}=1")
+    end
+  end
+
+  defp require_named_environment!(requirements, key, opts \\ []) do
+    env_name = Map.fetch!(requirements, key)
+    value = System.get_env(env_name)
+
+    cond do
+      is_nil(value) or String.trim(value) == "" ->
+        Mix.raise("canonical GEPA manifest requires #{env_name}")
+
+      Keyword.get(opts, :directory?, false) and not File.dir?(value) ->
+        Mix.raise("canonical GEPA manifest requires #{env_name} to name an existing directory")
+
+      true ->
+        :ok
+    end
   end
 
   defp truthy_env?(name), do: System.get_env(name) in ["1", "true", "TRUE", "yes"]
