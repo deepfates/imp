@@ -336,6 +336,26 @@ defmodule ReqLLMClientTest do
     assert DSEx.Prediction.get(prediction, :score) == 7
   end
 
+  test "ReqLLM consumes rollout IDs without forwarding them to the provider" do
+    lm = DSEx.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    program =
+      DSEx.predict("question -> answer, score: int",
+        lm: lm,
+        adapter: DSEx.Adapter.JSON,
+        config: [cache: false, rollout_id: 17]
+      )
+
+    assert {:ok, _prediction} = DSEx.call(program, %{question: "pong?"})
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
+    refute Keyword.has_key?(opts, :rollout_id)
+
+    messages = [%{role: :user, content: "same prompt"}]
+
+    refute DSEx.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 17) ==
+             DSEx.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 18)
+  end
+
   test "ReqLLM client translates local file path attachments into file content parts" do
     path = Path.join(System.tmp_dir!(), "dsex-req-llm-#{System.unique_integer([:positive])}.md")
     File.write!(path, "# Attachment\n")

@@ -53,15 +53,19 @@ defmodule DSEx.Clients.ReqLLM do
   def generate(%__MODULE__{} = lm, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
 
-    opts =
+    {rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
+      |> Keyword.pop(:rollout_id)
+
+    opts =
+      opts
       |> normalize_opts()
       |> normalize_provider_profile_opts(lm.model)
 
     cache? = Keyword.get(opts, :cache, false)
     opts = Keyword.delete(opts, :cache)
-    cache_key = cache_key(lm, messages, opts)
+    cache_key = cache_key(lm, messages, maybe_put_rollout_id(opts, rollout_id))
 
     if cache? do
       generate_cached(lm, messages, opts, cache_key)
@@ -150,9 +154,13 @@ defmodule DSEx.Clients.ReqLLM do
   def stream(%__MODULE__{} = lm, messages, opts \\ []) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.stream/3")
 
-    opts =
+    {_rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
+      |> Keyword.pop(:rollout_id)
+
+    opts =
+      opts
       |> normalize_opts()
       |> normalize_provider_profile_opts(lm.model)
 
@@ -213,6 +221,9 @@ defmodule DSEx.Clients.ReqLLM do
   defp validate_call_opts!(opts, context) do
     raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
+
+  defp maybe_put_rollout_id(opts, nil), do: opts
+  defp maybe_put_rollout_id(opts, rollout_id), do: Keyword.put(opts, :rollout_id, rollout_id)
 
   defp to_req_messages(messages) do
     Enum.map(messages, fn
