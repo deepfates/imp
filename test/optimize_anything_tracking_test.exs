@@ -9,7 +9,7 @@ defmodule DSEx.Optimize.Anything.TrackingTest do
     tracking_uri = start_mlflow(self())
 
     result =
-      Anything.optimize(
+      Anything.run(
         "tracked",
         fn _candidate -> 0.75 end,
         config: config(tracking_uri),
@@ -41,7 +41,7 @@ defmodule DSEx.Optimize.Anything.TrackingTest do
     tracking_uri = start_mlflow(self())
 
     assert_raise RuntimeError, "evaluation failed", fn ->
-      Anything.optimize(
+      Anything.run(
         "tracked",
         fn _candidate -> raise "evaluation failed" end,
         config: config(tracking_uri),

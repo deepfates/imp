@@ -834,7 +834,7 @@ config =
   )
 
 result =
-  Anything.optimize(
+  Anything.run(
     %{planner: "Plan directly.", writer: "Answer clearly."},
     fn candidate, example ->
       score = evaluator.(candidate, example)
@@ -851,36 +851,8 @@ Result.best_candidate(result)
 
 `Result` retains candidate lineage, per-example validation scores, Pareto
 frontiers, measured budgets, rejected proposals, history, and a resumable
-engine checkpoint. The older `new_artifact/3` API remains supported for callers
-that need its aggregate evaluator and `Report` schema.
-
-## GEPA-Style Reflection
-
-DSEx's GEPA surface is an Elixir-native reflective optimizer over explicit
-artifacts and evaluator functions. It borrows the GEPA ideas of per-example
-scores, Actionable Side Information, Pareto selection, and candidate lineage;
-it is not a wrapper around Python GEPA and should be cited with benchmark
-evidence when making paper- or DSPy-comparison claims.
-
-```elixir
-artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
-
-report =
-  DSEx.Optimize.GEPA.optimize(
-    artifact,
-    fn artifact, examples ->
-      %{
-        per_example_scores: Enum.map(examples, &if(String.contains?(artifact.text, &1), do: 1.0, else: 0.0)),
-        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
-      }
-    end,
-    examples: ["Paris", "concise"],
-    dev_examples: ["Paris"],
-    generations: 2
-  )
-
-report.best
-```
+engine checkpoint. This `Config`/`Result`/`run` contract is the sole
+Optimize Anything surface.
 
 ## Tools And ReAct
 

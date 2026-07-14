@@ -9,7 +9,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     receiver = self()
 
     result =
-      Anything.optimize(
+      Anything.run(
         "baseline",
         fn candidate ->
           send(receiver, {:evaluated, candidate})
@@ -31,7 +31,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     dataset = [%{id: :first, target: "alpha"}, %{id: :second, target: "beta"}]
 
     result =
-      Anything.optimize(
+      Anything.run(
         "alpha only",
         fn candidate, example ->
           send(receiver, {:evaluated, candidate, example.id})
@@ -54,7 +54,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     valset = [%{split: :validation, score: 0.25}, %{split: :validation, score: 0.75}]
 
     result =
-      Anything.optimize(
+      Anything.run(
         "baseline",
         fn candidate, example ->
           send(receiver, {:evaluated, candidate, example.split, example.score})
@@ -76,7 +76,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     candidate = %{planner: "plan carefully", writer: "answer briefly"}
 
     result =
-      Anything.optimize(
+      Anything.run(
         candidate,
         fn evaluated ->
           send(receiver, {:evaluated, evaluated})
@@ -107,7 +107,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     dataset = Enum.map(1..4, &%{sample: &1})
 
     result =
-      Anything.optimize(
+      Anything.run(
         nil,
         fn candidate, _example -> if(candidate == "generated seed", do: 1.0, else: 0.0) end,
         dataset: dataset,
@@ -131,7 +131,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
   test "structured objective scores populate the public objective frontier" do
     result =
-      Anything.optimize(
+      Anything.run(
         %{prompt: "answer"},
         fn _candidate -> {0.75, %{scores: %{quality: 0.9, safety: 1.0}}} end,
         runner_options(0)
@@ -161,7 +161,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     }
 
     result =
-      Anything.optimize(
+      Anything.run(
         "base",
         fn _candidate, _example ->
           {0.0, %{a: %{visual: first}, z: [second]}}
@@ -183,7 +183,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
   test "capture_stdio preserves evaluator output as actionable side information" do
     result =
-      Anything.optimize(
+      Anything.run(
         "base",
         fn _candidate ->
           IO.write("diagnostic output")
@@ -206,7 +206,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     }
 
     result =
-      Anything.optimize(
+      Anything.run(
         "base",
         fn candidate -> if(candidate == "better", do: 1.0, else: 0.0) end,
         objective: "Produce the better candidate",
@@ -237,7 +237,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     evaluator = fn _candidate, _example -> 1.0 end
 
     assert_raise ArgumentError, ~r/requires :dataset when :valset is provided/, fn ->
-      Anything.optimize("baseline", evaluator, runner_options(0, valset: [:held_out]))
+      Anything.run("baseline", evaluator, runner_options(0, valset: [:held_out]))
     end
 
     for options <- [
@@ -249,28 +249,28 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
       assert_raise ArgumentError,
                    ~r/:dataset and :valset must be non-empty lists or nil/,
                    fn ->
-                     Anything.optimize("baseline", evaluator, runner_options(0, options))
+                     Anything.run("baseline", evaluator, runner_options(0, options))
                    end
     end
   end
 
   test "rejects unknown and malformed runner options before execution" do
     assert_raise ArgumentError, ~r/unknown Optimize Anything options: \[:datset\]/, fn ->
-      Anything.optimize("baseline", fn _candidate -> 1.0 end,
+      Anything.run("baseline", fn _candidate -> 1.0 end,
         datset: [:misspelled],
         config: Config.new(engine: [max_candidate_proposals: 0])
       )
     end
 
     assert_raise ArgumentError, ~r/:checkpoint_fn must be nil or an arity-1 function/, fn ->
-      Anything.optimize("baseline", fn _candidate -> 1.0 end,
+      Anything.run("baseline", fn _candidate -> 1.0 end,
         checkpoint_fn: :invalid,
         config: Config.new(engine: [max_candidate_proposals: 0])
       )
     end
 
     assert_raise ArgumentError, ~r/:fallback_max_iterations must be a non-negative integer/, fn ->
-      Anything.optimize("baseline", fn _candidate -> 1.0 end,
+      Anything.run("baseline", fn _candidate -> 1.0 end,
         fallback_max_iterations: -1,
         fallback_proposer: fn candidate, component, _, _ -> Map.fetch!(candidate, component) end
       )
@@ -288,7 +288,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
 
     {:checkpoint, first_checkpoint} =
       catch_throw(
-        Anything.optimize(
+        Anything.run(
           "0",
           evaluator,
           runner_options(2,
@@ -304,7 +304,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
       )
 
     resumed =
-      Anything.optimize(
+      Anything.run(
         "0",
         evaluator,
         runner_options(2,
@@ -315,7 +315,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
       )
 
     uninterrupted =
-      Anything.optimize(
+      Anything.run(
         "0",
         evaluator,
         runner_options(2, dataset: dataset, fallback_proposer: proposer)
@@ -340,7 +340,7 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
     on_exit(fn -> File.rm_rf!(run_dir) end)
 
     result =
-      Anything.optimize(
+      Anything.run(
         "baseline",
         fn _candidate -> {0.75, %{explanation: "seed evidence"}} end,
         config:
@@ -397,13 +397,13 @@ defmodule DSEx.Optimize.Anything.RunnerTest do
           )
       )
 
-    first = Anything.optimize("cached", evaluator, options)
+    first = Anything.run("cached", evaluator, options)
     assert_receive {:evaluated, "cached"}
     assert first.total_metric_calls == 1
 
     File.rm!(Path.join(run_dir, "gepa_state.json"))
 
-    second = Anything.optimize("cached", evaluator, options)
+    second = Anything.run("cached", evaluator, options)
     refute_receive {:evaluated, "cached"}
     assert second.total_metric_calls == 0
     assert second.validation_scores == [0.9]

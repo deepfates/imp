@@ -33,7 +33,7 @@ config =
   )
 
 result =
-  Anything.optimize(
+  Anything.run(
     %{config: "mode=slow", policy: "prefer safe changes"},
     fn candidate ->
       if candidate.config == "mode=fast", do: 1.0, else: 0.0
@@ -106,47 +106,10 @@ The smoke command validates wiring only. The source-checkout benchmark guide
 defines the multi-seed, held-out evaluation, cost, and checkpoint requirements
 that authorize the scoped live effectiveness claim.
 
-The compatibility `Artifact`/`Report` API remains available and delegates to
-the same engine. New code should use binary or named-map candidates and the
-production `Result` contract above.
-
 Release fidelity is pinned to GEPA v0.1.1. Adapter-owned resume, reflection
 budgets, attachable tracking runs, and other selected post-tag lifecycle fixes
 are DSEx production extensions, not a claim of parity with unreleased GEPA
 main. Real non-prompt effectiveness campaigns remain a separate release gate.
-
-## Pareto/ASI GEPA-Style Reflection
-
-`DSEx.Optimize.GEPA` is a DSEx-native artifact optimizer. It uses the GEPA
-philosophy of per-example scores, Actionable Side Information, Pareto frontier
-selection, and reflective mutation, but it is not a Python GEPA wrapper and does
-not imply paper-scale benchmark results without the separate parity evidence
-gates.
-
-```elixir
-artifact = DSEx.Optimize.Anything.new_artifact(:prompt, "Base")
-
-report =
-  DSEx.Optimize.GEPA.optimize(
-    artifact,
-    fn artifact, examples ->
-      %{
-        per_example_scores:
-          Enum.map(examples, &if(String.contains?(artifact.text, &1), do: 1.0, else: 0.0)),
-        asi: Enum.reject(examples, &String.contains?(artifact.text, &1))
-      }
-    end,
-    examples: ["Paris", "concise"],
-    generations: 2,
-    mutation_fn: fn _artifact, asi, _generation -> Enum.join(asi, "\n") end
-  )
-
-report.best.aggregate_score
-#=> 1.0
-```
-
-The report tracks per-example scores, Pareto frontier membership, ASI
-diagnostics, candidate lineage, replacement branches, and system-aware merges.
 
 ## Agents And MCP
 
