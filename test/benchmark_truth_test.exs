@@ -969,6 +969,15 @@ defmodule BenchmarkTruthTest do
     assert runner.dspy_lm_name("anthropic/claude-haiku-4-5") == "anthropic/claude-haiku-4-5"
     assert runner.wire_api("anthropic/claude-haiku-4-5") == "litellm_anthropic_messages"
     assert runner.wire_api("gemini/gemini-3-flash-preview") == "litellm_google_generate_content"
+    assert runner.effective_generation(
+        "responses/gpt-4.1-mini-2025-04-14", 0.0, 700, None
+    ) == (
+        {"temperature": 0.0, "max_tokens": 700},
+        ["DSPy/LiteLLM routed this comparison through OpenAI Responses for endpoint-equivalent parity"],
+    )
+    assert runner.effective_generation(
+        "responses/gpt-5.4-mini", 0.0, 700, "low"
+    )[0] == {"max_completion_tokens": 700, "reasoning_effort": "low"}
     print("ok")
     """
 

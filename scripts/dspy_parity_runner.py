@@ -154,7 +154,11 @@ def configure_dspy(
         "cache": False,
     }
     normalized = model.lower()
-    if dspy_responses_model(normalized) or dspy_reasoning_model(normalized):
+    if dspy_responses_model(normalized) and reasoning_model(responses_model_family(normalized)):
+        lm_args["max_tokens"] = max_tokens
+        lm_args["max_completion_tokens"] = max_tokens
+        lm_args["temperature"] = 1.0
+    elif dspy_reasoning_model(normalized):
         lm_args["max_tokens"] = max_tokens
         lm_args["max_completion_tokens"] = max_tokens
         lm_args["temperature"] = 1.0
@@ -210,6 +214,15 @@ def effective_generation(
 ) -> Tuple[Dict[str, Any], List[str]]:
     normalized = model.lower()
     if dspy_responses_model(normalized):
+        if not reasoning_model(responses_model_family(normalized)):
+            effective = {"temperature": temperature, "max_tokens": max_tokens}
+            if reasoning_effort:
+                effective["reasoning_effort"] = reasoning_effort
+            return (
+                effective,
+                ["DSPy/LiteLLM routed this comparison through OpenAI Responses for endpoint-equivalent parity"],
+            )
+
         effective = {"max_completion_tokens": max_tokens}
         if reasoning_effort:
             effective["reasoning_effort"] = reasoning_effort
@@ -249,6 +262,11 @@ def dspy_reasoning_model(model: str) -> bool:
 def dspy_responses_model(model: str) -> bool:
     normalized = model.lower().strip("/")
     return normalized.startswith("responses/") or "/responses/" in normalized
+
+
+def responses_model_family(model: str) -> str:
+    normalized = model.lower().strip("/")
+    return normalized.split("responses/", 1)[-1]
 
 
 def wire_api(model: str) -> str:
