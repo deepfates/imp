@@ -81,6 +81,7 @@ defmodule DSEx.MixProject do
           "benchmark.rag_tool_agent.check": :test,
           "benchmark.rlm.check": :test,
           "benchmark.rlm.contract.check": :test,
+          "reproduction.check": :test,
           "benchmark.parity.check": :test,
           "benchmark.parity.full": :test,
           "upstream_fidelity.check": :test
@@ -126,9 +127,15 @@ defmodule DSEx.MixProject do
       Path.wildcard("lib/mix/tasks/dsex.benchmark*.ex") ++
         Path.wildcard("lib/mix/tasks/dsex.identity*.ex") ++
         Path.wildcard("lib/mix/tasks/dsex.gate_evidence.ex") ++
+        Path.wildcard("lib/mix/tasks/dsex.reproductions.ex") ++
         Path.wildcard("lib/dsex/benchmark*.ex") ++
         Path.wildcard("lib/dsex/benchmark_truth/**/*.ex") ++
-        Path.wildcard("lib/dsex/identity_*.ex")
+        Path.wildcard("lib/dsex/reproduction_registry.ex") ++
+        Path.wildcard("lib/dsex/identity_*.ex") ++
+        [
+          "lib/dsex/optimizer/playbook/campaign.ex",
+          "lib/dsex/optimizer/playbook/equation_search.ex"
+        ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
       Path.wildcard("examples/deployment/**/*") ++
@@ -158,6 +165,7 @@ defmodule DSEx.MixProject do
       "docs/RLM_FIDELITY.md",
       "docs/INSTRUCTION_OPTIMIZER_FIDELITY.md",
       "docs/COMBEE_FIDELITY.md",
+      "docs/AX_DIFFERENTIAL.md",
       "docs/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
@@ -267,6 +275,7 @@ defmodule DSEx.MixProject do
   defp benchmark_aliases do
     [
       "evidence.check": [
+        "reproduction.check",
         "benchmark.truth.check",
         "benchmark.trace.check",
         "benchmark.operations_stress.check",
@@ -285,6 +294,9 @@ defmodule DSEx.MixProject do
       ],
       "upstream_fidelity.check": [
         "dsex.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
+      ],
+      "reproduction.check": [
+        "dsex.reproductions --check"
       ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
