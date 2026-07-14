@@ -174,7 +174,7 @@ defmodule AuthorityInventoryTest do
     assert family["local_differential"]["status"] == "partial"
 
     assert family["local_differential"]["artifacts"] == [
-             "benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"
+             "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"
            ]
 
     assert family["notes"] =~ "not paid-provider"

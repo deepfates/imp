@@ -32,7 +32,7 @@ defmodule DSEx.UpstreamFidelityTest do
     assert react.rationale =~ "fails fast"
 
     weights = by_id["optimization.weights"]
-    assert weights.status == :gap
+    assert weights.status == :elixir_native_equivalent
     assert "Avatar" in weights.upstream
     assert "AvatarOptimizer" in weights.upstream
     assert DSEx.Predict.Avatar in weights.dsex
@@ -57,7 +57,6 @@ defmodule DSEx.UpstreamFidelityTest do
 
     assert MapSet.new(weights.evidence.missing) ==
              MapSet.new([
-               "fresh post-hardening local MLX execution with exact model and adapter identity",
                "paid-provider weight-training execution evidence",
                "BetterTogether paid-provider lifecycle completion",
                "matched Avatar and AvatarOptimizer effectiveness",
@@ -65,7 +64,7 @@ defmodule DSEx.UpstreamFidelityTest do
              ])
 
     assert weights.evidence.artifacts == [
-             "benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"
+             "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"
            ]
 
     assert by_id["primitives.multimodal"].status == :conformant
@@ -84,7 +83,7 @@ defmodule DSEx.UpstreamFidelityTest do
     assert report.summary.release_blockers < report.summary.gaps
     refute report.summary.passing
     refute "optimization.instructions" in report.blocking_ids
-    assert "optimization.weights" in report.blocking_ids
+    refute "optimization.weights" in report.blocking_ids
     assert "product.release" in report.blocking_ids
   end
 
@@ -160,7 +159,9 @@ defmodule DSEx.UpstreamFidelityTest do
       assert body =~ "### `#{row.id}`"
     end
 
-    assert body =~ "| optimization.weights | optimization | gap | release blocker |"
+    assert body =~
+             "| optimization.weights | optimization | elixir_native_equivalent | satisfied |"
+
     assert body =~ "| optimization.instructions | optimization | gap | claim-specific gap |"
     assert body =~ "| optimization.anything | optimization | tracking | tracked |"
 

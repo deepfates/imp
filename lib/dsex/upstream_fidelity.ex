@@ -474,7 +474,9 @@ defmodule DSEx.UpstreamFidelity do
       ],
       source:
         "dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py",
-      disposition: :gap,
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.",
       ticket: "de-9x31",
       dsex: [
         DSEx.Predict.Avatar,
@@ -497,6 +499,7 @@ defmodule DSEx.UpstreamFidelity do
           "test/avatar_test.exs",
           "test/avatar_optimizer_test.exs",
           "test/better_together_test.exs",
+          "test/optimizer_contract_test.exs",
           "test/provider_training_lifecycle_test.exs",
           "test/protocol_training/provider_training_lifecycle_test.exs",
           "test/public_surface_test.exs"
@@ -506,9 +509,8 @@ defmodule DSEx.UpstreamFidelity do
           "docs/COVERAGE_MATRIX.md",
           "docs/UPSTREAM_FIDELITY_AUDIT.md"
         ],
-        artifacts: ["benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json"],
+        artifacts: ["benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"],
         missing: [
-          "fresh post-hardening local MLX execution with exact model and adapter identity",
           "paid-provider weight-training execution evidence",
           "BetterTogether paid-provider lifecycle completion",
           "matched Avatar and AvatarOptimizer effectiveness",

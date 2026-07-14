@@ -4,7 +4,7 @@ defmodule DSEx.BenchmarkTruth.LocalMLXCampaignTest do
   alias DSEx.BenchmarkTruth.LocalMLXCampaign
 
   @artifact_path Path.expand(
-                   "../benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json",
+                   "../benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
                    __DIR__
                  )
 

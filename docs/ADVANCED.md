@@ -326,7 +326,7 @@ new immutable evidence file rather than overwriting prior results. This evidence
 supports a local weight-training effectiveness claim; it does not by itself
 establish BetterTogether parity.
 
-The canonical clean campaign at commit `ada199b` improved held-out Banking77
+The canonical post-hardening campaign at commit `922a85e` improved held-out Banking77
 accuracy from `0.15` to `0.85` and macro-F1 from `0.0769` to `0.8430` across 40
 rows. The fused and save/load-rebound programs produced identical row outcomes.
 `LocalMLXCampaign.validate_artifact/1` independently verifies the checked-in

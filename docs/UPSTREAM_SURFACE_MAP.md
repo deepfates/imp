@@ -3,14 +3,14 @@
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
 Conformant: 13
-Elixir-native equivalents: 5
+Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 3
+Gaps: 2
 Claim-specific non-blocking gaps: 1
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 2
+Release blockers: 1
 Passing: false
 
 | ID | Category | Status | Product gate | Upstream surfaces | Ticket |
@@ -29,7 +29,7 @@ Passing: false
 | optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
 | optimization.gepa | optimization | conformant | satisfied | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
-| optimization.weights | optimization | gap | release blocker | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
+| optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
 | optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates | de-4bkz |
 | optimization.anything | optimization | tracking | tracked | optimize_anything, arbitrary text artifacts | de-16fo |
 | retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |  |
@@ -417,11 +417,13 @@ Missing evidence or behavior:
 
 ### `optimization.weights`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
 DSEx modules: `DSEx.Predict.Avatar`, `DSEx.Optimizer.Avatar`, `DSEx.Optimizer.BootstrapFinetune`, `DSEx.Optimizer.GRPO`, `DSEx.Optimizer.BetterTogether`, `DSEx.Optimizer.Ensemble`
+Elixir-native rationale: BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.
+
 Semantic invariants:
 
 - Avatar runs a bounded typed-action loop with recoverable tool observations and a reserved Finish action
@@ -436,17 +438,17 @@ Executable evidence:
 - test: `test/avatar_test.exs`
 - test: `test/avatar_optimizer_test.exs`
 - test: `test/better_together_test.exs`
+- test: `test/optimizer_contract_test.exs`
 - test: `test/provider_training_lifecycle_test.exs`
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
 - test: `test/public_surface_test.exs`
 - docs: `docs/ADVANCED.md`
 - docs: `docs/COVERAGE_MATRIX.md`
 - docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
-- artifact: `benchmarks/results/local-mlx/local-mlx-ada199b-20260713.json`
+- artifact: `benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json`
 
 Missing evidence or behavior:
 
-- fresh post-hardening local MLX execution with exact model and adapter identity
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
 - matched Avatar and AvatarOptimizer effectiveness
