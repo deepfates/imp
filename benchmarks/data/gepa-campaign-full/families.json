@@ -1,0 +1,191 @@
+{
+  "dataset_aliases": {
+    "hotpot_qa": "hotpotqa/hotpot_qa",
+    "hover": "hover-nlp/hover"
+  },
+  "dataset_scope": "full",
+  "families": [
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "AIMEBench",
+      "input_keys": [
+        "problem"
+      ],
+      "instructions": "Solve the problem and provide the answer in the correct format.",
+      "max_per_split": null,
+      "metric_calls": 1839,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "answer",
+      "program": "CoT",
+      "signature": "problem -> answer",
+      "split_checksums": {
+        "dev": "sha256:cd8a46d0d0210420fc5c6550e1a2a1cd647fddb464e1698318e3e734c63e4552",
+        "test": "sha256:5d05d1d1cf45d139526c1c160e8e23ac13df7a3ce083e5473c3d7bcbb11ebe6d",
+        "train": "sha256:d2ac1967257a089b6930b0b06c55366763df0c0e370322291b78082736f31fba"
+      },
+      "split_counts": {
+        "dev": 45,
+        "test": 150,
+        "train": 45
+      },
+      "upstream_metric": "AIME.metric integer exact match"
+    },
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "HotpotQABench",
+      "input_keys": [
+        "question"
+      ],
+      "instructions": "Answer the multi-hop question using retrieved evidence.",
+      "max_per_split": null,
+      "metric_calls": 6871,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "answer",
+      "program": "HotpotMultiHop",
+      "retrieval": {
+        "corpus_checksum": "sha256:c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724",
+        "corpus_path": "gepa_artifact/benchmarks/hover/wiki.abstracts.2017.jsonl",
+        "index_checksum": "sha256:c35ec78680306e6521110e714083998edc653926ea0641fb272908b744629d22",
+        "index_path": "gepa_artifact/benchmarks/hover/bm25s_retriever",
+        "kind": "bm25s_wiki_abstracts_2017",
+        "source_url": "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
+        "status": "present"
+      },
+      "signature": "question -> answer",
+      "split_checksums": {
+        "dev": "sha256:694006eb031b34f4bc00b04ba8430e5fc40a84d4a3f3f958ccdca0d11278994c",
+        "test": "sha256:16b3ec8a4054676352a0cdc4627be1f2a1cd7938c4d67ad6651f94869171e37d",
+        "train": "sha256:bfc87f7d260635544e28e86e884de5cec9c5a9ca190c226fca5c42979402e22b"
+      },
+      "split_counts": {
+        "dev": 300,
+        "test": 300,
+        "train": 150
+      },
+      "upstream_metric": "dspy.evaluate.answer_exact_match"
+    },
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "hoverBench",
+      "input_keys": [
+        "claim"
+      ],
+      "instructions": "Verify the claim using retrieved supporting evidence.",
+      "max_per_split": null,
+      "metric_calls": 7051,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "retrieved_docs",
+      "program": "HoverMultiHop",
+      "retrieval": {
+        "corpus_checksum": "sha256:c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724",
+        "corpus_path": "gepa_artifact/benchmarks/hover/wiki.abstracts.2017.jsonl",
+        "index_checksum": "sha256:c35ec78680306e6521110e714083998edc653926ea0641fb272908b744629d22",
+        "index_path": "gepa_artifact/benchmarks/hover/bm25s_retriever",
+        "kind": "bm25s_wiki_abstracts_2017",
+        "source_url": "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz",
+        "status": "present"
+      },
+      "signature": "claim -> retrieved_docs",
+      "split_checksums": {
+        "dev": "sha256:b342dbaaa4516e55b7f4f7ac046828c2201952e69de5b97751173238674a74a7",
+        "test": "sha256:cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807",
+        "train": "sha256:448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370"
+      },
+      "split_counts": {
+        "dev": 300,
+        "test": 300,
+        "train": 150
+      },
+      "upstream_metric": "hover_utils.discrete_retrieval_eval"
+    },
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "IFBench",
+      "input_keys": [
+        "prompt"
+      ],
+      "instructions": "Respond to the query while satisfying all instruction-following constraints.",
+      "max_per_split": null,
+      "metric_calls": 3593,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "response",
+      "program": "IFBenchCoT2StageProgram",
+      "signature": "prompt -> response",
+      "split_checksums": {
+        "dev": "sha256:96700ae2f5f9a1916b9a435f852bc65b53f45ab7ae860a81691f0836543aa277",
+        "test": "sha256:9eba8a4800a29d03057b7a92092368ada27d89c00cae6bb2a0d0cce345804032",
+        "train": "sha256:6b6d87e50a8a4490075cac1c685c004ccb4e1b49c9c1e261a9876d49f21a4ad2"
+      },
+      "split_counts": {
+        "dev": 300,
+        "test": 294,
+        "train": 150
+      },
+      "upstream_metric": "IFBench.ifbench_metric.metric"
+    },
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "LiveBenchMathBench",
+      "input_keys": [
+        "question"
+      ],
+      "instructions": "Solve the question and provide the answer in the correct format.",
+      "max_per_split": null,
+      "metric_calls": 1839,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "answer",
+      "program": "CoT",
+      "signature": "question -> answer",
+      "split_checksums": {
+        "dev": "sha256:bd843c4aa1cb3947c8442dd0bb15df637b8bbe1a35ddbd92ca936a12b0d00f26",
+        "test": "sha256:669b939a8df053c656238cd8b4b0494e4c4b4534f51db3ab095016768241dff4",
+        "train": "sha256:b449be0f4def4aef1d2021d906137a978b4989193b9ecbd71d1c81538d1786a2"
+      },
+      "split_counts": {
+        "dev": 121,
+        "test": 126,
+        "train": 121
+      },
+      "upstream_metric": "livebench_math.calculate_livebench_score"
+    },
+    {
+      "dataset_scope": "full",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "Papillon",
+      "input_keys": [
+        "user_query"
+      ],
+      "instructions": "Answer the user query while preserving privacy-sensitive information.",
+      "max_per_split": null,
+      "metric_calls": 2426,
+      "metric_fidelity": "upstream_metric_named_for_adapter; DSEx campaign runner ports deterministic adapters, Papillon judge scoring, IFBench registry checks, and guarded LiveBenchMath symbolic bridge branches",
+      "output_key": "response",
+      "program": "PAPILLON",
+      "signature": "user_query -> llm_request, response",
+      "split_checksums": {
+        "dev": "sha256:d5d04a8c914afc8fe9f6d3278607bc6d54e10bd03749743296270fd03f03d174",
+        "test": "sha256:42c5086dedf46d52abc9f0ba618655219c1daac0fa4aa2cd4c51dbf815aba848",
+        "train": "sha256:197df31c70fc2acfe9d54707ef43ce08a2cfe0dc1f6978ed9900424c7ec61ecb"
+      },
+      "split_counts": {
+        "dev": 111,
+        "test": 221,
+        "train": 111
+      },
+      "upstream_metric": "papillon_utils.compute_overall_score"
+    }
+  ],
+  "max_per_split": null,
+  "runner": "gepa_export_dataset_root.py",
+  "schema_version": 2,
+  "upstream_source": {
+    "commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+    "repository": "https://github.com/gepa-ai/gepa-artifact",
+    "tree": "799ec6ab01e8e6c595b19f0baa245356a995f0b3"
+  }
+}

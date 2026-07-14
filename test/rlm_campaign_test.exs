@@ -274,7 +274,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   end
 
   test "a bounded subset of a T3 manifest is labeled only T2" do
-    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+    manifest = fixture!() |> canonical_manifest_with_fixture_oolong!()
 
     plan =
       RLMCampaign.plan(manifest,
@@ -291,7 +291,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   end
 
   test "an unavailable selected family fails closed while pinned families remain runnable" do
-    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+    manifest = fixture!() |> canonical_manifest_with_fixture_oolong!()
 
     assert_raise ArgumentError, ~r/unavailable or unpinned: s_niah/, fn ->
       RLMCampaign.plan(manifest, families: ["s_niah"], row_limit: 1)
@@ -1186,6 +1186,37 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
   defp sha(path),
     do: path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
+
+  defp canonical_manifest_with_fixture_oolong!(fixture) do
+    canonical =
+      "benchmarks/config/rlm-paper-protocol-v3.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    fixture_manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+    fixture_spec = fixture_manifest["datasets"]["oolong"]
+    [fixture_row] = fixture_spec["path"] |> File.stream!() |> Enum.map(&Jason.decode!/1)
+
+    rows =
+      Enum.map(1..50, fn index ->
+        Map.put(fixture_row, "id", "oolong-#{index}")
+      end)
+
+    dataset_path = Path.join(Path.dirname(fixture.manifest_path), "paper-oolong.jsonl")
+    File.write!(dataset_path, Enum.map_join(rows, "\n", &Jason.encode!/1) <> "\n")
+
+    paper_spec =
+      fixture_spec
+      |> Map.put("path", dataset_path)
+      |> Map.put("sha256", sha(dataset_path))
+      |> Map.put("sample_count", 50)
+      |> Map.put("sample_ids", Enum.map(rows, & &1["id"]))
+
+    manifest = put_in(canonical, ["datasets", "oolong"], paper_spec)
+    path = Path.join(Path.dirname(fixture.manifest_path), "paper-manifest.json")
+    File.write!(path, Jason.encode!(manifest, pretty: true))
+    path
+  end
 
   defp tmp_dir(label) do
     path =

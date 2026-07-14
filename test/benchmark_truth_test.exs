@@ -39,7 +39,7 @@ defmodule BenchmarkTruthTest do
   end
 
   test "RLM campaign plan task emits exact bounded jobs without execution" do
-    manifest = Path.expand("../benchmarks/config/rlm-paper-protocol-v3.json", __DIR__)
+    manifest = hermetic_rlm_manifest!()
 
     output =
       capture_io(fn ->
@@ -72,6 +72,50 @@ defmodule BenchmarkTruthTest do
              "dspy:rlm:oolong:17000206"
            ]
   end
+
+  defp hermetic_rlm_manifest! do
+    root = Path.join(System.tmp_dir!(), "imp-rlm-plan-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    canonical =
+      "benchmarks/config/rlm-paper-protocol-v3.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    spec = canonical["datasets"]["oolong"]
+
+    rows =
+      Enum.map(0..49, fn index ->
+        %{
+          "id" => if(index == 0, do: "17000206", else: "synthetic-#{index}"),
+          "source" => spec["source"],
+          "revision" => spec["revision"],
+          "split" => spec["split"],
+          "context" => ["yes"],
+          "question" => "answer?",
+          "answer" => "yes"
+        }
+      end)
+
+    dataset_path = Path.join(root, "oolong.jsonl")
+    File.write!(dataset_path, Enum.map_join(rows, "\n", &Jason.encode!/1) <> "\n")
+
+    dataset =
+      spec
+      |> Map.put("path", dataset_path)
+      |> Map.put("sha256", sha256_file(dataset_path))
+      |> Map.put("sample_count", 50)
+      |> Map.put("sample_ids", Enum.map(rows, & &1["id"]))
+
+    manifest = put_in(canonical, ["datasets", "oolong"], dataset)
+    manifest_path = Path.join(root, "manifest.json")
+    File.write!(manifest_path, Jason.encode!(manifest, pretty: true))
+    manifest_path
+  end
+
+  defp sha256_file(path),
+    do: path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 
   defmodule ReqLLMStub do
     def generate_text(_model, messages, opts) do

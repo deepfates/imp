@@ -92,6 +92,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
         out_dir: fixture.out,
         checkpoint_dir: fixture.checkpoints,
         run_context: fixture.context,
+        dspy_pythonpath: fixture.dspy_root,
         imp_executor: imp_executor,
         python_executor: python_executor
       )
@@ -138,6 +139,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
         out_dir: fixture.out,
         checkpoint_dir: fixture.checkpoints,
         run_context: fixture.context,
+        dspy_pythonpath: fixture.dspy_root,
         runtimes: [],
         imp_artifact: imp,
         dspy_artifact: dspy,
@@ -217,12 +219,16 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
       manifest_path: fixture.manifest_path,
       out_dir: fixture.out,
       checkpoint_dir: fixture.checkpoints,
-      run_context: fixture.context
+      run_context: fixture.context,
+      dspy_pythonpath: fixture.dspy_root
     )
   end
 
   defp fixture!(name) do
     root = tmp_dir(name)
+    dspy_root = Path.join(root, "dspy-source")
+    File.mkdir_p!(Path.join(dspy_root, "dspy"))
+    File.write!(Path.join([dspy_root, "dspy", "__init__.py"]), "# pinned test source\n")
     family_dir = Path.join(root, "AIMEBench")
     File.mkdir_p!(family_dir)
 
@@ -326,6 +332,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
     %{
       root: root,
+      dspy_root: dspy_root,
       manifest: manifest,
       manifest_path: Path.join(root, "manifest.json"),
       out: Path.join(root, "results"),

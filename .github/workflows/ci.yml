@@ -17,15 +17,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "scripts/setup_dspy_parity_env.sh"
+          cache-dependency-path: |
+            scripts/setup_dspy_parity_env.sh
+            scripts/setup_reference_test_env.sh
       - run: mix local.hex --force
       - run: mix deps.get
-      - name: Install pinned DSPy reference runtime
-        run: PYTHON=python3.12 scripts/setup_dspy_parity_env.sh
-      - name: Check out pinned GEPA artifact reference
-        run: |
-          git clone https://github.com/gepa-ai/gepa-artifact.git tmp/gepa-artifact
-          git -C tmp/gepa-artifact checkout cbefbc1aa0f43dd39874ec4bf42211365dbda42e
+      - name: Install pinned reference runtimes
+        run: PYTHON=python3.12 scripts/setup_reference_test_env.sh
       - run: mix production.check
       - run: mix integration.check
       - run: mix protocol.check
