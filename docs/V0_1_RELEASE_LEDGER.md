@@ -52,10 +52,12 @@ or aggregate seed reporting that never uses test scores for selection. Such
 artifacts can still be retained as smoke or operator evidence, but cannot close
 the parity claim.
 
-`benchmarks/claims.json` and `mix benchmark.dashboard.full` remain the
-authorities for those stronger claims. `mix dsex.upstream_fidelity
---require-conformant` is the product-conformance gate and passes while only
-explicitly non-blocking claim gaps remain.
+`benchmarks/claims.json` remains the authority for claim scope.
+`mix benchmark.dashboard.full` is the v0.1 profile gate, while
+`mix benchmark.dashboard.telos.full` is the explicit gate for broader telos
+research claims. `mix dsex.upstream_fidelity --require-conformant` is the
+product-conformance gate and passes while only explicitly non-blocking claim
+gaps remain.
 
 ## Remaining Release Decisions
 

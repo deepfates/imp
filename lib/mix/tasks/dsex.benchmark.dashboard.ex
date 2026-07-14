@@ -136,32 +136,37 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
           "product_package",
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
-          "package.check"
+          "package.check",
+          :source_checkout
         ),
       "livebook_execute" =>
         gate_lane(
           "livebook_execute",
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
-          "livebook.execute.check"
+          "livebook.execute.check",
+          :source_checkout
         ),
       "live_provider_smoke" =>
         gate_lane(
           "live_provider_smoke",
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
-          "live.check"
+          "live.check",
+          :strict
         ),
       "protocol_gates" =>
         gate_lane(
           "protocol_gates",
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
-          "protocol.check"
+          "protocol.check",
+          :source_checkout
         ),
       "failure_recovery" =>
         failure_recovery_lane(
           Keyword.get(opts, :failure_campaign_dir, "tmp/failure-campaign"),
+          results_dir(opts),
           max_age_hours
         ),
       "local_mlx_weight_training" =>
@@ -207,7 +212,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     claims = claims_gate(claims_path, lanes, profile)
     gate_checks = release_gate_checks(required, lanes, claims)
     full_parity = Enum.all?(gate_checks, &(&1["passing"] == true))
-    performance_supported = get_in(lanes, ["provider_free_overhead", "passing"]) == true
+    performance_supported = get_in(lanes, ["provider_free_overhead", "full_evidence"]) == true
 
     %{
       "schema_version" => 1,
@@ -447,6 +452,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         passing: passing,
         full_evidence: passing,
         scale: "full",
+        freshness: :source_checkout,
         summary: %{
           "cases" => get_in(artifact, ["summary", "total"]),
           "passing_cases" => get_in(artifact, ["summary", "passing"]),
@@ -462,7 +468,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp gate_lane(id, dir, max_age_hours, expected_mix_task) do
+  defp gate_lane(id, dir, max_age_hours, expected_mix_task, freshness) do
     with {:ok, path} <- latest(Path.join(dir, "gate-evidence-#{id}-*.json")),
          {:ok, artifact} <- read_artifact(path) do
       passing =
@@ -474,6 +480,7 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         passing: passing,
         full_evidence: passing,
         scale: "full",
+        freshness: freshness,
         summary: %{
           "mix_task" => get_in(artifact, ["summary", "mix_task"]),
           "exit_status" => get_in(artifact, ["summary", "exit_status"]),
@@ -510,9 +517,12 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     end
   end
 
-  defp failure_recovery_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "failure-campaign-*.json")),
-         {:ok, artifact} <- read_verified_failure_artifact(path) do
+  defp failure_recovery_lane(dir, canonical_results_dir, max_age_hours) do
+    with {:ok, path, artifact} <-
+           latest_verified_failure_artifact([
+             Path.join(dir, "failure-campaign-*.json"),
+             Path.join(canonical_results_dir, "failure-campaign-*.json")
+           ]) do
       authority = failure_recovery_authority(artifact)
       deterministic = authority["deterministic_complete"]
       live = authority["live_complete"]
@@ -535,6 +545,9 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
         passing: deterministic,
         full_evidence: deterministic and live,
         scale: if(live, do: "full", else: "t0"),
+        freshness: :source_checkout,
+        full_freshness: if(live, do: :strict, else: :source_checkout),
+        status_freshness: if(live, do: :strict, else: :source_checkout),
         summary: %{
           "evidence_tier" => artifact["evidence_tier"],
           "authority" => authority,
@@ -569,6 +582,36 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     {:ok, ArtifactFile.read_run_json!(path)}
   rescue
     error -> {:error, {:unverifiable, path, Exception.message(error)}}
+  end
+
+  defp latest_verified_failure_artifact(globs) do
+    paths =
+      globs
+      |> Enum.flat_map(&Path.wildcard/1)
+      |> Enum.uniq()
+      |> Enum.sort_by(&mtime_unix!/1, :desc)
+
+    case paths do
+      [] ->
+        {:error, :missing}
+
+      paths ->
+        paths
+        |> Enum.reduce_while(nil, fn path, first_error ->
+          case read_verified_failure_artifact(path) do
+            {:ok, artifact} ->
+              {:halt, {:ok, path, artifact}}
+
+            {:error, {:unverifiable, ^path, reason}} ->
+              {:cont, first_error || {:error, path, reason}}
+          end
+        end)
+        |> case do
+          {:ok, path, artifact} -> {:ok, path, artifact}
+          {:error, path, reason} -> {:error, {:unverifiable, path, reason}}
+          nil -> {:error, :missing}
+        end
+    end
   end
 
   defp local_mlx_weight_training_lane(dir, max_age_hours) do
@@ -1505,14 +1548,19 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
   end
 
   defp artifact_lane(id, path, artifact, max_age_hours, opts) do
-    fresh = fresh?(artifact, path, max_age_hours)
+    freshness = Keyword.get(opts, :freshness, :strict)
+    full_freshness = Keyword.get(opts, :full_freshness, freshness)
+    status_freshness = Keyword.get(opts, :status_freshness, freshness)
+    fresh = fresh?(artifact, path, max_age_hours, freshness)
+    full_fresh = fresh?(artifact, path, max_age_hours, full_freshness)
+    status_fresh = fresh?(artifact, path, max_age_hours, status_freshness)
     passing = Keyword.fetch!(opts, :passing)
-    full_evidence = Keyword.fetch!(opts, :full_evidence) and fresh
+    full_evidence = Keyword.fetch!(opts, :full_evidence) and full_fresh
     scale = Keyword.fetch!(opts, :scale)
 
     %{
       "id" => id,
-      "status" => status(passing, full_evidence, scale, fresh),
+      "status" => status(passing, full_evidence, scale, status_fresh),
       "passing" => passing,
       "fresh" => fresh,
       "full_evidence" => full_evidence,
@@ -1769,7 +1817,16 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
     _error -> {:error, :invalid_json}
   end
 
-  defp fresh?(artifact, path, max_age_hours) do
+  defp fresh?(artifact, path, max_age_hours, freshness)
+
+  defp fresh?(artifact, path, max_age_hours, :source_checkout) do
+    current_git_sha_bound?(artifact) or fresh_by_age?(artifact, path, max_age_hours)
+  end
+
+  defp fresh?(artifact, path, max_age_hours, :strict),
+    do: fresh_by_age?(artifact, path, max_age_hours)
+
+  defp fresh_by_age?(artifact, path, max_age_hours) do
     case artifact_generated_at(artifact) do
       {:ok, datetime} ->
         DateTime.diff(DateTime.utc_now(), datetime, :second) <= max_age_hours * 60 * 60
@@ -1777,6 +1834,13 @@ defmodule Mix.Tasks.Dsex.Benchmark.Dashboard do
       :error ->
         age_seconds = System.system_time(:second) - mtime_unix!(path)
         age_seconds <= max_age_hours * 60 * 60
+    end
+  end
+
+  defp current_git_sha_bound?(artifact) do
+    case git_sha() do
+      current when is_binary(current) -> artifact["git_sha"] == current
+      _other -> false
     end
   end
 

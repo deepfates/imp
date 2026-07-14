@@ -312,6 +312,8 @@ defmodule DashboardTest do
 
     capture_io(fn ->
       Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--profile",
+        "telos",
         "--trace-dir",
         trace_dir,
         "--failure-campaign-dir",
@@ -417,7 +419,11 @@ defmodule DashboardTest do
              {"claim.optimize_anything.non_prompt_effectiveness",
               ["optimize_anything.non_prompt.full"]},
              {"claim.rlm.provider_free_benchmark", ["rlm_benchmark.full"]},
-             {"claim.failure_recovery.live", ["failure_recovery.live.full"]}
+             {"claim.failure_recovery.live",
+              [
+                "provider_retry_timeout_idempotency_live",
+                "retrieval_and_tool_agent_recovery_live"
+              ]}
            ]
 
     active_live_claim =
@@ -582,6 +588,8 @@ defmodule DashboardTest do
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
           Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+            "--profile",
+            "telos",
             "--trace-dir",
             trace_dir,
             "--failure-campaign-dir",
@@ -774,10 +782,10 @@ defmodule DashboardTest do
            )
   end
 
-  test "missing stale failed or unpinned structural evidence stays red and blocks optimizer parity" do
+  test "missing mismatched failed or unpinned structural evidence stays red and blocks optimizer parity" do
     scenarios = [
       {"missing", :missing, "missing"},
-      {"stale", [generated_at: "2020-01-01T00:00:00Z"], "stale"},
+      {"mismatched", [generated_at: "2020-01-01T00:00:00Z", git_sha: "stale-sha"], "failing"},
       {"failed", [structural_complete: false], "failing"},
       {"unpinned", [dspy_version: "3.3.0"], "failing"}
     ]
@@ -810,6 +818,8 @@ defmodule DashboardTest do
         Mix.Task.reenable("dsex.benchmark.dashboard")
 
         Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+          "--profile",
+          "telos",
           "--instruction-optimizer-dir",
           contract_dir,
           "--optimizer-dir",
@@ -963,6 +973,8 @@ defmodule DashboardTest do
       assert_raise Mix.Error, fn ->
         capture_io(fn ->
           Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+            "--profile",
+            "telos",
             "--trace-dir",
             Path.join(root, "missing-trace"),
             "--overhead-dir",
@@ -1209,11 +1221,94 @@ defmodule DashboardTest do
            ]
   end
 
-  defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+  test "current-git-bound deterministic evidence bypasses age but live evidence stays strict" do
+    root = tmp_dir("dashboard-freshness-policy")
+    gate_dir = Path.join(root, "gate")
+    failure_dir = Path.join(root, "failure")
+    overhead_dir = Path.join(root, "overhead")
+    out_dir = Path.join(root, "out")
+    Enum.each([gate_dir, failure_dir, overhead_dir, out_dir], &File.mkdir_p!/1)
 
-  defp run_failure_dashboard!(root, out_name, failure_dir) do
-    out_dir = Path.join(root, out_name)
-    File.mkdir_p!(out_dir)
+    old = ~U[2000-01-01 00:00:00Z]
+    current_sha = dashboard_git_sha()
+
+    write_gate_evidence!(gate_dir, "product_package", "package.check",
+      generated_at: old,
+      git_sha: current_sha
+    )
+
+    write_gate_evidence!(gate_dir, "live_provider_smoke", "live.check",
+      generated_at: old,
+      git_sha: current_sha
+    )
+
+    write_failure_campaign!(failure_dir, generated_at: old, git_sha: current_sha)
+
+    write_json!(Path.join(overhead_dir, "overhead-parity-old.json"), %{
+      "schema_version" => 1,
+      "generated_at" => DateTime.to_iso8601(old),
+      "git_sha" => current_sha,
+      "max_ratio" => 50.0,
+      "summary" => %{"total" => 1, "passing" => 1, "all_passing" => true},
+      "cases" => [%{"id" => "adapter_parse", "median_ratio_dsex_over_dspy" => 0.5}]
+    })
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--gate-dir",
+        gate_dir,
+        "--failure-campaign-dir",
+        failure_dir,
+        "--overhead-dir",
+        overhead_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "1"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+
+    deterministic_gate = dashboard["lanes"]["product_package"]
+    assert deterministic_gate["status"] == "full"
+    assert deterministic_gate["fresh"]
+
+    live_gate = dashboard["lanes"]["live_provider_smoke"]
+    assert live_gate["status"] == "stale"
+    refute live_gate["fresh"]
+    refute live_gate["full_evidence"]
+
+    failure_lane = dashboard["lanes"]["failure_recovery"]
+    assert failure_lane["status"] == "passing"
+    assert failure_lane["passing"]
+    assert failure_lane["fresh"]
+
+    overhead_lane = dashboard["lanes"]["provider_free_overhead"]
+    assert overhead_lane["status"] == "stale"
+    refute overhead_lane["full_evidence"]
+    refute dashboard["performance_claim_supported"]
+  end
+
+  test "failure recovery skips invalid tmp candidates and falls back to results" do
+    root = tmp_dir("dashboard-failure-results-fallback")
+    failure_dir = Path.join(root, "failure")
+    results_dir = Path.join(root, "results")
+    out_dir = Path.join(root, "out")
+    Enum.each([failure_dir, results_dir, out_dir], &File.mkdir_p!/1)
+
+    invalid_path = Path.join(failure_dir, "failure-campaign-newest.json")
+    write_json!(invalid_path, %{"schema_version" => 3, "runner" => "dsex-failure-campaign"})
+    File.touch!(invalid_path, {{2099, 1, 1}, {0, 0, 0}})
+
+    valid_path =
+      write_failure_campaign!(results_dir,
+        generated_at: ~U[2000-01-01 00:00:00Z],
+        git_sha: dashboard_git_sha()
+      )
 
     capture_io(fn ->
       Mix.Task.reenable("dsex.benchmark.dashboard")
@@ -1221,6 +1316,40 @@ defmodule DashboardTest do
       Mix.Tasks.Dsex.Benchmark.Dashboard.run([
         "--failure-campaign-dir",
         failure_dir,
+        "--results-dir",
+        results_dir,
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "1"
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+    lane = dashboard["lanes"]["failure_recovery"]
+
+    assert lane["artifact"]["path"] == valid_path
+    assert lane["passing"]
+    assert lane["fresh"]
+  end
+
+  defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp run_failure_dashboard!(root, out_name, failure_dir) do
+    out_dir = Path.join(root, out_name)
+    results_dir = Path.join(root, "#{out_name}-results")
+    File.mkdir_p!(out_dir)
+    File.mkdir_p!(results_dir)
+
+    capture_io(fn ->
+      Mix.Task.reenable("dsex.benchmark.dashboard")
+
+      Mix.Tasks.Dsex.Benchmark.Dashboard.run([
+        "--failure-campaign-dir",
+        failure_dir,
+        "--results-dir",
+        results_dir,
         "--out",
         out_dir,
         "--max-age-hours",
@@ -1381,11 +1510,12 @@ defmodule DashboardTest do
       "scope" => Enum.map(cases, & &1["id"])
     }
 
-    clock = fn -> ~U[2026-07-07 00:02:00Z] end
+    clock = fn -> Keyword.get(opts, :generated_at, ~U[2026-07-07 00:02:00Z]) end
+    source_sha = Keyword.get(opts, :git_sha, "abc")
 
     context =
       DSEx.BenchmarkTruth.RunContext.new!(
-        source_commits: %{"dsex" => "deepfates/dsex@abc"},
+        source_commits: %{"dsex" => "deepfates/dsex@#{source_sha}"},
         workspace_state: "synthetic",
         clock: clock
       )
@@ -1594,12 +1724,12 @@ defmodule DashboardTest do
     String.trim(sha)
   end
 
-  defp write_gate_evidence!(dir, gate, mix_task) do
+  defp write_gate_evidence!(dir, gate, mix_task, opts \\ []) do
     write_json!(Path.join(dir, "gate-evidence-#{gate}-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "runner" => "dsex-gate-evidence",
-      "generated_at" => "2026-07-07T00:00:00Z",
-      "git_sha" => "abc",
+      "generated_at" => Keyword.get(opts, :generated_at, "2026-07-07T00:00:00Z"),
+      "git_sha" => Keyword.get(opts, :git_sha, "abc"),
       "gate" => gate,
       "command" => %{"executable" => "mix", "args" => [mix_task], "env" => []},
       "summary" => %{

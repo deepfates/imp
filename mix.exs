@@ -68,6 +68,8 @@ defmodule DSEx.MixProject do
           "benchmark.live.check": :test,
           "benchmark.dashboard": :test,
           "benchmark.dashboard.full": :test,
+          "benchmark.dashboard.telos": :test,
+          "benchmark.dashboard.telos.full": :test,
           "benchmark.live_matrix": :test,
           "dsex.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
@@ -361,9 +363,15 @@ defmodule DSEx.MixProject do
         "dsex.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "dsex.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "dsex.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.full": [
+        "dsex.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+      ],
+      "benchmark.dashboard.telos": [
+        "dsex.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+      ],
+      "benchmark.dashboard.telos.full": [
         "dsex.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rag-tool-agent-dir tmp/rag-tool-agent --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
       ],
       "benchmark.live.check": [

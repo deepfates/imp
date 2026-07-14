@@ -3,8 +3,8 @@ defmodule DSEx.ReleaseProfileTest do
 
   alias DSEx.BenchmarkTruth.ReleaseProfile
 
-  test "canonical profiles are cumulative and telos is the conservative default" do
-    assert ReleaseProfile.default() == "telos"
+  test "canonical profiles are cumulative and v0.1 is the product default" do
+    assert ReleaseProfile.default() == "v0.1"
     assert ReleaseProfile.names() == ["research", "telos", "v0.1"]
     assert ReleaseProfile.fetch!("v0.1")["claim_releases"] == ["v0.1"]
     assert ReleaseProfile.fetch!("telos")["claim_releases"] == ["v0.1", "telos"]

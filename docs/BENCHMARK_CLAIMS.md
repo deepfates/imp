@@ -7,13 +7,21 @@ evidence lanes and adds a `public_claims` release-gate check.
 This inventory governs full parity, comparative effectiveness, and benchmark
 claims. It is additive to the scoped v0.1 product contract in
 `docs/V0_1_RELEASE_LEDGER.md`; deferred research rows may keep
-`benchmark.dashboard.full` red without invalidating a product-only v0.1
+`benchmark.dashboard.telos.full` red without invalidating a product-only v0.1
 candidate, provided those claims are not presented as current capabilities.
 
-The rule is simple: if a claim is release-blocking, the dashboard must be able
-to trace it to fresh passing evidence before `mix benchmark.dashboard.full`
+The rule is simple: v0.1 release-blocking claims must trace to fresh passing
+evidence before `mix benchmark.dashboard.full` passes. Broader telos claims
+must trace to fresh passing evidence before `mix benchmark.dashboard.telos.full`
 passes. Claims that are true only for a narrower path must say so in the claim
 statement and in the linked docs.
+
+The inventory has two policy scopes. `v0.1` rows are scoped product claims for
+the named APIs, workflows, and evidence cases in those rows. `telos` rows are
+future research targets for comparative effectiveness, parity, or replication;
+they remain release-blocking gaps and must not be read as current product
+capabilities. A `full` requirement means full evidence for that row's precise
+scope, not full parity for an entire subsystem or the whole upstream project.
 
 ## Shape
 
@@ -32,7 +40,8 @@ Each claim has:
   `post-v0.1`.
 - `scope`: the precise boundary of the claim.
 - `limitations`: explicit exclusions or evidence still required.
-- `release_blocking`: whether this claim blocks `benchmark.dashboard.full`.
+- `release_blocking`: whether this claim blocks the full dashboard for its
+  release profile.
 - `sources`: docs, tests, fixtures, or papers that explain the claim.
 - `requirements`: evidence rows the dashboard can evaluate.
 
@@ -64,6 +73,8 @@ mix gate.protocol.evidence
 mix gate.live_provider.evidence
 mix benchmark.dashboard
 mix benchmark.dashboard.full
+mix benchmark.dashboard.telos
+mix benchmark.dashboard.telos.full
 ```
 
 The `gate.*.evidence` aliases run real source-checkout gates and write
@@ -77,6 +88,13 @@ Live matched-model evidence also consumes `benchmarks/model_availability.json`
 for documented external model unavailability. That file can unblock a historical
 lane only when the historical endpoint itself is no longer a stable provider
 baseline; it cannot replace current-model coverage.
+
+RLM research claims require exact paper-scale authority. The checked-in RLM
+protocol still marks the exact S-NIAH instances, BrowseComp+ query/document
+selection, and OOLONG-Pairs scorer as unavailable with explicit acquisition
+markers. T0 fixture replay, T1 operational contracts, and sampled T2 evidence
+cannot be promoted to the exact T3 research claim while those authorities are
+unavailable.
 
 GEPA research claims use the `gepa_replication` lane, not the generic
 `optimizer_lift` lane. The dashboard only accepts those claims when a fresh
@@ -106,11 +124,16 @@ positive held-out accuracy and macro-F1 lift, and exact fused/save-load row
 equivalence. This proves the local training and deployment substrate only; it
 does not authorize paid-provider, BetterTogether, GRPO, or DSPy-matched parity.
 
-When `benchmark.dashboard.full` fails, the terminal error names both the
+Failure-recovery live evidence is limited to two required rows: provider retry,
+timeout, and idempotency; and integration retrieval plus tool-agent recovery.
+The campaign does not create or cancel a live provider training job, so its
+failure-recovery policy makes no live provider-training claim.
+
+When a profile-specific full dashboard fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
-work queue: either produce the missing evidence, narrow or remove the claim, or
-mark a genuinely impossible external dependency as unavailable in the relevant
-evidence artifact.
+work queue for that profile: either produce the missing evidence, narrow or
+remove the claim, or mark a genuinely impossible external dependency as
+unavailable in the relevant evidence artifact.
 
 Do not add a marketing or README claim without adding or updating a row in
 `benchmarks/claims.json`. Do not mark a claim non-blocking merely because the

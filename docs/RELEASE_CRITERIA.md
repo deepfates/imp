@@ -112,13 +112,13 @@ DSEx is production complete when:
    external MCP servers is backed by dedicated external-service tests, or the
    claim is removed.
 14. The docs and Livebooks teach DSEx as a coherent Elixir-native system.
-15. `mix benchmark.dashboard` produces a current
+15. `mix benchmark.dashboard` produces a current v0.1-scoped
     `parity-dashboard-*.json` artifact.
 16. `mix benchmark.dashboard.full` passes, and the dashboard reports
-    `full_parity: true`, before the release claims full DSPy parity.
-    When this gate fails, its terminal error must name the blocking release
-    requirements so the next operator can continue from the failure without
-    hand-inspecting the dashboard JSON first.
+    `full_parity: true`, before the release makes any v0.1-scoped benchmark
+    claim that requires full evidence. When this gate fails, its terminal
+    error must name the blocking release requirements so the next operator can
+    continue from the failure without hand-inspecting the dashboard JSON first.
     The gate also evaluates `benchmarks/claims.json`; every release-blocking
     public claim must map to fresh passing evidence before the full dashboard
     gate passes. See `docs/BENCHMARK_CLAIMS.md`.
@@ -126,6 +126,10 @@ DSEx is production complete when:
     dashboard evidence through `mix gate.package.evidence`,
     `mix gate.livebook.evidence`, `mix gate.protocol.evidence`, and
     `mix gate.live_provider.evidence`.
+    The explicit `mix benchmark.dashboard.telos` and
+    `mix benchmark.dashboard.telos.full` aliases retain the cumulative telos
+    research view; failures there do not block a v0.1 product release unless
+    those broader claims are presented as product capabilities.
 17. The parity dashboard reports `performance_claim_supported: true` before the
     release claims DSEx is faster than DSPy on any named path.
 18. Live latency claims cite dashboard or matrix instrumentation that separates

@@ -2,7 +2,7 @@ defmodule DSEx.BenchmarkTruth.ReleaseProfile do
   @moduledoc false
 
   @schema_version 1
-  @default "telos"
+  @default "v0.1"
   @profiles %{
     "v0.1" => ["v0.1"],
     "telos" => ["v0.1", "telos"],

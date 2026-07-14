@@ -62,8 +62,31 @@ defmodule ClaimsInventoryTest do
     assert claim["release"] == "telos"
     assert claim["release_blocking"]
 
-    assert [%{"lane" => "failure_recovery", "evidence" => "full"}] =
-             claim["requirements"]
+    assert [
+             %{
+               "id" => "provider_retry_timeout_idempotency_live",
+               "lane" => "failure_recovery",
+               "evidence" => "full"
+             },
+             %{
+               "id" => "retrieval_and_tool_agent_recovery_live",
+               "lane" => "failure_recovery",
+               "evidence" => "full"
+             }
+           ] = claim["requirements"]
+
+    refute "training_protocol" in claim["surface"]
+    assert claim["statement"] =~ "does not claim live provider training"
+  end
+
+  test "RLM research claim names unavailable exact authorities" do
+    claim =
+      Enum.find(read_claims!(), &(&1["id"] == "claim.rlm.provider_free_benchmark"))
+
+    assert claim["release"] == "telos"
+    assert Enum.any?(claim["limitations"], &String.contains?(&1, "S-NIAH"))
+    assert Enum.any?(claim["limitations"], &String.contains?(&1, "ACQUIRE_AND_PIN_SHA256"))
+    assert claim["statement"] =~ "exact paper authority"
   end
 
   test "local MLX effectiveness claim remains narrow and independently gated" do
