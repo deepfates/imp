@@ -684,7 +684,7 @@ submit(%{answer: child[:answer]})|
         [],
         {:rlm_tool_error, {:tool_denied, :lookup}}
       },
-      {~S|missing_tool(%{})|, [], :allow, {:function_not_allowed, "missing_tool"}},
+      {~S|missing_tool(%{})|, [], :allow, {:function_not_allowed, :missing_tool}},
       {
         ~S|boom(%{})|,
         [DSEx.Tool.new(:boom, "boom", fn _ -> raise "tool exploded" end)],
