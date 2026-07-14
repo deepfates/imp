@@ -65,6 +65,22 @@ defmodule DSEx.Predict.ReActV2 do
     }
   end
 
+  @doc false
+  def with_tools(%__MODULE__{} = agent, tools) when is_map(tools) do
+    tools = validate_updated_tools!(agent.tools, tools)
+
+    react = %{
+      agent.react
+      | config: Keyword.merge(agent.react.config, provider_tool_config(tools, agent.signature))
+    }
+
+    %{agent | tools: tools, react: react}
+  end
+
+  def with_tools(%__MODULE__{}, tools) do
+    raise ArgumentError, "ReActV2 tools must be a map, got: #{inspect(tools)}"
+  end
+
   @impl true
   def call(%__MODULE__{} = react, inputs) when is_map(inputs) or is_list(inputs) do
     with {:ok, inputs} <- normalize_inputs(inputs),
@@ -333,5 +349,39 @@ defmodule DSEx.Predict.ReActV2 do
         parameters: parameters
       }
     }
+  end
+
+  defp validate_updated_tools!(original, updated) do
+    unless MapSet.new(Map.keys(original)) == MapSet.new(Map.keys(updated)) do
+      raise ArgumentError, "ReActV2 tool updates cannot add or remove tools"
+    end
+
+    Enum.each(original, fn {name, tool} ->
+      case Map.fetch(updated, name) do
+        {:ok, %DSEx.Tool{} = replacement} ->
+          ensure_preserved_tool!(tool, replacement)
+
+        {:ok, replacement} ->
+          raise ArgumentError, "ReActV2 tool update is not a DSEx.Tool: #{inspect(replacement)}"
+
+        :error ->
+          raise ArgumentError, "ReActV2 tool update removed #{inspect(name)}"
+      end
+    end)
+
+    updated
+  end
+
+  defp ensure_preserved_tool!(%DSEx.Tool{name: :submit} = original, replacement) do
+    unless replacement.name == original.name and replacement.description == original.description and
+             replacement.schema == original.schema and replacement.run === original.run do
+      raise ArgumentError, "ReActV2 submit is reserved and cannot be changed"
+    end
+  end
+
+  defp ensure_preserved_tool!(original, replacement) do
+    unless replacement.name == original.name and replacement.run === original.run do
+      raise ArgumentError, "ReActV2 tool updates must preserve tool names and runners"
+    end
   end
 end

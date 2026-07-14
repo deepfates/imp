@@ -106,6 +106,26 @@ defmodule DSEx.Predict.ReAct do
     }
   end
 
+  @doc false
+  def with_tools(%__MODULE__{} = agent, tools) when is_map(tools) do
+    tools = validate_updated_tools!(agent.tools, tools)
+
+    react = %{
+      agent.react
+      | config:
+          Keyword.merge(
+            agent.react.config,
+            provider_tool_config(tools, agent.signature, agent.mode)
+          )
+    }
+
+    %{agent | tools: tools, react: react}
+  end
+
+  def with_tools(%__MODULE__{}, tools) do
+    raise ArgumentError, "ReAct tools must be a map, got: #{inspect(tools)}"
+  end
+
   defp submit_tool(:provider_native),
     do: DSEx.Tool.new(:submit, "Submit final outputs", fn args -> args end)
 
@@ -547,6 +567,40 @@ defmodule DSEx.Predict.ReAct do
     do: %{"type" => "object", "properties" => %{}}
 
   defp normalize_tool_name(tools, name), do: DSEx.Tool.resolve_name(tools, name)
+
+  defp validate_updated_tools!(original, updated) do
+    unless MapSet.new(Map.keys(original)) == MapSet.new(Map.keys(updated)) do
+      raise ArgumentError, "ReAct tool updates cannot add or remove tools"
+    end
+
+    Enum.each(original, fn {name, tool} ->
+      case Map.fetch(updated, name) do
+        {:ok, %DSEx.Tool{} = replacement} ->
+          ensure_preserved_tool!(tool, replacement)
+
+        {:ok, replacement} ->
+          raise ArgumentError, "ReAct tool update is not a DSEx.Tool: #{inspect(replacement)}"
+
+        :error ->
+          raise ArgumentError, "ReAct tool update removed #{inspect(name)}"
+      end
+    end)
+
+    updated
+  end
+
+  defp ensure_preserved_tool!(%DSEx.Tool{name: :submit} = original, replacement) do
+    unless replacement.name == original.name and replacement.description == original.description and
+             replacement.schema == original.schema and replacement.run === original.run do
+      raise ArgumentError, "ReAct submit is reserved and cannot be changed"
+    end
+  end
+
+  defp ensure_preserved_tool!(original, replacement) do
+    unless replacement.name == original.name and replacement.run === original.run do
+      raise ArgumentError, "ReAct tool updates must preserve tool names and runners"
+    end
+  end
 
   defp non_negative_integer(value) when is_integer(value) and value >= 0, do: value
 end

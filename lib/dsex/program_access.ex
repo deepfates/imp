@@ -26,6 +26,9 @@ defmodule DSEx.ProgramAccess do
   def predict(%ReAct{react: predict}), do: predict
   def predict(%ReActV2{react: predict}), do: predict
   def predict(%Avatar{actor: predict}), do: predict
+  def predict(%BestOfN{program: program}), do: predict(program)
+  def predict(%Refine{program: program}), do: predict(program)
+  def predict(%MultiChainComparison{predict: predict}), do: predict(predict)
   def predict(_program), do: nil
 
   def task_signature(%Predict{signature: signature}), do: signature
@@ -161,6 +164,22 @@ defmodule DSEx.ProgramAccess do
 
   def put_metadata(%RAG{program: inner} = program, key, value) do
     %{program | program: put_metadata(inner, key, value)}
+  end
+
+  def put_metadata(%Assertions{program: inner} = program, key, value) do
+    %{program | program: put_metadata(inner, key, value)}
+  end
+
+  def put_metadata(%BestOfN{program: inner} = program, key, value) do
+    %{program | program: put_metadata(inner, key, value)}
+  end
+
+  def put_metadata(%Refine{program: inner} = program, key, value) do
+    %{program | program: put_metadata(inner, key, value)}
+  end
+
+  def put_metadata(%MultiChainComparison{predict: predict} = program, key, value) do
+    %{program | predict: put_metadata(predict, key, value)}
   end
 
   def put_metadata(%ReAct{react: predict} = program, key, value),
