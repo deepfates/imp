@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "campaign_id": "instruction-optimizer-aime-economical-preflight-v2-20260714",
+  "campaign_id": "instruction-optimizer-aime-economical-preflight-v3-20260714",
   "family": "AIMEBench",
   "model": {
     "logical": "gpt-4.1-mini-2025-04-14",
