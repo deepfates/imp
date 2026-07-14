@@ -50,16 +50,20 @@ defmodule DSEx.IdentityEvaluationTest do
     assert {:ok, report} =
              IdentityEvaluation.compile(registry, assessments, flags, dissent, atlas, scenarios)
 
+    assert report["schema_version"] == 2
     [view] = report["scenarios"]
     assert view["ranked_candidate_count"] == 2
     assert view["pareto_candidate_count"] == 2
 
     alpha = Enum.find(view["ranked"], &(&1["candidate_id"] == "cand-a"))
-    beta = Enum.find(view["ranked"], &(&1["candidate_id"] == "cand-b"))
+    alpha_candidate = Enum.find(report["candidates"], &(&1["candidate_id"] == "cand-a"))
+    beta_candidate = Enum.find(report["candidates"], &(&1["candidate_id"] == "cand-b"))
 
     assert alpha["scenario_score"] == 4.5
-    assert alpha["flags"] == ["flag-a"]
-    assert beta["dissent"] == ["dissent-b"]
+    assert alpha_candidate["flags"] == ["flag-a"]
+    assert beta_candidate["dissent"] == ["dissent-b"]
+    assert get_in(alpha_candidate, ["axis_scores", "semantic-truth", "replicates"]) == 3
+    assert Map.keys(alpha) |> Enum.sort() == ~w(candidate_id pareto scenario_score tier)
   end
 
   test "a candidate remains visible but unranked until replicate coverage is complete" do

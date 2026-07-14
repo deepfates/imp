@@ -55,14 +55,13 @@ defmodule DSEx.IdentityEvaluation do
             scenario_config["tier_thresholds"],
             entities,
             score_vectors,
-            active_flags,
-            active_dissent,
             required_replicates
           )
         end)
 
       {:ok,
        %{
+         "schema_version" => 2,
          "generated_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
          "atlas_version" => atlas["atlas_version"],
@@ -79,6 +78,7 @@ defmodule DSEx.IdentityEvaluation do
            "active_dissent" => length(active_dissent),
            "required_assessment_replicates" => required_replicates
          },
+         "candidates" => candidate_views(entities, score_vectors, active_flags, active_dissent),
          "scenarios" => views
        }}
     else
@@ -299,8 +299,6 @@ defmodule DSEx.IdentityEvaluation do
          thresholds,
          entities,
          score_vectors,
-         flags,
-         dissent,
          required_replicates
        ) do
     active_axes =
@@ -324,12 +322,13 @@ defmodule DSEx.IdentityEvaluation do
             end)
 
           row =
-            entity
-            |> Map.put("axis_scores", axis_scores)
+            %{
+              "candidate_id" => candidate_id,
+              "display" => entity["display"],
+              "axis_scores" => axis_scores
+            }
             |> Map.put("scenario_score", score)
             |> Map.put("tier", tier(score, thresholds))
-            |> Map.put("flags", candidate_records(flags, candidate_id))
-            |> Map.put("dissent", candidate_records(dissent, candidate_id))
 
           {[row | ranked], missing}
         else
@@ -349,6 +348,7 @@ defmodule DSEx.IdentityEvaluation do
       eligible
       |> Enum.map(&Map.put(&1, "pareto", MapSet.member?(frontier_ids, &1["candidate_id"])))
       |> Enum.sort_by(fn row -> {-row["scenario_score"], String.downcase(row["display"])} end)
+      |> Enum.map(&Map.take(&1, ~w(candidate_id scenario_score tier pareto)))
 
     %{
       "id" => scenario["id"],
@@ -358,8 +358,22 @@ defmodule DSEx.IdentityEvaluation do
       "unranked_candidate_count" => length(unranked),
       "pareto_candidate_count" => MapSet.size(frontier_ids),
       "ranked" => ranked,
-      "unranked" => Enum.sort_by(unranked, &String.downcase(&1["display"]))
+      "unranked" =>
+        unranked
+        |> Enum.sort_by(&String.downcase(&1["display"]))
+        |> Enum.map(&Map.drop(&1, ["display"]))
     }
+  end
+
+  defp candidate_views(entities, score_vectors, flags, dissent) do
+    entities
+    |> Enum.map(fn {candidate_id, entity} ->
+      entity
+      |> Map.put("axis_scores", Map.get(score_vectors, candidate_id, %{}))
+      |> Map.put("flags", record_ids(flags, candidate_id))
+      |> Map.put("dissent", record_ids(dissent, candidate_id))
+    end)
+    |> Enum.sort_by(&{String.downcase(&1["display"]), &1["candidate_id"]})
   end
 
   defp pareto_frontier_ids(rows, axes) do
@@ -393,7 +407,7 @@ defmodule DSEx.IdentityEvaluation do
     |> Map.fetch!("tier")
   end
 
-  defp candidate_records(records, candidate_id) do
+  defp record_ids(records, candidate_id) do
     records
     |> Enum.filter(&(&1["candidate_id"] == candidate_id))
     |> Enum.map(& &1["id"])
