@@ -1,9 +1,9 @@
 # Identity-Space Census
 
-This directory is the Step 8 decision checkpoint for replacing the working
-`DSEx` identity. It is a research corpus, not a shortlist and not an instruction
-to rename the package. Final selection and implementation wait until the owner
-adds the unrevealed candidate to the completed corpus.
+This directory preserves the research and decision record for replacing the
+working `DSEx` identity. The owner selected `Imp` and authorized the hard
+pre-release cutover on 2026-07-14. [`DECISION.md`](DECISION.md) is the concise
+authority for the final naming grammar and historical-evidence boundary.
 
 Start with [`reports/executive-brief.md`](reports/executive-brief.md) for the
 decision state and conclusion-first synthesis. The system map, hostile audit,
@@ -31,12 +31,12 @@ package, API, runtime, tooling, evidence, and repository contracts that the
 eventual decision must migrate together. It recommends a clean pre-release
 rename while preserving immutable identity and benchmark provenance.
 
-The owner's held-out candidate has now been revealed as `Imp`. The
+The owner's held-out candidate was revealed as `Imp`. The
 [`reports/imp-finalist-review.md`](reports/imp-finalist-review.md) records its
 pre-reveal embodiment, independent adversarial review, technical projection,
-direct public conflicts, and comparison with `DSX`. `Imp` is the provisional
-intrinsic winner, but selection remains conditional on the owner accepting a
-shared AI/software identity and obtaining qualified legal-risk review.
+direct public conflicts, and comparison with `DSX`. The owner accepted the
+documented shared-identity tradeoff and selected `Imp`; qualified legal review
+remains external risk work rather than a condition on the code cutover.
 
 The checkpoint follows the repository rule that no generation is silently
 discarded. Raw portfolios are immutable inputs. Repeated names, malformed

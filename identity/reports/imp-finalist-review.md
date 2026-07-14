@@ -2,8 +2,9 @@
 
 ## Conclusion
 
-`Imp` passes the intrinsic identity review and becomes the provisional rank-one
-candidate ahead of `DSX`. It is more memorable, more natural in Elixir code,
+`Imp` passed the intrinsic identity review and became the selected identity on
+2026-07-14 after the owner accepted the documented coexistence tradeoff. It is
+more memorable, more natural in Elixir code,
 more extensible as a product family, and less derivative of DSPy while retaining
 the intended lineage:
 
@@ -18,8 +19,9 @@ namespace. The decision is therefore straightforward:
 - do not choose `Imp` if broad exclusivity across AI infrastructure, developer
   tools, and future hosted services is a hard requirement.
 
-No repository rename should begin until the owner accepts that tradeoff and a
-qualified legal review finds no blocking likelihood-of-confusion issue.
+The owner has authorized the code cutover and explicitly treats the unrelated
+same-name software projects as non-blocking. This report preserves the observed
+collision evidence without turning it into an implementation gate.
 
 ## Why It Works
 
@@ -111,16 +113,18 @@ collision and weaker intrinsic character.
 
 ## Recommendation
 
-Treat `Imp` as the **provisional winner** and ask one explicit owner question:
+The owner answered the explicit decision question in favor of the best-fitting
+Elixir identity despite the shared software namespace. Treat `Imp` as the
+**selected identity** and execute the hard pre-release rename described in
+[`rename-surface-audit.md`](rename-surface-audit.md).
 
 > Are we choosing the best-fitting Elixir identity even though active AI
 > projects already use the same short name, or is broad software-brand
 > exclusivity a requirement?
 
-If qualified legal review is acceptable and the answer is the former, select
-`Imp`, record the decision, and execute the hard pre-release rename described in
-[`rename-surface-audit.md`](rename-surface-audit.md). If the answer is the
-latter, `Imp` fails a hard requirement and the naming decision must remain open.
+The authoritative naming grammar and historical boundary are recorded in
+[`../DECISION.md`](../DECISION.md). This review remains the dated risk analysis
+and does not claim the implementation rename is complete.
 
 The machine-readable evidence and limitations are in
 [`imp-finalist-screen-01.json`](../research/imp-finalist-screen-01.json). The
