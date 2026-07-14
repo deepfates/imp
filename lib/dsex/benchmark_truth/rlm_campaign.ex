@@ -504,7 +504,8 @@ defmodule DSEx.BenchmarkTruth.RLMCampaign do
           "input_tokens" => Enum.sum(Enum.map(initial_rows, & &1["usage"]["input_tokens"])),
           "output_tokens" => Enum.sum(Enum.map(initial_rows, & &1["usage"]["output_tokens"])),
           "usd" => Enum.sum(Enum.map(initial_rows, & &1["usage"]["usd"]))
-        }
+        },
+        "reservations" => []
       }
 
       {:ok, pid} =
