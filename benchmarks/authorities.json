@@ -165,8 +165,8 @@
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2312.13382v2", "revision": "v2", "title": "DSPy Assertions: Computational Constraints for Self-Refining Language Model Pipelines"},
       "upstream_tests": {"status": "present", "references": ["tests/evaluate/test_evaluate.py#sha256=04a87b5f0efe668a4d7a476afa7cc956a5fd86417b3a1548e3cc934ee5c0858a", "tests/evaluate/test_metrics.py#sha256=0096234f1c1f202dd807de4769dfaf7d2987b678eaa81bba1c2cf4aed60637ef", "tests/evaluate/test_auto_evaluation.py#sha256=2ee33255d3de75dce4dbb41ce2cfe6abd277644903203f8a4370d87b78af1467", "tests/predict/test_refine.py#sha256=13d061e2c5a2650b2c0eaf52db202b55e30382b98885bda528ae0686c010a509"]},
       "dataset_protocol": {"status": "not_applicable", "references": [], "immutable_digests": []},
-      "local_differential": {"status": "partial", "artifacts": ["benchmarks/config/auto-evaluation-differential-v1.json", "test/auto_evaluation_contract_test.exs", "test/auto_evaluation_fidelity_test.exs"]},
-      "notes": "The provider-free auto-evaluation differential covers the deterministic DSPy 3.2.1 source contract without claiming judge quality. Immutable T1 admission awaits a clean post-commit capture; matched natural-data quality remains open."
+      "local_differential": {"status": "present", "artifacts": ["benchmarks/config/auto-evaluation-differential-v1.json", "benchmarks/results/auto-evaluation-differential-v1.json", "test/auto_evaluation_contract_test.exs", "test/auto_evaluation_fidelity_test.exs"]},
+      "notes": "The clean provider-free auto-evaluation differential covers the deterministic DSPy 3.2.1 source contract without claiming judge quality. Matched natural-data quality remains open."
     },
     {
       "id": "family.optimizer_few_shot_search",
