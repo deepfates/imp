@@ -1,0 +1,19 @@
+{
+  "commit": "3101c7d5072418e28b9008a6636bde82a006892c",
+  "files": [
+    {
+      "path": "grade_school_math/data/test.jsonl",
+      "sha256": "3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14"
+    },
+    {
+      "path": "grade_school_math/dataset.py",
+      "sha256": "c22b81bccaaebfd1123be296e8b3c3dca3ddc704c46b70bf4a50603bb627e197"
+    }
+  ],
+  "repository": "https://github.com/openai/grade-school-math",
+  "schema_version": 1,
+  "source_paths": [
+    "grade_school_math/data/test.jsonl",
+    "grade_school_math/dataset.py"
+  ]
+}

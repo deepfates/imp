@@ -31,7 +31,7 @@ Each row records five independent authority dimensions:
 
 | Dimension | What it records | Gap rule |
 | --- | --- | --- |
-| `upstream_repository` | Repository, release/version, git ref, commit, and source paths | Unknown immutable coordinates remain `null`; a repository name alone is not a pin. |
+| `upstream_repository` | Repository, release/version, git ref, commit, source paths, and a digest-bound per-file source manifest | Unknown immutable coordinates remain `null`; a repository name alone is not a pin. |
 | `primary_authority` | Primary paper or specification locator and revision | Missing or non-primary documentation is recorded as `gap` or `no_primary_authority`. |
 | `upstream_tests` | Whether the audited upstream tree has relevant tests | Unaudited coverage is `not_audited`; absence is not inferred from silence. |
 | `dataset_protocol` | Dataset split/protocol references and immutable digests | A named dataset without source and split digests is `partial`, `protocol_defined`, or `gap`. |
@@ -40,6 +40,12 @@ Each row records five independent authority dimensions:
 All five blocks are required on every row. Empty arrays and explicit `null`
 values are intentional: they prevent a consumer from confusing an omitted field
 with an established authority.
+
+Pinned repository rows reference `benchmarks/authority_sources/*.json`. Each
+manifest binds the repository and commit to every tracked file under the row's
+declared source paths with a SHA-256 digest. The ledger also binds the complete
+manifest bytes and file count. Authority loading fails closed on a changed
+manifest, an uncovered source path, duplicate paths, or repository/commit drift.
 
 ## Status Vocabulary
 
@@ -66,7 +72,7 @@ open.
 | DSPy programming model | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | present |
 | Model, provider, settings, and normalized runtime | runtime | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | not_applicable | partial |
 | Structured adapters and multimodal value types | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | partial |
-| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |
+| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | protocol_defined | present |
 | Recursive Language Models | algorithm | 3.3.0b1 @ b2829b7ae3b6 | pinned | present | partial | partial |
 | Refinement, evaluation, and metrics | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | partial |
 | Few-shot, KNN, and random search optimizers | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |

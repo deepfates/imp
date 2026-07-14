@@ -6,10 +6,13 @@ defmodule DSEx.EvidenceAuthorities do
   @summary_end "<!-- evidence-authority-summary:end -->"
   @sha_reference ~r/^.+#sha256=[0-9a-f]{64}$/
   @sha_digest ~r/^sha256:[0-9a-f]{64}$/
+  @sha256 ~r/^[0-9a-f]{64}$/
+  @pinned_repository_statuses ~w(release_and_commit_pinned commit_pinned)
 
   def load!(path \\ "benchmarks/authorities.json") do
     ledger = path |> File.read!() |> Jason.decode!()
     validate!(ledger)
+    validate_source_manifests!(ledger, path)
   end
 
   def validate!(%{"schema_version" => 1, "families" => families} = ledger)
@@ -77,9 +80,10 @@ defmodule DSEx.EvidenceAuthorities do
   end
 
   defp validate_repository!(id, %{"status" => status} = repository)
-       when status in ["release_and_commit_pinned", "commit_pinned"] do
+       when status in @pinned_repository_statuses do
     unless nonempty?(repository["repository"]) and nonempty?(repository["version"]) and
-             nonempty?(repository["git_ref"]) and digest?(repository["commit"], 40) do
+             nonempty?(repository["git_ref"]) and digest?(repository["commit"], 40) and
+             valid_manifest_reference?(repository["source_manifest"]) do
       raise ArgumentError, "#{id} has an invalid pinned repository"
     end
   end
@@ -128,7 +132,7 @@ defmodule DSEx.EvidenceAuthorities do
   defp validate_dataset_protocol!(_id, _protocol), do: :ok
 
   defp repository_label(%{"status" => status, "version" => version, "commit" => commit})
-       when status in ["release_and_commit_pinned", "commit_pinned"] do
+       when status in @pinned_repository_statuses do
     "#{version} @ #{String.slice(commit, 0, 12)}"
   end
 
@@ -141,4 +145,86 @@ defmodule DSEx.EvidenceAuthorities do
   defp digest?(value, length) do
     is_binary(value) and byte_size(value) == length and String.match?(value, ~r/^[0-9a-f]+$/)
   end
+
+  defp valid_manifest_reference?(%{
+         "path" => "benchmarks/authority_sources/" <> name,
+         "sha256" => sha256,
+         "file_count" => file_count
+       }) do
+    name != "" and not String.contains?(name, ["/", ".."]) and
+      is_binary(sha256) and Regex.match?(@sha256, sha256) and
+      is_integer(file_count) and file_count > 0
+  end
+
+  defp valid_manifest_reference?(_reference), do: false
+
+  defp validate_source_manifests!(ledger, ledger_path) do
+    project_root = ledger_path |> Path.expand() |> Path.dirname() |> Path.dirname()
+
+    ledger["families"]
+    |> Enum.filter(&(&1["upstream_repository"]["status"] in @pinned_repository_statuses))
+    |> Enum.group_by(fn family ->
+      repository = family["upstream_repository"]
+      {repository["repository"], repository["commit"], repository["source_manifest"]}
+    end)
+    |> Enum.each(fn {{repository, commit, reference}, families} ->
+      manifest_path = Path.join(project_root, reference["path"])
+      bytes = File.read!(manifest_path)
+      actual_sha256 = sha256(bytes)
+
+      unless actual_sha256 == reference["sha256"] do
+        raise ArgumentError,
+              "authority source manifest digest mismatch for #{reference["path"]}: " <>
+                "expected #{reference["sha256"]}, got #{actual_sha256}"
+      end
+
+      manifest = Jason.decode!(bytes)
+      validate_source_manifest!(manifest, repository, commit, reference, families)
+    end)
+
+    ledger
+  end
+
+  defp validate_source_manifest!(manifest, repository, commit, reference, families) do
+    files = manifest["files"]
+
+    unless manifest["schema_version"] == 1 and manifest["repository"] == repository and
+             manifest["commit"] == commit and is_list(files) and
+             length(files) == reference["file_count"] and files != [] do
+      raise ArgumentError, "invalid authority source manifest #{reference["path"]}"
+    end
+
+    file_paths = Enum.map(files, & &1["path"])
+
+    unless file_paths == Enum.sort(Enum.uniq(file_paths)) and
+             Enum.all?(files, &valid_source_file?/1) do
+      raise ArgumentError, "invalid authority source files in #{reference["path"]}"
+    end
+
+    declared_paths =
+      families
+      |> Enum.flat_map(& &1["upstream_repository"]["source_paths"])
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    unless manifest["source_paths"] == declared_paths and
+             Enum.all?(declared_paths, &source_path_covered?(&1, file_paths)) do
+      raise ArgumentError, "authority source manifest coverage mismatch for #{reference["path"]}"
+    end
+  end
+
+  defp valid_source_file?(%{"path" => path, "sha256" => sha256}) do
+    nonempty?(path) and not String.starts_with?(path, "/") and
+      not String.contains?(path, "..") and is_binary(sha256) and Regex.match?(@sha256, sha256)
+  end
+
+  defp valid_source_file?(_file), do: false
+
+  defp source_path_covered?(source_path, file_paths) do
+    Enum.any?(file_paths, fn file_path ->
+      file_path == source_path or String.starts_with?(file_path, source_path <> "/")
+    end)
+  end
+
+  defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 end

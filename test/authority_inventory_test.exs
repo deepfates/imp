@@ -76,7 +76,8 @@ defmodule AuthorityInventoryTest do
         "version",
         "git_ref",
         "commit",
-        "source_paths"
+        "source_paths",
+        "source_manifest"
       ])
 
       assert_keys(family["primary_authority"], ["status", "locator", "revision", "title"])

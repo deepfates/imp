@@ -1,0 +1,110 @@
+{
+  "commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+  "files": [
+    {
+      "path": "gepa_artifact/benchmarks/AIME/AIME_data.py",
+      "sha256": "672aa24c248a735c78701d7b04ad17ca5950143ee0bfc6f4d0b0519912f7f37d"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/AIME/AIME_program.py",
+      "sha256": "826b6f89a8ce5eebf45d538afd82fe325610485170e313454a9d5a025abba303"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/IFBench/data/IFBench_test.jsonl",
+      "sha256": "11c3d683dcc7f4908a4d3cacd05c9a8bbd5484af2f8fde969e7abe2b8bad3e34"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/IFBench/data/IFBench_train.jsonl",
+      "sha256": "a5ec13223a93879b7172da783d54669d5873dc4632b57fd6d961730c9679fc8c"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/IFBench/ifbench_data.py",
+      "sha256": "e575cb0efe687a6fc213e82b776845f7aaa0ea068b4c0e952b41c44267c49960"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/IFBench/ifbench_metric.py",
+      "sha256": "96e4d69e9adafb765b535c994e4ee2888c0f9e70fde0fa218b898c16d74b103e"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hotpotQA/hotpot_data.py",
+      "sha256": "1dbbc5df71588946367afd6c45604a03590d81548aa0ead03ffb14dd3e605b2d"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hotpotQA/hotpot_program.py",
+      "sha256": "bc11bada2a2ffa84ca4ad5a33c0170f4be616cf8177d4dfadc575f2607170df0"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hotpotQA/hotpot_utils.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hover/hover_data.py",
+      "sha256": "702cbecdf5bb1c6725910cd6cfd37804d6be3f03778549bb37ffc11871bcf183"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hover/hover_program.py",
+      "sha256": "705a1d4fa5452d66d21c00d8d915d5dcd57e820b077a68bf3786407d040d3522"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/hover/hover_utils.py",
+      "sha256": "1bb0203800caa8c347aab173df319fc2d0507db4c737bec45b6ade915f101f5a"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_data.py",
+      "sha256": "a73f2fddb46c9208e5ee19efbf8f7c12b1fd803ec46f14f838762c6baec23133"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils/AMPS_Hard/utils.py",
+      "sha256": "d02f6c1b721aec02074fe15d06e6d755143889296be5cc77ed29d86eede68c73"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils/math_competitions/utils.py",
+      "sha256": "79ed8745507bfe220f879a29dc3f4da2764bcf0486fe59052a668b802e1ffed9"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils/metric.py",
+      "sha256": "9f05848ea8cdf54065149fa8e8f8cbb8afdec2322d3fc0b260a9bc1847e5bab1"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils/olympiad/utils.py",
+      "sha256": "0b2ab96614c3d4c4553f6a47a4fd9eee3fa9c7bcd2ea49267f866359cbd97bb6"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils/util.py",
+      "sha256": "f4f8769b5b0d1bf696151212962823009753b822e3310c2087818f7a36b1ac0a"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/papillon/papillon_data.py",
+      "sha256": "090cdd1cf42ab08020a4b978a04ebc766418cf45079cd8856965a0d99184a996"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/papillon/papillon_program.py",
+      "sha256": "c57fbc2215fa51d3b72e5198a143e4ae5cb443b463e65deafa2f50d7e6e48ce9"
+    },
+    {
+      "path": "gepa_artifact/benchmarks/papillon/papillon_utils.py",
+      "sha256": "a068e8db9b1d62c99313f00657c651dcb975b4058532c92a59decdf95e0e1fce"
+    }
+  ],
+  "repository": "https://github.com/gepa-ai/gepa-artifact",
+  "schema_version": 1,
+  "source_paths": [
+    "gepa_artifact/benchmarks/AIME/AIME_data.py",
+    "gepa_artifact/benchmarks/AIME/AIME_program.py",
+    "gepa_artifact/benchmarks/IFBench/data/IFBench_test.jsonl",
+    "gepa_artifact/benchmarks/IFBench/data/IFBench_train.jsonl",
+    "gepa_artifact/benchmarks/IFBench/ifbench_data.py",
+    "gepa_artifact/benchmarks/IFBench/ifbench_metric.py",
+    "gepa_artifact/benchmarks/hotpotQA/hotpot_data.py",
+    "gepa_artifact/benchmarks/hotpotQA/hotpot_program.py",
+    "gepa_artifact/benchmarks/hotpotQA/hotpot_utils.py",
+    "gepa_artifact/benchmarks/hover/hover_data.py",
+    "gepa_artifact/benchmarks/hover/hover_program.py",
+    "gepa_artifact/benchmarks/hover/hover_utils.py",
+    "gepa_artifact/benchmarks/livebench_math/livebenchmath_data.py",
+    "gepa_artifact/benchmarks/livebench_math/livebenchmath_utils",
+    "gepa_artifact/benchmarks/papillon/papillon_data.py",
+    "gepa_artifact/benchmarks/papillon/papillon_program.py",
+    "gepa_artifact/benchmarks/papillon/papillon_utils.py"
+  ]
+}

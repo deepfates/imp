@@ -1,0 +1,133 @@
+{
+  "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+  "files": [
+    {
+      "path": "dspy/adapters/types/tool.py",
+      "sha256": "32e79627e2f0c911c0b08b622440a84b3c67ad6b13d6a1cb7f83c4c082d70494"
+    },
+    {
+      "path": "dspy/clients/__init__.py",
+      "sha256": "4e587b01f9c1cd6eb7acaa231e9245b953296a5ad1982657a9f1038ac13ea42c"
+    },
+    {
+      "path": "dspy/clients/_litellm.py",
+      "sha256": "c0c62739dbe059aeaffb02cc94420861afce5043980f51e2d536e7a56f3dbf3d"
+    },
+    {
+      "path": "dspy/clients/base_lm.py",
+      "sha256": "6b3be5547e13f8796cca7bc1c5ce2a8274f58b10a70cc77a56891c086828593f"
+    },
+    {
+      "path": "dspy/clients/cache.py",
+      "sha256": "dc242bde66e0a827ca2fee83af3e35fe5f9a5ad60557e60a49ab2f703d42cf52"
+    },
+    {
+      "path": "dspy/clients/databricks.py",
+      "sha256": "411daa9bf0c2ac9696cceae2b06c69d7a2738c1b8b90966c1d8f2195364a4623"
+    },
+    {
+      "path": "dspy/clients/disk_serialization.py",
+      "sha256": "69fec31431f6940a8c7f481059bd75c95530175e28fe039621e4582fb1189757"
+    },
+    {
+      "path": "dspy/clients/embedding.py",
+      "sha256": "ff7f082d4ac76240965149005ea70b3e60882110d3073d158e1178330380fada"
+    },
+    {
+      "path": "dspy/clients/lm.py",
+      "sha256": "58bb5846e10969e8e0d2d20f757826e6fa9f84843ec8227eb1cf17472c1378ab"
+    },
+    {
+      "path": "dspy/clients/lm_local.py",
+      "sha256": "13713e6fb3bc6b8145ecabdd997d153f7b0bf9f543aafe805f3d7d23113edd73"
+    },
+    {
+      "path": "dspy/clients/openai.py",
+      "sha256": "251838ecee9619acc943c437cb9e59d337a8a133dcb34d4530d8cdf43b842a23"
+    },
+    {
+      "path": "dspy/clients/openai_format.py",
+      "sha256": "eb0332489694ea29eea58322f28a33eb12c308994545a0699c06cda2d47f449d"
+    },
+    {
+      "path": "dspy/clients/provider.py",
+      "sha256": "6a1de5a92edf453f8b7b5a0b54a3fb35ec9b0c8a978adbebf3799f95b727a768"
+    },
+    {
+      "path": "dspy/clients/utils_finetune.py",
+      "sha256": "58e11ae50e58cd1d50fa92a8f193fe074602a0a61c55f336cd5523b1ee629d0e"
+    },
+    {
+      "path": "dspy/core/types.py",
+      "sha256": "ebcb5b81d9e7c27e2f1a132043658d539737ba6f739572afc7c8ca7ae4cc6417"
+    },
+    {
+      "path": "dspy/predict/code_act.py",
+      "sha256": "a3261179299f4c52bf84199ac44b34d13f7186dc8b1b358ffe227504215723dc"
+    },
+    {
+      "path": "dspy/predict/program_of_thought.py",
+      "sha256": "371e0fd5c229a10d07e0f00af07af9823f6845b0e2887f842303dea58e140545"
+    },
+    {
+      "path": "dspy/predict/react.py",
+      "sha256": "41d47882f6c8200f0f23de69eda903d282bc56f8dcb1b466d8bdc0974f3b43f8"
+    },
+    {
+      "path": "dspy/predict/react_v2.py",
+      "sha256": "69c1d48aceed67126379ffa047eba3814eba32660cdfcadf173f9ec0e1db7e93"
+    },
+    {
+      "path": "dspy/predict/rlm.py",
+      "sha256": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8"
+    },
+    {
+      "path": "dspy/propose/grounded_proposer.py",
+      "sha256": "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3"
+    },
+    {
+      "path": "dspy/teleprompt/bootstrap.py",
+      "sha256": "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255"
+    },
+    {
+      "path": "dspy/teleprompt/mipro_optimizer_v2.py",
+      "sha256": "6bf7632836d3a54ab0da3f38a8f1963813472312e9c0e3f2ff19b4377af407f3"
+    },
+    {
+      "path": "dspy/teleprompt/simba.py",
+      "sha256": "4de72e1d0cb1cd30a180569c21973c41fa272c3ebb82a365e3f307986ab67a55"
+    },
+    {
+      "path": "dspy/teleprompt/simba_utils.py",
+      "sha256": "ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c"
+    },
+    {
+      "path": "dspy/teleprompt/utils.py",
+      "sha256": "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182"
+    },
+    {
+      "path": "dspy/utils/mcp.py",
+      "sha256": "0b6fdb4f358083a87947829e2575b3fa6b2b6a6c5f3eef74e46564d2ab224a41"
+    }
+  ],
+  "repository": "https://github.com/stanfordnlp/dspy",
+  "schema_version": 1,
+  "source_paths": [
+    "dspy/adapters/types/tool.py",
+    "dspy/clients",
+    "dspy/clients/base_lm.py",
+    "dspy/core/types.py",
+    "dspy/predict/code_act.py",
+    "dspy/predict/program_of_thought.py",
+    "dspy/predict/react.py",
+    "dspy/predict/react_v2.py",
+    "dspy/predict/rlm.py",
+    "dspy/propose/grounded_proposer.py",
+    "dspy/teleprompt/bootstrap.py",
+    "dspy/teleprompt/mipro_optimizer_v2.py",
+    "dspy/teleprompt/simba.py",
+    "dspy/teleprompt/simba_utils.py",
+    "dspy/teleprompt/utils.py",
+    "dspy/utils/mcp.py"
+  ]
+}
