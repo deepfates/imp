@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "authority_type": "provider_pricing_capture",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "source": "https://www.anthropic.com/news/claude-sonnet-5",
+  "source_published_at": "2026-06-30",
+  "retrieved_at": "2026-07-15",
+  "effective_window": {
+    "starts_at": "2026-06-30",
+    "ends_at": "2026-08-31"
+  },
+  "standard_api_text_tokens_per_million_usd": {
+    "input": 2.0,
+    "output": 10.0
+  },
+  "scope": "introductory Claude API pricing; excludes cache, batch, regional, and platform-specific adjustments"
+}

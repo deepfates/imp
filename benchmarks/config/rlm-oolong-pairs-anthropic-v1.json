@@ -18,6 +18,10 @@
         "path": "tmp/pdfs/rlm-2512.24601v3.pdf",
         "sha256": "8567362c22768d9b50d4a4a8d63bb28dda2c2b2051be30d67f70f645170429ca"
       },
+      "anthropic_pricing": {
+        "path": "benchmarks/authority_sources/anthropic-claude-sonnet-5-pricing-20260715.json",
+        "sha256": "041c27978d265f439ffd6f5c6ca4379985285c0010253848092dacfa177244a7"
+      },
       "rlm_core": {
         "path": "tmp/rlm-upstream/rlm/core/rlm.py",
         "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
@@ -161,14 +165,14 @@
       "id": "current_economical_pilot_model",
       "scope": "models",
       "paper_behavior": "Paper model matrix including GPT-5, Qwen3-Coder, and Claude Code",
-      "implementation": "Dated Gemini 3.5 Flash through OpenRouter for a matched current flash-class systems and behavior pilot",
+      "implementation": "Claude Sonnet 5 through Anthropic for a matched current-provider systems and behavior pilot",
       "impact": "Validates current-provider execution and matched runtime behavior, not paper model parity."
     },
     {
       "id": "dspy_rlm_release_semantics",
       "scope": "dspy:rlm",
       "paper_behavior": "alexzhang13/rlm reference runtime",
-      "implementation": "DSPy 3.3.0b1 dspy.RLM with pinned source files",
+      "implementation": "DSPy 3.3.0b1 dspy.RLM with a verified complete 149-file source tree",
       "impact": "Cross-runtime answer and effect evidence is supported; prompts and interpreter trajectories are not identical."
     }
   ]

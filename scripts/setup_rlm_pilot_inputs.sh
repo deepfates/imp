@@ -1,8 +1,6 @@
 #!/usr/bin/env sh
 set -eu
 
-DSPY_VERSION="3.3.0b1"
-DSPY_TARGET="tmp/dspy-current-target"
 DSPY_VENV="tmp/dspy-current-venv"
 RLM_COMMIT="72d6940142ddfb84ee6be573dc999a37e633e671"
 RLM_TARGET="tmp/rlm-upstream"
@@ -70,15 +68,7 @@ fi
 git -C "$RLM_TARGET" fetch --filter=blob:none origin "$RLM_COMMIT"
 git -C "$RLM_TARGET" checkout --detach "$RLM_COMMIT"
 
-if [ ! -f "$DSPY_TARGET/dspy/predict/rlm.py" ]; then
-  rm -rf "$DSPY_TARGET"
-  if command -v uv >/dev/null 2>&1; then
-    uv pip install --target "$DSPY_TARGET" --no-deps "dspy==$DSPY_VERSION"
-  else
-    "$DSPY_VENV/bin/python" -m pip install --disable-pip-version-check \
-      --target "$DSPY_TARGET" --no-deps "dspy==$DSPY_VERSION"
-  fi
-fi
+PYTHON="$DSPY_VENV/bin/python" scripts/setup_dspy_current_target.sh
 
 "$DSPY_VENV/bin/python" benchmarks/data/rlm/fetch.py --family oolong_pairs
 
@@ -90,8 +80,6 @@ expected = {
     "tmp/pdfs/rlm-2512.24601v3.pdf": "8567362c22768d9b50d4a4a8d63bb28dda2c2b2051be30d67f70f645170429ca",
     "tmp/rlm-upstream/rlm/core/rlm.py": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562",
     "tmp/rlm-upstream/rlm/utils/prompts.py": "579c8ef220739f691d3896257b8289eec7e7b634fe473f41dea4adb83560b47e",
-    "tmp/dspy-current-target/dspy/predict/rlm.py": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8",
-    "tmp/dspy-current-target/dspy/primitives/python_interpreter.py": "fef9baa19cd979e8466ef19e364e5f7e67848c9738955a2d3e1f0d7dae2177d4",
     "benchmarks/data/rlm/oolong_pairs_trec_coarse.jsonl": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
 }
 for name, wanted in expected.items():
