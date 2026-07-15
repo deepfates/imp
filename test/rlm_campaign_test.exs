@@ -318,6 +318,10 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     assert result.artifact["summary"]["total"] == 60
     assert result.artifact["summary"]["all_passing"]
     refute result.artifact["summary"]["paper_protocol_complete"]
+    refute result.artifact["environment"]["dspy_used"]
+    assert result.artifact["environment"]["python"] == nil
+    assert String.match?(result.artifact["environment"]["lock_sha256"], ~r/^[0-9a-f]{64}$/)
+    assert is_boolean(result.artifact["untracked_worktree_dirty"])
 
     assert Enum.all?(result.artifact["rows"], fn row ->
              row["usage"]["cost_authority"] == "provider_reported" and
@@ -455,9 +459,9 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   test "malformed output commits terminal errors and does not replay" do
     fixture = fixture!()
     result = run!(fixture, MalformedRuntime)
-    assert Enum.all?(result.artifact["rows"], &(&1["status"] == "error"))
+    assert Enum.all?(result.artifact["rows"], &(&1["status"] == "error" and is_nil(&1["score"])))
     resumed = run!(fixture, CrashRuntime)
-    assert Enum.all?(resumed.artifact["rows"], &(&1["status"] == "error"))
+    assert Enum.all?(resumed.artifact["rows"], &(&1["status"] == "error" and is_nil(&1["score"])))
   end
 
   test "exact request boundary rejects a row reporting more calls than remain" do

@@ -57,9 +57,10 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     existing = RLMCheckpoint.rows(checkpoint)
     budgets = start_budgets!(manifest, runtimes, existing)
     planned_jobs = jobs(manifest, datasets, selection)
-    execute_jobs!(planned_jobs, manifest, checkpoint, budgets, opts)
+    python = Keyword.get(opts, :python, default_python())
+    execute_jobs!(planned_jobs, manifest, checkpoint, budgets, Keyword.put(opts, :python, python))
     rows = RLMCheckpoint.rows(checkpoint)
-    artifact = artifact(manifest, datasets, rows, selection, checkpoint_path)
+    artifact = artifact(manifest, datasets, rows, selection, checkpoint_path, python)
     protocol = RLMProtocol.evaluate(artifact)
 
     artifact =
@@ -338,7 +339,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       "runtime" => job.runtime,
       "status" => "error",
       "answer" => nil,
-      "score" => 0.0,
+      "score" => nil,
       "latency_ms" => error["latency_ms"] || 0.0,
       "usage" => normalize_row_usage(usage),
       "query_id" => job.row["query_id"] || job.row["id"],
@@ -529,7 +530,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     end
   end
 
-  defp artifact(manifest, datasets, rows, selection, checkpoint_path) do
+  defp artifact(manifest, datasets, rows, selection, checkpoint_path, python) do
     dataset_evidence =
       Map.new(datasets, fn {family, data} ->
         spec = manifest["datasets"][family]
@@ -557,6 +558,8 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
       "tracked_worktree_dirty" => tracked_worktree_dirty?(),
+      "untracked_worktree_dirty" => untracked_worktree_dirty?(),
+      "environment" => runtime_environment(selection, python),
       "manifest" => Map.drop(manifest, ["manifest_path"]),
       "datasets" => dataset_evidence,
       "execution" => %{
@@ -1000,5 +1003,54 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       {_output, 1} -> true
       _other -> nil
     end
+  end
+
+  defp untracked_worktree_dirty? do
+    case System.cmd("git", ["ls-files", "--others", "--exclude-standard"], stderr_to_stdout: true) do
+      {output, 0} -> String.trim(output) != ""
+      _other -> nil
+    end
+  end
+
+  defp runtime_environment(selection, python) do
+    lock_path = "benchmarks/requirements-dspy-rlm.lock"
+    setup_path = "scripts/setup_reference_test_env.sh"
+    dspy_used = "dspy" in selection["runtimes"]
+
+    %{
+      "dspy_used" => dspy_used,
+      "python" => if(dspy_used, do: python_identity!(python), else: nil),
+      "deno_version" => if(dspy_used, do: deno_version!(), else: nil),
+      "lock_path" => lock_path,
+      "lock_sha256" => sha256_file!(lock_path),
+      "setup_path" => setup_path,
+      "setup_sha256" => sha256_file!(setup_path)
+    }
+  end
+
+  defp python_identity!(python) do
+    code =
+      "import importlib.metadata,json,platform,sys; " <>
+        "print(json.dumps({'executable':sys.executable,'python_version':platform.python_version()," <>
+        "'dspy_version':importlib.metadata.version('dspy')}))"
+
+    case System.cmd(python, ["-c", code], stderr_to_stdout: true) do
+      {output, 0} -> Jason.decode!(String.trim(output))
+      {output, status} -> raise "failed to inspect DSPy Python environment (#{status}): #{output}"
+    end
+  end
+
+  defp deno_version! do
+    case System.cmd("deno", ["--version"], stderr_to_stdout: true) do
+      {output, 0} -> output |> String.split("\n", parts: 2) |> hd()
+      {output, status} -> raise "failed to inspect Deno environment (#{status}): #{output}"
+    end
+  end
+
+  defp sha256_file!(path) do
+    path
+    |> File.read!()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 end

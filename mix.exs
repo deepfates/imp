@@ -364,6 +364,8 @@ defmodule Imp.MixProject do
         "imp.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"
       ],
       "benchmark.rlm.contract.check": [
+        "cmd tmp/dspy-current-venv/bin/python test/python_dspy_rlm_campaign_test.py",
+        "cmd tmp/dspy-current-venv/bin/python test/python_dspy_rlm_wrapper_integration_test.py",
         "imp.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
       ],
       "benchmark.live_matrix": [

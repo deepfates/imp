@@ -313,7 +313,14 @@ def lexical_retrieval(row: dict[str, Any], k: int) -> str:
 def prediction_answer(prediction: Any, usage: dict[str, Any], trace: list[Any] | None = None) -> str:
     answer = getattr(prediction, "answer", None)
     if not isinstance(answer, str) or not answer.strip():
-        raise CampaignError("malformed DSPy output: expected a non-empty string answer", usage, trace)
+        fields = prediction.toDict() if callable(getattr(prediction, "toDict", None)) else {}
+        field_names = sorted(str(key) for key in fields) if isinstance(fields, dict) else []
+        raise CampaignError(
+            "malformed DSPy output: expected a non-empty string answer "
+            f"(answer_type={type(answer).__name__}; fields={field_names})",
+            usage,
+            trace,
+        )
     return answer
 
 

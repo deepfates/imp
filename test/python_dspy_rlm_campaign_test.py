@@ -112,7 +112,10 @@ def wrapped(
 
 class BudgetLMTest(unittest.TestCase):
     def test_malformed_prediction_errors_are_redacted_and_keep_trace(self):
-        prediction = types.SimpleNamespace(answer={"api_key": "sk-secret-answer-123456789"})
+        prediction = types.SimpleNamespace(
+            answer={"api_key": "sk-secret-answer-123456789"},
+            toDict=lambda: {"answer": {"api_key": "sk-secret-answer-123456789"}},
+        )
         trace = [{"action": "repl", "sha256": "abc"}]
 
         with self.assertRaisesRegex(
@@ -121,6 +124,8 @@ class BudgetLMTest(unittest.TestCase):
             campaign.prediction_answer(prediction, empty_ledger(), trace)
 
         self.assertNotIn("sk-secret-answer", str(raised.exception))
+        self.assertIn("answer_type=dict", str(raised.exception))
+        self.assertIn("fields=['answer']", str(raised.exception))
         self.assertEqual(raised.exception.trace, trace)
         self.assertEqual(
             campaign.redact_error("Bearer secret-token-123456789"),

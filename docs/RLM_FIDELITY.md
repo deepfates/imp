@@ -237,19 +237,22 @@ row, and neither RLM made recursive subcalls. The runtimes also expose different
 these limitations make expansion unjustified. The campaign was not expanded;
 unavailable families and exact T3 remain red.
 
-### 2026-07-15 scorer audit
+### 2026-07-15 scorer and DSPy integration audit
 
-An initial pre-admission OOLONG-Pairs pilot exposed a defect in the operator
-scorer: an unanchored pair regex interpreted ordinary prose commas as answer
-pairs. Both direct models semantically concluded that the gold set was empty,
-but their explanatory prose was incorrectly scored 0.0 while the concise RLM
-answer scored 1.0. That artifact was rejected rather than admitted as evidence.
+An initial pre-admission OOLONG-Pairs pilot exposed an unanchored scorer that
+could interpret prose commas as pairs. That artifact was rejected. The scorer
+now accepts only complete canonical `(id_1, id_2)` lines or a standalone
+empty-set marker; any mixed prose is invalid. Failed rows are excluded from
+paired bootstrap comparisons instead of being treated as scored zeros.
 
-The corrected scorer accepts only complete canonical `(id_1, id_2)` lines and
-explicit empty-set markers; unmatched prose is invalid. Failed rows are also
-excluded from paired bootstrap comparisons instead of being treated as scored
-zeros. A replacement live artifact must be generated from a committed
-implementation SHA before any result-specific T2 statement is restored here.
+A replacement diagnostic on frozen query `1` at context size `1024` showed a
+DSPy prediction with the expected `answer`, `final_reasoning`, and `trajectory`
+fields, but an empty string in `answer`. Before treating that as a reference
+runtime outcome, the sidecar's metering wrapper was driven through the real
+pinned `dspy.RLM`; submit, trajectory, and usage accounting passed. The full
+provider-free comparison also passes all 12 required matched operational cases.
+A fresh matched artifact must still be generated from the committed diagnostic
+implementation before any result-specific T2 statement is admitted here.
 
 ## Mechanical T3 Gate
 
