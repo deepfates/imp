@@ -1015,6 +1015,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
   defp runtime_environment(selection, python) do
     lock_path = "benchmarks/requirements-dspy-rlm.lock"
     setup_path = "scripts/setup_reference_test_env.sh"
+    input_setup_path = "scripts/setup_rlm_pilot_inputs.sh"
     dspy_used = "dspy" in selection["runtimes"]
 
     %{
@@ -1024,7 +1025,9 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       "lock_path" => lock_path,
       "lock_sha256" => sha256_file!(lock_path),
       "setup_path" => setup_path,
-      "setup_sha256" => sha256_file!(setup_path)
+      "setup_sha256" => sha256_file!(setup_path),
+      "input_setup_path" => input_setup_path,
+      "input_setup_sha256" => sha256_file!(input_setup_path)
     }
   end
 

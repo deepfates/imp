@@ -321,6 +321,13 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     refute result.artifact["environment"]["dspy_used"]
     assert result.artifact["environment"]["python"] == nil
     assert String.match?(result.artifact["environment"]["lock_sha256"], ~r/^[0-9a-f]{64}$/)
+    assert result.artifact["environment"]["input_setup_path"] ==
+             "scripts/setup_rlm_pilot_inputs.sh"
+
+    assert String.match?(
+             result.artifact["environment"]["input_setup_sha256"],
+             ~r/^[0-9a-f]{64}$/
+           )
     assert is_boolean(result.artifact["untracked_worktree_dirty"])
 
     assert Enum.all?(result.artifact["rows"], fn row ->
