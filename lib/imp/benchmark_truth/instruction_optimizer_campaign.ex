@@ -6,6 +6,25 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
 
   @schema_version 1
   @default_arms [:baseline, :bootstrap_few_shot, :mipro_v2, :simba]
+  @arm_names Map.new(@default_arms, &{Atom.to_string(&1), &1})
+  @split_names %{"train" => :train, "dev" => :dev, "test" => :test}
+  @arm_option_names %{
+    "auto" => :auto,
+    "num_candidates" => :num_candidates,
+    "num_trials" => :num_trials,
+    "minibatch" => :minibatch,
+    "max_bootstrapped_demos" => :max_bootstrapped_demos,
+    "max_labeled_demos" => :max_labeled_demos,
+    "startup_trials" => :startup_trials,
+    "max_errors" => :max_errors,
+    "timeout" => :timeout,
+    "bsize" => :bsize,
+    "max_steps" => :max_steps,
+    "max_demos" => :max_demos,
+    "demo_input_field_maxlen" => :demo_input_field_maxlen,
+    "sampling_temperature" => :sampling_temperature,
+    "candidate_temperature" => :candidate_temperature
+  }
 
   def run(opts) do
     context = build_context!(opts)
@@ -436,7 +455,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp limited_split(path, input_keys, opts, split) do
     limits = Keyword.fetch!(opts, :split_limits)
-    limit = Map.get(limits, split, Map.get(limits, String.to_existing_atom(split)))
+    limit = Map.get(limits, split, Map.get(limits, Map.fetch!(@split_names, split)))
     rows = Imp.Datasets.jsonl(path, input_keys)
 
     if not is_integer(limit) or limit <= 0 or limit > length(rows) do
@@ -507,7 +526,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     arms =
       Enum.map(arms, fn
         arm when is_atom(arm) -> arm
-        arm when is_binary(arm) -> String.to_existing_atom(arm)
+        arm when is_binary(arm) -> Map.get(@arm_names, arm, arm)
       end)
 
     unknown = arms -- @default_arms
@@ -531,7 +550,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
   defp keywordize(map),
     do:
       Enum.map(map, fn {key, value} ->
-        {if(is_atom(key), do: key, else: String.to_existing_atom(key)), value}
+        {if(is_atom(key), do: key, else: Map.fetch!(@arm_option_names, key)), value}
       end)
 
   defp checkpoint_path(dir, campaign_id, family, seed) do
