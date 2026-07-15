@@ -222,12 +222,8 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
 
     def generate(%__MODULE__{inner: inner}, messages, opts) do
       with {:ok, result} <- Imp.LM.generate(inner, messages, opts),
-           {:ok, content} <- controller_content(result),
-           {:ok, action} when is_map(action) <- decode_action(content) do
-        {:ok, action}
-      else
-        {:ok, _other} -> {:error, :invalid_rlm_controller_json}
-        {:error, _reason} = error -> error
+           {:ok, content} <- controller_content(result) do
+        {:ok, content}
       end
     end
 
@@ -251,10 +247,6 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
 
     defp controller_content(content) when is_binary(content), do: {:ok, content}
     defp controller_content(_result), do: {:error, :missing_rlm_controller_content}
-
-    defp decode_action(content) do
-      Imp.Predict.RLM.Action.decode(content)
-    end
   end
 
   defmodule Native do

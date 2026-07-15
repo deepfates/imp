@@ -205,6 +205,7 @@ defmodule Imp.Predict.RLM do
       depth: depth,
       observations: [],
       trace: [],
+      invalid_action_digests: MapSet.new(),
       trace_limit: rlm.max_observation_chars,
       llm_calls: Budget.snapshot(budget).lm_calls,
       started_at: System.monotonic_time(:millisecond)
@@ -283,8 +284,26 @@ defmodule Imp.Predict.RLM do
         {:error, original_error}
       end
     else
-      {:error, original_error}
+      if is_binary(output),
+        do: controller_action_error(output, state, iteration, original_error),
+        else: {:error, original_error}
     end
+  end
+
+  defp controller_action_error(output, state, iteration, reason) do
+    detail = safe_error_detail(output)
+    digest = :crypto.hash(:sha256, output)
+
+    state =
+      state
+      |> Map.update!(:invalid_action_digests, &MapSet.put(&1, digest))
+      |> add_observation(%{
+        reasoning: "",
+        output: {:action_error, reason |> Imp.Redaction.redact() |> Trace.compact(512)}
+      })
+      |> trace(iteration, :action_error, %{reasoning: ""}, detail)
+
+    {:cont, state}
   end
 
   defp unwrap_lm_output(%{__imp_lm_output__: _output} = result) do
@@ -424,10 +443,16 @@ defmodule Imp.Predict.RLM do
        {:invalid_rlm_action, "expected a map with a binary code field", safe_error_detail(other)}}
 
   defp safe_error_detail(value) when is_binary(value) do
+    fingerprint =
+      value
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+      |> String.slice(0, 16)
+
     %{
       type: :string,
       bytes: byte_size(value),
-      sha256: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
+      fingerprint: fingerprint
     }
   end
 
@@ -901,15 +926,33 @@ defmodule Imp.Predict.RLM do
     with {:ok, raw} <- run_budgeted(state.budget, fn -> Imp.LM.generate(lm, messages, []) end),
          {:ok, raw} <- Imp.LM.Result.output(raw),
          {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []),
-         true <- required_outputs_present?(rlm.signature, prediction) do
+         :ok <- validate_fallback_prediction(rlm.signature, prediction, state) do
       state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
       {:ok, add_trace(prediction, state)}
     else
-      false ->
-        {:error, {:rlm_extract_failed, :empty_required_output, Enum.reverse(state.trace)}}
-
       {:error, reason} ->
         {:error, {:rlm_extract_failed, reason, Enum.reverse(state.trace)}}
+    end
+  end
+
+  defp validate_fallback_prediction(signature, prediction, state) do
+    cond do
+      not required_outputs_present?(signature, prediction) ->
+        {:error, :empty_required_output}
+
+      Enum.any?(Imp.Signature.output_names(signature), fn name ->
+        case Imp.Prediction.get(prediction, name) do
+          value when is_binary(value) ->
+            MapSet.member?(state.invalid_action_digests, :crypto.hash(:sha256, value))
+
+          _value ->
+            false
+        end
+      end) ->
+        {:error, :replayed_invalid_action}
+
+      true ->
+        :ok
     end
   end
 

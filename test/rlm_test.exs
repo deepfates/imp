@@ -94,8 +94,36 @@ defmodule RLMPublicSurfaceTest do
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
       assert {:error, reason} = Imp.Predict.RLM.call(rlm, %{question: "q"})
-      refute inspect(reason) =~ "sk-secret-controller-value"
+      rendered = inspect(reason)
+      assert rendered =~ "action_error"
+      assert rendered =~ "fingerprint"
+      refute rendered =~ "sk-secret-controller-value"
     end)
+  end
+
+  test "RLM records malformed binary actions and permits controller repair" do
+    Process.put(:rlm_action_repairs, [
+      "controller prose instead of an action",
+      Jason.encode!(%{reasoning: "repaired", code: ~S|submit(%{answer: "done"})|})
+    ])
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [response | rest] = Process.get(:rlm_action_repairs)
+          Process.put(:rlm_action_repairs, rest)
+          response
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:action_error, :submit]
+  after
+    Process.delete(:rlm_action_repairs)
   end
 
   test "RLM accepts exactly the required outputs as a typed direct submission" do

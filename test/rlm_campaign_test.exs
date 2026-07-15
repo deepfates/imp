@@ -696,7 +696,8 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     end
 
     lm = %RLMRuntime.ControllerLM{inner: inner}
-    assert {:ok, ^action} = RLMRuntime.ControllerLM.generate(lm, [], [])
+    assert {:ok, encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
+    assert Jason.decode!(encoded) == action
   end
 
   test "RLM controller adapter accepts a single JSON markdown fence" do
@@ -704,17 +705,14 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     encoded = "```json\n#{Jason.encode!(action)}\n```"
     lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
 
-    assert {:ok, ^action} = RLMRuntime.ControllerLM.generate(lm, [], [])
+    assert {:ok, ^encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
   end
 
   test "RLM controller adapter accepts one exact constrained-Elixir fence" do
     encoded = "```elixir\ncontext = load(\"context\")\nprint(context)\n```"
     lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
 
-    assert {:ok, %{"reasoning" => "", "code" => code}} =
-             RLMRuntime.ControllerLM.generate(lm, [], [])
-
-    assert code == "context = load(\"context\")\nprint(context)"
+    assert {:ok, ^encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
   end
 
   test "RLM action decoder rejects prose around fenced code" do
