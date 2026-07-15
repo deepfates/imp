@@ -2633,8 +2633,94 @@ defmodule BenchmarkTruthTest do
     assert required["current_low_cost"]["policy"]["required_scale"] == "full"
     assert required["frontier_sanity"]["satisfied"]
     assert required["frontier_sanity"]["policy"]["required_scale"] == "research_sample"
+    assert required["frontier_sanity"]["policy"]["required_outcome"] == "measurement"
+    assert required["frontier_sanity"]["parity_outcome"] == "parity_established"
     assert required["historical_research"]["satisfied"]
     assert required["historical_research"]["policy"]["required_scale"] == "research_sample"
+    assert required["historical_research"]["policy"]["required_outcome"] == "parity"
+  end
+
+  test "frontier measurement can complete without establishing parity" do
+    out_dir = tmp_dir("live-matrix-frontier-measured-red")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "frontier-threshold-miss.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => Map.put(sample_parity(), "max_task_score_gap", 0.02),
+      "aggregate" => %{"imp_score" => 0.87, "dspy_score" => 0.86, "score_delta" => 0.01},
+      "generation" => matched_effective_generation(),
+      "tasks" => []
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+
+    frontier =
+      matrix_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> get_in(["summary", "required_lanes", "frontier_sanity"])
+
+    assert frontier["satisfied"]
+    assert frontier["satisfaction"] == "evidence"
+    assert frontier["parity_outcome"] == "parity_not_established"
+    refute frontier["full_evidence"]
+    assert frontier["best_parity"]["max_task_score_gap"] == 0.02
+  end
+
+  test "frontier measurement rejects nominal coverage with runtime errors" do
+    out_dir = tmp_dir("live-matrix-frontier-error")
+    in_dir = Path.join(out_dir, "campaigns")
+    matrix_dir = Path.join(out_dir, "matrix")
+    File.mkdir_p!(in_dir)
+
+    write_campaign_artifact(in_dir, "frontier-error.json", %{
+      "provider" => "req_llm",
+      "model" => "anthropic:claude-sonnet-4-6",
+      "generated_at" => "2026-07-07T00:00:00Z",
+      "coverage" => %{"covered" => 200, "expected" => 8724, "full" => false},
+      "parity" => sample_parity(),
+      "aggregate" => %{"imp_score" => 0.8, "dspy_score" => 0.8, "score_delta" => 0.0},
+      "generation" => matched_effective_generation(),
+      "tasks" => [%{"task" => "hotpotqa", "imp_errors" => ["timeout"], "dspy_errors" => []}]
+    })
+
+    capture_io(fn ->
+      Mix.Tasks.Imp.Benchmark.LiveMatrix.run([
+        "--in",
+        Path.join(in_dir, "*.json"),
+        "--out",
+        matrix_dir,
+        "--max-age-hours",
+        "100000"
+      ])
+    end)
+
+    [matrix_path] = Path.wildcard(Path.join(matrix_dir, "live-matched-model-matrix-*.json"))
+
+    frontier =
+      matrix_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> get_in(["summary", "required_lanes", "frontier_sanity"])
+
+    refute frontier["satisfied"]
+    assert frontier["parity_outcome"] == "not_measured"
   end
 
   test "live matrix consumes model availability evidence for historical lane" do

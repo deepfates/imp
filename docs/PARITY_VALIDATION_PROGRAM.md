@@ -171,7 +171,8 @@ Pass condition:
 - the current low-cost lane covers every canonical row with accepted row
   evidence, not only attempted provider calls
 - frontier and historical/research-style lanes reach the configured research
-  sample size with matched generation and strict score/latency parity
+  sample size with matched generation; measurement completion is reported
+  separately from the strict score/latency parity outcome
 - runner/API error rows, including quota/rate-limit rows with null answers, are
   counted as incomplete evidence and remain rerunnable
 - selected live campaign artifacts record a single consistent `max_concurrency`

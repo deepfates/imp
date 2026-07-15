@@ -818,6 +818,15 @@ model remains an explicit fallback for legacy artifacts. Run a bounded
 current-model tranche and inspect this projection before approving a full paid
 campaign.
 
+The live matrix separates evidence completion from experimental outcome. The
+`frontier_sanity` lane is complete when a fresh, error-free, matched sample has
+at least 200 accepted rows and complete score, latency, prompt-contract, and
+generation evidence. Its `parity_outcome` remains `parity_not_established` when
+the predeclared score or latency threshold misses. This does not weaken the
+threshold or create a parity claim; it prevents repeated paid sampling from
+being used to shop for a passing result. Full current-low-cost parity still
+requires full accepted coverage and all strict parity checks.
+
 If a live chunk produces runner/API errors, the campaign runner halts after that
 chunk instead of continuing to spend provider calls. Any rows with complete
 Imp/DSPy evidence are preserved, but quota/rate-limit failures remain

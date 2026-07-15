@@ -907,6 +907,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
       "present" => candidates != [],
       "satisfied" => satisfied,
       "satisfaction" => satisfaction_status(evidence_satisfied, unavailable_satisfied),
+      "parity_outcome" => parity_outcome(candidates, policy),
       "availability" => availability_status(unavailable_note),
       "policy" => policy,
       "full_evidence" => Enum.any?(candidates, & &1["full_evidence"]),
@@ -969,15 +970,17 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
   defp lane_policy("frontier_sanity") do
     %{
       "required_scale" => "research_sample",
+      "required_outcome" => "measurement",
       "min_accepted_rows" => 200,
       "description" =>
-        "At least one current frontier model must have a fresh matched research sample with score, latency, prompt-contract, and generation proof."
+        "At least one current frontier model must have a fresh matched research sample with score, latency, prompt-contract, and generation proof. Measurement completion is distinct from a positive parity outcome."
     }
   end
 
   defp lane_policy("historical_research") do
     %{
       "required_scale" => "research_sample",
+      "required_outcome" => "parity",
       "min_accepted_rows" => 200,
       "description" =>
         "At least one historical or research-style model must have a fresh matched research sample, or the release must explicitly document unavailability outside this matrix."
@@ -996,14 +999,64 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
     model["full_evidence"] == true or
       (base_release_proof?(model) and
          (get_in(model, ["coverage_progress", "covered_rows"]) || 0) >= min_rows and
-         score_parity?(model["parity"]) and
-         get_in(model, ["parity", "latency_parity"]) == true)
+         research_sample_outcome_satisfies?(model, policy))
+  end
+
+  defp research_sample_outcome_satisfies?(model, %{"required_outcome" => "measurement"}),
+    do: complete_measurement?(model)
+
+  defp research_sample_outcome_satisfies?(model, _policy),
+    do: positive_parity?(model)
+
+  defp complete_measurement?(model) do
+    score = model["score"] || %{}
+    parity = model["parity"] || %{}
+
+    Enum.all?(
+      [
+        score["imp_score"],
+        score["dspy_score"],
+        score["score_delta"],
+        parity["aggregate_gap"],
+        parity["max_task_score_gap"]
+      ],
+      &is_number/1
+    ) and
+      is_boolean(parity["latency_parity"]) and error_free?(model)
+  end
+
+  defp positive_parity?(model),
+    do:
+      complete_measurement?(model) and score_parity?(model["parity"]) and
+        get_in(model, ["parity", "latency_parity"]) == true
+
+  defp error_free?(model) do
+    Enum.all?(model["errors"] || [], fn error ->
+      error["imp_errors"] == 0 and error["dspy_errors"] == 0
+    end)
+  end
+
+  defp parity_outcome(candidates, policy) do
+    cond do
+      Enum.any?(candidates, &positive_parity?/1) -> "parity_established"
+      Enum.any?(candidates, &measured_candidate?(&1, policy)) -> "parity_not_established"
+      true -> "not_measured"
+    end
+  end
+
+  defp measured_candidate?(model, policy) do
+    min_rows = policy["min_accepted_rows"] || 200
+
+    base_release_proof?(model) and
+      (get_in(model, ["coverage_progress", "covered_rows"]) || 0) >= min_rows and
+      complete_measurement?(model)
   end
 
   defp base_release_proof?(model) do
     proof = model["proof"] || %{}
 
     model["fresh"] == true and
+      proof["evidence_policy_current"] == true and
       proof["requested_generation_consistent"] == true and
       proof["effective_generation_complete"] == true and
       proof["effective_generation_matched"] == true and
