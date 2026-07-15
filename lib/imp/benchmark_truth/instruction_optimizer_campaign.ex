@@ -544,7 +544,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
       {:ok, json} ->
         %{"payload" => payload, "payload_sha256" => checksum} = Jason.decode!(json)
 
-        unless checksum == term_sha256(payload),
+        unless valid_checkpoint_checksum?(payload, checksum),
           do: raise(ArgumentError, "campaign checkpoint checksum mismatch")
 
         unless payload["identity"] == identity,
@@ -567,7 +567,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
           payload = Map.fetch!(envelope, "payload")
           checksum = Map.fetch!(envelope, "payload_sha256")
 
-          unless checksum == term_sha256(payload),
+          unless valid_checkpoint_checksum?(payload, checksum),
             do: raise(ArgumentError, "campaign checkpoint checksum mismatch")
 
           in_progress = Map.get(payload["in_progress"], arm_key, %{}) || %{}
@@ -591,7 +591,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
   defp write_checkpoint_unlocked!(path, checkpoint),
     do:
       write_json_atomic!(path, %{
-        "payload_sha256" => term_sha256(checkpoint),
+        "payload_sha256" => checkpoint_checksum(checkpoint),
         "payload" => checkpoint
       })
 
@@ -613,7 +613,24 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     path
   end
 
-  defp term_sha256(value),
+  @doc false
+  def checkpoint_checksum(value) do
+    value
+    |> Jason.encode!()
+    |> Jason.decode!()
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  @doc false
+  def valid_checkpoint_checksum?(value, checksum) when is_binary(checksum) do
+    checksum in [checkpoint_checksum(value), legacy_checkpoint_checksum(value)]
+  end
+
+  def valid_checkpoint_checksum?(_value, _checksum), do: false
+
+  defp legacy_checkpoint_checksum(value),
     do:
       value |> Jason.encode!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 

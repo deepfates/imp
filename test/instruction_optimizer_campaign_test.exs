@@ -201,6 +201,31 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     end
   end
 
+  test "checkpoint checksums survive JSON normalization and map key reordering" do
+    payload = %{
+      "identity" => %{"model" => "anthropic:claude-haiku-4-5-20251001"},
+      "in_progress" => %{
+        "baseline" => %{
+          "program" => %{
+            type: :chain_of_thought,
+            config: [["cache", false], ["temperature", 0.0]],
+            metadata: %{provider: :anthropic, enabled: true}
+          }
+        }
+      }
+    }
+
+    checksum = InstructionOptimizerCampaign.checkpoint_checksum(payload)
+    decoded = payload |> Jason.encode!() |> Jason.decode!()
+
+    assert InstructionOptimizerCampaign.valid_checkpoint_checksum?(decoded, checksum)
+
+    refute InstructionOptimizerCampaign.valid_checkpoint_checksum?(
+             put_in(decoded, ["identity", "model"], "tampered"),
+             checksum
+           )
+  end
+
   test "ambiguous evaluation dispatch intent is never replayed" do
     root = tmp_dir("ambiguous-evaluation")
     dataset = write_aime_dataset!(root)
