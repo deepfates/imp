@@ -13,6 +13,18 @@ defmodule BenchmarkTruthTest do
     Process.put(key, %{
       "lm_calls" => 0,
       "lm_duration_ms" => 0.0,
+      "req_llm_requests" => 0,
+      "req_llm_request_duration_ms" => 0.0,
+      "finch_requests" => 0,
+      "finch_request_duration_ms" => 0.0,
+      "finch_queue_events" => 0,
+      "finch_queue_duration_ms" => 0.0,
+      "finch_connects" => 0,
+      "finch_connect_duration_ms" => 0.0,
+      "finch_sends" => 0,
+      "finch_send_duration_ms" => 0.0,
+      "finch_receives" => 0,
+      "finch_receive_duration_ms" => 0.0,
       "json_fallbacks" => 0,
       "parse_retries" => 0,
       "usage_events" => 0,
@@ -36,6 +48,80 @@ defmodule BenchmarkTruthTest do
              "output_tokens" => 45,
              "usd" => 0.0067
            }
+  end
+
+  test "benchmark row instrumentation decomposes ReqLLM and Finch transport time" do
+    key = {__MODULE__, make_ref()}
+    owner = self()
+    Process.put(key, transport_instrumentation())
+    on_exit(fn -> Process.delete(key) end)
+
+    events = [
+      {[:req_llm, :request, :stop], 120_000_000},
+      {[:finch, :request, :stop], 110_000_000},
+      {[:finch, :queue, :stop], 20_000_000},
+      {[:finch, :connect, :stop], 10_000_000},
+      {[:finch, :send, :stop], 5_000_000},
+      {[:finch, :recv, :stop], 75_000_000},
+      {[:finch, :request, :exception], 2_000_000}
+    ]
+
+    Enum.each(events, fn {event, duration} ->
+      Imp.BenchmarkTruth.Runner.record_instrumentation(
+        event,
+        %{duration: System.convert_time_unit(duration, :nanosecond, :native)},
+        %{},
+        {owner, key}
+      )
+    end)
+
+    stats = Process.get(key)
+    assert stats["req_llm_requests"] == 1
+    assert stats["req_llm_request_duration_ms"] == 120.0
+    assert stats["finch_requests"] == 2
+    assert stats["finch_request_duration_ms"] == 112.0
+    assert stats["finch_queue_duration_ms"] == 20.0
+    assert stats["finch_connect_duration_ms"] == 10.0
+    assert stats["finch_send_duration_ms"] == 5.0
+    assert stats["finch_receive_duration_ms"] == 75.0
+
+    task =
+      Task.async(fn ->
+        Imp.BenchmarkTruth.Runner.record_instrumentation(
+          [:finch, :queue, :stop],
+          %{duration: System.convert_time_unit(1, :second, :native)},
+          %{},
+          {owner, key}
+        )
+      end)
+
+    Task.await(task)
+    assert Process.get(key)["finch_queue_events"] == 1
+  end
+
+  defp transport_instrumentation do
+    %{
+      "lm_calls" => 0,
+      "lm_duration_ms" => 0.0,
+      "req_llm_requests" => 0,
+      "req_llm_request_duration_ms" => 0.0,
+      "finch_requests" => 0,
+      "finch_request_duration_ms" => 0.0,
+      "finch_queue_events" => 0,
+      "finch_queue_duration_ms" => 0.0,
+      "finch_connects" => 0,
+      "finch_connect_duration_ms" => 0.0,
+      "finch_sends" => 0,
+      "finch_send_duration_ms" => 0.0,
+      "finch_receives" => 0,
+      "finch_receive_duration_ms" => 0.0,
+      "json_fallbacks" => 0,
+      "parse_retries" => 0,
+      "usage_events" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "usd" => 0.0
+    }
   end
 
   test "RLM campaign plan task emits exact bounded jobs without execution" do
@@ -1103,12 +1189,22 @@ defmodule BenchmarkTruthTest do
 
       assert Application.get_env(:req_llm, :stream_pool_protocols) == [:http2]
       assert Application.get_env(:req_llm, :stream_pool_count) == 16
-      assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(pool_opts) == nil
+
+      assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(max_concurrency: 8) == %{
+               "count" => 1,
+               "protocols" => [:http1],
+               "size" => 8
+             }
 
       assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(
                req_llm_pool_protocols: "http1",
                req_llm_pool_count: 16
-             ) == %{"count" => 16, "protocols" => [:http1]}
+             ) == %{"count" => 16, "protocols" => [:http1], "size" => 1}
+
+      assert Mix.Tasks.Imp.Benchmark.Parity.req_llm_pool_config(
+               req_llm_pool_protocols: "http2",
+               max_concurrency: 8
+             ) == %{"count" => 1, "protocols" => [:http2]}
     after
       restore_app_env(:req_llm, :stream_pool_protocols, previous_protocols)
       restore_app_env(:req_llm, :stream_pool_size, previous_size)

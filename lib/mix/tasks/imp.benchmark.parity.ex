@@ -286,11 +286,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
 
   @doc false
   def configure_req_llm_pool!(opts) do
+    pool = req_llm_pool_config(opts)
+
     pool_opts =
       []
-      |> maybe_keyword(:stream_pool_protocols, req_llm_pool_protocols(opts))
-      |> maybe_keyword(:stream_pool_size, Keyword.get(opts, :req_llm_pool_size))
-      |> maybe_keyword(:stream_pool_count, Keyword.get(opts, :req_llm_pool_count))
+      |> maybe_keyword(:stream_pool_protocols, pool["protocols"])
+      |> maybe_keyword(:stream_pool_size, pool["size"])
+      |> maybe_keyword(:stream_pool_count, pool["count"])
 
     Enum.each(pool_opts, fn {key, value} -> Application.put_env(:req_llm, key, value) end)
 
@@ -718,13 +720,23 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
 
   @doc false
   def req_llm_pool_config(opts) do
-    pool =
-      %{}
-      |> maybe_put_pool("protocols", req_llm_pool_protocols(opts))
-      |> maybe_put_pool("size", Keyword.get(opts, :req_llm_pool_size))
-      |> maybe_put_pool("count", Keyword.get(opts, :req_llm_pool_count))
+    protocols = req_llm_pool_protocols(opts) || [:http1]
+    explicit_count = Keyword.get(opts, :req_llm_pool_count)
 
-    if map_size(pool) == 0, do: nil, else: pool
+    %{
+      "protocols" => protocols,
+      "count" => explicit_count || 1
+    }
+    |> maybe_put_pool("size", effective_http1_pool_size(opts, protocols, explicit_count))
+  end
+
+  defp effective_http1_pool_size(opts, protocols, explicit_count) do
+    cond do
+      size = Keyword.get(opts, :req_llm_pool_size) -> size
+      :http1 not in protocols -> nil
+      explicit_count -> 1
+      true -> max(Keyword.get(opts, :max_concurrency, 1), 1)
+    end
   end
 
   defp maybe_put_pool(pool, _key, nil), do: pool

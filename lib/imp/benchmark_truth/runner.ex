@@ -507,6 +507,16 @@ defmodule Imp.BenchmarkTruth.Runner do
       [:imp, :lm, :stop],
       [:imp, :adapter, :parse, :json_fallback],
       [:imp, :adapter, :parse, :retry],
+      [:req_llm, :request, :stop],
+      [:req_llm, :request, :exception],
+      [:finch, :request, :stop],
+      [:finch, :request, :exception],
+      [:finch, :queue, :stop],
+      [:finch, :queue, :exception],
+      [:finch, :connect, :stop],
+      [:finch, :send, :stop],
+      [:finch, :recv, :stop],
+      [:finch, :recv, :exception],
       [:req_llm, :token_usage]
     ]
 
@@ -524,6 +534,18 @@ defmodule Imp.BenchmarkTruth.Runner do
     %{
       "lm_calls" => 0,
       "lm_duration_ms" => 0.0,
+      "req_llm_requests" => 0,
+      "req_llm_request_duration_ms" => 0.0,
+      "finch_requests" => 0,
+      "finch_request_duration_ms" => 0.0,
+      "finch_queue_events" => 0,
+      "finch_queue_duration_ms" => 0.0,
+      "finch_connects" => 0,
+      "finch_connect_duration_ms" => 0.0,
+      "finch_sends" => 0,
+      "finch_send_duration_ms" => 0.0,
+      "finch_receives" => 0,
+      "finch_receive_duration_ms" => 0.0,
       "json_fallbacks" => 0,
       "parse_retries" => 0,
       "usage_events" => 0,
@@ -561,6 +583,28 @@ defmodule Imp.BenchmarkTruth.Runner do
   defp update_instrumentation(stats, [:imp, :adapter, :parse, :retry], _measurements),
     do: Map.update!(stats, "parse_retries", &(&1 + 1))
 
+  defp update_instrumentation(stats, [:req_llm, :request, outcome], measurements)
+       when outcome in [:stop, :exception],
+       do: add_timing(stats, "req_llm_requests", "req_llm_request_duration_ms", measurements)
+
+  defp update_instrumentation(stats, [:finch, :request, outcome], measurements)
+       when outcome in [:stop, :exception],
+       do: add_timing(stats, "finch_requests", "finch_request_duration_ms", measurements)
+
+  defp update_instrumentation(stats, [:finch, :queue, outcome], measurements)
+       when outcome in [:stop, :exception],
+       do: add_timing(stats, "finch_queue_events", "finch_queue_duration_ms", measurements)
+
+  defp update_instrumentation(stats, [:finch, :connect, :stop], measurements),
+    do: add_timing(stats, "finch_connects", "finch_connect_duration_ms", measurements)
+
+  defp update_instrumentation(stats, [:finch, :send, :stop], measurements),
+    do: add_timing(stats, "finch_sends", "finch_send_duration_ms", measurements)
+
+  defp update_instrumentation(stats, [:finch, :recv, outcome], measurements)
+       when outcome in [:stop, :exception],
+       do: add_timing(stats, "finch_receives", "finch_receive_duration_ms", measurements)
+
   defp update_instrumentation(stats, [:req_llm, :token_usage], measurements) do
     tokens = Map.get(measurements, :tokens, %{})
 
@@ -575,6 +619,18 @@ defmodule Imp.BenchmarkTruth.Runner do
   end
 
   defp update_instrumentation(stats, _event, _measurements), do: stats
+
+  defp add_timing(stats, count_key, duration_key, measurements) do
+    duration_ms =
+      measurements
+      |> Map.get(:duration, 0)
+      |> System.convert_time_unit(:native, :microsecond)
+      |> us_to_ms()
+
+    stats
+    |> Map.update!(count_key, &(&1 + 1))
+    |> Map.update!(duration_key, &Float.round(&1 + duration_ms, 3))
+  end
 
   defp first_number(map, keys) do
     Enum.find_value(keys, 0, fn key ->

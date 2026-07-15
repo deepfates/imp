@@ -30,8 +30,6 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
 
   @impl true
   def run(args) do
-    Mix.Task.run("app.start")
-
     {opts, _argv, invalid} =
       OptionParser.parse(args,
         strict: [
@@ -61,6 +59,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
     Imp.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
+    Mix.Tasks.Imp.Benchmark.Parity.configure_req_llm_pool!(opts)
+    Mix.Task.run("app.start")
 
     model = Keyword.get(opts, :model) || Mix.raise("--model is required")
     out_dir = Keyword.get(opts, :out, "benchmarks/results")

@@ -793,6 +793,51 @@ Use this for measured transport experiments, not as a hidden release-policy
 escape hatch. Release evidence should record the campaign id, model, generation
 settings, and pool settings whenever they change.
 
+The parity runner records its effective pool topology even when no pool flags
+are passed. Its HTTP/1 default is one shard with `size` equal to
+`--max-concurrency`. This preserves the requested parallel capacity without
+randomly queueing colliding requests behind one-connection shards. Explicit
+pool flags remain authoritative. The campaign driver applies this configuration
+before starting ReqLLM; applying it after application startup does not rebuild
+the already-running Finch pool.
+
+Each new Imp row also records ReqLLM request time and Finch request, queue,
+connect, send, and receive counts and durations. These fields are process-local
+and contain no headers, URLs, request bodies, or credentials. Use them to decide
+whether a latency difference is provider time, pool contention, connection
+setup, or retries before paying for a larger campaign.
+
+### ReqLLM HTTP/1 latency root cause (2026-07-14)
+
+The completed 8,724-row current-low-cost campaign established close quality
+parity but reported an Imp/DSPy latency ratio of `1.765`. Runner-order splits
+were similar, so order bias did not explain the gap. Its ReqLLM pool used the
+upstream default of eight HTTP/1 shards with one connection per shard.
+
+A provider-free 80-request test with eight concurrent delayed responses held
+total connection capacity constant. The `8 x 1` topology took `1,624.0 ms`
+with `48.095 ms` mean queue time; `1 x 8` took `1,014.8 ms` with `0.101 ms`
+mean queue time. Finch documents that multiple HTTP/1 shards can scatter work
+and reduce connection reuse.
+
+A paid A/B/B/A crossover then ran the same 16 HotPotQA rows and matched model
+under both runner orders:
+
+| Pool | Runner order | Imp ms | DSPy ms | Ratio | Mean Finch queue ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `8 x 1` | Imp first | 7,789.403 | 3,583.527 | 2.174 | 1,392.365 |
+| `1 x 8` | DSPy first | 4,474.305 | 5,069.463 | 0.883 | 1.384 |
+| `1 x 8` | Imp first | 4,244.587 | 4,943.526 | 0.859 | 1.547 |
+| `8 x 1` | DSPy first | 4,545.958 | 3,014.296 | 1.508 | 540.644 |
+
+Every trial recorded 16 ReqLLM lifecycles, 16 Finch requests, and zero runner
+errors, ruling out hidden retries. The four paired trials cost `$0.144541` in
+provider-reported usage. Their raw artifacts live under
+`benchmarks/results/latency-root-cause/`. This diagnoses and fixes the harness
+defect; it does not retroactively turn the historical full campaign's latency
+outcome green. A future full claim must use a fresh campaign id and the recorded
+effective `1 x concurrency` topology.
+
 When resuming a release campaign after concurrency experiments, keep passing the
 release `--max-concurrency` value. The campaign runner forwards that value to
 aggregation, so coverage and next offsets are computed from the comparable
