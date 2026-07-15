@@ -130,13 +130,16 @@ defmodule DashboardTest do
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "summary" => %{
-        "total" => 12,
-        "passing" => 12,
+        "total" => 15,
+        "passing" => 15,
         "all_passing" => true,
-        "direct_comparisons" => 2,
-        "imp_only_or_deviation" => 10,
+        "direct_comparisons" => 4,
+        "imp_only_or_deviation" => 11,
+        "provider_free_contract_complete" => true,
+        "live_matched_behavior_complete" => true,
         "full_rag_tool_agent_parity" => true
-      }
+      },
+      "rows" => rag_tool_agent_rows()
     })
 
     write_json!(Path.join(rlm_dir, "rlm-benchmark-parity-20260707T000000Z.json"), %{
@@ -780,6 +783,46 @@ defmodule DashboardTest do
              lane["blocking_requirements"],
              &(&1["kind"] == "instruction_optimizer_implementation_revision_mismatch")
            )
+  end
+
+  test "RAG tool agent lane rejects a forged full summary without authoritative rows" do
+    root = tmp_dir("dashboard-rag-tool-forgery")
+    rag_dir = Path.join(root, "rag")
+    out_dir = Path.join(root, "out")
+    Enum.each([rag_dir, out_dir], &File.mkdir_p!/1)
+
+    write_json!(Path.join(rag_dir, "rag-tool-agent-parity-forged.json"), %{
+      "schema_version" => 1,
+      "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "summary" => %{
+        "total" => 15,
+        "passing" => 15,
+        "all_passing" => true,
+        "provider_free_contract_complete" => true,
+        "live_matched_behavior_complete" => true,
+        "full_rag_tool_agent_parity" => true
+      },
+      "rows" => []
+    })
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--rag-tool-agent-dir",
+        rag_dir,
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    lane = path |> File.read!() |> Jason.decode!() |> get_in(["lanes", "rag_tool_agent"])
+
+    assert lane["status"] == "failing"
+    refute lane["full_evidence"]
+    refute lane["summary"]["authority"]["rows_reconciled"]
+    refute lane["summary"]["authority"]["full"]
   end
 
   test "missing mismatched failed or unpinned structural evidence stays red and blocks optimizer parity" do
@@ -1702,6 +1745,69 @@ defmodule DashboardTest do
     })
 
     path
+  end
+
+  defp rag_tool_agent_rows do
+    provider_free_ids = ~w(
+      rag_memory_retrieval
+      rag_multi_hop_retrieval
+      http_retriever_protocol_shape
+      react_lookup_tool
+      react_unknown_tool_error_trace
+      mcp_import_agent_trace
+      agent_tool_policy_denial
+      code_act_tool_program
+      program_of_thought_safe_eval
+      program_of_thought_rejects_unsafe_remote_call
+      streaming_incremental_fields
+      tasks_async_stream_ordered_results
+      save_load_redacts_provider_secret
+    )
+
+    base_evidence = %{
+      "mode" => "live",
+      "provider" => "anthropic",
+      "model_identity" => "claude-haiku-4-5-20251001",
+      "generation" => %{"max_tokens" => 400},
+      "usage_complete" => true,
+      "error" => nil
+    }
+
+    live_row = fn id, prompt_contract, imp_termination, dspy_termination ->
+      %{
+        "id" => id,
+        "passing" => true,
+        "imp" => %{
+          "passing" => true,
+          "evidence" =>
+            Map.merge(base_evidence, %{
+              "wire_api" => "anthropic_messages",
+              "prompt_contract" => prompt_contract,
+              "termination_tool" => imp_termination
+            })
+        },
+        "dspy" => %{
+          "passing" => true,
+          "evidence" =>
+            Map.merge(base_evidence, %{
+              "wire_api" => "litellm_anthropic_messages",
+              "prompt_contract" => prompt_contract,
+              "termination_tool" => dspy_termination
+            })
+        }
+      }
+    end
+
+    Enum.map(provider_free_ids, &%{"id" => &1, "passing" => true}) ++
+      [
+        live_row.("live_rag_memory_retrieval", "rag-exact-context-v1", nil, nil),
+        live_row.(
+          "live_mcp_lookup_tool",
+          "lookup-capital-then-terminate-v1",
+          "submit",
+          "finish"
+        )
+      ]
   end
 
   defp run_instruction_optimizer_dashboard!(contract_dir, out_dir) do

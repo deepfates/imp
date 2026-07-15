@@ -415,8 +415,10 @@ BEAM async execution, and save/load credential redaction. This is full
 provider-free production evidence. Explicit live mode adds matched Imp/DSPy
 retrieval and tool-use behavior with provider usage and fail-closed control
 matching. The two runtimes retain their native ReAct terminators (`submit` and
-`finish`) under a shared semantic contract. A complete live artifact is still
-required before the lane or its public claim becomes full evidence.
+`finish`) under a shared semantic contract. The revision-bound Haiku 4.5 run at
+`benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-haiku45-7105b5e-20260715.json`
+passes all 15 rows and completes the bounded production-behavior claim. It does
+not imply research-scale retrieval or tool-use quality.
 
 The RLM command produces T0 deterministic contract replay over hand-authored
 fixture rows. It is useful for checking harness wiring and inspecting traces,

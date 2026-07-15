@@ -1,0 +1,712 @@
+{
+  "dspy": {
+    "dspy_version": "3.2.1",
+    "git_sha": "7105b5e63d326a0cdae5086ed9ff91d56c41ca4d",
+    "python": "3.13.12",
+    "runner": "python-dspy-rag-tool-agent"
+  },
+  "generated_at": "2026-07-15T06:52:38Z",
+  "git_sha": "7105b5e63d326a0cdae5086ed9ff91d56c41ca4d",
+  "imp": {
+    "elixir": "1.19.5",
+    "git_sha": "7105b5e63d326a0cdae5086ed9ff91d56c41ca4d",
+    "otp": "28",
+    "runner": "imp-rag-tool-agent"
+  },
+  "rows": [
+    {
+      "category": "rag",
+      "comparison_status": "direct",
+      "deviation": null,
+      "dspy": {
+        "answer": "Paris",
+        "category": "rag",
+        "id": "rag_memory_retrieval",
+        "passing": true,
+        "retrieved": [
+          "France capital: Paris."
+        ],
+        "trace": {
+          "lm_calls": 1,
+          "remaining_responses": 0
+        }
+      },
+      "expected": {
+        "answer": "Paris"
+      },
+      "id": "rag_memory_retrieval",
+      "imp": {
+        "answer": "Paris",
+        "category": "rag",
+        "comparison_status": "direct",
+        "id": "rag_memory_retrieval",
+        "passing": true,
+        "retrieved": [
+          {
+            "id": "fr",
+            "score": 2,
+            "text": "France capital: Paris."
+          }
+        ],
+        "trace": {
+          "documents": 1,
+          "retriever": "Imp.Retrieve.Memory"
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "rag",
+      "comparison_status": "imp_only",
+      "deviation": "Imp multi-hop RAG is a native iterative retrieval option on Imp.rag/3; DSPy rows cover one-shot RAG directly while this row proves Imp-owned hop semantics.",
+      "dspy": null,
+      "id": "rag_multi_hop_retrieval",
+      "imp": {
+        "answer": "France",
+        "category": "rag",
+        "comparison_status": "imp_only",
+        "deviation": "Imp multi-hop RAG is a native iterative retrieval option on Imp.rag/3; DSPy rows cover one-shot RAG directly while this row proves Imp-owned hop semantics.",
+        "id": "rag_multi_hop_retrieval",
+        "passing": true,
+        "retrieved": [
+          {
+            "id": "bridge",
+            "text": "The Eiffel Tower is in Paris."
+          },
+          {
+            "id": "answer",
+            "text": "Paris is the capital of France."
+          }
+        ],
+        "trace": {
+          "hops": [
+            {
+              "count": 1,
+              "docs": [
+                {
+                  "id": "bridge",
+                  "text": "The Eiffel Tower is in Paris."
+                }
+              ],
+              "hop": 1,
+              "query": "Which country has the capital of Eiffel's city?"
+            },
+            {
+              "count": 1,
+              "docs": [
+                {
+                  "id": "answer",
+                  "text": "Paris is the capital of France."
+                }
+              ],
+              "hop": 2,
+              "query": "Which country has the capital of Eiffel's city?\n\nThe Eiffel Tower is in Paris."
+            }
+          ]
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "retriever_protocol",
+      "comparison_status": "imp_only",
+      "deviation": "Provider-facing HTTP retriever protocol shape is an Imp production boundary; this row proves request construction, response mapping, and metadata preservation without live service state.",
+      "dspy": null,
+      "id": "http_retriever_protocol_shape",
+      "imp": {
+        "category": "retriever_protocol",
+        "comparison_status": "imp_only",
+        "deviation": "Provider-facing HTTP retriever protocol shape is an Imp production boundary; this row proves request construction, response mapping, and metadata preservation without live service state.",
+        "id": "http_retriever_protocol_shape",
+        "passing": true,
+        "retrieved": [
+          {
+            "metadata": {
+              "id": "http-doc"
+            },
+            "score": 0.99,
+            "text": "Paris is the capital of France."
+          }
+        ],
+        "trace": {
+          "request": {
+            "body": {
+              "k": 1,
+              "query": "capital France"
+            },
+            "headers": [
+              [
+                "idempotency-key",
+                "imp-retrieval-QozajYO77-F-XitMusMGDA"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ]
+            ],
+            "opts": [
+              [
+                "timeout",
+                15000
+              ],
+              [
+                "k",
+                1
+              ]
+            ],
+            "url": "https://retriever.example/search"
+          }
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "tools",
+      "comparison_status": "direct",
+      "deviation": null,
+      "dspy": {
+        "answer": "Paris",
+        "category": "tools",
+        "id": "react_lookup_tool",
+        "passing": true,
+        "tool_trace": [
+          {
+            "arguments": {
+              "query": "capital-france"
+            },
+            "result": "Paris",
+            "tool": "lookup"
+          }
+        ],
+        "trace": {
+          "lm_calls": 3,
+          "remaining_responses": 0
+        }
+      },
+      "expected": {
+        "answer": "Paris",
+        "tool_trace": [
+          {
+            "arguments": {
+              "query": "capital-france"
+            },
+            "result": "Paris",
+            "tool": "lookup"
+          }
+        ]
+      },
+      "id": "react_lookup_tool",
+      "imp": {
+        "answer": "Paris",
+        "category": "tools",
+        "comparison_status": "direct",
+        "id": "react_lookup_tool",
+        "passing": true,
+        "tool_trace": [
+          {
+            "arguments": {
+              "query": "capital-france"
+            },
+            "result": "Paris",
+            "tool": "lookup"
+          }
+        ],
+        "trace": {
+          "termination_reason": "submit"
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "tools",
+      "comparison_status": "imp_only",
+      "deviation": "Unknown provider tool-call handling is Imp production error semantics; direct DSPy rows cover successful ReAct tool use.",
+      "dspy": null,
+      "id": "react_unknown_tool_error_trace",
+      "imp": {
+        "category": "tools",
+        "comparison_status": "imp_only",
+        "deviation": "Unknown provider tool-call handling is Imp production error semantics; direct DSPy rows cover successful ReAct tool use.",
+        "id": "react_unknown_tool_error_trace",
+        "passing": true,
+        "trace": [
+          "error",
+          [
+            "unknown_tool",
+            "missing_tool"
+          ]
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "mcp_agent",
+      "comparison_status": "imp_only",
+      "deviation": "DSPy does not expose Imp's MCP import and typed Agent runtime; this row proves Imp production semantics.",
+      "dspy": null,
+      "id": "mcp_import_agent_trace",
+      "imp": {
+        "category": "mcp_agent",
+        "comparison_status": "imp_only",
+        "deviation": "DSPy does not expose Imp's MCP import and typed Agent runtime; this row proves Imp production semantics.",
+        "id": "mcp_import_agent_trace",
+        "passing": true,
+        "trace": [
+          {
+            "at": 0,
+            "input": {
+              "key": "abc"
+            },
+            "output": {
+              "value": "value:abc"
+            },
+            "tool": "lookup",
+            "type": "tool"
+          },
+          {
+            "agent": "lookup_agent",
+            "at": 1,
+            "output": {
+              "value": "value:abc"
+            },
+            "type": "agent"
+          }
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "agent",
+      "comparison_status": "imp_only",
+      "deviation": "Imp Agent tool policies are an Elixir production-runtime surface, not a direct DSPy primitive.",
+      "dspy": null,
+      "id": "agent_tool_policy_denial",
+      "imp": {
+        "category": "agent",
+        "comparison_status": "imp_only",
+        "deviation": "Imp Agent tool policies are an Elixir production-runtime surface, not a direct DSPy primitive.",
+        "id": "agent_tool_policy_denial",
+        "passing": true,
+        "trace": [
+          {
+            "at": 0,
+            "error": [
+              "tool_denied",
+              "blocked"
+            ],
+            "tool": "blocked",
+            "type": "tool_denied"
+          },
+          {
+            "agent": "locked",
+            "at": 1,
+            "error": [
+              "tool_denied",
+              "blocked"
+            ],
+            "type": "agent_error"
+          }
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "code_act",
+      "comparison_status": "imp_only",
+      "deviation": "CodeAct execution policy is tested as Imp production semantics; no direct DSPy row is asserted in this initial artifact.",
+      "dspy": null,
+      "id": "code_act_tool_program",
+      "imp": {
+        "category": "code_act",
+        "comparison_status": "imp_only",
+        "deviation": "CodeAct execution policy is tested as Imp production semantics; no direct DSPy row is asserted in this initial artifact.",
+        "id": "code_act_tool_program",
+        "passing": true,
+        "trace": [
+          {
+            "action": "tool",
+            "input": {
+              "arguments": {
+                "key": "n"
+              },
+              "name": "lookup"
+            },
+            "iteration": 1,
+            "output": 41
+          },
+          {
+            "action": "program",
+            "input": "observation + 1",
+            "iteration": 2,
+            "output": [
+              "ok",
+              42
+            ]
+          }
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "program_of_thought",
+      "comparison_status": "imp_only",
+      "deviation": "ProgramOfThought safe evaluation is an Imp execution-policy proof in this artifact.",
+      "dspy": null,
+      "id": "program_of_thought_safe_eval",
+      "imp": {
+        "category": "program_of_thought",
+        "comparison_status": "imp_only",
+        "deviation": "ProgramOfThought safe evaluation is an Imp execution-policy proof in this artifact.",
+        "id": "program_of_thought_safe_eval",
+        "passing": true,
+        "trace": {
+          "program": "x * 2"
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "program_of_thought",
+      "comparison_status": "imp_only",
+      "deviation": "ProgramOfThought sandbox rejection is an Imp execution-policy guarantee.",
+      "dspy": null,
+      "id": "program_of_thought_rejects_unsafe_remote_call",
+      "imp": {
+        "category": "program_of_thought",
+        "comparison_status": "imp_only",
+        "deviation": "ProgramOfThought sandbox rejection is an Imp execution-policy guarantee.",
+        "id": "program_of_thought_rejects_unsafe_remote_call",
+        "passing": true,
+        "trace": [
+          "error",
+          [
+            "unsafe_ast",
+            [
+              [
+                ".",
+                [
+                  [
+                    "line",
+                    1
+                  ]
+                ],
+                [
+                  [
+                    "__aliases__",
+                    [
+                      [
+                        "line",
+                        1
+                      ]
+                    ],
+                    [
+                      "System"
+                    ]
+                  ],
+                  "cmd"
+                ]
+              ],
+              [
+                [
+                  "line",
+                  1
+                ]
+              ],
+              [
+                "echo",
+                []
+              ]
+            ]
+          ]
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "streaming",
+      "comparison_status": "imp_only",
+      "deviation": "Streaming incremental field parsing is Imp production semantics in this artifact.",
+      "dspy": null,
+      "id": "streaming_incremental_fields",
+      "imp": {
+        "category": "streaming",
+        "comparison_status": "imp_only",
+        "deviation": "Streaming incremental field parsing is Imp production semantics in this artifact.",
+        "id": "streaming_incremental_fields",
+        "passing": true,
+        "trace": [
+          {
+            "field": "answer",
+            "value": "Paris"
+          },
+          {
+            "field": "rationale",
+            "value": "retrieved"
+          }
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "async",
+      "comparison_status": "imp_only",
+      "deviation": "BEAM-native async stream semantics are an Imp production runtime feature rather than a direct DSPy primitive.",
+      "dspy": null,
+      "id": "tasks_async_stream_ordered_results",
+      "imp": {
+        "category": "async",
+        "comparison_status": "imp_only",
+        "deviation": "BEAM-native async stream semantics are an Imp production runtime feature rather than a direct DSPy primitive.",
+        "id": "tasks_async_stream_ordered_results",
+        "passing": true,
+        "trace": [
+          [
+            "ok",
+            2
+          ],
+          [
+            "ok",
+            4
+          ],
+          [
+            "ok",
+            6
+          ]
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "persistence",
+      "comparison_status": "imp_only",
+      "deviation": "Save/load credential redaction is an Imp production safety invariant.",
+      "dspy": null,
+      "id": "save_load_redacts_provider_secret",
+      "imp": {
+        "category": "persistence",
+        "comparison_status": "imp_only",
+        "deviation": "Save/load credential redaction is an Imp production safety invariant.",
+        "id": "save_load_redacts_provider_secret",
+        "passing": true,
+        "trace": {
+          "secret_persisted": false
+        }
+      },
+      "passing": true
+    },
+    {
+      "category": "rag",
+      "comparison_status": "direct",
+      "deviation": null,
+      "dspy": {
+        "answer": "Paris",
+        "category": "rag",
+        "evidence": {
+          "error": null,
+          "generation": {
+            "cache": false,
+            "effective_generation": {
+              "max_tokens": 400,
+              "temperature": 0.0
+            },
+            "max_iters": 4,
+            "max_tokens": 400,
+            "reasoning_effort": null,
+            "retrieval_k": 1,
+            "temperature": 0.0
+          },
+          "mode": "live",
+          "model_identity": "claude-haiku-4-5-20251001",
+          "prompt_contract": "rag-exact-context-v1",
+          "provider": "anthropic",
+          "runtime_model": "anthropic/claude-haiku-4-5-20251001",
+          "termination_tool": null,
+          "usage": {
+            "input_tokens": 205,
+            "output_tokens": 20,
+            "requests": 1,
+            "usd": 3.05e-4
+          },
+          "usage_complete": true,
+          "wire_api": "litellm_anthropic_messages"
+        },
+        "id": "live_rag_memory_retrieval",
+        "passing": true,
+        "retrieved": [
+          {
+            "id": "fr",
+            "text": "France capital: Paris."
+          }
+        ]
+      },
+      "expected": {
+        "answer": "Paris"
+      },
+      "id": "live_rag_memory_retrieval",
+      "imp": {
+        "answer": "Paris",
+        "category": "rag",
+        "comparison_status": "direct",
+        "evidence": {
+          "error": null,
+          "generation": {
+            "cache": false,
+            "effective_generation": {
+              "max_tokens": 400,
+              "temperature": 0.0
+            },
+            "max_iters": 4,
+            "max_tokens": 400,
+            "reasoning_effort": null,
+            "retrieval_k": 1,
+            "temperature": 0.0
+          },
+          "mode": "live",
+          "model_identity": "claude-haiku-4-5-20251001",
+          "prompt_contract": "rag-exact-context-v1",
+          "provider": "anthropic",
+          "runtime_model": "anthropic:claude-haiku-4-5-20251001",
+          "termination_tool": null,
+          "usage": {
+            "input_tokens": 206,
+            "output_tokens": 19,
+            "requests": 1,
+            "usd": 3.01e-4
+          },
+          "usage_complete": true,
+          "wire_api": "anthropic_messages"
+        },
+        "id": "live_rag_memory_retrieval",
+        "passing": true,
+        "retrieved": [
+          {
+            "id": "fr",
+            "score": 2,
+            "text": "France capital: Paris."
+          }
+        ]
+      },
+      "passing": true
+    },
+    {
+      "category": "tools",
+      "comparison_status": "direct",
+      "deviation": null,
+      "dspy": {
+        "answer": "Paris",
+        "category": "tools",
+        "evidence": {
+          "error": null,
+          "generation": {
+            "cache": false,
+            "effective_generation": {
+              "max_tokens": 400,
+              "temperature": 0.0
+            },
+            "max_iters": 4,
+            "max_tokens": 400,
+            "reasoning_effort": null,
+            "retrieval_k": 1,
+            "temperature": 0.0
+          },
+          "mode": "live",
+          "model_identity": "claude-haiku-4-5-20251001",
+          "prompt_contract": "lookup-capital-then-terminate-v1",
+          "provider": "anthropic",
+          "runtime_model": "anthropic/claude-haiku-4-5-20251001",
+          "termination_tool": "finish",
+          "usage": {
+            "input_tokens": 2060,
+            "output_tokens": 301,
+            "requests": 3,
+            "usd": 0.003565
+          },
+          "usage_complete": true,
+          "wire_api": "litellm_anthropic_messages"
+        },
+        "id": "live_mcp_lookup_tool",
+        "passing": true,
+        "tool_trace": [
+          {
+            "arguments": {
+              "country": "france"
+            },
+            "result": "Paris",
+            "tool": "lookup_capital"
+          }
+        ]
+      },
+      "expected": {
+        "answer": "Paris",
+        "tool_trace": [
+          {
+            "arguments": {
+              "country": "france"
+            },
+            "result": "Paris",
+            "tool": "lookup_capital"
+          }
+        ]
+      },
+      "id": "live_mcp_lookup_tool",
+      "imp": {
+        "answer": "Paris",
+        "category": "tools",
+        "comparison_status": "direct",
+        "evidence": {
+          "error": null,
+          "generation": {
+            "cache": false,
+            "effective_generation": {
+              "max_tokens": 400,
+              "temperature": 0.0
+            },
+            "max_iters": 4,
+            "max_tokens": 400,
+            "reasoning_effort": null,
+            "retrieval_k": 1,
+            "temperature": 0.0
+          },
+          "mode": "live",
+          "model_identity": "claude-haiku-4-5-20251001",
+          "prompt_contract": "lookup-capital-then-terminate-v1",
+          "provider": "anthropic",
+          "runtime_model": "anthropic:claude-haiku-4-5-20251001",
+          "termination_tool": "submit",
+          "usage": {
+            "input_tokens": 2107,
+            "output_tokens": 265,
+            "requests": 2,
+            "usd": 0.003432
+          },
+          "usage_complete": true,
+          "wire_api": "anthropic_messages"
+        },
+        "id": "live_mcp_lookup_tool",
+        "passing": true,
+        "tool_trace": [
+          {
+            "arguments": {
+              "country": "france"
+            },
+            "result": "Paris",
+            "tool": "lookup_capital"
+          }
+        ]
+      },
+      "passing": true
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "all_passing": true,
+    "direct_comparisons": 4,
+    "full_rag_tool_agent_parity": true,
+    "imp_only_or_deviation": 11,
+    "live_matched_behavior_complete": true,
+    "note": "Provider-free production contracts and matched live retrieval/tool behavior pass. Live rows use one model identity, provider-equivalent wire APIs, matched generation controls, complete provider usage, exact answers, and canonical tool traces. Imp's tool row imports an MCP catalog tool; the credential-gated live provider suite separately proves the same ReAct composition through HTTP MCP JSON-RPC transport.",
+    "passing": 15,
+    "provider_free_contract_complete": true,
+    "total": 15
+  }
+}

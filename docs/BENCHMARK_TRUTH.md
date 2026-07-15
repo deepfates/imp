@@ -545,6 +545,14 @@ HTTP MCP JSON-RPC server. `full_rag_tool_agent_parity` remains false unless all
 provider-free and live rows pass. Quota or provider errors are retained as
 failed evidence, never converted into missing or passing rows.
 
+The admitted revision-bound run is
+`benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-haiku45-7105b5e-20260715.json`.
+It binds the runner to commit `7105b5e63d326a0cdae5086ed9ff91d56c41ca4d`,
+uses `claude-haiku-4-5-20251001` over Anthropic Messages on both runtimes, and
+passes 15/15 rows. The two matched live rows record exact answers and traces,
+complete provider usage, and about $0.0076 total cost. This establishes bounded
+production behavior, not research-scale retrieval or tool-use quality.
+
 ## Run RLM Benchmark Parity
 
 ```sh

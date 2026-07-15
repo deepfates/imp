@@ -54,6 +54,22 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     "dspy/teleprompt/utils.py" =>
       "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182"
   }
+  @rag_tool_agent_provider_free_ids ~w(
+    rag_memory_retrieval
+    rag_multi_hop_retrieval
+    http_retriever_protocol_shape
+    react_lookup_tool
+    react_unknown_tool_error_trace
+    mcp_import_agent_trace
+    agent_tool_policy_denial
+    code_act_tool_program
+    program_of_thought_safe_eval
+    program_of_thought_rejects_unsafe_remote_call
+    streaming_incremental_fields
+    tasks_async_stream_ordered_results
+    save_load_redacts_provider_secret
+  )
+  @rag_tool_agent_live_ids ~w(live_rag_memory_retrieval live_mcp_lookup_tool)
 
   @impl true
   def run(args) do
@@ -196,7 +212,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "rag_tool_agent" =>
         rag_tool_agent_lane(
-          Keyword.get(opts, :rag_tool_agent_dir, "tmp/rag-tool-agent"),
+          Keyword.get(opts, :rag_tool_agent_dir),
           max_age_hours
         ),
       "rlm_benchmark" =>
@@ -1247,10 +1263,23 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp rag_tool_agent_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "rag-tool-agent-parity-*.json")),
+    globs =
+      case dir do
+        nil ->
+          [
+            "tmp/rag-tool-agent/rag-tool-agent-parity-*.json",
+            "benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-*.json"
+          ]
+
+        path ->
+          [Path.join(path, "rag-tool-agent-parity-*.json")]
+      end
+
+    with {:ok, path} <- latest(globs),
          {:ok, artifact} <- read_artifact(path) do
-      passing = get_in(artifact, ["summary", "all_passing"]) == true
-      full = get_in(artifact, ["summary", "full_rag_tool_agent_parity"]) == true
+      authority = rag_tool_agent_authority(artifact)
+      passing = authority["provider_free_complete"]
+      full = authority["full"]
 
       artifact_lane("rag_tool_agent", path, artifact, max_age_hours,
         passing: passing,
@@ -1265,7 +1294,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
             get_in(artifact, ["summary", "provider_free_contract_complete"]) == true,
           "live_matched_behavior_complete" =>
             get_in(artifact, ["summary", "live_matched_behavior_complete"]) == true,
-          "full_rag_tool_agent_parity" => full
+          "full_rag_tool_agent_parity" => full,
+          "authority" => authority
         },
         limitation:
           if(full,
@@ -1275,9 +1305,78 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           )
       )
     else
-      _ -> missing_lane("rag_tool_agent", "no rag-tool-agent-parity artifact found in #{dir}")
+      _ ->
+        missing_lane(
+          "rag_tool_agent",
+          "no rag-tool-agent-parity artifact found in #{Enum.join(globs, ", ")}"
+        )
     end
   end
+
+  defp rag_tool_agent_authority(artifact) do
+    rows = if is_list(artifact["rows"]), do: artifact["rows"], else: []
+    rows_by_id = Map.new(rows, &{&1["id"], &1})
+    row_ids = Map.keys(rows_by_id) |> MapSet.new()
+    provider_free_ids = MapSet.new(@rag_tool_agent_provider_free_ids)
+    live_ids = MapSet.new(@rag_tool_agent_live_ids)
+    summary = if is_map(artifact["summary"]), do: artifact["summary"], else: %{}
+
+    rows_reconciled =
+      length(rows) == MapSet.size(row_ids) and summary["total"] == length(rows) and
+        summary["passing"] == Enum.count(rows, &(&1["passing"] == true)) and
+        Enum.all?(rows, &(&1["passing"] == true)) and summary["all_passing"] == true
+
+    provider_free_complete =
+      rows_reconciled and MapSet.subset?(provider_free_ids, row_ids) and
+        Enum.all?(@rag_tool_agent_provider_free_ids, &(rows_by_id[&1]["passing"] == true))
+
+    live_complete =
+      MapSet.subset?(live_ids, row_ids) and
+        Enum.all?(@rag_tool_agent_live_ids, &valid_live_rag_tool_agent_row?(rows_by_id[&1]))
+
+    full =
+      provider_free_complete and live_complete and
+        summary["provider_free_contract_complete"] == true and
+        summary["live_matched_behavior_complete"] == true and
+        summary["full_rag_tool_agent_parity"] == true
+
+    %{
+      "rows_reconciled" => rows_reconciled,
+      "provider_free_complete" => provider_free_complete,
+      "live_complete" => live_complete,
+      "full" => full
+    }
+  end
+
+  defp valid_live_rag_tool_agent_row?(%{"id" => id, "imp" => imp, "dspy" => dspy}) do
+    imp_evidence = imp["evidence"] || %{}
+    dspy_evidence = dspy["evidence"] || %{}
+
+    imp["passing"] == true and dspy["passing"] == true and
+      imp_evidence["mode"] == "live" and dspy_evidence["mode"] == "live" and
+      imp_evidence["provider"] == dspy_evidence["provider"] and
+      imp_evidence["model_identity"] == dspy_evidence["model_identity"] and
+      wire_api_family(imp_evidence["wire_api"]) == wire_api_family(dspy_evidence["wire_api"]) and
+      imp_evidence["generation"] == dspy_evidence["generation"] and
+      imp_evidence["prompt_contract"] == dspy_evidence["prompt_contract"] and
+      imp_evidence["usage_complete"] == true and dspy_evidence["usage_complete"] == true and
+      is_nil(imp_evidence["error"]) and is_nil(dspy_evidence["error"]) and
+      valid_rag_tool_termination?(id, imp_evidence, dspy_evidence)
+  end
+
+  defp valid_live_rag_tool_agent_row?(_row), do: false
+
+  defp valid_rag_tool_termination?("live_mcp_lookup_tool", imp, dspy),
+    do: imp["termination_tool"] == "submit" and dspy["termination_tool"] == "finish"
+
+  defp valid_rag_tool_termination?(_id, imp, dspy),
+    do: is_nil(imp["termination_tool"]) and is_nil(dspy["termination_tool"])
+
+  defp wire_api_family("anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("litellm_anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("google_generate_content"), do: "google_generate_content"
+  defp wire_api_family("litellm_google_generate_content"), do: "google_generate_content"
+  defp wire_api_family(value), do: value
 
   defp rlm_benchmark_lane(dir, max_age_hours) do
     with {:ok, path} <- latest(Path.join(dir, "rlm-benchmark-parity-*.json")),
