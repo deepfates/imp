@@ -34,7 +34,6 @@ listed by the audit policy. A new token in a product surface fails the check;
 the focused test also supplies a controlled live-source fixture to prove that
 failure behavior.
 
-The package contract separately proves that a clean consumer sees `app: :imp`,
-`Imp.Application`, and the loaded `Application.spec(:imp, :mod)` tuple. The
-current OTP identity is therefore checked at both the source boundary and the
-package boundary.
+The package contract separately proves that a clean consumer sees `app: :imp`
+and loads the expected OTP application callback tuple. The current OTP identity
+is therefore checked at both the source boundary and the package boundary.
