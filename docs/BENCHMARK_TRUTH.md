@@ -938,11 +938,12 @@ missing ranges instead of being treated as both-failed parity rows. It reports:
 - latency ratio from covered chunk artifacts
 - runtime instrumentation summaries: Imp LM call counts, LM-duration share,
   local overhead, fallback/retry counts, prompt size, raw output size, and
-  DSPy-side input/message/raw-size diagnostics. DSPy `message_chars` records
-  its source as `lm_history` when a concurrent history entry is unambiguously
-  attributable to the row, or `row_estimate` when the runner falls back to the
-  canonical question/context shape so concurrency does not hide prompt-size
-  evidence.
+  DSPy-side input/message/raw-size diagnostics. The benchmark-local DSPy LM
+  captures the exact history entry in worker-local storage before each call
+  returns, so concurrent usage and cost do not depend on shared-list append
+  order or prompt-text matching. `history_attribution` records
+  `thread_local_lm`; `shared_history_match` remains a compatibility fallback.
+  `message_chars` uses `row_estimate` only when no attributable entry exists.
 - explicit `full_parity: true/false`
 
 `full_parity` is false unless every canonical row is covered, the prompt
@@ -974,7 +975,9 @@ coverage from quota-tainted or otherwise incomplete chunks is not release proof.
 Review `dspy_instrumentation.message_chars_sources` before using shape ratios
 for fine-grained prompt work: `lm_history` is exact sidecar evidence, while
 `row_estimate` is deterministic diagnostic evidence for rows whose DSPy history
-was ambiguous under concurrency.
+was unavailable. New live evidence should also report
+`history_attribution=thread_local_lm`; the shared-history fallback is not
+sufficient for a complete concurrent cost claim.
 
 ## Evidence Standard
 

@@ -15,6 +15,7 @@ import platform
 import re
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 DIAGNOSTIC_LIMIT_CHARS = 2048
 DIAGNOSTIC_SECRETS: Tuple[str, ...] = ()
+HISTORY_ENTRY_UNSET = object()
 
 
 def isolate_from_beam_process_group() -> None:
@@ -169,8 +171,27 @@ def configure_dspy(
     if reasoning_effort:
         lm_args["reasoning_effort"] = reasoning_effort
 
-    lm = dspy.LM(dspy_lm_name(model), **lm_args)
+    lm = attributing_lm(dspy_lm_name(model), **lm_args)
     dspy.configure(lm=lm)
+
+
+def attributing_lm(*args: Any, **kwargs: Any) -> Any:
+    class AttributingLM(dspy.LM):
+        def __init__(self, *lm_args: Any, **lm_kwargs: Any) -> None:
+            super().__init__(*lm_args, **lm_kwargs)
+            self._imp_thread_history = threading.local()
+
+        def update_history(self, entry: Dict[str, Any]) -> None:
+            super().update_history(entry)
+            self._imp_thread_history.entry = entry
+
+        def clear_thread_history_entry(self) -> None:
+            self._imp_thread_history.entry = None
+
+        def thread_history_entry(self) -> Optional[Dict[str, Any]]:
+            return getattr(self._imp_thread_history, "entry", None)
+
+    return AttributingLM(*args, **kwargs)
 
 
 def dspy_lm_name(model: str) -> str:
@@ -319,6 +340,7 @@ def run_row(
 ) -> Dict[str, Any]:
     started = time.perf_counter()
     before_history_len = dspy_history_len()
+    clear_thread_history_entry()
     try:
         program = GSM8KProgram() if task == "gsm8k" else HotPotQAProgram()
         if task == "gsm8k":
@@ -337,6 +359,7 @@ def run_row(
         pred = None
 
     duration_ms = round((time.perf_counter() - started) * 1000, 3)
+    history_entry = thread_history_entry()
 
     return {
         "index": index,
@@ -346,8 +369,28 @@ def run_row(
         "metric_metadata": metric_result.get("metadata", {}),
         "error": error,
         "duration_ms": duration_ms,
-        "instrumentation": dspy_instrumentation(task, row, pred, duration_ms, before_history_len),
+        "instrumentation": dspy_instrumentation(
+            task,
+            row,
+            pred,
+            duration_ms,
+            before_history_len,
+            history_entry=history_entry,
+        ),
     }
+
+
+def clear_thread_history_entry() -> None:
+    lm = getattr(dspy.settings, "lm", None)
+    clear = getattr(lm, "clear_thread_history_entry", None)
+    if callable(clear):
+        clear()
+
+
+def thread_history_entry() -> Optional[Dict[str, Any]]:
+    lm = getattr(dspy.settings, "lm", None)
+    get_entry = getattr(lm, "thread_history_entry", None)
+    return get_entry() if callable(get_entry) else None
 
 
 def exception_diagnostic(index: int, exc: Exception) -> Dict[str, Any]:
@@ -388,8 +431,14 @@ def dspy_instrumentation(
     prediction: Optional[Dict[str, Any]],
     duration_ms: float,
     before_history_len: int,
+    history_entry: Any = HISTORY_ENTRY_UNSET,
 ) -> Dict[str, Any]:
-    history_entry = attributed_history_entry(before_history_len, row)
+    if history_entry is HISTORY_ENTRY_UNSET:
+        history_entry = attributed_history_entry(before_history_len, row)
+        history_attribution = "shared_history_match" if history_entry is not None else "unavailable"
+    else:
+        history_attribution = "thread_local_lm" if history_entry is not None else "unavailable"
+
     history = history_instrumentation(history_entry)
     input_chars = len(str(row.get("question", "")))
     if task == "hotpotqa":
@@ -410,6 +459,7 @@ def dspy_instrumentation(
         "raw_chars": history.get("raw_chars") or char_len(prediction),
         "raw_chars_source": "lm_history" if history.get("raw_chars") else "prediction_fallback",
         "history_found": history_entry is not None,
+        "history_attribution": history_attribution,
         "usage_found": all(
             history.get(key) is not None for key in ("input_tokens", "output_tokens", "usd")
         ),
@@ -418,8 +468,8 @@ def dspy_instrumentation(
         "usd": history.get("usd"),
         "history_keys": sorted(history_entry.keys()) if isinstance(history_entry, dict) else [],
         "note": (
-            "DSPy instrumentation uses LM history when a history entry can be unambiguously "
-            "attributed to this row. If concurrent history attribution is unavailable, "
+            "The parity LM captures each row's exact history entry in worker-local storage. "
+            "Shared-history matching remains a compatibility fallback; if neither is available, "
             "message_chars is a deterministic estimate from the canonical benchmark row."
         ),
     }

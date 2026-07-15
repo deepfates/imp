@@ -1030,6 +1030,90 @@ defmodule BenchmarkTruthTest do
     assert output =~ "ok"
   end
 
+  test "DSPy parity runner attributes each concurrent call through thread-local LM history" do
+    runner_path = Path.expand("../scripts/dspy_parity_runner.py", __DIR__)
+
+    python = """
+    import importlib.util
+    import sys
+    import threading
+    import types
+
+    fake = types.ModuleType("dspy")
+    fake.__version__ = "fake"
+    fake.settings = types.SimpleNamespace(lm=None)
+    fake.Signature = type("Signature", (), {})
+    fake.Module = type("Module", (), {})
+    fake.ChainOfThought = lambda signature: None
+    fake.Predict = lambda signature: None
+    fake.InputField = lambda *args, **kwargs: None
+    fake.OutputField = lambda *args, **kwargs: None
+    class FakeLM:
+        def __init__(self, *args, **kwargs):
+            self.history = []
+
+        def update_history(self, entry):
+            self.history.append(entry)
+
+    fake.LM = FakeLM
+    fake.configure = lambda **kwargs: setattr(fake.settings, "lm", kwargs["lm"])
+    sys.modules["dspy"] = fake
+
+    spec = importlib.util.spec_from_file_location("dspy_parity_runner", #{Jason.encode!(runner_path)})
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    lm = runner.attributing_lm("fake-model")
+    fake.settings.lm = lm
+    barrier = threading.Barrier(2)
+    observed = {}
+
+    def record(name, tokens):
+        lm.clear_thread_history_entry()
+        barrier.wait()
+        entry = {
+            "messages": [{"content": name}],
+            "usage": {"input_tokens": tokens, "output_tokens": 1},
+            "cost": tokens / 1000,
+        }
+        lm.update_history(entry)
+        observed[name] = lm.thread_history_entry()
+
+    threads = [
+        threading.Thread(target=record, args=("alpha", 11)),
+        threading.Thread(target=record, args=("beta", 17)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert observed["alpha"]["usage"]["input_tokens"] == 11
+    assert observed["beta"]["usage"]["input_tokens"] == 17
+    assert len(lm.history) == 2
+
+    instrumentation = runner.dspy_instrumentation(
+        "hotpotqa",
+        {"question": "beta", "context": ""},
+        {"answer": "yes"},
+        12.0,
+        0,
+        history_entry=observed["beta"],
+    )
+    assert instrumentation["history_found"] is True
+    assert instrumentation["history_attribution"] == "thread_local_lm"
+    assert instrumentation["usage_found"] is True
+    assert instrumentation["input_tokens"] == 17
+    assert instrumentation["output_tokens"] == 1
+    assert instrumentation["usd"] == 0.017
+    print("ok")
+    """
+
+    {output, status} = System.cmd("python3", ["-c", python], stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ "ok"
+  end
+
   test "DSPy parity runner estimates message shape when concurrent LM history is ambiguous" do
     runner_path = Path.expand("../scripts/dspy_parity_runner.py", __DIR__)
 
@@ -1059,6 +1143,7 @@ defmodule BenchmarkTruthTest do
     instrumentation = runner.dspy_instrumentation("hotpotqa", row, {"answer": "There"}, 12.0, 0)
 
     assert instrumentation["history_found"] is False
+    assert instrumentation["history_attribution"] == "unavailable"
     assert instrumentation["message_chars"] == len(row["question"]) + len(row["context"])
     assert instrumentation["message_chars_source"] == "row_estimate"
     assert instrumentation["raw_chars_source"] == "prediction_fallback"
