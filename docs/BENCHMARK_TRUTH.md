@@ -522,7 +522,28 @@ production-semantics evidence for HTTP retriever protocol shape, MCP import
 through agents, tool policy denial traces, ReAct error traces, CodeAct,
 ProgramOfThought success and sandbox rejection, streaming incremental fields,
 BEAM async execution, and save/load redaction. Provider behavior over real
-models remains covered by the live matched-model lane.
+models can be measured directly in the same artifact:
+
+```sh
+mix imp.benchmark.rag_tool_agent \
+  --live \
+  --model anthropic:claude-haiku-4-5-20251001 \
+  --dspy-model anthropic/claude-haiku-4-5-20251001 \
+  --env-file .env \
+  --python tmp/dspy-parity-venv/bin/python \
+  --out benchmarks/results/rag-tool-agent-live
+```
+
+Live mode adds one retrieval-conditioned answer and one ReAct lookup row under
+matched model identity, provider-equivalent wire APIs, effective generation
+controls, exact outputs/traces, and complete provider-reported usage. Imp uses
+its reserved `submit` tool while DSPy ReAct uses `finish`; the artifact records
+and admits only that explicit runtime adaptation under one semantic prompt
+contract. The Imp row imports an MCP catalog tool. `LIVE_PROVIDER=1 mix
+live.check` separately proves the same provider/ReAct composition through an
+HTTP MCP JSON-RPC server. `full_rag_tool_agent_parity` remains false unless all
+provider-free and live rows pass. Quota or provider errors are retained as
+failed evidence, never converted into missing or passing rows.
 
 ## Run RLM Benchmark Parity
 

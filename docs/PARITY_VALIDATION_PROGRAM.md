@@ -396,6 +396,13 @@ Initial executable command:
 
 ```sh
 mix benchmark.rag_tool_agent.check
+mix imp.benchmark.rag_tool_agent \
+  --live \
+  --model anthropic:claude-haiku-4-5-20251001 \
+  --dspy-model anthropic/claude-haiku-4-5-20251001 \
+  --env-file .env \
+  --python tmp/dspy-parity-venv/bin/python \
+  --out benchmarks/results/rag-tool-agent-live
 mix benchmark.rlm.check
 ```
 
@@ -405,8 +412,11 @@ production-semantics proofs for HTTP retriever protocol shape, MCP import
 through agents, agent tool policy denial traces, ReAct error traces, CodeAct,
 ProgramOfThought success and sandbox rejection, streaming incremental fields,
 BEAM async execution, and save/load credential redaction. This is full
-provider-free production evidence; live matched-model campaigns remain the
-separate provider-behavior lane.
+provider-free production evidence. Explicit live mode adds matched Imp/DSPy
+retrieval and tool-use behavior with provider usage and fail-closed control
+matching. The two runtimes retain their native ReAct terminators (`submit` and
+`finish`) under a shared semantic contract. A complete live artifact is still
+required before the lane or its public claim becomes full evidence.
 
 The RLM command produces T0 deterministic contract replay over hand-authored
 fixture rows. It is useful for checking harness wiring and inspecting traces,

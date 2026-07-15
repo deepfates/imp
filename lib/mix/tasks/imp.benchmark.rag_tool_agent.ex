@@ -1,11 +1,20 @@
 defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   @moduledoc """
-  Run provider-free RAG, tool, and agent production-semantics parity checks.
+  Run RAG, tool, and agent parity plus production-semantics checks.
 
       mix imp.benchmark.rag_tool_agent
 
+      mix imp.benchmark.rag_tool_agent \
+        --live \
+        --model gpt-5.4-mini-2026-03-17 \
+        --dspy-model responses/gpt-5.4-mini-2026-03-17 \
+        --env-file .env
+
   The task compares directly equivalent DSPy slices where practical and records
   Imp-only production semantics for surfaces DSPy does not model the same way.
+  Live mode adds matched retrieval and tool-use rows and fails closed unless
+  model identity, provider-equivalent transport, effective generation controls,
+  exact outputs/traces, and provider-reported usage are complete on both sides.
   """
 
   use Mix.Task
@@ -13,26 +22,64 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   @shortdoc "Run RAG/tool/agent parity and production-semantics checks"
 
   @default_out_dir "benchmarks/results"
+  @live_row_ids ["live_rag_memory_retrieval", "live_mcp_lookup_tool"]
+  @live_settings %{
+    "temperature" => 0.0,
+    "max_tokens" => 400,
+    "reasoning_effort" => nil,
+    "effective_generation" => %{
+      "max_completion_tokens" => 400,
+      "reasoning_effort" => nil,
+      "temperature" => "provider_default"
+    },
+    "cache" => false,
+    "max_iters" => 4,
+    "retrieval_k" => 1
+  }
+
+  @live_rag_instruction "Answer using the supplied context. Return only the exact answer span."
+
+  @live_tool_instruction """
+  First call lookup_capital with country "france". After its result is in history,
+  call submit with answer exactly equal to that result. Never answer from memory
+  and never call lookup_capital more than once.
+  """
 
   @impl true
   def run(args) do
-    Mix.Task.run("app.start")
+    run_with_runners(args, %{})
+  end
 
+  @doc false
+  def run_with_runners(args, runners) when is_list(args) and is_map(runners) do
     {opts, _argv, invalid} =
       OptionParser.parse(args,
         strict: [
           out: :string,
-          python: :string
+          python: :string,
+          live: :boolean,
+          model: :string,
+          dspy_model: :string,
+          api_key_env: :string,
+          env_file: :string,
+          temperature: :float,
+          max_tokens: :integer,
+          reasoning_effort: :string
         ]
       )
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
+    Imp.BenchmarkEnv.load_files!(Keyword.get_values(opts, :env_file))
+    Mix.Task.run("app.start")
 
     out_dir = Keyword.get(opts, :out, @default_out_dir)
     File.mkdir_p!(out_dir)
+    live = Keyword.get(opts, :live, false)
+    live_config = if live, do: live_config!(opts), else: nil
 
     imp = imp_report()
-    dspy = dspy_report(python(opts), out_dir)
+    imp = maybe_add_live_rows(imp, live_config, runners[:imp])
+    dspy = dspy_report(python(opts), out_dir, live_config, runners[:dspy])
     report = comparison_report(imp, dspy)
     out_path = Path.join(out_dir, "rag-tool-agent-parity-#{timestamp_slug()}.json")
     File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
@@ -47,6 +94,112 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       Mix.raise("RAG/tool/agent parity failed; inspect #{out_path}")
     end
   end
+
+  defp live_config!(opts) do
+    model = Keyword.get(opts, :model) || Mix.raise("--model is required with --live")
+
+    dspy_model =
+      Keyword.get(opts, :dspy_model) || Mix.raise("--dspy-model is required with --live")
+
+    provider = model_provider(model)
+    api_key_env = Keyword.get(opts, :api_key_env, default_api_key_env(provider))
+    api_key = System.get_env(api_key_env)
+
+    unless is_binary(api_key) and byte_size(api_key) > 0 do
+      Mix.raise("#{api_key_env} is required with --live")
+    end
+
+    temperature = Keyword.get(opts, :temperature, @live_settings["temperature"])
+    max_tokens = Keyword.get(opts, :max_tokens, @live_settings["max_tokens"])
+
+    reasoning_effort =
+      Keyword.get(opts, :reasoning_effort, default_reasoning_effort(provider, model))
+
+    settings = %{
+      @live_settings
+      | "temperature" => temperature,
+        "max_tokens" => max_tokens,
+        "reasoning_effort" => reasoning_effort,
+        "effective_generation" =>
+          effective_generation(provider, model, temperature, max_tokens, reasoning_effort)
+    }
+
+    %{
+      model: model,
+      dspy_model: dspy_model,
+      provider: provider,
+      model_identity: model_identity(model),
+      wire_api: imp_wire_api(provider, model),
+      api_key_env: api_key_env,
+      api_key: api_key,
+      settings: settings
+    }
+  end
+
+  defp model_identity(model) do
+    model
+    |> String.trim()
+    |> String.trim_leading("openai:")
+    |> String.trim_leading("openai/")
+    |> String.trim_leading("responses/")
+    |> String.trim_leading("anthropic:")
+    |> String.trim_leading("anthropic/")
+    |> String.trim_leading("gemini:")
+    |> String.trim_leading("gemini/")
+    |> String.trim_leading("google:")
+    |> String.trim_leading("google/")
+  end
+
+  defp model_provider(model) do
+    normalized = model |> String.trim() |> String.downcase()
+
+    cond do
+      String.starts_with?(normalized, ["anthropic:", "anthropic/"]) -> "anthropic"
+      String.starts_with?(normalized, ["gemini:", "gemini/", "google:", "google/"]) -> "google"
+      true -> "openai"
+    end
+  end
+
+  defp default_api_key_env("anthropic"), do: "ANTHROPIC_API_KEY"
+  defp default_api_key_env("google"), do: "GEMINI_API_KEY"
+  defp default_api_key_env("openai"), do: "OPENAI_API_KEY"
+
+  defp default_reasoning_effort("openai", model) do
+    if String.match?(String.downcase(model), ~r/(gpt-5|o[134])/) do
+      "low"
+    end
+  end
+
+  defp default_reasoning_effort(_provider, _model), do: nil
+
+  defp effective_generation("openai", model, temperature, max_tokens, reasoning_effort) do
+    if String.match?(String.downcase(model), ~r/(gpt-5|o[134])/) do
+      %{
+        "max_completion_tokens" => max_tokens,
+        "reasoning_effort" => reasoning_effort,
+        "temperature" => "provider_default"
+      }
+    else
+      %{"max_tokens" => max_tokens, "temperature" => temperature}
+    end
+  end
+
+  defp effective_generation(_provider, _model, temperature, max_tokens, reasoning_effort) do
+    %{"max_tokens" => max_tokens, "temperature" => temperature}
+    |> maybe_put("reasoning_effort", reasoning_effort)
+  end
+
+  defp imp_wire_api("anthropic", _model), do: "anthropic_messages"
+  defp imp_wire_api("google", _model), do: "google_generate_content"
+
+  defp imp_wire_api("openai", model) do
+    if String.contains?(String.downcase(model), "responses/"),
+      do: "openai_responses",
+      else: "openai_responses"
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp imp_report do
     rows = [
@@ -483,19 +636,339 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
     }
   end
 
-  defp dspy_report(python, out_dir) do
+  defp maybe_add_live_rows(report, nil, _runner), do: report
+
+  defp maybe_add_live_rows(report, config, runner) do
+    rows =
+      case runner do
+        fun when is_function(fun, 1) -> fun.(public_live_config(config))
+        nil -> live_imp_rows(config)
+        other -> Mix.raise("invalid injected Imp live runner: #{inspect(other)}")
+      end
+
+    validate_live_rows!(rows, "Imp")
+    Map.update!(report, "rows", &(&1 ++ rows))
+  end
+
+  defp live_imp_rows(config) do
+    [live_imp_rag_row(config), live_imp_mcp_tool_row(config)]
+  end
+
+  defp live_imp_rag_row(config) do
+    live_imp_row("live_rag_memory_retrieval", "rag", config, fn lm ->
+      retriever =
+        Imp.Retrieve.Memory.new([
+          %{id: "fr", text: "France capital: Paris."},
+          %{id: "beam", text: "BEAM runs lightweight Elixir processes."}
+        ])
+
+      program =
+        Imp.signature("question, context -> answer", @live_rag_instruction)
+        |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
+        |> Imp.rag(retriever, k: config.settings["retrieval_k"])
+
+      with {:ok, prediction} <- Imp.call(program, %{question: "What is France's capital?"}) do
+        answer = prediction |> Imp.get(:answer, "") |> to_string()
+        retrieval = prediction.metadata.retrieval
+
+        {:ok,
+         %{
+           "answer" => answer,
+           "retrieved" => Enum.map(retrieval.docs, &normalize/1),
+           "passing" => answer == "Paris" and retrieval.count == 1
+         }}
+      end
+    end)
+  end
+
+  defp live_imp_mcp_tool_row(config) do
+    live_imp_row("live_mcp_lookup_tool", "tools", config, fn lm ->
+      catalog =
+        Imp.MCP.Catalog.new([
+          %{
+            name: :lookup_capital,
+            description: "Look up the capital for one supported country key.",
+            input_schema: %{
+              "type" => "object",
+              "properties" => %{
+                "country" => %{"type" => "string", "enum" => ["france"]}
+              },
+              "required" => ["country"]
+            },
+            run: fn
+              %{country: "france"} -> "Paris"
+              %{"country" => "france"} -> "Paris"
+              other -> {:error, {:unexpected_country, other}}
+            end
+          }
+        ])
+
+      [tool] = Imp.MCP.import_tools(catalog)
+
+      agent =
+        Imp.react(
+          Imp.Signature.new("question -> answer", @live_tool_instruction),
+          [tool],
+          lm: lm,
+          tool_policy: [:lookup_capital, :submit],
+          max_iters: config.settings["max_iters"]
+        )
+
+      with {:ok, prediction} <- Imp.call(agent, %{question: "What is France's capital?"}) do
+        answer = prediction |> Imp.get(:answer, "") |> to_string()
+
+        trace =
+          prediction
+          |> Imp.get(:history, [])
+          |> Enum.reject(&(&1.tool == :submit))
+          |> Enum.map(
+            &%{
+              "tool" => to_string(&1.tool),
+              "arguments" => normalize(&1.arguments),
+              "result" => &1.result
+            }
+          )
+
+        {:ok,
+         %{
+           "answer" => answer,
+           "tool_trace" => trace,
+           "passing" => answer == "Paris" and trace == expected_live_tool_trace()
+         }}
+      end
+    end)
+  end
+
+  defp live_imp_row(id, category, config, fun) do
+    lm_opts =
+      [
+        api_key: config.api_key,
+        temperature: config.settings["temperature"],
+        max_tokens: config.settings["max_tokens"],
+        cache: config.settings["cache"]
+      ]
+      |> maybe_keyword(:reasoning_effort, config.settings["reasoning_effort"])
+
+    lm =
+      Imp.req_llm(imp_model(config.model), lm_opts)
+
+    {result, usage} = collect_req_llm_usage(fn -> fun.(lm) end)
+
+    case result do
+      {:ok, values} ->
+        values
+        |> Map.merge(%{
+          "id" => id,
+          "category" => category,
+          "comparison_status" => "direct",
+          "passing" => values["passing"] == true and usage_complete?(usage),
+          "evidence" => live_evidence(config, config.model, usage, nil, id, "submit")
+        })
+
+      {:error, reason} ->
+        %{
+          "id" => id,
+          "category" => category,
+          "comparison_status" => "direct",
+          "passing" => false,
+          "answer" => nil,
+          "error" => diagnostic(reason),
+          "evidence" =>
+            live_evidence(config, config.model, usage, diagnostic(reason), id, "submit")
+        }
+    end
+  rescue
+    exception ->
+      %{
+        "id" => id,
+        "category" => category,
+        "comparison_status" => "direct",
+        "passing" => false,
+        "answer" => nil,
+        "error" => diagnostic(exception),
+        "evidence" =>
+          live_evidence(
+            config,
+            config.model,
+            empty_usage(),
+            diagnostic(exception),
+            id,
+            "submit"
+          )
+      }
+  end
+
+  defp collect_req_llm_usage(fun) do
+    {:ok, usage_agent} = Agent.start_link(fn -> empty_usage() end)
+    handler_id = {__MODULE__, :live_usage, make_ref()}
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:req_llm, :token_usage],
+        &__MODULE__.handle_live_usage/4,
+        usage_agent
+      )
+
+    try do
+      result = fun.()
+      {result, Agent.get(usage_agent, & &1)}
+    after
+      :telemetry.detach(handler_id)
+      Agent.stop(usage_agent)
+    end
+  end
+
+  defp empty_usage,
+    do: %{"requests" => 0, "input_tokens" => 0, "output_tokens" => 0, "usd" => 0.0}
+
+  @doc false
+  def handle_live_usage(_event, measurements, _metadata, usage_agent) do
+    Agent.update(usage_agent, &add_usage(&1, measurements))
+  end
+
+  defp add_usage(usage, measurements) do
+    tokens = Map.get(measurements, :tokens, %{})
+
+    usage
+    |> Map.update!("requests", &(&1 + 1))
+    |> Map.update!("input_tokens", &(&1 + usage_number(tokens, :input_tokens)))
+    |> Map.update!("output_tokens", &(&1 + usage_number(tokens, :output_tokens)))
+    |> Map.update!("usd", &(&1 + usage_number(measurements, :total_cost)))
+  end
+
+  defp usage_number(map, key) do
+    case Map.get(map, key, Map.get(map, to_string(key), 0)) do
+      value when is_number(value) -> value
+      _other -> 0
+    end
+  end
+
+  defp usage_complete?(usage) do
+    usage["requests"] > 0 and usage["input_tokens"] > 0 and usage["output_tokens"] > 0 and
+      is_number(usage["usd"]) and usage["usd"] > 0
+  end
+
+  defp live_evidence(config, runtime_model, usage, error, row_id, termination_tool) do
+    %{
+      "mode" => "live",
+      "provider" => config.provider,
+      "model_identity" => config.model_identity,
+      "runtime_model" => runtime_model,
+      "wire_api" => config.wire_api,
+      "generation" => config.settings,
+      "prompt_contract" => live_prompt_contract(row_id),
+      "termination_tool" => if(row_id == "live_mcp_lookup_tool", do: termination_tool),
+      "usage" => usage,
+      "usage_complete" => usage_complete?(usage),
+      "error" => error
+    }
+  end
+
+  defp imp_model(model) do
+    cond do
+      String.contains?(model, ":") -> model
+      String.starts_with?(model, "anthropic/") -> "anthropic:#{model_identity(model)}"
+      String.starts_with?(model, ["gemini/", "google/"]) -> "google:#{model_identity(model)}"
+      true -> "openai:#{model_identity(model)}"
+    end
+  end
+
+  defp public_live_config(config) do
+    %{
+      "model" => config.model,
+      "dspy_model" => config.dspy_model,
+      "provider" => config.provider,
+      "model_identity" => config.model_identity,
+      "wire_api" => config.wire_api,
+      "api_key_env" => config.api_key_env,
+      "settings" => config.settings
+    }
+  end
+
+  defp live_prompt_contract("live_rag_memory_retrieval"), do: "rag-exact-context-v1"
+  defp live_prompt_contract("live_mcp_lookup_tool"), do: "lookup-capital-then-terminate-v1"
+
+  defp validate_live_rows!(rows, runner) when is_list(rows) do
+    ids = MapSet.new(rows, & &1["id"])
+    expected = MapSet.new(@live_row_ids)
+
+    unless ids == expected do
+      Mix.raise(
+        "#{runner} live rows must be exactly #{inspect(@live_row_ids)}, got: #{inspect(MapSet.to_list(ids))}"
+      )
+    end
+  end
+
+  defp validate_live_rows!(rows, runner),
+    do: Mix.raise("#{runner} live runner returned invalid rows: #{inspect(rows)}")
+
+  defp dspy_report(python, out_dir, live_config, runner) do
+    cond do
+      is_function(runner, 1) ->
+        report = runner.(if(live_config, do: public_live_config(live_config), else: nil))
+        validate_dspy_report!(report, live_config)
+        report
+
+      is_nil(runner) ->
+        run_dspy_report!(python, out_dir, live_config)
+
+      true ->
+        Mix.raise("invalid injected DSPy runner: #{inspect(runner)}")
+    end
+  end
+
+  defp run_dspy_report!(python, out_dir, live_config) do
     out_path = Path.join(out_dir, "dspy-rag-tool-agent-#{timestamp_slug()}.json")
 
-    case System.cmd(python, ["scripts/dspy_rag_tool_agent.py", "--out", out_path],
-           stderr_to_stdout: true
-         ) do
+    args =
+      ["scripts/dspy_rag_tool_agent.py", "--out", out_path] ++
+        dspy_live_args(live_config)
+
+    case System.cmd(python, args, stderr_to_stdout: true) do
       {_output, 0} ->
-        out_path |> File.read!() |> Jason.decode!()
+        report = out_path |> File.read!() |> Jason.decode!()
+        validate_dspy_report!(report, live_config)
+        report
 
       {output, status} ->
         Mix.raise("DSPy RAG/tool sidecar failed with status #{status}:\n#{output}")
     end
   end
+
+  defp dspy_live_args(nil), do: []
+
+  defp dspy_live_args(config) do
+    [
+      "--live",
+      "--model",
+      config.dspy_model,
+      "--api-key-env",
+      config.api_key_env,
+      "--temperature",
+      to_string(config.settings["temperature"]),
+      "--max-tokens",
+      to_string(config.settings["max_tokens"])
+    ]
+    |> maybe_args("--reasoning-effort", config.settings["reasoning_effort"])
+  end
+
+  defp maybe_args(args, _flag, nil), do: args
+  defp maybe_args(args, flag, value), do: args ++ [flag, value]
+
+  defp maybe_keyword(opts, _key, nil), do: opts
+  defp maybe_keyword(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp validate_dspy_report!(report, nil) when is_map(report), do: :ok
+
+  defp validate_dspy_report!(%{"rows" => rows}, _config) do
+    rows
+    |> Enum.filter(&(&1["id"] in @live_row_ids))
+    |> validate_live_rows!("DSPy")
+  end
+
+  defp validate_dspy_report!(report, _config),
+    do: Mix.raise("DSPy runner returned invalid report: #{inspect(report)}")
 
   defp comparison_report(imp, dspy) do
     dspy_rows = Map.new(dspy["rows"], &{&1["id"], &1})
@@ -506,6 +979,15 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       end)
 
     passing = Enum.count(rows, & &1["passing"])
+    provider_free_rows = Enum.reject(rows, &(&1["id"] in @live_row_ids))
+    live_rows = Enum.filter(rows, &(&1["id"] in @live_row_ids))
+    provider_free_complete = Enum.all?(provider_free_rows, & &1["passing"])
+
+    live_complete =
+      MapSet.new(live_rows, & &1["id"]) == MapSet.new(@live_row_ids) and
+        Enum.all?(live_rows, & &1["passing"])
+
+    full = provider_free_complete and live_complete
 
     %{
       "schema_version" => 1,
@@ -517,11 +999,10 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
         "all_passing" => passing == length(rows),
         "direct_comparisons" => Enum.count(rows, &(&1["comparison_status"] == "direct")),
         "imp_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
-        "provider_free_contract_complete" => true,
-        "live_matched_behavior_complete" => false,
-        "full_rag_tool_agent_parity" => false,
-        "note" =>
-          "Provider-free RAG/tool/agent artifact. Direct DSPy comparisons cover deterministic one-shot RAG retrieval and ReAct lookup. Imp production rows cover multi-hop RAG, HTTP retriever protocol shape, MCP import, agent policy denial, ReAct error traces, CodeAct, ProgramOfThought success/error policy, streaming, async, and save/load redaction."
+        "provider_free_contract_complete" => provider_free_complete,
+        "live_matched_behavior_complete" => live_complete,
+        "full_rag_tool_agent_parity" => full,
+        "note" => summary_note(live_complete)
       },
       "imp" => Map.take(imp, ["runner", "elixir", "otp", "git_sha"]),
       "dspy" => Map.take(dspy, ["runner", "python", "dspy_version", "git_sha"]),
@@ -547,7 +1028,8 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
 
     parity =
       Map.take(imp, Map.keys(expected)) == expected and
-        Map.take(dspy, Map.keys(expected)) == expected
+        Map.take(dspy, Map.keys(expected)) == expected and
+        live_evidence_compatible?(imp, dspy)
 
     %{
       "id" => imp["id"],
@@ -566,10 +1048,68 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   defp direct_expected("react_lookup_tool"),
     do: %{"answer" => "Paris", "tool_trace" => expected_tool_trace()}
 
+  defp direct_expected("live_rag_memory_retrieval"), do: %{"answer" => "Paris"}
+
+  defp direct_expected("live_mcp_lookup_tool"),
+    do: %{"answer" => "Paris", "tool_trace" => expected_live_tool_trace()}
+
   defp expected_tool_trace,
     do: [
       %{"tool" => "lookup", "arguments" => %{"query" => "capital-france"}, "result" => "Paris"}
     ]
+
+  defp expected_live_tool_trace,
+    do: [
+      %{
+        "tool" => "lookup_capital",
+        "arguments" => %{"country" => "france"},
+        "result" => "Paris"
+      }
+    ]
+
+  defp live_evidence_compatible?(%{"id" => id}, _dspy) when id not in @live_row_ids, do: true
+
+  defp live_evidence_compatible?(imp, dspy) do
+    imp_evidence = imp["evidence"] || %{}
+    dspy_evidence = dspy["evidence"] || %{}
+
+    imp_evidence["mode"] == "live" and dspy_evidence["mode"] == "live" and
+      imp_evidence["provider"] == dspy_evidence["provider"] and
+      imp_evidence["model_identity"] == dspy_evidence["model_identity"] and
+      wire_api_family(imp_evidence["wire_api"]) == wire_api_family(dspy_evidence["wire_api"]) and
+      imp_evidence["generation"] == dspy_evidence["generation"] and
+      imp_evidence["prompt_contract"] == dspy_evidence["prompt_contract"] and
+      termination_tools_compatible?(imp["id"], imp_evidence, dspy_evidence) and
+      imp_evidence["usage_complete"] == true and dspy_evidence["usage_complete"] == true and
+      is_nil(imp_evidence["error"]) and is_nil(dspy_evidence["error"])
+  end
+
+  defp wire_api_family("anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("litellm_anthropic_messages"), do: "anthropic_messages"
+  defp wire_api_family("google_generate_content"), do: "google_generate_content"
+  defp wire_api_family("litellm_google_generate_content"), do: "google_generate_content"
+  defp wire_api_family(value), do: value
+
+  defp termination_tools_compatible?("live_mcp_lookup_tool", imp, dspy),
+    do: imp["termination_tool"] == "submit" and dspy["termination_tool"] == "finish"
+
+  defp termination_tools_compatible?(_id, imp, dspy),
+    do: is_nil(imp["termination_tool"]) and is_nil(dspy["termination_tool"])
+
+  defp summary_note(false) do
+    "Provider-free RAG/tool/agent artifact. Direct DSPy comparisons cover deterministic one-shot RAG retrieval and ReAct lookup. Imp production rows cover multi-hop RAG, HTTP retriever protocol shape, MCP import, agent policy denial, ReAct error traces, CodeAct, ProgramOfThought success/error policy, streaming, async, and save/load redaction. Live matched behavior is not present or did not pass complete evidence controls."
+  end
+
+  defp summary_note(true) do
+    "Provider-free production contracts and matched live retrieval/tool behavior pass. Live rows use one model identity, provider-equivalent wire APIs, matched generation controls, complete provider usage, exact answers, and canonical tool traces. Imp's tool row imports an MCP catalog tool; the credential-gated live provider suite separately proves the same ReAct composition through HTTP MCP JSON-RPC transport."
+  end
+
+  defp diagnostic(reason) do
+    reason
+    |> inspect(limit: 20, printable_limit: 2_048)
+    |> Imp.Redaction.redact()
+    |> String.slice(0, 2_048)
+  end
 
   defp python(opts) do
     path =

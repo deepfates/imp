@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import subprocess
 from dataclasses import dataclass
@@ -14,6 +15,14 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import dspy
+
+from dspy_parity_runner import configure_dspy, history_instrumentation, wire_api
+
+
+LIVE_RAG_INSTRUCTION = "Answer using the supplied context. Return only the exact answer span."
+LIVE_TOOL_INSTRUCTION = """First call lookup_capital with country "france". After its result is in history,
+finish with answer exactly equal to that result. Never answer from memory and
+never call lookup_capital more than once."""
 
 
 class QASignature(dspy.Signature):
@@ -29,6 +38,21 @@ class ToolSignature(dspy.Signature):
 
     question = dspy.InputField()
     answer = dspy.OutputField()
+
+
+class LiveQASignature(dspy.Signature):
+    __doc__ = LIVE_RAG_INSTRUCTION
+
+    question = dspy.InputField()
+    context = dspy.InputField()
+    answer = dspy.OutputField(desc="exact answer span")
+
+
+class LiveToolSignature(dspy.Signature):
+    __doc__ = LIVE_TOOL_INSTRUCTION
+
+    question = dspy.InputField()
+    answer = dspy.OutputField(desc="exact tool result")
 
 
 @dataclass
@@ -74,12 +98,38 @@ class FakeRM:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out")
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--model")
+    parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--max-tokens", type=int, default=400)
+    parser.add_argument("--reasoning-effort")
     args = parser.parse_args()
 
     rows = [rag_row(), react_tool_row()]
+    mode = "provider_free"
+
+    if args.live:
+        if not args.model:
+            raise SystemExit("--model is required with --live")
+        api_key = os.environ.get(args.api_key_env)
+        if not api_key:
+            raise SystemExit(f"{args.api_key_env} is required with --live")
+        configure_dspy(
+            args.model,
+            api_key,
+            args.temperature,
+            args.max_tokens,
+            args.reasoning_effort,
+        )
+        settings = live_settings(args)
+        rows.extend([live_rag_row(args.model, settings), live_tool_row(args.model, settings)])
+        mode = "live_matched"
+
     report = {
         "schema_version": 1,
         "runner": "python-dspy-rag-tool-agent",
+        "mode": mode,
         "generated_at": timestamp(),
         "git_sha": git_sha(),
         "python": platform.python_version(),
@@ -95,6 +145,196 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
 
     return 0
+
+
+def live_settings(args: argparse.Namespace) -> Dict[str, Any]:
+    effective = {"max_tokens": args.max_tokens, "temperature": args.temperature}
+    if provider(args.model) == "openai" and is_openai_reasoning_model(args.model):
+        effective = {
+            "max_completion_tokens": args.max_tokens,
+            "reasoning_effort": args.reasoning_effort,
+            "temperature": "provider_default",
+        }
+    elif args.reasoning_effort:
+        effective["reasoning_effort"] = args.reasoning_effort
+
+    return {
+        "temperature": args.temperature,
+        "max_tokens": args.max_tokens,
+        "reasoning_effort": args.reasoning_effort,
+        "effective_generation": effective,
+        "cache": False,
+        "max_iters": 4,
+        "retrieval_k": 1,
+    }
+
+
+def live_rag_row(model: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+    before = len(dspy.settings.lm.history)
+    try:
+        retriever = FakeRM()
+        context = retriever("What is France's capital?", k=settings["retrieval_k"])[0].long_text
+        prediction = dspy.Predict(LiveQASignature)(
+            question="What is France's capital?", context=context
+        )
+        answer = str(prediction.answer)
+        usage = usage_since(before)
+        return {
+            "id": "live_rag_memory_retrieval",
+            "category": "rag",
+            "passing": answer == "Paris" and context == "France capital: Paris." and usage_complete(usage),
+            "answer": answer,
+            "retrieved": [{"id": "fr", "text": context}],
+            "evidence": live_evidence(
+                model, settings, usage, None, "rag-exact-context-v1", None
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001 - evidence must fail closed.
+        usage = usage_since(before)
+        error = bounded_error(exc)
+        return {
+            "id": "live_rag_memory_retrieval",
+            "category": "rag",
+            "passing": False,
+            "answer": None,
+            "error": error,
+            "evidence": live_evidence(
+                model, settings, usage, error, "rag-exact-context-v1", None
+            ),
+        }
+
+
+def live_tool_row(model: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+    before = len(dspy.settings.lm.history)
+    try:
+        prediction = dspy.ReAct(
+            LiveToolSignature, [lookup_capital], max_iters=settings["max_iters"]
+        )(question="What is France's capital?")
+        answer = str(prediction.answer)
+        trace = normalize_tool_trace(prediction.toDict())
+        usage = usage_since(before)
+        expected = [
+            {
+                "tool": "lookup_capital",
+                "arguments": {"country": "france"},
+                "result": "Paris",
+            }
+        ]
+        return {
+            "id": "live_mcp_lookup_tool",
+            "category": "tools",
+            "passing": answer == "Paris" and trace == expected and usage_complete(usage),
+            "answer": answer,
+            "tool_trace": trace,
+            "evidence": live_evidence(
+                model,
+                settings,
+                usage,
+                None,
+                "lookup-capital-then-terminate-v1",
+                "finish",
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001 - evidence must fail closed.
+        usage = usage_since(before)
+        error = bounded_error(exc)
+        return {
+            "id": "live_mcp_lookup_tool",
+            "category": "tools",
+            "passing": False,
+            "answer": None,
+            "error": error,
+            "evidence": live_evidence(
+                model,
+                settings,
+                usage,
+                error,
+                "lookup-capital-then-terminate-v1",
+                "finish",
+            ),
+        }
+
+
+def lookup_capital(country: str) -> str:
+    """Look up the capital for one supported country key."""
+
+    if country == "france":
+        return "Paris"
+    raise ValueError(f"unexpected country: {country}")
+
+
+def usage_since(before: int) -> Dict[str, Any]:
+    entries = dspy.settings.lm.history[before:]
+    usage = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "usd": 0.0}
+    for entry in entries:
+        values = history_instrumentation(entry)
+        if all(values.get(key) is not None for key in ("input_tokens", "output_tokens", "usd")):
+            usage["requests"] += 1
+            usage["input_tokens"] += int(values["input_tokens"])
+            usage["output_tokens"] += int(values["output_tokens"])
+            usage["usd"] += float(values["usd"])
+    return usage
+
+
+def usage_complete(usage: Dict[str, Any]) -> bool:
+    return (
+        usage["requests"] > 0
+        and usage["input_tokens"] > 0
+        and usage["output_tokens"] > 0
+        and usage["usd"] > 0
+    )
+
+
+def live_evidence(
+    model: str,
+    settings: Dict[str, Any],
+    usage: Dict[str, Any],
+    error: Optional[str],
+    prompt_contract: str,
+    termination_tool: Optional[str],
+) -> Dict[str, Any]:
+    return {
+        "mode": "live",
+        "provider": provider(model),
+        "model_identity": model_identity(model),
+        "runtime_model": model,
+        "wire_api": wire_api(model),
+        "generation": settings,
+        "prompt_contract": prompt_contract,
+        "termination_tool": termination_tool,
+        "usage": usage,
+        "usage_complete": usage_complete(usage),
+        "error": error,
+    }
+
+
+def model_identity(model: str) -> str:
+    normalized = model.strip().strip("/")
+    for prefix in (
+        "openai:", "openai/", "responses/", "anthropic:", "anthropic/",
+        "gemini:", "gemini/", "google:", "google/",
+    ):
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix) :]
+    return normalized
+
+
+def provider(model: str) -> str:
+    normalized = model.lower().strip()
+    if normalized.startswith("anthropic/") or normalized.startswith("anthropic:"):
+        return "anthropic"
+    if normalized.startswith(("gemini/", "gemini:", "google/", "google:")):
+        return "google"
+    return "openai"
+
+
+def is_openai_reasoning_model(model: str) -> bool:
+    normalized = model_identity(model).lower()
+    return normalized.startswith(("gpt-5", "o1", "o3", "o4"))
+
+
+def bounded_error(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"[:2048]
 
 
 def rag_row() -> Dict[str, Any]:

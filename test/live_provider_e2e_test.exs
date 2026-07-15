@@ -5,7 +5,7 @@ defmodule LiveProviderE2ETest do
 
   defp live_lm(opts \\ []) do
     api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL")
+    {model, opts} = Keyword.pop(opts, :model, System.get_env("OPENAI_MODEL"))
 
     assert is_binary(api_key) and byte_size(api_key) > 0
     assert is_binary(model) and byte_size(model) > 0
@@ -203,7 +203,12 @@ defmodule LiveProviderE2ETest do
 
     agent =
       Imp.react(signature, [lookup],
-        lm: live_lm(max_completion_tokens: 180),
+        lm:
+          live_lm(
+            model: "gpt-5.4-mini-2026-03-17",
+            max_completion_tokens: 400,
+            reasoning_effort: "low"
+          ),
         tool_policy: [:lookup_capital, :submit],
         max_iters: 4
       )
