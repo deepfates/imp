@@ -931,6 +931,10 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   test "OOLONG-Pairs uses canonical pair-set F1 rather than token overlap" do
     assert RLMCampaign.score("(b, a)\n(c, d)\n(a, b)", "(a, b)\n(c, x)", "set_f1") == 0.5
     assert RLMCampaign.score("no pairs", "no pairs", "set_f1") == 1.0
+    assert RLMCampaign.score("No pairs exist.", "", "set_f1") == 1.0
+
+    assert RLMCampaign.score("No pairs exist, because only one user qualifies.", "", "set_f1") ==
+             0.0
 
     assert RLMCampaign.score(
              "Reasoning, with ordinary prose.\n\n(No pairs found)",

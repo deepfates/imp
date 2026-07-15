@@ -867,7 +867,14 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     |> String.downcase()
     |> String.replace(~r/^[^a-z0-9]+|[^a-z0-9]+$/, "")
     |> then(
-      &(&1 in ["none", "no pairs", "no pairs found", "no such pairs", "no such pairs exist"])
+      &(&1 in [
+          "none",
+          "no pairs",
+          "no pairs exist",
+          "no pairs found",
+          "no such pairs",
+          "no such pairs exist"
+        ])
     )
   end
 
