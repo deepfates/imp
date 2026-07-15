@@ -38,6 +38,7 @@ openai==2.45.0
 orjson==3.11.9
 packaging==26.2
 propcache==0.5.2
+pyarrow==25.0.0
 pydantic==2.13.4
 pydantic-core==2.46.4
 python-dotenv==1.2.2

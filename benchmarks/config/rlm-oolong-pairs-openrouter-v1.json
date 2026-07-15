@@ -14,9 +14,9 @@
       "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
     },
     "sources": {
-      "paper_text": {
-        "path": "tmp/pdfs/rlm-2512.24601v3.txt",
-        "sha256": "4d3881423d60e0c0abdc77b5e08bd9e3d5835af49beb3833c000182ebdec4480"
+      "paper_pdf": {
+        "path": "tmp/pdfs/rlm-2512.24601v3.pdf",
+        "sha256": "8567362c22768d9b50d4a4a8d63bb28dda2c2b2051be30d67f70f645170429ca"
       },
       "rlm_core": {
         "path": "tmp/rlm-upstream/rlm/core/rlm.py",
