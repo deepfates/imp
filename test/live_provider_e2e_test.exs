@@ -133,6 +133,103 @@ defmodule LiveProviderE2ETest do
     assert Enum.any?(history, &(&1.tool == :submit))
   end
 
+  test "live provider drives an imported HTTP MCP tool through ReAct" do
+    test_pid = self()
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn request ->
+        decoded = Jason.decode!(request.body)
+        send(test_pid, {:mcp_json_rpc, decoded, request.headers})
+
+        case decoded["method"] do
+          "initialize" ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 protocolVersion: "2025-03-26",
+                 capabilities: %{},
+                 serverInfo: %{name: "imp-live-e2e", version: "1"}
+               }
+             }}
+
+          "notifications/initialized" ->
+            {200, %{jsonrpc: "2.0", result: %{}}}
+
+          "tools/list" ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 tools: [
+                   %{
+                     name: "lookup_capital",
+                     description: "Look up the capital for one supported country key.",
+                     input_schema: %{
+                       type: "object",
+                       properties: %{
+                         country: %{type: "string", enum: ["france"]}
+                       },
+                       required: ["country"]
+                     }
+                   }
+                 ]
+               }
+             }}
+
+          "tools/call" ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: "Paris"
+             }}
+        end
+      end)
+
+    [lookup] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
+
+    signature =
+      Imp.Signature.new(
+        "question -> answer",
+        """
+        First call lookup_capital with country "france". After its result is in
+        history, call submit with answer exactly equal to that result. Never
+        answer from memory and never call lookup_capital more than once.
+        """
+      )
+
+    agent =
+      Imp.react(signature, [lookup],
+        lm: live_lm(max_completion_tokens: 180),
+        tool_policy: [:lookup_capital, :submit],
+        max_iters: 4
+      )
+
+    assert {:ok, prediction} = Imp.call(agent, %{question: "What is France's capital?"})
+    assert Imp.get(prediction, :answer) == "Paris"
+
+    history = Imp.get(prediction, :history)
+    assert Enum.any?(history, &(&1.tool == :lookup_capital and &1.result == "Paris"))
+    assert Enum.any?(history, &(&1.tool == :submit))
+
+    assert_received {:mcp_json_rpc, %{"method" => "initialize"}, headers}
+    assert headers["mcp-protocol-version"] == "2025-03-26"
+    assert_received {:mcp_json_rpc, %{"method" => "notifications/initialized"}, _headers}
+    assert_received {:mcp_json_rpc, %{"method" => "tools/list"}, _headers}
+
+    assert_received {:mcp_json_rpc,
+                     %{
+                       "method" => "tools/call",
+                       "params" => %{
+                         "name" => "lookup_capital",
+                         "arguments" => %{"country" => "france"}
+                       }
+                     }, _headers}
+  end
+
   test "live provider supports orchestration modules over real calls" do
     base =
       Imp.predict("question -> answer",
