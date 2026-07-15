@@ -563,6 +563,43 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     assert_in_delta snapshot["usage"]["usd"], 0.000009, 1.0e-12
   end
 
+  test "metered LM never serializes an unauditable provider request" do
+    rates = UsageFixture.rates()
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{
+          "requests" => 2,
+          "input_tokens" => 10_000,
+          "output_tokens" => 100,
+          "usd" => 1.0
+        },
+        pricing: rates,
+        default_max_output_tokens: 10
+      )
+
+    {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
+    secret = "sk-secret-request-body-123456789"
+    inner = fn _messages, _opts -> {:error, %{request_body: secret, response_body: secret}} end
+
+    lm = %RLMRuntime.MeteredLM{
+      inner: inner,
+      budget: budget,
+      usage: usage_agent,
+      max_tokens: 10,
+      role: "root",
+      pricing: rates
+    }
+
+    error =
+      assert_raise RLMRuntime.AmbiguousExternalCall, fn ->
+        RLMRuntime.MeteredLM.generate(lm, [%{role: :user, content: "private"}], [])
+      end
+
+    assert error.message == "provider call returned without auditable usage (map)"
+    refute error.message =~ secret
+  end
+
   test "metered LM charges but rejects token-incomplete provider success" do
     rates = UsageFixture.rates()
 

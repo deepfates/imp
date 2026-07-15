@@ -52,13 +52,21 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
         %{} = usage ->
           Imp.BenchmarkTruth.CampaignBudget.record_usage(lm.budget, usage)
           Agent.update(lm.usage, &sum(&1, usage, lm.role))
-          {:error, {:provider_error_with_usage, inspect(reason)}}
+          {:error, {:provider_error_with_usage, error_class(reason)}}
 
         nil ->
           raise Imp.BenchmarkTruth.RLMRuntime.AmbiguousExternalCall,
-            message: "provider call returned without auditable usage: #{inspect(reason)}"
+            message: "provider call returned without auditable usage (#{error_class(reason)})"
       end
     end
+
+    defp error_class(%{__struct__: module}) when is_atom(module), do: inspect(module)
+    defp error_class({tag, _value}) when is_atom(tag), do: Atom.to_string(tag)
+    defp error_class(value) when is_map(value), do: "map"
+    defp error_class(value) when is_atom(value), do: "atom"
+    defp error_class(value) when is_tuple(value), do: "tuple"
+    defp error_class(value) when is_binary(value), do: "string"
+    defp error_class(_value), do: "term"
 
     defp usage(%{__imp_lm_metadata__: _metadata} = result, pricing) do
       with {:ok, metadata} <- Imp.LM.Result.metadata(result) do
