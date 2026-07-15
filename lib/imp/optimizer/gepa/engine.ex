@@ -123,7 +123,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       state
       |> ensure_proposal_policy!(proposal_policy)
       |> ensure_combee_policy!(combee_policy)
-      |> reject_interrupted_validation!()
+      |> recover_interrupted_validation!(opts)
 
     max_iterations = Keyword.get(opts, :max_iterations, 10)
 
@@ -1204,14 +1204,15 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
   end
 
-  defp prepare_validation!(state, candidate, ids, event, opts) do
+  defp prepare_validation!(state, candidate, ids, metric_calls, event, opts) do
     pending = %{
       "status" => "prepared",
       "iteration" => event.iteration,
       "target_candidate_id" => event.candidate_idx,
       "parent_ids" => event.parent_ids,
       "candidate" => Imp.Optimizer.Report.json_safe(candidate),
-      "validation_ids" => ids
+      "validation_ids" => ids,
+      "metric_calls" => metric_calls
     }
 
     state = %{state | pending_validation: pending}
@@ -1234,11 +1235,51 @@ defmodule Imp.Optimizer.GEPA.Engine do
     raise ArgumentError, "GEPA full validation completion does not match its durable checkpoint"
   end
 
-  defp reject_interrupted_validation!(%State{pending_validation: nil} = state), do: state
+  defp recover_interrupted_validation!(%State{pending_validation: nil} = state, _opts), do: state
 
-  defp reject_interrupted_validation!(%State{pending_validation: pending}) do
-    raise ArgumentError,
-          "GEPA resume contains a #{pending["status"]} full validation with ambiguous external effects"
+  defp recover_interrupted_validation!(%State{pending_validation: pending} = state, opts) do
+    {budget, reason} = recover_validation_budget!(state.budget, pending)
+
+    event = %{
+      iteration: pending["iteration"],
+      status: :rejected,
+      operation: :validation,
+      candidate_id: pending["target_candidate_id"],
+      parent_ids: pending["parent_ids"],
+      candidate: Imp.Optimizer.Report.restore_json_safe(pending["candidate"]),
+      validation_instances: pending["validation_ids"],
+      reason: reason
+    }
+
+    state = %{
+      state
+      | budget: budget,
+        iteration: max(state.iteration, pending["iteration"]),
+        rejected: state.rejected ++ [event],
+        history: state.history ++ [event],
+        last_iteration_found_candidate: false,
+        pending_validation: nil
+    }
+
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp recover_validation_budget!(budget, %{"status" => "prepared"}) do
+    {budget, {:interrupted_validation, :discarded_before_dispatch}}
+  end
+
+  defp recover_validation_budget!(budget, %{"status" => "started"} = pending) do
+    metric_calls = Map.get(pending, "metric_calls", length(pending["validation_ids"]))
+
+    case Budget.record_evaluation(budget, metric_calls, :full) do
+      {:ok, budget} ->
+        {budget, {:interrupted_validation, :ambiguous_external_effects}}
+
+      {:error, reason, _budget} ->
+        raise ArgumentError,
+              "GEPA interrupted validation cannot be conservatively charged: #{inspect(reason)}"
+    end
   end
 
   defp perfect_result?(result, opts) do
@@ -1390,17 +1431,20 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp validate_pending_validation!(nil), do: nil
 
   defp validate_pending_validation!(pending) when is_map(pending) do
-    require_exact_keys!(
-      pending,
-      ~w(status iteration target_candidate_id parent_ids candidate validation_ids),
-      "GEPA pending validation"
-    )
+    legacy_keys = ~w(status iteration target_candidate_id parent_ids candidate validation_ids)
+    current_keys = legacy_keys ++ ["metric_calls"]
+
+    unless MapSet.new(Map.keys(pending)) in [MapSet.new(legacy_keys), MapSet.new(current_keys)] do
+      raise ArgumentError, "GEPA pending validation has unexpected or missing keys"
+    end
 
     unless pending["status"] in ["prepared", "started"] and
              is_integer(pending["iteration"]) and pending["iteration"] >= 0 and
              is_integer(pending["target_candidate_id"]) and
              pending["target_candidate_id"] >= 0 and is_list(pending["parent_ids"]) and
-             is_list(pending["validation_ids"]) do
+             is_list(pending["validation_ids"]) and
+             (is_nil(pending["metric_calls"]) or
+                (is_integer(pending["metric_calls"]) and pending["metric_calls"] >= 0)) do
       raise ArgumentError, "GEPA pending validation has invalid fields"
     end
 
@@ -2081,6 +2125,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     batch = Enum.map(ids, &Enum.fetch!(valset, &1))
 
+    metric_calls =
+      Adapter.metric_call_reservation(adapter, batch, candidate, capture_traces: false)
+
     event = %{
       iteration: iteration,
       candidate_idx: target_candidate_id,
@@ -2090,11 +2137,11 @@ defmodule Imp.Optimizer.GEPA.Engine do
     }
 
     state =
-      if state.candidates == [] do
+      if state.candidates == [] or state.proposal_policy.resolved != 1 do
         state
       else
         state
-        |> prepare_validation!(candidate, ids, event, opts)
+        |> prepare_validation!(candidate, ids, metric_calls, event, opts)
         |> start_validation!(opts)
       end
 

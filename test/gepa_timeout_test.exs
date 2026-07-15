@@ -45,7 +45,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
       module: Imp.LM.Static,
       opts: [
         handler: fn _messages, _opts ->
-          Process.sleep(20)
+          Process.sleep(40)
           %{answer: "ok"}
         end
       ]
@@ -85,7 +85,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
         Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
           generations: 0,
           max_concurrency: 32,
-          timeout: 45
+          timeout: 90
         )
         |> Imp.Optimizer.GEPA.compile_with_report(program, [example()], examples)
 
@@ -93,7 +93,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
     end)
 
     elapsed = System.monotonic_time(:millisecond) - started_at
-    assert elapsed < 100
+    assert elapsed < 180
   end
 
   test "accepts infinity and rejects invalid timeout values" do
@@ -199,7 +199,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
     refute_receive :replayed_ambiguous_reflection
   end
 
-  test "in-flight sequential full validation is checkpointed and cannot admit a partial row" do
+  test "in-flight sequential full validation resumes as a conservatively charged rejection" do
     owner = self()
 
     assert_raise RuntimeError, "interrupt", fn ->
@@ -219,11 +219,28 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
 
     assert_receive {:validation_checkpoint, checkpoint}
     assert checkpoint["pending_validation"]["validation_ids"] == [0]
+    assert checkpoint["pending_validation"]["metric_calls"] == 1
     assert checkpoint["pending_validation_integrity"]
 
-    assert_raise ArgumentError, ~r/started full validation with ambiguous external effects/, fn ->
-      run_sequential_engine(resume_state: checkpoint)
-    end
+    resumed = run_sequential_engine(resume_state: checkpoint)
+
+    assert resumed.pending_validation == nil
+    assert resumed.iteration == 1
+    assert Enum.map(resumed.candidates, & &1.id) == [0]
+    assert resumed.budget.full_evaluations == checkpoint["budget"]["full_evaluations"] + 1
+
+    assert [%{reason: {:interrupted_validation, :ambiguous_external_effects}} = rejected] =
+             resumed.rejected
+
+    refute Map.has_key?(rejected, :validation_score)
+
+    resumed_checkpoint = Imp.Optimizer.GEPA.Engine.dump_state(resumed)
+    assert resumed_checkpoint["pending_validation"] == nil
+
+    continued = run_sequential_engine(resume_state: resumed_checkpoint, max_iterations: 2)
+    assert continued.iteration == 2
+    assert Enum.map(continued.candidates, & &1.id) == [0, 1]
+    assert Enum.find(continued.history, &(&1.iteration == 1)).status == :rejected
   end
 
   defp interrupt_sequential_checkpoint!(owner, status, phase) do
