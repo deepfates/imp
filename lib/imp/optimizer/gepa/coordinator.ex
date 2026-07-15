@@ -44,6 +44,30 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
 
   def current_deadline, do: Process.get(@deadline_key, :infinity)
 
+  @doc false
+  def remaining(deadline) do
+    case deadline do
+      :infinity -> :infinity
+      absolute when is_integer(absolute) -> max(absolute - System.monotonic_time(:millisecond), 0)
+    end
+  end
+
+  @doc false
+  def with_deadline(timeout, fun) when is_function(fun, 0) do
+    deadline = deadline(timeout)
+    previous = Process.get(@deadline_key, :__imp_missing_deadline__)
+    Process.put(@deadline_key, deadline)
+
+    try do
+      fun.()
+    after
+      case previous do
+        :__imp_missing_deadline__ -> Process.delete(@deadline_key)
+        value -> Process.put(@deadline_key, value)
+      end
+    end
+  end
+
   def deadline(timeout) do
     requested =
       case timeout do
@@ -157,8 +181,6 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
 
   defp expired?(:infinity), do: false
   defp expired?(deadline), do: remaining(deadline) == 0
-  defp remaining(:infinity), do: :infinity
-  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp guarded(owner, snapshot, deadline, fun) do
     Process.flag(:trap_exit, true)

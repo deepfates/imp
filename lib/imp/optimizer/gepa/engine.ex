@@ -52,6 +52,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
               stopper_state: nil,
               budget_ledger: %BudgetLedger{},
               pending_proposal_batch: nil,
+              pending_validation: nil,
               proposal_policy: %{requested: 1, resolved: 1, timeout: :infinity},
               combee_policy: nil,
               combee_reports: [],
@@ -122,6 +123,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       state
       |> ensure_proposal_policy!(proposal_policy)
       |> ensure_combee_policy!(combee_policy)
+      |> reject_interrupted_validation!()
 
     max_iterations = Keyword.get(opts, :max_iterations, 10)
 
@@ -1202,6 +1204,43 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
   end
 
+  defp prepare_validation!(state, candidate, ids, event, opts) do
+    pending = %{
+      "status" => "prepared",
+      "iteration" => event.iteration,
+      "target_candidate_id" => event.candidate_idx,
+      "parent_ids" => event.parent_ids,
+      "candidate" => Imp.Optimizer.Report.json_safe(candidate),
+      "validation_ids" => ids
+    }
+
+    state = %{state | pending_validation: pending}
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp start_validation!(state, opts) do
+    state = put_in(state.pending_validation["status"], "started")
+    checkpoint!(state, opts)
+    state
+  end
+
+  defp complete_validation!(%State{pending_validation: %{"status" => "started"}} = state),
+    do: %{state | pending_validation: nil}
+
+  defp complete_validation!(%State{pending_validation: nil} = state), do: state
+
+  defp complete_validation!(_state) do
+    raise ArgumentError, "GEPA full validation completion does not match its durable checkpoint"
+  end
+
+  defp reject_interrupted_validation!(%State{pending_validation: nil} = state), do: state
+
+  defp reject_interrupted_validation!(%State{pending_validation: pending}) do
+    raise ArgumentError,
+          "GEPA resume contains a #{pending["status"]} full validation with ambiguous external effects"
+  end
+
   defp perfect_result?(result, opts) do
     Keyword.get(opts, :skip_perfect_score, false) and
       Enum.all?(result.scores, &(&1 >= Keyword.fetch!(opts, :perfect_score)))
@@ -1323,6 +1362,55 @@ defmodule Imp.Optimizer.GEPA.Engine do
     :ok
   end
 
+  defp dump_pending_validation(nil), do: nil
+
+  defp dump_pending_validation(pending) when is_map(pending), do: pending
+
+  defp validation_integrity(pending),
+    do: Proposal.checkpoint_integrity(pending, %{}, %{})
+
+  defp load_pending_validation!(dumped) do
+    case {Map.fetch(dumped, "pending_validation"),
+          Map.fetch(dumped, "pending_validation_integrity")} do
+      {:error, :error} ->
+        nil
+
+      {{:ok, pending}, {:ok, integrity}} ->
+        unless integrity == validation_integrity(pending) do
+          raise ArgumentError, "GEPA pending validation checkpoint integrity mismatch"
+        end
+
+        validate_pending_validation!(pending)
+
+      _other ->
+        raise ArgumentError, "GEPA pending validation checkpoint is incomplete"
+    end
+  end
+
+  defp validate_pending_validation!(nil), do: nil
+
+  defp validate_pending_validation!(pending) when is_map(pending) do
+    require_exact_keys!(
+      pending,
+      ~w(status iteration target_candidate_id parent_ids candidate validation_ids),
+      "GEPA pending validation"
+    )
+
+    unless pending["status"] in ["prepared", "started"] and
+             is_integer(pending["iteration"]) and pending["iteration"] >= 0 and
+             is_integer(pending["target_candidate_id"]) and
+             pending["target_candidate_id"] >= 0 and is_list(pending["parent_ids"]) and
+             is_list(pending["validation_ids"]) do
+      raise ArgumentError, "GEPA pending validation has invalid fields"
+    end
+
+    pending
+  end
+
+  defp validate_pending_validation!(_pending) do
+    raise ArgumentError, "GEPA pending validation must be a map or nil"
+  end
+
   defp run_iteration(adapter, trainset, valset, proposer, minibatch_size, iteration, state, opts) do
     notify(opts, :on_iteration_start, %{iteration: iteration, state: state})
     candidate_count = length(state.candidates)
@@ -1385,6 +1473,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
       "stopper_state" => dump_stopper_state(state.stopper_state),
       "budget_ledger" => ledger,
       "pending_proposal_batch" => pending,
+      "pending_validation" => dump_pending_validation(state.pending_validation),
+      "pending_validation_integrity" => validation_integrity(state.pending_validation),
       "proposal_policy" => policy,
       "combee_policy" => combee_policy,
       "combee_reports" => Enum.map(state.combee_reports, &ComBee.dump_report/1),
@@ -1426,7 +1516,12 @@ defmodule Imp.Optimizer.GEPA.Engine do
           discovered_at: state.budget.metric_calls
         }
 
-        state = state |> track_validation_outputs(entry) |> Map.put(:candidates, [entry])
+        state =
+          state
+          |> complete_validation!()
+          |> track_validation_outputs(entry)
+          |> Map.put(:candidates, [entry])
+
         notify_valset_evaluated(opts, state, entry, valset, 0)
         checkpoint!(state, opts)
         state
@@ -1775,7 +1870,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
           validation_score: validation.aggregate_score
         }
 
-        state = track_validation_outputs(state, entry)
+        state = state |> complete_validation!() |> track_validation_outputs(entry)
 
         state = %{
           state
@@ -1907,7 +2002,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
           validation_score: validation.aggregate_score
         }
 
-        state = track_validation_outputs(state, entry)
+        state = state |> complete_validation!() |> track_validation_outputs(entry)
 
         state = %{
           state
@@ -1986,18 +2081,30 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     batch = Enum.map(ids, &Enum.fetch!(valset, &1))
 
-    case evaluate(adapter, batch, candidate, false, :full, state, opts, %{
-           iteration: iteration,
-           candidate_idx: target_candidate_id,
-           parent_ids: parent_ids,
-           is_seed_candidate: target_candidate_id == 0
-         }) do
+    event = %{
+      iteration: iteration,
+      candidate_idx: target_candidate_id,
+      parent_ids: parent_ids,
+      is_seed_candidate: target_candidate_id == 0,
+      deadline: Coordinator.deadline(Keyword.get(opts, :evaluation_timeout, :infinity))
+    }
+
+    state =
+      if state.candidates == [] do
+        state
+      else
+        state
+        |> prepare_validation!(candidate, ids, event, opts)
+        |> start_validation!(opts)
+      end
+
+    case evaluate(adapter, batch, candidate, false, :full, state, opts, event) do
       {:ok, result, state} ->
         result = %{result | metadata: Map.put(result.metadata, :validation_ids, ids)}
         {:ok, result, state}
 
-      error ->
-        error
+      {:error, reason, state} ->
+        {:error, reason, %{state | pending_validation: nil}}
     end
   end
 
@@ -2114,7 +2221,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
         notify_evaluation_start(opts, batch, false, event)
 
         missing_result =
-          Evaluation.evaluate(adapter, missing_batch, candidate, capture_traces: false)
+          Evaluation.evaluate(adapter, missing_batch, candidate,
+            capture_traces: false,
+            deadline: event[:deadline]
+          )
 
         result = backend.assemble(batch, hits, missing_indexes, missing_result)
         actual_calls = metric_calls(missing_result, length(missing_batch))
@@ -2146,7 +2256,13 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     with :ok <- Budget.authorize_evaluation(state.budget, reservation, kind) do
       notify_evaluation_start(opts, batch, capture_traces, event)
-      result = Evaluation.evaluate(adapter, batch, candidate, capture_traces: capture_traces)
+
+      result =
+        Evaluation.evaluate(adapter, batch, candidate,
+          capture_traces: capture_traces,
+          deadline: event[:deadline]
+        )
+
       actual_calls = metric_calls(result, length(batch))
 
       case record_with_reservation(state.budget, actual_calls, reservation, kind) do
@@ -2549,6 +2665,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
   end
 
+  defp emit_progress(%State{candidates: []}), do: :ok
+
   defp emit_progress(%State{} = state) do
     candidate = List.last(state.candidates)
 
@@ -2654,9 +2772,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
          seed_candidate,
          opts
        ) do
-    require_exact_keys!(
+    require_checkpoint_keys!(
       dumped,
       ~w(schema_version iteration candidates rejected history cache budget rng_state merge_due total_merges_tested merge_attempts last_iteration_found_candidate frontier_type evaluation_policy best_outputs_valset stopper_state budget_ledger pending_proposal_batch proposal_policy combee_policy combee_reports stop_reason pending_proposal_integrity),
+      ~w(pending_validation pending_validation_integrity),
       "GEPA engine checkpoint"
     )
 
@@ -2683,6 +2802,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         dumped
         |> Map.fetch!("pending_proposal_batch")
         |> Proposal.load!(&load_result!/1),
+      pending_validation: load_pending_validation!(dumped),
       proposal_policy: load_proposal_policy(dumped, 4, Keyword.fetch!(opts, :proposal_policy)),
       combee_policy: load_combee_policy(dumped, 4, Keyword.fetch!(opts, :combee_policy)),
       combee_reports: dumped |> Map.fetch!("combee_reports") |> Enum.map(&ComBee.load_report/1),
@@ -2962,6 +3082,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp require_exact_keys!(map, keys, context) when is_map(map) do
     unless MapSet.new(Map.keys(map)) == MapSet.new(keys) do
+      raise ArgumentError, "#{context} has unexpected or missing keys"
+    end
+
+    :ok
+  end
+
+  defp require_checkpoint_keys!(map, required, optional, context) when is_map(map) do
+    keys = MapSet.new(Map.keys(map))
+    required = MapSet.new(required)
+    optional = MapSet.new(optional)
+
+    unless MapSet.subset?(required, keys) and
+             MapSet.subset?(keys, MapSet.union(required, optional)) do
       raise ArgumentError, "#{context} has unexpected or missing keys"
     end
 

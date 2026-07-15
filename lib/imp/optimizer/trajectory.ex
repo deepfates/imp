@@ -1017,6 +1017,7 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   """
 
   alias Imp.Optimizer.{Trace, Trajectory}
+  alias Imp.Optimizer.GEPA.Coordinator
 
   @spec run(struct(), Enumerable.t(), function(), keyword()) :: [Trajectory.t()]
   def run(program, examples, metric, opts \\ []) do
@@ -1024,9 +1025,22 @@ defmodule Imp.Optimizer.TrajectoryRunner do
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     timeout = Keyword.get(opts, :timeout, 5_000)
 
-    examples
-    |> Enum.to_list()
-    |> Enum.with_index()
+    indexed_examples = examples |> Enum.to_list() |> Enum.with_index()
+
+    case Keyword.get(opts, :deadline) do
+      nil ->
+        run_stream(program, indexed_examples, metric, opts, max_concurrency, timeout)
+
+      :infinity ->
+        run_stream(program, indexed_examples, metric, opts, max_concurrency, timeout)
+
+      deadline ->
+        run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline)
+    end
+  end
+
+  defp run_stream(program, indexed_examples, metric, opts, max_concurrency, timeout) do
+    indexed_examples
     |> Imp.Tasks.async_stream(
       fn {example, index} -> evaluate(program, example, index, metric, opts) end,
       ordered: true,
@@ -1035,7 +1049,56 @@ defmodule Imp.Optimizer.TrajectoryRunner do
       on_timeout: :kill_task,
       zip_input_on_exit: true
     )
-    |> Enum.map(fn
+    |> to_trajectories(opts)
+  end
+
+  # Task.async_stream applies its timeout per task. Split a deadline-bound
+  # evaluation into effective-concurrency waves so every new wave gets only
+  # the time remaining from the original monotonic deadline.
+  defp run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline) do
+    effective_concurrency =
+      min(max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
+
+    indexed_examples
+    |> Enum.chunk_every(effective_concurrency)
+    |> Enum.flat_map(fn wave ->
+      case Coordinator.remaining(deadline) do
+        0 ->
+          Enum.map(wave, &timed_out_trajectory(&1, opts))
+
+        remaining ->
+          run_deadline_wave(
+            program,
+            wave,
+            metric,
+            opts,
+            effective_concurrency,
+            deadline,
+            remaining
+          )
+      end
+    end)
+  end
+
+  defp run_deadline_wave(program, wave, metric, opts, max_concurrency, deadline, remaining) do
+    wave
+    |> Imp.Tasks.async_stream(
+      fn {example, index} ->
+        Coordinator.with_deadline({:deadline, deadline}, fn ->
+          evaluate(program, example, index, metric, opts)
+        end)
+      end,
+      ordered: true,
+      max_concurrency: max_concurrency,
+      timeout: remaining,
+      on_timeout: :kill_task,
+      zip_input_on_exit: true
+    )
+    |> to_trajectories(opts)
+  end
+
+  defp to_trajectories(results, opts) do
+    Enum.map(results, fn
       {:ok, trajectory} ->
         trajectory
 
@@ -1046,6 +1109,9 @@ defmodule Imp.Optimizer.TrajectoryRunner do
         failed(-1, nil, [], {:task_exit, reason}, opts)
     end)
   end
+
+  defp timed_out_trajectory({example, index}, opts),
+    do: failed(index, normalize_example(example), [], {:task_exit, :timeout}, opts)
 
   defp evaluate(program, example, index, metric, opts) do
     example = normalize_example(example)

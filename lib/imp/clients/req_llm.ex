@@ -112,6 +112,8 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp do_generate_uncached(lm, messages, opts) do
+    opts = cap_transport_timeouts(opts)
+
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
         {:ok, from_response(response, lm.model)}
@@ -168,6 +170,8 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp safe_stream(lm, messages, opts) do
+    opts = cap_transport_timeouts(opts)
+
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
       {:ok, other} -> {:error, {:invalid_req_llm_stream, inspect(other)}}
@@ -428,6 +432,30 @@ defmodule Imp.Clients.ReqLLM do
       {nil, opts} -> opts
       {timeout, opts} -> Keyword.put_new(opts, :receive_timeout, timeout)
     end
+  end
+
+  defp cap_transport_timeouts(opts) do
+    case Imp.Optimizer.GEPA.Coordinator.current_deadline() do
+      :infinity ->
+        opts
+
+      deadline ->
+        remaining = Imp.Optimizer.GEPA.Coordinator.remaining(deadline)
+
+        opts
+        |> cap_timeout(:receive_timeout, remaining)
+        |> Keyword.update(:connect_options, [timeout: remaining], fn connect_options ->
+          cap_timeout(connect_options, :timeout, remaining)
+        end)
+    end
+  end
+
+  defp cap_timeout(opts, key, remaining) do
+    Keyword.update(opts, key, remaining, fn
+      timeout when is_integer(timeout) -> min(timeout, remaining)
+      :infinity -> remaining
+      other -> other
+    end)
   end
 
   defp normalize_numeric_opts(opts) do

@@ -142,7 +142,11 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     optimizer_callbacks = Keyword.get(opts, :optimizer_callbacks, [])
     parent_families = Keyword.get(opts, :families) || @required_families
     reporter = Keyword.get(opts, :reporter, fn _event -> :ok end)
-    max_concurrency = Keyword.get(opts, :max_concurrency, 1)
+    requested_max_concurrency = Keyword.get(opts, :max_concurrency, 1)
+
+    effective_max_concurrency =
+      min(requested_max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
+
     execution = Keyword.get(opts, :execution, %{"source" => "library_default"})
     checkpoint_dir = Keyword.get(opts, :checkpoint_dir, Path.join(out_dir, "gepa-checkpoints"))
     budgets = Keyword.get(opts, :budgets)
@@ -190,7 +194,8 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         judge_model: judge_model,
         pricing_source: pricing_source,
         reporter: reporter,
-        max_concurrency: max_concurrency,
+        max_concurrency: effective_max_concurrency,
+        requested_max_concurrency: requested_max_concurrency,
         checkpoint_dir: checkpoint_dir,
         source_commits: source_commits,
         source_git_sha: run_context.code_revision,
@@ -226,7 +231,9 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         "judge_model" => judge_model,
         "seeds" => seeds,
         "generations" => generation_identity,
-        "max_concurrency" => max_concurrency,
+        "max_concurrency" => requested_max_concurrency,
+        "max_concurrency_requested" => requested_max_concurrency,
+        "max_concurrency_effective" => effective_max_concurrency,
         "pricing_source" => pricing_source,
         "token_cost_schedule_sha256" => term_sha256(token_cost),
         "source_commits" => source_commits,
@@ -259,7 +266,9 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
           "reflection_model" => reflection_model,
           "seeds" => seeds,
           "generations" => generation_identity,
-          "max_concurrency" => max_concurrency,
+          "max_concurrency" => requested_max_concurrency,
+          "max_concurrency_requested" => requested_max_concurrency,
+          "max_concurrency_effective" => effective_max_concurrency,
           "execution" => execution,
           "budgets" => budgets,
           "budget_scope" => budget_scope(budgets, families, selected_shard),
@@ -587,6 +596,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       pricing_source: pricing_source,
       reporter: reporter,
       max_concurrency: max_concurrency,
+      requested_max_concurrency: requested_max_concurrency,
       checkpoint_dir: checkpoint_dir,
       source_commits: source_commits,
       execution: execution,
@@ -626,6 +636,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         budget: budget,
         generations: generations,
         max_concurrency: max_concurrency,
+        requested_max_concurrency: requested_max_concurrency,
         execution: execution,
         optimizer_callbacks: optimizer_callbacks
       }
@@ -640,7 +651,8 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         },
         seeds: seeds,
         generations: generations,
-        max_concurrency: max_concurrency
+        max_concurrency: max_concurrency,
+        requested_max_concurrency: requested_max_concurrency
       })
 
       checkpoint_path = checkpoint_path(checkpoint_dir, campaign_id, family)
@@ -654,7 +666,9 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         "judge_model" => judge_model,
         "seeds" => seeds,
         "generations" => generations,
-        "max_concurrency" => max_concurrency,
+        "max_concurrency" => requested_max_concurrency,
+        "max_concurrency_requested" => requested_max_concurrency,
+        "max_concurrency_effective" => max_concurrency,
         "pricing_source" => pricing_source,
         "token_cost" => token_cost,
         "source_commits" => source_commits,
@@ -845,6 +859,8 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
           "budget_complete" => budget_complete?,
           "generation_policy" => generation_identity(generation_policy),
           "max_iterations" => generations,
+          "max_concurrency_requested" => requested_max_concurrency,
+          "max_concurrency_effective" => max_concurrency,
           "signature" => signature,
           "instructions" => spec["instructions"],
           "output_key" => spec["output_key"],
@@ -1017,9 +1033,33 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
     %{
       seed: seed,
-      train: score(compiled, trainset, metric, max_concurrency, evaluation_timeout),
-      dev: score(compiled, devset, metric, max_concurrency, evaluation_timeout),
-      test: score(compiled, testset, metric, max_concurrency, evaluation_timeout),
+      train:
+        score(
+          compiled,
+          trainset,
+          metric,
+          max_concurrency,
+          evaluation_timeout,
+          Imp.Optimizer.GEPA.Coordinator.deadline(evaluation_timeout)
+        ),
+      dev:
+        score(
+          compiled,
+          devset,
+          metric,
+          max_concurrency,
+          evaluation_timeout,
+          Imp.Optimizer.GEPA.Coordinator.deadline(evaluation_timeout)
+        ),
+      test:
+        score(
+          compiled,
+          testset,
+          metric,
+          max_concurrency,
+          evaluation_timeout,
+          Imp.Optimizer.GEPA.Coordinator.deadline(evaluation_timeout)
+        ),
       baseline_train: baseline.train,
       baseline_dev: baseline.dev,
       baseline_test: baseline.test,
@@ -1205,7 +1245,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       {:ok, contents} ->
         checkpoint = decode_checkpoint!(contents, path)
 
-        unless checkpoint["identity"] == identity do
+        unless checkpoint_identity_matches?(checkpoint["identity"], identity) do
           raise ArgumentError,
                 "Imp GEPA checkpoint configuration or dataset identity mismatch: #{path}"
         end
@@ -1218,6 +1258,11 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       {:error, reason} ->
         raise File.Error, reason: reason, action: "read GEPA checkpoint", path: path
     end
+  end
+
+  defp checkpoint_identity_matches?(stored, identity) do
+    stored == identity or
+      stored == Map.drop(identity, ["max_concurrency_requested", "max_concurrency_effective"])
   end
 
   defp checkpoint_seed(checkpoint, seed) do
@@ -1593,15 +1638,22 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     end)
   end
 
-  defp score(program, examples, metric, max_concurrency, timeout) do
-    Imp.Evaluate.run(
-      Imp.Evaluate.new(examples, metric,
-        max_errors: :infinity,
-        max_concurrency: max_concurrency,
-        timeout: timeout
-      ),
-      program
-    ).score
+  defp score(program, examples, metric, max_concurrency, timeout, deadline) do
+    timeout = remaining_timeout(deadline, timeout)
+
+    if timeout == 0 do
+      0.0
+    else
+      Imp.Evaluate.run(
+        Imp.Evaluate.new(examples, metric,
+          max_errors: :infinity,
+          max_concurrency: max_concurrency,
+          timeout: timeout,
+          deadline: deadline
+        ),
+        program
+      ).score
+    end
   end
 
   defp baseline_scores(
@@ -1644,6 +1696,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
          progress_fn
        ) do
     key = Atom.to_string(split)
+    deadline = Imp.Optimizer.GEPA.Coordinator.deadline(timeout)
 
     case get_in(progress, ["baseline", key]) do
       checkpointed when is_number(checkpointed) ->
@@ -1657,6 +1710,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
           metric,
           max_concurrency,
           timeout,
+          deadline,
           progress,
           checkpointed,
           progress_fn
@@ -1672,6 +1726,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
           metric,
           max_concurrency,
           timeout,
+          deadline,
           progress,
           prefix,
           progress_fn
@@ -1686,6 +1741,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
          metric,
          max_concurrency,
          timeout,
+         deadline,
          progress,
          prefix,
          progress_fn
@@ -1718,7 +1774,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
         progress = persist_baseline_prefix(progress, split, dispatch_intent, progress_fn)
 
-        batch_score = score(program, batch, metric, max_concurrency, timeout)
+        batch_score = score(program, batch, metric, max_concurrency, timeout, deadline)
 
         committed =
           dispatch_intent
@@ -1752,6 +1808,12 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     progress_fn.(progress)
     progress
   end
+
+  defp remaining_timeout(nil, timeout), do: timeout
+  defp remaining_timeout(:infinity, timeout), do: timeout
+
+  defp remaining_timeout(deadline, _timeout),
+    do: Imp.Optimizer.GEPA.Coordinator.remaining(deadline)
 
   defp split_paths(dataset_root, family) do
     family_dir = Path.join(dataset_root, family)

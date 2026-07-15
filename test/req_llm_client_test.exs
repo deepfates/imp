@@ -327,6 +327,23 @@ defmodule ReqLLMClientTest do
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
   end
 
+  test "ReqLLM caps receive and connect transport timeouts to the GEPA deadline" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
+    deadline = Imp.Optimizer.GEPA.Coordinator.deadline(1_000)
+
+    assert {:ok, _output} =
+             Imp.Optimizer.GEPA.Coordinator.with_deadline({:deadline, deadline}, fn ->
+               Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}],
+                 timeout: 5_000,
+                 connect_options: [timeout: 5_000]
+               )
+             end)
+
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
+    assert Keyword.fetch!(opts, :receive_timeout) <= 1_000
+    assert Keyword.fetch!(opts, :connect_options)[:timeout] <= 1_000
+  end
+
   test "ReqLLM text responses still work with Imp adapters" do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
     program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)

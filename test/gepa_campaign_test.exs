@@ -209,6 +209,36 @@ defmodule GepaCampaignTest do
     assert Enum.map(row["token_cost"]["breakdown"], & &1["seed"]) == [0, 1]
   end
 
+  test "campaign artifacts and checkpoint identity record requested and effective concurrency" do
+    dataset_root = tmp_dir("gepa-campaign-concurrency-identity-data")
+    rows_dir = tmp_dir("gepa-campaign-concurrency-identity-rows")
+    write_dataset_root!(dataset_root)
+
+    result =
+      Imp.context([async_max_workers: 8], fn ->
+        GepaCampaign.run(
+          campaign_opts(dataset_root, rows_dir,
+            campaign_id: "gepa-campaign-concurrency-identity",
+            max_concurrency: 32
+          )
+        )
+      end)
+
+    assert get_in(result.report, ["summary", "max_concurrency_requested"]) == 32
+    assert get_in(result.report, ["summary", "max_concurrency_effective"]) == 8
+
+    assert get_in(result.report, ["rows", Access.at(0), "metadata", "max_concurrency_requested"]) ==
+             32
+
+    assert get_in(result.report, ["rows", Access.at(0), "metadata", "max_concurrency_effective"]) ==
+             8
+
+    [checkpoint_path] = Path.wildcard(Path.join(rows_dir, "gepa-checkpoints/*.json"))
+    checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
+    assert checkpoint["identity"]["max_concurrency_requested"] == 32
+    assert checkpoint["identity"]["max_concurrency_effective"] == 8
+  end
+
   test "Imp GEPA campaign rejects one fallback cost tuple for multiple seeds" do
     dataset_root = tmp_dir("gepa-campaign-ambiguous-cost-data")
     rows_dir = tmp_dir("gepa-campaign-ambiguous-cost-rows")

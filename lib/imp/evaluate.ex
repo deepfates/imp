@@ -48,7 +48,8 @@ defmodule Imp.Evaluate do
     failure_score: 0.0,
     max_errors: :infinity,
     max_concurrency: 1,
-    timeout: 5000
+    timeout: 5000,
+    deadline: nil
   ]
 
   @option_schema [
@@ -59,7 +60,8 @@ defmodule Imp.Evaluate do
       default: :infinity
     ],
     max_concurrency: [type: :pos_integer, default: 1],
-    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5000]
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5000],
+    deadline: [type: :any, default: nil]
   ]
 
   def new(devset, metric, opts \\ []) do
@@ -74,7 +76,8 @@ defmodule Imp.Evaluate do
       failure_score: opts[:failure_score],
       max_errors: opts[:max_errors],
       max_concurrency: opts[:max_concurrency],
-      timeout: opts[:timeout]
+      timeout: opts[:timeout],
+      deadline: opts[:deadline]
     }
   end
 
@@ -97,7 +100,7 @@ defmodule Imp.Evaluate do
     evaluator.devset
     |> Enum.with_index()
     |> Enum.reduce_while({[], []}, fn {example, index}, {rows, errors} ->
-      {row, error} = evaluate_row(evaluator, program, example, index)
+      {row, error} = evaluate_with_deadline(evaluator, program, example, index)
       errors = add_error(errors, error)
 
       if too_many_errors?(errors, evaluator.max_errors) do
@@ -109,15 +112,8 @@ defmodule Imp.Evaluate do
   end
 
   defp run_rows(%__MODULE__{} = evaluator, program) do
-    evaluator.devset
-    |> Enum.with_index()
-    |> Imp.Tasks.async_stream(
-      fn {example, index} -> evaluate_row(evaluator, program, example, index) end,
-      ordered: true,
-      max_concurrency: evaluator.max_concurrency,
-      timeout: evaluator.timeout,
-      on_timeout: :kill_task
-    )
+    evaluator
+    |> evaluation_stream(program)
     |> Enum.reduce_while({[], []}, fn
       {:ok, {row, error}}, {rows, errors} ->
         errors = add_error(errors, error)
@@ -140,6 +136,38 @@ defmodule Imp.Evaluate do
           {:cont, {[row | rows], errors}}
         end
     end)
+  end
+
+  defp evaluation_stream(%__MODULE__{deadline: nil} = evaluator, program) do
+    evaluator.devset
+    |> Enum.with_index()
+    |> run_evaluation_wave(evaluator, program, evaluator.timeout)
+  end
+
+  defp evaluation_stream(%__MODULE__{} = evaluator, program) do
+    effective_concurrency =
+      min(evaluator.max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
+
+    evaluator.devset
+    |> Enum.with_index()
+    |> Enum.chunk_every(effective_concurrency)
+    |> Stream.flat_map(fn wave ->
+      case Imp.Optimizer.GEPA.Coordinator.remaining(evaluator.deadline) do
+        0 -> Enum.map(wave, fn _item -> {:exit, :timeout} end)
+        remaining -> run_evaluation_wave(wave, evaluator, program, remaining)
+      end
+    end)
+  end
+
+  defp run_evaluation_wave(items, evaluator, program, timeout) do
+    Imp.Tasks.async_stream(
+      items,
+      fn {example, index} -> evaluate_with_deadline(evaluator, program, example, index) end,
+      ordered: true,
+      max_concurrency: evaluator.max_concurrency,
+      timeout: timeout,
+      on_timeout: :kill_task
+    )
   end
 
   defp evaluate_row(evaluator, program, example, index) do
@@ -176,6 +204,20 @@ defmodule Imp.Evaluate do
            reason: reason
          }}
     end
+  end
+
+  defp evaluate_with_deadline(%__MODULE__{deadline: nil} = evaluator, program, example, index),
+    do: evaluate_row(evaluator, program, example, index)
+
+  defp evaluate_with_deadline(
+         %__MODULE__{deadline: deadline} = evaluator,
+         program,
+         example,
+         index
+       ) do
+    Imp.Optimizer.GEPA.Coordinator.with_deadline({:deadline, deadline}, fn ->
+      evaluate_row(evaluator, program, example, index)
+    end)
   end
 
   defp validate_devset!(devset) do

@@ -202,6 +202,7 @@ defmodule Imp.Optimizer.GEPA do
         max_metric_calls: optimizer.max_metric_calls,
         max_full_evaluations: optimizer.max_full_evaluations,
         max_reflection_calls: optimizer.max_reflection_calls,
+        evaluation_timeout: optimizer.timeout,
         resume_state: opts[:resume_state],
         checkpoint_fn: opts[:checkpoint_fn]
       ]

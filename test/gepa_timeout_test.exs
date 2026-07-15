@@ -64,6 +64,38 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
     assert [%{candidate_id: "baseline", diagnostics: ["{:task_exit, :timeout}"]}] = report.errors
   end
 
+  test "one full validation deadline bounds 45 examples across effective-concurrency waves" do
+    examples = List.duplicate(example(), 45)
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          Process.sleep(20)
+          %{answer: "ok"}
+        end
+      ]
+    }
+
+    program = Imp.predict("question -> answer", lm: lm)
+    started_at = System.monotonic_time(:millisecond)
+
+    Imp.context([async_max_workers: 8], fn ->
+      {_compiled, report} =
+        Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
+          generations: 0,
+          max_concurrency: 32,
+          timeout: 45
+        )
+        |> Imp.Optimizer.GEPA.compile_with_report(program, [example()], examples)
+
+      assert report.metadata.max_concurrency == 32
+    end)
+
+    elapsed = System.monotonic_time(:millisecond) - started_at
+    assert elapsed < 100
+  end
+
   test "accepts infinity and rejects invalid timeout values" do
     assert %Imp.Optimizer.GEPA{timeout: :infinity, proposal_timeout: :infinity} =
              Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer), timeout: :infinity)
@@ -165,6 +197,33 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
              resumed_started.rejected
 
     refute_receive :replayed_ambiguous_reflection
+  end
+
+  test "in-flight sequential full validation is checkpointed and cannot admit a partial row" do
+    owner = self()
+
+    assert_raise RuntimeError, "interrupt", fn ->
+      run_sequential_engine(
+        checkpoint_fn: fn checkpoint ->
+          case checkpoint["pending_validation"] do
+            %{"status" => "started", "target_candidate_id" => 1} ->
+              send(owner, {:validation_checkpoint, checkpoint})
+              raise "interrupt"
+
+            _other ->
+              :ok
+          end
+        end
+      )
+    end
+
+    assert_receive {:validation_checkpoint, checkpoint}
+    assert checkpoint["pending_validation"]["validation_ids"] == [0]
+    assert checkpoint["pending_validation_integrity"]
+
+    assert_raise ArgumentError, ~r/started full validation with ambiguous external effects/, fn ->
+      run_sequential_engine(resume_state: checkpoint)
+    end
   end
 
   defp interrupt_sequential_checkpoint!(owner, status, phase) do
