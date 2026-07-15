@@ -11,10 +11,11 @@ evaluation, optimization, tools, retrieval, persistence, Livebooks, and the
 executable upstream-conformance ledger. The ledger remains the authority for
 features that are not yet release-complete.
 
-The current release candidate adds a clean-room package proof, explicit LM
-rebinding for loaded programs, durable GEPA seed checkpoints, and a scoped v0.1
-claims ledger. Naming, repository location, and final candidate-commit
-verification remain release decisions.
+The current release candidate uses the Imp identity and repository throughout.
+It adds a clean-room package proof, explicit LM rebinding for loaded programs,
+durable GEPA seed checkpoints, recursive provider-native structured-output
+schemas, and a scoped v0.1 claims ledger. Final candidate-commit verification
+remains a release decision.
 
 Public releases will list user-visible additions, changes, fixes, security
 updates, and any migration instructions in this file.
