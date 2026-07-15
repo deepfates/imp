@@ -22,6 +22,10 @@
         "path": "benchmarks/authority_sources/anthropic-claude-sonnet-5-pricing-20260715.json",
         "sha256": "041c27978d265f439ffd6f5c6ca4379985285c0010253848092dacfa177244a7"
       },
+      "dspy_source_verifier": {
+        "path": "scripts/verify_dspy_current_target.py",
+        "sha256": "caae2c15b8f68ce0c8c883a14f1e86cf6e2a6279098d6b8b1bd4810281483fdf"
+      },
       "rlm_core": {
         "path": "tmp/rlm-upstream/rlm/core/rlm.py",
         "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
