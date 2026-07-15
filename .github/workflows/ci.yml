@@ -24,6 +24,7 @@ jobs:
           cache: "pip"
           cache-dependency-path: |
             scripts/setup_dspy_parity_env.sh
+            scripts/setup_dspy_current_target.sh
             scripts/setup_reference_test_env.sh
       - uses: denoland/setup-deno@v2
         with:
@@ -31,7 +32,10 @@ jobs:
       - run: mix local.hex --force
       - run: mix deps.get
       - name: Install pinned reference runtimes
-        run: PYTHON=python3.12 scripts/setup_reference_test_env.sh
+        run: |
+          PYTHON=python3.12 scripts/setup_dspy_parity_env.sh
+          PYTHON=python3.12 scripts/setup_dspy_current_target.sh
+          PYTHON=python3.12 scripts/setup_reference_test_env.sh
       - run: mix production.check
       - run: mix integration.check
       - run: mix protocol.check
