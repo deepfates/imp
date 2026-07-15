@@ -1,0 +1,902 @@
+{
+  "aggregate": {
+    "approaches": {
+      "dspy:direct": {
+        "calls": 1,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 1395,
+        "mean_latency_ms": 8067.444041998897,
+        "mean_score": 0.0,
+        "output_tokens": 750,
+        "rows": 1,
+        "usd": 0.01029
+      },
+      "dspy:rlm": {
+        "calls": 2,
+        "completed": 0,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 3822,
+        "mean_latency_ms": null,
+        "mean_score": null,
+        "output_tokens": 71,
+        "rows": 1,
+        "usd": 0.008354
+      },
+      "imp:direct": {
+        "calls": 1,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 1392,
+        "mean_latency_ms": 6554.119,
+        "mean_score": 0.0,
+        "output_tokens": 670,
+        "rows": 1,
+        "usd": 0.009484
+      },
+      "imp:rlm": {
+        "calls": 4,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 8460,
+        "mean_latency_ms": 34878.725,
+        "mean_score": 1.0,
+        "output_tokens": 3402,
+        "rows": 1,
+        "usd": 0.05094
+      }
+    },
+    "bootstrap": {
+      "confidence": 0.95,
+      "method": "family-scoped paired nonparametric bootstrap; OOLONG-Pairs clustered by logical query",
+      "samples": 10000,
+      "seed": 251224601
+    },
+    "comparisons": [
+      {
+        "bootstrap_clusters": 0,
+        "confidence_interval": {
+          "high": null,
+          "low": null
+        },
+        "family": "oolong_pairs",
+        "left": "direct",
+        "mean_score_difference": null,
+        "metric": "set_f1",
+        "paired_rows": 0,
+        "right": "rlm",
+        "runtime": "dspy"
+      },
+      {
+        "bootstrap_clusters": 1,
+        "confidence_interval": {
+          "high": -1.0,
+          "low": -1.0
+        },
+        "family": "oolong_pairs",
+        "left": "direct",
+        "mean_score_difference": -1.0,
+        "metric": "set_f1",
+        "paired_rows": 1,
+        "right": "rlm",
+        "runtime": "imp"
+      },
+      {
+        "bootstrap_clusters": 0,
+        "confidence_interval": {
+          "high": null,
+          "low": null
+        },
+        "family": "oolong_pairs",
+        "left": "imp_rlm",
+        "mean_score_difference": null,
+        "metric": "set_f1",
+        "paired_rows": 0,
+        "right": "dspy_rlm",
+        "runtime": "imp_vs_dspy"
+      }
+    ]
+  },
+  "datasets": {
+    "oolong_pairs": {
+      "context_grid": [
+        1024
+      ],
+      "docs_per_instance": null,
+      "evaluated_keys": [
+        {
+          "context_size": 1024,
+          "example_id": "1@1024",
+          "query_id": "1"
+        }
+      ],
+      "evaluated_rows": 1,
+      "evidence_in_dataset": true,
+      "family": "oolong_pairs",
+      "logical_instances": 1,
+      "revision": "pairs@d1e1522b86ac0c169bbc890b0471408aaa29e8fa; contexts@49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "sample_ids_sha256": "43de3a417d75f4818c5a553268b80ce3a5805109a3bbc6b605e9fb0b8f50b485",
+      "sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+      "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs + oolongbench/oolong-synth",
+      "split": "trec_coarse"
+    }
+  },
+  "environment": {
+    "deno_version": "deno 2.8.3 (stable, release, aarch64-apple-darwin)",
+    "dspy_used": true,
+    "input_setup_path": "scripts/setup_rlm_pilot_inputs.sh",
+    "input_setup_sha256": "4495ee968b22fadbc378dbf8d09145a38559c657ca64b65c195624289eb67f0f",
+    "lock_path": "benchmarks/requirements-dspy-rlm.lock",
+    "lock_sha256": "3bd236fe1ffa2e295d470d781573b3a402d9ec39cc4c6700fa01c47b4fa324fa",
+    "python": {
+      "dspy_version": "3.3.0b1",
+      "executable": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/dspy-current-venv/bin/python",
+      "python_version": "3.13.12"
+    },
+    "setup_path": "scripts/setup_reference_test_env.sh",
+    "setup_sha256": "b97e6e5a469db0fdf686220572ff05e9e8235f05707d77dfa638a838ccfa9b60"
+  },
+  "evidence_tier": "t2_live_sample",
+  "execution": {
+    "checkpoint_path": "benchmarks/results/rlm-anthropic-pilot/checkpoints-2b9cacd/de-m7aa-oolong-pairs-anthropic-claude-sonnet-5-v1-both.json",
+    "concurrency": 1,
+    "row_timeout_ms": 600000,
+    "runtime_selection": "both",
+    "selection": {
+      "approaches": [
+        "direct",
+        "rlm"
+      ],
+      "families": [
+        "oolong_pairs"
+      ],
+      "row_limit_per_family": 1,
+      "runtime": "both",
+      "runtimes": [
+        "imp",
+        "dspy"
+      ]
+    },
+    "subset": true
+  },
+  "generated_at": "2026-07-15T20:18:21Z",
+  "git_sha": "2b9cacd73ba91872db83f26a616a354e96139823",
+  "manifest": {
+    "approaches": {
+      "compaction": {
+        "budget": {
+          "input_tokens": 20000000,
+          "output_tokens": 200000,
+          "requests": 64,
+          "usd": 2.0
+        },
+        "enabled": true,
+        "runtimes": [
+          "imp",
+          "dspy"
+        ],
+        "settings": {
+          "chunk_chars": 100000,
+          "max_chunks": 32,
+          "reservation_pricing": {
+            "input_per_million": 2.0,
+            "output_per_million": 10.0
+          }
+        }
+      },
+      "direct": {
+        "budget": {
+          "input_tokens": 20000000,
+          "output_tokens": 200000,
+          "requests": 64,
+          "usd": 2.0
+        },
+        "enabled": true,
+        "runtimes": [
+          "imp",
+          "dspy"
+        ],
+        "settings": {
+          "reservation_pricing": {
+            "input_per_million": 2.0,
+            "output_per_million": 10.0
+          }
+        }
+      },
+      "rlm": {
+        "budget": {
+          "input_tokens": 20000000,
+          "output_tokens": 200000,
+          "requests": 64,
+          "usd": 2.0
+        },
+        "enabled": true,
+        "runtimes": [
+          "imp",
+          "dspy"
+        ],
+        "settings": {
+          "max_iterations": 8,
+          "max_llm_calls": 8,
+          "recursion_depth": 1,
+          "reservation_pricing": {
+            "input_per_million": 2.0,
+            "output_per_million": 10.0
+          }
+        }
+      },
+      "simple_retrieval": {
+        "budget": {
+          "input_tokens": 20000000,
+          "output_tokens": 200000,
+          "requests": 64,
+          "usd": 2.0
+        },
+        "enabled": true,
+        "runtimes": [
+          "imp",
+          "dspy"
+        ],
+        "settings": {
+          "k": 8,
+          "reservation_pricing": {
+            "input_per_million": 2.0,
+            "output_per_million": 10.0
+          },
+          "retriever": "deterministic_lexical"
+        }
+      }
+    },
+    "authorities": {
+      "dspy": {
+        "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+        "repository": "https://github.com/stanfordnlp/dspy",
+        "version": "3.3.0b1"
+      },
+      "paper": {
+        "arxiv": "2512.24601v3"
+      },
+      "rlm": {
+        "commit": "72d6940142ddfb84ee6be573dc999a37e633e671",
+        "repository": "https://github.com/alexzhang13/rlm"
+      },
+      "sources": {
+        "anthropic_pricing": {
+          "path": "benchmarks/authority_sources/anthropic-claude-sonnet-5-pricing-20260715.json",
+          "sha256": "041c27978d265f439ffd6f5c6ca4379985285c0010253848092dacfa177244a7"
+        },
+        "dspy_interpreter": {
+          "path": "tmp/dspy-current-target/dspy/primitives/python_interpreter.py",
+          "sha256": "fef9baa19cd979e8466ef19e364e5f7e67848c9738955a2d3e1f0d7dae2177d4"
+        },
+        "dspy_rlm": {
+          "path": "tmp/dspy-current-target/dspy/predict/rlm.py",
+          "sha256": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8"
+        },
+        "dspy_source_verifier": {
+          "path": "scripts/verify_dspy_current_target.py",
+          "sha256": "caae2c15b8f68ce0c8c883a14f1e86cf6e2a6279098d6b8b1bd4810281483fdf"
+        },
+        "paper_pdf": {
+          "path": "tmp/pdfs/rlm-2512.24601v3.pdf",
+          "sha256": "8567362c22768d9b50d4a4a8d63bb28dda2c2b2051be30d67f70f645170429ca"
+        },
+        "rlm_core": {
+          "path": "tmp/rlm-upstream/rlm/core/rlm.py",
+          "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
+        },
+        "rlm_prompts": {
+          "path": "tmp/rlm-upstream/rlm/utils/prompts.py",
+          "sha256": "579c8ef220739f691d3896257b8289eec7e7b634fe473f41dea4adb83560b47e"
+        }
+      }
+    },
+    "campaign_id": "de-m7aa-oolong-pairs-anthropic-claude-sonnet-5-v1",
+    "datasets": {
+      "oolong_pairs": {
+        "context_grid": [
+          1024
+        ],
+        "docs_per_instance": null,
+        "metric": "set_f1",
+        "path": "../data/rlm/oolong_pairs_trec_coarse.jsonl",
+        "revision": "pairs@d1e1522b86ac0c169bbc890b0471408aaa29e8fa; contexts@49898a421f4b14f2c9cae084d2d270f930ff4c90",
+        "sample_count": 20,
+        "sample_ids": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "20"
+        ],
+        "sample_seed": 251224601,
+        "sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+        "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs + oolongbench/oolong-synth",
+        "split": "trec_coarse"
+      }
+    },
+    "deviations": [
+      {
+        "id": "imp_repl_language",
+        "impact": "Trajectory syntax is not byte-for-byte comparable; answer, budget, and effect shape remain comparable.",
+        "implementation": "BEAM-native constrained Elixir-shaped interpreter with equivalent persistent variable and sub-LM effects",
+        "paper_behavior": "Python REPL over external context variables",
+        "scope": "imp:rlm"
+      },
+      {
+        "id": "adapted_public_oolong_pairs",
+        "impact": "This campaign is adapted T2 evidence and cannot satisfy the exact paper T3 gate.",
+        "implementation": "Pinned public 20-query, 11-context-size reconstruction with normalized unordered pair-set F1",
+        "paper_behavior": "Paper-selected OOLONG-Pairs examples and unpublished scorer",
+        "scope": "dataset"
+      },
+      {
+        "id": "current_economical_pilot_model",
+        "impact": "Validates current-provider execution and matched runtime behavior, not paper model parity.",
+        "implementation": "Claude Sonnet 5 through Anthropic for a matched current-provider systems and behavior pilot",
+        "paper_behavior": "Paper model matrix including GPT-5, Qwen3-Coder, and Claude Code",
+        "scope": "models"
+      },
+      {
+        "id": "dspy_rlm_release_semantics",
+        "impact": "Cross-runtime answer and effect evidence is supported; prompts and interpreter trajectories are not identical.",
+        "implementation": "DSPy 3.3.0b1 dspy.RLM with a verified complete 149-file source tree",
+        "paper_behavior": "alexzhang13/rlm reference runtime",
+        "scope": "dspy:rlm"
+      }
+    ],
+    "evidence_tier": "t2_live_sample",
+    "execution": {
+      "bootstrap_samples": 10000,
+      "cancellation_grace_ms": 5000,
+      "concurrency": 1,
+      "confidence": 0.95,
+      "row_timeout_ms": 600000,
+      "seed": 251224601
+    },
+    "manifest_sha256": "da975f3ecf4cdffee83c001d356009895a2c5f0500e703fccfc2fb1f3627afa6",
+    "models": {
+      "compaction": {
+        "dspy": "anthropic/claude-sonnet-5",
+        "imp": {
+          "api_key_env": "ANTHROPIC_API_KEY",
+          "base_url": "https://api.anthropic.com",
+          "context_window": 200000,
+          "id": "claude-sonnet-5",
+          "provider": "anthropic"
+        },
+        "logical": "claude-sonnet-5-via-anthropic",
+        "max_output_tokens": 8192,
+        "reasoning": "none",
+        "temperature": 1.0
+      },
+      "root": {
+        "dspy": "anthropic/claude-sonnet-5",
+        "imp": {
+          "api_key_env": "ANTHROPIC_API_KEY",
+          "base_url": "https://api.anthropic.com",
+          "context_window": 200000,
+          "id": "claude-sonnet-5",
+          "provider": "anthropic"
+        },
+        "logical": "claude-sonnet-5-via-anthropic",
+        "max_output_tokens": 8192,
+        "reasoning": "none",
+        "temperature": 1.0
+      },
+      "submodel": {
+        "dspy": "anthropic/claude-sonnet-5",
+        "imp": {
+          "api_key_env": "ANTHROPIC_API_KEY",
+          "base_url": "https://api.anthropic.com",
+          "context_window": 200000,
+          "id": "claude-sonnet-5",
+          "provider": "anthropic"
+        },
+        "logical": "claude-sonnet-5-via-anthropic",
+        "max_output_tokens": 8192,
+        "reasoning": "none",
+        "temperature": 1.0
+      }
+    },
+    "schema_version": 1
+  },
+  "requested_evidence_tier": "t2_live_sample",
+  "rows": [
+    {
+      "answer": "No valid pairs exist. Only user 77482 has instances with a numeric value or location label (the rainbow colors question and the regular price question are numeric value; the \"rule of thumb\" origin question is location). No other user has any instance classified as numeric value or location, so there are no two distinct users who both satisfy the condition.",
+      "approach": "direct",
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "context_size": 1024,
+      "error": null,
+      "example_id": "1@1024",
+      "family": "oolong_pairs",
+      "key": "dspy:direct:oolong_pairs:1@1024",
+      "latency_ms": 8067.444041998897,
+      "metric": "set_f1",
+      "model_family": "claude_sonnet_5_via_anthropic",
+      "provenance": {
+        "dataset_key": "1@1024",
+        "dataset_sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+        "manifest_sha256": "da975f3ecf4cdffee83c001d356009895a2c5f0500e703fccfc2fb1f3627afa6"
+      },
+      "query_id": "1",
+      "runtime": "dspy",
+      "score": 0.0,
+      "scorer_evidence": {
+        "contract": "set_f1",
+        "implementation": "imp_rlm_campaign",
+        "input_sha256": "d44694742668f0532e2d886938e8b1e6ca88fcf128bff93477a1671ad1bb275d"
+      },
+      "status": "ok",
+      "trace": [],
+      "trace_shape": [
+        "predict:direct"
+      ],
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 1395,
+            "output_tokens": 750,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.01029
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 2.0,
+          "output_per_million": 10.0
+        },
+        "input_tokens": 1395,
+        "output_tokens": 750,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.01029
+      }
+    },
+    {
+      "answer": null,
+      "approach": "rlm",
+      "call_semantics": {
+        "configured_max_depth": 1,
+        "max_llm_calls_scope": "subcalls_only",
+        "max_observed_depth": 0,
+        "provider_calls": 2,
+        "root_calls": 2,
+        "sub_calls": 0
+      },
+      "context_size": 1024,
+      "error": "DSPy execution failed: dspy.utils.exceptions.AdapterParseError",
+      "example_id": "1@1024",
+      "family": "oolong_pairs",
+      "key": "dspy:rlm:oolong_pairs:1@1024",
+      "latency_ms": 6316.576207998878,
+      "metric": "set_f1",
+      "model_family": "claude_sonnet_5_via_anthropic",
+      "provenance": {
+        "dataset_key": "1@1024",
+        "dataset_sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+        "manifest_sha256": "da975f3ecf4cdffee83c001d356009895a2c5f0500e703fccfc2fb1f3627afa6"
+      },
+      "query_id": "1",
+      "runtime": "dspy",
+      "score": null,
+      "scorer_evidence": null,
+      "status": "error",
+      "trace": [],
+      "trace_shape": [],
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 1929,
+            "output_tokens": 34,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.004198
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 1893,
+            "output_tokens": 37,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 2,
+            "role": "root",
+            "usd": 0.004156
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 2.0,
+          "output_per_million": 10.0
+        },
+        "input_tokens": 3822,
+        "output_tokens": 71,
+        "requests": 2,
+        "root_calls": 2,
+        "sub_calls": 0,
+        "usd": 0.008354
+      }
+    },
+    {
+      "answer": "No pairs exist. Only user 77482 has instances labeled as numeric value (\"How many colors are there in a rainbow?\", \"What is the regular price?\") or location (\"Where did the saying 'rule of thumb' come from?\"). No other user has any instance in these two categories, so there are no valid pairs of two distinct users both satisfying the condition.",
+      "approach": "direct",
+      "call_semantics": {
+        "configured_max_depth": 0,
+        "max_llm_calls_scope": "not_applicable",
+        "max_observed_depth": 0,
+        "provider_calls": 1,
+        "root_calls": 1,
+        "sub_calls": 0
+      },
+      "context_size": 1024,
+      "error": null,
+      "example_id": "1@1024",
+      "family": "oolong_pairs",
+      "key": "imp:direct:oolong_pairs:1@1024",
+      "latency_ms": 6554.119,
+      "metric": "set_f1",
+      "model_family": "claude_sonnet_5_via_anthropic",
+      "provenance": {
+        "dataset_key": "1@1024",
+        "dataset_sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+        "manifest_sha256": "da975f3ecf4cdffee83c001d356009895a2c5f0500e703fccfc2fb1f3627afa6"
+      },
+      "query_id": "1",
+      "runtime": "imp",
+      "score": 0.0,
+      "scorer_evidence": {
+        "contract": "set_f1",
+        "implementation": "imp_rlm_campaign",
+        "input_sha256": "88dfd73f3e19f8e97a79b6c2541a31ab2a3dfec7a981af2a2cd18a770a680448"
+      },
+      "status": "ok",
+      "trace": [],
+      "trace_shape": [
+        "predict:direct"
+      ],
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 1392,
+            "output_tokens": 670,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.009484
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 2.0,
+          "output_per_million": 10.0
+        },
+        "input_tokens": 1392,
+        "output_tokens": 670,
+        "requests": 1,
+        "root_calls": 1,
+        "sub_calls": 0,
+        "usd": 0.009484
+      }
+    },
+    {
+      "answer": "No such pairs exist.",
+      "approach": "rlm",
+      "call_semantics": {
+        "configured_max_depth": 1,
+        "max_llm_calls_scope": "shared_root_sub_and_extract_calls",
+        "max_observed_depth": 0,
+        "provider_calls": 4,
+        "root_calls": 4,
+        "sub_calls": 0
+      },
+      "context_size": 1024,
+      "error": null,
+      "example_id": "1@1024",
+      "family": "oolong_pairs",
+      "key": "imp:rlm:oolong_pairs:1@1024",
+      "latency_ms": 34878.725,
+      "metric": "set_f1",
+      "model_family": "claude_sonnet_5_via_anthropic",
+      "provenance": {
+        "dataset_key": "1@1024",
+        "dataset_sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+        "manifest_sha256": "da975f3ecf4cdffee83c001d356009895a2c5f0500e703fccfc2fb1f3627afa6"
+      },
+      "query_id": "1",
+      "runtime": "imp",
+      "score": 1.0,
+      "scorer_evidence": {
+        "contract": "set_f1",
+        "implementation": "imp_rlm_campaign",
+        "input_sha256": "0936ac13c949a4fb0c2ec637b2cf15a2b2eb742c0db4ebd874e378111de6d643"
+      },
+      "status": "ok",
+      "trace": [
+        {
+          "action": "run",
+          "bytes": 2182,
+          "index": 0,
+          "sha256": "02bbfe1fea1772f95f7bb27632c07014e814591b9cb319799c51ab7d9be76b6c"
+        },
+        {
+          "action": "action_error",
+          "bytes": 145,
+          "index": 1,
+          "sha256": "3273c168e1d68d9037ffe77ad00000428d21fd2b411906cb249973a0e20ad33f"
+        },
+        {
+          "action": "action_error",
+          "bytes": 144,
+          "index": 2,
+          "sha256": "6960857c0299182aa2b295ce9c7716da23947288ebd28866b99024140ee47b11"
+        },
+        {
+          "action": "submit",
+          "bytes": 494,
+          "index": 3,
+          "sha256": "f76169a66139028a45d9b6c7dc3e4f5deeea9a17c425074b2c221489560b4901"
+        }
+      ],
+      "trace_shape": [
+        "rlm:run",
+        "rlm:action_error",
+        "rlm:action_error",
+        "rlm:submit"
+      ],
+      "usage": {
+        "cost_audit": [
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 667,
+            "output_tokens": 50,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 1,
+            "role": "root",
+            "usd": 0.001834
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 2489,
+            "output_tokens": 1666,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 2,
+            "role": "root",
+            "usd": 0.021638
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 2562,
+            "output_tokens": 881,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 3,
+            "role": "root",
+            "usd": 0.013934
+          },
+          {
+            "authority": "pricing_derived",
+            "input_tokens": 2742,
+            "output_tokens": 805,
+            "provider_reported_usd": null,
+            "rates": {
+              "input_per_million": 2.0,
+              "output_per_million": 10.0
+            },
+            "request": 4,
+            "role": "root",
+            "usd": 0.013534000000000001
+          }
+        ],
+        "cost_authority": "pricing_derived",
+        "cost_rates": {
+          "input_per_million": 2.0,
+          "output_per_million": 10.0
+        },
+        "input_tokens": 8460,
+        "output_tokens": 3402,
+        "requests": 4,
+        "root_calls": 4,
+        "sub_calls": 0,
+        "usd": 0.05094
+      }
+    }
+  ],
+  "runner": "imp-rlm-campaign",
+  "schema_version": 2,
+  "summary": {
+    "all_passing": false,
+    "approaches": {
+      "dspy:direct": {
+        "calls": 1,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 1395,
+        "mean_latency_ms": 8067.444041998897,
+        "mean_score": 0.0,
+        "output_tokens": 750,
+        "rows": 1,
+        "usd": 0.01029
+      },
+      "dspy:rlm": {
+        "calls": 2,
+        "completed": 0,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 3822,
+        "mean_latency_ms": null,
+        "mean_score": null,
+        "output_tokens": 71,
+        "rows": 1,
+        "usd": 0.008354
+      },
+      "imp:direct": {
+        "calls": 1,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 1392,
+        "mean_latency_ms": 6554.119,
+        "mean_score": 0.0,
+        "output_tokens": 670,
+        "rows": 1,
+        "usd": 0.009484
+      },
+      "imp:rlm": {
+        "calls": 4,
+        "completed": 1,
+        "cost_authorities": {
+          "pricing_derived": 1
+        },
+        "input_tokens": 8460,
+        "mean_latency_ms": 34878.725,
+        "mean_score": 1.0,
+        "output_tokens": 3402,
+        "rows": 1,
+        "usd": 0.05094
+      }
+    },
+    "paper_protocol_complete": false,
+    "passing": 3,
+    "t3_gate_checks": [
+      {
+        "id": "tier",
+        "passing": false
+      },
+      {
+        "id": "authorities",
+        "passing": true
+      },
+      {
+        "id": "models",
+        "passing": false
+      },
+      {
+        "id": "exact_paper_manifest",
+        "passing": false
+      },
+      {
+        "id": "families",
+        "passing": false
+      },
+      {
+        "id": "dataset_protocol",
+        "passing": false
+      },
+      {
+        "id": "dataset_authority",
+        "passing": false
+      },
+      {
+        "id": "metric_contracts",
+        "passing": false
+      },
+      {
+        "id": "official_scorers",
+        "passing": false
+      },
+      {
+        "id": "dataset_key_sets",
+        "passing": true
+      },
+      {
+        "id": "approaches",
+        "passing": false
+      },
+      {
+        "id": "runtime_comparison",
+        "passing": false
+      },
+      {
+        "id": "call_semantics_equivalent",
+        "passing": false
+      },
+      {
+        "id": "cost_accounting",
+        "passing": false
+      },
+      {
+        "id": "row_outcomes",
+        "passing": false
+      },
+      {
+        "id": "evidence",
+        "passing": false
+      },
+      {
+        "id": "deviations",
+        "passing": true
+      }
+    ],
+    "total": 4
+  },
+  "tracked_worktree_dirty": false,
+  "untracked_worktree_dirty": true
+}

@@ -119,8 +119,10 @@ fields with Jaxon. A one-row load measured 6.8 seconds and 315 MB peak RSS,
 instead of the 11.2 GB process footprint observed with whole-file decoding.
 Tests verify that an invalid unselected query is not decoded under a row limit.
 
-`benchmarks/config/rlm-oolong-pairs-openrouter-v1.json` is an adapted T2
-manifest for provider-neutral live checks. A model role may use the historical
+`benchmarks/config/rlm-oolong-pairs-anthropic-v1.json` is an adapted T2
+manifest for provider-neutral live checks. It declares only the 1024-token
+slice exercised by the bounded pilot; the T3 manifest retains the complete
+11-size paper grid. A model role may use the historical
 string form or an explicit `{provider, id, base_url, api_key_env,
 context_window}` object. Standard provider credentials are accepted only with
 their canonical HTTPS endpoint; nonstandard providers require a dedicated
@@ -137,7 +139,7 @@ mix imp.benchmark.rlm_campaign --runtime imp
 mix imp.benchmark.rlm_campaign --runtime dspy
 mix imp.benchmark.rlm_campaign --runtime both
 mix imp.benchmark.rlm_campaign \
-  --manifest benchmarks/config/rlm-oolong-pairs-openrouter-v1.json \
+  --manifest benchmarks/config/rlm-oolong-pairs-anthropic-v1.json \
   --runtime both --approach direct,rlm --row-limit 1
 mix imp.benchmark.rlm_campaign --plan --family oolong \
   --approach direct,simple_retrieval,rlm --runtime both --row-limit 1
@@ -237,7 +239,7 @@ row, and neither RLM made recursive subcalls. The runtimes also expose different
 these limitations make expansion unjustified. The campaign was not expanded;
 unavailable families and exact T3 remain red.
 
-### 2026-07-15 scorer and DSPy integration audit
+### 2026-07-15 corrected bounded pilot
 
 An initial pre-admission OOLONG-Pairs pilot exposed an unanchored scorer that
 could interpret prose commas as pairs. That artifact was rejected. The scorer
@@ -245,14 +247,28 @@ now accepts only complete canonical `(id_1, id_2)` lines or a standalone
 empty-set marker; any mixed prose is invalid. Failed rows are excluded from
 paired bootstrap comparisons instead of being treated as scored zeros.
 
-A replacement diagnostic on frozen query `1` at context size `1024` showed a
-DSPy prediction with the expected `answer`, `final_reasoning`, and `trajectory`
-fields, but an empty string in `answer`. Before treating that as a reference
-runtime outcome, the sidecar's metering wrapper was driven through the real
-pinned `dspy.RLM`; submit, trajectory, and usage accounting passed. The full
-provider-free comparison also passes all 12 required matched operational cases.
-A fresh matched artifact must still be generated from the committed diagnostic
-implementation before any result-specific T2 statement is admitted here.
+The admitted replacement was generated from commit `2b9cacd` on frozen query
+`1` at context size `1024` with `claude-sonnet-5`. Imp direct and DSPy direct
+both explained the correct empty-set conclusion in noncanonical prose and
+scored `0.0`. Imp RLM recorded `run`, `action_error`, and `submit` events,
+returned the accepted empty-set marker `No such pairs exist.` in four root
+calls, and scored `1.0`.
+DSPy RLM made two root calls and failed with
+`dspy.utils.exceptions.AdapterParseError`; its row has a null score. The
+artifact contains DSPy and cross-runtime comparison records with zero paired
+rows and no estimate.
+
+Before admitting that outcome, the metering wrapper was driven through the
+real pinned `dspy.RLM`; submit, trajectory, and usage accounting passed. The
+provider-free comparison also passes all 12 required matched operational
+cases. The live artifact records Python 3.13.12, DSPy 3.3.0b1, Deno 2.8.3,
+version-pinned Python dependencies, both setup-script hashes, a complete DSPy
+source-tree verifier, and a dated pricing authority. This remains one-row
+end-to-end and output-contract evidence only, not aggregate quality,
+reliability, semantic superiority, paper parity, or T3 evidence. The exact
+command and limitations are recorded in
+`benchmarks/results/rlm-anthropic-pilot/README.md`; the artifact SHA-256 is
+`b6b9757696c424568633cd80f84f626fb2093db51176b8d79e279b477ddfcaff`.
 
 ## Mechanical T3 Gate
 
