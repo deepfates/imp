@@ -321,6 +321,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     refute result.artifact["environment"]["dspy_used"]
     assert result.artifact["environment"]["python"] == nil
     assert String.match?(result.artifact["environment"]["lock_sha256"], ~r/^[0-9a-f]{64}$/)
+
     assert result.artifact["environment"]["input_setup_path"] ==
              "scripts/setup_rlm_pilot_inputs.sh"
 
@@ -328,6 +329,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
              result.artifact["environment"]["input_setup_sha256"],
              ~r/^[0-9a-f]{64}$/
            )
+
     assert is_boolean(result.artifact["untracked_worktree_dirty"])
 
     assert Enum.all?(result.artifact["rows"], fn row ->
@@ -952,12 +954,24 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     assert Enum.map(loaded["rows"], & &1["gold"]) ==
              ["(1, 2)", "", "(3, 4)", "", "(5, 6)", "", "(7, 8)", "", "(9, 10)", "", "(11, 12)"]
 
-    assert_raise ArgumentError, ~r/exact 11-size context grid/, fn ->
+    bounded =
       RLMDataset.load!(
         "oolong_pairs",
         Map.put(spec, "context_grid", [1024]),
         Path.dirname(fixture.manifest_path)
       )
+
+    assert bounded["evaluated_rows"] == 1
+    assert Enum.map(bounded["rows"], & &1["context_size"]) == [1024]
+
+    for invalid <- [[], [2048, 1024], [1024, 1024], [1234]] do
+      assert_raise ArgumentError, ~r/non-empty ordered paper-grid subset/, fn ->
+        RLMDataset.load!(
+          "oolong_pairs",
+          Map.put(spec, "context_grid", invalid),
+          Path.dirname(fixture.manifest_path)
+        )
+      end
     end
   end
 

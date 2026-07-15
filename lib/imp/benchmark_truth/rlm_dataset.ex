@@ -114,7 +114,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
       case family do
         "oolong_pairs" ->
           contexts = shared_contexts!(rows)
-          Enum.flat_map(selected, &normalize_pair!(&1, spec, contexts))
+          Enum.flat_map(selected, &normalize_pair!(&1, spec, contexts, spec["context_grid"]))
 
         _ ->
           Enum.flat_map(selected, &normalize!(family, &1, spec))
@@ -281,8 +281,12 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
     unless markers["reserved"] == 1,
       do: raise(ArgumentError, "OOLONG-Pairs requires exactly one __contexts__ row")
 
-    unless spec["context_grid"] == @oolong_pairs_context_grid,
-      do: raise(ArgumentError, "OOLONG-Pairs requires the exact 11-size context grid")
+    unless valid_pair_context_grid?(spec["context_grid"]),
+      do:
+        raise(
+          ArgumentError,
+          "OOLONG-Pairs context grid must be a non-empty ordered paper-grid subset"
+        )
   end
 
   defp validate_metadata_markers!(_markers, _spec, _family), do: :ok
@@ -364,11 +368,15 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
     ]
   end
 
-  defp normalize_pair!(row, spec, contexts, sizes \\ @oolong_pairs_context_grid) do
+  defp normalize_pair!(row, spec, contexts, sizes) do
     gold_by_context_size = Map.get(row, "gold_by_context_size")
 
-    unless spec["context_grid"] == @oolong_pairs_context_grid,
-      do: raise(ArgumentError, "OOLONG-Pairs requires the exact 11-size context grid")
+    unless valid_pair_context_grid?(spec["context_grid"]),
+      do:
+        raise(
+          ArgumentError,
+          "OOLONG-Pairs context grid must be a non-empty ordered paper-grid subset"
+        )
 
     unless is_map(gold_by_context_size),
       do:
@@ -379,7 +387,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
 
     expected_gold_keys = Enum.map(sizes, &Integer.to_string/1)
 
-    unless Enum.sort(Map.keys(gold_by_context_size)) == Enum.sort(expected_gold_keys),
+    unless Enum.all?(expected_gold_keys, &Map.has_key?(gold_by_context_size, &1)),
       do:
         raise(
           ArgumentError,
@@ -587,6 +595,12 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
   end
 
   defp pair_context_keys?(_value), do: false
+
+  defp valid_pair_context_grid?(grid) when is_list(grid) do
+    grid != [] and grid == Enum.filter(@oolong_pairs_context_grid, &(&1 in grid))
+  end
+
+  defp valid_pair_context_grid?(_grid), do: false
 
   defp base(row, family), do: %{"id" => required_string!(row, "id", family), "family" => family}
   defp put_context!(out, row), do: Map.put(out, "context", required_context!(row, out["family"]))

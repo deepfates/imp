@@ -5,6 +5,7 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
   @approaches ~w(direct simple_retrieval compaction rlm)
   @runtimes ~w(imp dspy)
   @reasoning_efforts ~w(none minimal low medium high xhigh default)
+  @oolong_pairs_context_grid Enum.map(10..20, &(:math.pow(2, &1) |> round()))
   @sha256 ~r/\A[0-9a-f]{64}\z/
   @standard_imp_providers %{
     "openai" => {"api.openai.com", "OPENAI_API_KEY"},
@@ -404,6 +405,16 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
     end)
   end
 
+  defp validate_family_protocol!("oolong_pairs", dataset, "t2_live_sample") do
+    grid = dataset["context_grid"]
+
+    require!(
+      is_list(grid) and grid != [] and
+        grid == Enum.filter(@oolong_pairs_context_grid, &(&1 in grid)),
+      "OOLONG-Pairs T2 context grid must be a non-empty ordered paper-grid subset"
+    )
+  end
+
   defp validate_family_protocol!(_family, _dataset, "t2_live_sample"), do: :ok
 
   defp validate_family_protocol!("s_niah", dataset, "t3_paper_scale"),
@@ -424,7 +435,7 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
     require!(dataset["split"] == "trec_coarse", "OOLONG-Pairs split must be trec_coarse")
 
     require!(
-      dataset["context_grid"] == Enum.map(10..20, &(:math.pow(2, &1) |> round())),
+      dataset["context_grid"] == @oolong_pairs_context_grid,
       "OOLONG-Pairs context grid does not match the paper"
     )
   end
