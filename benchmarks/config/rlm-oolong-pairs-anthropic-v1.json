@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "campaign_id": "de-m7aa-oolong-pairs-openai-gpt-5-4-mini-v1",
+  "campaign_id": "de-m7aa-oolong-pairs-anthropic-claude-sonnet-5-v1",
   "evidence_tier": "t2_live_sample",
   "authorities": {
     "paper": {"arxiv": "2512.24601v3"},
@@ -38,43 +38,43 @@
   },
   "models": {
     "root": {
-      "logical": "gpt-5.4-mini-2026-03-17-via-openai",
+      "logical": "claude-sonnet-5-via-anthropic",
       "imp": {
-        "provider": "openai",
-        "id": "gpt-5.4-mini-2026-03-17",
-        "base_url": "https://api.openai.com/v1",
-        "api_key_env": "OPENAI_API_KEY",
-        "context_window": 400000
+        "provider": "anthropic",
+        "id": "claude-sonnet-5",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "context_window": 200000
       },
-      "dspy": "openai/gpt-5.4-mini-2026-03-17",
+      "dspy": "anthropic/claude-sonnet-5",
       "temperature": 1.0,
       "reasoning": "none",
       "max_output_tokens": 8192
     },
     "submodel": {
-      "logical": "gpt-5.4-mini-2026-03-17-via-openai",
+      "logical": "claude-sonnet-5-via-anthropic",
       "imp": {
-        "provider": "openai",
-        "id": "gpt-5.4-mini-2026-03-17",
-        "base_url": "https://api.openai.com/v1",
-        "api_key_env": "OPENAI_API_KEY",
-        "context_window": 400000
+        "provider": "anthropic",
+        "id": "claude-sonnet-5",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "context_window": 200000
       },
-      "dspy": "openai/gpt-5.4-mini-2026-03-17",
+      "dspy": "anthropic/claude-sonnet-5",
       "temperature": 1.0,
       "reasoning": "none",
       "max_output_tokens": 8192
     },
     "compaction": {
-      "logical": "gpt-5.4-mini-2026-03-17-via-openai",
+      "logical": "claude-sonnet-5-via-anthropic",
       "imp": {
-        "provider": "openai",
-        "id": "gpt-5.4-mini-2026-03-17",
-        "base_url": "https://api.openai.com/v1",
-        "api_key_env": "OPENAI_API_KEY",
-        "context_window": 400000
+        "provider": "anthropic",
+        "id": "claude-sonnet-5",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "context_window": 200000
       },
-      "dspy": "openai/gpt-5.4-mini-2026-03-17",
+      "dspy": "anthropic/claude-sonnet-5",
       "temperature": 1.0,
       "reasoning": "none",
       "max_output_tokens": 8192
@@ -85,7 +85,7 @@
       "enabled": true,
       "runtimes": ["imp", "dspy"],
       "budget": {"requests": 64, "input_tokens": 20000000, "output_tokens": 200000, "usd": 2.0},
-      "settings": {"reservation_pricing": {"input_per_million": 0.75, "output_per_million": 4.5}}
+      "settings": {"reservation_pricing": {"input_per_million": 2.0, "output_per_million": 10.0}}
     },
     "simple_retrieval": {
       "enabled": true,
@@ -94,7 +94,7 @@
       "settings": {
         "k": 8,
         "retriever": "deterministic_lexical",
-        "reservation_pricing": {"input_per_million": 0.75, "output_per_million": 4.5}
+        "reservation_pricing": {"input_per_million": 2.0, "output_per_million": 10.0}
       }
     },
     "compaction": {
@@ -104,7 +104,7 @@
       "settings": {
         "chunk_chars": 100000,
         "max_chunks": 32,
-        "reservation_pricing": {"input_per_million": 0.75, "output_per_million": 4.5}
+        "reservation_pricing": {"input_per_million": 2.0, "output_per_million": 10.0}
       }
     },
     "rlm": {
@@ -115,7 +115,7 @@
         "max_iterations": 8,
         "max_llm_calls": 8,
         "recursion_depth": 1,
-        "reservation_pricing": {"input_per_million": 0.75, "output_per_million": 4.5}
+        "reservation_pricing": {"input_per_million": 2.0, "output_per_million": 10.0}
       }
     }
   },

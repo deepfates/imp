@@ -57,7 +57,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     existing = RLMCheckpoint.rows(checkpoint)
     budgets = start_budgets!(manifest, runtimes, existing)
     planned_jobs = jobs(manifest, datasets, selection)
-    python = Keyword.get(opts, :python, default_python())
+    python = opts |> Keyword.get(:python, default_python()) |> executable_path()
     execute_jobs!(planned_jobs, manifest, checkpoint, budgets, Keyword.put(opts, :python, python))
     rows = RLMCheckpoint.rows(checkpoint)
     artifact = artifact(manifest, datasets, rows, selection, checkpoint_path, python)
@@ -988,6 +988,14 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
   defp default_python do
     local = Path.expand("tmp/dspy-current-venv/bin/python")
     if File.exists?(local), do: local, else: System.find_executable("python3") || "python3"
+  end
+
+  defp executable_path(path) do
+    if Path.type(path) == :absolute or String.contains?(path, "/") do
+      Path.expand(path)
+    else
+      System.find_executable(path) || path
+    end
   end
 
   defp git_sha do
