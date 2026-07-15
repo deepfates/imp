@@ -359,6 +359,91 @@ def build_dspy_lm(config: dict[str, Any]) -> Any:
     return dspy.LM(config["dspy"], **kwargs)
 
 
+def guarded_execution(callback: Any, ledger: dict[str, Any]) -> Any:
+    try:
+        return callback()
+    except CampaignError:
+        raise
+    except Exception as error:
+        error_type = f"{type(error).__module__}.{type(error).__qualname__}"
+        raise CampaignError(
+            f"DSPy execution failed: {error_type}", auditable_usage(ledger)
+        ) from error
+
+
+def execute_approach(
+    row: dict[str, Any],
+    approach: str,
+    settings: dict[str, Any],
+    root: BudgetLM,
+    sub: BudgetLM,
+    ledger: dict[str, Any],
+) -> tuple[str, list[str], list[dict[str, Any]]]:
+    if approach == "direct":
+        pred = dspy.Predict("context, question, choices -> answer")(
+            context=context_text(row),
+            question=row["question"],
+            choices=row.get("choices", []),
+        )
+        return prediction_answer(pred, auditable_usage(ledger)), ["predict:direct"], []
+    if approach == "simple_retrieval":
+        selected = lexical_retrieval(row, int(settings.get("k", 8)))
+        pred = dspy.Predict("context, question, choices -> answer")(
+            context=selected,
+            question=row["question"],
+            choices=row.get("choices", []),
+        )
+        return prediction_answer(pred, auditable_usage(ledger)), ["retrieve:lexical", "predict"], []
+    if approach == "compaction":
+        text = context_text(row)
+        size = int(settings.get("chunk_chars", 100_000))
+        chunks = [text[i : i + size] for i in range(0, len(text), size)][
+            : int(settings.get("max_chunks", 32))
+        ]
+        summaries = []
+        for chunk in chunks:
+            with dspy.context(lm=sub):
+                summaries.append(
+                    str(dspy.Predict("context -> summary")(context=chunk).summary)
+                )
+        pred = dspy.Predict("context, question, choices -> answer")(
+            context="\n\n".join(summaries),
+            question=row["question"],
+            choices=row.get("choices", []),
+        )
+        return (
+            prediction_answer(pred, auditable_usage(ledger)),
+            ["summarize"] * len(chunks) + ["predict"],
+            [],
+        )
+    if approach == "rlm":
+        recursion_depth = int(settings.get("recursion_depth", 1))
+        if recursion_depth not in (0, 1):
+            raise CampaignError("DSPy RLM comparison supports recursion_depth 0 or 1 only")
+        max_llm_calls = (
+            0 if recursion_depth == 0 else int(settings.get("max_llm_calls", 50))
+        )
+        program = dspy.RLM(
+            "context, question, choices -> answer",
+            sub_lm=sub,
+            max_iterations=int(settings.get("max_iterations", 20)),
+            max_llm_calls=max_llm_calls,
+        )
+        pred = program(
+            context=context_text(row),
+            question=row["question"],
+            choices=row.get("choices", []),
+        )
+        raw_trace = list(getattr(pred, "trajectory", []) or [])
+        trace = bounded_trace(raw_trace)
+        return (
+            prediction_answer(pred, auditable_usage(ledger), trace),
+            ["rlm:repl"] * max(1, len(raw_trace)),
+            trace,
+        )
+    raise CampaignError(f"unknown approach: {approach}")
+
+
 def execute(payload: dict[str, Any]) -> dict[str, Any]:
     row = payload["row"]
     approach = payload["approach"]
@@ -387,35 +472,9 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
     dspy.configure(lm=root)
     started = time.perf_counter()
 
-    if approach == "direct":
-        pred = dspy.Predict("context, question, choices -> answer")(context=context_text(row), question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["predict:direct"], []
-    elif approach == "simple_retrieval":
-        selected = lexical_retrieval(row, int(settings.get("k", 8)))
-        pred = dspy.Predict("context, question, choices -> answer")(context=selected, question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["retrieve:lexical", "predict"], []
-    elif approach == "compaction":
-        text = context_text(row)
-        size = int(settings.get("chunk_chars", 100_000))
-        chunks = [text[i : i + size] for i in range(0, len(text), size)][: int(settings.get("max_chunks", 32))]
-        summaries = []
-        for chunk in chunks:
-            with dspy.context(lm=sub):
-                summaries.append(str(dspy.Predict("context -> summary")(context=chunk).summary))
-        pred = dspy.Predict("context, question, choices -> answer")(context="\n\n".join(summaries), question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["summarize"] * len(chunks) + ["predict"], []
-    elif approach == "rlm":
-        recursion_depth = int(settings.get("recursion_depth", 1))
-        if recursion_depth not in (0, 1):
-            raise CampaignError("DSPy RLM comparison supports recursion_depth 0 or 1 only")
-        max_llm_calls = 0 if recursion_depth == 0 else int(settings.get("max_llm_calls", 50))
-        program = dspy.RLM("context, question, choices -> answer", sub_lm=sub, max_iterations=int(settings.get("max_iterations", 20)), max_llm_calls=max_llm_calls)
-        pred = program(context=context_text(row), question=row["question"], choices=row.get("choices", []))
-        raw_trace = list(getattr(pred, "trajectory", []) or [])
-        trace = bounded_trace(raw_trace)
-        answer, shape = prediction_answer(pred, auditable_usage(ledger), trace), ["rlm:repl"] * max(1, len(raw_trace))
-    else:
-        raise CampaignError(f"unknown approach: {approach}")
+    answer, shape, trace = guarded_execution(
+        lambda: execute_approach(row, approach, settings, root, sub, ledger), ledger
+    )
 
     return {
         "answer": answer,

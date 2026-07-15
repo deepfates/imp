@@ -111,6 +111,29 @@ def wrapped(
 
 
 class BudgetLMTest(unittest.TestCase):
+    def test_unexpected_dspy_error_retains_usage_without_raw_message(self):
+        ledger = empty_ledger()
+        ledger.update(
+            requests=1,
+            root_calls=1,
+            input_tokens=42,
+            output_tokens=7,
+            usd=0.001,
+        )
+
+        def fail():
+            raise ValueError("raw provider response with sk-secret-value-123456789")
+
+        with self.assertRaisesRegex(
+            campaign.CampaignError, "DSPy execution failed: builtins.ValueError"
+        ) as raised:
+            campaign.guarded_execution(fail, ledger)
+
+        self.assertNotIn("raw provider response", str(raised.exception))
+        self.assertNotIn("sk-secret", str(raised.exception))
+        self.assertEqual(raised.exception.usage["requests"], 1)
+        self.assertEqual(raised.exception.usage["input_tokens"], 42)
+
     def test_malformed_prediction_errors_are_redacted_and_keep_trace(self):
         prediction = types.SimpleNamespace(
             answer={"api_key": "sk-secret-answer-123456789"},
