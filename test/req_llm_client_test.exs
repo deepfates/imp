@@ -48,6 +48,21 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule NestedObjectStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_nested",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(""),
+         object: %{"items" => [%{"answer" => "yes", "confidence" => 0.9}]}
+       }}
+    end
+  end
+
   defmodule ThinkingStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -325,6 +340,49 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(opts, :temperature) == 0.0
     refute Keyword.has_key?(opts, :native_json_schema)
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
+  end
+
+  test "ReqLLM receives recursive native JSON schema constraints" do
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{
+            name: :items,
+            type: :array,
+            constraints: %{
+              items: %{
+                type: :object,
+                properties: %{
+                  answer: %{type: :string, enum: ["yes", "no"]},
+                  confidence: %{type: :number, min: 0, max: 1}
+                }
+              }
+            }
+          }
+        ]
+      })
+
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: NestedObjectStub)
+
+    program =
+      Imp.predict(signature,
+        lm: lm,
+        adapter: Imp.Adapter.JSON,
+        config: [native_json_schema: true]
+      )
+
+    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "classify"})
+    assert [%{"answer" => "yes", "confidence" => 0.9}] = Imp.get(prediction, :items)
+
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
+    schema = get_in(opts, [:provider_options, :response_format, :json_schema, :schema])
+    item_schema = get_in(schema, ["properties", "items", "items"])
+
+    assert item_schema["required"] == ["answer", "confidence"]
+    assert get_in(item_schema, ["properties", "answer", "enum"]) == ["yes", "no"]
+    assert get_in(item_schema, ["properties", "confidence", "minimum"]) == 0
+    assert get_in(item_schema, ["properties", "confidence", "maximum"]) == 1
   end
 
   test "ReqLLM caps receive and connect transport timeouts to the GEPA deadline" do

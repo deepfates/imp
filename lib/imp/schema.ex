@@ -124,7 +124,7 @@ defmodule Imp.Schema do
         pseudo = %{
           field
           | name: "#{field.name}[#{index}]",
-            type: fetch_meta(item_schema, :type, :any),
+            type: nested_type(item_schema, :any),
             metadata: %{constraints: delete_meta(item_schema, :type)}
         }
 
@@ -144,7 +144,7 @@ defmodule Imp.Schema do
         pseudo = %{
           field
           | name: "#{field.name}.#{name}",
-            type: fetch_meta(spec, :type, :any),
+            type: nested_type(spec, :any),
             metadata: %{
               constraints: delete_meta(spec, :type),
               optional: fetch_meta(spec, :optional, false)
@@ -209,23 +209,49 @@ defmodule Imp.Schema do
     |> maybe_put("maxLength", fetch_meta(constraints, :max_length))
     |> maybe_put("pattern", fetch_meta(constraints, :pattern))
     |> maybe_put("items", json_nested(fetch_meta(constraints, :items)))
-    |> maybe_put("properties", json_properties(fetch_meta(constraints, :properties)))
+    |> put_object_contract(fetch_meta(constraints, :properties))
   end
 
   defp json_nested(nil), do: nil
 
   defp json_nested(spec) do
     spec = normalize_constraints(spec)
-    %{"type" => json_type(fetch_meta(spec, :type, :string))}
+
+    %{"type" => json_type(nested_type(spec, :string))}
+    |> maybe_put("enum", fetch_meta(spec, :enum))
+    |> maybe_put("x-imp-answerShape", fetch_meta(spec, :answer_shape))
+    |> maybe_put("minimum", fetch_meta(spec, :min))
+    |> maybe_put("maximum", fetch_meta(spec, :max))
+    |> maybe_put("minLength", fetch_meta(spec, :min_length))
+    |> maybe_put("maxLength", fetch_meta(spec, :max_length))
+    |> maybe_put("pattern", fetch_meta(spec, :pattern))
+    |> maybe_put("items", json_nested(fetch_meta(spec, :items)))
+    |> put_object_contract(fetch_meta(spec, :properties))
   end
 
   defp json_properties(nil), do: nil
 
   defp json_properties(properties) do
     Map.new(properties, fn {name, spec} ->
-      spec = normalize_constraints(spec)
-      {to_string(name), %{"type" => json_type(fetch_meta(spec, :type, :string))}}
+      {to_string(name), json_nested(spec)}
     end)
+  end
+
+  defp put_object_contract(schema, nil), do: schema
+
+  defp put_object_contract(schema, properties) do
+    required =
+      properties
+      |> Enum.reject(fn {_name, spec} ->
+        spec = normalize_constraints(spec)
+        fetch_meta(spec, :optional, false)
+      end)
+      |> Enum.map(fn {name, _spec} -> to_string(name) end)
+      |> Enum.sort()
+
+    schema
+    |> Map.put("properties", json_properties(properties))
+    |> Map.put("required", required)
   end
 
   defp maybe_put(map, _key, nil), do: map
@@ -237,7 +263,30 @@ defmodule Imp.Schema do
   defp json_type(:boolean), do: "boolean"
   defp json_type(:array), do: "array"
   defp json_type(:object), do: "object"
+  defp json_type("integer"), do: "integer"
+  defp json_type("float"), do: "number"
+  defp json_type("number"), do: "number"
+  defp json_type("boolean"), do: "boolean"
+  defp json_type("array"), do: "array"
+  defp json_type("object"), do: "object"
+  defp json_type("string"), do: "string"
   defp json_type(_), do: "string"
+
+  defp nested_type(spec, default) do
+    case fetch_meta(spec, :type, default) do
+      "integer" -> :integer
+      "int" -> :integer
+      "float" -> :float
+      "number" -> :number
+      "boolean" -> :boolean
+      "bool" -> :boolean
+      "array" -> :array
+      "object" -> :object
+      "string" -> :string
+      "str" -> :string
+      type -> type
+    end
+  end
 
   defp error(field, rule, message), do: %{field: field.name, rule: rule, message: message}
 

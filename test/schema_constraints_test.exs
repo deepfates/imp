@@ -106,10 +106,106 @@ defmodule SchemaConstraintsTest do
                "items" => %{"type" => "array", "items" => %{"type" => "integer"}},
                "meta" => %{
                  "type" => "object",
-                 "properties" => %{"source" => %{"type" => "string"}}
+                 "properties" => %{"source" => %{"type" => "string"}},
+                 "required" => ["source"]
                }
              }
            }
+  end
+
+  test "exports recursive provider schema with nested required and optional fields" do
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{
+            name: :candidates,
+            type: :array,
+            constraints: %{
+              items: %{
+                type: :object,
+                properties: %{
+                  name: %{type: :string, min_length: 2, pattern: "^[A-Z]"},
+                  score: %{type: :number, min: 0, max: 1},
+                  tags: %{
+                    type: :array,
+                    items: %{type: :string, enum: ["clear", "novel"]}
+                  },
+                  rationale: %{type: :string, optional: true, max_length: 120}
+                }
+              }
+            }
+          }
+        ]
+      })
+
+    item_schema =
+      signature
+      |> Imp.Signature.json_schema()
+      |> get_in(["properties", "candidates", "items"])
+
+    assert item_schema["type"] == "object"
+    assert item_schema["required"] == ["name", "score", "tags"]
+
+    assert get_in(item_schema, ["properties", "name"]) == %{
+             "type" => "string",
+             "minLength" => 2,
+             "pattern" => "^[A-Z]"
+           }
+
+    assert get_in(item_schema, ["properties", "score"]) == %{
+             "type" => "number",
+             "minimum" => 0,
+             "maximum" => 1
+           }
+
+    assert get_in(item_schema, ["properties", "tags", "items"]) == %{
+             "type" => "string",
+             "enum" => ["clear", "novel"]
+           }
+
+    assert get_in(item_schema, ["properties", "rationale", "maxLength"]) == 120
+  end
+
+  test "Static prediction receives and enforces the recursive native schema" do
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{
+            name: :items,
+            type: :array,
+            constraints: %{
+              items: %{
+                type: :object,
+                properties: %{label: %{type: :string}, confidence: %{type: :number}}
+              }
+            }
+          }
+        ]
+      })
+
+    handler = fn _messages, opts ->
+      schema = get_in(opts, [:response_format, :json_schema, :schema])
+      send(self(), {:static_schema, schema})
+      %{"items" => [%{"label" => "BEAM", "confidence" => 0.9}]}
+    end
+
+    program =
+      Imp.predict(signature,
+        adapter: Imp.Adapter.JSON,
+        lm: %{module: Imp.LM.Static, opts: [handler: handler]},
+        config: [native_json_schema: true]
+      )
+
+    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "runtime?"})
+    assert [%{"label" => "BEAM", "confidence" => 0.9}] = Imp.get(prediction, :items)
+    assert_receive {:static_schema, schema}
+
+    assert get_in(schema, ["properties", "items", "items", "required"]) == [
+             "confidence",
+             "label"
+           ]
   end
 
   test "loaded JSON metadata preserves string-key constraints" do
@@ -138,6 +234,13 @@ defmodule SchemaConstraintsTest do
 
     assert Enum.map(errors, & &1.rule) == [:max, :min]
     assert Imp.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
+
+    assert get_in(Imp.Signature.json_schema(loaded), ["properties", "meta", "required"]) == [
+             "count"
+           ]
+
+    assert {:error, [%{field: "meta.count", rule: :type}]} =
+             Imp.Schema.validate_fields(loaded.outputs, %{score: 0.5, meta: %{count: "one"}})
   end
 
   test "invalid regex constraints become validation errors instead of crashes" do
