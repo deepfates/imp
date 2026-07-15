@@ -223,7 +223,7 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
     def generate(%__MODULE__{inner: inner}, messages, opts) do
       with {:ok, result} <- Imp.LM.generate(inner, messages, opts),
            {:ok, content} <- controller_content(result),
-           {:ok, action} when is_map(action) <- Jason.decode(content) do
+           {:ok, action} when is_map(action) <- decode_action(content) do
         {:ok, action}
       else
         {:ok, _other} -> {:error, :invalid_rlm_controller_json}
@@ -251,6 +251,10 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
 
     defp controller_content(content) when is_binary(content), do: {:ok, content}
     defp controller_content(_result), do: {:error, :missing_rlm_controller_content}
+
+    defp decode_action(content) do
+      Imp.Predict.RLM.Action.decode(content)
+    end
   end
 
   defmodule Native do
@@ -281,31 +285,90 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
       Agent.stop(usage)
 
       case result do
-        {:ok, answer, trace_shape, trace} when is_binary(answer) and answer != "" ->
-          {:ok,
+        {:ok, answer, trace_shape, trace} when is_binary(answer) ->
+          if String.trim(answer) == "" do
+            malformed_output(answer, trace_shape, trace, measured, latency, approach, context)
+          else
+            {:ok,
+             %{
+               "answer" => answer,
+               "latency_ms" => latency,
+               "usage" => measured,
+               "trace_shape" => trace_shape,
+               "trace" => bounded_trace(trace),
+               "budget_accounted" => true,
+               "call_semantics" => call_semantics(approach, context, measured, trace)
+             }}
+          end
+
+        {:ok, answer, shape, trace} ->
+          malformed_output(answer, shape, trace, measured, latency, approach, context)
+
+        {:error, reason} ->
+          trace = trace_from_reason(reason)
+
+          {:error,
            %{
-             "answer" => answer,
-             "latency_ms" => latency,
+             "reason" => safe_reason(reason),
              "usage" => measured,
-             "trace_shape" => trace_shape,
+             "latency_ms" => latency,
+             "trace_shape" => Enum.map(trace, &("rlm:" <> event_action(&1))),
              "trace" => bounded_trace(trace),
              "budget_accounted" => true,
              "call_semantics" => call_semantics(approach, context, measured, trace)
            }}
-
-        {:ok, answer, _shape, _trace} ->
-          {:error, {:malformed_output, answer}}
-
-        {:error, reason} ->
-          {:error,
-           %{
-             "reason" => inspect(reason),
-             "usage" => measured,
-             "budget_accounted" => true,
-             "call_semantics" => call_semantics(approach, context, measured, [])
-           }}
       end
     end
+
+    defp malformed_output(answer, shape, trace, usage, latency, approach, context) do
+      {:error,
+       %{
+         "reason" =>
+           "malformed output: expected a non-empty string answer, got #{malformed_type(answer)}",
+         "usage" => usage,
+         "latency_ms" => latency,
+         "trace_shape" => shape,
+         "trace" => bounded_trace(trace),
+         "budget_accounted" => true,
+         "call_semantics" => call_semantics(approach, context, usage, trace)
+       }}
+    end
+
+    defp malformed_type(value) when is_binary(value), do: "empty string"
+    defp malformed_type(value) when is_map(value), do: "map"
+    defp malformed_type(value) when is_list(value), do: "list"
+    defp malformed_type(value) when is_atom(value), do: "atom"
+    defp malformed_type(value) when is_number(value), do: "number"
+    defp malformed_type(_value), do: "term"
+
+    defp safe_reason(reason) do
+      reason
+      |> Imp.Redaction.redact()
+      |> inspect(limit: 50, printable_limit: 2_000)
+    end
+
+    defp trace_from_reason(reason) when is_tuple(reason) do
+      reason
+      |> Tuple.to_list()
+      |> Enum.reverse()
+      |> Enum.find_value([], fn item ->
+        case trace_from_reason(item) do
+          [] -> nil
+          trace -> trace
+        end
+      end)
+    end
+
+    defp trace_from_reason(trace) when is_list(trace) do
+      if Enum.all?(
+           trace,
+           &(is_map(&1) and (Map.has_key?(&1, :action) or Map.has_key?(&1, "action")))
+         ),
+         do: trace,
+         else: []
+    end
+
+    defp trace_from_reason(_reason), do: []
 
     defp run("direct", row, root, _sub, _context) do
       call_predict(root, row, full_context(row), ["predict:direct"])
@@ -359,7 +422,9 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
              choices: row["choices"] || []
            }) do
         {:ok, prediction} ->
-          trace = get_in(prediction.metadata, [:rlm_trace]) || []
+          trace =
+            (get_in(prediction.metadata, [:rlm_trace]) || []) ++
+              (get_in(prediction.metadata, [:rlm_child_traces]) || [])
 
           {:ok, to_string(Imp.get(prediction, :answer)),
            Enum.map(trace, &("rlm:" <> to_string(&1.action))), trace}
@@ -393,18 +458,21 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
 
     defp metered_lm(context, role, usage) do
       model = context["manifest"]["models"][role]
+      {model_spec, api_key_env} = imp_model_spec(model["imp"])
 
       api_key =
-        System.get_env("OPENAI_API_KEY") ||
-          raise "OPENAI_API_KEY is required for live RLM campaign execution"
+        System.get_env(api_key_env) ||
+          raise "#{api_key_env} is required for live RLM campaign execution"
 
-      inner =
-        Imp.req_llm(model["imp"],
+      opts =
+        [
           api_key: api_key,
           temperature: model["temperature"],
-          reasoning_effort: model["reasoning"],
           max_tokens: model["max_output_tokens"]
-        )
+        ]
+        |> maybe_put_reasoning_effort(model["reasoning"])
+
+      inner = Imp.req_llm(model_spec, opts)
 
       %MeteredLM{
         inner: inner,
@@ -415,6 +483,54 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
         pricing: get_in(context, ["approach", "settings", "reservation_pricing"])
       }
     end
+
+    defp imp_model_spec(spec) when is_binary(spec), do: {spec, legacy_api_key_env!(spec)}
+
+    defp imp_model_spec(spec) when is_map(spec) do
+      provider =
+        try do
+          String.to_existing_atom(spec["provider"])
+        rescue
+          ArgumentError ->
+            reraise RuntimeError,
+                    [message: "unknown ReqLLM provider in RLM manifest: #{spec["provider"]}"],
+                    __STACKTRACE__
+        end
+
+      model =
+        ReqLLM.model!(%{
+          provider: provider,
+          id: spec["id"],
+          base_url: spec["base_url"],
+          limits: %{context: spec["context_window"]}
+        })
+
+      {model, spec["api_key_env"]}
+    end
+
+    defp legacy_api_key_env!(spec) do
+      case String.split(spec, [":", "/"], parts: 2) do
+        ["openai", _model] ->
+          "OPENAI_API_KEY"
+
+        ["anthropic", _model] ->
+          "ANTHROPIC_API_KEY"
+
+        ["openrouter", _model] ->
+          "OPENROUTER_API_KEY"
+
+        [_model] ->
+          "OPENAI_API_KEY"
+
+        [provider, _model] ->
+          raise "RLM string model provider #{inspect(provider)} requires an explicit model spec with api_key_env"
+      end
+    end
+
+    defp maybe_put_reasoning_effort(opts, "none"), do: opts
+
+    defp maybe_put_reasoning_effort(opts, effort),
+      do: Keyword.put(opts, :reasoning_effort, String.to_existing_atom(effort))
 
     defp retrieve(row, k) do
       terms =
@@ -487,7 +603,7 @@ defmodule Imp.BenchmarkTruth.RLMRuntime do
         "sub_calls" => usage["sub_calls"],
         "max_llm_calls_scope" =>
           if(approach == "rlm",
-            do: "rlm_loop_provider_calls_excluding_extract",
+            do: "shared_root_sub_and_extract_calls",
             else: "not_applicable"
           ),
         "configured_max_depth" =>

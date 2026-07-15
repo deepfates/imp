@@ -4,7 +4,7 @@ defmodule Imp.Redaction do
 
   Imp keeps prompts, tool inputs, provider metadata, and optimizer reports
   inspectable, but credentials and credential-shaped strings must not leak into
-  those artifacts. `redact/2` walks ordinary Elixir maps, lists, and structs,
+  those artifacts. `redact/2` walks ordinary Elixir maps, lists, tuples, and structs,
   replacing known secret fields and secret-looking string values with
   `"[REDACTED]"`.
   """
@@ -81,6 +81,9 @@ defmodule Imp.Redaction do
       iex> Imp.Redaction.redact(%{tenant_id: "public"}, [:tenant_id])
       %{tenant_id: "[REDACTED]"}
 
+      iex> Imp.Redaction.redact({:error, "Bearer abcdefghijklmnop"})
+      {:error, "[REDACTED]"}
+
   """
   def redact(value, keys \\ @default_redact_keys)
 
@@ -101,6 +104,13 @@ defmodule Imp.Redaction do
   end
 
   def redact(value, keys) when is_list(value), do: Enum.map(value, &redact(&1, keys))
+
+  def redact(value, keys) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map(&redact(&1, keys))
+    |> List.to_tuple()
+  end
 
   def redact(value, _keys) when is_binary(value) do
     if secret_value?(value), do: "[REDACTED]", else: value

@@ -83,6 +83,96 @@ defmodule RLMPublicSurfaceTest do
              Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
   end
 
+  test "RLM rejects unterminated action fences and redacts invalid controller text" do
+    responses = [
+      "```json\n{\"reasoning\":\"x\",\"code\":\"1 + 1\"}",
+      "sk-secret-controller-value-123456789"
+    ]
+
+    Enum.each(responses, fn response ->
+      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> response end]}
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+
+      assert {:error, reason} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+      refute inspect(reason) =~ "sk-secret-controller-value"
+    end)
+  end
+
+  test "RLM accepts exactly the required outputs as a typed direct submission" do
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts -> %{"reasoning" => "finished", "answer" => "Paris"} end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert [%{action: :direct_submit}] = prediction.metadata.rlm_trace
+  end
+
+  test "RLM direct submission rejects fields outside reasoning and required outputs" do
+    output = %{"reasoning" => "finished", "answer" => "Paris", "untrusted" => true}
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> output end]}
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+
+    assert {:error, {:invalid_rlm_action, "expected a map with a binary code field", ^output}} =
+             Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+  end
+
+  test "RLM repairs empty typed direct submissions" do
+    Process.put(:direct_submit_repairs, [%{"answer" => ""}, %{"answer" => "repaired"}])
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [output | rest] = Process.get(:direct_submit_repairs)
+          Process.put(:direct_submit_repairs, rest)
+          output
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "repaired"
+
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) ==
+             [:direct_submit_error, :direct_submit]
+  after
+    Process.delete(:direct_submit_repairs)
+  end
+
+  test "RLM repairs empty interpreter submissions" do
+    actions = [
+      %{code: ~S|submit(%{answer: ""})|},
+      %{code: ~S|submit(%{answer: "repaired"})|}
+    ]
+
+    Process.put(:empty_submit_repairs, actions)
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:empty_submit_repairs)
+          Process.put(:empty_submit_repairs, rest)
+          action
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "repaired"
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:submit_error, :submit]
+  after
+    Process.delete(:empty_submit_repairs)
+  end
+
   test "RLM executes persistent Elixir code with programmatic sub-LM calls" do
     actions = [
       %{
@@ -316,6 +406,26 @@ submit(%{answer: child[:answer]})|
              Imp.Predict.RLM.call(rlm, %{question: "q"})
   after
     Process.delete(:rlm_prompt)
+  end
+
+  test "RLM rejects empty required outputs from extraction fallback" do
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          if Enum.any?(messages, &String.contains?(&1.content, "RLM extract pass")),
+            do: %{answer: "   "},
+            else: %{code: "1 + 1"}
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+    assert {:error, {:rlm_extract_failed, :empty_required_output, trace}} =
+             Imp.Predict.RLM.call(rlm, %{question: "q"})
+
+    assert Enum.map(trace, & &1.action) == [:run]
   end
 
   test "RLM treats zero budgets and preview limits conservatively" do
@@ -710,8 +820,42 @@ submit(%{answer: child[:answer]})|
 
     assert [%{action: :run, output: "%{answer: \"child answer\"}"}, %{action: :submit}] =
              prediction.metadata.rlm_trace
+
+    assert [%{action: :recurse, depth: 1, trace: child_trace}] =
+             prediction.metadata.rlm_child_traces
+
+    assert Enum.map(child_trace, & &1.action) == [:submit]
+    assert prediction.metadata.rlm.max_observed_depth == 1
   after
     Process.delete(:rlm_recurse_actions)
+  end
+
+  test "recursive children validate their required inputs" do
+    actions = [
+      %{code: ~S|recurse("question, context -> answer", %{question: "child"})|},
+      %{code: ~S|submit(%{answer: "repaired"})|}
+    ]
+
+    Process.put(:rlm_invalid_child_actions, actions)
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          [action | rest] = Process.get(:rlm_invalid_child_actions)
+          Process.put(:rlm_invalid_child_actions, rest)
+          action
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "parent"})
+    assert Imp.Prediction.get(prediction, :answer) == "repaired"
+    assert Enum.map(prediction.metadata.rlm_trace, & &1.action) == [:run_error, :submit]
+    assert inspect(hd(prediction.metadata.rlm_trace).output) =~ "missing_input_fields"
+  after
+    Process.delete(:rlm_invalid_child_actions)
   end
 
   test "RLM tool failures become repairable interpreter observations" do

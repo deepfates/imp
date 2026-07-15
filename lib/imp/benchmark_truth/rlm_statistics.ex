@@ -98,8 +98,8 @@ defmodule Imp.BenchmarkTruth.RLMStatistics do
   end
 
   defp paired(runtime, family, left_name, left_rows, right_name, right_rows, manifest) do
-    left = Map.new(left_rows, &{pair_key(&1), &1})
-    right = Map.new(right_rows, &{pair_key(&1), &1})
+    left = left_rows |> Enum.filter(&comparable?/1) |> Map.new(&{pair_key(&1), &1})
+    right = right_rows |> Enum.filter(&comparable?/1) |> Map.new(&{pair_key(&1), &1})
     keys = Map.keys(left) |> Enum.filter(&Map.has_key?(right, &1)) |> Enum.sort()
 
     row_diffs =
@@ -127,6 +127,8 @@ defmodule Imp.BenchmarkTruth.RLMStatistics do
       "confidence_interval" => %{"low" => low, "high" => high}
     }
   end
+
+  defp comparable?(row), do: row["status"] == "ok" and is_number(row["score"])
 
   defp bootstrap_ci([], _execution), do: {nil, nil}
 

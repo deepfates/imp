@@ -97,6 +97,7 @@ defmodule Imp.MixProject do
   defp deps do
     [
       {:jason, "~> 1.4"},
+      {:jaxon, "~> 2.0.8"},
       {:jsv, "~> 0.21"},
       {:nimble_options, "~> 1.1"},
       {:req, "~> 0.6"},

@@ -6,10 +6,129 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     RLMCampaign,
     RLMCheckpoint,
     RLMDataset,
+    RLMManifest,
     RLMProtocol,
     RLMRuntime,
     RLMStatistics
   }
+
+  test "manifest admits explicit current ReqLLM models without embedding credentials" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+
+    explicit = %{
+      "provider" => "openrouter",
+      "id" => "deepseek/deepseek-v4-flash-20260423",
+      "base_url" => "https://openrouter.ai/api/v1",
+      "api_key_env" => "OPENROUTER_API_KEY",
+      "context_window" => 1_048_576
+    }
+
+    manifest =
+      update_in(manifest, ["models"], fn models ->
+        Map.new(models, fn {role, model} -> {role, Map.put(model, "imp", explicit)} end)
+      end)
+
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+    loaded = RLMManifest.load!(fixture.manifest_path)
+
+    assert get_in(loaded, ["models", "root", "imp"]) == explicit
+    refute fixture.manifest_path |> File.read!() |> String.contains?("sk-or-")
+  end
+
+  test "explicit ReqLLM model credentials are environment references and fail closed" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+
+    invalid = %{
+      "provider" => "openrouter",
+      "id" => "deepseek/deepseek-v4-flash-20260423",
+      "base_url" => "https://openrouter.ai/api/v1",
+      "api_key_env" => "sk-or-secret",
+      "context_window" => 1_048_576
+    }
+
+    manifest = put_in(manifest, ["models", "root", "imp"], invalid)
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+
+    assert_raise ArgumentError,
+                 ~r/api_key_env must be an uppercase environment variable name/,
+                 fn ->
+                   RLMManifest.load!(fixture.manifest_path)
+                 end
+  end
+
+  test "standard provider credentials cannot be redirected to another endpoint" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+
+    redirected = %{
+      "provider" => "openrouter",
+      "id" => "google/gemini-3.5-flash",
+      "base_url" => "https://credential-collector.example/v1",
+      "api_key_env" => "OPENROUTER_API_KEY",
+      "context_window" => 1_048_576
+    }
+
+    manifest = put_in(manifest, ["models", "root", "imp"], redirected)
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+
+    assert_raise ArgumentError, ~r/must use the canonical openrouter endpoint/, fn ->
+      RLMManifest.load!(fixture.manifest_path)
+    end
+  end
+
+  test "nonstandard providers require a dedicated campaign credential" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+    model = get_in(manifest, ["models", "root", "imp"])
+    unsafe = %{model | "api_key_env" => "HOME"}
+    manifest = put_in(manifest, ["models", "root", "imp"], unsafe)
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+
+    assert_raise ArgumentError, ~r/must use a dedicated IMP_RLM_ credential/, fn ->
+      RLMManifest.load!(fixture.manifest_path)
+    end
+  end
+
+  test "explicit model capacity covers the declared dataset context grid" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+    manifest = put_in(manifest, ["models", "root", "imp", "context_window"], 1024)
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+
+    assert_raise ArgumentError, ~r/context_window must cover.*1048576/, fn ->
+      RLMManifest.load!(fixture.manifest_path)
+    end
+  end
+
+  test "nonstandard string providers require an explicit credential-bearing model spec" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+    manifest = put_in(manifest, ["models", "root", "imp"], "custom:model")
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+
+    assert_raise ArgumentError, ~r/use an explicit model object with api_key_env/, fn ->
+      RLMManifest.load!(fixture.manifest_path)
+    end
+  end
+
+  test "OOLONG-Pairs row limits are pushed into JSONL decoding" do
+    fixture = fixture!()
+    manifest = fixture.manifest_path |> File.read!() |> Jason.decode!()
+    path = manifest["datasets"]["oolong_pairs"]["path"]
+    lines = path |> File.read!() |> String.split("\n", trim: true)
+    File.write!(path, Enum.join(List.replace_at(lines, 2, "not-json"), "\n") <> "\n")
+
+    manifest = put_in(manifest, ["datasets", "oolong_pairs", "sha256"], sha(path))
+    File.write!(fixture.manifest_path, Jason.encode!(manifest, pretty: true))
+    loaded = RLMManifest.load!(fixture.manifest_path)
+
+    assert %{"oolong_pairs" => %{"rows" => [row]}} =
+             RLMDataset.load_all!(loaded, row_limit: 1)
+
+    assert row["id"] == "oolong_pairs-1@1024"
+  end
 
   defmodule UsageFixture do
     @rates %{"input_per_million" => 1.0, "output_per_million" => 1.0}
@@ -235,6 +354,20 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
              "imp:rlm:oolong:oolong-1",
              "imp:rlm:s_niah:s_niah-1"
            ]
+  end
+
+  test "an adapted manifest defaults to its declared families" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    manifest = put_in(manifest["datasets"], Map.take(manifest["datasets"], ["oolong_pairs"]))
+    path = Path.join(Path.dirname(fixture.manifest_path), "adapted-manifest.json")
+    File.write!(path, Jason.encode!(manifest))
+
+    plan = RLMCampaign.plan(path, approaches: ["direct"], row_limit: 1)
+
+    assert plan["selection"]["families"] == ["oolong_pairs"]
+    assert plan["families"] == %{"oolong_pairs" => 1}
+    assert plan["job_count"] == 1
   end
 
   test "invalid campaign filters fail before dispatch" do
@@ -562,6 +695,29 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     assert {:ok, ^action} = RLMRuntime.ControllerLM.generate(lm, [], [])
   end
 
+  test "RLM controller adapter accepts a single JSON markdown fence" do
+    action = %{"reasoning" => "inspect", "code" => "submit(%{answer: \"yes\"})"}
+    encoded = "```json\n#{Jason.encode!(action)}\n```"
+    lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
+
+    assert {:ok, ^action} = RLMRuntime.ControllerLM.generate(lm, [], [])
+  end
+
+  test "RLM controller adapter accepts one exact constrained-Elixir fence" do
+    encoded = "```elixir\ncontext = load(\"context\")\nprint(context)\n```"
+    lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
+
+    assert {:ok, %{"reasoning" => "", "code" => code}} =
+             RLMRuntime.ControllerLM.generate(lm, [], [])
+
+    assert code == "context = load(\"context\")\nprint(context)"
+  end
+
+  test "RLM action decoder rejects prose around fenced code" do
+    assert {:error, :invalid_rlm_action_serialization} =
+             Imp.Predict.RLM.Action.decode("try this:\n```elixir\nprint(1)\n```")
+  end
+
   test "checkpoint payload tamper is rejected" do
     root = tmp_dir("checkpoint")
     path = Path.join(root, "checkpoint.json")
@@ -727,6 +883,48 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   test "OOLONG-Pairs uses canonical pair-set F1 rather than token overlap" do
     assert RLMCampaign.score("(b, a)\n(c, d)\n(a, b)", "(a, b)\n(c, x)", "set_f1") == 0.5
     assert RLMCampaign.score("no pairs", "no pairs", "set_f1") == 1.0
+
+    assert RLMCampaign.score(
+             "Reasoning, with ordinary prose.\n\n(No pairs found)",
+             "",
+             "set_f1"
+           ) == 0.0
+
+    assert RLMCampaign.score("Reasoning, with ordinary prose.", "", "set_f1") == 0.0
+    assert RLMCampaign.score("explanation\n(a, b)", "(a, b)", "set_f1") == 0.0
+  end
+
+  test "failed rows are excluded from paired bootstrap comparisons" do
+    rows =
+      Enum.map([{"direct", "ok", 1.0}, {"rlm", "error", 0.0}], fn
+        {approach, status, score} ->
+          %{
+            "runtime" => "imp",
+            "approach" => approach,
+            "family" => "oolong_pairs",
+            "example_id" => "q1@1024",
+            "query_id" => "q1",
+            "context_size" => 1024,
+            "metric" => "set_f1",
+            "status" => status,
+            "score" => score,
+            "latency_ms" => 1.0,
+            "usage" => %{
+              "requests" => 1,
+              "input_tokens" => 1,
+              "output_tokens" => 1,
+              "usd" => 0.1
+            }
+          }
+      end)
+
+    manifest = %{"execution" => %{"bootstrap_samples" => 20, "confidence" => 0.95, "seed" => 17}}
+    [comparison] = RLMStatistics.aggregate(rows, manifest)["comparisons"]
+
+    assert comparison["paired_rows"] == 0
+    assert comparison["bootstrap_clusters"] == 0
+    assert comparison["mean_score_difference"] == nil
+    assert comparison["confidence_interval"] == %{"low" => nil, "high" => nil}
   end
 
   test "OOLONG-Pairs expands the frozen query into all 11 sizes with size-specific gold" do
@@ -804,6 +1002,35 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
     assert plan["provider_calls"] == 0
     assert plan["families"] == %{"oolong_pairs" => 1}
     assert Enum.all?(plan["jobs"], &(&1["context_size"] == 1024))
+  end
+
+  test "bounded OOLONG-Pairs loading validates row identity rather than manifest position" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    spec = manifest["datasets"]["oolong_pairs"]
+    mismatched = Map.put(spec, "sample_ids", ["wrong-id"])
+
+    assert_raise ArgumentError, ~r/expected id .* got/, fn ->
+      RLMDataset.load!(
+        "oolong_pairs",
+        mismatched,
+        Path.dirname(fixture.manifest_path),
+        row_limit: 1
+      )
+    end
+  end
+
+  test "direct dataset loading rejects non-positive row limits" do
+    fixture = fixture!()
+    manifest = Jason.decode!(File.read!(fixture.manifest_path))
+    spec = manifest["datasets"]["oolong_pairs"]
+    root = Path.dirname(fixture.manifest_path)
+
+    for row_limit <- [0, -1] do
+      assert_raise ArgumentError, ~r/row limit must be a positive integer/, fn ->
+        RLMDataset.load!("oolong_pairs", spec, root, row_limit: row_limit)
+      end
+    end
   end
 
   test "plan metadata stays bounded and never hydrates context or gold bodies" do
@@ -1092,7 +1319,13 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     model = %{
       "logical" => "test",
-      "imp" => "test:test",
+      "imp" => %{
+        "provider" => "test",
+        "id" => "test",
+        "base_url" => "https://example.test/v1",
+        "api_key_env" => "IMP_RLM_TEST_API_KEY",
+        "context_window" => 2_000_000
+      },
       "dspy" => "test/test",
       "temperature" => 0.0,
       "reasoning" => "none",

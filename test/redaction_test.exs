@@ -44,5 +44,8 @@ defmodule Imp.RedactionTest do
              label: "keep",
              nested: %{token: "[REDACTED]"}
            }
+
+    assert Imp.Redaction.redact({:error, {:provider, "Bearer abcdefghijklmnop"}}) ==
+             {:error, {:provider, "[REDACTED]"}}
   end
 end

@@ -17,9 +17,10 @@ import dspy
 
 
 class CampaignError(RuntimeError):
-    def __init__(self, message: str, usage: dict[str, Any] | None = None):
+    def __init__(self, message: str, usage: dict[str, Any] | None = None, trace: list[Any] | None = None):
         super().__init__(message)
         self.usage = usage
+        self.trace = trace or []
 
 
 class BudgetLM(dspy.BaseLM):
@@ -309,11 +310,18 @@ def lexical_retrieval(row: dict[str, Any], k: int) -> str:
     return "\n\n".join(docs[:k])
 
 
-def prediction_answer(prediction: Any) -> str:
+def prediction_answer(prediction: Any, usage: dict[str, Any], trace: list[Any] | None = None) -> str:
     answer = getattr(prediction, "answer", None)
     if not isinstance(answer, str) or not answer.strip():
-        raise CampaignError(f"malformed DSPy output: {answer!r}")
+        raise CampaignError("malformed DSPy output: expected a non-empty string answer", usage, trace)
     return answer
+
+
+def redact_error(value: Any) -> str:
+    text = str(value)
+    text = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}\b", "[REDACTED]", text)
+    text = re.sub(r"\bBearer\s+[A-Za-z0-9._-]{8,}\b", "Bearer [REDACTED]", text, flags=re.I)
+    return text[:2_000]
 
 
 def bounded_trace(events: list[Any]) -> list[dict[str, Any]]:
@@ -332,15 +340,16 @@ def provider_constructor_max_tokens(model: str, configured_max_tokens: int) -> i
 
 def build_dspy_lm(config: dict[str, Any]) -> Any:
     configured_max_tokens = int(config["max_output_tokens"])
-    return dspy.LM(
-        config["dspy"],
-        temperature=config["temperature"],
-        reasoning_effort=config["reasoning"],
-        max_tokens=provider_constructor_max_tokens(
+    kwargs = {
+        "temperature": config["temperature"],
+        "max_tokens": provider_constructor_max_tokens(
             config["dspy"], configured_max_tokens
         ),
-        cache=False,
-    )
+        "cache": False,
+    }
+    if config["reasoning"] != "none":
+        kwargs["reasoning_effort"] = config["reasoning"]
+    return dspy.LM(config["dspy"], **kwargs)
 
 
 def execute(payload: dict[str, Any]) -> dict[str, Any]:
@@ -373,11 +382,11 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
 
     if approach == "direct":
         pred = dspy.Predict("context, question, choices -> answer")(context=context_text(row), question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred), ["predict:direct"], []
+        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["predict:direct"], []
     elif approach == "simple_retrieval":
         selected = lexical_retrieval(row, int(settings.get("k", 8)))
         pred = dspy.Predict("context, question, choices -> answer")(context=selected, question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred), ["retrieve:lexical", "predict"], []
+        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["retrieve:lexical", "predict"], []
     elif approach == "compaction":
         text = context_text(row)
         size = int(settings.get("chunk_chars", 100_000))
@@ -387,13 +396,17 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
             with dspy.context(lm=sub):
                 summaries.append(str(dspy.Predict("context -> summary")(context=chunk).summary))
         pred = dspy.Predict("context, question, choices -> answer")(context="\n\n".join(summaries), question=row["question"], choices=row.get("choices", []))
-        answer, shape, trace = prediction_answer(pred), ["summarize"] * len(chunks) + ["predict"], []
+        answer, shape, trace = prediction_answer(pred, auditable_usage(ledger)), ["summarize"] * len(chunks) + ["predict"], []
     elif approach == "rlm":
-        program = dspy.RLM("context, question, choices -> answer", sub_lm=sub, max_iterations=int(settings.get("max_iterations", 20)), max_llm_calls=int(settings.get("max_llm_calls", 50)))
+        recursion_depth = int(settings.get("recursion_depth", 1))
+        if recursion_depth not in (0, 1):
+            raise CampaignError("DSPy RLM comparison supports recursion_depth 0 or 1 only")
+        max_llm_calls = 0 if recursion_depth == 0 else int(settings.get("max_llm_calls", 50))
+        program = dspy.RLM("context, question, choices -> answer", sub_lm=sub, max_iterations=int(settings.get("max_iterations", 20)), max_llm_calls=max_llm_calls)
         pred = program(context=context_text(row), question=row["question"], choices=row.get("choices", []))
         raw_trace = list(getattr(pred, "trajectory", []) or [])
         trace = bounded_trace(raw_trace)
-        answer, shape = prediction_answer(pred), ["rlm:repl"] * max(1, len(raw_trace))
+        answer, shape = prediction_answer(pred, auditable_usage(ledger), trace), ["rlm:repl"] * max(1, len(raw_trace))
     else:
         raise CampaignError(f"unknown approach: {approach}")
 
@@ -409,7 +422,7 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
             "sub_calls": ledger["sub_calls"],
             "max_llm_calls_scope": "subcalls_only" if approach == "rlm" else "not_applicable",
             "configured_max_depth": int(settings.get("recursion_depth", 0)) if approach == "rlm" else 0,
-            "max_observed_depth": 1 if ledger["sub_calls"] > 0 else 0,
+            "max_observed_depth": 0,
         },
     }
 
@@ -422,6 +435,7 @@ def main() -> int:
     payload = json.loads(Path(args.request).read_text(encoding="utf-8"))
     if getattr(dspy, "__version__", None) != "3.3.0b1":
         raise CampaignError(f"DSPy 3.3.0b1 required, got {getattr(dspy, '__version__', None)!r}")
+    started = time.perf_counter()
     try:
         result = execute(payload)
     except CampaignError as error:
@@ -430,15 +444,18 @@ def main() -> int:
         settings = payload.get("manifest", {}).get("approaches", {}).get(approach, {}).get("settings", {})
         result = {
             "status": "error",
-            "error": str(error),
+            "error": redact_error(error),
+            "latency_ms": (time.perf_counter() - started) * 1000.0,
             "usage": usage,
+            "trace_shape": ["rlm:repl"] * len(error.trace),
+            "trace": error.trace,
             "call_semantics": {
                 "provider_calls": usage.get("requests", 0),
                 "root_calls": usage.get("root_calls", 0),
                 "sub_calls": usage.get("sub_calls", 0),
                 "max_llm_calls_scope": "subcalls_only" if approach == "rlm" else "not_applicable",
                 "configured_max_depth": int(settings.get("recursion_depth", 0)) if approach == "rlm" else 0,
-                "max_observed_depth": 1 if usage.get("sub_calls", 0) > 0 else 0,
+                "max_observed_depth": 0,
             },
         }
     Path(args.response).write_text(json.dumps(result, sort_keys=True) + "\n", encoding="utf-8")

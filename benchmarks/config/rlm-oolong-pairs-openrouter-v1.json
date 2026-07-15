@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "campaign_id": "de-m7aa-oolong-pairs-openrouter-gemini-3-5-flash-v1",
+  "evidence_tier": "t2_live_sample",
+  "authorities": {
+    "paper": {"arxiv": "2512.24601v3"},
+    "rlm": {
+      "repository": "https://github.com/alexzhang13/rlm",
+      "commit": "72d6940142ddfb84ee6be573dc999a37e633e671"
+    },
+    "dspy": {
+      "repository": "https://github.com/stanfordnlp/dspy",
+      "version": "3.3.0b1",
+      "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+    },
+    "sources": {
+      "paper_text": {
+        "path": "tmp/pdfs/rlm-2512.24601v3.txt",
+        "sha256": "4d3881423d60e0c0abdc77b5e08bd9e3d5835af49beb3833c000182ebdec4480"
+      },
+      "rlm_core": {
+        "path": "tmp/rlm-upstream/rlm/core/rlm.py",
+        "sha256": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562"
+      },
+      "rlm_prompts": {
+        "path": "tmp/rlm-upstream/rlm/utils/prompts.py",
+        "sha256": "579c8ef220739f691d3896257b8289eec7e7b634fe473f41dea4adb83560b47e"
+      },
+      "dspy_rlm": {
+        "path": "tmp/dspy-current-target/dspy/predict/rlm.py",
+        "sha256": "ab9c28702bd02b2b88e324e36e6bcaadbaadae5b6e374fa7b3d3643706427ce8"
+      },
+      "dspy_interpreter": {
+        "path": "tmp/dspy-current-target/dspy/primitives/python_interpreter.py",
+        "sha256": "fef9baa19cd979e8466ef19e364e5f7e67848c9738955a2d3e1f0d7dae2177d4"
+      }
+    }
+  },
+  "models": {
+    "root": {
+      "logical": "gemini-3.5-flash-20260519-via-openrouter",
+      "imp": {
+        "provider": "openrouter",
+        "id": "google/gemini-3.5-flash-20260519",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "context_window": 1048576
+      },
+      "dspy": "openrouter/google/gemini-3.5-flash-20260519",
+      "temperature": 0.0,
+      "reasoning": "none",
+      "max_output_tokens": 8192
+    },
+    "submodel": {
+      "logical": "gemini-3.5-flash-20260519-via-openrouter",
+      "imp": {
+        "provider": "openrouter",
+        "id": "google/gemini-3.5-flash-20260519",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "context_window": 1048576
+      },
+      "dspy": "openrouter/google/gemini-3.5-flash-20260519",
+      "temperature": 0.0,
+      "reasoning": "none",
+      "max_output_tokens": 8192
+    },
+    "compaction": {
+      "logical": "gemini-3.5-flash-20260519-via-openrouter",
+      "imp": {
+        "provider": "openrouter",
+        "id": "google/gemini-3.5-flash-20260519",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "context_window": 1048576
+      },
+      "dspy": "openrouter/google/gemini-3.5-flash-20260519",
+      "temperature": 0.0,
+      "reasoning": "none",
+      "max_output_tokens": 8192
+    }
+  },
+  "approaches": {
+    "direct": {
+      "enabled": true,
+      "runtimes": ["imp", "dspy"],
+      "budget": {"requests": 64, "input_tokens": 20000000, "output_tokens": 200000, "usd": 2.0},
+      "settings": {"reservation_pricing": {"input_per_million": 1.5, "output_per_million": 9.0}}
+    },
+    "simple_retrieval": {
+      "enabled": true,
+      "runtimes": ["imp", "dspy"],
+      "budget": {"requests": 64, "input_tokens": 20000000, "output_tokens": 200000, "usd": 2.0},
+      "settings": {
+        "k": 8,
+        "retriever": "deterministic_lexical",
+        "reservation_pricing": {"input_per_million": 1.5, "output_per_million": 9.0}
+      }
+    },
+    "compaction": {
+      "enabled": true,
+      "runtimes": ["imp", "dspy"],
+      "budget": {"requests": 64, "input_tokens": 20000000, "output_tokens": 200000, "usd": 2.0},
+      "settings": {
+        "chunk_chars": 100000,
+        "max_chunks": 32,
+        "reservation_pricing": {"input_per_million": 1.5, "output_per_million": 9.0}
+      }
+    },
+    "rlm": {
+      "enabled": true,
+      "runtimes": ["imp", "dspy"],
+      "budget": {"requests": 64, "input_tokens": 20000000, "output_tokens": 200000, "usd": 2.0},
+      "settings": {
+        "max_iterations": 8,
+        "max_llm_calls": 8,
+        "recursion_depth": 1,
+        "reservation_pricing": {"input_per_million": 1.5, "output_per_million": 9.0}
+      }
+    }
+  },
+  "execution": {
+    "seed": 251224601,
+    "concurrency": 1,
+    "row_timeout_ms": 600000,
+    "cancellation_grace_ms": 5000,
+    "bootstrap_samples": 10000,
+    "confidence": 0.95
+  },
+  "datasets": {
+    "oolong_pairs": {
+      "path": "../data/rlm/oolong_pairs_trec_coarse.jsonl",
+      "sha256": "11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc",
+      "source": "https://huggingface.co/datasets/mit-oasys/oolong-pairs + oolongbench/oolong-synth",
+      "revision": "pairs@d1e1522b86ac0c169bbc890b0471408aaa29e8fa; contexts@49898a421f4b14f2c9cae084d2d270f930ff4c90",
+      "split": "trec_coarse",
+      "sample_count": 20,
+      "sample_seed": 251224601,
+      "sample_ids": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+      "context_grid": [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576],
+      "docs_per_instance": null,
+      "metric": "set_f1"
+    }
+  },
+  "deviations": [
+    {
+      "id": "imp_repl_language",
+      "scope": "imp:rlm",
+      "paper_behavior": "Python REPL over external context variables",
+      "implementation": "BEAM-native constrained Elixir-shaped interpreter with equivalent persistent variable and sub-LM effects",
+      "impact": "Trajectory syntax is not byte-for-byte comparable; answer, budget, and effect shape remain comparable."
+    },
+    {
+      "id": "adapted_public_oolong_pairs",
+      "scope": "dataset",
+      "paper_behavior": "Paper-selected OOLONG-Pairs examples and unpublished scorer",
+      "implementation": "Pinned public 20-query, 11-context-size reconstruction with normalized unordered pair-set F1",
+      "impact": "This campaign is adapted T2 evidence and cannot satisfy the exact paper T3 gate."
+    },
+    {
+      "id": "current_economical_pilot_model",
+      "scope": "models",
+      "paper_behavior": "Paper model matrix including GPT-5, Qwen3-Coder, and Claude Code",
+      "implementation": "Dated Gemini 3.5 Flash through OpenRouter for a matched current flash-class systems and behavior pilot",
+      "impact": "Validates current-provider execution and matched runtime behavior, not paper model parity."
+    },
+    {
+      "id": "dspy_rlm_release_semantics",
+      "scope": "dspy:rlm",
+      "paper_behavior": "alexzhang13/rlm reference runtime",
+      "implementation": "DSPy 3.3.0b1 dspy.RLM with pinned source files",
+      "impact": "Cross-runtime answer and effect evidence is supported; prompts and interpreter trajectories are not identical."
+    }
+  ]
+}

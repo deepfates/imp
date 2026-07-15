@@ -243,15 +243,24 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
   defp observed_usd(value) when is_number(value) and value >= 0, do: value
   defp observed_usd(_value), do: 0.0
 
-  defp charged_error(reason, usage, source),
-    do:
-      {:error,
-       %{
-         "reason" => inspect(reason),
-         "usage" => usage,
-         "call_semantics" => source["call_semantics"] || empty_call_semantics(),
-         "budget_accounted" => true
-       }}
+  defp charged_error(reason, usage, source) do
+    runtime_reason = source["error"] || source["reason"]
+
+    evidence =
+      source
+      |> Map.take(~w(latency_ms trace_shape trace))
+      |> Map.merge(%{
+        "reason" =>
+          %{accounting: reason, runtime: runtime_reason}
+          |> Imp.Redaction.redact()
+          |> inspect(),
+        "usage" => usage,
+        "call_semantics" => source["call_semantics"] || empty_call_semantics(),
+        "budget_accounted" => true
+      })
+
+    {:error, evidence}
+  end
 
   defp reserve_requests(_budget, 0, reservations), do: {:ok, reservations}
 
@@ -330,14 +339,14 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       "status" => "error",
       "answer" => nil,
       "score" => 0.0,
-      "latency_ms" => 0.0,
+      "latency_ms" => error["latency_ms"] || 0.0,
       "usage" => normalize_row_usage(usage),
       "query_id" => job.row["query_id"] || job.row["id"],
       "context_size" => job.row["context_size"],
       "metric" => job.metric,
       "scorer_evidence" => error["scorer_evidence"],
-      "trace_shape" => ["error"],
-      "trace" => [],
+      "trace_shape" => error["trace_shape"] || ["error"],
+      "trace" => error["trace"] || [],
       "call_semantics" => error["call_semantics"] || empty_call_semantics(),
       "provenance" => provenance(job),
       "error" => to_string(reason)
@@ -547,6 +556,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       "requested_evidence_tier" => manifest["evidence_tier"],
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
+      "tracked_worktree_dirty" => tracked_worktree_dirty?(),
       "manifest" => Map.drop(manifest, ["manifest_path"]),
       "datasets" => dataset_evidence,
       "execution" => %{
@@ -622,7 +632,12 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
   defp selection!(manifest, opts) do
     runtime = Keyword.get(opts, :runtime, "imp")
     runtimes = selected_runtimes!(runtime)
-    families = selected_ids!(Keyword.get(opts, :families, []), RLMManifest.family_ids(), "family")
+
+    available_families =
+      RLMManifest.family_ids()
+      |> Enum.filter(&Map.has_key?(manifest["datasets"], &1))
+
+    families = selected_ids!(Keyword.get(opts, :families, []), available_families, "family")
 
     approaches =
       selected_ids!(Keyword.get(opts, :approaches, []), RLMManifest.approach_ids(), "approach")
@@ -687,7 +702,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
       put_in(manifest["datasets"], Map.take(manifest["datasets"], selection["families"]))
 
     selected_manifest
-    |> RLMDataset.load_all!()
+    |> RLMDataset.load_all!(row_limit: selection["row_limit_per_family"])
     |> Map.new(fn {family, data} ->
       {family, limit_dataset(data, selection["row_limit_per_family"])}
     end)
@@ -789,27 +804,68 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
   end
 
   defp pair_set_f1(answer, gold) do
-    predicted = pair_set(answer)
-    expected = pair_set(gold)
+    with {:ok, predicted} <- pair_set(answer),
+         {:ok, expected} <- pair_set(gold) do
+      cond do
+        MapSet.size(predicted) == 0 and MapSet.size(expected) == 0 ->
+          1.0
 
-    cond do
-      MapSet.size(predicted) == 0 and MapSet.size(expected) == 0 ->
-        1.0
+        MapSet.size(predicted) == 0 or MapSet.size(expected) == 0 ->
+          0.0
 
-      MapSet.size(predicted) == 0 or MapSet.size(expected) == 0 ->
-        0.0
-
-      true ->
-        common = predicted |> MapSet.intersection(expected) |> MapSet.size()
-        2 * common / (MapSet.size(predicted) + MapSet.size(expected))
+        true ->
+          common = predicted |> MapSet.intersection(expected) |> MapSet.size()
+          2 * common / (MapSet.size(predicted) + MapSet.size(expected))
+      end
+    else
+      :error -> 0.0
     end
   end
 
   defp pair_set(value) do
-    ~r/\(?\s*([A-Za-z0-9_.:-]+)\s*[,|]\s*([A-Za-z0-9_.:-]+)\s*\)?/
-    |> Regex.scan(to_string(value), capture: :all_but_first)
-    |> Enum.map(fn [left, right] -> if(left <= right, do: {left, right}, else: {right, left}) end)
-    |> MapSet.new()
+    lines = value |> to_string() |> String.split("\n") |> Enum.map(&String.trim/1)
+
+    parsed = Enum.map(lines, &parse_pair_line/1)
+    pairs = for {:pair, pair} <- parsed, do: pair
+
+    cond do
+      Enum.any?(parsed, &(&1 == :invalid)) ->
+        :error
+
+      pairs != [] and Enum.all?(parsed, &(match?({:pair, _}, &1) or &1 == :blank)) ->
+        {:ok, MapSet.new(pairs)}
+
+      pairs == [] and Enum.all?(parsed, &(&1 in [:blank, :empty])) ->
+        {:ok, MapSet.new()}
+
+      true ->
+        :error
+    end
+  end
+
+  defp parse_pair_line(""), do: :blank
+
+  defp parse_pair_line(line) do
+    case Regex.run(
+           ~r/^\(\s*([A-Za-z0-9_.:-]+)\s*,\s*([A-Za-z0-9_.:-]+)\s*\)$/,
+           line,
+           capture: :all_but_first
+         ) do
+      [left, right] ->
+        {:pair, if(left <= right, do: {left, right}, else: {right, left})}
+
+      nil ->
+        if empty_pair_marker?(line), do: :empty, else: :invalid
+    end
+  end
+
+  defp empty_pair_marker?(line) do
+    line
+    |> String.downcase()
+    |> String.replace(~r/^[^a-z0-9]+|[^a-z0-9]+$/, "")
+    |> then(
+      &(&1 in ["none", "no pairs", "no pairs found", "no such pairs", "no such pairs exist"])
+    )
   end
 
   defp token_f1(answer, gold) do
@@ -935,6 +991,14 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     case System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true) do
       {sha, 0} -> String.trim(sha)
       _ -> nil
+    end
+  end
+
+  defp tracked_worktree_dirty? do
+    case System.cmd("git", ["diff", "--quiet", "HEAD", "--"], stderr_to_stdout: true) do
+      {_output, 0} -> false
+      {_output, 1} -> true
+      _other -> nil
     end
   end
 end

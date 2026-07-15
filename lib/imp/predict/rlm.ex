@@ -25,7 +25,7 @@ defmodule Imp.Predict.RLM do
 
   @behaviour Imp.Module
 
-  alias Imp.Predict.RLM.{Budget, Interpreter, Runtime, Trace}
+  alias Imp.Predict.RLM.{Action, Budget, Interpreter, Runtime, Trace}
   alias Imp.Predict.RLM.Interpreter.Effect
 
   @task_process_keys [
@@ -226,8 +226,7 @@ defmodule Imp.Predict.RLM do
   defp run_loop(%__MODULE__{} = rlm, state, iteration) do
     with :ok <- check_time_budget(rlm, state),
          {:ok, raw_action} <- controller_action(rlm, state, iteration),
-         {:ok, action} <- normalize_action(raw_action),
-         {:cont, state} <- step(rlm, action, state, iteration) do
+         {:cont, state} <- consume_controller_output(rlm, raw_action, state, iteration) do
       run_loop(rlm, state, iteration + 1)
     else
       {:done, prediction, state} ->
@@ -239,6 +238,90 @@ defmodule Imp.Predict.RLM do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp consume_controller_output(rlm, raw, state, iteration) do
+    case normalize_action(raw) do
+      {:ok, action} -> step(rlm, action, state, iteration)
+      {:error, reason} -> maybe_direct_submit(rlm, raw, state, iteration, reason)
+    end
+  end
+
+  defp maybe_direct_submit(rlm, raw, state, iteration, original_error) do
+    output = unwrap_lm_output(raw)
+
+    if is_map(output) do
+      output = stringify_action_keys(output)
+      required = Enum.map(Imp.Signature.output_names(rlm.signature), &to_string/1)
+      keys = Map.keys(output)
+
+      if Enum.sort(keys) == Enum.sort(required) or
+           Enum.sort(keys) == Enum.sort(["reasoning" | required]) do
+        fields = Map.take(output, required)
+
+        case resolve_adapter(rlm).parse(rlm.signature, fields, []) do
+          {:ok, prediction} ->
+            if required_outputs_present?(rlm.signature, prediction) do
+              state =
+                trace(
+                  state,
+                  iteration,
+                  :direct_submit,
+                  %{reasoning: Map.get(output, "reasoning", "")},
+                  fields
+                )
+
+              {:done, prediction, state}
+            else
+              direct_submit_error(rlm, output, fields, state, iteration, :empty_required_output)
+            end
+
+          {:error, reason} ->
+            direct_submit_error(rlm, output, fields, state, iteration, reason)
+        end
+      else
+        {:error, original_error}
+      end
+    else
+      {:error, original_error}
+    end
+  end
+
+  defp unwrap_lm_output(%{__imp_lm_output__: _output} = result) do
+    case Imp.LM.Result.output(result) do
+      {:ok, output} -> output
+      {:error, _reason} -> result
+    end
+  end
+
+  defp unwrap_lm_output(%{"__imp_lm_output__" => _output} = result) do
+    case Imp.LM.Result.output(result) do
+      {:ok, output} -> output
+      {:error, _reason} -> result
+    end
+  end
+
+  defp unwrap_lm_output(output), do: output
+
+  defp direct_submit_error(rlm, output, fields, state, iteration, reason) do
+    observation = {:submit_error, reason}
+
+    state =
+      state
+      |> add_observation(%{
+        reasoning: Map.get(output, "reasoning", ""),
+        output: observation
+      })
+      |> trace(
+        iteration,
+        :direct_submit_error,
+        %{reasoning: Map.get(output, "reasoning", "")},
+        fields
+      )
+
+    if iteration >= rlm.max_iterations,
+      do: {:error, {:rlm_invalid_final_output, reason, Enum.reverse(state.trace)}},
+      else: {:cont, state}
   end
 
   defp controller_action(%__MODULE__{} = rlm, state, iteration) do
@@ -253,7 +336,7 @@ defmodule Imp.Predict.RLM do
       %{
         role: :system,
         content:
-          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly and return JSON with reasoning and code. Code may inspect and assign variables, use for comprehensions, call llm_query(prompt), llm_query_batched(prompts), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). State persists across turns. Explore and compute in code; submit only when every required signature output is ready."
+          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call llm_query(prompt), llm_query_batched(prompts), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). Do not call modules such as IO. State persists across turns. Explore and compute in code; when every required output is ready, return code that calls submit/1 with non-empty values. A JSON object containing exactly the required output fields is also accepted as a typed final submission."
       },
       %{
         role: :user,
@@ -297,7 +380,8 @@ defmodule Imp.Predict.RLM do
     do:
       {:error,
        {:invalid_rlm_action,
-        "legacy discrete submit maps are unsupported; call submit/1 from code", action}}
+        "legacy discrete submit maps are unsupported; call submit/1 from code",
+        safe_error_detail(action)}}
 
   defp normalize_action(%{"code" => code} = action)
        when is_binary(code) and not is_map_key(action, "action") do
@@ -314,9 +398,9 @@ defmodule Imp.Predict.RLM do
        do: action |> stringify_action_keys() |> normalize_action()
 
   defp normalize_action(text) when is_binary(text) do
-    case Jason.decode(text) do
-      {:ok, action} when is_map(action) -> normalize_action(action)
-      _ -> {:error, {:invalid_rlm_action, text}}
+    case Action.decode(text) do
+      {:ok, action} -> normalize_action(action)
+      {:error, _reason} -> {:error, {:invalid_rlm_action, safe_error_detail(text)}}
     end
   end
 
@@ -325,16 +409,29 @@ defmodule Imp.Predict.RLM do
       {:error,
        {:invalid_rlm_action,
         "legacy discrete action maps are unsupported; return a map with reasoning and code",
-        action}}
+        safe_error_detail(action)}}
 
   defp normalize_action(%{"submit" => _} = action),
     do:
       {:error,
        {:invalid_rlm_action,
-        "legacy discrete submit maps are unsupported; call submit/1 from code", action}}
+        "legacy discrete submit maps are unsupported; call submit/1 from code",
+        safe_error_detail(action)}}
 
   defp normalize_action(other),
-    do: {:error, {:invalid_rlm_action, "expected a map with a binary code field", other}}
+    do:
+      {:error,
+       {:invalid_rlm_action, "expected a map with a binary code field", safe_error_detail(other)}}
+
+  defp safe_error_detail(value) when is_binary(value) do
+    %{
+      type: :string,
+      bytes: byte_size(value),
+      sha256: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
+    }
+  end
+
+  defp safe_error_detail(value), do: value |> Imp.Redaction.redact() |> Trace.compact(512)
 
   defp stringify_action_keys(action) do
     Map.new(action, fn
@@ -365,9 +462,24 @@ defmodule Imp.Predict.RLM do
       {:final, result, interpreter} ->
         case resolve_adapter(rlm).parse(rlm.signature, result, []) do
           {:ok, prediction} ->
-            state = sync_interpreter(state, Interpreter.commit(interpreter))
-            state = trace(state, iteration, :submit, %{reasoning: reasoning, code: code}, result)
-            {:done, prediction, state}
+            if required_outputs_present?(rlm.signature, prediction) do
+              state = sync_interpreter(state, Interpreter.commit(interpreter))
+
+              state =
+                trace(state, iteration, :submit, %{reasoning: reasoning, code: code}, result)
+
+              {:done, prediction, state}
+            else
+              output = {:submit_error, :empty_required_output}
+
+              state =
+                state
+                |> sync_interpreter(interpreter)
+                |> add_observation(%{reasoning: reasoning, code: code, output: output})
+                |> trace(iteration, :submit_error, %{reasoning: reasoning, code: code}, output)
+
+              {:cont, state}
+            end
 
           {:error, reason} ->
             output = {:submit_error, reason}
@@ -397,6 +509,16 @@ defmodule Imp.Predict.RLM do
           {:cont, state}
         end
     end
+  end
+
+  defp required_outputs_present?(signature, prediction) do
+    Enum.all?(Imp.Signature.output_names(signature), fn name ->
+      case Imp.Prediction.get(prediction, name) do
+        nil -> false
+        value when is_binary(value) -> String.trim(value) != ""
+        _value -> true
+      end
+    end)
   end
 
   defp interpreter_callbacks(%__MODULE__{} = rlm) do
@@ -519,12 +641,18 @@ defmodule Imp.Predict.RLM do
        )
        when (is_binary(signature) or is_struct(signature, Imp.Signature)) and is_map(inputs) do
     with {:ok, child_signature} <- safe_signature(signature),
+         :ok <- validate_required_inputs(child_signature, inputs),
          {:ok, depth} <- Budget.enter_recursion(budget, parent_depth) do
       child = %{rlm | signature: child_signature}
 
       case call_with_budget(child, inputs, budget, depth) do
-        {:ok, prediction} -> {:ok, Imp.Prediction.to_map(prediction), runtime}
-        {:error, reason} -> {:error, reason, runtime}
+        {:ok, prediction} ->
+          trace = get_in(prediction.metadata, [:rlm_trace]) || []
+          runtime = Runtime.observe_recursion(runtime, depth, trace)
+          {:ok, Imp.Prediction.to_map(prediction), runtime}
+
+        {:error, reason} ->
+          {:error, reason, Runtime.observe_recursion(runtime, depth)}
       end
     else
       {:error, reason} -> {:error, reason, runtime}
@@ -772,10 +900,14 @@ defmodule Imp.Predict.RLM do
 
     with {:ok, raw} <- run_budgeted(state.budget, fn -> Imp.LM.generate(lm, messages, []) end),
          {:ok, raw} <- Imp.LM.Result.output(raw),
-         {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []) do
+         {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []),
+         true <- required_outputs_present?(rlm.signature, prediction) do
       state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
       {:ok, add_trace(prediction, state)}
     else
+      false ->
+        {:error, {:rlm_extract_failed, :empty_required_output, Enum.reverse(state.trace)}}
+
       {:error, reason} ->
         {:error, {:rlm_extract_failed, reason, Enum.reverse(state.trace)}}
     end
@@ -788,6 +920,7 @@ defmodule Imp.Predict.RLM do
     event = %{
       iteration: iteration,
       action: action,
+      depth: state.depth,
       input: trace_term(input, state.trace_limit),
       output: trace_term(output, state.trace_limit)
     }
@@ -801,17 +934,21 @@ defmodule Imp.Predict.RLM do
 
   defp add_trace(%Imp.Prediction{} = prediction, state) do
     trace = Enum.reverse(state.trace)
+    runtime = state.interpreter.runtime
+    child_traces = Enum.reverse(runtime.child_traces)
     trajectory = normalized_trajectory(trace)
     final_reasoning = trajectory |> List.last() |> then(&if(&1, do: &1.reasoning))
 
     metadata =
       prediction.metadata
       |> Map.put(:rlm_trace, trace)
+      |> Map.put(:rlm_child_traces, child_traces)
       |> Map.put(:trajectory, trajectory)
       |> Map.put(:final_reasoning, final_reasoning)
       |> Map.put(:rlm, %{
         iterations: trace |> Enum.map(& &1.iteration) |> Enum.max(fn -> 0 end),
         sub_lm_calls: state.llm_calls,
+        max_observed_depth: runtime.max_observed_depth,
         elapsed_ms: System.monotonic_time(:millisecond) - state.started_at
       })
 

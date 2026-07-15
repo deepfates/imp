@@ -111,12 +111,34 @@ mapping is an operator reconstruction and its paper-promised scorer remains
 unavailable. The pinned normalized artifact SHA-256 is
 `11b58e289d19152c3e6fa80f347e250021a6fe25f181925bac8e4e4ca2a4d4cc`.
 
+The normalized authority is about 1.5 GB because it contains quadratic gold at
+every context size. Loading a bounded pilot does not hydrate that file. The
+loader hashes the complete authority, indexes JSONL byte ranges, seeks only the
+selected query, and incrementally extracts its required scalar and context-gold
+fields with Jaxon. A one-row load measured 6.8 seconds and 315 MB peak RSS,
+instead of the 11.2 GB process footprint observed with whole-file decoding.
+Tests verify that an invalid unselected query is not decoded under a row limit.
+
+`benchmarks/config/rlm-oolong-pairs-openrouter-v1.json` is an adapted T2
+manifest for provider-neutral live checks. A model role may use the historical
+string form or an explicit `{provider, id, base_url, api_key_env,
+context_window}` object. Standard provider credentials are accepted only with
+their canonical HTTPS endpoint; nonstandard providers require a dedicated
+`IMP_RLM_*` credential. Credentials are resolved only from that named
+environment variable and are never serialized. Explicit context capacity is
+carried into the ReqLLM model and must cover the largest declared dataset
+context grid. Adapted manifests default to the families they declare; the
+paper manifest still defaults to its complete five-family preregistration.
+
 ```console
 mix imp.benchmark.rlm_campaign --plan
 mix imp.benchmark.rlm_campaign --dry-run
 mix imp.benchmark.rlm_campaign --runtime imp
 mix imp.benchmark.rlm_campaign --runtime dspy
 mix imp.benchmark.rlm_campaign --runtime both
+mix imp.benchmark.rlm_campaign \
+  --manifest benchmarks/config/rlm-oolong-pairs-openrouter-v1.json \
+  --runtime both --approach direct,rlm --row-limit 1
 mix imp.benchmark.rlm_campaign --plan --family oolong \
   --approach direct,simple_retrieval,rlm --runtime both --row-limit 1
 ```
@@ -215,6 +237,20 @@ row, and neither RLM made recursive subcalls. The runtimes also expose different
 these limitations make expansion unjustified. The campaign was not expanded;
 unavailable families and exact T3 remain red.
 
+### 2026-07-15 scorer audit
+
+An initial pre-admission OOLONG-Pairs pilot exposed a defect in the operator
+scorer: an unanchored pair regex interpreted ordinary prose commas as answer
+pairs. Both direct models semantically concluded that the gold set was empty,
+but their explanatory prose was incorrectly scored 0.0 while the concise RLM
+answer scored 1.0. That artifact was rejected rather than admitted as evidence.
+
+The corrected scorer accepts only complete canonical `(id_1, id_2)` lines and
+explicit empty-set markers; unmatched prose is invalid. Failed rows are also
+excluded from paired bootstrap comparisons instead of being treated as scored
+zeros. A replacement live artifact must be generated from a committed
+implementation SHA before any result-specific T2 statement is restored here.
+
 ## Mechanical T3 Gate
 
 Neither the runner nor dashboard trusts `paper_protocol_complete`. The shared
@@ -264,10 +300,10 @@ T2 evidence and cannot satisfy T3.
 - The chunk-and-summarize lane is not the paper's iterative threshold-based
   compaction agent.
 - The campaign currently runs one configured RLM depth and does not execute the
-  paper's depth 0--3 matrix. Imp bounds RLM-loop calls and separately meters a
-  possible answer-extraction call; the campaign budget bounds their total.
-  DSPy 3.3.0b1 counts subcalls. These scopes are recorded separately and
-  mechanically fail equivalence.
+  paper's depth 0--3 matrix. Imp's shared `max_llm_calls` budget covers root,
+  submodel, and extraction calls. DSPy 3.3.0b1 applies `max_llm_calls` to
+  subcalls. These scopes are recorded separately and mechanically fail
+  equivalence.
 - Rows use bounded campaign concurrency although the paper reports blocking,
   sequential calls; campaign wall time is therefore not paper-runtime parity.
 - Python comparison uses the pinned DSPy 3.3.0b1 `dspy.RLM`, not the standalone

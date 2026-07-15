@@ -4,7 +4,13 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
   @families ~w(s_niah browsecomp_plus oolong oolong_pairs longbench_v2_codeqa)
   @approaches ~w(direct simple_retrieval compaction rlm)
   @runtimes ~w(imp dspy)
+  @reasoning_efforts ~w(none minimal low medium high xhigh default)
   @sha256 ~r/\A[0-9a-f]{64}\z/
+  @standard_imp_providers %{
+    "openai" => {"api.openai.com", "OPENAI_API_KEY"},
+    "anthropic" => {"api.anthropic.com", "ANTHROPIC_API_KEY"},
+    "openrouter" => {"openrouter.ai", "OPENROUTER_API_KEY"}
+  }
 
   def load!(path, opts \\ []) do
     manifest = path |> File.read!() |> Jason.decode!() |> Imp.Persistence.Legacy.rlm_manifest()
@@ -44,6 +50,8 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
       manifest["evidence_tier"],
       Keyword.get(opts, :allow_pending, false)
     )
+
+    validate_model_capacity!(manifest["models"], manifest["datasets"])
 
     validate_deviations!(manifest["deviations"])
     validate_paper_protocol!(manifest["paper_protocol"])
@@ -125,15 +133,106 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
       )
 
       require_string!(settings["logical"], "models.#{role}.logical")
-      require_string!(settings["imp"], "models.#{role}.imp")
+      validate_imp_model!(settings["imp"], "models.#{role}.imp")
       require_string!(settings["dspy"], "models.#{role}.dspy")
-      require_string!(settings["reasoning"], "models.#{role}.reasoning")
+
+      require!(
+        settings["reasoning"] in @reasoning_efforts,
+        "models.#{role}.reasoning must be one of #{Enum.join(@reasoning_efforts, ", ")}"
+      )
+
       require!(is_number(settings["temperature"]), "models.#{role}.temperature must be numeric")
 
       require!(
         is_integer(settings["max_output_tokens"]) and settings["max_output_tokens"] > 0,
         "models.#{role}.max_output_tokens must be positive"
       )
+    end)
+  end
+
+  defp validate_imp_model!(model, label) when is_binary(model) do
+    require_string!(model, label)
+
+    case String.split(model, [":", "/"], parts: 2) do
+      [provider, _id] when provider in ~w(openai anthropic openrouter) ->
+        :ok
+
+      [_id] ->
+        :ok
+
+      _other ->
+        raise ArgumentError,
+              "invalid RLM manifest: #{label} uses a nonstandard provider; use an explicit model object with api_key_env"
+    end
+  end
+
+  defp validate_imp_model!(model, label) when is_map(model) do
+    require_exact_keys!(
+      model,
+      ~w(provider id base_url api_key_env context_window),
+      label
+    )
+
+    Enum.each(~w(provider id base_url api_key_env), &require_string!(model[&1], "#{label}.#{&1}"))
+
+    uri = URI.parse(model["base_url"])
+
+    require!(
+      uri.scheme == "https" and is_binary(uri.host),
+      "#{label}.base_url must be an HTTPS URL"
+    )
+
+    require!(
+      String.match?(model["api_key_env"], ~r/\A[A-Z][A-Z0-9_]*\z/),
+      "#{label}.api_key_env must be an uppercase environment variable name"
+    )
+
+    require!(
+      is_integer(model["context_window"]) and model["context_window"] > 0,
+      "#{label}.context_window must be positive"
+    )
+
+    validate_endpoint_credential_pair!(model, uri, label)
+  end
+
+  defp validate_imp_model!(_model, label),
+    do: raise(ArgumentError, "invalid RLM manifest: #{label} must be a string or object")
+
+  defp validate_endpoint_credential_pair!(model, uri, label) do
+    case @standard_imp_providers[model["provider"]] do
+      {host, api_key_env} ->
+        require!(
+          uri.host == host and model["api_key_env"] == api_key_env,
+          "#{label} must use the canonical #{model["provider"]} endpoint and #{api_key_env}"
+        )
+
+      nil ->
+        require!(
+          String.starts_with?(model["api_key_env"], "IMP_RLM_"),
+          "#{label}.api_key_env for a nonstandard provider must use a dedicated IMP_RLM_ credential"
+        )
+    end
+  end
+
+  defp validate_model_capacity!(models, datasets) do
+    required_context =
+      datasets
+      |> Map.values()
+      |> Enum.flat_map(&List.wrap(&1["context_grid"]))
+      |> Enum.filter(&is_integer/1)
+      |> Enum.max(fn -> 0 end)
+
+    Enum.each(models, fn {role, settings} ->
+      case settings["imp"] do
+        %{"context_window" => context_window} ->
+          require!(
+            context_window >= required_context,
+            "models.#{role}.imp.context_window must cover the largest dataset context_grid value #{required_context}"
+          )
+
+        _string ->
+          :ok
+      end
     end)
   end
 

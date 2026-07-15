@@ -19,9 +19,10 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
 
   def load_all!(manifest, opts \\ []) do
     root = Keyword.get(opts, :root, Path.dirname(manifest["manifest_path"]))
+    row_limit = Keyword.get(opts, :row_limit)
 
     Map.new(manifest["datasets"], fn {family, spec} ->
-      {family, load!(family, spec, root)}
+      {family, load!(family, spec, root, row_limit: row_limit)}
     end)
   end
 
@@ -80,7 +81,20 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
     }
   end
 
-  def load!(family, spec, root) do
+  def load!(family, spec, root, opts \\ []) do
+    row_limit = Keyword.get(opts, :row_limit)
+
+    unless is_nil(row_limit) or (is_integer(row_limit) and row_limit > 0),
+      do: raise(ArgumentError, "row limit must be a positive integer")
+
+    if family == "oolong_pairs" and is_integer(row_limit) do
+      load_limited_oolong_pairs!(spec, root, row_limit)
+    else
+      load_eager!(family, spec, root)
+    end
+  end
+
+  defp load_eager!(family, spec, root) do
     path = Path.expand(spec["path"], root)
     bytes = File.read!(path)
     actual = sha256(bytes)
@@ -125,6 +139,74 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
             "context_size" => row["context_size"]
           }
         end),
+      "rows" => normalized
+    }
+  end
+
+  defp load_limited_oolong_pairs!(spec, root, row_limit) do
+    path = Path.expand(spec["path"], root)
+    file_identity = file_identity!(path)
+    actual = sha256_file!(path)
+
+    unless actual == spec["sha256"],
+      do:
+        raise(
+          ArgumentError,
+          "dataset oolong_pairs hash mismatch: expected #{spec["sha256"]}, got #{actual}"
+        )
+
+    requested =
+      "oolong_pairs"
+      |> metadata_rows(spec["sample_ids"], spec["context_grid"])
+      |> Enum.take(row_limit)
+
+    requested_ids = requested |> Enum.map(& &1["query_id"]) |> Enum.uniq()
+    sizes_by_query = Enum.group_by(requested, & &1["query_id"], & &1["context_size"])
+    ranges = jsonl_ranges!(path)
+
+    unless length(ranges) == 1 + @oolong_pairs_query_count,
+      do: raise(ArgumentError, "OOLONG-Pairs JSONL row count does not match frozen IDs")
+
+    reserved = ranges |> hd() |> read_range!(path) |> decode_jsonl_line!(path, 1)
+
+    selected =
+      Map.new(requested_ids, fn id ->
+        line_number = Enum.find_index(spec["sample_ids"], &(&1 == id)) + 2
+        range = Enum.at(ranges, line_number - 1)
+
+        {id,
+         decode_limited_pair_range!(
+           path,
+           range,
+           line_number,
+           id,
+           Map.fetch!(sizes_by_query, id)
+         )}
+      end)
+
+    selected_rows = Enum.map(requested_ids, &Map.fetch!(selected, &1))
+    validate_dataset_identity!([reserved | selected_rows], spec, "oolong_pairs")
+    contexts = contexts_from_reserved!(reserved)
+
+    normalized =
+      Enum.flat_map(selected_rows, fn row ->
+        normalize_pair!(row, spec, contexts, Map.fetch!(sizes_by_query, row["id"]))
+      end)
+
+    verify_unchanged_file!(path, file_identity, actual)
+
+    %{
+      "family" => "oolong_pairs",
+      "path" => path,
+      "sha256" => actual,
+      "source" => spec["source"],
+      "revision" => spec["revision"],
+      "split" => spec["split"],
+      "logical_instances" => length(requested_ids),
+      "evaluated_rows" => length(normalized),
+      "sample_ids" => requested_ids,
+      "sample_ids_sha256" => sha256(Jason.encode!(requested_ids)),
+      "evaluated_keys" => Enum.map(normalized, &metadata_key/1),
       "rows" => normalized
     }
   end
@@ -282,7 +364,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
     ]
   end
 
-  defp normalize_pair!(row, spec, contexts) do
+  defp normalize_pair!(row, spec, contexts, sizes \\ @oolong_pairs_context_grid) do
     gold_by_context_size = Map.get(row, "gold_by_context_size")
 
     unless spec["context_grid"] == @oolong_pairs_context_grid,
@@ -295,10 +377,16 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
           "OOLONG-Pairs #{row["id"]} gold_by_context_size must be keyed by paper context size"
         )
 
-    unless pair_context_keys?(gold_by_context_size),
-      do: raise(ArgumentError, "OOLONG-Pairs #{row["id"]} must contain exactly 11 gold sets")
+    expected_gold_keys = Enum.map(sizes, &Integer.to_string/1)
 
-    Enum.map(@oolong_pairs_context_grid, fn size ->
+    unless Enum.sort(Map.keys(gold_by_context_size)) == Enum.sort(expected_gold_keys),
+      do:
+        raise(
+          ArgumentError,
+          "OOLONG-Pairs #{row["id"]} must contain the selected gold sets"
+        )
+
+    Enum.map(sizes, fn size ->
       context = contexts[Integer.to_string(size)]
       gold_pairs = gold_by_context_size[Integer.to_string(size)]
 
@@ -346,7 +434,11 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
         do: raise(ArgumentError, "OOLONG-Pairs query gold must contain exactly 11 sizes")
     end)
 
-    contexts = Map.get(hd(reserved), "contexts")
+    contexts_from_reserved!(hd(reserved))
+  end
+
+  defp contexts_from_reserved!(reserved) do
+    contexts = Map.get(reserved, "contexts")
 
     unless is_map(contexts) and pair_context_keys?(contexts),
       do: raise(ArgumentError, "OOLONG-Pairs __contexts__ must contain exactly 11 contexts")
@@ -358,6 +450,136 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
 
     contexts
   end
+
+  defp decode_jsonl_line!(line, path, number) do
+    case Jason.decode(line) do
+      {:ok, row} when is_map(row) ->
+        row
+
+      {:ok, _} ->
+        raise ArgumentError, "dataset #{path}:#{number} must be a JSON object"
+
+      {:error, error} ->
+        raise ArgumentError,
+              "invalid dataset JSON #{path}:#{number}: #{Exception.message(error)}"
+    end
+  end
+
+  defp decode_limited_pair_range!(path, range, number, id, sizes) do
+    decoded_id = jaxon_one!(path, range, [:root, "id"], number)
+
+    unless decoded_id == id,
+      do:
+        raise(
+          ArgumentError,
+          "dataset #{path}:#{number} expected id #{inspect(id)}, got #{inspect(decoded_id)}"
+        )
+
+    %{
+      "id" => decoded_id,
+      "source" => jaxon_one!(path, range, [:root, "source"], number),
+      "revision" => jaxon_one!(path, range, [:root, "revision"], number),
+      "split" => jaxon_one!(path, range, [:root, "split"], number),
+      "question" => jaxon_one!(path, range, [:root, "question"], number),
+      "gold_by_context_size" =>
+        Map.new(sizes, fn size ->
+          key = Integer.to_string(size)
+
+          {key,
+           jaxon_all!(
+             path,
+             range,
+             [:root, "gold_by_context_size", key, :all],
+             number
+           )}
+        end)
+    }
+  end
+
+  defp jaxon_one!(path, range, query, number) do
+    case jaxon_all!(path, range, query, number) do
+      [value] ->
+        value
+
+      values ->
+        raise ArgumentError,
+              "dataset #{path}:#{number} expected one #{inspect(query)}, got #{length(values)}"
+    end
+  end
+
+  defp jaxon_all!(path, range, query, number) do
+    path
+    |> range_stream(range)
+    |> Jaxon.Stream.from_enumerable()
+    |> Jaxon.Stream.query(query)
+    |> Enum.to_list()
+    |> Enum.map(&detach_json/1)
+  rescue
+    error in [Jaxon.ParseError] ->
+      reraise ArgumentError,
+              [message: "invalid dataset JSON #{path}:#{number}: #{Exception.message(error)}"],
+              __STACKTRACE__
+  end
+
+  defp jsonl_ranges!(path) do
+    {offset, line_start, ranges} =
+      path
+      |> File.stream!([], @metadata_chunk_size)
+      |> Enum.reduce({0, 0, []}, fn chunk, {offset, line_start, ranges} ->
+        {line_start, ranges} =
+          Enum.reduce(:binary.matches(chunk, "\n"), {line_start, ranges}, fn {at, 1},
+                                                                             {current_start,
+                                                                              ranges} ->
+            newline = offset + at
+            {newline + 1, [{current_start, newline - current_start} | ranges]}
+          end)
+
+        {offset + byte_size(chunk), line_start, ranges}
+      end)
+
+    ranges =
+      if line_start < offset, do: [{line_start, offset - line_start} | ranges], else: ranges
+
+    Enum.reverse(ranges)
+  end
+
+  defp read_range!({start, length}, path) do
+    {:ok, io} = File.open(path, [:read, :binary, :raw])
+
+    try do
+      {:ok, bytes} = :file.pread(io, start, length)
+      bytes
+    after
+      File.close(io)
+    end
+  end
+
+  defp range_stream(path, {start, length}) do
+    Stream.resource(
+      fn ->
+        io = File.open!(path, [:read, :binary, :raw])
+        {:ok, ^start} = :file.position(io, start)
+        {io, length}
+      end,
+      fn
+        {io, 0} ->
+          {:halt, {io, 0}}
+
+        {io, remaining} ->
+          count = min(remaining, @metadata_chunk_size)
+
+          case IO.binread(io, count) do
+            bytes when is_binary(bytes) -> {[bytes], {io, remaining - byte_size(bytes)}}
+            :eof -> raise ArgumentError, "unexpected end of JSONL range"
+            {:error, reason} -> raise File.Error, reason: reason, action: "read", path: path
+          end
+      end,
+      fn {io, _remaining} -> File.close(io) end
+    )
+  end
+
+  defp detach_json(value) when is_binary(value), do: :binary.copy(value)
+  defp detach_json(value), do: value
 
   defp pair_context_keys?(value) when is_map(value) do
     expected = Enum.map(@oolong_pairs_context_grid, &Integer.to_string/1)
@@ -439,5 +661,28 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
 
   defp map_size_or_length(value) when is_map(value), do: map_size(value)
   defp map_size_or_length(value) when is_list(value), do: length(value)
+
+  defp sha256_file!(path) do
+    digest =
+      path
+      |> File.stream!([], @metadata_chunk_size)
+      |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+
+    digest |> :crypto.hash_final() |> Base.encode16(case: :lower)
+  end
+
+  defp file_identity!(path) do
+    stat = File.stat!(path)
+    {stat.major_device, stat.inode, stat.size, stat.mtime, stat.ctime}
+  end
+
+  defp verify_unchanged_file!(path, expected_identity, expected_sha256) do
+    identity = file_identity!(path)
+    sha256 = sha256_file!(path)
+
+    unless identity == expected_identity and sha256 == expected_sha256,
+      do: raise(ArgumentError, "dataset changed while loading: #{path}")
+  end
+
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 end

@@ -111,6 +111,22 @@ def wrapped(
 
 
 class BudgetLMTest(unittest.TestCase):
+    def test_malformed_prediction_errors_are_redacted_and_keep_trace(self):
+        prediction = types.SimpleNamespace(answer={"api_key": "sk-secret-answer-123456789"})
+        trace = [{"action": "repl", "sha256": "abc"}]
+
+        with self.assertRaisesRegex(
+            campaign.CampaignError, "expected a non-empty string answer"
+        ) as raised:
+            campaign.prediction_answer(prediction, empty_ledger(), trace)
+
+        self.assertNotIn("sk-secret-answer", str(raised.exception))
+        self.assertEqual(raised.exception.trace, trace)
+        self.assertEqual(
+            campaign.redact_error("Bearer secret-token-123456789"),
+            "Bearer [REDACTED]",
+        )
+
     def test_wrapper_satisfies_dspy_base_lm_identity(self):
         self.assertIsInstance(wrapped(FakeReasoningLM()), campaign.dspy.BaseLM)
 
