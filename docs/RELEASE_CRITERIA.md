@@ -68,6 +68,7 @@ mix benchmark.instruction_optimizer.contract.check
 mix package.check
 mix livebook.check
 mix livebook.execute.check
+mix legacy_identity.check
 mix quality.check
 LIVE_PROVIDER=1 mix live.check
 ```
@@ -103,10 +104,11 @@ Imp is production complete when:
 8. `mix livebook.check` validates the shipped notebooks under `livebooks/`.
 9. `mix livebook.execute.check` executes the shipped notebooks when changing
    public examples, saving/loading examples, or learning material control flow.
-10. `mix quality.check` passes.
+10. `mix legacy_identity.check` and `mix quality.check` pass.
 11. GitHub Actions runs the deterministic release gates:
    `production.check`, `integration.check`, `protocol.check`,
-   `package.check`, `livebook.check`, and `quality.check`.
+   `package.check`, `livebook.check`, `legacy_identity.check`, and
+   `quality.check`.
 12. `LIVE_PROVIDER=1 mix live.check` passes with local credentials.
 13. Any public production claim about paid training, external retrievers, or
    external MCP servers is backed by dedicated external-service tests, or the

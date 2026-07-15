@@ -134,7 +134,8 @@ defmodule Imp.MixProject do
         Path.wildcard("lib/imp/reproduction_registry.ex") ++
         [
           "lib/imp/optimizer/playbook/campaign.ex",
-          "lib/imp/optimizer/playbook/equation_search.ex"
+          "lib/imp/optimizer/playbook/equation_search.ex",
+          "lib/imp/legacy_identity_audit.ex"
         ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
@@ -190,6 +191,7 @@ defmodule Imp.MixProject do
       [
         "Elixir.Imp.Benchmark",
         "Elixir.Imp.Benchmarks",
+        "Elixir.Imp.LegacyIdentityAudit",
         "Elixir.Mix.Tasks.Imp.Benchmark"
       ],
       &String.starts_with?(module_name, &1)
@@ -211,6 +213,7 @@ defmodule Imp.MixProject do
         "format --check-formatted",
         "clean",
         "compile --warnings-as-errors",
+        "legacy_identity.check",
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "benchmark.failure_campaign.check",
         "package.check",
@@ -252,7 +255,11 @@ defmodule Imp.MixProject do
       "livebook.execute.check": [
         "test.livebooks --path livebooks --execute"
       ],
+      "legacy_identity.check": [
+        "run scripts/legacy_identity_audit.exs"
+      ],
       "quality.check": [
+        "legacy_identity.check",
         "credo --only warning",
         "cmd mix hex.audit"
       ],

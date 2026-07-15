@@ -8,6 +8,7 @@ defmodule GateContractTest do
              "format --check-formatted",
              "clean",
              "compile --warnings-as-errors",
+             "legacy_identity.check",
              "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
              "benchmark.failure_campaign.check",
              "package.check",
@@ -171,7 +172,12 @@ defmodule GateContractTest do
              "test.livebooks --path livebooks --execute"
            ]
 
+    assert Keyword.fetch!(aliases, :"legacy_identity.check") == [
+             "run scripts/legacy_identity_audit.exs"
+           ]
+
     assert Keyword.fetch!(aliases, :"quality.check") == [
+             "legacy_identity.check",
              "credo --only warning",
              "cmd mix hex.audit"
            ]

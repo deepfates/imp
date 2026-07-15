@@ -17,3 +17,24 @@ both successful migration and collision or tampering rejection.
 
 This boundary may shrink when an old artifact class is no longer supported. It
 must not expand into aliases for current source code or public APIs.
+
+## Maintainer Audit
+
+The source checkout keeps this boundary executable with:
+
+```sh
+mix legacy_identity.check
+```
+
+The check reads the tracked tree with an Elixir path policy. It scans the live
+and package-facing `lib/`, deployment, Livebook, documentation, README, and
+release surfaces for legacy identity tokens. The only exceptions are the
+explicit compatibility files above and historical benchmark/provenance paths
+listed by the audit policy. A new token in a product surface fails the check;
+the focused test also supplies a controlled live-source fixture to prove that
+failure behavior.
+
+The package contract separately proves that a clean consumer sees `app: :imp`,
+`Imp.Application`, and the loaded `Application.spec(:imp, :mod)` tuple. The
+current OTP identity is therefore checked at both the source boundary and the
+package boundary.

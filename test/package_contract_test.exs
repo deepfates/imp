@@ -44,6 +44,7 @@ defmodule PackageContractTest do
     "docs/COVERAGE_MATRIX.md",
     "docs/PARITY_VALIDATION_PROGRAM.md",
     "docs/RELEASE_CRITERIA.md",
+    "lib/imp/legacy_identity_audit.ex",
     "lib/imp/benchmarks.ex"
   ]
 
@@ -77,6 +78,11 @@ defmodule PackageContractTest do
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
     assert hd(Keyword.fetch!(aliases, :"package.check")) == "package.clean"
     assert is_list(Keyword.fetch!(aliases, :"package.clean"))
+  end
+
+  test "root project declares the Imp OTP application contract" do
+    assert Mix.Project.config()[:app] == :imp
+    assert Imp.MixProject.application()[:mod] == {Imp.Application, []}
   end
 
   test "clean-room output guard accepts siblings but rejects deleting its package input" do
@@ -229,6 +235,14 @@ defmodule PackageContractTest do
       |> Keyword.keys()
       |> Enum.map(&to_string/1)
 
+    if Mix.Project.config()[:app] != :imp do
+      raise "unpacked package changed its OTP application name"
+    end
+
+    if Imp.MixProject.application()[:mod] != {Imp.Application, []} do
+      raise "unpacked package changed its OTP application module"
+    end
+
     if aliases != [] or preferred_envs != [] do
       raise "unpacked package exposes source-checkout Mix surface: \#{inspect(%{aliases: aliases, preferred_envs: preferred_envs})}"
     end
@@ -266,6 +280,19 @@ defmodule PackageContractTest do
     File.write!(Path.join(consumer_dir, "mix.exs"), mix_exs)
 
     script = """
+    case Application.load(:imp) do
+      :ok -> :ok
+      {:error, {:already_loaded, :imp}} -> :ok
+    end
+
+    unless Application.spec(:imp, :mod) == {Imp.Application, []} do
+      raise "package consumer did not load :imp with Imp.Application"
+    end
+
+    unless Code.ensure_loaded?(Imp) and Application.get_application(Imp) == :imp do
+      raise "package consumer could not resolve Imp through :imp"
+    end
+
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
