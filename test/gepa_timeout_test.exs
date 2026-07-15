@@ -243,6 +243,58 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
     assert Enum.find(continued.history, &(&1.iteration == 1)).status == :rejected
   end
 
+  test "pre-authorization validation checkpoint resumes without a budget charge" do
+    owner = self()
+
+    assert_raise RuntimeError, "interrupt", fn ->
+      run_sequential_engine(
+        max_full_evaluations: 1,
+        checkpoint_fn: fn checkpoint ->
+          case checkpoint["pending_validation"] do
+            %{"status" => "started", "target_candidate_id" => 1} ->
+              send(owner, {:unauthorized_validation_checkpoint, checkpoint})
+              raise "interrupt"
+
+            _other ->
+              :ok
+          end
+        end
+      )
+    end
+
+    assert_receive {:unauthorized_validation_checkpoint, checkpoint}
+    assert checkpoint["budget"]["full_evaluations"] == 1
+
+    resumed =
+      run_sequential_engine(
+        resume_state: checkpoint,
+        max_full_evaluations: 1
+      )
+
+    assert resumed.pending_validation == nil
+    assert resumed.iteration == 1
+    assert Enum.map(resumed.candidates, & &1.id) == [0]
+    assert resumed.budget.full_evaluations == checkpoint["budget"]["full_evaluations"]
+
+    assert [%{reason: {:interrupted_validation, :discarded_before_authorization}} = rejected] =
+             resumed.rejected
+
+    refute Map.has_key?(rejected, :validation_score)
+
+    resumed_checkpoint = Imp.Optimizer.GEPA.Engine.dump_state(resumed)
+    assert resumed_checkpoint["pending_validation"] == nil
+
+    continued =
+      run_sequential_engine(
+        resume_state: resumed_checkpoint,
+        max_iterations: 2,
+        max_full_evaluations: 1
+      )
+
+    assert continued.iteration == 1
+    assert Enum.map(continued.candidates, & &1.id) == [0]
+  end
+
   defp interrupt_sequential_checkpoint!(owner, status, phase) do
     assert_raise RuntimeError, "interrupt", fn ->
       run_sequential_engine(

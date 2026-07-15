@@ -1276,6 +1276,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
       {:ok, budget} ->
         {budget, {:interrupted_validation, :ambiguous_external_effects}}
 
+      {:error, {:budget_exhausted, _resource, _requested, _limit}, _budget} ->
+        {budget, {:interrupted_validation, :discarded_before_authorization}}
+
       {:error, reason, _budget} ->
         raise ArgumentError,
               "GEPA interrupted validation cannot be conservatively charged: #{inspect(reason)}"
