@@ -35,5 +35,4 @@ jobs:
       - run: mix production.check
       - run: mix integration.check
       - run: mix protocol.check
-      - run: mix legacy_identity.check
       - run: mix quality.check

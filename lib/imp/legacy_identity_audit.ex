@@ -197,5 +197,5 @@ defmodule Imp.LegacyIdentityAudit do
 
   defp path_matches?(prefix, path), do: path == prefix or String.starts_with?(path, prefix)
 
-  defp normalize_path(path), do: path |> Path.relative_to_cwd() |> String.replace("\\", "/")
+  defp normalize_path(path), do: String.replace(path, "\\", "/")
 end
