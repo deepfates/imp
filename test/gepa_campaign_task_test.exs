@@ -74,4 +74,9 @@ defmodule GepaCampaignTaskTest do
              })
            end) == "[GEPA] AIMEBench seed=0 baseline checkpoint splits=dev,train\n"
   end
+
+  test "progress reporter cleanup is idempotent", %{reporter: reporter} do
+    assert :ok = Task.stop_progress_reporter(reporter)
+    assert :ok = Task.stop_progress_reporter(reporter)
+  end
 end

@@ -124,14 +124,18 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
 
     receive do
       {ref, result} when is_map_key(state.active, ref) ->
-        {{index, _task}, active} = Map.pop(state.active, ref)
-        Process.demonitor(ref, [:flush])
-        state = %{state | active: active, results: Map.put(state.results, index, result)}
-
-        if state.fail_fast and terminal?(result) do
-          terminate(state, index)
+        if expired?(deadline) do
+          timeout(state)
         else
-          schedule(state, deadline, max_concurrency, snapshot, fun)
+          {{index, _task}, active} = Map.pop(state.active, ref)
+          Process.demonitor(ref, [:flush])
+          state = %{state | active: active, results: Map.put(state.results, index, result)}
+
+          if state.fail_fast and terminal?(result) do
+            terminate(state, index)
+          else
+            schedule(state, deadline, max_concurrency, snapshot, fun)
+          end
         end
 
       {:DOWN, ref, :process, _pid, reason} when is_map_key(state.active, ref) ->

@@ -211,7 +211,7 @@ Always render the deterministic no-network plan before a paid run:
 
 ```bash
 mix imp.benchmark.instruction_optimizer_experiment \
-  --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight.json \
+  --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json \
   --env-file .env \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
@@ -231,7 +231,7 @@ manifest:
 
 ```bash
 mix imp.benchmark.instruction_optimizer_experiment \
-  --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
+  --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json \
   --env-file .env \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
@@ -239,17 +239,21 @@ mix imp.benchmark.instruction_optimizer_experiment \
   --out benchmarks/results
 ```
 
-The manifest binds the logical model to the provider-specific ReqLLM and
+The admitted economical preflight binds Claude Haiku 4.5 to the
+provider-specific ReqLLM and
 LiteLLM identifiers, all three AIME split hashes, seed, arm order, optimizer
 options, DSPy `3.3.0b1`, Optuna `4.9.0`, and independent per-arm request,
-input-token, output-token, and USD ceilings. The economical manifest pins
-`gpt-4.1-mini-2025-04-14`, official standard pricing of `$0.40/M` input and
-`$1.60/M` output, prefix limits `6/3/3`, and a maximum two-runtime exposure of
-`480` requests and `$3`. See the
-[official model page](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+input-token, output-token, and USD ceilings. It uses prefix limits `6/3/3` and
+a maximum two-runtime exposure of `480` requests and `$4.50`.
 The orchestrator derives one Imp
 campaign and one all-arm DSPy campaign and refuses to merge incomplete or
 identity-mismatched artifacts.
+
+The admitted one-seed artifact is
+`benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json`.
+Both runtimes completed every arm without failures. Baseline, MIPROv2, and
+SIMBA each scored `2/3` on that runtime's frozen test split, so this establishes
+live sampled execution and accounting but not optimizer lift or T3 parity.
 
 Each arm is evaluated on the frozen test split and compared with that runtime's
 baseline. The dev leader is descriptive only: MIPROv2 already uses dev as its

@@ -411,8 +411,12 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaCampaign do
   def stop_progress_reporter(%{handler_id: handler_id, state: state}) do
     :telemetry.detach(handler_id)
 
-    if Process.alive?(state), do: Agent.stop(state)
-    :ok
+    try do
+      Agent.stop(state)
+    catch
+      :exit, {:noproc, _} -> :ok
+      :exit, :noproc -> :ok
+    end
   end
 
   @doc false

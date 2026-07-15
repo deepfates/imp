@@ -71,6 +71,23 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
     assert derived.identity["design"]["mipro_v2"]["deviation"] =~ "native Optuna TPE"
   end
 
+  test "resolves a relative Python executable against the repository root" do
+    fixture = fixture!("relative-python")
+
+    derived =
+      InstructionOptimizerExperiment.derive!(fixture.manifest,
+        manifest_path: fixture.manifest_path,
+        out_dir: fixture.out,
+        checkpoint_dir: fixture.checkpoints,
+        run_context: fixture.context,
+        repo_root: fixture.root,
+        python: "tmp/venv/bin/python",
+        dspy_pythonpath: fixture.dspy_root
+      )
+
+    assert derived.python.command == Path.join(fixture.root, "tmp/venv/bin/python")
+  end
+
   test "injectable executors run each campaign once and emit baseline-relative preflight evidence" do
     fixture = fixture!("execute")
     parent = self()
@@ -345,7 +362,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
   defp imp_artifact(options, fixture) do
     arms = Enum.map(Keyword.fetch!(options, :arms), &Atom.to_string/1)
-    configs = options |> Keyword.fetch!(:arm_configs) |> json()
+    configs = options |> Keyword.fetch!(:arm_configs) |> Imp.Optimizer.Report.json_safe()
 
     %{
       "schema_version" => 1,

@@ -214,7 +214,7 @@ manifest with:
 
 ```sh
 mix imp.benchmark.instruction_optimizer_experiment \
-  --manifest benchmarks/config/instruction-optimizer-aime-matched-preflight.json \
+  --manifest benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \
@@ -226,6 +226,10 @@ same logical model to each runtime's provider identifier, and enforces the same
 per-arm request/input/output/USD ceilings before merging results. It reports
 frozen-test deltas for every arm. It does not choose a global winner from dev,
 and its one seed is explicitly research preflight rather than T3 evidence.
+The admitted Haiku 4.5 run completed baseline, MIPROv2, and SIMBA in both
+runtimes without failures. All six runtime/arm rows scored `2/3` on frozen
+test, which supports T2 live sampled behavior but neither optimizer lift nor
+full parity.
 
 The third command runs a T1 structural differential against standalone GEPA
 `v0.1.1` at commit `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`.

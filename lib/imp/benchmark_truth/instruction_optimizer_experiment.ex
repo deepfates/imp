@@ -78,7 +78,10 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       checkpoint_path:
         Path.join(checkpoints, "#{slug(manifest["campaign_id"])}-dspy.checkpoint.json"),
       output_path: Path.join(out, "#{slug(manifest["campaign_id"])}-dspy.json"),
-      command: Keyword.get(opts, :python, System.find_executable("python3") || "python3"),
+      command:
+        opts
+        |> Keyword.get(:python, System.find_executable("python3") || "python3")
+        |> executable(repo_root),
       script: Keyword.get(opts, :python_script, "scripts/dspy_instruction_optimizer_campaign.py"),
       dspy_pythonpath: dspy_pythonpath,
       env: [{"PYTHONPATH", prepend_pythonpath(dspy_pythonpath)}]
@@ -692,7 +695,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       id["arms"] == d.identity["arms"],
       id["budget_scope"] == "per_arm",
       id["budget"] == expected_budget,
-      id["arm_configs"] == d.manifest["arm_configs"],
+      id["arm_configs"] == Imp.Optimizer.Report.json_safe(d.manifest["arm_configs"]),
       id["split_limits"] == d.manifest["preflight"]["split_limits"],
       id["split_checksums"] == d.manifest["dataset"]["checksums"],
       id["source_commits"] == d.identity["source_commits"],
@@ -840,6 +843,14 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       "" -> root
       current -> root <> ":" <> current
     end
+  end
+
+  defp executable(command, repo_root) do
+    command = string!(command, "python")
+
+    if Path.type(command) == :relative and String.contains?(command, "/"),
+      do: Path.expand(command, repo_root),
+      else: command
   end
 
   defp scope,
