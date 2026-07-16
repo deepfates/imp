@@ -414,6 +414,8 @@ defmodule ReqLLMClientTest do
     schema = get_in(opts, [:provider_options, :response_format, :json_schema, :schema])
     item_schema = get_in(schema, ["properties", "items", "items"])
 
+    assert schema["additionalProperties"] == false
+    assert item_schema["additionalProperties"] == false
     assert item_schema["required"] == ["answer", "confidence"]
     assert get_in(item_schema, ["properties", "answer", "enum"]) == ["yes", "no"]
     assert get_in(item_schema, ["properties", "confidence", "minimum"]) == 0
@@ -916,6 +918,7 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(provider_options, :anthropic_beta) == ["structured-outputs-2025-11-13"]
     assert get_in(provider_options, [:output_format, :type]) == "json_schema"
     assert get_in(provider_options, [:output_format, :schema, "type"]) == "object"
+    assert get_in(provider_options, [:output_format, :schema, "additionalProperties"]) == false
   end
 
   test "ReqLLM client drops OpenAI-only JSON object hints for Anthropic" do

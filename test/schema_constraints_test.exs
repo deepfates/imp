@@ -98,6 +98,7 @@ defmodule SchemaConstraintsTest do
 
     assert Imp.Signature.json_schema(signature) == %{
              "type" => "object",
+             "additionalProperties" => false,
              "required" => ["answer", "span", "confidence", "items"],
              "properties" => %{
                "answer" => %{"type" => "string", "enum" => ["yes", "no"]},
@@ -106,6 +107,7 @@ defmodule SchemaConstraintsTest do
                "items" => %{"type" => "array", "items" => %{"type" => "integer"}},
                "meta" => %{
                  "type" => "object",
+                 "additionalProperties" => false,
                  "properties" => %{"source" => %{"type" => "string"}},
                  "required" => ["source"]
                }
@@ -145,6 +147,7 @@ defmodule SchemaConstraintsTest do
       |> get_in(["properties", "candidates", "items"])
 
     assert item_schema["type"] == "object"
+    assert item_schema["additionalProperties"] == false
     assert item_schema["required"] == ["name", "score", "tags"]
 
     assert get_in(item_schema, ["properties", "name"]) == %{

@@ -1,6 +1,44 @@
 defmodule ReActV2Test do
   use ExUnit.Case, async: true
 
+  defmodule NativeToolStub do
+    def generate_text(model, messages, opts) do
+      state = Keyword.fetch!(opts, :state)
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      send(test_pid, {:native_tool_request, opts})
+
+      response =
+        Agent.get_and_update(state, fn
+          :initial ->
+            {%ReqLLM.Response{
+               id: "resp_empty",
+               model: to_string(model),
+               context: ReqLLM.Context.new(messages),
+               message: ReqLLM.Context.assistant(""),
+               object: %{tool_calls: []},
+               finish_reason: :stop
+             }, :forced}
+
+          :forced ->
+            {%ReqLLM.Response{
+               id: "resp_submit",
+               model: to_string(model),
+               context: ReqLLM.Context.new(messages),
+               message:
+                 ReqLLM.Context.assistant("",
+                   tool_calls: [
+                     ReqLLM.ToolCall.new("toolu_submit", "submit", ~s({"answer":"Paris"}))
+                   ]
+                 ),
+               object: nil,
+               finish_reason: :tool_calls
+             }, :done}
+        end)
+
+      {:ok, response}
+    end
+  end
+
   test "executes parallel calls, preserves IDs and results, and submits final outputs" do
     parent = self()
     lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found #{query}" end)
@@ -75,9 +113,51 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :termination_reason) == :forced_submit
     assert_received {:lm_call, _normal_opts}
     assert_received {:lm_call, forced_opts}
-    assert get_in(Map.new(forced_opts), [:tool_choice, :function, :name]) == "submit"
+    assert Keyword.fetch!(forced_opts, :tool_choice) == %{type: "tool", name: "submit"}
     assert Keyword.has_key?(forced_opts, :reasoning_effort)
     assert Keyword.get(forced_opts, :reasoning_effort) == nil
+  end
+
+  test "forces native submit through the provider-neutral ReqLLM tool choice" do
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("anthropic:fixture",
+        req_module: NativeToolStub,
+        state: state,
+        test_pid: self(),
+        cache: false
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    assert_received {:native_tool_request, initial_opts}
+    assert initial_opts[:tool_choice] == "auto"
+    assert_received {:native_tool_request, forced_opts}
+    assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
+  end
+
+  test "normalizes atom- and string-keyed tool-call collection wrappers" do
+    for wrapped <- [
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "atom"}}]},
+          %{"tool_calls" => [%{"name" => "submit", "arguments" => %{"answer" => "string"}}]}
+        ] do
+      lm = action_lm([Imp.Prediction.new(%{tool_calls: wrapped})])
+
+      assert {:ok, prediction} =
+               Imp.react_v2("question -> answer", [], lm: lm)
+               |> Imp.call(%{question: "q"})
+
+      assert Imp.get(prediction, :answer) in ["atom", "string"]
+      assert [event] = Imp.get(prediction, :history).messages
+
+      assert [%{id: "call_0_0", name: "submit"}] = event.tool_calls.tool_calls
+    end
   end
 
   test "accepts atom and string per-call max_iters overrides" do

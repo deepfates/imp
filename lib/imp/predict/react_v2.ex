@@ -132,7 +132,10 @@ defmodule Imp.Predict.ReActV2 do
       react.react
       | config:
           Keyword.merge(react.react.config,
-            tool_choice: %{type: "function", function: %{name: "submit"}},
+            # ReqLLM's provider-neutral form. OpenAI-compatible providers translate
+            # this to their nested `function` shape while Anthropic keeps the
+            # canonical `tool`/`name` pair.
+            tool_choice: %{type: "tool", name: "submit"},
             reasoning_effort: nil
           )
     }
@@ -167,6 +170,12 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp normalize_calls(%ToolCalls{} = calls, turn), do: ensure_ids(calls, turn)
+
+  # `ToolCalls.format/1` and provider adapters may retain the collection wrapper
+  # around an otherwise normalized list. Accept either key vocabulary rather
+  # than treating that wrapper as one tool call.
+  defp normalize_calls(%{tool_calls: calls}, turn), do: normalize_calls(calls, turn)
+  defp normalize_calls(%{"tool_calls" => calls}, turn), do: normalize_calls(calls, turn)
 
   defp normalize_calls(calls, turn),
     do: calls |> List.wrap() |> ToolCalls.new() |> ensure_ids(turn)

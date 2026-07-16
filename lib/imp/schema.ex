@@ -58,7 +58,12 @@ defmodule Imp.Schema do
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
       |> Enum.map(&to_string(&1.name))
 
-    %{"type" => "object", "properties" => properties, "required" => required}
+    %{
+      "type" => "object",
+      "properties" => properties,
+      "required" => required,
+      "additionalProperties" => false
+    }
   end
 
   defp validate_type(errors, field, value) do
@@ -252,6 +257,7 @@ defmodule Imp.Schema do
     schema
     |> Map.put("properties", json_properties(properties))
     |> Map.put("required", required)
+    |> Map.put("additionalProperties", false)
   end
 
   defp maybe_put(map, _key, nil), do: map
