@@ -500,26 +500,32 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
   end
 
   defp scrub_nested_transport_controls(opts) do
-    Enum.reduce([:provider_options, :request_options], opts, fn key, acc ->
-      Keyword.update(acc, key, [], fn
-        nested when is_list(nested) ->
-          Keyword.drop(nested, [:max_tokens, :max_completion_tokens, :max_retries, :cache])
+    opts
+    |> then(fn acc ->
+      if Keyword.has_key?(acc, :provider_options) do
+        Keyword.update!(acc, :provider_options, fn
+          nested when is_list(nested) ->
+            Keyword.drop(nested, [:max_tokens, :max_completion_tokens, :max_retries, :cache])
 
-        nested when is_map(nested) ->
-          Map.drop(nested, [
-            :max_tokens,
-            :max_completion_tokens,
-            :max_retries,
-            :cache,
-            "max_tokens",
-            "max_completion_tokens",
-            "max_retries",
-            "cache"
-          ])
+          nested when is_map(nested) ->
+            Map.drop(nested, [
+              :max_tokens,
+              :max_completion_tokens,
+              :max_retries,
+              :cache,
+              "max_tokens",
+              "max_completion_tokens",
+              "max_retries",
+              "cache"
+            ])
 
-        _other ->
-          []
-      end)
+          _other ->
+            []
+        end)
+      else
+        acc
+      end
     end)
+    |> Keyword.delete(:request_options)
   end
 end

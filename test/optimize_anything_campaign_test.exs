@@ -558,6 +558,7 @@ defmodule OptimizeAnythingCampaignTest do
     assert Keyword.fetch!(opts, :max_completion_tokens) == 64
     assert Keyword.fetch!(opts, :max_retries) == 0
     refute Keyword.has_key?(opts, :max_tokens)
+    refute Keyword.has_key?(opts, :request_options)
     refute Keyword.has_key?(Keyword.get(opts, :provider_options, []), :max_completion_tokens)
     refute Keyword.has_key?(Keyword.get(opts, :provider_options, []), :max_retries)
   end
