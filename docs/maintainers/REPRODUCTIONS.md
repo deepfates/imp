@@ -17,7 +17,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | MCP protocol boundary | native_extension | rag_agent | NONE | none |
 | CodeAct | adaptation | rag_agent | NONE | none |
 | ProgramOfThought | adaptation | rag_agent | NONE | none |
-| Recursive Language Models | adaptation | rlm_contract<br>rlm_runtime_differential<br>rlm_paper | T1 | benchmarks/evidence/admitted/rlm_runtime_differential/c3eea92ae7611f7fddca5d6ff3303564a0c2f226e82e32cc948aa9a6cda753a8.json |
+| Recursive Language Models | adaptation | rlm_contract<br>rlm_runtime_differential<br>rlm_paper | T1 | benchmarks/evidence/admitted/rlm_runtime_differential/7c34e486bef0f8b82d3e6d043e2a82eb4beb6ddd091095302196e74756dbf48c.json |
 | Assertions and evaluation | adaptation | confidence_calibration | NONE | none |
 | SemanticF1 auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
 | CompleteAndGrounded auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
@@ -26,7 +26,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BootstrapFewShot | replication | optimizer_lift<br>instruction_live | NONE | none |
 | BootstrapRS and RandomSearch | replication | optimizer_lift | NONE | none |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/b470039ed3ac73379c551883bd80f0202bf9e8e2875321e056ea1a19d1667da9.json |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/dcad73d7acf199134f3a8b22ea74fb8cd156eb48b30f8127a350a215af8b5d27.json |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |

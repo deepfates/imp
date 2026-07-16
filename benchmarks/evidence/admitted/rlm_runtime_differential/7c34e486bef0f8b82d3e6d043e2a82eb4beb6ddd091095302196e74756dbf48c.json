@@ -1,0 +1,1499 @@
+{
+  "authority": {
+    "commit": "72d6940142ddfb84ee6be573dc999a37e633e671",
+    "files": {
+      "rlm/core/rlm.py": "f7df6af55027159b2f428ff98c9b19beb872618ee88aa8fef62c9498fa1e0562",
+      "rlm/environments/base_env.py": "288a7a08707783cd4116cccf1c7ebd77a5b577e3cb2a9febeb1ef67cf5c4e15b",
+      "rlm/environments/local_repl.py": "cee6bcfc530b01cef4b39f722b2efc084dd2fa08fe495b88ceda7efa63b5e31e",
+      "rlm/utils/exceptions.py": "4acbbed03dba820f47743644c24a8f3f1a91c79483c9bc997c204593d9089fa7",
+      "tests/test_depth_metadata.py": "675ca4c29e36df9e063e7cd8d316dc5fecd7c54c114c101a0f903348dbfdfd3b",
+      "tests/test_local_repl.py": "d176aadebb7f72311e672da3768b1d2b4af0417d412c278243766fb1437015be",
+      "tests/test_local_repl_persistent.py": "e48379a49cd28c67dc2ce430c8f90b52ae650a946ba64ff6f47080616f313095",
+      "tests/test_rlm_query.py": "2714fd157ff9f4a64099b5020b3d1d53651533cb6adbcafc55ad4944a07f77e2",
+      "tests/test_subcall.py": "6b757db67de4bec1ef62a8ec8b0bcf112c7bbf09ce2332399179bedc547ab527"
+    },
+    "package": "rlms",
+    "repository": "https://github.com/alexzhang13/rlm",
+    "selected_tests": [
+      "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_completion_returns_metadata_with_logger",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_metadata_has_multiple_iterations",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_error_threshold_check",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_token_limit_check_raises",
+      "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_surfaces_final_answer",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_false_does_not_surface",
+      "tests/test_rlm_query.py::TestLlmQueryDoesNotUseSubcallFn::test_llm_query_ignores_subcall_fn",
+      "tests/test_rlm_query.py::TestRlmQueryBatchedWithSubcallFn::test_batched_partial_failure",
+      "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_child_receives_remaining_timeout"
+    ],
+    "version": "0.1.3"
+  },
+  "claim_scope": {
+    "c1": "Behavioral conformance for the canonical observations named by required matched cases.",
+    "c2": "Provider-free operation through traced or wrapped public Imp and standalone runtime calls.",
+    "excluded": [
+      "live provider quality",
+      "long-context effectiveness",
+      "DSPy RLM adapter conformance",
+      "paper-scale T3 reproduction"
+    ]
+  },
+  "evidence_tier": "t1_pinned_runtime_differential",
+  "fixture": {
+    "path": "benchmarks/config/rlm-runtime-differential-v1.json",
+    "sha256": "3b8f4f4a885dcb8e8b00977ee37aa4f3c7068e3b24097ea982abdfc806ea7734"
+  },
+  "generated_at": "2026-07-16T21:41:36Z",
+  "git_sha": "7adcbfdcfdc4c9bdd59fb5cb639dbd88660f837b",
+  "harness_files": {
+    "lib/imp/benchmark_truth/rlm_runtime_differential.ex": "848027a4c0af8ad76bbed81c5a9cda667c22b04656e3c6cb024ae7374c5efcfa",
+    "lib/mix/tasks/imp.benchmark.rlm_runtime_differential.ex": "129f211d87d04688624c4c9ee34d200e1eb6122ac7a8418fa786ba596a494ef0",
+    "scripts/rlm_runtime_differential.py": "843002651d1a72bd34f58c41108aea044fdb22da4f687729218b2a15124a013f"
+  },
+  "protocol_id": "rlm_runtime_differential",
+  "rows": [
+    {
+      "authority_tests": [
+        "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "RLM",
+          "kind": "public_method",
+          "method": "completion",
+          "minimum_invocations": 1,
+          "module": "rlm.core.rlm"
+        }
+      },
+      "category": "environment_repl",
+      "comparison": "matched",
+      "id": "continuous_root_transcript",
+      "imp": {
+        "authority_tests": [
+          "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "continuous_transcript": true,
+          "controller_iterations": 2,
+          "output": "alpha-derived"
+        },
+        "category": "environment_repl",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "second_turn_roles": [
+            "system",
+            "user",
+            "user",
+            "assistant",
+            "user",
+            "user"
+          ]
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "continuous_transcript": true,
+          "controller_iterations": 2,
+          "output": "alpha-derived"
+        },
+        "id": "continuous_root_transcript",
+        "invariant": "Controller state and the assistant/REPL transcript remain available on the next root turn.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "Controller state and the assistant/REPL transcript remain available on the next root turn.",
+      "official": {
+        "authority_tests": [
+          "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "continuous_transcript": true,
+          "controller_iterations": 2,
+          "output": "alpha-derived"
+        },
+        "category": "environment_repl",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "RLM",
+            "mechanism": "python_public_method_wrapper",
+            "method": "completion",
+            "method_is_public": true,
+            "module": "rlm.core.rlm",
+            "observed_invocations": 1
+          },
+          "second_turn_roles": [
+            "system",
+            "user",
+            "user",
+            "assistant",
+            "user",
+            "user"
+          ]
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "continuous_transcript": true,
+          "controller_iterations": 2,
+          "output": "alpha-derived"
+        },
+        "id": "continuous_root_transcript",
+        "invariant": "Controller state and the assistant/REPL transcript remain available on the next root turn.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "tests/test_local_repl.py::TestLocalREPLScaffoldRestoration::test_context_restored_after_overwrite"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "execute",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM.Interpreter"
+        },
+        "official": {
+          "class": "LocalREPL",
+          "kind": "public_method",
+          "method": "execute_code",
+          "minimum_invocations": 1,
+          "module": "rlm.environments.local_repl"
+        }
+      },
+      "category": "sandbox",
+      "comparison": "matched",
+      "id": "protected_context_alias",
+      "imp": {
+        "authority_tests": [
+          "tests/test_local_repl.py::TestLocalREPLScaffoldRestoration::test_context_restored_after_overwrite"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "context": "original",
+          "restored": true
+        },
+        "category": "sandbox",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "execute",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM.Interpreter",
+            "observed_invocations": 2,
+            "trace_pattern_matches": 1
+          }
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "context": "original",
+          "restored": true
+        },
+        "id": "protected_context_alias",
+        "invariant": "Overwriting the canonical context alias in one cell does not corrupt it for the next controller turn.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "Overwriting the canonical context alias in one cell does not corrupt it for the next controller turn.",
+      "official": {
+        "authority_tests": [
+          "tests/test_local_repl.py::TestLocalREPLScaffoldRestoration::test_context_restored_after_overwrite"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "context": "original",
+          "restored": true
+        },
+        "category": "sandbox",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "LocalREPL",
+            "mechanism": "python_public_method_wrapper",
+            "method": "execute_code",
+            "method_is_public": true,
+            "module": "rlm.environments.local_repl",
+            "observed_invocations": 4
+          },
+          "first_stderr": "",
+          "second_stdout": "original"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "context": "original",
+          "restored": true
+        },
+        "id": "protected_context_alias",
+        "invariant": "Overwriting the canonical context alias in one cell does not corrupt it for the next controller turn.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "tests/test_local_repl_persistent.py::TestLocalREPLPersistentState::test_full_persistent_session_simulation"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "RLM",
+          "kind": "public_method",
+          "method": "completion",
+          "minimum_invocations": 1,
+          "module": "rlm.core.rlm"
+        }
+      },
+      "category": "persistence",
+      "comparison": "matched",
+      "id": "persistent_context_versioning",
+      "imp": {
+        "authority_tests": [
+          "tests/test_local_repl_persistent.py::TestLocalREPLPersistentState::test_full_persistent_session_simulation"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "context_count": 2,
+          "first_output": "first-derived",
+          "history_count": 2,
+          "second_output": "first:second:first-derived"
+        },
+        "category": "persistence",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 2,
+            "trace_pattern_matches": 1
+          },
+          "session": "Imp.Predict.RLM.Session"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "context_count": 2,
+          "first_output": "first-derived",
+          "history_count": 2,
+          "second_output": "first:second:first-derived"
+        },
+        "id": "persistent_context_versioning",
+        "invariant": "Persistent calls retain computed state, version contexts, and retain one history per completed call.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "Persistent calls retain computed state, version contexts, and retain one history per completed call.",
+      "official": {
+        "authority_tests": [
+          "tests/test_local_repl_persistent.py::TestLocalREPLPersistentState::test_full_persistent_session_simulation"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "context_count": 2,
+          "first_output": "first-derived",
+          "history_count": 2,
+          "second_output": "first:second:first-derived"
+        },
+        "category": "persistence",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "RLM",
+            "mechanism": "python_public_method_wrapper",
+            "method": "completion",
+            "method_is_public": true,
+            "module": "rlm.core.rlm",
+            "observed_invocations": 2
+          },
+          "environment": "LocalREPL"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "context_count": 2,
+          "first_output": "first-derived",
+          "history_count": 2,
+          "second_output": "first:second:first-derived"
+        },
+        "id": "persistent_context_versioning",
+        "invariant": "Persistent calls retain computed state, version contexts, and retain one history per completed call.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "rlm/core/rlm.py::RLM.completion"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "RLM",
+          "kind": "public_method",
+          "method": "completion",
+          "minimum_invocations": 1,
+          "module": "rlm.core.rlm"
+        }
+      },
+      "category": "compaction",
+      "comparison": "matched",
+      "id": "compaction_public_prompt_transition",
+      "imp": {
+        "authority_tests": [
+          "rlm/core/rlm.py::RLM.completion"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "controller_iterations": 2,
+          "next_prompt_has_full_raw_trajectory": false,
+          "next_prompt_has_summary": true,
+          "next_prompt_shorter": true,
+          "next_prompt_trajectory_probes_observed": 0,
+          "root_model_calls": 3,
+          "summary_prompt_has_full_raw_trajectory": true,
+          "summary_prompt_trajectory_probes_observed": 16,
+          "summary_request_observed": true,
+          "trajectory_bytes": 801472,
+          "trajectory_probe_count": 16,
+          "trajectory_sha256": "952f4d178bee22ec2f452f347d3497db6fdab8a6895deb7b2a36306a2ebcd33a"
+        },
+        "category": "compaction",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "prompt_count_observed": 3,
+          "prompt_sizes_observed": {
+            "first": 1902,
+            "next": 2324,
+            "summary": 803969
+          },
+          "trajectory_probe_scheme": "16 deterministic probes interleaved across 100000 fixed-width hexadecimal values"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "controller_iterations": 2,
+          "next_prompt_has_full_raw_trajectory": false,
+          "next_prompt_has_summary": true,
+          "next_prompt_shorter": true,
+          "next_prompt_trajectory_probes_observed": 0,
+          "root_model_calls": 3,
+          "summary_prompt_has_full_raw_trajectory": true,
+          "summary_prompt_trajectory_probes_observed": 16,
+          "summary_request_observed": true,
+          "trajectory_bytes": 801472,
+          "trajectory_probe_count": 16,
+          "trajectory_sha256": "952f4d178bee22ec2f452f347d3497db6fdab8a6895deb7b2a36306a2ebcd33a"
+        },
+        "id": "compaction_public_prompt_transition",
+        "invariant": "A bounded public RLM.completion call observes a summary request over a deterministic high-entropy trajectory and a shorter next controller prompt containing that summary, without the complete prior trajectory or any of 16 probes interleaved across it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "A bounded public RLM.completion call observes a summary request over a deterministic high-entropy trajectory and a shorter next controller prompt containing that summary, without the complete prior trajectory or any of 16 probes interleaved across it.",
+      "official": {
+        "authority_tests": [
+          "rlm/core/rlm.py::RLM.completion"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "controller_iterations": 2,
+          "next_prompt_has_full_raw_trajectory": false,
+          "next_prompt_has_summary": true,
+          "next_prompt_shorter": true,
+          "next_prompt_trajectory_probes_observed": 0,
+          "root_model_calls": 3,
+          "summary_prompt_has_full_raw_trajectory": true,
+          "summary_prompt_trajectory_probes_observed": 16,
+          "summary_request_observed": true,
+          "trajectory_bytes": 801472,
+          "trajectory_probe_count": 16,
+          "trajectory_sha256": "952f4d178bee22ec2f452f347d3497db6fdab8a6895deb7b2a36306a2ebcd33a"
+        },
+        "category": "compaction",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "RLM",
+            "mechanism": "python_public_method_wrapper",
+            "method": "completion",
+            "method_is_public": true,
+            "module": "rlm.core.rlm",
+            "observed_invocations": 1
+          },
+          "next_prompt_bytes": 6144,
+          "next_prompt_messages": 5,
+          "summary_prompt_bytes": 808051,
+          "summary_prompt_messages": 6,
+          "trajectory_probe_scheme": "16 deterministic probes interleaved across 100000 fixed-width hexadecimal values"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "controller_iterations": 2,
+          "next_prompt_has_full_raw_trajectory": false,
+          "next_prompt_has_summary": true,
+          "next_prompt_shorter": true,
+          "next_prompt_trajectory_probes_observed": 0,
+          "root_model_calls": 3,
+          "summary_prompt_has_full_raw_trajectory": true,
+          "summary_prompt_trajectory_probes_observed": 16,
+          "summary_request_observed": true,
+          "trajectory_bytes": 801472,
+          "trajectory_probe_count": 16,
+          "trajectory_sha256": "952f4d178bee22ec2f452f347d3497db6fdab8a6895deb7b2a36306a2ebcd33a"
+        },
+        "id": "compaction_public_prompt_transition",
+        "invariant": "A bounded public RLM.completion call observes a summary request over a deterministic high-entropy trajectory and a shorter next controller prompt containing that summary, without the complete prior trajectory or any of 16 probes interleaved across it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "tests/test_subcall.py::TestSubcallModelOverrideAtLeafDepth::test_model_override_at_leaf_depth_uses_overridden_model"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "RLM",
+          "kind": "public_method",
+          "method": "completion",
+          "minimum_invocations": 1,
+          "module": "rlm.core.rlm"
+        }
+      },
+      "category": "recursion_depth",
+      "comparison": "matched",
+      "id": "recursive_depth_boundary",
+      "imp": {
+        "authority_tests": [
+          "tests/test_subcall.py::TestSubcallModelOverrideAtLeafDepth::test_model_override_at_leaf_depth_uses_overridden_model"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "depth_boundary_fallback": true,
+          "output": "leaf response",
+          "parent_model": "parent-model",
+          "requested_model": "child-model"
+        },
+        "category": "recursion_depth",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "child_trace_count": 0,
+          "sub_lm_calls": 1
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "depth_boundary_fallback": true,
+          "output": "leaf response",
+          "parent_model": "parent-model",
+          "requested_model": "child-model"
+        },
+        "id": "recursive_depth_boundary",
+        "invariant": "A recursive query at the configured depth boundary becomes a one-shot LM call, honors its model override, and does not mutate the parent model.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "A recursive query at the configured depth boundary becomes a one-shot LM call, honors its model override, and does not mutate the parent model.",
+      "official": {
+        "authority_tests": [
+          "tests/test_subcall.py::TestSubcallModelOverrideAtLeafDepth::test_model_override_at_leaf_depth_uses_overridden_model"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "depth_boundary_fallback": true,
+          "output": "leaf response",
+          "parent_model": "parent-model",
+          "requested_model": "child-model"
+        },
+        "category": "recursion_depth",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "RLM",
+            "mechanism": "python_public_method_wrapper",
+            "method": "completion",
+            "method_is_public": true,
+            "module": "rlm.core.rlm",
+            "observed_invocations": 1
+          },
+          "controller_calls": 2,
+          "result_root_model": "parent-model"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "depth_boundary_fallback": true,
+          "output": "leaf response",
+          "parent_model": "parent-model",
+          "requested_model": "child-model"
+        },
+        "id": "recursive_depth_boundary",
+        "invariant": "A recursive query at the configured depth boundary becomes a one-shot LM call, honors its model override, and does not mutate the parent model.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "rlm/environments/local_repl.py::LocalREPL._rlm_query_batched"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "LocalREPL",
+          "kind": "public_method",
+          "method": "execute_code",
+          "minimum_invocations": 1,
+          "module": "rlm.environments.local_repl"
+        }
+      },
+      "category": "recursion_depth",
+      "comparison": "matched",
+      "id": "bounded_ordered_recursive_fanout",
+      "imp": {
+        "authority_tests": [
+          "rlm/environments/local_repl.py::LocalREPL._rlm_query_batched"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "call_count": 3,
+          "max_concurrency": 2,
+          "ordered_results": [
+            "slow",
+            "error",
+            "fast"
+          ]
+        },
+        "category": "recursion_depth",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "child_contexts": [
+            "bad",
+            "fast",
+            "slow"
+          ]
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "call_count": 3,
+          "max_concurrency": 2,
+          "ordered_results": [
+            "slow",
+            "error",
+            "fast"
+          ]
+        },
+        "id": "bounded_ordered_recursive_fanout",
+        "invariant": "Recursive fanout is concurrency-bounded, contains one child failure, and returns normalized results in input order.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "Recursive fanout is concurrency-bounded, contains one child failure, and returns normalized results in input order.",
+      "official": {
+        "authority_tests": [
+          "rlm/environments/local_repl.py::LocalREPL._rlm_query_batched"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "call_count": 3,
+          "max_concurrency": 2,
+          "ordered_results": [
+            "slow",
+            "error",
+            "fast"
+          ]
+        },
+        "category": "recursion_depth",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "LocalREPL",
+            "mechanism": "python_public_method_wrapper",
+            "method": "execute_code",
+            "method_is_public": true,
+            "module": "rlm.environments.local_repl",
+            "observed_invocations": 3
+          },
+          "calls": [
+            [
+              "slow",
+              "child-model"
+            ],
+            [
+              "bad",
+              "child-model"
+            ],
+            [
+              "fast",
+              "child-model"
+            ]
+          ],
+          "stderr": ""
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "call_count": 3,
+          "max_concurrency": 2,
+          "ordered_results": [
+            "slow",
+            "error",
+            "fast"
+          ]
+        },
+        "id": "bounded_ordered_recursive_fanout",
+        "invariant": "Recursive fanout is concurrency-bounded, contains one child failure, and returns normalized results in input order.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_subcall_returns_error_when_timeout_exhausted"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "call",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM"
+        },
+        "official": {
+          "class": "RLM",
+          "kind": "public_method",
+          "method": "completion",
+          "minimum_invocations": 1,
+          "module": "rlm.core.rlm"
+        }
+      },
+      "category": "failure_semantics",
+      "comparison": "matched",
+      "id": "expired_deadline_prevents_subcall",
+      "imp": {
+        "authority_tests": [
+          "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_subcall_returns_error_when_timeout_exhausted"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "status": "bounded_failure",
+          "subcall_started": false
+        },
+        "category": "failure_semantics",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "call",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "result": "{:error, {:rlm_max_time_ms, 1, []}}"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "status": "bounded_failure",
+          "subcall_started": false
+        },
+        "id": "expired_deadline_prevents_subcall",
+        "invariant": "An already-expired deadline fails closed before a recursive external call begins.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "An already-expired deadline fails closed before a recursive external call begins.",
+      "official": {
+        "authority_tests": [
+          "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_subcall_returns_error_when_timeout_exhausted"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "call",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM"
+          },
+          "official": {
+            "class": "RLM",
+            "kind": "public_method",
+            "method": "completion",
+            "minimum_invocations": 1,
+            "module": "rlm.core.rlm"
+          }
+        },
+        "canonical": {
+          "status": "bounded_failure",
+          "subcall_started": false
+        },
+        "category": "failure_semantics",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "RLM",
+            "mechanism": "python_public_method_wrapper",
+            "method": "completion",
+            "method_is_public": true,
+            "module": "rlm.core.rlm",
+            "observed_invocations": 1
+          },
+          "response": "Error: Timeout exhausted (0.1s of 0.1s)"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "status": "bounded_failure",
+          "subcall_started": false
+        },
+        "id": "expired_deadline_prevents_subcall",
+        "invariant": "An already-expired deadline fails closed before a recursive external call begins.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "execute",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM.Interpreter"
+        },
+        "official": {
+          "class": "LocalREPL",
+          "kind": "public_method",
+          "method": "execute_code",
+          "minimum_invocations": 1,
+          "module": "rlm.environments.local_repl"
+        }
+      },
+      "category": "sandbox",
+      "comparison": "declared_deviation",
+      "id": "local_code_capability",
+      "imp": {
+        "authority_tests": [
+          "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "imports_allowed": false,
+          "runtime": "constrained_beam_allowlist",
+          "value": null
+        },
+        "category": "sandbox",
+        "comparison": "declared_deviation",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "execute",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM.Interpreter",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          },
+          "result": "{:error, {:function_not_allowed, :import}, %Imp.Predict.RLM.Interpreter{vars: %{}, protected_vars: %{}, callbacks: %{}, runtime: nil, output: \"\", max_steps: 10000, max_output_chars: 8000, max_source_bytes: 32000, max_value_bytes: 16000000, max_effects: 100, effect_journal: [], effect_results: [], effect_requests: [], steps: 0}}",
+          "source": "import :math, only: [sqrt: 1]; value = :math.sqrt(9)"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "imports_allowed": false,
+          "runtime": "constrained_beam_allowlist",
+          "value": null
+        },
+        "id": "local_code_capability",
+        "invariant": "Equivalent standard-library math capability probes use each runtime's native syntax; the official local environment permits the import, while Imp proves the constrained interpreter rejects it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "Equivalent standard-library math capability probes use each runtime's native syntax; the official local environment permits the import, while Imp proves the constrained interpreter rejects it.",
+      "official": {
+        "authority_tests": [
+          "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "imports_allowed": true,
+          "runtime": "non_isolated_local_python",
+          "value": 3.0
+        },
+        "category": "sandbox",
+        "comparison": "declared_deviation",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "LocalREPL",
+            "mechanism": "python_public_method_wrapper",
+            "method": "execute_code",
+            "method_is_public": true,
+            "module": "rlm.environments.local_repl",
+            "observed_invocations": 1
+          },
+          "source": "import math; value = math.sqrt(9)",
+          "stderr": ""
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "imports_allowed": true,
+          "runtime": "non_isolated_local_python",
+          "value": 3.0
+        },
+        "id": "local_code_capability",
+        "invariant": "Equivalent standard-library math capability probes use each runtime's native syntax; the official local environment permits the import, while Imp proves the constrained interpreter rejects it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    },
+    {
+      "authority_tests": [
+        "rlm/environments/local_repl.py::LocalREPL.execute_code"
+      ],
+      "boundary": {
+        "imp": {
+          "arity": 2,
+          "function": "execute",
+          "kind": "exported_call",
+          "minimum_invocations": 1,
+          "module": "Imp.Predict.RLM.Interpreter"
+        },
+        "official": {
+          "class": "LocalREPL",
+          "kind": "public_method",
+          "method": "execute_code",
+          "minimum_invocations": 1,
+          "module": "rlm.environments.local_repl"
+        }
+      },
+      "category": "failure_semantics",
+      "comparison": "matched",
+      "id": "assignment_before_cell_error",
+      "imp": {
+        "authority_tests": [
+          "rlm/environments/local_repl.py::LocalREPL.execute_code"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "assignment_survives_error": false
+        },
+        "category": "failure_semantics",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "arity": 2,
+            "exported": true,
+            "function": "execute",
+            "mechanism": "erlang_call_trace",
+            "module": "Imp.Predict.RLM.Interpreter",
+            "observed_invocations": 1,
+            "trace_pattern_matches": 1
+          }
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "assignment_survives_error": false
+        },
+        "id": "assignment_before_cell_error",
+        "invariant": "A failed cell rolls back an earlier ordinary assignment before later cells or persistent calls can observe it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "invariant": "A failed cell rolls back an earlier ordinary assignment before later cells or persistent calls can observe it.",
+      "official": {
+        "authority_tests": [
+          "rlm/environments/local_repl.py::LocalREPL.execute_code"
+        ],
+        "boundary": {
+          "imp": {
+            "arity": 2,
+            "function": "execute",
+            "kind": "exported_call",
+            "minimum_invocations": 1,
+            "module": "Imp.Predict.RLM.Interpreter"
+          },
+          "official": {
+            "class": "LocalREPL",
+            "kind": "public_method",
+            "method": "execute_code",
+            "minimum_invocations": 1,
+            "module": "rlm.environments.local_repl"
+          }
+        },
+        "canonical": {
+          "assignment_survives_error": false
+        },
+        "category": "failure_semantics",
+        "comparison": "matched",
+        "details": {
+          "boundary_evidence": {
+            "call_shapes": [
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              },
+              {
+                "keyword_arguments": [],
+                "positional_arguments": 2
+              }
+            ],
+            "class": "LocalREPL",
+            "mechanism": "python_public_method_wrapper",
+            "method": "execute_code",
+            "method_is_public": true,
+            "module": "rlm.environments.local_repl",
+            "observed_invocations": 3
+          },
+          "stderr": "\nNameError: name 'missing' is not defined"
+        },
+        "errors": [],
+        "executed": true,
+        "expected": {
+          "assignment_survives_error": false
+        },
+        "id": "assignment_before_cell_error",
+        "invariant": "A failed cell rolls back an earlier ordinary assignment before later cells or persistent calls can observe it.",
+        "passing": true,
+        "real_boundary": true,
+        "required": true
+      },
+      "passing": true,
+      "required": true
+    }
+  ],
+  "runner": "imp-standalone-rlm-runtime-differential",
+  "runtimes": {
+    "imp": {
+      "elixir_version": "1.19.5",
+      "otp_release": "28",
+      "runtime": "beam_constrained_elixir",
+      "source_files": {
+        "lib/imp/predict/rlm.ex": "279ac25383958217eb843f25996a6365468d3552d949f1e0751ae78fb3eb1e65",
+        "lib/imp/predict/rlm/budget.ex": "6c483154aa6b080e32faa64f391a8ad9a8b896b1d5ff53bb568725ad2fa27ad5",
+        "lib/imp/predict/rlm/compaction.ex": "c47e0cd78757c97f15977ffdc75009946bd1efe3770ec095b20c9ac7a5018008",
+        "lib/imp/predict/rlm/interpreter.ex": "233c499c17d4301d4daa30833038ceba3393e7dd64b6eaa49d77490f1fcd3815",
+        "lib/imp/predict/rlm/runtime.ex": "e3630cbcee979b99dd72f54e51186e3e1b76d7d5d87ba99905392a033c38149e",
+        "lib/imp/predict/rlm/session.ex": "01a7b5e3e684f78b58b96b2d14937e94577221b0c4a83734f7feeeec9794bfd4"
+      }
+    },
+    "official": {
+      "loaded_source": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/rlm-upstream/rlm/core/rlm.py",
+      "python_version": "3.11.15",
+      "runner": "official-standalone-rlm-runtime-differential",
+      "runner_source": {
+        "path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/scripts/rlm_runtime_differential.py",
+        "sha256": "843002651d1a72bd34f58c41108aea044fdb22da4f687729218b2a15124a013f"
+      },
+      "runtime": "official"
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "c1_behavioral_conformance": true,
+    "c2_provider_free_operation": true,
+    "category_coverage_complete": true,
+    "covered_categories": [
+      "compaction",
+      "environment_repl",
+      "failure_semantics",
+      "persistence",
+      "recursion_depth",
+      "sandbox"
+    ],
+    "declared_deviations": 1,
+    "differential_complete": true,
+    "effectiveness_claimed": false,
+    "highest_satisfied_rung": "C2",
+    "matched_cases": 8,
+    "paper_protocol_complete": false,
+    "required_cases": 9,
+    "required_categories": [
+      "compaction",
+      "environment_repl",
+      "failure_semantics",
+      "persistence",
+      "recursion_depth",
+      "sandbox"
+    ],
+    "required_passing": 9,
+    "total_cases": 9,
+    "upstream_authority_tests_passed": true
+  },
+  "upstream_tests": {
+    "command": [
+      "python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_completion_returns_metadata_with_logger",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_metadata_has_multiple_iterations",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_error_threshold_check",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_token_limit_check_raises",
+      "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_surfaces_final_answer",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_false_does_not_surface",
+      "tests/test_rlm_query.py::TestLlmQueryDoesNotUseSubcallFn::test_llm_query_ignores_subcall_fn",
+      "tests/test_rlm_query.py::TestRlmQueryBatchedWithSubcallFn::test_batched_partial_failure",
+      "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_child_receives_remaining_timeout"
+    ],
+    "exit_code": 0,
+    "output_sha256": "47fc54e05e346e7f4e042e82b80d3772da0f0d0bc33b0be3f383fc3ed2f86fbf",
+    "runner": "pytest",
+    "status": "passed",
+    "stderr": "",
+    "stdout": "...........                                                              [100%]\n11 passed in 2.06s\n",
+    "summary": "11 passed in 2.06s",
+    "tests": [
+      "tests/test_depth_metadata.py::TestDepth1CompletionLoop::test_multi_iteration_before_final",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_completion_returns_metadata_with_logger",
+      "tests/test_depth_metadata.py::TestDepth1LoggerMetadata::test_metadata_has_multiple_iterations",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_error_threshold_check",
+      "tests/test_depth_metadata.py::TestDepth1LimitChecks::test_token_limit_check_raises",
+      "tests/test_local_repl.py::TestLocalREPLBuiltins::test_imports_work",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_surfaces_final_answer",
+      "tests/test_local_repl.py::TestLocalREPLHelpers::test_answer_ready_false_does_not_surface",
+      "tests/test_rlm_query.py::TestLlmQueryDoesNotUseSubcallFn::test_llm_query_ignores_subcall_fn",
+      "tests/test_rlm_query.py::TestRlmQueryBatchedWithSubcallFn::test_batched_partial_failure",
+      "tests/test_subcall.py::TestSubcallTimeoutPropagation::test_child_receives_remaining_timeout"
+    ]
+  }
+}
