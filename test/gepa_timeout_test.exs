@@ -140,6 +140,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
         timeout: 20,
         reflection_lm: reflection_lm,
         max_reflection_calls: 1,
+        raise_on_exception: false,
         callbacks: [{ErrorCallback, owner}]
       )
       |> Imp.Optimizer.GEPA.compile_with_report(program, [example()], [example()])

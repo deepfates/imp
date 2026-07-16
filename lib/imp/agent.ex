@@ -11,7 +11,7 @@ defmodule Imp.Agent do
       fn agent, inputs, runtime -> Imp.Agent.call_tool(agent, :tool, inputs, runtime) end
 
   Tool execution is policy-gated with `:tool_policy`, and every trace event is
-  redacted through `Imp.Agent.Runtime` before it is stored or streamed.
+  redacted by the agent's trace runtime before it is stored or streamed.
 
   Agent failure boundaries are explicit:
 

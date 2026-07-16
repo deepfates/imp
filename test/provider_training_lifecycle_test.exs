@@ -1,6 +1,16 @@
 defmodule ProviderTrainingLifecycleTest do
   use ExUnit.Case
 
+  test "training statuses distinguish known active, terminal, and unknown states" do
+    assert Imp.Clients.TrainingJob.normalize_status("validating_files") == :pending
+    assert Imp.Clients.TrainingJob.active_status?("validating_files")
+    assert Imp.Clients.TrainingJob.active_status?(:queued)
+    assert Imp.Clients.TrainingJob.terminal_status?("cancelled")
+    assert Imp.Clients.TrainingJob.terminal_status?(:artifact_missing)
+    refute Imp.Clients.TrainingJob.active_status?({:unknown, "provider-paused"})
+    refute Imp.Clients.TrainingJob.terminal_status?({:unknown, "provider-paused"})
+  end
+
   defmodule OpenAITrainingTransport do
     @behaviour Imp.HTTP
 
@@ -350,10 +360,20 @@ defmodule ProviderTrainingLifecycleTest do
     assert %Imp.Clients.TrainingJob{status: :running} =
              Imp.Clients.TrainingJob.new(%{status: "in_progress"})
 
+    assert %Imp.Clients.TrainingJob{status: :succeeded} =
+             Imp.Clients.TrainingJob.new(%{status: :completed, result_model: "atom-model"})
+
+    assert %Imp.Clients.TrainingJob{status: :pending} =
+             Imp.Clients.TrainingJob.new(%{status: :queued})
+
+    assert %Imp.Clients.TrainingJob{status: :running} =
+             Imp.Clients.TrainingJob.new(%{status: :in_progress})
+
     assert %Imp.Clients.TrainingJob{status: {:unknown, "provider-paused"}} =
              Imp.Clients.TrainingJob.new(%{status: "provider-paused"})
 
     assert Imp.Clients.TrainingJob.normalize_status("canceled") == :cancelled
+    assert Imp.Clients.TrainingJob.normalize_status(:canceled) == :cancelled
 
     unknown = Imp.Clients.TrainingJob.new(%{status: "provider-paused"})
 
@@ -462,6 +482,43 @@ defmodule ProviderTrainingLifecycleTest do
 
     unsupported = %{job | cancel_url: nil}
     assert {:error, :training_cancel_not_supported} = Imp.Clients.TrainingJob.cancel(unsupported)
+  end
+
+  test "a successful cancellation request is incomplete until the provider reports cancelled" do
+    statuses = [
+      {"running", :running},
+      {"queued", :pending},
+      {"validating", {:unknown, "validating"}}
+    ]
+
+    Enum.each(statuses, fn {provider_status, expected_status} ->
+      transport = fn _url, _headers, _body, _opts ->
+        {:ok,
+         %{
+           status: 200,
+           headers: [],
+           body: Jason.encode!(%{status: provider_status, request_accepted: true})
+         }}
+      end
+
+      job =
+        Imp.Clients.TrainingJob.new(%{
+          id: "cancel-#{provider_status}",
+          status: :running,
+          transport: transport,
+          cancel_url: "https://training.example/jobs/#{provider_status}/cancel",
+          cancel_body: :empty,
+          max_attempts: 1
+        })
+
+      assert {:error,
+              {:training_cancel_incomplete, ^expected_status,
+               %{"last_status_response" => response}}} =
+               Imp.Clients.TrainingJob.cancel(job)
+
+      assert response["status"] == provider_status
+      assert response["request_accepted"]
+    end)
   end
 
   test "training jobs accept decoded provider-style attrs and reject malformed attrs clearly" do
@@ -1026,6 +1083,51 @@ defmodule ProviderTrainingLifecycleTest do
                      _headers, %{"training_file" => "file-uploaded-demos"}}
   end
 
+  test "BootstrapFinetune forwards a caller OpenAI example encoder unchanged" do
+    lm = %{
+      module: Imp.LM.Static,
+      model: "gpt-test",
+      opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
+    }
+
+    program = Imp.predict("question -> answer", lm: lm)
+    owner = self()
+
+    encoder = fn example ->
+      send(owner, {:caller_example_encoder, Imp.Example.get(example, :question)})
+
+      {:ok,
+       %{
+         messages: [
+           %{role: "user", content: "caller-owned-input"},
+           %{role: "assistant", content: "caller-owned-output"}
+         ]
+       }}
+    end
+
+    trainer =
+      Imp.Clients.OpenAITrainer.new(
+        base_url: "https://api.example/v1",
+        api_key: "sk-test",
+        transport: OpenAITrainingTransport
+      )
+
+    result =
+      Imp.Optimizer.BootstrapFinetune.new(Imp.Metrics.exact_match(:answer),
+        trainer: trainer,
+        max_demos: 1,
+        train_kwargs: [example_encoder: encoder]
+      )
+      |> Imp.Optimizer.BootstrapFinetune.compile(program, examples())
+
+    assert %{job: %Imp.Clients.TrainingJob{provider: :openai}} = result
+    assert_received {:caller_example_encoder, "2+2?"}
+    assert_received {:openai_file_upload, _url, _headers, multipart}
+    assert multipart =~ "caller-owned-input"
+    assert multipart =~ "caller-owned-output"
+    refute multipart =~ "Your input fields are:"
+  end
+
   test "training optimizer constructors reject invalid boundary contracts" do
     metric = Imp.Metrics.exact_match(:answer)
     callback = fn _lm, _examples, _opts -> {:ok, Imp.Clients.TrainingJob.new(%{})} end
@@ -1104,7 +1206,7 @@ defmodule ProviderTrainingLifecycleTest do
                  end
   end
 
-  test "BootstrapFinetune extracts demos and LM through composed program wrappers" do
+  test "BootstrapFinetune extracts trace rows and LM through composed program wrappers" do
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
@@ -1135,14 +1237,14 @@ defmodule ProviderTrainingLifecycleTest do
 
     assert %{
              program: %Imp.Predict.RAG{
-               program: %Imp.Predict.ProgramOfThought{predict: %{demos: [demo]}}
+               program: %Imp.Predict.ProgramOfThought{predict: %{demos: []}}
              },
              job: %Imp.Clients.TrainingJob{id: "job_wrapped"}
            } = result
 
-    assert Imp.Example.get(demo, :program) == "x * 2"
-    assert Imp.Example.get(demo, :doubled) == nil
-    assert_received {:bootstrap_finetune, ^lm, [^demo], [method: :sft]}
+    assert_received {:bootstrap_finetune, ^lm, [training_row], [method: :sft]}
+    assert Imp.Example.get(training_row, :program) == "x * 2"
+    assert Imp.Example.get(training_row, :doubled) == nil
   end
 
   test "GRPO extracts the provider LM through CodeAct and ProgramOfThought wrappers" do

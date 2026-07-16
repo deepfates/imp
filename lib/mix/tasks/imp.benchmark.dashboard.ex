@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
-  @default_results_dir "benchmarks/results"
+  @default_results_dir Imp.BenchmarkTruth.Paths.runs_root()
   @default_claims_file "benchmarks/claims.json"
   @failure_case_ids ~w(
     task_cancellation_releases_admission
@@ -192,7 +192,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "local_mlx_weight_training" =>
         local_mlx_weight_training_lane(
-          Keyword.get(opts, :local_mlx_dir, "benchmarks/results/local-mlx"),
+          Keyword.get(opts, :local_mlx_dir, Imp.BenchmarkTruth.Paths.admitted("local_mlx")),
           max_age_hours
         ),
       "golden_trace" =>
@@ -212,7 +212,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "optimize_anything" =>
         optimize_anything_lane(
-          Keyword.get(opts, :optimize_anything_dir, "benchmarks/results"),
+          Keyword.get(
+            opts,
+            :optimize_anything_dir,
+            Imp.BenchmarkTruth.Paths.admitted("optimize_anything")
+          ),
           max_age_hours
         ),
       "rag_tool_agent" =>
@@ -236,7 +240,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     performance_supported = get_in(lanes, ["provider_free_overhead", "full_evidence"]) == true
 
     %{
-      "schema_version" => 2,
+      "schema_version" => 3,
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => code_revision,
       "max_age_hours" => max_age_hours,
@@ -505,10 +509,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp golden_trace_lane(dir, max_age_hours) do
     with {:ok, path} <-
-           latest_admitted(
+           latest_eligible(
              Path.join(dir, "golden-trace-parity-*.json"),
              :source_revision,
-             max_age_hours
+             max_age_hours,
+             &valid_golden_trace_candidate?/1
            ),
          {:ok, artifact} <- read_artifact(path) do
       passing =
@@ -537,10 +542,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp gate_lane(id, dir, max_age_hours, expected_mix_task, freshness) do
     with {:ok, path} <-
-           latest_admitted(
+           latest_eligible(
              Path.join(dir, "gate-evidence-#{id}-*.json"),
              freshness,
-             max_age_hours
+             max_age_hours,
+             &valid_gate_candidate?(&1, id, expected_mix_task)
            ),
          {:ok, artifact} <- read_artifact(path) do
       passing =
@@ -705,7 +711,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp local_mlx_weight_training_lane(dir, max_age_hours) do
     with {:ok, path, validated} <-
-           latest_valid_local_mlx_artifact(Path.join(dir, "local-mlx-*.json")) do
+           latest_valid_local_mlx_artifact(Path.join(dir, "*.json")) do
       artifact_lane("local_mlx_weight_training", path, validated, max_age_hours,
         passing: true,
         full_evidence: true,
@@ -1057,7 +1063,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp overhead_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "overhead-parity-*.json")),
+    with {:ok, path} <-
+           latest(Path.join(dir, "overhead-parity-*.json"), &valid_overhead_candidate?/1),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
 
@@ -1080,7 +1087,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp instruction_optimizer_contract_lane(dir, max_age_hours, code_revision) do
-    with {:ok, path} <- latest(Path.join(dir, "instruction-optimizer-contract-*.json")),
+    with {:ok, path} <-
+           latest(
+             Path.join(dir, "instruction-optimizer-contract-*.json"),
+             &valid_instruction_optimizer_candidate?/1
+           ),
          {:ok, artifact} <- read_artifact(path) do
       authority = instruction_optimizer_authority(artifact)
       artifact_revision = artifact["git_sha"]
@@ -1176,7 +1187,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp optimizer_lift_lane(dir, max_age_hours, instruction_optimizer_contract) do
-    with {:ok, path} <- latest(Path.join(dir, "optimizer-lift-parity-*.json")),
+    with {:ok, path} <-
+           latest(
+             Path.join(dir, "optimizer-lift-parity-*.json"),
+             &valid_optimizer_lift_candidate?/1
+           ),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
       reported_full = get_in(artifact, ["summary", "full_optimizer_parity"]) == true
@@ -1229,7 +1244,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     required_families = Imp.BenchmarkTruth.GepaReplicationContract.required_families()
     optimizer_fields = Imp.BenchmarkTruth.GepaReplicationContract.optimizer_fields()
 
-    with {:ok, path} <- latest(Path.join(dir, "gepa-replication-*.json")),
+    with {:ok, path} <-
+           latest(Path.join(dir, "gepa-replication-*.json"), &valid_gepa_candidate?/1),
          {:ok, artifact} <- read_artifact(path) do
       rows = Map.get(artifact, "rows", [])
       validation = Imp.BenchmarkTruth.GepaReplicationContract.validate_rows(rows)
@@ -1271,7 +1287,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp optimize_anything_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "optimize-anything-replication-*.json")),
+    with {:ok, path} <-
+           latest(
+             Path.join(dir, "*.json"),
+             &valid_optimize_anything_candidate?/1
+           ),
          {:ok, artifact} <- read_artifact(path) do
       full = Imp.BenchmarkTruth.OptimizeAnything.Artifact.full_artifact?(artifact)
       rows = if is_list(artifact["rows"]), do: artifact["rows"], else: []
@@ -1354,14 +1374,17 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         nil ->
           [
             "tmp/rag-tool-agent/rag-tool-agent-parity-*.json",
-            "benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-*.json"
+            Path.join(
+              Imp.BenchmarkTruth.Paths.runs("rag-tool-agent"),
+              "rag-tool-agent-parity-*.json"
+            )
           ]
 
         path ->
           [Path.join(path, "rag-tool-agent-parity-*.json")]
       end
 
-    with {:ok, path} <- latest(globs),
+    with {:ok, path} <- latest(globs, &valid_rag_tool_agent_candidate?/1),
          {:ok, artifact} <- read_artifact(path) do
       authority = rag_tool_agent_authority(artifact)
       passing = authority["provider_free_complete"]
@@ -1465,7 +1488,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp wire_api_family(value), do: value
 
   defp rlm_benchmark_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "rlm-benchmark-parity-*.json")),
+    with {:ok, path} <-
+           latest(Path.join(dir, "rlm-benchmark-parity-*.json"), &valid_rlm_candidate?/1),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "all_passing"]) == true
       tier = artifact["evidence_tier"]
@@ -1761,7 +1785,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp live_matrix_lane(globs, max_age_hours) do
-    with {:ok, path} <- latest(globs),
+    with {:ok, path} <- latest(globs, &valid_live_matrix_candidate?/1),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["summary", "matrix_complete"]) == true
 
@@ -1798,7 +1822,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp live_campaign_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "imp-dspy-parity-campaign-*.json")),
+    with {:ok, path} <-
+           latest(
+             Path.join(dir, "imp-dspy-parity-campaign-*.json"),
+             &valid_live_campaign_candidate?/1
+           ),
          {:ok, artifact} <- read_artifact(path) do
       passing = get_in(artifact, ["parity", "full_parity"]) == true
 
@@ -1841,14 +1869,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     passing = Keyword.fetch!(opts, :passing)
     full_evidence = Keyword.fetch!(opts, :full_evidence) and full_fresh
     scale = Keyword.fetch!(opts, :scale)
-    admission = admission_details(artifact, path, max_age_hours, freshness)
+    candidate_eligibility = candidate_eligibility(artifact, path, max_age_hours, freshness)
 
     %{
       "id" => id,
       "status" => status(passing, full_evidence, scale, status_fresh),
       "passing" => passing,
       "fresh" => fresh,
-      "admission" => admission,
+      "candidate_eligibility" => candidate_eligibility,
       "full_evidence" => full_evidence,
       "scale" => scale,
       "artifact" => %{
@@ -1869,9 +1897,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       "status" => "missing",
       "passing" => false,
       "fresh" => false,
-      "admission" => %{
+      "candidate_eligibility" => %{
         "policy" => "missing",
-        "admitted" => false,
+        "eligible" => false,
         "recency_valid" => false,
         "source_compatible" => false,
         "rejection_reasons" => ["artifact_missing"]
@@ -2089,14 +2117,17 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp status(true, _full_evidence, scale, true) when scale in ["smoke", "sample"], do: scale
   defp status(true, _full_evidence, _scale, true), do: "passing"
 
-  defp latest_admitted(glob, policy, _max_age_hours) do
+  defp latest_eligible(glob, policy, _max_age_hours, validator) do
     candidates =
       glob
       |> Path.wildcard()
       |> Enum.flat_map(fn path ->
         case read_artifact(path) do
-          {:ok, artifact} -> [{path, artifact}]
-          {:error, _reason} -> []
+          {:ok, artifact} ->
+            if valid_candidate?(validator, artifact), do: [{path, artifact}], else: []
+
+          {:error, _reason} ->
+            []
         end
       end)
 
@@ -2108,22 +2139,104 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     choose_latest_candidate(eligible)
   end
 
-  defp latest(glob) when is_binary(glob), do: latest([glob])
+  defp latest(glob, validator) when is_binary(glob), do: latest([glob], validator)
 
-  defp latest(globs) do
+  defp latest(globs, validator) do
     candidates =
       globs
       |> Enum.flat_map(&Path.wildcard/1)
       |> Enum.uniq()
       |> Enum.flat_map(fn path ->
         case read_artifact(path) do
-          {:ok, artifact} -> [{path, artifact}]
-          {:error, _reason} -> []
+          {:ok, artifact} ->
+            if valid_candidate?(validator, artifact), do: [{path, artifact}], else: []
+
+          {:error, _reason} ->
+            []
         end
       end)
 
     choose_latest_candidate(candidates)
   end
+
+  defp valid_candidate?(validator, artifact) do
+    validator.(artifact) == true
+  rescue
+    _error -> false
+  catch
+    _kind, _reason -> false
+  end
+
+  defp valid_golden_trace_candidate?(%{"summary" => summary}) when is_map(summary) do
+    is_boolean(summary["all_cases_passing"]) and
+      is_map(summary["imp_semantic_checks"]) and
+      is_boolean(summary["imp_semantic_checks"]["all_passing"])
+  end
+
+  defp valid_golden_trace_candidate?(_artifact), do: false
+
+  defp valid_gate_candidate?(%{"summary" => summary} = artifact, id, expected_mix_task)
+       when is_map(summary) do
+    artifact["gate"] == id and summary["mix_task"] == expected_mix_task and
+      is_boolean(summary["passing"])
+  end
+
+  defp valid_gate_candidate?(_artifact, _id, _expected_mix_task), do: false
+
+  defp valid_overhead_candidate?(%{"summary" => summary, "cases" => cases})
+       when is_map(summary) and is_list(cases),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_overhead_candidate?(_artifact), do: false
+
+  defp valid_instruction_optimizer_candidate?(%{"summary" => summary, "dspy" => dspy})
+       when is_map(summary) and is_map(dspy) do
+    is_boolean(summary["structural_contract_complete"]) and
+      is_integer(summary["required_cases"]) and is_integer(summary["required_passing"])
+  end
+
+  defp valid_instruction_optimizer_candidate?(_artifact), do: false
+
+  defp valid_optimizer_lift_candidate?(%{"summary" => summary, "rows" => rows})
+       when is_map(summary) and is_list(rows),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_optimizer_lift_candidate?(_artifact), do: false
+
+  defp valid_gepa_candidate?(%{"summary" => summary, "rows" => rows})
+       when is_map(summary) and is_list(rows),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_gepa_candidate?(_artifact), do: false
+
+  defp valid_optimize_anything_candidate?(%{"summary" => summary, "rows" => rows})
+       when is_map(summary) and is_list(rows),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_optimize_anything_candidate?(_artifact), do: false
+
+  defp valid_rag_tool_agent_candidate?(%{"summary" => summary, "rows" => rows})
+       when is_map(summary) and is_list(rows),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_rag_tool_agent_candidate?(_artifact), do: false
+
+  defp valid_rlm_candidate?(%{"summary" => summary, "evidence_tier" => tier})
+       when is_map(summary) and is_binary(tier),
+       do: is_boolean(summary["all_passing"])
+
+  defp valid_rlm_candidate?(_artifact), do: false
+
+  defp valid_live_matrix_candidate?(%{"summary" => summary}) when is_map(summary),
+    do: is_boolean(summary["matrix_complete"])
+
+  defp valid_live_matrix_candidate?(_artifact), do: false
+
+  defp valid_live_campaign_candidate?(%{"coverage" => coverage, "parity" => parity})
+       when is_map(coverage) and is_map(parity),
+       do: is_boolean(coverage["full"]) and is_boolean(parity["full_parity"])
+
+  defp valid_live_campaign_candidate?(_artifact), do: false
 
   defp choose_latest_candidate([]), do: {:error, :missing}
 
@@ -2161,10 +2274,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp policy_candidate?(artifact, _path, :source_and_age),
     do: current_git_sha_bound?(artifact) and valid_artifact_time?(artifact)
 
-  defp admission_details(artifact, path, max_age_hours, policy) do
+  defp candidate_eligibility(artifact, path, max_age_hours, policy) do
     recency_valid = fresh_by_age?(artifact, path, max_age_hours)
     source_compatible = current_git_sha_bound?(artifact)
-    admitted = fresh?(artifact, path, max_age_hours, policy)
+    eligible = fresh?(artifact, path, max_age_hours, policy)
 
     rejection_reasons =
       []
@@ -2176,7 +2289,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
     %{
       "policy" => Atom.to_string(policy),
-      "admitted" => admitted,
+      "eligible" => eligible,
       "recency_valid" => recency_valid,
       "source_compatible" => source_compatible,
       "max_age_hours" => max_age_hours,

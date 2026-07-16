@@ -43,7 +43,7 @@ defmodule Imp.BenchmarkTruth.RLMCampaign do
     ensure_runnable_selection!(manifest, selection)
     datasets = load_selected_datasets!(manifest, selection)
     runtimes = selection["runtimes"]
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("rlm-campaign"))
     checkpoint_dir = Keyword.get(opts, :checkpoint_dir, Path.join(out_dir, "rlm-checkpoints"))
     File.mkdir_p!(out_dir)
     File.mkdir_p!(checkpoint_dir)

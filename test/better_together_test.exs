@@ -61,6 +61,22 @@ defmodule BetterTogetherTest do
     def run(%__MODULE__{}, _program, _opts), do: {:error, :compile_failed}
   end
 
+  defmodule RaisingOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct []
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts), do: raise("compile exploded")
+  end
+
   defmodule SpyOptimizer do
     @behaviour Imp.Optimizer
     defstruct [:owner]
@@ -98,6 +114,265 @@ defmodule BetterTogetherTest do
       valset = Keyword.fetch!(opts, :validation)
       send(owner, {:prepared_sets, length(trainset), length(valset)})
       {:ok, program}
+    end
+  end
+
+  defmodule CompileArgsOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct [:owner]
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :optional},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{owner: owner}, program, opts) do
+      send(owner, {:compile_args, opts})
+      {:ok, program}
+    end
+  end
+
+  defmodule TeacherCaptureOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct [:owner, :label]
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{owner: owner, label: label}, program, opts) do
+      send(owner, {:generic_teacher, label, Keyword.get(opts, :teacher), opts[:marker]})
+      {:ok, program}
+    end
+  end
+
+  defmodule StatefulCapabilitiesOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct [:owner]
+
+    @impl true
+    def __optimizer__ do
+      key = {__MODULE__, :capability_probes}
+      probes = Process.get(key, 0)
+      Process.put(key, probes + 1)
+
+      if probes == 0 do
+        %{
+          kind: :program,
+          datasets: %{trainset: :required, validation: :unsupported},
+          result: :program
+        }
+      else
+        %{
+          kind: :training,
+          datasets: %{trainset: :required, validation: :unsupported},
+          result: :training_result
+        }
+      end
+    end
+
+    @impl true
+    def run(%__MODULE__{owner: owner}, program, _opts) do
+      send(owner, :stateful_optimizer_ran)
+      {:ok, program}
+    end
+  end
+
+  defmodule GenericTrainingOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct [:job]
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :training,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :training_result
+      }
+
+    @impl true
+    def run(%__MODULE__{job: job}, program, _opts),
+      do:
+        {:ok,
+         %Imp.Optimizer.TrainingResult{
+           program: program,
+           job: job,
+           status: :job_created,
+           metadata: %{optimizer: :generic_test}
+         }}
+  end
+
+  defmodule MetadataProgram do
+    @behaviour Imp.Module
+    defstruct [:predict, metadata: %{}]
+
+    def optimizer_predictors(program), do: [main: program.predict]
+
+    def update_optimizer_predictor(program, :main, update),
+      do: %{program | predict: update.(program.predict)}
+
+    @impl true
+    def call(program, inputs), do: Imp.Module.call(program.predict, inputs)
+  end
+
+  defmodule ReportlessProgram do
+    @behaviour Imp.Module
+    defstruct [:predict]
+
+    def optimizer_predictors(program), do: [main: program.predict]
+
+    def update_optimizer_predictor(program, :main, update),
+      do: %{program | predict: update.(program.predict)}
+
+    @impl true
+    def call(program, inputs), do: Imp.Module.call(program.predict, inputs)
+  end
+
+  defmodule TwoPredictorProgram do
+    @behaviour Imp.Module
+    defstruct [:first, :second, metadata: %{}]
+
+    def optimizer_predictors(program), do: [first: program.first, second: program.second]
+
+    def update_optimizer_predictor(program, name, update),
+      do: Map.update!(program, name, update)
+
+    @impl true
+    def call(program, inputs) do
+      with {:ok, first} <- Imp.Module.call(program.first, inputs),
+           {:ok, second} <- Imp.Module.call(program.second, inputs) do
+        prediction =
+          first
+          |> Imp.Prediction.to_map()
+          |> Map.merge(Imp.Prediction.to_map(second))
+          |> Imp.Prediction.new()
+
+        {:ok, prediction}
+      end
+    end
+  end
+
+  defmodule CompletingTrainingTransport do
+    def request(:get, _url, _headers, _body, _opts) do
+      {:ok,
+       %{
+         status: 200,
+         headers: [],
+         body: Jason.encode!(%{status: "succeeded", result_model: "trained-model"})
+       }}
+    end
+  end
+
+  defmodule SlowTrainingTransport do
+    def request(:get, _url, _headers, _body, _opts) do
+      if owner = Process.whereis(BetterTogetherTest.SlowTransportOwner) do
+        send(owner, :slow_refresh_started)
+      end
+
+      Process.sleep(1_000)
+
+      {:ok,
+       %{
+         status: 200,
+         headers: [],
+         body: Jason.encode!(%{status: "succeeded", result_model: "too-late"})
+       }}
+    end
+
+    def request(:post, url, _headers, _body, _opts) do
+      if owner = Process.whereis(BetterTogetherTest.SlowTransportOwner) do
+        send(owner, {:slow_cancel_requested, url})
+      end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+  end
+
+  defmodule MixedTrainingTransport do
+    def request(:get, url, _headers, _body, _opts) do
+      cond do
+        String.ends_with?(url, "/failed") ->
+          {:ok,
+           %{
+             status: 200,
+             headers: [],
+             body: Jason.encode!(%{status: "failed", error: "provider rejected data"})
+           }}
+
+        String.ends_with?(url, "/blocked") ->
+          if owner = Process.whereis(BetterTogetherTest.MixedTransportOwner) do
+            send(owner, :mixed_blocking_refresh_started)
+          end
+
+          Process.sleep(1_000)
+
+          {:ok,
+           %{
+             status: 200,
+             headers: [],
+             body: Jason.encode!(%{status: "running"})
+           }}
+      end
+    end
+
+    def request(:post, url, _headers, _body, _opts) do
+      if owner = Process.whereis(BetterTogetherTest.MixedTransportOwner) do
+        send(owner, {:mixed_cancel_requested, url})
+      end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+  end
+
+  defmodule FailureThenRefreshErrorTransport do
+    def request(:get, url, _headers, _body, _opts) do
+      cond do
+        String.ends_with?(url, "/failed") ->
+          {:ok,
+           %{
+             status: 200,
+             headers: [],
+             body: Jason.encode!(%{status: "failed", error: "provider rejected data"})
+           }}
+
+        String.ends_with?(url, "/refresh-error") ->
+          if owner = Process.whereis(BetterTogetherTest.RefreshErrorOwner) do
+            send(owner, :mixed_refresh_error_seen)
+          end
+
+          {:error, :provider_status_unavailable}
+      end
+    end
+
+    def request(:post, url, _headers, _body, _opts) do
+      if owner = Process.whereis(BetterTogetherTest.RefreshErrorOwner) do
+        send(owner, {:mixed_refresh_cancel_requested, url})
+      end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+  end
+
+  defmodule HungCancellationTransport do
+    def request(:post, url, _headers, _body, _opts) do
+      if owner = Process.whereis(BetterTogetherTest.HungCancellationOwner) do
+        send(owner, {:hung_cleanup_requested, url})
+      end
+
+      if String.ends_with?(url, "/hung/cancel") do
+        Process.sleep(1_000)
+      end
+
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
     end
   end
 
@@ -156,6 +431,24 @@ defmodule BetterTogetherTest do
     assert report.metadata.steps == ["p", "w", "p"]
     assert report.metadata.selected_strategy == "p -> w -> p"
     assert Enum.map(report.candidates, & &1.score) == [0.0, 0.5, 0.0, 1.0]
+  end
+
+  test "accepts trace-aware arity-three metrics" do
+    owner = self()
+
+    metric = fn example, prediction, _trace ->
+      send(owner, :trace_metric_called)
+      Imp.Example.get(example, :answer) == Imp.Prediction.get(prediction, :answer)
+    end
+
+    compiled =
+      BetterTogether.new(metric, %{
+        p: %SetInstruction{instruction: "Answer every question."}
+      })
+      |> BetterTogether.compile(program(), examples(), examples(), strategy: :p)
+
+    assert_received :trace_metric_called
+    assert Imp.Optimizer.Report.fetch(compiled).candidate_count == 2
   end
 
   test "retains and returns the baseline when optimization makes validation worse" do
@@ -232,6 +525,495 @@ defmodule BetterTogetherTest do
     assert report.metadata.validation_size == 0
   end
 
+  test "forwards keyed compile arguments after applying per-step dataset overrides" do
+    overridden_trainset = [hd(examples())]
+
+    compiled =
+      metric()
+      |> BetterTogether.new(%{capture: %CompileArgsOptimizer{owner: self()}})
+      |> BetterTogether.compile(program(), examples(), examples(),
+        strategy: :capture,
+        shuffle_trainset_between_steps: false,
+        optimizer_compile_args: %{
+          capture: [trainset: overridden_trainset, validation: [], marker: :per_step]
+        }
+      )
+
+    assert_received {:compile_args, opts}
+    assert opts[:trainset] == overridden_trainset
+    assert opts[:validation] == []
+    assert opts[:marker] == :per_step
+
+    assert Enum.any?(Imp.Optimizer.Report.fetch(compiled).candidates, fn candidate ->
+             candidate.strategy == "capture"
+           end)
+  end
+
+  test "routes global and per-step teachers through a generic optimizer contract" do
+    global_teacher = program()
+
+    step_teacher =
+      program()
+      |> Imp.Optimizer.InstructionSearch.put_instruction("step teacher")
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        global: %TeacherCaptureOptimizer{owner: self(), label: :global},
+        override: %TeacherCaptureOptimizer{owner: self(), label: :override}
+      })
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: [:global, :override],
+        teacher: global_teacher,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false,
+        optimizer_compile_args: %{
+          global: [marker: :global],
+          override: [teacher: step_teacher, marker: :override]
+        }
+      )
+
+    assert_received {:generic_teacher, :global, ^global_teacher, :global}
+    assert_received {:generic_teacher, :override, ^step_teacher, :override}
+    assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_strategy == "global -> override"
+  end
+
+  test "executes a generic step under its single captured capability declaration" do
+    key = {StatefulCapabilitiesOptimizer, :capability_probes}
+    Process.delete(key)
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        stateful: %StatefulCapabilitiesOptimizer{owner: self()}
+      })
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :stateful,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received :stateful_optimizer_ran
+    assert Process.get(key) == 1
+    assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_strategy == "stateful"
+  end
+
+  test "awaits and rebinds an active generic training result" do
+    trainable_program =
+      Imp.with_lm(program(), Map.put(Imp.ProgramAccess.lm(program()), :model, "generic-base"))
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "generic-active",
+        provider: :test,
+        model: "generic-base",
+        status: :running,
+        status_url: "https://training.example/jobs/generic-active",
+        status_method: :get,
+        transport: CompletingTrainingTransport
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+      |> BetterTogether.compile(trainable_program, examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_timeout: 100,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert Imp.ProgramAccess.lm(compiled).model == "trained-model"
+
+    assert Enum.any?(Imp.Optimizer.Report.fetch(compiled).candidates, fn candidate ->
+             Map.get(candidate, :compile_metadata) == %{
+               kind: :training,
+               optimizer: GenericTrainingOptimizer,
+               awaited: true,
+               training_status: :completed
+             }
+           end)
+  end
+
+  test "cleans up an active generic training result when polling times out" do
+    owner = self()
+
+    cancel_transport = fn url, _headers, _body, _opts ->
+      send(owner, {:generic_cancel_requested, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "generic-cleanup-success",
+        provider: :test,
+        status: :running,
+        transport: cancel_transport,
+        cancel_url: "https://training.example/jobs/generic-cleanup-success/cancel",
+        cancel_body: :empty,
+        max_attempts: 1
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_timeout: 0,
+        training_cancellation_timeout: 100,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:generic_cancel_requested,
+                     "https://training.example/jobs/generic-cleanup-success/cancel"}
+
+    assert [%{error: {:training_step_timeout, GenericTrainingOptimizer, 0, [summary], [cleanup]}}] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert summary == %{job_id: "generic-cleanup-success", status: :running, metadata: %{}}
+
+    assert cleanup == %{
+             job_id: "generic-cleanup-success",
+             prior_status: :running,
+             status: :cancelled,
+             result: :ok
+           }
+  end
+
+  test "reports generic cleanup failure without claiming completion" do
+    cancel_transport = fn _url, _headers, _body, _opts ->
+      {:ok, %{status: 503, headers: [], body: Jason.encode!(%{error: "unavailable"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "generic-cleanup-failure",
+        provider: :test,
+        status: :running,
+        transport: cancel_transport,
+        cancel_url: "https://training.example/jobs/generic-cleanup-failure/cancel",
+        cancel_body: :empty,
+        max_attempts: 1
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_timeout: 0,
+        training_cancellation_timeout: 100,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert [
+             %{
+               error: {:training_step_timeout, GenericTrainingOptimizer, 0, [_summary], [cleanup]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert {:error, {:http_error, 503, _body}} = cleanup.result
+    assert cleanup.status == :running
+  end
+
+  test "bounds generic cleanup when cancellation hangs" do
+    owner = self()
+
+    cancel_transport = fn url, _headers, _body, _opts ->
+      send(owner, {:generic_hung_cancel_requested, url})
+      Process.sleep(1_000)
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "generic-cleanup-timeout",
+        provider: :test,
+        status: :running,
+        transport: cancel_transport,
+        cancel_url: "https://training.example/jobs/generic-cleanup-timeout/cancel",
+        cancel_body: :empty,
+        max_attempts: 1
+      })
+
+    started_at = System.monotonic_time(:millisecond)
+
+    compiled =
+      BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_timeout: 0,
+        training_cancellation_timeout: 25,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert System.monotonic_time(:millisecond) - started_at < 500
+
+    assert_received {:generic_hung_cancel_requested,
+                     "https://training.example/jobs/generic-cleanup-timeout/cancel"}
+
+    assert [
+             %{
+               error: {:training_step_timeout, GenericTrainingOptimizer, 0, [_summary], [cleanup]}
+             }
+           ] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert {:error, {:training_cancel_timeout, timeout}} = cleanup.result
+    assert timeout in 0..25
+    assert cleanup.status == :running
+  end
+
+  test "handles known terminal generic jobs without polling or cancellation" do
+    owner = self()
+
+    transport = fn url, _headers, _body, _opts ->
+      send(owner, {:unexpected_generic_lifecycle_request, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "running"})}}
+    end
+
+    base_program = program()
+
+    trainable_program =
+      Imp.with_lm(
+        base_program,
+        Map.put(Imp.ProgramAccess.lm(base_program), :model, "terminal-base")
+      )
+
+    for status <- [:succeeded, :failed, :cancelled, :artifact_missing] do
+      attrs = %{
+        id: "generic-terminal-#{status}",
+        provider: :test,
+        status: status,
+        transport: transport,
+        status_url: "https://training.example/jobs/terminal-#{status}",
+        cancel_url: "https://training.example/jobs/terminal-#{status}/cancel",
+        cancel_body: :empty
+      }
+
+      attrs =
+        if status == :succeeded, do: Map.put(attrs, :result_model, "terminal-model"), else: attrs
+
+      job = Imp.Clients.TrainingJob.new(attrs)
+
+      compiled =
+        BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+        |> BetterTogether.compile(trainable_program, examples(), nil,
+          strategy: :g,
+          valset_ratio: 0,
+          training_timeout: 25,
+          shuffle_trainset_between_steps: false
+        )
+
+      case status do
+        :succeeded ->
+          assert Imp.ProgramAccess.lm(compiled).model == "terminal-model"
+          assert Imp.Optimizer.Report.fetch(compiled).errors == []
+
+        _failure ->
+          assert [%{error: {:training_failed, ^status, _metadata}}] =
+                   Imp.Optimizer.Report.fetch(compiled).errors
+      end
+    end
+
+    refute_received {:unexpected_generic_lifecycle_request, _}
+  end
+
+  test "fails closed without polling or cancelling an unknown generic job status" do
+    owner = self()
+
+    transport = fn url, _headers, _body, _opts ->
+      send(owner, {:unexpected_unknown_lifecycle_request, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "generic-unknown",
+        provider: :test,
+        status: {:unknown, "provider-paused"},
+        transport: transport,
+        status_url: "https://training.example/jobs/generic-unknown",
+        cancel_url: "https://training.example/jobs/generic-unknown/cancel",
+        cancel_body: :empty
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{g: %GenericTrainingOptimizer{job: job}})
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_timeout: 25,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert [
+             %{
+               error:
+                 {:unknown_training_status, GenericTrainingOptimizer,
+                  {:unknown, "provider-paused"}, %{}}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    refute_received {:unexpected_unknown_lifecycle_request, _}
+  end
+
+  test "explicitly rejects a function-valued generic optimizer" do
+    owner = self()
+
+    function_optimizer = fn _optimizer, _program, _opts ->
+      send(owner, :function_optimizer_called)
+      {:error, :unexpected_function_dispatch}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{callable: function_optimizer})
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :callable,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    refute_received :function_optimizer_called
+
+    assert [%{error: {:not_an_optimizer, ^function_optimizer}}] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
+  test "attaches reports to custom executable metadata carriers" do
+    student = %MetadataProgram{predict: program()}
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        custom: %TeacherCaptureOptimizer{owner: self(), label: :carrier}
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :custom,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:generic_teacher, :carrier, nil, nil}
+    assert %MetadataProgram{} = compiled
+    assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_strategy == "custom"
+  end
+
+  test "rejects reportless custom executables before optimizer work" do
+    student = %ReportlessProgram{predict: program()}
+
+    better =
+      BetterTogether.new(metric(), %{
+        custom: %SpyOptimizer{owner: self()}
+      })
+
+    assert_raise ArgumentError, ~r/cannot store optimizer reports.*map-valued :metadata/s, fn ->
+      BetterTogether.compile(better, student, examples(), nil,
+        strategy: :custom,
+        valset_ratio: 0
+      )
+    end
+
+    refute_received :unexpected_later_step
+  end
+
+  test "routes an explicit teacher into BootstrapFewShot" do
+    student_lm = %{
+      module: Imp.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "student"} end]
+    }
+
+    teacher_lm = %{
+      module: Imp.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "teacher"} end]
+    }
+
+    student = Imp.predict("question -> answer", lm: student_lm)
+    teacher = Imp.predict("question -> answer", lm: teacher_lm)
+    trainset = [example("Who answered?", "teacher")]
+
+    optimizer =
+      Imp.Optimizer.BootstrapFewShot.new(metric(),
+        max_bootstrapped_demos: 1,
+        max_labeled_demos: 0
+      )
+
+    compiled =
+      BetterTogether.new(metric(), %{p: optimizer})
+      |> BetterTogether.compile(student, trainset, nil,
+        strategy: :p,
+        teacher: teacher,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert [demo] = compiled.demos
+    assert Imp.Example.get(demo, :answer) == "teacher"
+
+    assert Enum.any?(Imp.Optimizer.Report.fetch(compiled).candidates, fn candidate ->
+             get_in(candidate, [:compile_metadata, :teacher]) == :provided
+           end)
+  end
+
+  test "routes an explicit teacher into BootstrapFinetune while training the student LM" do
+    student_lm = %{
+      module: Imp.LM.Static,
+      model: "student-base",
+      opts: [handler: fn _messages, _opts -> %{answer: "student"} end]
+    }
+
+    teacher_lm = %{
+      module: Imp.LM.Static,
+      model: "teacher-base",
+      opts: [handler: fn _messages, _opts -> %{answer: "teacher"} end]
+    }
+
+    student = Imp.predict("question -> answer", lm: student_lm)
+    teacher = Imp.predict("question -> answer", lm: teacher_lm)
+    trainset = [example("Who answered?", "teacher")]
+
+    trainer = fn training_lm, rows, _opts ->
+      send(self(), {:teacher_training_rows, training_lm, rows})
+
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "teacher-sft",
+         provider: :test,
+         model: training_lm.model,
+         status: :succeeded,
+         result_model: "teacher-trained"
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+      })
+      |> BetterTogether.compile(student, trainset, nil,
+        strategy: :w,
+        teacher: teacher,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:teacher_training_rows, ^student_lm, [row]}
+    assert Imp.Example.get(row, :answer) == "teacher"
+    assert Imp.ProgramAccess.lm(compiled).model == "teacher-trained"
+  end
+
+  test "rejects teacher propagation into GEPA before running it" do
+    teacher = program()
+    gepa = Imp.Optimizer.GEPA.new(metric(), generations: 0)
+
+    compiled =
+      BetterTogether.new(metric(), %{g: gepa})
+      |> BetterTogether.compile(program(), examples(), examples(),
+        strategy: :g,
+        teacher: teacher
+      )
+
+    assert [%{error: {:teacher_not_supported, Imp.Optimizer.GEPA}}] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
   test "stops after the first failed step and reports the evaluated prefixes" do
     better =
       BetterTogether.new(metric(), %{
@@ -256,6 +1038,23 @@ defmodule BetterTogetherTest do
     assert report.errors == [%{index: 2, key: :bad, error: :compile_failed}]
   end
 
+  test "converts a raised optimizer step into a terminal strategy error" do
+    compiled =
+      BetterTogether.new(metric(), %{
+        bad: %RaisingOptimizer{},
+        later: %SpyOptimizer{owner: self()}
+      })
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: [:bad, :later],
+        valset_ratio: 0
+      )
+
+    refute_receive :unexpected_later_step
+
+    assert [%{error: {:optimizer_failed, RaisingOptimizer, "compile exploded"}}] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
   test "does not claim provider weight training succeeded when no trainer is available" do
     compiled =
       metric()
@@ -270,7 +1069,9 @@ defmodule BetterTogetherTest do
     assert [%{error: {:training_not_started, :trainer_required, _compiled}}] = report.errors
 
     assert report.metadata.provider_training_semantics ==
-             :completed_training_results_only
+             :bounded_await_and_atomic_rebind
+
+    assert report.metadata.weight_provider_boundary == :explicit_trainer_required
   end
 
   test "composes a terminal successful weight step with the rebound program" do
@@ -308,6 +1109,478 @@ defmodule BetterTogetherTest do
     assert Enum.any?(report.candidates, fn candidate ->
              get_in(candidate, [:compile_metadata, :training_status]) == :completed
            end)
+  end
+
+  test "awaits an asynchronous weight job, rebinds, and continues the strategy" do
+    base_program = program()
+
+    trainable_program =
+      Imp.with_lm(base_program, Map.put(Imp.ProgramAccess.lm(base_program), :model, "base"))
+
+    trainer = fn training_lm, _examples, _opts ->
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "async-sft",
+         provider: :test,
+         model: training_lm.model,
+         status: :running,
+         status_url: "https://training.example/jobs/async-sft",
+         status_method: :get,
+         transport: CompletingTrainingTransport
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer),
+        p: %SetInstruction{instruction: "Answer every question."}
+      })
+      |> BetterTogether.compile(trainable_program, examples(), nil,
+        strategy: [:w, :p],
+        valset_ratio: 0,
+        training_timeout: 100,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert Imp.ProgramAccess.lm(compiled).model == "trained-model"
+
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             "Answer every question."
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    refute report.metadata.compilation_error_occurred
+    assert report.metadata.selected_strategy == "w -> p"
+
+    assert Enum.any?(report.candidates, fn candidate ->
+             candidate.strategy == "w" and
+               get_in(candidate, [:compile_metadata, :awaited]) == true
+           end)
+  end
+
+  test "a pending weight job times out without running later steps" do
+    base_program = program()
+
+    trainable_program =
+      Imp.with_lm(base_program, Map.put(Imp.ProgramAccess.lm(base_program), :model, "base"))
+
+    owner = self()
+
+    cancel_transport = fn url, _headers, _body, _opts ->
+      send(owner, {:timeout_cancel_requested, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    trainer = fn _lm, _examples, _opts ->
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "never-completes",
+         provider: :test,
+         model: "base",
+         status: :running,
+         transport: cancel_transport,
+         cancel_url: "https://training.example/jobs/never-completes/cancel",
+         cancel_body: :empty
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer),
+        later: %SpyOptimizer{owner: self()}
+      })
+      |> BetterTogether.compile(trainable_program, examples(), nil,
+        strategy: [:w, :later],
+        valset_ratio: 0,
+        training_timeout: 0,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    refute_receive :unexpected_later_step
+
+    assert_received {:timeout_cancel_requested,
+                     "https://training.example/jobs/never-completes/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_step_timeout, Imp.Optimizer.BootstrapFinetune, 0, [summary],
+                  [cancellation]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert summary.job_id == "never-completes"
+    assert summary.status == :cancelled
+    assert cancellation.job_id == "never-completes"
+    assert cancellation.prior_status == :running
+    assert cancellation.status == :cancelled
+    assert cancellation.result == :ok
+  end
+
+  test "timeout cleanup starts peers concurrently and bounds a hung cancellation" do
+    Process.register(self(), BetterTogetherTest.HungCancellationOwner)
+
+    on_exit(fn ->
+      if Process.whereis(BetterTogetherTest.HungCancellationOwner) do
+        Process.unregister(BetterTogetherTest.HungCancellationOwner)
+      end
+    end)
+
+    hung_lm = %{
+      module: Imp.LM.Static,
+      model: "hung-base",
+      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
+    }
+
+    fast_lm = %{
+      module: Imp.LM.Static,
+      model: "fast-base",
+      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
+    }
+
+    student = %TwoPredictorProgram{
+      first: Imp.predict("question -> first_answer", lm: hung_lm),
+      second: Imp.predict("question -> second_answer", lm: fast_lm)
+    }
+
+    trainer = fn training_lm, _examples, _opts ->
+      suffix = if training_lm.model == "hung-base", do: "hung", else: "fast"
+
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "cleanup-#{suffix}",
+         status: :running,
+         transport: HungCancellationTransport,
+         cancel_url: "https://training.example/jobs/#{suffix}/cancel",
+         cancel_body: :empty,
+         max_attempts: 1
+       })}
+    end
+
+    started_at = System.monotonic_time(:millisecond)
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(nil, trainer: trainer)
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        training_timeout: 0,
+        training_cancellation_timeout: 25,
+        shuffle_trainset_between_steps: false
+      )
+
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert elapsed < 500
+    assert Process.alive?(self())
+
+    assert_received {:hung_cleanup_requested, "https://training.example/jobs/hung/cancel"}
+
+    assert_received {:hung_cleanup_requested, "https://training.example/jobs/fast/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_step_timeout, Imp.Optimizer.BootstrapFinetune, 0,
+                  [hung_summary, fast_summary], [hung_cleanup, fast_cleanup]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert {hung_summary.job_id, hung_summary.status} == {"cleanup-hung", :running}
+    assert {fast_summary.job_id, fast_summary.status} == {"cleanup-fast", :cancelled}
+    assert hung_cleanup.job_id == "cleanup-hung"
+    assert hung_cleanup.status == :running
+    assert {:error, {:training_cancel_timeout, timeout}} = hung_cleanup.result
+    assert timeout in 0..25
+    assert fast_cleanup.job_id == "cleanup-fast"
+    assert fast_cleanup.status == :cancelled
+    assert fast_cleanup.result == :ok
+  end
+
+  test "a provider-cancelled job cancels every still-running peer" do
+    cancelled_lm = %{
+      module: Imp.LM.Static,
+      model: "cancelled-base",
+      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
+    }
+
+    running_lm = %{
+      module: Imp.LM.Static,
+      model: "running-base",
+      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
+    }
+
+    student = %TwoPredictorProgram{
+      first: Imp.predict("question -> first_answer", lm: cancelled_lm),
+      second: Imp.predict("question -> second_answer", lm: running_lm)
+    }
+
+    owner = self()
+
+    cancel_transport = fn url, _headers, _body, _opts ->
+      send(owner, {:peer_cancel_requested, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    trainer = fn
+      %{model: "cancelled-base"}, _examples, _opts ->
+        {:ok,
+         Imp.Clients.TrainingJob.new(%{
+           id: "provider-cancelled",
+           provider: :test,
+           status: :cancelled,
+           metadata: %{reason: :provider_cancelled}
+         })}
+
+      %{model: "running-base"}, _examples, _opts ->
+        {:ok,
+         Imp.Clients.TrainingJob.new(%{
+           id: "running-peer",
+           provider: :test,
+           status: :running,
+           transport: cancel_transport,
+           cancel_url: "https://training.example/jobs/running-peer/cancel",
+           cancel_body: :empty
+         })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(nil, trainer: trainer)
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:peer_cancel_requested, "https://training.example/jobs/running-peer/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_plan_failed, [%{job_id: "provider-cancelled", status: :cancelled}],
+                  _jobs, [%{job_id: "running-peer", status: :cancelled, result: :ok}]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
+  test "the await deadline bounds a blocking provider refresh" do
+    Process.register(self(), BetterTogetherTest.SlowTransportOwner)
+
+    on_exit(fn ->
+      if Process.whereis(BetterTogetherTest.SlowTransportOwner) do
+        Process.unregister(BetterTogetherTest.SlowTransportOwner)
+      end
+    end)
+
+    base_program = program()
+
+    trainable_program =
+      Imp.with_lm(base_program, Map.put(Imp.ProgramAccess.lm(base_program), :model, "base"))
+
+    trainer = fn training_lm, _examples, _opts ->
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "slow-refresh",
+         provider: :test,
+         model: training_lm.model,
+         status: :running,
+         status_url: "https://training.example/jobs/slow-refresh",
+         cancel_url: "https://training.example/jobs/slow-refresh/cancel",
+         status_method: :get,
+         cancel_body: :empty,
+         max_attempts: 1,
+         transport: SlowTrainingTransport
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+      })
+      |> BetterTogether.compile(trainable_program, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        training_timeout: 25,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received :slow_refresh_started
+    assert_received {:slow_cancel_requested, "https://training.example/jobs/slow-refresh/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_step_timeout, Imp.Optimizer.BootstrapFinetune, 25,
+                  [%{status: :cancelled}], [%{status: :cancelled, result: :ok}]}
+             }
+           ] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
+  test "provider failure wins when a later refresh returns an error" do
+    Process.register(self(), BetterTogetherTest.RefreshErrorOwner)
+
+    on_exit(fn ->
+      if Process.whereis(BetterTogetherTest.RefreshErrorOwner) do
+        Process.unregister(BetterTogetherTest.RefreshErrorOwner)
+      end
+    end)
+
+    failed_lm = %{
+      module: Imp.LM.Static,
+      model: "failed-before-refresh-error",
+      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
+    }
+
+    refresh_error_lm = %{
+      module: Imp.LM.Static,
+      model: "refresh-error-base",
+      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
+    }
+
+    student = %TwoPredictorProgram{
+      first: Imp.predict("question -> first_answer", lm: failed_lm),
+      second: Imp.predict("question -> second_answer", lm: refresh_error_lm)
+    }
+
+    trainer = fn training_lm, _examples, _opts ->
+      suffix =
+        if training_lm.model == "failed-before-refresh-error",
+          do: "failed",
+          else: "refresh-error"
+
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "ordered-#{suffix}",
+         provider: :test,
+         model: training_lm.model,
+         status: :running,
+         status_url: "https://training.example/jobs/#{suffix}",
+         cancel_url: "https://training.example/jobs/#{suffix}/cancel",
+         status_method: :get,
+         cancel_body: :empty,
+         max_attempts: 1,
+         transport: FailureThenRefreshErrorTransport
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(nil, trainer: trainer)
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        training_timeout: 100,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received :mixed_refresh_error_seen
+
+    assert_received {:mixed_refresh_cancel_requested,
+                     "https://training.example/jobs/refresh-error/cancel"}
+
+    refute_received {:mixed_refresh_cancel_requested,
+                     "https://training.example/jobs/failed/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_plan_failed, [failed], all_jobs,
+                  [%{job_id: "ordered-refresh-error", status: :cancelled, result: :ok}]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert failed.job_id == "ordered-failed"
+    assert failed.status == :failed
+
+    assert Enum.map(all_jobs, &{&1.job_id, &1.status}) == [
+             {"ordered-failed", :failed},
+             {"ordered-refresh-error", :running}
+           ]
+  end
+
+  test "preserves a terminal provider failure when a later refresh blocks to timeout" do
+    Process.register(self(), BetterTogetherTest.MixedTransportOwner)
+
+    on_exit(fn ->
+      if Process.whereis(BetterTogetherTest.MixedTransportOwner) do
+        Process.unregister(BetterTogetherTest.MixedTransportOwner)
+      end
+    end)
+
+    failed_lm = %{
+      module: Imp.LM.Static,
+      model: "failed-base",
+      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
+    }
+
+    blocked_lm = %{
+      module: Imp.LM.Static,
+      model: "blocked-base",
+      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
+    }
+
+    student = %TwoPredictorProgram{
+      first: Imp.predict("question -> first_answer", lm: failed_lm),
+      second: Imp.predict("question -> second_answer", lm: blocked_lm)
+    }
+
+    trainer = fn training_lm, _examples, _opts ->
+      suffix = if training_lm.model == "failed-base", do: "failed", else: "blocked"
+
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "mixed-#{suffix}",
+         provider: :test,
+         model: training_lm.model,
+         status: :running,
+         status_url: "https://training.example/jobs/#{suffix}",
+         cancel_url: "https://training.example/jobs/#{suffix}/cancel",
+         status_method: :get,
+         cancel_body: :empty,
+         max_attempts: 1,
+         transport: MixedTrainingTransport
+       })}
+    end
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(nil, trainer: trainer)
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        training_timeout: 25,
+        training_poll_interval: 0,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received :mixed_blocking_refresh_started
+    assert_received {:mixed_cancel_requested, "https://training.example/jobs/blocked/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_plan_failed, [failed], all_jobs,
+                  [%{job_id: "mixed-blocked", status: :cancelled, result: :ok}]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert failed.job_id == "mixed-failed"
+    assert failed.status == :failed
+
+    assert Enum.map(all_jobs, &{&1.job_id, &1.status}) == [
+             {"mixed-failed", :failed},
+             {"mixed-blocked", :running}
+           ]
   end
 
   test "rejects empty training data and invalid holdout ratios during preparation" do

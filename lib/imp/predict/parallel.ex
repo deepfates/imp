@@ -1,6 +1,7 @@
 defmodule Imp.Predict.Parallel do
   @moduledoc """
-  Run a program across many inputs concurrently through `Imp.Tasks`.
+  Run a program across many inputs concurrently through a supervised BEAM task
+  boundary.
 
   `map/3` is the Imp batch prediction primitive. It accepts any executable
   Imp program and an enumerable of input maps, runs the program through the

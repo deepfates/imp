@@ -15,6 +15,105 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaignTest do
     refute ProviderTrainingCampaign.valid_dataset?(tampered)
   end
 
+  test "dispatch intent is stable and credential-free across a restart" do
+    dataset = %{"payload_sha256" => "sha256:" <> String.duplicate("a", 64)}
+
+    first =
+      ProviderTrainingCampaign.dispatch_plan(dataset, "openai:test-model", 3,
+        api_key: "sk-provider-secret-1234567890",
+        suffix: "campaign-test"
+      )
+
+    restarted =
+      Jason.encode!(first.intent)
+      |> Jason.decode!()
+
+    second =
+      ProviderTrainingCampaign.dispatch_plan(dataset, "openai:test-model", 3,
+        api_key: "sk-provider-secret-1234567890",
+        suffix: "campaign-test"
+      )
+
+    assert first.idempotency_key == second.idempotency_key
+    assert restarted["identity"]["dataset_payload_sha256"] == dataset["payload_sha256"]
+
+    assert restarted["idempotency_key_sha256"] ==
+             :crypto.hash(:sha256, first.idempotency_key) |> Base.encode16(case: :lower)
+
+    refute Jason.encode!(restarted) =~ "sk-provider-secret-1234567890"
+    refute Map.has_key?(restarted["identity"], "api_key")
+  end
+
+  test "restart after provider acceptance before checkpoint refuses a second submission" do
+    checkpoint_path =
+      Path.join(System.tmp_dir!(), "provider-training-missing-#{System.unique_integer()}.json")
+
+    plan =
+      ProviderTrainingCampaign.dispatch_plan(
+        %{"payload_sha256" => "sha256:campaign-dataset"},
+        "openai:test-model",
+        3
+      )
+
+    state = %{"status" => "baseline_complete", "dispatch_intent" => plan.intent}
+    restarted = state |> Jason.encode!() |> Jason.decode!()
+
+    assert {:error, {:ambiguous_dispatch, identity}} =
+             ProviderTrainingCampaign.recover_dispatch(restarted, checkpoint_path)
+
+    assert identity["dataset_payload_sha256"] == "sha256:campaign-dataset"
+    refute File.exists?(checkpoint_path)
+  end
+
+  test "interruption before the provider call remains fail-closed on restart" do
+    checkpoint_path =
+      Path.join(
+        System.tmp_dir!(),
+        "provider-training-interrupted-#{System.unique_integer()}.json"
+      )
+
+    plan =
+      ProviderTrainingCampaign.dispatch_plan(
+        %{"payload_sha256" => "sha256:campaign-dataset"},
+        "openai:test-model",
+        3
+      )
+
+    assert {:error, {:ambiguous_dispatch, _identity}} =
+             ProviderTrainingCampaign.recover_dispatch(
+               %{"status" => "baseline_complete", "dispatch_intent" => plan.intent},
+               checkpoint_path
+             )
+  end
+
+  test "a saved checkpoint resolves a pending intent without changing its job identity" do
+    checkpoint_path =
+      Path.join(System.tmp_dir!(), "provider-training-checkpoint-#{System.unique_integer()}.json")
+
+    File.write!(checkpoint_path, "checkpoint")
+
+    plan =
+      ProviderTrainingCampaign.dispatch_plan(
+        %{"payload_sha256" => "sha256:campaign-dataset"},
+        "openai:test-model",
+        3
+      )
+
+    assert {:ok, recovered} =
+             ProviderTrainingCampaign.recover_dispatch(
+               %{
+                 "status" => "baseline_complete",
+                 "dispatch_intent" => plan.intent,
+                 "job" => %{"id" => "ftjob-existing"}
+               },
+               checkpoint_path
+             )
+
+    refute Map.has_key?(recovered, "dispatch_intent")
+    assert recovered["job"]["id"] == "ftjob-existing"
+    File.rm!(checkpoint_path)
+  end
+
   test "training and held-out inference share the chat representation" do
     signature =
       Imp.signature(

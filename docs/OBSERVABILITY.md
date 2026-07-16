@@ -7,8 +7,8 @@ telemetry and status subscriptions remain redacted.
 
 ## Inspection
 
-`Imp.Observability.inspect_artifact/2` returns a
-`Imp.Observability.Inspection` with a common entry shape:
+`Imp.Observability.inspect_artifact/2` returns a redacted inspection artifact
+with a common entry shape:
 
 ```elixir
 inspection = Imp.Observability.inspect_artifact(prediction)

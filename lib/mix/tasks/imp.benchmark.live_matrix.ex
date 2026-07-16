@@ -13,7 +13,10 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
 
   @shortdoc "Aggregate live matched-model parity campaigns into a matrix"
 
-  @default_in "benchmarks/results/imp-dspy-parity-campaign-*.json"
+  @default_in Path.join(
+                Imp.BenchmarkTruth.Paths.runs("parity"),
+                "imp-dspy-parity-campaign-*.json"
+              )
   @default_out "tmp/live-matrix"
   @current_prompt_contract Imp.BenchmarkTruth.Contract.current_prompt_contract()
   @current_evidence_policy_version 2

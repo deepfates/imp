@@ -561,7 +561,7 @@ defmodule Imp.Tracking.MLflow do
 
   defp stringify(value) when is_binary(value), do: value
   defp stringify(value) when is_atom(value), do: Atom.to_string(value)
-  defp stringify(value), do: value |> Report.json_safe() |> Jason.encode!()
+  defp stringify(value), do: value |> Report.encode_term() |> Jason.encode!()
 
   defp finish_status(:finished), do: {:ok, "FINISHED"}
   defp finish_status(:success), do: {:ok, "FINISHED"}

@@ -45,7 +45,7 @@ defmodule Imp.Optimize.Anything.ResultTest do
     assert result.full_evaluations == 2
     assert result.reflection_calls == 1
     assert result.best_outputs_valset == %{heldout_a: [{1, %{answer: "better"}}]}
-    assert result.checkpoint["schema_version"] == 4
+    assert result.checkpoint["schema_version"] == 7
   end
 
   test "schema two round-trips through JSON" do
@@ -57,15 +57,19 @@ defmodule Imp.Optimize.Anything.ResultTest do
     }
 
     result = Result.from_state(state, mode: :single_task)
+    encoded = Result.to_map(result)
+
+    assert encoded["validation_schema_version"] == 2
+    refute Map.has_key?(encoded, "__imp_type__")
 
     restored =
-      result |> Result.to_map() |> Jason.encode!() |> Jason.decode!() |> Result.from_map()
+      encoded |> Jason.encode!() |> Jason.decode!() |> Result.from_map()
 
     assert restored.validation_scores == [1.0]
     assert restored.total_metric_calls == 0
     assert restored.mode == :single_task
     assert restored.best_outputs_valset == %{only: [{0, "base output"}]}
-    assert restored.checkpoint.schema_version == 4
+    assert restored.checkpoint["schema_version"] == 7
   end
 
   defp entry(id, candidate, parents, scores, discovered_at) do

@@ -20,6 +20,7 @@ defmodule Imp.Predict.RLM.Interpreter do
   @default_max_effects 100
 
   defstruct vars: %{},
+            protected_vars: %{},
             callbacks: %{},
             runtime: nil,
             output: "",
@@ -38,11 +39,14 @@ defmodule Imp.Predict.RLM.Interpreter do
   @doc "Creates an interpreter with persistent variables and callback runtime."
   def new(vars, callbacks, runtime, opts \\ []) do
     vars = Map.new(vars)
+    protected_vars = opts |> Keyword.get(:protected_vars, %{}) |> Map.new()
+    vars = restore_protected_vars(vars, protected_vars)
     max_value_bytes = positive_option(opts, :max_value_bytes, @default_max_value_bytes)
     validate_initial_vars!(vars, max_value_bytes)
 
     %__MODULE__{
       vars: vars,
+      protected_vars: protected_vars,
       callbacks: Map.new(callbacks),
       runtime: runtime,
       max_steps: positive_option(opts, :max_steps, @default_max_steps),
@@ -63,6 +67,17 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   @doc false
   def commit(%__MODULE__{} = interpreter), do: %{interpreter | effect_journal: []}
+
+  @doc false
+  def put_protected(%__MODULE__{} = interpreter, name, value) do
+    protected_vars = Map.put(interpreter.protected_vars, to_string(name), value)
+    vars = restore_protected_vars(interpreter.vars, protected_vars)
+
+    case validate_value(vars, interpreter.max_value_bytes) do
+      :ok -> {:ok, %{interpreter | vars: vars, protected_vars: protected_vars}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   @doc false
   def resume(%Continuation{} = continuation, result)
@@ -98,6 +113,7 @@ defmodule Imp.Predict.RLM.Interpreter do
 
     with :ok <- check_source_budget(source, interpreter.max_source_bytes),
          {:ok, source} <- unwrap_fence(source),
+         {:ok, source} <- normalize_repl_helpers(source),
          {:ok, ast} <- parse(source),
          :ok <- check_ast_budget(ast, interpreter.max_steps) do
       case eval(ast, interpreter) do
@@ -107,13 +123,13 @@ defmodule Imp.Predict.RLM.Interpreter do
         {:final, value, next} ->
           {:final, value, preserve_transaction(next, effect_results)}
 
-        {:error, reason, next} ->
-          {:error, reason, preserve_transaction(next, effect_results)}
+        {:error, reason, _next} ->
+          {:error, reason, rollback_transaction(original, effect_results)}
 
         {:effect, request, _partial} ->
           if length(effect_results) >= interpreter.max_effects do
             {:error, {:effect_limit_exceeded, interpreter.max_effects},
-             preserve_transaction(original, effect_results)}
+             rollback_transaction(original, effect_results)}
           else
             {:effect, request,
              %Continuation{
@@ -174,6 +190,13 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
+  # The standalone Python REPL documents this helper in uppercase. Elixir
+  # reserves uppercase identifiers for aliases, so normalize only this fixed
+  # runtime primitive before parsing generated source.
+  defp normalize_repl_helpers(source) do
+    {:ok, Regex.replace(~r/(?<![[:alnum:]_])SHOW_VARS\s*\(/, source, "show_vars(")}
+  end
+
   defp check_ast_budget(ast, limit) do
     {_ast, count} = Macro.prewalk(ast, 0, fn node, count -> {node, count + 1} end)
     if count <= limit, do: :ok, else: {:error, :ast_step_limit_exceeded}
@@ -206,11 +229,39 @@ defmodule Imp.Predict.RLM.Interpreter do
   defp clean_transient(interpreter),
     do: %{interpreter | effect_results: [], effect_requests: [], steps: 0}
 
-  defp finish_transaction(interpreter),
-    do: %{clean_transient(interpreter) | effect_journal: []}
+  defp finish_transaction(interpreter) do
+    interpreter = restore_protected_state(interpreter)
+    %{clean_transient(interpreter) | effect_journal: []}
+  end
 
-  defp preserve_transaction(interpreter, effect_results),
-    do: %{clean_transient(interpreter) | effect_journal: effect_results}
+  defp preserve_transaction(interpreter, effect_results) do
+    interpreter = restore_protected_state(interpreter)
+    %{clean_transient(interpreter) | effect_journal: effect_results}
+  end
+
+  # A failed cell must not publish ordinary bindings from its partial evaluation.
+  # Completed effects remain journaled so an explicit repair does not replay them.
+  # `original` may already include values loaded through an effect continuation.
+  defp rollback_transaction(interpreter, effect_results) do
+    interpreter = restore_protected_state(interpreter)
+    %{clean_transient(interpreter) | effect_journal: effect_results}
+  end
+
+  defp restore_protected_state(interpreter) do
+    %{interpreter | vars: restore_protected_vars(interpreter.vars, interpreter.protected_vars)}
+  end
+
+  defp restore_protected_vars(vars, protected_vars) do
+    Enum.reduce(protected_vars, vars, fn {name, value}, vars ->
+      string_name = to_string(name)
+      canonical_name = existing_atom_or_string(string_name)
+
+      vars
+      |> Map.delete(string_name)
+      |> Map.delete(canonical_name)
+      |> Map.put(canonical_name, value)
+    end)
+  end
 
   defp validate_value(value, max_bytes) do
     bytes = :erlang.external_size(value)
@@ -363,6 +414,18 @@ defmodule Imp.Predict.RLM.Interpreter do
       {:error, reason} -> {:error, reason, state}
       other -> other
     end
+  end
+
+  # Source-compatible namespace inspection without exposing callback or runtime
+  # internals to generated code.
+  defp eval_node({name, _, []}, state) when name in [:show_vars, "show_vars"] do
+    variables =
+      state.vars
+      |> Enum.map(fn {key, value} -> {to_string(key), type_name(value)} end)
+      |> Enum.sort()
+      |> Map.new()
+
+    {:ok, "Available variables: #{inspect(variables)}", state}
   end
 
   defp eval_node({name, _, args}, state)
@@ -897,6 +960,16 @@ defmodule Imp.Predict.RLM.Interpreter do
   rescue
     ArgumentError -> value
   end
+
+  defp type_name(value) when is_binary(value), do: "binary"
+  defp type_name(value) when is_list(value), do: "list"
+  defp type_name(value) when is_map(value), do: "map"
+  defp type_name(value) when is_tuple(value), do: "tuple"
+  defp type_name(value) when is_integer(value), do: "integer"
+  defp type_name(value) when is_float(value), do: "float"
+  defp type_name(value) when is_boolean(value), do: "boolean"
+  defp type_name(nil), do: "nil"
+  defp type_name(_value), do: "term"
 
   defp truthy?(value), do: value not in [false, nil]
 

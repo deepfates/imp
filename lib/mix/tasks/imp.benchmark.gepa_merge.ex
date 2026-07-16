@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaMerge do
   @moduledoc """
   Merge independently produced Imp GEPA family chunks into one validated input.
 
-      mix imp.benchmark.gepa_merge chunk-a.json chunk-b.json --out benchmarks/results
+      mix imp.benchmark.gepa_merge chunk-a.json chunk-b.json --out benchmarks/runs/gepa-merge
 
   Every required family must occur exactly once. The task rejects capped or smoke
   datasets and campaign chunks whose canonical campaign contracts disagree.
@@ -26,7 +26,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaMerge do
     validate_matching_summaries!(chunks)
 
     first = hd(chunks)
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("gepa-merge"))
     File.mkdir_p!(out_dir)
 
     artifact = %{

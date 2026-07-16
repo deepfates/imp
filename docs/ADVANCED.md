@@ -23,32 +23,23 @@ and negative controls that must remain below threshold.
 ## Optimize Anything
 
 ```elixir
-alias Imp.Optimize.Anything
-alias Imp.Optimize.Anything.{Config, Result}
-
-config =
-  Config.new(
-    engine: [max_candidate_proposals: 2, run_dir: "tmp/anything-run"],
-    reflection: [module_selector: :all]
-  )
-
 result =
-  Anything.run(
+  Imp.Optimize.Anything.run(
     %{config: "mode=slow", policy: "prefer safe changes"},
     fn candidate ->
       if candidate.config == "mode=fast", do: 1.0, else: 0.0
     end,
-    config: config,
+    config: [
+      engine: [max_candidate_proposals: 2, run_dir: "tmp/anything-run"],
+      reflection: [module_selector: :all]
+    ],
     fallback_proposer: fn candidate, component, _feedback, _iteration ->
-      case component do
-        :config -> "mode=fast"
-        :policy -> candidate.policy
-      end
+      if component == :config, do: "mode=fast", else: candidate.policy
     end
   )
 
-Result.best_candidate(result)
-#=> %{config: "mode=fast", policy: "prefer safe changes"}
+result
+#=> an immutable Optimize Anything result containing the winning candidate
 ```
 
 The public frontend delegates to the production GEPA engine. With no dataset,
@@ -73,7 +64,7 @@ config and results use tagged JSON codecs; W&B credentials are never written.
 External tracking is optional:
 
 ```elixir
-Config.new(
+config = [
   engine: [max_candidate_proposals: 10, run_dir: "tmp/anything-run"],
   tracking: [
     use_wandb: true,
@@ -82,7 +73,9 @@ Config.new(
     mlflow_tracking_uri: "http://127.0.0.1:5000",
     mlflow_experiment_name: "artifact-optimization"
   ]
-)
+]
+
+Imp.Optimize.Anything.run(seed, evaluator, config: config)
 ```
 
 W&B reads `WANDB_API_KEY` unless `wandb_api_key` is supplied at runtime.
@@ -99,17 +92,18 @@ configuration, and scheduling artifacts:
 mix benchmark.optimize_anything.check
 mix imp.benchmark.optimize_anything --live --provider openai \
   --model gpt-5.4-2026-03-05 --seeds 17,23,31 --max-proposals 5 \
-  --out benchmarks/results
+  --out benchmarks/runs/optimize-anything
 ```
 
 The smoke command validates wiring only. The source-checkout benchmark guide
 defines the multi-seed, held-out evaluation, cost, and checkpoint requirements
 that authorize the scoped live effectiveness claim.
 
-Release fidelity is pinned to GEPA v0.1.1. Adapter-owned resume, reflection
-budgets, attachable tracking runs, and other selected post-tag lifecycle fixes
-are Imp production extensions, not a claim of parity with unreleased GEPA
-main. Real non-prompt effectiveness campaigns remain a separate release gate.
+Current implementation fidelity is pinned to GEPA v0.1.4. The exact v0.1.1
+checkout remains a historical structural differential, and new campaign
+artifacts record the v0.1.4 commit resolved from the canonical authority
+ledger. Real non-prompt effectiveness campaigns remain a separate release
+gate.
 
 ## Agents And MCP
 

@@ -29,7 +29,16 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
     max_cost_usd = Keyword.get(opts, :max_cost_usd, 5.0)
 
     context =
-      RunContext.capture_git!(cwd: cwd, require_clean: Keyword.get(opts, :require_clean, true))
+      RunContext.capture_git!(
+        cwd: cwd,
+        require_clean: Keyword.get(opts, :require_clean, true),
+        inputs: %{
+          "protocol_id" => "provider_training",
+          "dataset_payload_sha256" => @dataset_payload_sha256,
+          "model" => model,
+          "epochs" => epochs
+        }
+      )
 
     dataset = load_dataset!(dataset_path)
     require_canonical_dataset!(dataset)
@@ -79,7 +88,22 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
             do: Keyword.put(opts, :training_file, recovered_receipt["id"]),
             else: opts
 
-        job = submit!(base_program, signature, dataset["train"], api_key, submit_opts)
+        state = recover_dispatch!(state, checkpoint_path)
+        dispatch = dispatch_plan(dataset, model, epochs, submit_opts)
+
+        state
+        |> Map.put("dispatch_intent", dispatch.intent)
+        |> write_json!(state_path)
+
+        job =
+          submit!(
+            base_program,
+            signature,
+            dataset["train"],
+            api_key,
+            Keyword.put(submit_opts, :idempotency_key, dispatch.idempotency_key)
+          )
+
         TrainingJob.save!(job, checkpoint_path)
         assert_secret_absent!([checkpoint_path], api_key)
         training_file = provider_training_file(job)
@@ -89,6 +113,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
 
         state =
           state
+          |> Map.delete("dispatch_intent")
           |> Map.put("status", "submitted")
           |> Map.put("job", public_job(job))
           |> Map.put("provider_training_file", training_file)
@@ -254,14 +279,100 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
   end
 
   defp resume_state!(checkpoint_path, state_path, api_key, dataset, model, upload) do
-    _job = TrainingJob.load!(checkpoint_path, api_key: api_key)
+    job = TrainingJob.load!(checkpoint_path, api_key: api_key)
 
-    case File.read(state_path) do
-      {:ok, _json} ->
-        load_state!(state_path, dataset, model, upload)
+    unless job.model == model do
+      raise "provider training checkpoint model mismatch: expected=#{model} got=#{job.model}"
+    end
 
-      {:error, reason} ->
-        raise "campaign checkpoint exists without readable artifact: #{inspect(reason)}"
+    state =
+      case File.read(state_path) do
+        {:ok, _json} ->
+          load_state!(state_path, dataset, model, upload)
+
+        {:error, reason} ->
+          raise "campaign checkpoint exists without readable artifact: #{inspect(reason)}"
+      end
+
+    case get_in(state, ["job", "id"]) do
+      nil ->
+        :ok
+
+      id when id == job.id ->
+        :ok
+
+      id ->
+        raise "provider training checkpoint identity mismatch: state=#{inspect(id)} job=#{job.id}"
+    end
+
+    recovered = recover_dispatch!(state, checkpoint_path)
+
+    if recovered != state do
+      write_json!(state_path, recovered)
+    end
+
+    recovered
+  end
+
+  @doc false
+  def dispatch_plan(dataset, model, epochs, opts \\ []) when is_map(dataset) do
+    identity = %{
+      "protocol_id" => "provider_training",
+      "dataset_payload_sha256" => dataset["payload_sha256"],
+      "model" => model,
+      "epochs" => epochs,
+      "method" => "sft",
+      "suffix" => Imp.Redaction.redact(Keyword.get(opts, :suffix, "imp-route-v1")),
+      "training_file" => Imp.Redaction.redact(Keyword.get(opts, :training_file))
+    }
+
+    idempotency_key =
+      Keyword.get(opts, :idempotency_key) ||
+        "imp-provider-training-" <> sha256(Jason.encode!(identity))
+
+    %{
+      idempotency_key: idempotency_key,
+      intent: %{
+        "protocol" => "fail_closed",
+        "schema_version" => 1,
+        "status" => "unresolved",
+        "identity" => identity,
+        "idempotency_key_sha256" => sha256(idempotency_key),
+        "recorded_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+    }
+  end
+
+  @doc false
+  def recover_dispatch(state, checkpoint_path)
+      when is_map(state) and is_binary(checkpoint_path) do
+    cond do
+      File.exists?(checkpoint_path) ->
+        {:ok, Map.delete(state, "dispatch_intent")}
+
+      Map.has_key?(state, "dispatch_intent") ->
+        {:error, {:ambiguous_dispatch, get_in(state, ["dispatch_intent", "identity"]) || %{}}}
+
+      state["status"] in ["submitted", "training", "complete"] ->
+        {:error, {:missing_checkpoint, state["status"]}}
+
+      true ->
+        {:ok, state}
+    end
+  end
+
+  defp recover_dispatch!(state, checkpoint_path) do
+    case recover_dispatch(state, checkpoint_path) do
+      {:ok, recovered} ->
+        recovered
+
+      {:error, {:ambiguous_dispatch, identity}} ->
+        raise RuntimeError,
+              "provider training dispatch has an ambiguous outcome after durable intent; checkpoint is missing, so replay is refused: #{inspect(identity)}"
+
+      {:error, {:missing_checkpoint, status}} ->
+        raise RuntimeError,
+              "provider training state is #{inspect(status)} but its checkpoint is missing; replay is refused"
     end
   end
 

@@ -24,6 +24,8 @@ defmodule Imp.Clients.ReqLLM do
     opts: [type: :keyword_list, default: []]
   ]
 
+  @cache_credential_marker {:imp_cache_identity, :credential}
+
   def new(model_spec, opts \\ []) do
     {req_module, nested_opts} = validate_new_opts!(opts)
 
@@ -63,7 +65,7 @@ defmodule Imp.Clients.ReqLLM do
       |> normalize_opts()
       |> normalize_provider_profile_opts(lm.model)
 
-    cache? = Keyword.get(opts, :cache, false)
+    cache? = Keyword.get(opts, :cache, true)
     opts = Keyword.delete(opts, :cache)
     cache_key = cache_key(lm, messages, maybe_put_rollout_id(opts, rollout_id))
 
@@ -133,18 +135,68 @@ defmodule Imp.Clients.ReqLLM do
   def cache_key(%__MODULE__{} = lm, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.cache_key/3")
 
-    opts =
-      opts
-      |> Keyword.drop([:api_key, :headers, :req_module])
-      |> Enum.sort()
+    identity = {
+      lm.req_module,
+      cache_identity_value(lm.model),
+      to_req_messages(messages),
+      cache_identity_options(opts)
+    }
 
     {:lm_response,
      :crypto.hash(
        :sha256,
-       :erlang.term_to_binary({lm.model, to_req_messages(messages), opts})
+       :erlang.term_to_binary(identity, [:deterministic])
      )
      |> Base.encode16(case: :lower)}
   end
+
+  defp cache_identity_options(opts) do
+    Enum.map(opts, fn {key, value} ->
+      {key, cache_identity_field(key, value)}
+    end)
+  end
+
+  defp cache_identity_field(key, value) do
+    if Imp.Redaction.credential_entry?(key, value) do
+      @cache_credential_marker
+    else
+      cache_identity_value(value)
+    end
+  end
+
+  defp cache_identity_value(%_{} = struct) do
+    {:struct, struct.__struct__, struct |> Map.from_struct() |> cache_identity_value()}
+  end
+
+  defp cache_identity_value(map) when is_map(map) do
+    Map.new(map, fn {key, value} -> {key, cache_identity_field(key, value)} end)
+  end
+
+  defp cache_identity_value([key, value]) when is_atom(key) or is_binary(key) or is_map(key) do
+    [key, cache_identity_field(key, value)]
+  end
+
+  defp cache_identity_value(list) when is_list(list) do
+    if Keyword.keyword?(list) do
+      cache_identity_options(list)
+    else
+      Enum.map(list, &cache_identity_value/1)
+    end
+  end
+
+  defp cache_identity_value({key, value})
+       when is_atom(key) or is_binary(key) or is_map(key) do
+    {key, cache_identity_field(key, value)}
+  end
+
+  defp cache_identity_value(tuple) when is_tuple(tuple) do
+    tuple
+    |> Tuple.to_list()
+    |> Enum.map(&cache_identity_value/1)
+    |> List.to_tuple()
+  end
+
+  defp cache_identity_value(value), do: value
 
   def generate_async(%__MODULE__{} = lm, messages, opts \\ []) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate_async/3")
@@ -185,13 +237,13 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   def dump(%__MODULE__{} = lm) do
+    model = lm.model |> encode_model() |> Imp.Redaction.drop_credentials()
+    opts = Imp.Redaction.drop_credentials(lm.opts)
+
     %{
       provider: :req_llm,
-      model: encode_model(lm.model),
-      opts:
-        lm.opts
-        |> Keyword.drop([:api_key, :authorization, :headers])
-        |> Enum.map(fn {k, v} -> [Atom.to_string(k), v] end)
+      model: model,
+      opts: Enum.map(opts, fn {key, value} -> [Atom.to_string(key), value] end)
     }
   end
 
@@ -684,34 +736,29 @@ defmodule Imp.Clients.ReqLLM do
 
   defp sanitize_usage_value(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
-      if sensitive_usage_key?(key),
+      if Imp.Redaction.credential_key?(key),
         do: {key, "[REDACTED]"},
         else: {key, sanitize_usage_value(nested)}
     end)
   end
 
+  defp sanitize_usage_value([key, nested]) when is_atom(key) or is_binary(key) do
+    if Imp.Redaction.credential_key?(key),
+      do: [key, "[REDACTED]"],
+      else: [key, sanitize_usage_value(nested)]
+  end
+
   defp sanitize_usage_value(value) when is_list(value),
     do: Enum.map(value, &sanitize_usage_value/1)
 
+  defp sanitize_usage_value({key, nested}) when is_atom(key) or is_binary(key) do
+    if Imp.Redaction.credential_key?(key),
+      do: {key, "[REDACTED]"},
+      else: {key, sanitize_usage_value(nested)}
+  end
+
   defp sanitize_usage_value(value) when is_binary(value), do: Imp.Redaction.redact(value)
   defp sanitize_usage_value(value), do: value
-
-  defp sensitive_usage_key?(key) do
-    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
-
-    normalized in [
-      "api_key",
-      "authorization",
-      "access_token",
-      "password",
-      "secret",
-      "client_secret",
-      "private_key",
-      "x_api_key"
-    ] or String.ends_with?(normalized, "_api_key") or
-      String.ends_with?(normalized, "_access_token") or
-      String.ends_with?(normalized, "_secret")
-  end
 
   defp sanitize_logprobs(logprobs) when is_list(logprobs) do
     logprobs
@@ -946,7 +993,8 @@ defmodule Imp.Clients.ReqLLM do
   defp encode_model(model) when is_binary(model), do: model
   defp encode_model(model), do: model
 
-  defp redact_lm(%__MODULE__{model: model}), do: %{provider: :req_llm, model: model}
+  defp redact_lm(%__MODULE__{model: model}),
+    do: %{provider: :req_llm, model: Imp.Redaction.redact(model)}
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

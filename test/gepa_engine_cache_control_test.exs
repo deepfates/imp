@@ -41,9 +41,11 @@ defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
   test "repeated non-trace evaluations use the cache by default" do
     state = run_engine()
 
-    assert_received {:evaluation, [:same], false}
     assert_received {:evaluation, [:same], true}
-    refute_received {:evaluation, [:same], false}
+    assert_received {:evaluation, [:same], true}
+    refute_received {:evaluation, [:same], _capture_traces}
+
+    assert_received {:evaluation_start, %{capture_traces: false}}
 
     assert_received {:evaluation_skipped, %{reason: :cache_hit, scores: [score]}}
     assert score == 0.0
@@ -55,9 +57,10 @@ defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
   test "cache_evaluation false re-evaluates repeated non-trace work with normal accounting" do
     state = run_engine(cache_evaluation: false)
 
-    assert_received {:evaluation, [:same], false}
     assert_received {:evaluation, [:same], true}
-    assert_received {:evaluation, [:same], false}
+    assert_received {:evaluation, [:same], true}
+    assert_received {:evaluation, [:same], true}
+    refute_received {:evaluation, [:same], _capture_traces}
 
     assert_received {:evaluation_start, %{capture_traces: false}}
     assert_received {:evaluation_end, %{scores: [score]}}

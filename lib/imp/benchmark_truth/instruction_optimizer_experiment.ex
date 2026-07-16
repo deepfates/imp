@@ -45,7 +45,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       "dataset" => dataset!(raw, path, family),
       "dspy_authority" => authority!(raw, opts),
       "dependency_identity" => dependency_identity!(raw),
-      "source_commits" => map!(Map.get(raw, "source_commits", %{}), "source_commits"),
+      "source_commits" => source_commits!(raw),
       "scope" => scope(),
       "design" => design()
     }
@@ -60,13 +60,21 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
     check_imp_pin!(manifest, context)
     sources = Map.put(manifest["source_commits"], "imp", context.source_commits["imp"])
     identity = identity(manifest, sources)
-    out = opts |> Keyword.get(:out_dir, "benchmarks/results") |> Path.expand()
+
+    out =
+      opts
+      |> Keyword.get(:out_dir, Imp.BenchmarkTruth.Paths.runs("instruction-optimizer-experiment"))
+      |> Path.expand()
+
     repo_root = opts |> Keyword.get(:repo_root, File.cwd!()) |> Path.expand()
     dspy_pythonpath = pinned_dspy_root!(Keyword.get(opts, :dspy_pythonpath), repo_root)
 
     checkpoints =
       opts
-      |> Keyword.get(:checkpoint_dir, Path.join(out, "instruction-optimizer-checkpoints"))
+      |> Keyword.get(
+        :checkpoint_dir,
+        Imp.BenchmarkTruth.Paths.checkpoints("instruction-optimizer-experiment")
+      )
       |> Path.expand()
 
     File.mkdir_p!(out)
@@ -171,7 +179,6 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       expanded
       |> File.read!()
       |> Jason.decode!()
-      |> Imp.Persistence.Legacy.instruction_manifest()
 
     {manifest, expanded}
   rescue
@@ -189,12 +196,15 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
         Path.join(File.cwd!(), "instruction-optimizer-experiment.json")
       )
 
-    {map |> json() |> Imp.Persistence.Legacy.instruction_manifest(), Path.expand(path)}
+    {json(map), Path.expand(path)}
   end
 
   defp models!(raw) do
     model = raw["model"]
     bindings = Map.get(raw, "runtime_models", %{})
+
+    if is_map(bindings) and map_size(bindings) > 0,
+      do: exact_keys!(bindings, ~w(imp dspy), "runtime_models")
 
     case model do
       value when is_binary(value) ->
@@ -205,6 +215,8 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
         }
 
       %{} ->
+        exact_keys!(model, ~w(logical imp dspy), "model")
+
         %{
           "logical" => string!(model["logical"], "model.logical"),
           "imp" => string!(model["imp"], "model.imp"),
@@ -441,6 +453,12 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
     put_in(manifest, ["source_commits", "dspy"], expected)
   end
 
+  defp source_commits!(raw) do
+    commits = map!(Map.get(raw, "source_commits", %{}), "source_commits")
+    exact_keys!(commits, ~w(dspy imp), "source_commits")
+    commits
+  end
+
   defp dependency_identity!(raw) do
     dependency = map!(raw["dependency_identity"], "dependency_identity")
 
@@ -470,7 +488,12 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
     Keyword.get(opts, :run_context) ||
       RunContext.capture_git!(
         cwd: Keyword.get(opts, :repo_root, File.cwd!()),
-        source_commits: Map.delete(manifest["source_commits"], "imp")
+        source_commits: Map.delete(manifest["source_commits"], "imp"),
+        inputs: %{
+          "protocol_id" => "instruction_live",
+          "campaign_id" => manifest["campaign_id"],
+          "manifest_sha256" => manifest["manifest_sha256"]
+        }
       )
   end
 
@@ -695,7 +718,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
       id["arms"] == d.identity["arms"],
       id["budget_scope"] == "per_arm",
       id["budget"] == expected_budget,
-      id["arm_configs"] == Imp.Optimizer.Report.json_safe(d.manifest["arm_configs"]),
+      id["arm_configs"] == Imp.Optimizer.Report.encode_term(d.manifest["arm_configs"]),
       id["split_limits"] == d.manifest["preflight"]["split_limits"],
       id["split_checksums"] == d.manifest["dataset"]["checksums"],
       id["source_commits"] == d.identity["source_commits"],
@@ -882,6 +905,14 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperiment do
 
   defp map!(value, _) when is_map(value), do: value
   defp map!(_, label), do: raise(ArgumentError, "#{label} must be an object")
+
+  defp exact_keys!(map, expected, label) do
+    require!(
+      Map.keys(map) |> Enum.sort() == Enum.sort(expected),
+      "#{label} keys must be exactly #{Enum.join(expected, ", ")}"
+    )
+  end
+
   defp string!(value, _) when is_binary(value) and value != "", do: value
   defp string!(_, label), do: raise(ArgumentError, "#{label} must be a non-empty string")
   defp integer!(value, _) when is_integer(value) and value >= 0, do: value

@@ -12,8 +12,11 @@ defmodule Imp.MixProject do
       package: package(),
       docs: [
         main: "Imp",
+        api_reference: true,
         extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
-        filter_modules: &public_doc_module?/2
+        filter_modules: &public_doc_module?/2,
+        skip_undefined_reference_warnings_on: &skip_filtered_doc_reference?/1,
+        skip_code_autolink_to: &skip_filtered_doc_reference?/1
       ],
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -127,16 +130,18 @@ defmodule Imp.MixProject do
 
   defp package_files do
     excluded_lib =
-      Path.wildcard("lib/mix/tasks/imp.benchmark*.ex") ++
-        Path.wildcard("lib/mix/tasks/imp.gate_evidence.ex") ++
-        Path.wildcard("lib/mix/tasks/imp.reproductions.ex") ++
+      Path.wildcard("lib/mix/tasks/**/*.ex") ++
         Path.wildcard("lib/imp/benchmark*.ex") ++
         Path.wildcard("lib/imp/benchmark_truth/**/*.ex") ++
         Path.wildcard("lib/imp/reproduction_registry.ex") ++
         [
+          "lib/imp/evidence_authorities.ex",
           "lib/imp/optimizer/playbook/campaign.ex",
           "lib/imp/optimizer/playbook/equation_search.ex",
-          "lib/imp/legacy_identity_audit.ex"
+          "lib/imp/legacy_identity_audit.ex",
+          "lib/imp/research_portfolio.ex",
+          "lib/imp/upstream_authority_registry.ex",
+          "lib/imp/upstream_fidelity.ex"
         ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
@@ -147,6 +152,7 @@ defmodule Imp.MixProject do
         ".formatter.exs",
         "CHANGELOG.md",
         "LICENSE",
+        "priv/public_api.json",
         "README.md",
         "mix.exs"
       ]
@@ -186,17 +192,31 @@ defmodule Imp.MixProject do
   end
 
   defp public_doc_module?(module, _metadata) do
-    module_name = Atom.to_string(module)
+    MapSet.member?(canonical_supported_modules(), inspect(module))
+  end
 
-    not Enum.any?(
-      [
-        "Elixir.Imp.Benchmark",
-        "Elixir.Imp.Benchmarks",
-        "Elixir.Imp.LegacyIdentityAudit",
-        "Elixir.Mix.Tasks.Imp.Benchmark"
-      ],
-      &String.starts_with?(module_name, &1)
-    )
+  defp canonical_supported_modules do
+    Path.join(__DIR__, "priv/public_api.json")
+    |> File.read!()
+    |> Jason.decode!()
+    |> Map.fetch!("modules")
+    |> MapSet.new(& &1["module"])
+  end
+
+  defp canonical_internal_modules do
+    Path.join(__DIR__, "priv/public_api.json")
+    |> File.read!()
+    |> Jason.decode!()
+    |> Map.fetch!("excluded_modules")
+    |> MapSet.new(& &1["module"])
+  end
+
+  defp skip_filtered_doc_reference?(reference) do
+    reference = String.trim_leading(reference, "Elixir.")
+
+    Enum.any?(canonical_internal_modules(), fn module_name ->
+      reference == module_name or String.starts_with?(reference, module_name <> ".")
+    end)
   end
 
   defp aliases do
@@ -209,7 +229,10 @@ defmodule Imp.MixProject do
 
   defp source_checkout_aliases do
     base_aliases = [
-      "public_surface.check": ["test test/public_surface_test.exs"],
+      "public_surface.check": [
+        "imp.public_api --check",
+        "test test/public_api_manifest_test.exs test/public_surface_test.exs"
+      ],
       "production.check": [
         "format --check-formatted",
         "clean",
@@ -369,22 +392,22 @@ defmodule Imp.MixProject do
         "imp.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
       ],
       "benchmark.live_matrix": [
-        "imp.benchmark.live_matrix --in benchmarks/results/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
+        "imp.benchmark.live_matrix --in benchmarks/runs/parity/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
       ],
       "benchmark.hotpotqa_analysis": [
         "imp.benchmark.hotpotqa_analysis"
       ],
       "benchmark.dashboard": [
-        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.ready": [
-        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
+        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
       ],
       "benchmark.dashboard.telos": [
-        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
       "benchmark.dashboard.telos.ready": [
-        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
+        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
       ],
       "benchmark.live.check": [
         "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

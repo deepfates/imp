@@ -13,10 +13,13 @@ defmodule Imp.Predict.RLM do
   transformations, `llm_query/1`, `llm_query_batched/1`, `recurse/2`,
   `load/1`, registered tools, `print/1`, and `submit/1`.
 
-  A shared atomic ledger enforces `max_iterations`, `max_llm_calls`,
-  `max_recursion_depth`, and `max_time_ms` across recursive children. Generated
-  source is parsed but never evaluated by `Code.eval_*`; only an explicit AST
-  allowlist executes, with atom-safe parsing and an interpreter step budget.
+  Controller iterations, recursion depth, and optional wall time are bounded
+  separately. A shared `max_llm_calls` ledger covers only one-shot sub-LM work
+  from `llm_query*`, depth-limit `rlm_query*` fallbacks, and sub-LM calls made
+  inside recursive children. Root and child controller turns, extraction, and
+  compaction generations are not charged. Generated source is parsed but never
+  evaluated by `Code.eval_*`; only an explicit AST allowlist executes, with
+  atom-safe parsing and an interpreter step budget.
 
   Tool execution is policy-gated. Denied, crashing, or policy-crashing
   registered-tool effects return `{:error, {:rlm_tool_error, reason}}` to the
@@ -25,8 +28,10 @@ defmodule Imp.Predict.RLM do
 
   @behaviour Imp.Module
 
-  alias Imp.Predict.RLM.{Action, Budget, Interpreter, Runtime, Trace}
+  alias Imp.Predict.RLM.{Action, Budget, Compaction, Interpreter, Runtime, Session, Trace}
   alias Imp.Predict.RLM.Interpreter.Effect
+
+  @max_llm_calls_scope :subcalls_only
 
   @task_process_keys [
     :"$ancestors",
@@ -41,6 +46,7 @@ defmodule Imp.Predict.RLM do
     :lm,
     :adapter,
     :sub_lm,
+    :model_override,
     tools: %{},
     tool_policy: :allow,
     max_iterations: 20,
@@ -49,9 +55,15 @@ defmodule Imp.Predict.RLM do
     max_interpreter_steps: 10_000,
     max_interpreter_value_bytes: 16_000_000,
     max_interpreter_effects: 100,
+    max_concurrent_subcalls: 4,
     max_time_ms: nil,
     max_preview_chars: 2_000,
     max_observation_chars: 10_000,
+    compaction: false,
+    compaction_threshold_pct: 0.85,
+    compaction_context_tokens: 128_000,
+    persistent: false,
+    session: nil,
     dynamic_lm?: true,
     dynamic_sub_lm?: true,
     dynamic_adapter?: true
@@ -66,13 +78,21 @@ defmodule Imp.Predict.RLM do
   - `:sub_lm` - LM used for `llm_query` calls; defaults to `:lm`.
   - `:tools` - list of `Imp.Tool` values available to tool calls.
   - `:tool_policy` - `:allow`, a list of allowed tool names, or a predicate.
-  - `:max_iterations` / `:max_iters`, `:max_llm_calls`, `:max_time_ms` - execution budgets.
+  - `:max_iterations` / `:max_iters` - maximum controller turns.
+  - `:max_llm_calls` - shared limit for one-shot sub-LM calls. This includes
+    `llm_query*`, depth-limit `rlm_query*` fallbacks, and sub-LM work inside
+    recursive children; it excludes controller, extraction, and compaction calls.
+  - `:max_time_ms` - optional deadline for the complete RLM call. When omitted,
+    RLM effects have no configured deadline.
   - `:max_recursion_depth` - maximum symbolic child depth; defaults to `1`.
   - `:max_interpreter_steps` - AST execution steps per controller turn.
   - `:max_interpreter_value_bytes` - maximum serialized size of an interpreter value.
   - `:max_interpreter_effects` - external effects allowed per controller turn.
   - `:max_preview_chars` - how much large input context the controller sees.
   - `:max_observation_chars` - truncation limit for string observations.
+  - `:compaction` / `:compaction_threshold_pct` - summarize root history at a model-context fraction.
+  - `:compaction_context_tokens` - context limit paired with the explicit chars/4 token-estimation fallback; Imp.LM currently exposes no standard tokenizer/context metadata.
+  - `:persistent` - retain the constrained namespace across calls; release it with `close/1`.
   """
   @option_schema [
     lm: [type: {:custom, Imp.LM, :validate_lm, []}],
@@ -90,16 +110,27 @@ defmodule Imp.Predict.RLM do
     max_interpreter_steps: [type: :pos_integer, default: 10_000],
     max_interpreter_value_bytes: [type: :pos_integer, default: 16_000_000],
     max_interpreter_effects: [type: :pos_integer, default: 100],
+    max_concurrent_subcalls: [type: :pos_integer, default: 4],
     max_time_ms: [type: :non_neg_integer],
     max_preview_chars: [type: :non_neg_integer, default: 2_000],
     max_observation_chars: [type: :non_neg_integer, default: 10_000],
-    max_output_chars: [type: :non_neg_integer]
+    max_output_chars: [type: :non_neg_integer],
+    compaction: [type: :boolean, default: false],
+    compaction_threshold_pct: [
+      type: {:custom, __MODULE__, :validate_compaction_threshold, []},
+      default: 0.85
+    ],
+    compaction_context_tokens: [type: :pos_integer, default: 128_000],
+    persistent: [type: :boolean, default: false]
   ]
 
   def new(signature, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.RLM.new/2")
     tools = Imp.Tool.index_tools!(opts[:tools], "Imp.Predict.RLM.new/2")
+
+    persistent = opts[:persistent]
+    session = if persistent, do: start_persistent_session!(), else: nil
 
     %__MODULE__{
       signature: signature,
@@ -114,19 +145,38 @@ defmodule Imp.Predict.RLM do
       max_interpreter_steps: opts[:max_interpreter_steps],
       max_interpreter_value_bytes: opts[:max_interpreter_value_bytes],
       max_interpreter_effects: opts[:max_interpreter_effects],
+      max_concurrent_subcalls: opts[:max_concurrent_subcalls],
       max_time_ms: non_negative_integer_or_nil(opts[:max_time_ms]),
       max_preview_chars: non_negative_integer(opts[:max_preview_chars]),
       max_observation_chars:
         non_negative_integer(Keyword.get(opts, :max_output_chars, opts[:max_observation_chars])),
+      compaction: opts[:compaction],
+      compaction_threshold_pct: opts[:compaction_threshold_pct],
+      compaction_context_tokens: opts[:compaction_context_tokens],
+      persistent: persistent,
+      session: session,
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
       dynamic_sub_lm?: not Keyword.has_key?(opts, :sub_lm) and not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
     }
   end
 
+  @doc false
+  def validate_compaction_threshold(value) when is_number(value) and value > 0 and value <= 1,
+    do: {:ok, value * 1.0}
+
+  def validate_compaction_threshold(value),
+    do: {:error, "expected a number greater than 0 and at most 1, got: #{inspect(value)}"}
+
   @doc "Creates a lazy value handle that an RLM controller can load explicitly."
   def sandbox_serializable(name, loader, opts \\ []),
     do: Imp.Predict.RLM.SandboxSerializable.new(name, loader, opts)
+
+  @doc "Closes the optional persistent RLM environment."
+  def close(%__MODULE__{persistent: true, session: session}) when is_pid(session),
+    do: Session.close(session)
+
+  def close(%__MODULE__{}), do: :ok
 
   @doc false
   def internal_predictors(%__MODULE__{} = rlm) do
@@ -147,18 +197,8 @@ defmodule Imp.Predict.RLM do
   """
   def call(%__MODULE__{} = rlm, inputs) when is_list(inputs) or is_map(inputs) do
     with {:ok, vars} <- normalize_inputs(inputs),
-         :ok <- validate_required_inputs(rlm.signature, vars),
-         {:ok, budget} <-
-           Budget.start_link(
-             max_lm_calls: rlm.max_llm_calls,
-             max_time_ms: rlm.max_time_ms,
-             max_recursion_depth: rlm.max_recursion_depth
-           ) do
-      try do
-        call_with_budget(rlm, vars, budget)
-      after
-        if Process.alive?(budget), do: GenServer.stop(budget, :normal)
-      end
+         :ok <- validate_required_inputs(rlm.signature, vars) do
+      call_with_environment(rlm, vars)
     end
   end
 
@@ -187,7 +227,95 @@ defmodule Imp.Predict.RLM do
   defp input_present?(inputs, name),
     do: Map.has_key?(inputs, name) or Map.has_key?(inputs, to_string(name))
 
-  defp call_with_budget(%__MODULE__{} = rlm, vars, budget, depth \\ 0) do
+  defp call_with_environment(%__MODULE__{persistent: true, session: session} = rlm, vars)
+       when is_pid(session) do
+    Session.transaction(session, fn snapshot ->
+      environment = Session.merge_inputs(snapshot, vars)
+
+      {result, state} =
+        call_with_new_budget(rlm, environment.vars,
+          protected_vars: Session.protected_vars(environment, rlm.compaction),
+          compaction_history: environment.compaction_history
+        )
+
+      environment = %{
+        environment
+        | vars: state.interpreter.vars,
+          compaction_history: state.compaction_history
+      }
+
+      environment =
+        case result do
+          {:ok, _prediction} ->
+            Session.add_history(
+              environment,
+              state.call_history,
+              state.compaction_history,
+              rlm.compaction
+            )
+
+          {:error, _reason} ->
+            environment
+        end
+
+      {result, environment}
+    end)
+  end
+
+  defp call_with_environment(%__MODULE__{persistent: true}, _vars),
+    do: {:error, :rlm_persistent_session_closed}
+
+  defp call_with_environment(%__MODULE__{} = rlm, vars) do
+    {result, _state} =
+      call_with_new_budget(rlm, vars, protected_vars: protected_input_vars(vars))
+
+    result
+  end
+
+  defp protected_input_vars(vars) do
+    case Enum.find(vars, fn {key, _value} -> to_string(key) == "context" end) do
+      {_key, value} -> %{"context" => value}
+      nil -> %{}
+    end
+  end
+
+  defp call_with_new_budget(%__MODULE__{} = rlm, vars, opts) do
+    case Budget.start_link(
+           max_lm_calls: rlm.max_llm_calls,
+           max_time_ms: rlm.max_time_ms,
+           max_recursion_depth: rlm.max_recursion_depth
+         ) do
+      {:ok, budget} ->
+        try do
+          call_with_budget_state(rlm, vars, budget, 0, opts)
+        after
+          if Process.alive?(budget), do: GenServer.stop(budget, :normal)
+        end
+
+      {:error, reason} ->
+        {{:error, reason}, %{interpreter: Interpreter.new(vars, %{}, nil)}}
+    end
+  end
+
+  defp call_with_budget(%__MODULE__{} = rlm, vars, budget, depth) do
+    {result, _state} = call_with_budget_state(rlm, vars, budget, depth, [])
+    result
+  end
+
+  defp call_with_budget_state(%__MODULE__{} = rlm, vars, budget, depth, opts) do
+    protected_vars = opts |> Keyword.get(:protected_vars, %{}) |> Map.new()
+    compaction_history = Keyword.get(opts, :compaction_history, [])
+
+    {vars, protected_vars} =
+      if rlm.compaction do
+        {
+          Map.put(vars, :history, compaction_history),
+          Map.put(protected_vars, "history", compaction_history)
+        }
+      else
+        {vars, protected_vars}
+      end
+
     runtime = Runtime.new(rlm, budget, vars, depth)
 
     interpreter =
@@ -195,7 +323,8 @@ defmodule Imp.Predict.RLM do
         max_steps: rlm.max_interpreter_steps,
         max_output_chars: rlm.max_observation_chars,
         max_value_bytes: rlm.max_interpreter_value_bytes,
-        max_effects: rlm.max_interpreter_effects
+        max_effects: rlm.max_interpreter_effects,
+        protected_vars: protected_vars
       )
 
     state = %{
@@ -208,7 +337,15 @@ defmodule Imp.Predict.RLM do
       invalid_action_digests: MapSet.new(),
       trace_limit: rlm.max_observation_chars,
       llm_calls: Budget.snapshot(budget).lm_calls,
-      started_at: System.monotonic_time(:millisecond)
+      started_at: System.monotonic_time(:millisecond),
+      call_history: [],
+      active_history: [],
+      pending_history_segment: [],
+      compaction_history: compaction_history,
+      compaction_count: 0,
+      compaction_summary: nil,
+      compaction?: rlm.compaction,
+      history_error: nil
     }
 
     run_loop(rlm, state, 1)
@@ -216,7 +353,7 @@ defmodule Imp.Predict.RLM do
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration)
        when iteration > rlm.max_iterations and rlm.max_iterations == 0 do
-    {:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}
+    {{:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}, state}
   end
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration)
@@ -226,18 +363,24 @@ defmodule Imp.Predict.RLM do
 
   defp run_loop(%__MODULE__{} = rlm, state, iteration) do
     with :ok <- check_time_budget(rlm, state),
-         {:ok, raw_action} <- controller_action(rlm, state, iteration),
+         :ok <- check_history_error(state),
+         {:ok, state} <- maybe_compact_history(rlm, state, iteration),
+         {:ok, raw_action, messages} <- controller_action(rlm, state, iteration),
+         state = record_controller_exchange(state, messages, raw_action),
          {:cont, state} <- consume_controller_output(rlm, raw_action, state, iteration) do
       run_loop(rlm, state, iteration + 1)
     else
       {:done, prediction, state} ->
-        {:ok, add_trace(prediction, state)}
+        case check_history_error(state) do
+          :ok -> {{:ok, add_trace(prediction, state)}, state}
+          {:error, reason} -> {{:error, reason}, state}
+        end
 
       {:error, :rlm_time_budget_exceeded} ->
-        {:error, {:rlm_max_time_ms, rlm.max_time_ms, Enum.reverse(state.trace)}}
+        {{:error, {:rlm_max_time_ms, rlm.max_time_ms, Enum.reverse(state.trace)}}, state}
 
       {:error, reason} ->
-        {:error, reason}
+        {{:error, reason}, state}
     end
   end
 
@@ -264,8 +407,9 @@ defmodule Imp.Predict.RLM do
           {:ok, prediction} ->
             if required_outputs_present?(rlm.signature, prediction) do
               state =
-                trace(
-                  state,
+                state
+                |> discard_pending_history_segment()
+                |> trace_without_history(
                   iteration,
                   :direct_submit,
                   %{reasoning: Map.get(output, "reasoning", "")},
@@ -351,11 +495,56 @@ defmodule Imp.Predict.RLM do
   end
 
   defp controller_action_with_lm(%__MODULE__{} = rlm, lm, state, iteration) do
-    messages = [
+    messages = controller_messages(rlm, state, iteration)
+
+    case run_budgeted(state.budget, fn -> generate_lm(rlm, lm, messages) end) do
+      {:ok, raw_action} -> {:ok, raw_action, messages}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp controller_messages(%__MODULE__{} = rlm, state, iteration) do
+    turn_message = %{
+      role: :user,
+      content:
+        Jason.encode!(%{
+          iteration: iteration,
+          variables: variable_metadata(state.interpreter.vars, rlm.max_preview_chars),
+          observations: %{
+            count: length(state.observations),
+            source: :prior_repl_messages
+          },
+          compaction:
+            if(state.compaction_summary,
+              do: %{
+                count: state.compaction_count,
+                summary: :available_in_prior_messages,
+                full_history: :available_in_environment
+              },
+              else: nil
+            ),
+          budget: %{
+            remaining_iterations: rlm.max_iterations - iteration + 1,
+            remaining_sub_lm_calls: rlm.max_llm_calls - state.llm_calls,
+            max_llm_calls_scope: @max_llm_calls_scope,
+            remaining_time_ms: remaining_time(rlm, state)
+          }
+        })
+    }
+
+    if state.active_history == [] do
+      controller_prefix(rlm) ++ [turn_message]
+    else
+      state.active_history ++ [turn_message]
+    end
+  end
+
+  defp controller_prefix(%__MODULE__{} = rlm) do
+    [
       %{
         role: :system,
         content:
-          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call llm_query(prompt), llm_query_batched(prompts), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). Do not call modules such as IO. State persists across turns. Explore and compute in code; when every required output is ready, return code that calls submit/1 with non-empty values. A JSON object containing exactly the required output fields is also accepted as a typed final submission."
+          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call SHOW_VARS(), llm_query(prompt, model \\\\ nil), llm_query_batched(prompts, model \\\\ nil), rlm_query(prompt, model \\\\ nil), rlm_query_batched(prompts, model \\\\ nil), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). rlm_query creates an isolated recursive constrained environment and falls back to a one-shot query at the configured depth limit. Do not call modules such as IO. State persists across turns. Explore and compute in code; when every required output is ready, return code that calls submit/1 with non-empty values. A JSON object containing exactly the required output fields is also accepted as a typed final submission."
       },
       %{
         role: :user,
@@ -364,20 +553,15 @@ defmodule Imp.Predict.RLM do
             signature: Imp.Signature.to_spec(rlm.signature),
             task_instructions: rlm.signature.instructions,
             required_outputs: Imp.Signature.output_names(rlm.signature),
-            iteration: iteration,
-            variables: variable_metadata(state.interpreter.vars, rlm.max_preview_chars),
-            observations: Enum.map(state.observations, &safe_json/1),
             tools: tool_metadata(rlm.tools),
-            budget: %{
-              remaining_iterations: rlm.max_iterations - iteration + 1,
-              remaining_llm_calls: rlm.max_llm_calls - state.llm_calls,
-              remaining_time_ms: remaining_time(rlm, state)
+            environment: %{
+              runtime: :beam_constrained_elixir,
+              persistent_namespace: true,
+              full_history_variable: if(rlm.compaction, do: :history, else: nil)
             }
           })
       }
     ]
-
-    run_budgeted(state.budget, fn -> Imp.LM.generate(lm, messages, []) end)
   end
 
   defp normalize_action(%{action: _} = action),
@@ -491,7 +675,14 @@ defmodule Imp.Predict.RLM do
               state = sync_interpreter(state, Interpreter.commit(interpreter))
 
               state =
-                trace(state, iteration, :submit, %{reasoning: reasoning, code: code}, result)
+                state
+                |> discard_pending_history_segment()
+                |> trace_without_history(
+                  iteration,
+                  :submit,
+                  %{reasoning: reasoning, code: code},
+                  result
+                )
 
               {:done, prediction, state}
             else
@@ -550,6 +741,8 @@ defmodule Imp.Predict.RLM do
     builtins = %{
       "llm_query" => :llm_query,
       "llm_query_batched" => :llm_query_batched,
+      "rlm_query" => :rlm_query,
+      "rlm_query_batched" => :rlm_query_batched,
       "recurse" => :recurse,
       "load" => :load
     }
@@ -567,7 +760,8 @@ defmodule Imp.Predict.RLM do
       | interpreter: %{
           continuation.interpreter
           | runtime: state.interpreter.runtime,
-            vars: state.interpreter.vars
+            vars: state.interpreter.vars,
+            protected_vars: state.interpreter.protected_vars
         }
     }
 
@@ -586,6 +780,12 @@ defmodule Imp.Predict.RLM do
 
         %Effect{kind: :llm_query_batched, arguments: args} ->
           interpreter_llm_query_batched(args, runtime)
+
+        %Effect{kind: :rlm_query, arguments: args} ->
+          interpreter_rlm_query(args, runtime)
+
+        %Effect{kind: :rlm_query_batched, arguments: args} ->
+          interpreter_rlm_query_batched(args, runtime)
 
         %Effect{kind: :recurse, arguments: args} ->
           interpreter_recurse(args, runtime)
@@ -619,11 +819,14 @@ defmodule Imp.Predict.RLM do
       {{:error, error}, sync_budget_usage(state)}
   end
 
-  defp interpreter_llm_query([prompt], %{budget: budget, rlm: rlm} = runtime)
-       when is_binary(prompt) do
+  defp interpreter_llm_query([prompt], runtime),
+    do: interpreter_llm_query([prompt, nil], runtime)
+
+  defp interpreter_llm_query([prompt, model], %{budget: budget, rlm: rlm} = runtime)
+       when is_binary(prompt) and (is_nil(model) or is_binary(model)) do
     with {:ok, _used} <- Budget.reserve_lm(budget, 1),
          :ok <- Budget.check(budget),
-         {:ok, raw} <- run_budgeted(budget, fn -> query_sub_lm(rlm, prompt) end),
+         {:ok, raw} <- run_budgeted(budget, fn -> query_sub_lm(rlm, prompt, model) end),
          {:ok, value} <- subquery_value(raw) do
       {:ok, value, runtime}
     else
@@ -634,20 +837,27 @@ defmodule Imp.Predict.RLM do
   defp interpreter_llm_query(args, runtime),
     do: {:error, {:invalid_llm_query_arguments, args}, runtime}
 
-  defp interpreter_llm_query_batched([prompts], %{budget: budget, rlm: rlm} = runtime)
-       when is_list(prompts) do
+  defp interpreter_llm_query_batched([prompts], runtime),
+    do: interpreter_llm_query_batched([prompts, nil], runtime)
+
+  defp interpreter_llm_query_batched(
+         [prompts, model],
+         %{budget: budget, rlm: rlm} = runtime
+       )
+       when is_list(prompts) and (is_nil(model) or is_binary(model)) do
     with true <- Enum.all?(prompts, &(is_binary(&1) and &1 != "")),
-         {:ok, results} <- run_leased_batch(budget, prompts, &query_sub_lm(rlm, &1)) do
+         {:ok, results} <-
+           run_leased_batch(budget, prompts, &query_sub_lm(rlm, &1, model)) do
       normalized =
         Enum.map(results, fn
           {:ok, value} ->
             case subquery_value(value) do
               {:ok, output} -> output
-              {:error, reason} -> {:error, reason}
+              {:error, reason} -> llm_query_error(reason)
             end
 
           {:error, reason} ->
-            {:error, reason}
+            llm_query_error(reason)
         end)
 
       {:ok, normalized, runtime}
@@ -660,6 +870,190 @@ defmodule Imp.Predict.RLM do
   defp interpreter_llm_query_batched(args, runtime),
     do: {:error, {:invalid_llm_query_batched_arguments, args}, runtime}
 
+  defp interpreter_rlm_query([prompt], runtime),
+    do: interpreter_rlm_query([prompt, nil], runtime)
+
+  defp interpreter_rlm_query([prompt, model], runtime)
+       when is_binary(prompt) and prompt != "" and (is_nil(model) or is_binary(model)) do
+    if recursive_child_available?(runtime) do
+      case run_recursive_child(runtime, prompt, model) do
+        {:ok, value, depth, trace} ->
+          runtime = Runtime.observe_recursion(runtime, depth, trace, :rlm_query)
+          {:ok, value, runtime}
+
+        {:error, reason, depth, trace} ->
+          runtime = Runtime.observe_recursion(runtime, depth, trace, :rlm_query)
+          {:error, reason, runtime}
+
+        {:partial_error, value, _depth} ->
+          {:ok, value, runtime}
+      end
+    else
+      rlm_query_fallback(prompt, model, runtime)
+    end
+  end
+
+  defp interpreter_rlm_query(args, runtime),
+    do: {:error, {:invalid_rlm_query_arguments, args}, runtime}
+
+  defp interpreter_rlm_query_batched([prompts], runtime),
+    do: interpreter_rlm_query_batched([prompts, nil], runtime)
+
+  defp interpreter_rlm_query_batched([prompts, model], runtime)
+       when is_list(prompts) and (is_nil(model) or is_binary(model)) do
+    if Enum.all?(prompts, &(is_binary(&1) and &1 != "")) do
+      if recursive_child_available?(runtime) do
+        run_recursive_children(prompts, model, runtime)
+      else
+        rlm_query_batched_fallback(prompts, model, runtime)
+      end
+    else
+      {:error, {:invalid_rlm_query_batched_arguments, prompts}, runtime}
+    end
+  end
+
+  defp interpreter_rlm_query_batched(args, runtime),
+    do: {:error, {:invalid_rlm_query_batched_arguments, args}, runtime}
+
+  defp recursive_child_available?(%{depth: depth, rlm: rlm}) do
+    depth + 1 < rlm.max_recursion_depth
+  end
+
+  defp run_recursive_child(%{budget: budget, rlm: rlm, depth: parent_depth}, prompt, model) do
+    with {:ok, depth} <- Budget.enter_recursion(budget, parent_depth) do
+      child = recursive_query_child(rlm, model)
+
+      case call_with_budget(child, %{context: prompt}, budget, depth) do
+        {:ok, prediction} ->
+          trace = get_in(prediction.metadata, [:rlm_trace]) || []
+          {:ok, recursive_query_value(prediction), depth, trace}
+
+        {:error, reason} ->
+          if hard_runtime_error?(reason),
+            do: {:error, reason, depth, []},
+            else: {:partial_error, recursive_query_error(reason), depth}
+      end
+    else
+      {:error, reason} -> {:error, reason, parent_depth + 1, []}
+    end
+  end
+
+  defp run_recursive_children(prompts, model, runtime) do
+    settings = Imp.Settings.snapshot()
+    process_dictionary = effect_process_dictionary()
+
+    run_child = fn prompt ->
+      Imp.Settings.with_snapshot(settings, fn ->
+        put_effect_process_dictionary(process_dictionary)
+        run_recursive_child(runtime, prompt, model)
+      end)
+    end
+
+    stream =
+      Task.Supervisor.async_stream_nolink(
+        Imp.Tasks.supervisor(),
+        prompts,
+        run_child,
+        ordered: true,
+        max_concurrency: min(runtime.rlm.max_concurrent_subcalls, max(length(prompts), 1)),
+        timeout: Budget.task_timeout(runtime.budget),
+        on_timeout: :kill_task
+      )
+
+    results =
+      Enum.map(stream, fn
+        {:ok, result} ->
+          result
+
+        {:exit, reason} ->
+          {:partial_error, recursive_query_error({:child_exit, reason}), runtime.depth + 1}
+      end)
+
+    case Budget.check(runtime.budget) do
+      {:error, reason} ->
+        {:error, reason, runtime}
+
+      :ok ->
+        case Enum.find(results, fn
+               {:error, reason, _depth, _trace} -> hard_runtime_error?(reason)
+               _result -> false
+             end) do
+          {:error, reason, _depth, _trace} ->
+            {:error, reason, runtime}
+
+          nil ->
+            {values, runtime} =
+              Enum.map_reduce(results, runtime, fn
+                {:ok, value, depth, trace}, runtime ->
+                  {value, Runtime.observe_recursion(runtime, depth, trace, :rlm_query)}
+
+                {:partial_error, value, _depth}, runtime ->
+                  {value, runtime}
+              end)
+
+            {:ok, values, runtime}
+        end
+    end
+  end
+
+  defp rlm_query_fallback(prompt, model, runtime) do
+    case interpreter_llm_query([prompt, model], runtime) do
+      {:ok, value, runtime} ->
+        {:ok, recursive_query_value(value), runtime}
+
+      {:error, reason, runtime} ->
+        if hard_runtime_error?(reason),
+          do: {:error, reason, runtime},
+          else: {:ok, recursive_query_error(reason), runtime}
+    end
+  end
+
+  defp rlm_query_batched_fallback(prompts, model, runtime) do
+    case interpreter_llm_query_batched([prompts, model], runtime) do
+      {:ok, values, runtime} ->
+        values =
+          Enum.map(values, fn
+            {:error, reason} -> recursive_query_error(reason)
+            value -> recursive_query_value(value)
+          end)
+
+        {:ok, values, runtime}
+
+      {:error, reason, runtime} ->
+        if hard_runtime_error?(reason),
+          do: {:error, reason, runtime},
+          else: {:ok, List.duplicate(recursive_query_error(reason), length(prompts)), runtime}
+    end
+  end
+
+  defp recursive_query_child(rlm, model) do
+    %{
+      rlm
+      | signature: Imp.Signature.ensure("context -> answer"),
+        persistent: false,
+        session: nil,
+        compaction: false,
+        model_override: model
+    }
+  end
+
+  defp recursive_query_value(%Imp.Prediction{} = prediction),
+    do: prediction |> Imp.Prediction.get(:answer) |> recursive_query_value()
+
+  defp recursive_query_value(value) when is_binary(value), do: value
+  defp recursive_query_value(value), do: inspect(value)
+
+  defp recursive_query_error(reason) do
+    reason = reason |> Imp.Redaction.redact() |> inspect(limit: 12, printable_limit: 512)
+    "Error: RLM query failed - #{reason}"
+  end
+
+  defp hard_runtime_error?(:rlm_time_budget_exceeded), do: true
+  defp hard_runtime_error?({:rlm_max_time_ms, _max, _trace}), do: true
+  defp hard_runtime_error?({:rlm_cancelled, _reason}), do: true
+  defp hard_runtime_error?({{:rlm_cancelled, _reason}, _trace}), do: true
+  defp hard_runtime_error?(_reason), do: false
+
   defp interpreter_recurse(
          [signature, inputs],
          %{budget: budget, rlm: rlm, depth: parent_depth} = runtime
@@ -668,7 +1062,9 @@ defmodule Imp.Predict.RLM do
     with {:ok, child_signature} <- safe_signature(signature),
          :ok <- validate_required_inputs(child_signature, inputs),
          {:ok, depth} <- Budget.enter_recursion(budget, parent_depth) do
-      child = %{rlm | signature: child_signature}
+      # Recursive calls run in a distinct REPL environment. Do not let an
+      # opt-in persistent root session cross a recursion branch boundary.
+      child = %{rlm | signature: child_signature, persistent: false, session: nil}
 
       case call_with_budget(child, inputs, budget, depth) do
         {:ok, prediction} ->
@@ -720,10 +1116,25 @@ defmodule Imp.Predict.RLM do
   defp interpreter_tool(name, args, runtime),
     do: {:error, {:invalid_tool_arguments, name, args}, runtime}
 
-  defp query_sub_lm(%__MODULE__{} = rlm, prompt) do
+  defp query_sub_lm(%__MODULE__{} = rlm, prompt, model) do
     case resolve_sub_lm(rlm) do
       nil -> {:error, :rlm_requires_sub_lm}
-      lm -> Imp.LM.generate(lm, [%{role: :user, content: prompt}], [])
+      lm -> generate_lm(rlm, lm, [%{role: :user, content: prompt}], model)
+    end
+  end
+
+  defp generate_lm(rlm, lm, messages, model \\ nil) do
+    model = model || rlm.model_override
+
+    case {lm, model} do
+      {lm, nil} ->
+        Imp.LM.generate(lm, messages, [])
+
+      {%{__struct__: _module, model: _configured} = lm, model} ->
+        Imp.LM.generate(Map.put(lm, :model, model), messages, [])
+
+      {lm, model} ->
+        Imp.LM.generate(lm, messages, model: model)
     end
   end
 
@@ -757,10 +1168,14 @@ defmodule Imp.Predict.RLM do
   end
 
   defp await_budgeted_effect(budget, task, result_ref, inherited_keys) do
-    case Task.yield(task, interpreter_timeout(budget)) do
+    case Task.yield(task, Budget.task_timeout(budget)) do
       {:ok, {^result_ref, result, effect_dictionary}} ->
         sync_effect_process_dictionary(inherited_keys, effect_dictionary)
-        result
+
+        case Budget.check(budget) do
+          :ok -> result
+          {:error, reason} -> {:error, reason}
+        end
 
       {:exit, reason} ->
         {:error, {:rlm_effect_exit, reason}}
@@ -803,7 +1218,7 @@ defmodule Imp.Predict.RLM do
               end,
               ordered: true,
               max_concurrency: min(max(length(items), 1), 8),
-              timeout: interpreter_timeout(budget),
+              timeout: Budget.task_timeout(budget),
               on_timeout: :kill_task
             )
             |> Enum.map(fn
@@ -827,12 +1242,9 @@ defmodule Imp.Predict.RLM do
     end
   end
 
-  defp interpreter_timeout(budget) do
-    case Budget.snapshot(budget).remaining_time_ms do
-      nil -> 120_000
-      0 -> 1
-      remaining -> remaining
-    end
+  defp llm_query_error(reason) do
+    reason = reason |> Imp.Redaction.redact() |> inspect(limit: 12, printable_limit: 512)
+    "Error: LM query failed - #{reason}"
   end
 
   defp sync_interpreter(state, interpreter) do
@@ -850,6 +1262,20 @@ defmodule Imp.Predict.RLM do
   defp put_interpreter_runtime(state, runtime) do
     previous_inputs = state.interpreter.runtime.inputs
 
+    interpreter =
+      Enum.reduce(runtime.inputs, state.interpreter, fn {key, value}, interpreter ->
+        case Map.fetch(previous_inputs, key) do
+          {:ok, %Imp.Predict.RLM.SandboxSerializable{}} ->
+            case Interpreter.put_protected(interpreter, key, value) do
+              {:ok, interpreter} -> interpreter
+              {:error, _reason} -> interpreter
+            end
+
+          _other ->
+            interpreter
+        end
+      end)
+
     vars =
       Enum.reduce(runtime.inputs, state.interpreter.vars, fn {key, value}, vars ->
         case Map.fetch(previous_inputs, key) do
@@ -858,7 +1284,8 @@ defmodule Imp.Predict.RLM do
         end
       end)
 
-    %{state | interpreter: %{state.interpreter | runtime: runtime, vars: vars}, vars: vars}
+    interpreter = %{interpreter | runtime: runtime, vars: vars}
+    %{state | interpreter: interpreter, vars: vars}
   end
 
   defp sync_budget_usage(state) do
@@ -896,7 +1323,7 @@ defmodule Imp.Predict.RLM do
   defp extract_fallback(%__MODULE__{} = rlm, state, iteration) do
     case resolve_lm(rlm) do
       nil ->
-        {:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}
+        {{:error, {:rlm_max_iterations, rlm.max_iterations, Enum.reverse(state.trace)}}, state}
 
       lm ->
         extract_fallback_with_lm(rlm, lm, state, iteration)
@@ -923,15 +1350,15 @@ defmodule Imp.Predict.RLM do
       }
     ]
 
-    with {:ok, raw} <- run_budgeted(state.budget, fn -> Imp.LM.generate(lm, messages, []) end),
+    with {:ok, raw} <- run_budgeted(state.budget, fn -> generate_lm(rlm, lm, messages) end),
          {:ok, raw} <- Imp.LM.Result.output(raw),
          {:ok, prediction} <- resolve_adapter(rlm).parse(rlm.signature, raw, []),
          :ok <- validate_fallback_prediction(rlm.signature, prediction, state) do
-      state = trace(state, iteration, :extract, %{reason: :max_iterations}, raw)
-      {:ok, add_trace(prediction, state)}
+      state = trace_without_history(state, iteration, :extract, %{reason: :max_iterations}, raw)
+      {{:ok, add_trace(prediction, state)}, state}
     else
       {:error, reason} ->
-        {:error, {:rlm_extract_failed, reason, Enum.reverse(state.trace)}}
+        {{:error, {:rlm_extract_failed, reason, Enum.reverse(state.trace)}}, state}
     end
   end
 
@@ -956,10 +1383,191 @@ defmodule Imp.Predict.RLM do
     end
   end
 
+  defp maybe_compact_history(%__MODULE__{compaction: false}, state, _iteration),
+    do: {:ok, state}
+
+  defp maybe_compact_history(%__MODULE__{} = rlm, state, iteration) do
+    compact? =
+      state.active_history != [] and
+        Compaction.should_compact?(
+          state.active_history,
+          rlm.compaction_threshold_pct,
+          rlm.compaction_context_tokens
+        )
+
+    if compact? do
+      compact_history(rlm, state, iteration)
+    else
+      {:ok, state}
+    end
+  end
+
+  defp compact_history(rlm, state, iteration) do
+    with lm when not is_nil(lm) <- resolve_lm(rlm),
+         summary_messages = Compaction.summary_messages(state.active_history),
+         {:ok, raw} <-
+           run_budgeted(state.budget, fn -> generate_lm(rlm, lm, summary_messages) end),
+         {:ok, summary} when is_binary(summary) <- Imp.LM.Result.output(raw) do
+      count = state.compaction_count + 1
+      continuation = Compaction.continuation(summary, count)
+
+      event = %{
+        iteration: iteration,
+        action: :compact,
+        depth: state.depth,
+        input: %{
+          estimated_tokens: Compaction.estimate_tokens(state.active_history),
+          token_estimator: Compaction.estimator(),
+          context_tokens: rlm.compaction_context_tokens
+        },
+        output: trace_term(%{count: count, summary: summary}, state.trace_limit)
+      }
+
+      scaffold =
+        Enum.take(state.active_history, 2) ++
+          [
+            %{role: :assistant, content: summary},
+            %{role: :user, content: continuation.instruction}
+          ]
+
+      state = %{
+        state
+        | observations: [],
+          active_history: scaffold,
+          call_history: normalize_history_messages(scaffold),
+          pending_history_segment: [],
+          compaction_history:
+            state.compaction_history ++ [%{"type" => "summary", "content" => summary}],
+          compaction_count: count,
+          compaction_summary: summary,
+          trace: [event | state.trace]
+      }
+
+      state = sync_compaction_history(state)
+
+      case check_history_error(state) do
+        :ok -> {:ok, state}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      nil -> {:error, :rlm_requires_controller_lm}
+      {:ok, other} -> {:error, {:rlm_compaction_failed, {:invalid_summary, other}}}
+      {:error, reason} -> {:error, {:rlm_compaction_failed, reason}}
+    end
+  end
+
+  defp record_controller_exchange(state, messages, raw_action) do
+    messages = normalize_controller_messages(messages)
+    new_prompt_messages = Enum.drop(messages, length(state.active_history))
+    assistant_content = history_content(unwrap_lm_output(raw_action))
+    assistant_message = %{role: :assistant, content: assistant_content}
+
+    call_segment =
+      normalize_history_messages(new_prompt_messages) ++
+        [%{"role" => "assistant", "content" => assistant_content}]
+
+    # The environment's compaction history mirrors upstream format_iteration/1:
+    # assistant action followed by one REPL-result user message.
+    pending_history_segment = [%{"role" => "assistant", "content" => assistant_content}]
+
+    %{
+      state
+      | call_history: state.call_history ++ call_segment,
+        active_history: messages ++ [assistant_message],
+        pending_history_segment: pending_history_segment
+    }
+  end
+
+  defp normalize_controller_messages(messages) do
+    Enum.map(messages, fn message ->
+      %{
+        role: normalize_controller_role(Map.get(message, :role, Map.get(message, "role"))),
+        content: history_content(Map.get(message, :content, Map.get(message, "content", "")))
+      }
+    end)
+  end
+
+  defp normalize_controller_role(role) when role in [:system, :assistant, :user], do: role
+  defp normalize_controller_role("system"), do: :system
+  defp normalize_controller_role("assistant"), do: :assistant
+  defp normalize_controller_role(_role), do: :user
+
+  defp normalize_history_messages(messages) do
+    Enum.map(messages, fn message ->
+      %{
+        "role" => message |> Map.get(:role, Map.get(message, "role", "unknown")) |> to_string(),
+        "content" => history_content(Map.get(message, :content, Map.get(message, "content", "")))
+      }
+    end)
+  end
+
+  defp history_content(value) when is_binary(value), do: value
+
+  defp history_content(value) do
+    Jason.encode!(value)
+  rescue
+    _error -> inspect(value, limit: 50, printable_limit: 4_000)
+  end
+
+  defp append_history_event(state, action, output) do
+    pending_segment = state.pending_history_segment
+    repl_content = "REPL output (#{action}):\n#{history_content(output)}"
+
+    history_message = %{"role" => "user", "content" => repl_content}
+    controller_message = %{role: :user, content: repl_content}
+
+    state = %{
+      state
+      | call_history: state.call_history ++ [history_message],
+        active_history: state.active_history ++ [controller_message],
+        pending_history_segment: []
+    }
+
+    if state.compaction? do
+      entry = pending_segment ++ [history_message]
+      state = %{state | compaction_history: state.compaction_history ++ [entry]}
+      sync_compaction_history(state)
+    else
+      state
+    end
+  end
+
+  defp discard_pending_history_segment(%{pending_history_segment: []} = state), do: state
+
+  defp discard_pending_history_segment(state) do
+    count = length(state.pending_history_segment)
+
+    %{
+      state
+      | call_history: Enum.drop(state.call_history, -count),
+        active_history: Enum.drop(state.active_history, -count),
+        pending_history_segment: []
+    }
+  end
+
+  defp sync_compaction_history(state) do
+    case Interpreter.put_protected(state.interpreter, "history", state.compaction_history) do
+      {:ok, interpreter} ->
+        %{state | interpreter: interpreter, vars: interpreter.vars, history_error: nil}
+
+      {:error, reason} ->
+        %{state | history_error: {:rlm_history_budget_exceeded, reason}}
+    end
+  end
+
+  defp check_history_error(%{history_error: nil}), do: :ok
+  defp check_history_error(%{history_error: reason}), do: {:error, reason}
+
   defp add_observation(state, observation),
     do: Map.update!(state, :observations, &[trace_term(observation, state.trace_limit) | &1])
 
   defp trace(state, iteration, action, input, output) do
+    state
+    |> trace_without_history(iteration, action, input, output)
+    |> append_history_event(action, output)
+  end
+
+  defp trace_without_history(state, iteration, action, input, output) do
     event = %{
       iteration: iteration,
       action: action,
@@ -990,8 +1598,12 @@ defmodule Imp.Predict.RLM do
       |> Map.put(:final_reasoning, final_reasoning)
       |> Map.put(:rlm, %{
         iterations: trace |> Enum.map(& &1.iteration) |> Enum.max(fn -> 0 end),
+        max_llm_calls: runtime.rlm.max_llm_calls,
+        max_llm_calls_scope: @max_llm_calls_scope,
         sub_lm_calls: state.llm_calls,
         max_observed_depth: runtime.max_observed_depth,
+        compactions: state.compaction_count,
+        compaction_token_estimator: Compaction.estimator(),
         elapsed_ms: System.monotonic_time(:millisecond) - state.started_at
       })
 
@@ -1009,7 +1621,21 @@ defmodule Imp.Predict.RLM do
   end
 
   defp variable_metadata(vars, preview_chars) do
-    Map.new(vars, fn {key, value} -> {key, describe_value(value, preview_chars)} end)
+    Map.new(vars, fn {key, value} ->
+      description =
+        if history_variable?(key) and is_list(value) do
+          %{type: :history, length: length(value), preview: :available_in_environment}
+        else
+          describe_value(value, preview_chars)
+        end
+
+      {key, description}
+    end)
+  end
+
+  defp history_variable?(key) do
+    name = to_string(key)
+    name == "history" or String.starts_with?(name, "history_")
   end
 
   defp describe_value(%Imp.Predict.RLM.SandboxSerializable{} = value, _preview_chars) do
@@ -1136,6 +1762,13 @@ defmodule Imp.Predict.RLM do
     String.to_existing_atom(name)
   rescue
     ArgumentError -> name
+  end
+
+  defp start_persistent_session! do
+    case Session.start_link() do
+      {:ok, session} -> session
+      {:error, reason} -> raise "failed to start RLM persistent session: #{inspect(reason)}"
+    end
   end
 
   defp safe_signature(signature) do

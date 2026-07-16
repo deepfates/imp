@@ -171,7 +171,7 @@
         {
           "role": "upstream_implementation",
           "locator": "https://github.com/gepa-ai/gepa",
-          "revision": "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
+          "revision": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
         },
         {
           "role": "upstream_drift_canary",
@@ -246,7 +246,7 @@
         {
           "role": "upstream_implementation",
           "locator": "https://github.com/gepa-ai/gepa",
-          "revision": "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
+          "revision": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
         },
         {
           "role": "primary_paper",

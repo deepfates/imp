@@ -14,6 +14,11 @@ The release baseline is DSPy `3.2.1`, pinned to commit
 the normalized BaseLM runtime, ReActV2, and the GEPA 0.1.1 result contract is
 visible without silently changing the stable release target.
 
+Standalone GEPA is versioned independently. Its current implementation
+authority is release `v0.1.4` at
+`8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`; the exact `v0.1.1` checkout is
+retained only as a historical executable differential.
+
 When DSPy publishes a new stable release, updating the baseline is a reviewed
 product change. The ledger must first account for every added, removed, or
 changed upstream surface and give each one a semantic contract and owner.

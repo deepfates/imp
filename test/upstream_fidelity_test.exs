@@ -64,18 +64,26 @@ defmodule Imp.UpstreamFidelityTest do
              ])
 
     assert weights.evidence.artifacts == [
-             "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"
+             "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json"
            ]
 
     assert by_id["primitives.multimodal"].status == :conformant
     assert by_id["agents.rlm"].status == :elixir_native_equivalent
     assert by_id["optimization.instructions"].status == :gap
     refute by_id["optimization.instructions"].release_blocking
-    assert by_id["optimization.gepa"].status == :conformant
+    gepa = by_id["optimization.gepa"]
+    assert gepa.status == :gap
+    refute gepa.release_blocking
+    assert gepa.local_conformance == :structural
+    assert gepa.evidence_rung == "C1"
+    assert gepa.claim_boundary =~ "not paper-family reproduction evidence"
+    assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C2 "))
+    assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C5 "))
     assert by_id["product.learning_path"].status == :conformant
     assert by_id["product.release"].status == :conformant
 
     assert report.summary.invalid_evidence == 0
+    assert report.summary.local_conformance == 1
     assert report.summary.manifest_missing == 0
     assert report.summary.manifest_duplicates == 0
     assert report.summary.gaps > 0

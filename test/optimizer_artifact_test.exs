@@ -99,6 +99,94 @@ defmodule Imp.Optimizer.ArtifactTest do
     end
   end
 
+  test "candidate reports drop atom-key credentials before tagged JSON encoding" do
+    canaries = %{
+      api_key: "CANARY_ARTIFACT_ATOM_API_KEY_7e31d",
+      authorization: "CANARY_ARTIFACT_ATOM_AUTHORIZATION_51bc9",
+      provider_auth: "CANARY_ARTIFACT_PROVIDER_AUTH_f208a",
+      provider_session: "CANARY_ARTIFACT_PROVIDER_SESSION_9d14e"
+    }
+
+    report =
+      Report.new(
+        optimizer: :bootstrap_few_shot,
+        candidate_count: 1,
+        candidates: [
+          %{
+            api_key: canaries.api_key,
+            nested: %{authorization: canaries.authorization},
+            label: "retained-candidate"
+          }
+        ],
+        metadata: %{providerAuth: canaries.provider_auth, scope: "retained-scope"}
+      )
+
+    candidate = Artifact.candidate("tagged-report", optimized("safe"), report: report)
+    candidate_json = Jason.encode!(candidate)
+
+    Enum.each(canaries, fn {_name, canary} -> refute candidate_json =~ canary end)
+    refute candidate_json =~ "api_key"
+    refute candidate_json =~ "authorization"
+    refute candidate_json =~ "providerAuth"
+
+    sanitized_report = Report.load(candidate["report"])
+    assert sanitized_report.candidates == [%{label: "retained-candidate", nested: %{}}]
+    assert sanitized_report.metadata == %{scope: "retained-scope"}
+
+    artifact =
+      Artifact.new(candidate, [],
+        provenance: %{providerSession: canaries.provider_session, owner: "retained-owner"}
+      )
+
+    assert artifact["payload"]["security"]["credentials_absent"]
+    assert artifact["payload"]["provenance"] == %{"owner" => "retained-owner"}
+
+    artifact_json = Jason.encode!(artifact)
+    Enum.each(canaries, fn {_name, canary} -> refute artifact_json =~ canary end)
+  end
+
+  test "malformed typed credential keys cannot contradict the artifact security proof" do
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key", "extra" => "bypass"}
+
+    report = Report.new(metadata: %{typed_key => "CANARY_TYPED_KEY_SECRET"})
+    candidate = Artifact.candidate("typed-key", optimized("safe"), report: report)
+    artifact = Artifact.new(candidate)
+    encoded = Jason.encode!(artifact)
+
+    refute encoded =~ "CANARY_TYPED_KEY_SECRET"
+    assert artifact["payload"]["security"]["credentials_absent"]
+    assert Report.load(candidate["report"]).metadata == %{}
+  end
+
+  test "mixed tagged envelope collisions cannot contradict the artifact security proof" do
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key"}
+
+    hostile =
+      Map.new([
+        {:__imp_type__, "noop"},
+        {"__imp_type__", "map"},
+        {:entries, [[typed_key, "CANARY_COLLISION_SECRET"]]},
+        {"entries", []}
+      ])
+
+    assert_raise ArgumentError, ~r/collide after JSON normalization/, fn ->
+      Artifact.candidate("collision", optimized("safe"), metadata: hostile)
+    end
+  end
+
+  test "semantic credential-named schema fields survive artifact normalization" do
+    candidate =
+      Artifact.candidate("schema", optimized("safe"),
+        metadata: %{schema: %{token: :string, api_key: :string, name: :string}}
+      )
+
+    assert candidate["metadata"]["schema"] == %{
+             "token" => "string",
+             "api_key" => "string",
+             "name" => "string"
+           }
+  end
+
   test "registry-backed callbacks are names, never serialized functions" do
     metric = fn _example, _prediction -> true end
     registry = Imp.Saving.Registry.new(always_pass: metric)

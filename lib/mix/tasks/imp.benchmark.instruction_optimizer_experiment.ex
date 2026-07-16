@@ -6,7 +6,7 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerExperiment do
         --manifest benchmarks/config/instruction-optimizer-experiment.json \
         --env-file .env \
         --runtime both \
-        --out benchmarks/results
+        --out benchmarks/runs/instruction-optimizer-experiment
 
   `--runtime` accepts `both`, `imp`, `dspy`, or `none`. When a runtime is
   skipped, pass `--imp-artifact` and/or `--dspy-artifact` to perform a

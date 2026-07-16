@@ -402,7 +402,7 @@ mix imp.benchmark.rag_tool_agent \
   --dspy-model anthropic/claude-haiku-4-5-20251001 \
   --env-file .env \
   --python tmp/dspy-parity-venv/bin/python \
-  --out benchmarks/results/rag-tool-agent-live
+  --out benchmarks/runs/rag-tool-agent
 mix benchmark.rlm.check
 ```
 
@@ -415,10 +415,11 @@ BEAM async execution, and save/load credential redaction. This is full
 provider-free production evidence. Explicit live mode adds matched Imp/DSPy
 retrieval and tool-use behavior with provider usage and fail-closed control
 matching. The two runtimes retain their native ReAct terminators (`submit` and
-`finish`) under a shared semantic contract. The revision-bound Haiku 4.5 run at
-`benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-haiku45-7105b5e-20260715.json`
-passes all 15 rows and completes the bounded production-behavior claim. It does
-not imply research-scale retrieval or tool-use quality.
+`finish`) under a shared semantic contract. The tracked pre-cutover Haiku 4.5
+artifact under `benchmarks/results/` passed all 15 rows for its bound revision,
+but it does not authorize the current revision. A fresh run belongs under
+`benchmarks/runs/rag-tool-agent/` and still does not imply research-scale
+retrieval or tool-use quality.
 
 The RLM command produces T0 deterministic contract replay over hand-authored
 fixture rows. It is useful for checking harness wiring and inspecting traces,
@@ -492,7 +493,7 @@ details, but release decisions need machine-readable artifacts.
 
 Required outputs:
 
-- `benchmarks/results/parity-dashboard-*.json`
+- `benchmarks/runs/parity-dashboard-*.json`
 - lane status: `missing`, `smoke`, `sample`, `full`, `passing`, `failing`
 - links to source artifacts
 - dataset digests

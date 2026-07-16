@@ -35,20 +35,53 @@ result cannot excuse a C1 semantic mismatch.
 ## Artifact Lifecycle
 
 ```text
-protocol -> run envelope -> lane validator -> typed evidence facts
+protocol -> run envelope -> candidate eligibility -> lane validator
+         -> explicit immutable admission -> typed evidence facts
          -> claim requirements -> computed evidence state -> profile gate
 ```
 
-Admission reports independent dimensions: integrity, source compatibility,
-recency when relevant, environment compatibility, evidence tier, and rejection
-reasons. Filesystem mtime is not scientific provenance. A newer malformed or
-rejected artifact must not mask an older admissible artifact.
+Candidate eligibility reports source compatibility, recency when relevant,
+environment compatibility, and rejection reasons. Admission is a separate,
+durable operation: it verifies exact bytes, the declared pure protocol
+validator, feature ownership, and evidence tier before installing an immutable
+content-addressed artifact. Historical admitted evidence does not become
+unadmitted when the current checkout or clock changes.
+
+Filesystem mtime is never scientific provenance. It may only break ties between
+otherwise valid disposable candidates. A newer malformed or ineligible run must
+not mask an older eligible candidate, and neither candidate automatically
+becomes admitted evidence.
 
 Scratch runs belong outside admitted evidence and must never change a dashboard
 merely because `tmp/` was cleaned. Accepted artifacts are immutable and bound
 to protocol, authority revisions, source identity, model identity, data,
 budgets, and payload digest. Historical pre-cutover artifacts retain their
 original bytes and are labeled historical rather than rewritten.
+
+```text
+benchmarks/config/              committed protocol inputs
+benchmarks/evidence/admitted/  committed content-addressed evidence
+benchmarks/evidence/archive/   committed historical and negative evidence
+benchmarks/runs/                ignored disposable executions
+benchmarks/checkpoints/         ignored resumable state
+tmp/                            replaceable build and cache material
+```
+
+`benchmarks/results/` contains tracked pre-cutover records only. New writers,
+dashboard defaults, and operator commands must use `runs/` or `checkpoints/`;
+release evidence moves into `evidence/admitted/` only through explicit
+admission.
+
+Admit a validated run explicitly. The command copies its exact bytes to the
+content-addressed store and atomically updates the selected feature records:
+
+```console
+mix imp.evidence.admit \
+  --artifact benchmarks/runs/example.json \
+  --protocol protocol_id \
+  --tier t2 \
+  --features feature_id,second_feature_id
+```
 
 ## Operating Rules
 

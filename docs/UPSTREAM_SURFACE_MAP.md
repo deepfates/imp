@@ -28,7 +28,7 @@ Passing: true
 | evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |  |
 | optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |  |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer | de-9x31 |
-| optimization.gepa | optimization | conformant | satisfied | GEPA, GEPA advanced, GEPA 0.1.1 result contract | de-izej |
+| optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract | de-izej |
 | optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble | de-9x31 |
 | optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates | de-4bkz |
 | optimization.anything | optimization | tracking | tracked | optimize_anything, arbitrary text artifacts | de-16fo |
@@ -374,10 +374,17 @@ Semantic invariants:
 - public names preserve the upstream optimization mechanism
 - proposal, bootstrapping, search, and selection stages are independently observable
 - optimization demonstrates held-out lift under matched budgets
+- pinned DSPy 3.2.1 COPRO evidence isolates the global LM in a fresh process and
+  observes proposal fan-out/order from LM call history before checking equal-score
+  duplicate removal and statistics shape; first-record retention is separately
+  supported by the pinned source's greater-than-or-equal score guard
 
 Executable evidence:
 
 - test: `test/optimizer_behavioral_corpus_test.exs`
+- test: `test/copro_isolation_differential_test.exs`
+- test: `test/python_dspy_copro_isolation_differential_test.py`
+- fixture: `test/fixtures/dspy_copro_isolation_differential.json`
 - docs: `docs/API_GUIDE.md`
 
 
@@ -386,20 +393,29 @@ Missing evidence or behavior:
 - matched DSPy 3.3.0b1 MIPROv2 differential artifact
 - matched DSPy 3.3.0b1 SIMBA differential artifact
 - paper-scale lift evidence
+- exact Python RNG sequence parity and provider/effectiveness evidence remain out of scope
 
 ### `optimization.gepa`
 
-Status: `conformant`
+Status: `gap`
 
-Upstream source: `dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457`
+Product gate: `claim-specific gap` (nonblocking)
+
+Local conformance: `structural`
+
+Evidence rung: `C1`
+
+Claim boundary: local structural and behavioral conformance only; this is not paper-family reproduction evidence.
+
+Upstream source: `gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975 (standalone v0.1.4 structural authority)`
 
 Imp modules: `Imp.Optimizer.GEPA`, `Imp.Optimize.Anything`
 Semantic invariants:
 
-- reflective mutation uses per-example feedback and trajectories
-- candidate lineage and Pareto state are retained
-- result shape is source-versioned
-- paper families reproduce under matched budgets
+- the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure
+- reflective mutation uses per-example feedback and trajectories in focused local tests
+- candidate lineage, Pareto state, and source-versioned results are retained locally
+- C1 conformance does not establish matched upstream or paper-family outcomes
 
 Executable evidence:
 
@@ -413,7 +429,10 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- the six-family matched campaign remains required for paper-replication and dominance claims
+- C2 matched upstream differential evidence
+- C3 matched live-provider evidence
+- C4 full paper-family campaign evidence
+- C5 independently reproduced outcome evidence
 
 ### `optimization.weights`
 
@@ -445,7 +464,7 @@ Executable evidence:
 - docs: `docs/ADVANCED.md`
 - docs: `docs/COVERAGE_MATRIX.md`
 - docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
-- artifact: `benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json`
+- artifact: `benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json`
 
 Missing evidence or behavior:
 

@@ -102,6 +102,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       run_engine(
         delays: %{{:parent, 0} => :infinity},
         proposal_timeout: 15,
+        raise_on_exception: false,
         callbacks: [{RecordingCallback, self()}]
       )
 
@@ -112,11 +113,53 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       run_engine(
         proposer: fn _candidate, _component, _records, iteration ->
           if iteration == 1, do: raise("reflection failed"), else: "proposal-#{iteration}"
-        end
+        end,
+        raise_on_exception: false
       )
 
     assert length(crashed.candidates) == 2
     assert Enum.any?(crashed.rejected, &(&1.iteration == 1))
+  end
+
+  test "speculative proposer exceptions re-raise when configured" do
+    assert_raise ArgumentError, "speculative reflection failed", fn ->
+      run_engine(
+        max_iterations: 1,
+        proposer: fn _candidate, _component, _records, _iteration ->
+          raise ArgumentError, "speculative reflection failed"
+        end,
+        raise_on_exception: true
+      )
+    end
+  end
+
+  test "sequential proposer exceptions re-raise or become charged rejections" do
+    proposer = fn _candidate, _component, _records, _iteration ->
+      raise ArgumentError, "sequential reflection failed"
+    end
+
+    assert_raise ArgumentError, "sequential reflection failed", fn ->
+      run_engine(
+        max_iterations: 1,
+        proposal_concurrency: 1,
+        proposer: proposer,
+        raise_on_exception: true
+      )
+    end
+
+    state =
+      run_engine(
+        max_iterations: 1,
+        proposal_concurrency: 1,
+        proposer: proposer,
+        raise_on_exception: false
+      )
+
+    assert state.budget.reflection_calls == 1
+    assert length(state.candidates) == 1
+
+    assert [%{reason: {:proposal_error, {:proposal_exception, "sequential reflection failed"}}}] =
+             state.rejected
   end
 
   test "caller cancellation terminates proposal workers without admission leases" do
@@ -130,7 +173,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       end)
 
     assert_receive :caller_started
-    assert_receive {:evaluation_started, :parent, _id, worker}, 1_000
+    assert_receive {:evaluation_started, :parent, id, worker} when id != :validation, 1_000
     Process.exit(caller, :kill)
 
     assert eventually(fn ->
@@ -157,13 +200,30 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     assert Task.await(task) == [{:error, {:worker_exit, :killed}}]
   end
 
-  test "schema 4 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
+  test "schema 7 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
     prepared = interrupt_checkpoint!(:prepared)
-    assert prepared["schema_version"] == 4
+    assert prepared["schema_version"] == 7
     assert prepared["pending_proposal_batch"]["status"] == "prepared"
 
     resumed = run_engine(resume_state: json_round_trip(prepared))
     assert resumed.iteration == 2
+
+    schema4 =
+      prepared
+      |> Map.put("schema_version", 4)
+      |> Map.delete("adapter_state")
+      |> Map.delete("batch_sampler")
+      |> Map.delete("reflection_strategy_state")
+
+    strategy_resumed =
+      run_engine(
+        resume_state: json_round_trip(schema4),
+        sampling_strategy: :single,
+        selection_strategy: :all_improvements
+      )
+
+    assert strategy_resumed.iteration == 2
+    assert is_nil(strategy_resumed.pending_proposal_batch)
 
     child_prepared = interrupt_checkpoint!(:prepared, :child)
     child_resumed = run_engine(resume_state: json_round_trip(child_prepared))
@@ -317,6 +377,9 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
 
   defp receive_evaluation_starts(count, acc) do
     receive do
+      {:evaluation_started, _phase, :validation, _pid} ->
+        receive_evaluation_starts(count, acc)
+
       {:evaluation_started, _phase, _id, _pid} = event ->
         receive_evaluation_starts(count - 1, [event | acc])
     after

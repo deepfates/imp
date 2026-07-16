@@ -39,6 +39,16 @@ defmodule Imp.Predict.RLM.Budget do
   def snapshot(pid), do: GenServer.call(pid, :snapshot)
   def cancel(pid, reason \\ :cancelled), do: GenServer.call(pid, {:cancel, reason})
 
+  @doc false
+  @spec task_timeout(pid()) :: timeout()
+  def task_timeout(pid) do
+    case snapshot(pid).remaining_time_ms do
+      nil -> :infinity
+      0 -> 1
+      remaining -> remaining
+    end
+  end
+
   @impl true
   def init(opts) do
     started_at = System.monotonic_time(:millisecond)

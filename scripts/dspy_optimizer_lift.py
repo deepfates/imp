@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +17,11 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import dspy
+
+
+COPRO_SETUP = """git clone https://github.com/stanfordnlp/dspy.git tmp/dspy-3.2.1
+git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c
+IMP_DSPY_VENV=tmp/dspy-parity-venv scripts/setup_dspy_parity_env.sh"""
 
 
 class QASignature(dspy.Signature):
@@ -97,13 +104,7 @@ def main() -> int:
                 max_errors=2,
             ).compile(student, trainset=trainset, valset=datasets()[1]),
         ),
-        run_optimizer(
-            "COPRO",
-            lm,
-            lambda student, trainset: dspy.COPRO(metric=metric, breadth=2, depth=1).compile(
-                student, trainset=trainset, eval_kwargs={}
-            ),
-        ),
+        copro_row(lm),
         run_optimizer(
             "MIPROv2",
             lm,
@@ -219,6 +220,47 @@ def run_optimizer(name: str, lm: DemoSensitiveLM, compile_fn) -> Dict[str, Any]:
             "notes": "Provider-free deterministic LM answers train question or demo/instruction-conditioned prompts."
         },
     }
+
+
+def copro_row(lm: DemoSensitiveLM) -> Dict[str, Any]:
+    row = run_optimizer(
+        "COPRO",
+        lm,
+        lambda student, trainset: dspy.COPRO(metric=metric, breadth=2, depth=1).compile(
+            student, trainset=trainset, eval_kwargs={}
+        ),
+    )
+    row["c1_differential"] = run_copro_isolation_differential()
+    return row
+
+
+def run_copro_isolation_differential() -> Dict[str, Any]:
+    fixture = Path(__file__).resolve().with_name("dspy_copro_isolation_differential.py")
+    config = Path(__file__).resolve().parents[1] / "test/fixtures/dspy_copro_isolation_differential.json"
+    target = Path(os.environ.get("IMP_DSPY_COPRO_SOURCE", "tmp/dspy-3.2.1"))
+    if not target.is_absolute():
+        target = Path.cwd() / target
+
+    if not (target / ".git").is_dir():
+        raise RuntimeError(
+            f"pinned DSPy 3.2.1 COPRO source checkout is missing: {target}\n"
+            f"Exact setup:\n{COPRO_SETUP}"
+        )
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(target)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
+    )
+    completed = subprocess.run(
+        [sys.executable, str(fixture), "--config", str(config)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise RuntimeError(f"pinned DSPy 3.2.1 COPRO differential failed:\n{detail}")
+    return json.loads(completed.stdout)
 
 
 def compile_simba(student: Any, trainset: List[dspy.Example], lm: DemoSensitiveLM) -> Any:

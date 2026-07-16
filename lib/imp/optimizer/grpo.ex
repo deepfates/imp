@@ -1,10 +1,13 @@
 defmodule Imp.Optimizer.GRPO do
   @behaviour Imp.Optimizer
   @moduledoc """
-  Provider-neutral, iterative GRPO compilation.
+  Provider-neutral, iterative module-level mmGRPO compilation.
 
-  The optimizer owns rollout and grouping semantics; a trainer owns only the
-  reinforcement session lifecycle and model artifact.
+  Groups align calls by `{predictor, relative invocation}` across rollouts and
+  propagate the program-level reward to each aligned completion. A trainer owns
+  only the reinforcement session lifecycle and model artifact. This boundary
+  does not persist a resumable optimizer state or implement independent jobs for
+  multiple student LMs.
   """
 
   alias Imp.Clients.{ReinforcementSession, Trainer}
@@ -161,9 +164,15 @@ defmodule Imp.Optimizer.GRPO do
     }
 
     result =
-      with :ok <- maybe_validate(optimizer, program, trainset, valset, -1),
-           {:ok, state} <- run_steps(optimizer, trainset, valset, initial_state) do
-        {:ok, state}
+      try do
+        with :ok <- maybe_validate(optimizer, program, trainset, valset, -1),
+             {:ok, state} <- run_steps(optimizer, trainset, valset, initial_state) do
+          {:ok, state}
+        end
+      rescue
+        error -> {:error, {:grpo_execution_failed, Exception.message(error)}}
+      catch
+        kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}}
       end
 
     case result do

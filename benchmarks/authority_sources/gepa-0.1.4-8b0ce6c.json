@@ -1,0 +1,470 @@
+{
+  "commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+  "files": [
+    {
+      "path": "src/gepa/__init__.py",
+      "sha256": "61cdac47f24d1f24315b8beb8d65e834a67a2a7a6cf9b667ecf6c669ddc6f4a6"
+    },
+    {
+      "path": "src/gepa/adapters/README.md",
+      "sha256": "daeef3083490ba759f3160865d58a4c201cb33a7078457d2800d6c6b9946722e"
+    },
+    {
+      "path": "src/gepa/adapters/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/adapters/anymaths_adapter/README.md",
+      "sha256": "af91ab33b7174655a6b85bbb87eb2bdc9441d65c69695ca00d75f56b0367e2f3"
+    },
+    {
+      "path": "src/gepa/adapters/anymaths_adapter/__init__.py",
+      "sha256": "121e49528d57b20e76150d409ed1a1ef8b0f08532fa0ad7dfd0a49263eb2fe71"
+    },
+    {
+      "path": "src/gepa/adapters/anymaths_adapter/anymaths_adapter.py",
+      "sha256": "70dc1619f8447b1beb8de354cd6cbdf9cf39b913f5b36b9a365eacad9827c3d3"
+    },
+    {
+      "path": "src/gepa/adapters/anymaths_adapter/requirements.txt",
+      "sha256": "18df7fb1d1519ca7ebef092df8842c18b26ad811a7fefb9211ea26528b77ec83"
+    },
+    {
+      "path": "src/gepa/adapters/confidence_adapter/__init__.py",
+      "sha256": "d13275271f681d040c0905607bfac3fdf84f204fc8aebb5a144930b891e43223"
+    },
+    {
+      "path": "src/gepa/adapters/confidence_adapter/confidence_adapter.py",
+      "sha256": "b4b7c24d495e40cae61fb9f4b17b2f7fa951837e38d2fcfedc41f62dabd57e5a"
+    },
+    {
+      "path": "src/gepa/adapters/confidence_adapter/scoring.py",
+      "sha256": "e218f1dacf2497ab577e6f93fe39a98f7cd7cb66f14bae9b1f1c1845e5e82af2"
+    },
+    {
+      "path": "src/gepa/adapters/default_adapter/README.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/adapters/default_adapter/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/adapters/default_adapter/default_adapter.py",
+      "sha256": "9583ceb97990d2230450410913d748761fdbf9f279b9e6dcd7011200dec8063e"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_adapter/README.md",
+      "sha256": "0226f7c7ddcae0117b8917eb86f19b739e4cbdbcc10b7afc1fd4fa8075c63aa2"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_adapter/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_adapter/dspy_adapter.py",
+      "sha256": "35d82248aef5a4ed9b6f88cfbe7fba9c04e8d653b4e49416158c3007dcce21d0"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_adapter/instruction_proposal.py",
+      "sha256": "de61058caf84610b7e87635b1fe3fc848ab65318ef95d1a1e5a807e39f5b292d"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_full_program_adapter/README.md",
+      "sha256": "e5a52a3c6ebedfe1798408417c42f410a123785d7285967c1b58f6b1e88bd524"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_full_program_adapter/__init__.py",
+      "sha256": "93ca8fc801342d9f8a0181faf650cc0559d1d93ba6f475221f2f775ddec3bd42"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_full_program_adapter/dspy_program_proposal_signature.py",
+      "sha256": "bf28deb7752bf27eb27f7b2917ce6525b3c9d06b0462a59ac430fce42b79b743"
+    },
+    {
+      "path": "src/gepa/adapters/dspy_full_program_adapter/full_program_adapter.py",
+      "sha256": "de8d2838d390aacbb8f0146625d7ba8778eb3dc6e9f4c96c968e6ea4823d0431"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/GEPA_RAG.md",
+      "sha256": "1bfafcb42fce9dab53f8518888940be008000eb07123cc55e23c572885ab5d93"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/__init__.py",
+      "sha256": "f30f03f9ec9b4b25f88ab76ab9a664c8b234e983a326efec73ad98cc93f04c58"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/evaluation_metrics.py",
+      "sha256": "7fb9d73b48e9ed897ab52e9f03e1120c8b0eea23f5a489ca9a69d81721f06c34"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/generic_rag_adapter.py",
+      "sha256": "cbe1152a045770022aa34fe5e0743561c0c76f6c581f6f63a9cbe5250b93c597"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/rag_pipeline.py",
+      "sha256": "8dba4dc5fef4763d59f7f1f354f5a442738aef651dc15e7539e6974ae203eef7"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_store_interface.py",
+      "sha256": "a5d8b0f7bcbdf7750ae1a9a769bff741ad4469ecd91a08e5e858414b457e2bf3"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/__init__.py",
+      "sha256": "25006b3989e8b257028019b128739692b2345c2fd17ce46469066fd73ba06afb"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/chroma_store.py",
+      "sha256": "b8d527b8562577daf3d7beb2521c2c419735d4834626f0072ddea09ddefb3dc6"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/lancedb_store.py",
+      "sha256": "31fc5919c5b9251de60675ad126844885959abadf46f203d0d031d09e40ca804"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/milvus_store.py",
+      "sha256": "40b82f6464dbdf1f2161f3c5b080b37721224cbd7b73b6f20fbf7caebb35f777"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/qdrant_store.py",
+      "sha256": "4bd98e1973f44cfb011f1ae0d5d6693516a0f7521285fec5ee68cd75a0c85f8e"
+    },
+    {
+      "path": "src/gepa/adapters/generic_rag_adapter/vector_stores/weaviate_store.py",
+      "sha256": "75b1297a31964e6e392f181065a508b259d22afccb3a078fa3f5e5657024a80c"
+    },
+    {
+      "path": "src/gepa/adapters/langchain_adapter/README.md",
+      "sha256": "71eb0b84c252f2efe2a8d9e56caf54a1069b6c064e3284322b89f52b23868bcc"
+    },
+    {
+      "path": "src/gepa/adapters/langchain_adapter/__init__.py",
+      "sha256": "d7de53a334ab4775ebf71be526ff946af29c7eec0f0cf86f8bee54bce6a1dd8e"
+    },
+    {
+      "path": "src/gepa/adapters/langchain_adapter/langchain_adapter.py",
+      "sha256": "001ea36c4272a77add647fa2c4758c42b4590d001c02267a9b22a973c4d1f5db"
+    },
+    {
+      "path": "src/gepa/adapters/mcp_adapter/README.md",
+      "sha256": "8250ee3a0d03bd4dd73d9b78b1dd0f3aba914482a5a85fe56ed76f61d900f225"
+    },
+    {
+      "path": "src/gepa/adapters/mcp_adapter/__init__.py",
+      "sha256": "516969aa27da083b8abeddc190af410bd46458f286915c6249edb5a52f8a5400"
+    },
+    {
+      "path": "src/gepa/adapters/mcp_adapter/mcp_adapter.py",
+      "sha256": "8366e013d5bcad90eb55b998aa6d2b81859c831c0d58b5d6eeb47c005ded2c65"
+    },
+    {
+      "path": "src/gepa/adapters/mcp_adapter/mcp_client.py",
+      "sha256": "f420efcb09ac01a9d6ed85a205eb2ca8a90de0b641bece22444a873e1b0d8653"
+    },
+    {
+      "path": "src/gepa/adapters/optimize_anything_adapter/optimize_anything_adapter.py",
+      "sha256": "36f27ae8fa7f96c550e1a298ba20d353fa846424cb457c727e2961a7aaf7e4d8"
+    },
+    {
+      "path": "src/gepa/adapters/terminal_bench_adapter/README.md",
+      "sha256": "674a31e03d0f9352a14ccbd795239e4fde9d24cdc6dd93852c5ccf7ee2892d02"
+    },
+    {
+      "path": "src/gepa/adapters/terminal_bench_adapter/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/adapters/terminal_bench_adapter/terminal_bench_adapter.py",
+      "sha256": "7d87934f5ffca6740a630ea981158db2407c5f5f2ce68cdb3806aab70c9a72d8"
+    },
+    {
+      "path": "src/gepa/api.py",
+      "sha256": "228c4f80c782dc36afc19492bbb023eba12f257aaa22b947009efc473c4572f9"
+    },
+    {
+      "path": "src/gepa/core/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/core/adapter.py",
+      "sha256": "51f47f94802987555202ba4bbe1f8dddf328fce822d1ec02b25a7a049320cef8"
+    },
+    {
+      "path": "src/gepa/core/callbacks.py",
+      "sha256": "7f1e8a8a40546e659b900b2e769ab231cb05c38f35bc8bb164df5f99f2cc01d4"
+    },
+    {
+      "path": "src/gepa/core/data_loader.py",
+      "sha256": "b1343c92ca654bca51d42819d1b2e4b0edfa3c40124e3316ed060297837810bd"
+    },
+    {
+      "path": "src/gepa/core/engine.py",
+      "sha256": "ba361b477de74c20eb813b277b0fb85b6898ca534e09c8e878604fb1c8980c53"
+    },
+    {
+      "path": "src/gepa/core/result.py",
+      "sha256": "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85"
+    },
+    {
+      "path": "src/gepa/core/state.py",
+      "sha256": "9ad128c981c7344ba0e89d053c2fe33e98a2d74d830679d620cb7cd0d7b1820c"
+    },
+    {
+      "path": "src/gepa/examples/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/examples/aime.py",
+      "sha256": "75bba7b19456748529eba34b28b34efe64390ac921a4ee10b336ef58591327b6"
+    },
+    {
+      "path": "src/gepa/examples/anymaths-bench/eval_default.py",
+      "sha256": "8ba17775c96ff8e0c214f06c477b95854a53ace6b03a2344b8ac20fbb23b9322"
+    },
+    {
+      "path": "src/gepa/examples/anymaths-bench/prompt-templates/instruction_prompt.txt",
+      "sha256": "f182ed0909543bb9b151c48d27b375298317aaccad661999917472115f781274"
+    },
+    {
+      "path": "src/gepa/examples/anymaths-bench/prompt-templates/optimal_prompt.txt",
+      "sha256": "80943568a051634f427852cb4b03c5617c63b1a918ec3fcc4c4656f210b63463"
+    },
+    {
+      "path": "src/gepa/examples/anymaths-bench/train_anymaths.py",
+      "sha256": "09210464ce712b70eb5494a46175ecb1a1d62fdf73905b549741c701ed3cf0e8"
+    },
+    {
+      "path": "src/gepa/examples/dspy_full_program_evolution/arc_agi.ipynb",
+      "sha256": "3418d3de3c3905f9d61464e87d3adfe1437ef360cb59f8577bc0201d0c4a836a"
+    },
+    {
+      "path": "src/gepa/examples/dspy_full_program_evolution/example.ipynb",
+      "sha256": "e66cb66d0d71b88c8fa2a502b9c4ff422fc75b78cb226d3365c53cf185621d25"
+    },
+    {
+      "path": "src/gepa/examples/mcp_adapter/__init__.py",
+      "sha256": "a1f9d400525fe9e53167a4c6446f89dc7c022bf5fcf0db76ee7b309f6ac4ffba"
+    },
+    {
+      "path": "src/gepa/examples/mcp_adapter/mcp_optimization_example.py",
+      "sha256": "053d70352444c5a7fe6724d666b16154b2ca2e0117c0159fd0f98d28dfde22ed"
+    },
+    {
+      "path": "src/gepa/examples/rag_adapter/RAG_GUIDE.md",
+      "sha256": "5496089905d08d9f5c8df6f4cf43db48aa9d220e319e7220c7f1a645b9c279be"
+    },
+    {
+      "path": "src/gepa/examples/rag_adapter/__init__.py",
+      "sha256": "ec18895a1c95bda4ac9924ee9e38397372d037582577171990768da4652b7004"
+    },
+    {
+      "path": "src/gepa/examples/rag_adapter/rag_optimization.py",
+      "sha256": "dd38b601bdd9cac81f9090976ddf4f8d492d588a57bcc3e457f1fb35d132089e"
+    },
+    {
+      "path": "src/gepa/examples/rag_adapter/requirements-rag.txt",
+      "sha256": "a555c9a4a1a7a82a2ad086a0b587df1e850b7e9c49eb62ec2bb8ab91c7f7cd8a"
+    },
+    {
+      "path": "src/gepa/examples/terminal-bench/prompt-templates/instruction_prompt.txt",
+      "sha256": "7b33b73b8a6140fe77c2665af6f67c0474af3bb68ce952b71ce7d67a53e475b1"
+    },
+    {
+      "path": "src/gepa/examples/terminal-bench/prompt-templates/terminus.txt",
+      "sha256": "4d83400ac653b6a503ca36d795d40583961701c4601b233f95810b6590c130a0"
+    },
+    {
+      "path": "src/gepa/examples/terminal-bench/train_terminus.py",
+      "sha256": "682cfa266ce670bf5bcab108d46ab6159a4979fa759c32c90685c867d30626c3"
+    },
+    {
+      "path": "src/gepa/gepa_utils.py",
+      "sha256": "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c"
+    },
+    {
+      "path": "src/gepa/gskill/README.md",
+      "sha256": "cdec8afbc0b37113c35be382859264a825c1d59988350c7dfe2c5d27dd996307"
+    },
+    {
+      "path": "src/gepa/gskill/__init__.py",
+      "sha256": "762995e85daa1619696e6084937ccc0ea7a408eaead55f93943f32b953e1f546"
+    },
+    {
+      "path": "src/gepa/gskill/assets/architecture.png",
+      "sha256": "46c101b34e24b99f82934ec83cab2535a08df3b22d75f4e14140c4728d270b5a"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/cost_tracker.py",
+      "sha256": "e4b8d1856bd78a44ca5913948a7a1f6ff6f017c3ba8313b48fdb3cad67fcba74"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/evaluate/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/evaluate/claude_code.py",
+      "sha256": "2d073fd336730288402f42fd42841fa3f03ca90d550fbb6df431168701067d71"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/evaluate/claude_code_skills.py",
+      "sha256": "29782c68162e407d27788b89db98b5b340826915749b96d6cf1d9445c9badb66"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/evaluate/mini_swe_agent.py",
+      "sha256": "da679ca79f70c8404966380cc01e422ec6b072fa20a7b9ce8b88732cb280ffb8"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/experiment_logger.py",
+      "sha256": "e03c78cf1ad4760753f89a22bdcf4e4888b9b1a643a1daf9dac5a43693725ce6"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/mini_swe_agent_config/mini.yaml",
+      "sha256": "e85601870fd7e100f7cab331f9aad0ab581c95c6407f5f7ead16f1ec9062de45"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/mini_swe_agent_config/original_mini.yaml",
+      "sha256": "79e38ee9592689071d53975d74449752918a15c488da0057b1abcd9e2e179a28"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/swe_fitness_fn.py",
+      "sha256": "6b8c6a7efd7696a60287371a8da98b6a5272a61925f3fac2a9d9b8c4e456c78f"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/swe_harness.py",
+      "sha256": "34e783289e5172a33638a2e153c0e58eaeaf0f93aff2990da9e45e2dfab56e4c"
+    },
+    {
+      "path": "src/gepa/gskill/gskill/train_optimize_anything.py",
+      "sha256": "91c9750500fb733a24ea634bfab849bf3bc6130e2b8d138d25e5afe5d7d4b43f"
+    },
+    {
+      "path": "src/gepa/image.py",
+      "sha256": "9a567eb78747c365742e945aa8279007d7d38c2bd9163cdfb35f2191fd13d919"
+    },
+    {
+      "path": "src/gepa/lm.py",
+      "sha256": "ac3680ba1986a907b98b824165cfd9f6bdbb7c3e77caf76b5d97e029a82244d8"
+    },
+    {
+      "path": "src/gepa/logging/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/logging/experiment_tracker.py",
+      "sha256": "e6b6e54d18c9ced038c9c7d2f776183db7c9d928ba032673172504370b6d1dd2"
+    },
+    {
+      "path": "src/gepa/logging/logger.py",
+      "sha256": "10977fa9f2b28a708ad2416f00d129dfdfb18200883bee1c5d6fe0a91b003d4a"
+    },
+    {
+      "path": "src/gepa/logging/utils.py",
+      "sha256": "43f488abf884b363083d2f76b288cb517c30f03e893322321857a28aa9c2e536"
+    },
+    {
+      "path": "src/gepa/optimize_anything.py",
+      "sha256": "bd021ab277c44d5f988cf19a186127b9087b88d59656f560bb07e654524a7f26"
+    },
+    {
+      "path": "src/gepa/proposer/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/proposer/base.py",
+      "sha256": "75242e6c71758444d97949fb5c38ff84cd52f2f77f5464c894f6229c9beb210c"
+    },
+    {
+      "path": "src/gepa/proposer/merge.py",
+      "sha256": "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a"
+    },
+    {
+      "path": "src/gepa/proposer/reflective_mutation/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/proposer/reflective_mutation/base.py",
+      "sha256": "f183a12536999004eca9e0d889b53f82bea7e159b4f1c013a3e762251fe3afc1"
+    },
+    {
+      "path": "src/gepa/proposer/reflective_mutation/reflection_lm.py",
+      "sha256": "a7357585f90b9cae52c9930805c8020d982119489e4aaee853c3366df67bff85"
+    },
+    {
+      "path": "src/gepa/proposer/reflective_mutation/reflective_mutation.py",
+      "sha256": "73eac4a18249fdf84e4cd048bf9527cf9084a565424887a470e004ba047a6a87"
+    },
+    {
+      "path": "src/gepa/py.typed",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/strategies/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/gepa/strategies/acceptance.py",
+      "sha256": "a6234c188fdeab0f7181dd1f01d767fc91779512773ed4ad952df68855c1d3a4"
+    },
+    {
+      "path": "src/gepa/strategies/batch_sampler.py",
+      "sha256": "9d009fb88a65663bf22681accfd198261d6689bf4a88931b74bbb76b6d1e2278"
+    },
+    {
+      "path": "src/gepa/strategies/candidate_selector.py",
+      "sha256": "c2565e251d0cdc00d7548dde7fd0316190c97a64bc130ea86ea6e2fc8a232cfd"
+    },
+    {
+      "path": "src/gepa/strategies/component_selector.py",
+      "sha256": "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568"
+    },
+    {
+      "path": "src/gepa/strategies/eval_policy.py",
+      "sha256": "a54c5969ac47b82c5699e2bc0077ed09efbb046fa077661c10e8ed5f356055ce"
+    },
+    {
+      "path": "src/gepa/strategies/instruction_proposal.py",
+      "sha256": "c3848586365c546afdbfb7ffd6f80b6f49def7575821ff352a29bbcf624bd977"
+    },
+    {
+      "path": "src/gepa/strategies/proposal_sampling.py",
+      "sha256": "6a00c84708698adf24c207fa4ea5fdbd8a98a31009a84ecf3fffec5b2e5b3dac"
+    },
+    {
+      "path": "src/gepa/strategies/proposal_selection.py",
+      "sha256": "8866ac697928ab0824653117876e08af7087d4cbfe24a4feaedb8ceef9b75b18"
+    },
+    {
+      "path": "src/gepa/utils/__init__.py",
+      "sha256": "bc700cabd70b16ebce92ea16b579a256a0fdbb31900f226ddc3d0e9446f1f2da"
+    },
+    {
+      "path": "src/gepa/utils/code_execution.py",
+      "sha256": "d21c5449193d8cb63a95593c9e3e7c450adea422b6f2453563eee9842efff8aa"
+    },
+    {
+      "path": "src/gepa/utils/stdio_capture.py",
+      "sha256": "e2a24d14eb8dd79644554d32ff453ad83f13ffd937f0d97979c99f0d91dd778c"
+    },
+    {
+      "path": "src/gepa/utils/stop_condition.py",
+      "sha256": "d33475e411a38353f34272b12b0b2a7af24bbbeca2c2e4fe6c204fa476e87fdb"
+    },
+    {
+      "path": "src/gepa/visualization.py",
+      "sha256": "57261cff28ec8bdb2c00a3cd2b461ad24c60e69614c8f44721a95ab2065026ca"
+    }
+  ],
+  "repository": "https://github.com/gepa-ai/gepa",
+  "schema_version": 1,
+  "source_paths": [
+    "src/gepa",
+    "src/gepa/adapters/optimize_anything_adapter",
+    "src/gepa/core",
+    "src/gepa/optimize_anything.py",
+    "src/gepa/strategies"
+  ]
+}

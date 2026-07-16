@@ -115,7 +115,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaCampaign do
             Keyword.get(
               opts,
               :checkpoint_dir,
-              Path.join(Keyword.get(opts, :out, "benchmarks/results"), "gepa-checkpoints")
+              Imp.BenchmarkTruth.Paths.checkpoints("gepa-campaign")
             ),
           manifest_identity: Keyword.get(opts, :manifest_identity),
           source_commits: %{
@@ -146,13 +146,25 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaCampaign do
         )
 
       families = parse_families(Keyword.get(opts, :families))
+      seeds = parse_seeds(Keyword.get(opts, :seeds, "0,1"))
       require_upstream_bm25!(families)
       require_upstream_ifbench_descriptions!(families)
 
       run_context =
         Imp.BenchmarkTruth.RunContext.capture_git!(
           source_commits: upstream_source_commits(opts),
-          require_clean: true
+          require_clean: true,
+          inputs: %{
+            "protocol_id" => "gepa_campaign",
+            "campaign_id" => fetch!(opts, :campaign_id),
+            "manifest_identity" => Keyword.get(opts, :manifest_identity),
+            "model" => model,
+            "reflection_model" => reflection_model,
+            "judge_model" => Keyword.get(opts, :judge_model, model),
+            "families" => families,
+            "seeds" => seeds,
+            "generations" => Keyword.get(opts, :generations, :metric_budget)
+          }
         )
 
       result =
@@ -162,16 +174,16 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaCampaign do
             campaign_id: fetch!(opts, :campaign_id),
             model: model,
             reflection_model: reflection_model,
-            out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+            out_dir: Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("gepa-campaign")),
             checkpoint_dir:
               Keyword.get(
                 opts,
                 :checkpoint_dir,
-                Path.join(Keyword.get(opts, :out, "benchmarks/results"), "gepa-checkpoints")
+                Imp.BenchmarkTruth.Paths.checkpoints("gepa-campaign")
               ),
             families: families,
             max_concurrency: Keyword.get(opts, :max_concurrency, defaults.max_concurrency),
-            seeds: parse_seeds(Keyword.get(opts, :seeds, "0,1")),
+            seeds: seeds,
             generations: Keyword.get(opts, :generations, :metric_budget),
             pricing_source: fetch!(opts, :pricing_source),
             token_cost: token_cost(opts),

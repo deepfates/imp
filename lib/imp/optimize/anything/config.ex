@@ -1,6 +1,6 @@
 defmodule Imp.Optimize.Anything.Config do
   @moduledoc """
-  Immutable configuration for the GEPA v0.1.1 Optimize Anything frontend.
+  Immutable configuration for the GEPA v0.1.4 Optimize Anything frontend.
 
   The released Python frontend supplies a default external reflection model.
   Imp deliberately does not: `reflection.reflection_lm` defaults to `nil` and

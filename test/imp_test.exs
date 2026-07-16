@@ -538,7 +538,8 @@ defmodule ImpTest do
 
     optimizer =
       Imp.Optimizer.BootstrapFewShot.new(Imp.Metrics.exact_match(:answer),
-        max_bootstrapped_demos: 1
+        max_bootstrapped_demos: 1,
+        max_labeled_demos: 0
       )
 
     compiled = Imp.Optimizer.BootstrapFewShot.compile(optimizer, program, trainset)

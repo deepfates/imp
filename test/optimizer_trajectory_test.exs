@@ -57,10 +57,13 @@ defmodule Imp.Optimizer.TrajectoryTest do
     assert Enum.map(trajectory.trace, & &1.predictor) == [:hint]
   end
 
-  test "runs the metric after failure and keeps prediction-valued diagnostics" do
+  test "does not invoke the metric after a program-call failure" do
     example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+    parent = self()
 
     metric = fn _example, nil, trace ->
+      send(parent, {:metric_called_after_failure, trace})
+
       Imp.Prediction.new(%{
         score: 0.25,
         diagnosis: "recoverable",
@@ -71,9 +74,25 @@ defmodule Imp.Optimizer.TrajectoryTest do
     [trajectory] = Imp.Optimizer.TrajectoryRunner.run(program(true), [example], metric)
 
     assert trajectory.error == :forced_second_stage_failure
-    assert trajectory.score == 0.25
-    assert trajectory.metric_metadata.diagnosis == "recoverable"
-    assert trajectory.metric_metadata.trace_size == 1
+    assert trajectory.score == 0.0
+    assert trajectory.feedback == nil
+    assert trajectory.metric_metadata == %{}
+    assert Enum.map(trajectory.trace, & &1.predictor) == [:hint]
+    refute_received {:metric_called_after_failure, _trace}
+  end
+
+  test "distinguishes a metric failure after a successful program call" do
+    example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+    metric = fn _example, _prediction -> raise "metric exploded" end
+
+    [trajectory] = Imp.Optimizer.TrajectoryRunner.run(program(false), [example], metric)
+
+    assert %Imp.Prediction{} = trajectory.prediction
+    assert trajectory.error == {:metric_error, "metric exploded"}
+    assert trajectory.score == 0.0
+    assert trajectory.feedback == {:metric_error, "metric exploded"}
+    assert trajectory.metric_metadata == %{imp_metric_error: "metric exploded"}
+    assert Enum.map(trajectory.trace, & &1.predictor) == [:hint, :answer]
   end
 
   defp program(fail_after_first) do

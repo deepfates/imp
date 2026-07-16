@@ -67,7 +67,7 @@ defmodule Imp.Optimizer.GEPA.Proposal do
       "phase" => Atom.to_string(batch.phase),
       "status" => Atom.to_string(batch.status),
       "contexts" => Enum.map(batch.contexts, &dump_context(&1, dump_result)),
-      "deferred_stop_reason" => Imp.Optimizer.Report.json_safe(batch.deferred_stop_reason)
+      "deferred_stop_reason" => Imp.Optimizer.Report.encode_term(batch.deferred_stop_reason)
     }
 
     Map.put(payload, "integrity", digest(payload))
@@ -99,7 +99,7 @@ defmodule Imp.Optimizer.GEPA.Proposal do
       status: status,
       contexts: contexts,
       deferred_stop_reason:
-        payload |> Map.fetch!("deferred_stop_reason") |> Imp.Optimizer.Report.restore_json_safe()
+        payload |> Map.fetch!("deferred_stop_reason") |> Imp.Optimizer.Report.decode_term()
     }
 
     expected = new_batch(phase, contexts, batch.deferred_stop_reason).id
@@ -133,15 +133,15 @@ defmodule Imp.Optimizer.GEPA.Proposal do
       "child_ambiguous" => context.child_ambiguous || false,
       "reflection_calls" => context.reflection_calls,
       "reflection_ambiguous" => context.reflection_ambiguous || false,
-      "components" => Imp.Optimizer.Report.json_safe(context.components),
+      "components" => Imp.Optimizer.Report.encode_term(context.components),
       "next_component" => context.next_component,
       "action" => if(context.action, do: Atom.to_string(context.action)),
-      "error" => Imp.Optimizer.Report.json_safe(context.error),
-      "dataset" => Imp.Optimizer.Report.json_safe(context.dataset),
+      "error" => Imp.Optimizer.Report.encode_term(context.error),
+      "dataset" => Imp.Optimizer.Report.encode_term(context.dataset),
       "aggregation_reports" =>
         Enum.map(context.aggregation_reports || [], &Imp.Optimizer.GEPA.ComBee.dump_report/1),
-      "replacements" => Imp.Optimizer.Report.json_safe(context.replacements),
-      "candidate" => Imp.Optimizer.Report.json_safe(context.candidate)
+      "replacements" => Imp.Optimizer.Report.encode_term(context.replacements),
+      "candidate" => Imp.Optimizer.Report.encode_term(context.candidate)
     }
   end
 
@@ -179,18 +179,17 @@ defmodule Imp.Optimizer.GEPA.Proposal do
       child_ambiguous: Map.fetch!(context, "child_ambiguous"),
       reflection_calls: Map.fetch!(context, "reflection_calls"),
       reflection_ambiguous: Map.fetch!(context, "reflection_ambiguous"),
-      components: context |> Map.fetch!("components") |> Imp.Optimizer.Report.restore_json_safe(),
+      components: context |> Map.fetch!("components") |> Imp.Optimizer.Report.decode_term(),
       next_component: Map.fetch!(context, "next_component"),
       action: action,
-      error: context |> Map.fetch!("error") |> Imp.Optimizer.Report.restore_json_safe(),
-      dataset: context |> Map.fetch!("dataset") |> Imp.Optimizer.Report.restore_json_safe(),
+      error: context |> Map.fetch!("error") |> Imp.Optimizer.Report.decode_term(),
+      dataset: context |> Map.fetch!("dataset") |> Imp.Optimizer.Report.decode_term(),
       aggregation_reports:
         context
         |> Map.fetch!("aggregation_reports")
         |> Enum.map(&Imp.Optimizer.GEPA.ComBee.load_report/1),
-      replacements:
-        context |> Map.fetch!("replacements") |> Imp.Optimizer.Report.restore_json_safe(),
-      candidate: context |> Map.fetch!("candidate") |> Imp.Optimizer.Report.restore_json_safe()
+      replacements: context |> Map.fetch!("replacements") |> Imp.Optimizer.Report.decode_term(),
+      candidate: context |> Map.fetch!("candidate") |> Imp.Optimizer.Report.decode_term()
     }
   end
 

@@ -128,9 +128,9 @@ defmodule Imp.Predict.Predict do
   def dump(%__MODULE__{} = predict) do
     %{
       "signature" => Imp.Signature.dump(predict.signature),
-      "demos" => Enum.map(predict.demos, &Imp.Optimizer.Report.json_safe/1),
+      "demos" => Enum.map(predict.demos, &Imp.Optimizer.Report.encode_term/1),
       "config" => encode_keyword(predict.config),
-      "metadata" => Imp.Optimizer.Report.json_safe(predict.metadata),
+      "metadata" => Imp.Optimizer.Report.encode_term(predict.metadata),
       "adapter" => predict |> resolve_adapter() |> Atom.to_string(),
       "lm" => dump_lm(predict.lm),
       "dynamic_lm" => predict.dynamic_lm?,

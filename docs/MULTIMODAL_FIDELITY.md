@@ -8,7 +8,7 @@ model answered correctly.
 ## Current Evidence
 
 The claim-authorizing artifact is
-`benchmarks/results/multimodal-quality-live-20260713T224355Z.json` (SHA-256
+`benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json` (SHA-256
 `02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e`). It was
 generated on 2026-07-13 from OpenAI manifest payload SHA-256
 `04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8`.
@@ -138,7 +138,7 @@ Execute a clean or resumable paid campaign with:
 mix imp.benchmark.multimodal_quality \
   --profile openai-responses --live \
   --max-concurrency 2 \
-  --out benchmarks/results
+  --out benchmarks/runs/multimodal
 ```
 
 The task reads `OPENAI_API_KEY` only from the task process. A live run exits

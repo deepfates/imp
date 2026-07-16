@@ -41,7 +41,7 @@
   "models": {
     "root": {
       "logical": "gpt-5",
-      "dsex": "openai:gpt-5",
+      "imp": "openai:gpt-5",
       "dspy": "openai/gpt-5",
       "temperature": 1.0,
       "reasoning": "medium",
@@ -49,7 +49,7 @@
     },
     "submodel": {
       "logical": "gpt-5-mini",
-      "dsex": "openai:gpt-5-mini",
+      "imp": "openai:gpt-5-mini",
       "dspy": "openai/gpt-5-mini",
       "temperature": 1.0,
       "reasoning": "medium",
@@ -57,7 +57,7 @@
     },
     "compaction": {
       "logical": "gpt-5-nano",
-      "dsex": "openai:gpt-5-nano",
+      "imp": "openai:gpt-5-nano",
       "dspy": "openai/gpt-5-nano",
       "temperature": 1.0,
       "reasoning": "medium",
@@ -67,25 +67,25 @@
   "approaches": {
     "direct": {
       "enabled": true,
-      "runtimes": ["dsex", "dspy"],
+      "runtimes": ["imp", "dspy"],
       "budget": {"requests": 500, "input_tokens": 100000000, "output_tokens": 5000000, "usd": 5000.0},
       "settings": {"reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
     },
     "simple_retrieval": {
       "enabled": true,
-      "runtimes": ["dsex", "dspy"],
+      "runtimes": ["imp", "dspy"],
       "budget": {"requests": 500, "input_tokens": 10000000, "output_tokens": 5000000, "usd": 2500.0},
       "settings": {"k": 8, "retriever": "deterministic_lexical", "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
     },
     "compaction": {
       "enabled": true,
-      "runtimes": ["dsex", "dspy"],
+      "runtimes": ["imp", "dspy"],
       "budget": {"requests": 20000, "input_tokens": 200000000, "output_tokens": 20000000, "usd": 7500.0},
       "settings": {"chunk_chars": 100000, "max_chunks": 32, "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
     },
     "rlm": {
       "enabled": true,
-      "runtimes": ["dsex", "dspy"],
+      "runtimes": ["imp", "dspy"],
       "budget": {"requests": 50000, "input_tokens": 200000000, "output_tokens": 50000000, "usd": 15000.0},
       "settings": {"max_iterations": 20, "max_llm_calls": 500, "recursion_depth": 1, "reservation_pricing": {"input_per_million": 20.0, "output_per_million": 100.0}}
     }
@@ -453,8 +453,8 @@
   },
   "deviations": [
     {
-      "id": "dsex_repl_language",
-      "scope": "dsex:rlm",
+      "id": "imp_repl_language",
+      "scope": "imp:rlm",
       "paper_behavior": "Python REPL over external context variables",
       "implementation": "BEAM-native constrained Elixir-shaped interpreter with equivalent persistent variable and sub-LM effects",
       "impact": "trajectory syntax is not byte-for-byte comparable; answer, budget, and effect shape remain comparable"

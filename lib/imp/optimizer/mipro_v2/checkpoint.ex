@@ -11,7 +11,7 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
       when is_map(compatibility) and is_map(artifacts) and is_map(state) do
     payload = %{
       "compatibility" => compatibility,
-      "artifacts" => Report.json_safe(artifacts),
+      "artifacts" => Report.encode_term(artifacts),
       "state" => %{
         "policy" => SearchPolicy.dump(state.policy),
         "rng" => Sampling.dump(state.rng),
@@ -20,7 +20,7 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
         "full_evaluations" => dump_records(state.full_evaluations),
         "next_study_number" => state.next_study_number,
         "evaluation_calls" => state.evaluation_calls,
-        "errors" => Report.json_safe(state.errors)
+        "errors" => Report.encode_term(state.errors)
       }
     }
 
@@ -67,11 +67,11 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
         state |> Map.fetch!("full_evaluations") |> load_records!("full_evaluations"),
       next_study_number: fetch_non_negative_integer!(state, "next_study_number"),
       evaluation_calls: fetch_non_negative_integer!(state, "evaluation_calls"),
-      errors: state |> Map.fetch!("errors") |> Report.restore_json_safe()
+      errors: state |> Map.fetch!("errors") |> Report.decode_term()
     }
 
     validate_state!(loaded)
-    %{artifacts: Report.restore_json_safe(artifacts), state: loaded}
+    %{artifacts: Report.decode_term(artifacts), state: loaded}
   rescue
     error in [KeyError, ArgumentError] ->
       reraise ArgumentError,
@@ -86,11 +86,11 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
   defp dump_records(records) do
     records
     |> Enum.map(&Map.drop(&1, [:program]))
-    |> Report.json_safe()
+    |> Report.encode_term()
   end
 
   defp load_records!(records, name) when is_list(records) do
-    records = Report.restore_json_safe(records)
+    records = Report.decode_term(records)
 
     unless Enum.all?(records, &valid_record?/1) do
       raise ArgumentError, "MIPROv2 checkpoint #{name} contain an invalid record"

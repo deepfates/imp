@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "protocol_id": "optimize_anything_upstream_differential_v1",
+  "protocol_class": "adapted_matched_runtime_differential",
+  "claim_scope": {
+    "included": [
+      "pinned public Optimize Anything implementation executes",
+      "Imp and upstream use the same domain evaluator, seed candidate, task split, proposal budget, model family, temperature, and output limit",
+      "measured best-score, evaluator-call, token, cost, and wall-time comparison",
+      "two non-prompt executable-code domains and one bounded real repository task"
+    ],
+    "excluded": [
+      "exact reproduction of every paper domain or reported number",
+      "the paper's Docker-scale gskill or SWE-smith experiment",
+      "byte-identical provider requests or candidate trajectories",
+      "cryptographic attestation that a provider executed the recorded requests",
+      "general superiority outside these domains, controls, seeds, and model",
+      "cross-platform Flask environment equivalence beyond the content-bound local interpreter, installed-distribution manifest, recorded OS release, and architecture"
+    ]
+  },
+  "authority": {
+    "repository": "https://github.com/gepa-ai/optimize-anything-artifact",
+    "commit": "58cdf89d856f2fbc174991b89076eccdcf68e4ca",
+    "workspace": "tmp/optimize-anything-upstream",
+    "source_hashes": {
+      "src/gepa/optimize_anything.py": "52c898ff7f2190e36eb77a0329194f78352eb2f51641a508cfaf16b12ebe1952",
+      "src/gepa/adapters/optimize_anything_adapter/optimize_anything_adapter.py": "741794f4db352d8459ac4f67b99bc35f1d80ef6e66e2eb1c13b1ed8b688ec07e",
+      "src/gepa/core/result.py": "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
+      "src/gepa/lm.py": "a45424e8c1ccb00f443fd73dffa0c892d5ee21d2cb79d0379ac8cce4bcdb026c",
+      "src/gepa/utils/code_execution.py": "d21c5449193d8cb63a95593c9e3e7c450adea422b6f2453563eee9842efff8aa",
+      "examples/circle_packing/main.py": "001949e031a5ed60d4a3f490aad75ec5542441163202f8dbb29aff5d9a9d24df",
+      "examples/circle_packing/utils.py": "5a120f124295241a3e1e9f619fa3d73fe256e2caa67b0c4f900f44a0bec3026c",
+      "examples/blackbox/main.py": "3e76a8019584c63fda929d6ad45c8510533777d7c7189111ac753b0ce079fc3f",
+      "examples/blackbox/utils.py": "5449b22e3f340cc442f4041ea2e68f17ed4dabe6fea6c48481230e9be39cc2e9",
+      "examples/blackbox/evalset/problems.py": "41a90ac7b17f990a55938ea57c3b2397319623b5c174f80a46ab48958f216600"
+    },
+    "offline_verifier": {
+      "command": "uv run python acm_cais_artifact_evaluation/verify_offline_artifacts.py",
+      "expected_domains": 9
+    }
+  },
+  "swe_bench": {
+    "dataset": "SWE-bench/SWE-bench_Verified",
+    "dataset_revision": "91aa3ed51b709be6457e12d00300a6a596d4c6a3",
+    "parquet_sha256": "43ed5a3d1d98da36472c1ade65ddd2085d7b4ff694fcaf6a023a07c5c1f32f21",
+    "instance_id": "pallets__flask-5014",
+    "repository": "https://github.com/pallets/flask",
+    "workspace": "tmp/oa-flask-5014",
+    "base_commit": "7ee9ceb71e868944a46e1ff00b506772a53a4f1d",
+    "environment_setup_commit": "182ce3dd15dfa3537391c3efaf9c3ff407d134d4",
+    "source_path": "src/flask/blueprints.py",
+    "source_sha256": "9d296c3a0dffffbafd59ef15290a6d4c2061a470f3ad2b00709388d35d1dddc0",
+    "problem_statement": "Require a non-empty name for Blueprints. Things do not work correctly if a Blueprint is given an empty name. Raise ValueError when that happens.",
+    "reference_patch": "diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py\n--- a/src/flask/blueprints.py\n+++ b/src/flask/blueprints.py\n@@ -190,6 +190,9 @@ def __init__(\n             root_path=root_path,\n         )\n \n+        if not name:\n+            raise ValueError(\"'name' may not be empty.\")\n+\n         if \".\" in name:\n             raise ValueError(\"'name' may not contain a dot '.' character.\")\n \n",
+    "fail_to_pass": [
+      "tests/test_blueprints.py::test_empty_name_not_allowed"
+    ],
+    "pass_to_pass": [
+      "tests/test_blueprints.py::test_blueprint_specific_error_handling",
+      "tests/test_blueprints.py::test_blueprint_specific_user_error_handling",
+      "tests/test_blueprints.py::test_blueprint_app_error_handling",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[-/-/]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/--/]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/-/-/]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo--/foo]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo/--/foo/]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[-/bar-/bar]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo/-/bar-/foo/bar]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo/-bar-/foo/bar]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo-/bar-/foo/bar]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo/-//bar-/foo/bar]",
+      "tests/test_blueprints.py::test_blueprint_prefix_slash[/foo//-/bar-/foo/bar]",
+      "tests/test_blueprints.py::test_blueprint_url_defaults",
+      "tests/test_blueprints.py::test_blueprint_url_processors",
+      "tests/test_blueprints.py::test_templates_and_static",
+      "tests/test_blueprints.py::test_default_static_max_age",
+      "tests/test_blueprints.py::test_templates_list",
+      "tests/test_blueprints.py::test_dotted_name_not_allowed",
+      "tests/test_blueprints.py::test_dotted_names_from_app",
+      "tests/test_blueprints.py::test_empty_url_defaults",
+      "tests/test_blueprints.py::test_route_decorator_custom_endpoint",
+      "tests/test_blueprints.py::test_route_decorator_custom_endpoint_with_dots",
+      "tests/test_blueprints.py::test_endpoint_decorator",
+      "tests/test_blueprints.py::test_template_filter",
+      "tests/test_blueprints.py::test_add_template_filter",
+      "tests/test_blueprints.py::test_template_filter_with_name",
+      "tests/test_blueprints.py::test_add_template_filter_with_name",
+      "tests/test_blueprints.py::test_template_filter_with_template",
+      "tests/test_blueprints.py::test_template_filter_after_route_with_template",
+      "tests/test_blueprints.py::test_add_template_filter_with_template",
+      "tests/test_blueprints.py::test_template_filter_with_name_and_template",
+      "tests/test_blueprints.py::test_add_template_filter_with_name_and_template",
+      "tests/test_blueprints.py::test_template_test",
+      "tests/test_blueprints.py::test_add_template_test",
+      "tests/test_blueprints.py::test_template_test_with_name",
+      "tests/test_blueprints.py::test_add_template_test_with_name",
+      "tests/test_blueprints.py::test_template_test_with_template",
+      "tests/test_blueprints.py::test_template_test_after_route_with_template",
+      "tests/test_blueprints.py::test_add_template_test_with_template",
+      "tests/test_blueprints.py::test_template_test_with_name_and_template",
+      "tests/test_blueprints.py::test_add_template_test_with_name_and_template",
+      "tests/test_blueprints.py::test_context_processing",
+      "tests/test_blueprints.py::test_template_global",
+      "tests/test_blueprints.py::test_request_processing",
+      "tests/test_blueprints.py::test_app_request_processing",
+      "tests/test_blueprints.py::test_app_url_processors",
+      "tests/test_blueprints.py::test_nested_blueprint",
+      "tests/test_blueprints.py::test_nested_callback_order",
+      "tests/test_blueprints.py::test_nesting_url_prefixes[/parent-/child-None-None]",
+      "tests/test_blueprints.py::test_nesting_url_prefixes[/parent-None-None-/child]",
+      "tests/test_blueprints.py::test_nesting_url_prefixes[None-None-/parent-/child]",
+      "tests/test_blueprints.py::test_nesting_url_prefixes[/other-/something-/parent-/child]",
+      "tests/test_blueprints.py::test_nesting_subdomains",
+      "tests/test_blueprints.py::test_child_and_parent_subdomain",
+      "tests/test_blueprints.py::test_unique_blueprint_names",
+      "tests/test_blueprints.py::test_self_registration",
+      "tests/test_blueprints.py::test_blueprint_renaming"
+    ],
+    "test_patch": "diff --git a/tests/test_blueprints.py b/tests/test_blueprints.py\n--- a/tests/test_blueprints.py\n+++ b/tests/test_blueprints.py\n@@ -256,6 +256,11 @@ def test_dotted_name_not_allowed(app, client):\n         flask.Blueprint(\"app.ui\", __name__)\n \n \n+def test_empty_name_not_allowed(app, client):\n+    with pytest.raises(ValueError):\n+        flask.Blueprint(\"\", __name__)\n+\n+\n def test_dotted_names_from_app(app, client):\n     test = flask.Blueprint(\"test\", __name__)\n \n"
+  },
+  "controls": {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "max_candidate_proposals": 2,
+    "parallel": false,
+    "max_workers": 1,
+    "cache_evaluation": false,
+    "reflection_minibatch_size": 1,
+    "candidate_selection_strategy": "pareto",
+    "frontier_type": "hybrid",
+    "model": {
+      "provider": "anthropic",
+      "upstream_name": "anthropic/claude-haiku-4-5-20251001",
+      "imp_name": "anthropic:claude-haiku-4-5-20251001",
+      "temperature": 0,
+      "max_tokens": 4096,
+      "upstream_retries": 3,
+      "imp_retries": 3,
+      "imp_retry_base_delay_ms": 1000,
+      "imp_retry_max_delay_ms": 4000
+    }
+  },
+  "reflection_template": "You are improving an executable candidate under a fixed evaluator.\n\nObjective:\n<objective>\n\nDomain contract:\n<background>\n\nCurrent complete candidate:\n```\n<curr_param>\n```\n\nObserved evaluator feedback:\n```\n<side_info>\n```\n\nReturn only a complete drop-in replacement inside one fenced code block. Preserve the required interface, obey the evaluator budget, and make the smallest robust change that improves the measured score.",
+  "domains": [
+    {
+      "id": "circle_packing_26",
+      "kind": "non_prompt_code",
+      "seed_source": "examples/circle_packing/main.py::SEED_CODE",
+      "objective": "Maximize the sum of radii for 26 non-overlapping circles contained in the unit square.",
+      "background": "Return executable Python defining main(timeout, current_best_solution). It must return {'circles': a NumPy array shaped (26, 3), 'all_scores': a non-empty list}. Each row is x, y, radius. The matched evaluator uses the public authority's packing validator, a fixed random seed, no warm start, and a 20-second execution ceiling. Invalid geometry or execution scores 0.",
+      "evaluator": {
+        "timeout_seconds": 20,
+        "random_seed": 0,
+        "num_circles": 26
+      }
+    },
+    {
+      "id": "blackbox_problem_46",
+      "kind": "non_prompt_code",
+      "seed_source": "examples/blackbox/main.py::SEED_CODE",
+      "objective": "Maximize the negative of the best observed objective value on public blackbox problem 46 using no more than 20 objective calls.",
+      "background": "Return executable Python defining solve(objective_function, config, best_xs=None). config contains bounds, dim, and budget. Return a mapping with x, score, and all_attempts. The matched evaluator independently scores the best objective value it observed, enforces the 20-call boundary, uses the pinned public problem definition and fixed seed 0, and rejects failed or malformed execution.",
+      "evaluator": {
+        "problem_index": 46,
+        "objective_call_budget": 20,
+        "timeout_seconds": 12,
+        "random_seed": 0
+      }
+    },
+    {
+      "id": "swe_bench_flask_5014",
+      "kind": "real_repository_patch",
+      "seed_source": "protocol:no-op-unified-diff",
+      "objective": "Produce a minimal Flask source patch that makes Blueprint reject an empty name while preserving existing Blueprint behavior.",
+      "background": "Return a complete unified git diff touching only src/flask/blueprints.py. The repository is pallets/flask at commit 7ee9ceb71e868944a46e1ff00b506772a53a4f1d. Blueprint.__init__ calls super().__init__(name, import_name, static_folder, static_url_path, template_folder, root_path), then rejects a dot in name. The hidden target expects constructing Blueprint('', __name__) to raise ValueError. The evaluator applies the diff to a clean archive, applies the official SWE-bench test patch, runs the fail-to-pass target, then the official 59-test PASS_TO_PASS split.",
+      "evaluator": {
+        "fail_to_pass_weight": 0.8,
+        "pass_to_pass_weight": 0.2,
+        "test_timeout_seconds": 30
+      }
+    }
+  ]
+}

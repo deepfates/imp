@@ -24,7 +24,9 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
   @doc "Builds a deterministic, provider-free GEPA campaign plan."
   def plan(opts) do
-    dataset_root = Keyword.fetch!(opts, :dataset_root)
+    dataset_root =
+      opts |> Keyword.fetch!(:dataset_root) |> Imp.BenchmarkTruth.Paths.canonical_path!()
+
     campaign_id = Keyword.fetch!(opts, :campaign_id)
     parent_families = Keyword.get(opts, :families) || @required_families
     model = Keyword.get(opts, :model)
@@ -46,7 +48,11 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
     selected_checkpoint_dir =
       checkpoint_dir_for_shard(
-        Keyword.get(opts, :checkpoint_dir, "benchmarks/results/gepa-checkpoints"),
+        Keyword.get(
+          opts,
+          :checkpoint_dir,
+          Imp.BenchmarkTruth.Paths.checkpoints("gepa-campaign")
+        ),
         selected_shard
       )
 
@@ -114,11 +120,13 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
   end
 
   def run(opts) do
-    dataset_root = Keyword.fetch!(opts, :dataset_root)
+    dataset_root =
+      opts |> Keyword.fetch!(:dataset_root) |> Imp.BenchmarkTruth.Paths.canonical_path!()
+
     campaign_id = Keyword.fetch!(opts, :campaign_id)
     model = Keyword.fetch!(opts, :model)
     reflection_model = Keyword.fetch!(opts, :reflection_model)
-    out_dir = Keyword.get(opts, :out_dir, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out_dir, Imp.BenchmarkTruth.Paths.runs("gepa-campaign"))
     seeds = Keyword.get(opts, :seeds, [0, 1])
 
     generation_policy =
@@ -279,8 +287,13 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         "rows" => rows
       }
 
-      artifact_slug = if selected_shard, do: "#{shard_slug(selected_shard["id"])}-", else: ""
-      out_path = Path.join(out_dir, "imp-gepa-rows-#{artifact_slug}#{timestamp_slug()}.json")
+      artifact_identities = if selected_shard, do: [selected_shard["id"]], else: []
+
+      out_path =
+        Path.join(
+          out_dir,
+          ArtifactFile.artifact_name("imp-gepa-rows", artifact_identities)
+        )
 
       %{artifact: report, path: out_path} =
         ArtifactFile.write_run_json!(out_path, report, run_context)
@@ -446,7 +459,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
   defp checkpoint_dir_for_shard(directory, %{"id" => shard}),
     do: Path.join([directory, "shards", shard_slug(shard)])
 
-  defp shard_slug(shard), do: String.replace(shard, ~r/[^A-Za-z0-9._-]+/, "-")
+  defp shard_slug(shard), do: stable_slug(shard)
 
   defp default_sharding(families) do
     %{
@@ -1007,6 +1020,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         max_metric_calls: budget,
         callbacks: optimizer_callbacks,
         component_feedback: component_feedback,
+        raise_on_exception: false,
         stopper: semantic_progress_stopper(semantic_progress),
         feedback_fn: fn _trainset ->
           "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
@@ -1233,12 +1247,10 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
   defp validate_family_spec!(_spec), do: :ok
 
   defp checkpoint_path(checkpoint_dir, campaign_id, family) do
-    name =
-      "#{campaign_id}-#{family}"
-      |> String.replace(~r/[^A-Za-z0-9_.-]+/, "-")
-
-    Path.join(checkpoint_dir, name <> ".json")
+    Path.join(checkpoint_dir, stable_slug("#{campaign_id}-#{family}") <> ".json")
   end
+
+  defp stable_slug(value) when is_binary(value), do: ArtifactFile.slug(value)
 
   defp load_checkpoint!(path, identity) do
     case File.read(path) do
@@ -1850,12 +1862,5 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     |> File.read!()
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
-  end
-
-  defp timestamp_slug do
-    DateTime.utc_now()
-    |> DateTime.truncate(:second)
-    |> DateTime.to_iso8601(:basic)
-    |> String.replace("Z", "Z")
   end
 end

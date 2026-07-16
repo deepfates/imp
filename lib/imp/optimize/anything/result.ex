@@ -115,13 +115,14 @@ defmodule Imp.Optimize.Anything.Result do
     |> Map.update!(:instance_frontier, &dump_frontier/1)
     |> Map.update!(:objective_frontier, &dump_frontier/1)
     |> Map.put(:validation_schema_version, @schema_version)
-    |> OptimizerReport.json_safe()
+    |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
+    |> OptimizerReport.encode_term()
   end
 
   @doc "Restores a version-2 Optimize Anything result."
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
-    map = OptimizerReport.restore_json_safe(map)
+    map = OptimizerReport.decode_term(map)
     version = fetch(map, :validation_schema_version, 0)
 
     if version != @schema_version do

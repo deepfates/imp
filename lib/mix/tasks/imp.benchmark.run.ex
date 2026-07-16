@@ -61,7 +61,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Run do
         mode: mode,
         lm: live_lm(mode, opts),
         model: model_metadata(mode, opts),
-        out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+        out_dir: Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("benchmark")),
         offset: Keyword.get(opts, :offset, 0),
         max_examples: Keyword.get(opts, :max_examples, 20),
         max_concurrency: Keyword.get(opts, :max_concurrency, 1)

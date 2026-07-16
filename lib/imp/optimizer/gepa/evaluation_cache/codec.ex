@@ -6,7 +6,7 @@ defmodule Imp.Optimizer.GEPA.EvaluationCache.Codec do
   @spec digest(term()) :: String.t()
   def digest(value) do
     value
-    |> Report.json_safe()
+    |> Report.encode_term()
     |> canonical_json!()
     |> sha256()
   end

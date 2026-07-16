@@ -26,7 +26,7 @@ defmodule Imp.Optimize.Anything.Tracking do
 
   @impl true
   def on_optimization_start(event, session) do
-    Session.log(session, {:config, Report.json_safe(event.config)})
+    Session.log(session, {:config, Report.encode_term(event.config)})
   end
 
   @impl true

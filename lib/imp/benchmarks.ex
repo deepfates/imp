@@ -231,7 +231,9 @@ defmodule Imp.Benchmarks do
         "mode=slow",
         fn _candidate -> 0.0 end,
         config: deterministic_config(1),
-        fallback_proposer: fn candidate, _component, _records, _iteration -> candidate end
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component) <> "\nstill slow"
+        end
       )
 
     result(

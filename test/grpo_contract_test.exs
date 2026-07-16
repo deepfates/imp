@@ -271,6 +271,27 @@ defmodule GRPOContractTest do
     refute_received {:artifact, _}
   end
 
+  test "terminates a started session when validation raises" do
+    optimizer =
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+        trainer: trainer(),
+        validation_fn: fn _program, _dataset, _context -> raise "validation exploded" end,
+        num_train_steps: 1,
+        status_poll_interval_ms: 0
+      )
+
+    assert {:error, {:grpo_execution_failed, "validation exploded"}} =
+             Imp.Optimizer.GRPO.compile(
+               optimizer,
+               program(fn _messages, _opts -> %{answer: "ok"} end),
+               Enum.take(trainset(), 1),
+               valset: Enum.take(trainset(), 1)
+             )
+
+    assert_received {:terminate, []}
+    refute_received {:artifact, _}
+  end
+
   test "validates before training, periodically, and on the final step" do
     parent = self()
 

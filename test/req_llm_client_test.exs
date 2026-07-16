@@ -1,6 +1,41 @@
 defmodule ReqLLMClientTest do
   use ExUnit.Case
 
+  @credential_canaries [
+    auth: "CANARY_AUTH",
+    bearer: "CANARY_BEARER",
+    session: "CANARY_SESSION",
+    provider_auth: "CANARY_PROVIDER_AUTH",
+    providerAuth: "CANARY_PROVIDER_CAMEL_AUTH",
+    provider_bearer: "CANARY_PROVIDER_BEARER",
+    providerSession: "CANARY_PROVIDER_CAMEL_SESSION",
+    api_key: "CANARY_API_KEY",
+    authorization: "CANARY_AUTHORIZATION",
+    proxy_authorization: "CANARY_PROXY_AUTHORIZATION",
+    token: "CANARY_TOKEN",
+    api_token: "CANARY_API_TOKEN",
+    auth_token: "CANARY_AUTH_TOKEN",
+    bearer_token: "CANARY_BEARER_TOKEN",
+    access_token: "CANARY_ACCESS_TOKEN",
+    refresh_token: "CANARY_REFRESH_TOKEN",
+    id_token: "CANARY_ID_TOKEN",
+    session_token: "CANARY_SESSION_TOKEN",
+    access_key: "CANARY_ACCESS_KEY",
+    access_key_id: "CANARY_ACCESS_KEY_ID",
+    secret_access_key: "CANARY_SECRET_ACCESS_KEY",
+    secret_key: "CANARY_SECRET_KEY",
+    client_secret: "CANARY_CLIENT_SECRET",
+    private_key: "CANARY_PRIVATE_KEY",
+    private_token: "CANARY_PRIVATE_TOKEN",
+    service_account_key: "CANARY_SERVICE_ACCOUNT_KEY",
+    password: "CANARY_PASSWORD",
+    secret: "CANARY_SECRET",
+    credential: "CANARY_CREDENTIAL",
+    credentials: "CANARY_CREDENTIALS",
+    aws_access_key_id: "CANARY_AWS_ACCESS_KEY_ID",
+    "x-api-key": "CANARY_X_API_KEY"
+  ]
+
   defmodule TextStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -412,6 +447,7 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM consumes rollout IDs without forwarding them to the provider" do
+    Imp.Cache.clear()
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     program =
@@ -429,6 +465,285 @@ defmodule ReqLLMClientTest do
 
     refute Imp.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 17) ==
              Imp.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 18)
+
+    assert {:ok, first} = Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 17)
+    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 17)
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, cached_opts}
+    refute Keyword.has_key?(cached_opts, :rollout_id)
+    refute_received {:req_llm_generate, "openai:gpt-test", _messages, _opts}
+
+    assert {:ok, _second_rollout} =
+             Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 18)
+
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, second_opts}
+    refute Keyword.has_key?(second_opts, :rollout_id)
+  end
+
+  test "ReqLLM caches by default, allows opt-out, and excludes credentials from cache identity" do
+    Imp.Cache.clear()
+    model = "openai:gpt-cache-#{System.unique_integer([:positive])}"
+    messages = [%{role: :user, content: "same prompt"}]
+    lm = Imp.req_llm(model, test_pid: self(), req_module: TextStub)
+
+    assert {:ok, first} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+    refute_received {:req_llm_generate, ^model, _messages, _opts}
+
+    assert {:ok, _uncached} = Imp.Clients.ReqLLM.generate(lm, messages, cache: false)
+    assert_received {:req_llm_generate, ^model, _messages, uncached_opts}
+    refute Keyword.has_key?(uncached_opts, :cache)
+
+    first_key =
+      Imp.Clients.ReqLLM.cache_key(lm, messages,
+        api_key: "sk-first-credential",
+        authorization: "Bearer first-credential-value",
+        headers: [{"x-api-key", "first"}],
+        provider_options: %{client_secret: "first"}
+      )
+
+    second_key =
+      Imp.Clients.ReqLLM.cache_key(lm, messages,
+        api_key: "sk-second-credential",
+        authorization: "Bearer second-credential-value",
+        headers: [{"x-api-key", "second"}],
+        provider_options: %{client_secret: "second"}
+      )
+
+    assert first_key == second_key
+
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key", "extra" => "bypass"}
+
+    assert Imp.Clients.ReqLLM.cache_key(lm, messages,
+             provider_options: %{typed_key => "CANARY_TYPED_FIRST"}
+           ) ==
+             Imp.Clients.ReqLLM.cache_key(lm, messages,
+               provider_options: %{typed_key => "CANARY_TYPED_SECOND"}
+             )
+
+    mixed_envelope = fn canary ->
+      encoded_key = %{"__imp_type__" => "atom", "value" => "api_key"}
+
+      Map.new([
+        {:__imp_type__, "noop"},
+        {"__imp_type__", "map"},
+        {:entries, [[encoded_key, canary]]},
+        {"entries", []}
+      ])
+    end
+
+    assert Imp.Clients.ReqLLM.cache_key(lm, messages,
+             provider_options: mixed_envelope.("CANARY_COLLISION_FIRST")
+           ) ==
+             Imp.Clients.ReqLLM.cache_key(lm, messages,
+               provider_options: mixed_envelope.("CANARY_COLLISION_SECOND")
+             )
+  end
+
+  test "ReqLLM cache behavior isolates endpoints and semantic secret-shaped values" do
+    model = "openai:gpt-cache-routing-#{System.unique_integer([:positive])}"
+    messages = [%{role: :user, content: "same prompt"}]
+
+    Imp.Cache.clear()
+
+    endpoint_a =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        base_url: "https://endpoint-a.example/v1"
+      )
+
+    endpoint_b =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        base_url: "https://endpoint-b.example/v1"
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(endpoint_a, messages, [])
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(endpoint_b, messages, [])
+    assert_received {:req_llm_generate, ^model, _messages, first_endpoint_opts}
+    assert_received {:req_llm_generate, ^model, _messages, second_endpoint_opts}
+    assert first_endpoint_opts[:base_url] != second_endpoint_opts[:base_url]
+
+    Imp.Cache.clear()
+
+    semantic_a =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        provider_options: %{request_id: String.duplicate("a", 40)}
+      )
+
+    semantic_b =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        provider_options: %{request_id: String.duplicate("b", 40)}
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(semantic_a, messages, [])
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(semantic_b, messages, [])
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+
+    refute Imp.Clients.ReqLLM.cache_key(semantic_a, messages, max_tokens: 32) ==
+             Imp.Clients.ReqLLM.cache_key(semantic_a, messages, max_tokens: 64)
+  end
+
+  test "ReqLLM cache behavior ignores rotated credentials but preserves other headers" do
+    model = "openai:gpt-cache-credentials-#{System.unique_integer([:positive])}"
+    messages = [%{role: :user, content: "same prompt"}]
+
+    Imp.Cache.clear()
+
+    credential_a =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        api_key: "sk-first-credential",
+        headers: [{"authorization", "Bearer first-credential-value"}],
+        provider_options: %{aws_access_key_id: "AKIAFIRSTCREDENTIAL"}
+      )
+
+    credential_b =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        api_key: "sk-second-credential",
+        headers: [{"authorization", "Bearer second-credential-value"}],
+        provider_options: %{aws_access_key_id: "AKIASECONDCREDENTIAL"}
+      )
+
+    assert {:ok, first} = Imp.Clients.ReqLLM.generate(credential_a, messages, [])
+    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(credential_b, messages, [])
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+    refute_received {:req_llm_generate, ^model, _messages, _opts}
+
+    Imp.Cache.clear()
+
+    header_a =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        headers: [{"x-tenant", "tenant-a"}]
+      )
+
+    header_b =
+      Imp.req_llm(model,
+        test_pid: self(),
+        req_module: TextStub,
+        headers: [{"x-tenant", "tenant-b"}]
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(header_a, messages, [])
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(header_b, messages, [])
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+  end
+
+  test "ReqLLM cache identity isolates injected request modules" do
+    model = "openai:gpt-cache-module-#{System.unique_integer([:positive])}"
+    messages = [%{role: :user, content: "same prompt"}]
+
+    text_lm = Imp.req_llm(model, req_module: TextStub)
+    object_lm = Imp.req_llm(model, req_module: ObjectStub)
+
+    refute Imp.Clients.ReqLLM.cache_key(text_lm, messages, []) ==
+             Imp.Clients.ReqLLM.cache_key(object_lm, messages, [])
+  end
+
+  test "ReqLLM cache identity distinguishes secret-shaped local model paths" do
+    run_id = String.duplicate("a", 64)
+    messages = [%{role: :user, content: "same prompt"}]
+
+    baseline =
+      Imp.req_llm(%{
+        provider: :openai,
+        id: "/private/tmp/imp-mlx/#{run_id}/baseline",
+        model: "/private/tmp/imp-mlx/#{run_id}/baseline"
+      })
+
+    fused =
+      Imp.req_llm(%{
+        provider: :openai,
+        id: "/private/tmp/imp-mlx/#{run_id}/fused",
+        model: "/private/tmp/imp-mlx/#{run_id}/fused"
+      })
+
+    assert Imp.Redaction.redact(baseline.model) == baseline.model
+    assert Imp.Redaction.redact(fused.model) == fused.model
+    refute Imp.Redaction.redact(baseline.model) == Imp.Redaction.redact(fused.model)
+
+    refute Imp.Clients.ReqLLM.cache_key(baseline, messages, []) ==
+             Imp.Clients.ReqLLM.cache_key(fused, messages, [])
+  end
+
+  test "ReqLLM cache identity excludes inline model credentials" do
+    messages = [%{role: :user, content: "same prompt"}]
+
+    first =
+      Imp.req_llm(%{
+        provider: :openai,
+        id: "gpt-inline",
+        api_key: "sk-first-inline-credential",
+        access_key_id: "AKIAFIRSTINLINE"
+      })
+
+    second =
+      Imp.req_llm(%{
+        provider: :openai,
+        id: "gpt-inline",
+        api_key: "sk-second-inline-credential",
+        access_key_id: "AKIASECONDINLINE"
+      })
+
+    assert Imp.Clients.ReqLLM.cache_key(first, messages, []) ==
+             Imp.Clients.ReqLLM.cache_key(second, messages, [])
+  end
+
+  test "ReqLLM cache hits survive every representative credential rotation shape" do
+    messages = [%{role: :user, content: "same prompt"}]
+
+    for {credential_key, first_canary} <- @credential_canaries,
+        shape <- [:top_level, :provider_options, :inline_model] do
+      Imp.Cache.clear()
+      model_id = "credential-rotation-#{credential_key}-#{shape}"
+      second_canary = first_canary <> "_ROTATED"
+      {first_lm, provider_event} = rotation_lm(shape, model_id, credential_key, first_canary)
+      {second_lm, ^provider_event} = rotation_lm(shape, model_id, credential_key, second_canary)
+
+      assert {:ok, first_response} = Imp.Clients.ReqLLM.generate(first_lm, messages, [])
+      assert {:ok, ^first_response} = Imp.Clients.ReqLLM.generate(second_lm, messages, [])
+      assert_provider_call(provider_event)
+      refute_provider_call(provider_event)
+    end
+  end
+
+  test "ReqLLM telemetry redacts credentials embedded in model descriptors" do
+    ref = Imp.Test.TelemetryHelpers.attach([[:imp, :lm, :start]])
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: "gpt-inline",
+          api_key: "sk-inline-secret-1234567890",
+          access_key_id: "AKIAINLINEPLAINTEXT",
+          nested: %{authorization: "Bearer abcdefghijklmnop"}
+        },
+        test_pid: self(),
+        req_module: TextStub
+      )
+
+    assert {:error, _reason} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], cache: false)
+
+    assert_received {^ref, [:imp, :lm, :start], _, %{lm: %{model: redacted_model}}}
+    assert redacted_model.api_key == "[REDACTED]"
+    assert redacted_model.access_key_id == "[REDACTED]"
+    assert redacted_model.nested.authorization == "[REDACTED]"
+    assert redacted_model.id == "gpt-inline"
   end
 
   test "ReqLLM client translates local file path attachments into file content parts" do
@@ -935,5 +1250,150 @@ defmodule ReqLLMClientTest do
     loaded = Imp.Saving.load(dumped)
 
     assert %Imp.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
+  end
+
+  test "ReqLLM dumps, saved artifacts, and loads disclose no credential canary" do
+    canary_map = Map.new(@credential_canaries)
+    model_id = String.duplicate("d", 40)
+    model_path = "/private/tmp/imp-models/#{String.duplicate("e", 64)}/fused"
+
+    credential_headers =
+      Enum.map(@credential_canaries, fn {key, canary} -> {to_string(key), canary} end)
+
+    model =
+      Map.merge(
+        %{
+          provider: :openai,
+          id: model_id,
+          model: model_path,
+          provider_options: Map.merge(canary_map, %{region: "us-west-2"})
+        },
+        canary_map
+      )
+
+    runtime_opts =
+      [
+        max_tokens: 96,
+        request_id: model_id,
+        provider_options: Map.merge(canary_map, %{region: "us-west-2", request_id: model_id}),
+        headers: credential_headers ++ [{"x-tenant", "tenant-a"}]
+      ] ++ @credential_canaries
+
+    lm = Imp.req_llm(model, opts: runtime_opts)
+    client_dump = Imp.Clients.ReqLLM.dump(lm)
+
+    refute_credential_canaries(client_dump)
+    assert client_dump.model.id == model_id
+    assert client_dump.model.model == model_path
+
+    program =
+      Imp.predict("question -> answer",
+        lm: lm,
+        config: [
+          max_tokens: 96,
+          request_id: model_id,
+          provider_options: Map.merge(canary_map, %{request_id: model_id}),
+          headers: credential_headers ++ [{"x-tenant", "tenant-a"}]
+        ],
+        metadata: %{
+          nested: [canary_map],
+          headers: credential_headers,
+          inline_model: Map.merge(%{id: model_id, model: model_path}, canary_map)
+        }
+      )
+
+    dumped = Imp.Saving.dump(program)
+    refute_credential_canaries(dumped)
+    assert dumped["lm"][:model].id == model_id
+    assert dumped["lm"][:model].model == model_path
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-credential-redaction-#{System.unique_integer([:positive])}.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+    assert :ok = Imp.Saving.save!(program, path)
+    refute_credential_canaries(File.read!(path))
+
+    loaded = Imp.Saving.load!(path)
+    refute_credential_canaries(loaded)
+    assert loaded.lm.model["id"] == model_id
+    assert loaded.lm.model["model"] == model_path
+    assert loaded.lm.opts[:max_tokens] == 96
+    assert loaded.lm.opts[:request_id] == model_id
+    assert loaded.lm.opts[:provider_options]["request_id"] == model_id
+    assert loaded.lm.opts[:headers] == [{"x-tenant", "tenant-a"}]
+
+    poisoned_lm = %{
+      provider: :req_llm,
+      model: Map.merge(%{provider: :openai, id: model_id, model: model_path}, canary_map),
+      opts:
+        Enum.map(@credential_canaries, fn {key, canary} -> [to_string(key), canary] end) ++
+          [
+            ["max_tokens", 96],
+            ["request_id", model_id],
+            ["provider_options", Map.merge(canary_map, %{request_id: model_id})],
+            ["headers", credential_headers ++ [{"x-tenant", "tenant-a"}]]
+          ]
+    }
+
+    loaded_poisoned = dumped |> put_in(["lm"], poisoned_lm) |> Imp.Saving.load()
+
+    refute_credential_canaries(loaded_poisoned)
+    assert loaded_poisoned.lm.model.id == model_id
+    assert loaded_poisoned.lm.model.model == model_path
+    assert loaded_poisoned.lm.opts[:max_tokens] == 96
+    assert loaded_poisoned.lm.opts[:request_id] == model_id
+    assert loaded_poisoned.lm.opts[:provider_options] == %{request_id: model_id}
+    assert loaded_poisoned.lm.opts[:headers] == [{"x-tenant", "tenant-a"}]
+  end
+
+  defp rotation_lm(:top_level, model_id, credential_key, canary) do
+    opts = [test_pid: self(), req_module: TextStub] ++ [{credential_key, canary}]
+    {Imp.req_llm("openai:#{model_id}", opts), :req_llm_generate}
+  end
+
+  defp rotation_lm(:provider_options, model_id, credential_key, canary) do
+    lm =
+      Imp.req_llm("openai:#{model_id}",
+        test_pid: self(),
+        req_module: TextStub,
+        provider_options: %{credential_key => canary}
+      )
+
+    {lm, :req_llm_generate}
+  end
+
+  defp rotation_lm(:inline_model, model_id, credential_key, canary) do
+    lm =
+      Imp.req_llm(
+        %{credential_key => canary, provider: :openai, id: model_id},
+        test_pid: self(),
+        req_module: InlineModelStub
+      )
+
+    {lm, :inline_model_generate}
+  end
+
+  defp assert_provider_call(:req_llm_generate),
+    do: assert_receive({:req_llm_generate, _, _, _}, 1_000)
+
+  defp assert_provider_call(:inline_model_generate),
+    do: assert_receive({:inline_model_generate, _, _}, 1_000)
+
+  defp refute_provider_call(:req_llm_generate),
+    do: refute_receive({:req_llm_generate, _, _, _}, 0)
+
+  defp refute_provider_call(:inline_model_generate),
+    do: refute_receive({:inline_model_generate, _, _}, 0)
+
+  defp refute_credential_canaries(value) do
+    rendered = if is_binary(value), do: value, else: inspect(value, limit: :infinity)
+
+    Enum.each(@credential_canaries, fn {_key, canary} ->
+      refute rendered =~ canary, "credential canary leaked: #{canary}"
+    end)
   end
 end

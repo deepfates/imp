@@ -92,21 +92,20 @@ All major program structs implement the `Imp.Module` behaviour.
 
 ### Request-Local Search Boundary
 
-`Imp.Predict.Search` is an immutable orchestration boundary for one inference
-request. Callers supply explicit `Search.Candidate` values and an evaluator;
-the engine does not read optimizer state, cache search results, register a
-process, or persist state between calls. BestOfN and Refine translate their
-rollouts into candidates and delegate scoring, threshold stopping, deterministic
-tie selection, failure isolation, and provenance to this shared engine.
+BestOfN and Refine provide an immutable orchestration boundary for one
+inference request. They do not read optimizer state, cache search results,
+register a process, or persist state between calls. Their facade contracts
+cover scoring, threshold stopping, deterministic tie selection, failure
+isolation, and provenance.
 
 Finite multidimensional budgets perform ordered-prefix admission before work
 starts. `admitted_budget` is the sum of all admitted projections, while
 `observed_budget` is the sum of projections attached to completed outcomes.
 Neither field is actual provider usage. Sequential evaluators receive prior
 ordered outcomes, which Refine uses for feedback history. Concurrent evaluators
-run under `Imp.TaskSupervisor` through `Imp.Tasks.async_stream/3`, bounded by
-`max_concurrency`, and receive no causal prior outcomes. Concurrent threshold
-stopping may therefore include completed speculative work; incomplete work is
+run under Imp's supervised task runtime, bounded by `max_concurrency`, and
+receive no causal prior outcomes. Concurrent threshold stopping may therefore
+include completed speculative work; incomplete work is
 cancelled and represented in full-list provenance.
 
 The source-checkout `mix benchmark.search.check` lane records deterministic
@@ -220,13 +219,13 @@ fallbacks for library ergonomics, but the supervised path is the production
 posture.
 
 Long-running or fan-out work should have an OTP owner. Imp routes its built-in
-async helpers through `Imp.Tasks`, which uses linked and unlinked named task
-supervisors when the application is running and falls back to plain task
-helpers only for script-style library use before supervised startup. That keeps
-cancellation, crash reporting, telemetry context, and shutdown behavior visible
-to the host system in production.
+async helpers through supervised task owners when the application is running
+and falls back to plain task helpers only for script-style library use before
+supervised startup. That keeps cancellation, crash reporting, telemetry
+context, and shutdown behavior visible to the host system in production.
 
-`Imp.Tasks.cancel/2` terminates a supervised task with a bounded wait.
+The built-in cancellation helper terminates a supervised task with a bounded
+wait.
 `Imp.Streaming.Messages.StreamListener.attach/2` observes normalized stream
 events while yielding the original chunks, including terminal and error events,
 unchanged. `Imp.Cache.configure/1` controls enablement, TTL, and maximum entry
@@ -322,7 +321,9 @@ Metric-driven optimizers live under `Imp.Optimizer.*`:
   `Imp.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
   enforce job and terminal artifact identity, support idempotent bounded-retry
   submit/refresh/cancel, persist credential-free checkpoints, and can rebind a
-  successful model artifact onto the compiled program.
+  successful model artifact onto the compiled program. BetterTogether awaits
+  typed asynchronous jobs under explicit polling and cancellation deadlines;
+  unknown provider states remain visible and are not cancelled speculatively.
 - Fast-Slow state modules and `Imp.Training.FastSlow.Runner` preserve the paper's
   prefetch, GEPA fast update, cross-prompt rollout grouping, and exactly `T`
   slow-update cycle. Provider effects cross an explicit backend behaviour with
@@ -382,12 +383,11 @@ metadata before storage. A single absolute deadline governs controller calls,
 effects, batches, and recursive children; timed effects are registered with the
 execution coordinator so cancellation terminates in-flight tasks.
 
-Large or expensive values can enter the loop as
-`Imp.Predict.RLM.SandboxSerializable` handles. The first controller prompt sees
-only their metadata; `context = load("context")` materializes the value into
-variable space when needed. RLM also exposes internal action, extract, and subquery
-predictors through the program-access helper so optimizers and audits can see the
-parts that govern behavior.
+Large or expensive values can enter the loop as bounded serializable handles.
+The first controller prompt sees only their metadata; `context = load("context")`
+materializes the value into variable space when needed. The RLM facade keeps
+its action, extract, and subquery machinery private while exposing the behavior
+needed by callers.
 
 ## Persistence
 

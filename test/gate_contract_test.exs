@@ -117,7 +117,7 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.live_matrix") == [
-             "imp.benchmark.live_matrix --in benchmarks/results/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
+             "imp.benchmark.live_matrix --in benchmarks/runs/parity/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.optimize_anything.check") == [
@@ -125,19 +125,19 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard") == [
-             "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+             "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard.ready") == [
-             "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
+             "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard.telos") == [
-             "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
+             "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.dashboard.telos.ready") == [
-             "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
+             "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.live.check") == [

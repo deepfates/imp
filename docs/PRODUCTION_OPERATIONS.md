@@ -29,14 +29,12 @@ Supervised Imp runtime state:
 
 - `Imp.Settings` owns global defaults. Prefer `Imp.context/2` for scoped
   overrides in request code and tests. Plain BEAM tasks keep ordinary
-  process-local semantics; Imp-owned fan-out through `Imp.Tasks`,
-  `Parallel`, provider async, and agent event streams inherits the caller's
-  Imp context.
+  process-local semantics; Imp-owned fan-out through `Parallel`, provider async,
+  and agent event streams inherits the caller's Imp context.
 - `Imp.Cache` owns the ETS table used by the built-in response cache.
-- `Imp.TaskSupervisor` owns linked Imp async helpers, including provider
-  async and parallel prediction fan-out through `Imp.Tasks`.
-- `Imp.UnlinkedTaskSupervisor` owns unlinked event workers, including agent
-  event streaming.
+- supervised task owners hold linked async helpers, including provider async
+  and parallel prediction fan-out.
+- a separate unlinked worker owner handles agent event streaming.
 - host applications still own higher-level orchestration lifetimes and
   cancellation policy.
 
@@ -168,7 +166,7 @@ The live provider tests prove a real provider can execute:
 
 In a source checkout, `mix benchmark.live.check` is a separate research smoke
 gate. It fetches fresh GSM8K and HotPotQA rows and runs Imp programs over a
-live provider, writing result artifacts under `benchmarks/results/`. It is
+live provider, writing run artifacts under `benchmarks/runs/benchmark/`. It is
 intentionally not part of the fast production gate because it spends provider
 tokens and depends on external dataset and provider availability.
 
@@ -258,7 +256,7 @@ global Logger level. Log metadata is redacted before emission.
 
 `examples/deployment` is a packaged OTP reference application. It loads a
 checksummed program artifact during supervised startup, resolves callback names
-through `Imp.Saving.Registry`, obtains provider configuration from runtime
+through a host-supplied callback allowlist, obtains provider configuration from runtime
 environment variables, and serves calls through a GenServer. The accompanying
 test executes the same server with a deterministic LM and registry-backed
 artifact before release.

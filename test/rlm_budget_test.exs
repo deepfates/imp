@@ -99,4 +99,12 @@ defmodule RLMBudgetTest do
     assert {:error, :rlm_time_budget_exceeded} = Budget.check(budget)
     assert %{remaining_time_ms: 0} = Budget.snapshot(budget)
   end
+
+  test "deadline-free task waits use infinity instead of an implicit timeout" do
+    {:ok, unlimited} = Budget.start_link(max_lm_calls: 1)
+    {:ok, bounded} = Budget.start_link(max_lm_calls: 1, max_time_ms: 60_000)
+
+    assert Budget.task_timeout(unlimited) == :infinity
+    assert Budget.task_timeout(bounded) in 1..60_000
+  end
 end

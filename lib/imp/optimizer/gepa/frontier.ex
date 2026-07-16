@@ -132,14 +132,9 @@ defmodule Imp.Optimizer.GEPA.Frontier do
   defp validate_candidates!(candidates, policy) do
     Enum.each(candidates, &validate_candidate!/1)
     validate_unique_ids!(candidates)
-    validate_score_alignment!(candidates)
 
-    if policy in [:objective, :cartesian] do
+    if policy in [:objective, :hybrid, :cartesian] do
       Enum.each(candidates, &validate_objectives!/1)
-    end
-
-    if policy == :hybrid do
-      Enum.each(candidates, &validate_optional_objectives!/1)
     end
   end
 
@@ -169,22 +164,6 @@ defmodule Imp.Optimizer.GEPA.Frontier do
     end
   end
 
-  defp validate_score_alignment!([]), do: :ok
-
-  defp validate_score_alignment!([{_candidate_id, first} | rest]) do
-    expected = length(first.scores)
-
-    case Enum.find(rest, fn {_candidate_id, result} -> length(result.scores) != expected end) do
-      nil ->
-        :ok
-
-      {candidate_id, result} ->
-        raise ArgumentError,
-              "GEPA frontier candidate #{inspect(candidate_id)} has #{length(result.scores)} scores; " <>
-                "expected #{expected}"
-    end
-  end
-
   defp validate_objectives!({candidate_id, %Result{objective_scores: nil}}) do
     raise ArgumentError,
           "GEPA frontier policy requires objective scores for candidate #{inspect(candidate_id)}"
@@ -202,27 +181,6 @@ defmodule Imp.Optimizer.GEPA.Frontier do
       raise ArgumentError,
             "GEPA frontier candidate #{inspect(candidate_id)} objective scores must be maps with " <>
               "atom or string names and numeric values"
-    end
-
-    if Enum.all?(objective_scores, &(map_size(&1) == 0)) do
-      raise ArgumentError,
-            "GEPA frontier candidate #{inspect(candidate_id)} must report at least one objective"
-    end
-  end
-
-  defp validate_optional_objectives!({_candidate_id, %Result{objective_scores: nil}}), do: :ok
-
-  defp validate_optional_objectives!({candidate_id, %Result{} = result}) do
-    objective_scores = result.objective_scores
-
-    unless is_list(objective_scores) and length(objective_scores) == length(result.scores) do
-      raise ArgumentError,
-            "GEPA frontier candidate #{inspect(candidate_id)} objective scores must align with its scores"
-    end
-
-    unless Enum.all?(objective_scores, &valid_objective_scores?/1) do
-      raise ArgumentError,
-            "GEPA hybrid frontier candidate #{inspect(candidate_id)} objective scores must be nil or aligned maps"
     end
   end
 

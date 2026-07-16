@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OperationsStress do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("operations"))
     File.mkdir_p!(out_dir)
 
     artifact =

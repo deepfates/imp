@@ -54,7 +54,7 @@ mix imp.benchmark.failure_campaign \
   --model gpt-4.1-mini \
   --agent-model gpt-5.4 \
   --require-clean \
-  --out benchmarks/results
+  --out benchmarks/runs/failure-recovery
 ```
 
 Then point the dashboard at the result directory. The artifact’s signed payload

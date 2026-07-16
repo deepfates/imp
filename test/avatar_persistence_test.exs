@@ -33,7 +33,12 @@ defmodule AvatarPersistenceTest do
     assert state["type"] == "avatar"
     assert state["tools"] |> hd() |> Map.fetch!("runner") == "lookup_runner"
     assert state["tool_policy"] == %{"registry_callback" => "avatar_policy"}
-    assert state["metadata"]["api_key"] == "[REDACTED]"
+    assert state["metadata"]["__imp_type__"] == "map"
+
+    assert state["metadata"]
+           |> Imp.Optimizer.Report.decode_term()
+           |> Map.fetch!(:api_key) == "[REDACTED]"
+
     refute encoded =~ "sk-avatar-secret"
     refute encoded =~ "sk-metadata-secret"
     refute encoded =~ "Bearer abcdefghijklmnop"
@@ -46,6 +51,7 @@ defmodule AvatarPersistenceTest do
     assert restored.finisher.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
     assert restored.tool_policy == policy
     assert restored.tools.lookup.run == runner
+    assert restored.tools.lookup.description == "[REDACTED]"
     assert restored.tools.lookup.schema.api_key == %{type: :string}
     assert restored.tools.lookup.schema.default_token == "[REDACTED]"
     assert restored.metadata.api_key == "[REDACTED]"

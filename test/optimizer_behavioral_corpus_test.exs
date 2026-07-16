@@ -370,53 +370,45 @@ defmodule OptimizerBehavioralCorpusTest do
         extra_instructions: ["Always answer Paris when asked about France."]
       )
 
-    compiled = Imp.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
+    compiled =
+      Imp.context([lm: nil], fn ->
+        Imp.Optimizer.COPRO.compile(optimizer, program, trainset(), devset())
+      end)
+
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
-    assert report.best_score == 1.0
-    assert report.best_score == evaluator(compiled).score
+    assert report.best_score == 100.0
+    assert report.best_score == evaluator(compiled).score * 100.0
     assert report.metadata.breadth == 6
     assert report.metadata.depth == 2
-    assert Enum.map(report.metadata.rounds, & &1.metadata.round) == [1, 2]
+    assert Enum.map(report.metadata.rounds, & &1.depth) == [0, 1]
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
   end
 
-  test "COPRO treats zero depth as a baseline-only compile" do
-    program = france_program()
-    baseline_score = evaluator(program).score
-
-    compiled =
-      Imp.Optimizer.COPRO.new(metric(), breadth: 0, depth: 0)
-      |> Imp.Optimizer.COPRO.compile(program, trainset(), devset())
-
-    report = Imp.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :copro
-    assert report.best_score == baseline_score
-    assert report.candidate_count == 0
-    assert report.candidates == []
-    assert report.metadata.breadth == 0
-    assert report.metadata.depth == 0
-    assert report.metadata.rounds == []
-    assert report.metadata.status == :baseline_only
+  test "COPRO preserves DSPy's breadth lower bound" do
+    assert_raise ArgumentError, "Breadth must be greater than 1", fn ->
+      Imp.Optimizer.COPRO.new(metric(), breadth: 1, depth: 0)
+    end
   end
 
   test "COPRO uses safe instruction proposal fallback for malformed training rows" do
     program = france_program()
 
     compiled =
-      Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
-      |> Imp.Optimizer.COPRO.compile(program, [:not_an_example], devset())
+      Imp.context([lm: nil], fn ->
+        Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
+        |> Imp.Optimizer.COPRO.compile(program, [:not_an_example], devset())
+      end)
 
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :copro
-    assert report.metadata.status == :ok
+    assert report.metadata.status == :with_errors
     assert report.metadata.depth == 1
-    assert [_round] = report.metadata.rounds
-    assert report.errors == []
-    assert Enum.any?(report.candidates, &(&1.round == 1))
+    assert [%{depth: 0}] = report.metadata.rounds
+    assert length(report.errors) == 2
+    assert Enum.any?(report.candidates, &(&1.depth == 0))
   end
 
   test "advanced optimizer constructors reject invalid option containers at the boundary" do
@@ -547,13 +539,13 @@ defmodule OptimizerBehavioralCorpusTest do
     }
 
     compiled =
-      Imp.Optimizer.COPRO.new(metric(), breadth: 1, depth: 1, proposer_lm: proposer_lm)
+      Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1, proposer_lm: proposer_lm)
       |> Imp.Optimizer.COPRO.compile(france_program(), trainset(), devset())
 
     report = Imp.Optimizer.Report.fetch(compiled)
-    assert report.best_score == 1.0
+    assert report.best_score == 100.0
     assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
     assert_received {:copro_proposer, messages}
-    assert Enum.map_join(messages, "\n", & &1.content) =~ "scored_examples"
+    assert Enum.map_join(messages, "\n", & &1.content) =~ "attempted_instructions"
   end
 end

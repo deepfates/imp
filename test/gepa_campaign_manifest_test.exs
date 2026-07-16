@@ -31,7 +31,8 @@ defmodule GepaCampaignManifestTest do
     assert opts.reflection_model == opts.model
     assert opts.judge_model == opts.model
     assert opts.dataset_root == Path.expand("benchmarks/data/gepa-campaign-full")
-    assert opts.out == Path.expand("benchmarks/results")
+    assert opts.out == Path.expand("benchmarks/runs/gepa-campaign")
+    assert opts.checkpoint_dir == Path.expand("benchmarks/checkpoints/gepa-campaign")
     assert opts.manifest_identity["path"] == @manifest
     assert opts.manifest_identity["sha256"] == manifest["manifest_sha256"]
   end

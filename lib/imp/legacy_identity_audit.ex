@@ -15,37 +15,19 @@ defmodule Imp.LegacyIdentityAudit do
 
   @historical_prefixes %{
     "benchmarks/data/" => "frozen benchmark inputs and provenance",
-    "benchmarks/results/" => "checked-in benchmark results",
+    "benchmarks/evidence/admitted/" => "immutable admitted benchmark evidence",
+    "benchmarks/results/" => "pre-cutover benchmark results retained as historical evidence",
     "benchmarks/upstream/" => "pinned upstream evidence"
   }
 
   @allowlisted_files %{
     "benchmarks/authorities.json" => "benchmark authority provenance",
     "benchmarks/config/failure-recovery-live.json" => "historical live campaign configuration",
-    "benchmarks/config/gepa-paper-campaign-v1.json" => "historical GEPA campaign configuration",
-    "benchmarks/config/gepa-paper-campaign-v2.json" => "historical GEPA campaign configuration",
-    "benchmarks/config/instruction-optimizer-aime-economical-preflight-run1.json" =>
-      "historical instruction-optimizer campaign configuration",
-    "benchmarks/config/instruction-optimizer-aime-economical-preflight.json" =>
-      "historical instruction-optimizer campaign configuration",
-    "benchmarks/config/instruction-optimizer-aime-matched-preflight.json" =>
-      "historical instruction-optimizer campaign configuration",
-    "benchmarks/config/instruction-optimizer-aime-preflight.json" =>
-      "historical instruction-optimizer campaign configuration",
-    "benchmarks/config/rlm-paper-protocol-v3.json" => "historical RLM protocol configuration",
-    "docs/IDENTITY_COMPATIBILITY.md" => "documented read-only compatibility boundary",
-    "docs/README.md" => "maintainer pointer to historical identity evidence",
     "identity/DECISION.md" => "historical naming decision record",
     "lib/imp/benchmark_truth/local_mlx_campaign.ex" => "benchmark provenance adapter",
     "lib/imp/benchmark_truth/provider_training_campaign.ex" => "benchmark provenance adapter",
     "lib/imp/legacy_identity_audit.ex" => "the audit's own token matcher and policy",
-    "lib/imp/persistence/legacy.ex" => "read-only persisted-artifact compatibility",
-    "lib/imp/saving.ex" => "read-only persisted-artifact compatibility",
-    "lib/mix/tasks/imp.benchmark.trace.ex" => "benchmark provenance adapter",
-    "scripts/legacy_identity_audit.exs" => "the audit's release-gate entrypoint",
-    "test/fixtures/golden_trace/cases.json" => "frozen differential trace fixture",
-    "test/fixtures/rlm_contract_cases.json" => "frozen RLM contract fixture",
-    "test/persistence_legacy_test.exs" => "legacy persistence compatibility test"
+    "scripts/legacy_identity_audit.exs" => "the audit's release-gate entrypoint"
   }
 
   @type finding :: %{

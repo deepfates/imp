@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Search do
 
     if argv != [] or invalid != [], do: Mix.raise("invalid options: #{inspect(argv ++ invalid)}")
 
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("search"))
     File.mkdir_p!(out_dir)
 
     artifact =

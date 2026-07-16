@@ -79,10 +79,10 @@ open.
 | COPRO, InstructionSearch, InferRules, and SignatureOptimizer | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | protocol_defined | partial |
 | MIPROv2 | optimizer | 3.3.0b1 @ b2829b7ae3b6 | pinned | absent | partial | partial |
 | SIMBA | optimizer | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | absent | protocol_defined | partial |
-| GEPA prompt and program optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | partial |
+| GEPA prompt and program optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
 | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | partial |
 | Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
-| Optimize Anything arbitrary artifact optimization | optimizer | 0.1.1 @ b4dbb55b7601 | pinned | partial | protocol_defined | present |
+| Optimize Anything arbitrary artifact optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
 | Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | partial | present |
 | Async, streaming, cache, observability, and provider-free overhead | runtime | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |
 | Persistence, deployment, and protocol boundaries | operations | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |
@@ -118,12 +118,19 @@ matched structural task is implemented, but the local differential remains
 `partial` until a fresh artifact passes the dashboard authority and freshness
 checks.
 
-## GEPA v0.1.1 Pins
+## GEPA Current And Historical Pins
 
-The standalone GEPA authority is tag `v0.1.1` at full commit
-`b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. The tag retains
-`version="0.1.0"` in `pyproject.toml`; the contract pins that released-source
-fact separately from the `0.1.1` tag identity.
+The current standalone GEPA authority is tag `v0.1.4` at full commit
+`8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`. Its complete 114-file
+`src/gepa` tree is content-bound by
+`benchmarks/authority_sources/gepa-0.1.4-8b0ce6c.json`. The tag retains package
+version `0.1.3` in `pyproject.toml`; tag identity and package metadata are
+recorded separately.
+
+The existing exact executable contract remains GEPA `v0.1.1` at
+`b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. That historical tag retains
+`version="0.1.0"` in `pyproject.toml`. The hashes below belong to this retained
+regression contract, not the current release surface.
 
 | Source | SHA-256 |
 | --- | --- |
@@ -139,14 +146,40 @@ fact separately from the `0.1.1` tag identity.
 fixtures, then compares equivalent Imp pure-module behavior. Its T1 artifact
 does not satisfy GEPA paper reproduction, effectiveness, or full-parity claims.
 
-The ledger also pins GEPA `v0.1.1` as an algorithm authority, Ax `23.0.0` as an
-independent implementation comparator, and ReqLLM `v1.17.1` as the BEAM runtime
-dependency. Comparator pins help detect accidental design assumptions; they do
-not create scientific parity claims.
+The ledger pins GEPA `v0.1.4` as the current algorithm authority and `v0.1.1`
+as a historical executable contract, Ax `23.0.0` as an independent
+implementation comparator, and ReqLLM `v1.17.1` as the BEAM runtime dependency.
+Comparator pins help detect accidental design assumptions; they do not create
+scientific parity claims.
 
 Ax's selected implementation files are bound by
 `benchmarks/authority_sources/ax-23.0.0-eb5835e.json`; the executable scope and
 intentional native deviations are documented in `docs/AX_DIFFERENTIAL.md`.
+
+## Optimize Anything Protocol Pins
+
+The matched differential uses the public Optimize Anything artifact at commit
+`58cdf89d856f2fbc174991b89076eccdcf68e4ca`. The canonical ledger binds ten
+implementation and evaluator files from that checkout. Its authors' offline
+verifier covers nine published artifact domains; passing that verifier proves
+that the reference corpus is available, not that Imp reproduces its results.
+
+The bounded repository lane uses `pallets__flask-5014` from SWE-bench Verified
+at dataset revision `91aa3ed51b709be6457e12d00300a6a596d4c6a3`. The ledger binds the
+2 MB Parquet payload, the canonical selected row, Flask base commit
+`7ee9ceb71e868944a46e1ff00b506772a53a4f1d`, the official test patch, one
+FAIL_TO_PASS test, and the 59-test PASS_TO_PASS split. These pins establish
+protocol identity only. A matched claim additionally requires independently
+replayed evaluator traces, matched controls and realized budgets, complete
+declared seed/domain coverage, and an admitted content-bound run artifact.
+
+The Flask evaluator receipt also binds the resolved Python interpreter bytes
+and a deterministic inventory of every installed distribution's name,
+version, and installed-file content digest. Admission recomputes that runtime
+identity, so ignored `.venv` drift cannot inherit a clean repository status.
+This remains a platform-local receipt: it records the OS release and
+architecture and is not a cross-platform resolver lock or container-image
+identity.
 
 ## Consumption Rules
 

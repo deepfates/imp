@@ -156,12 +156,12 @@ defmodule Imp.Optimizer.GEPA.EvaluationCacheTest do
         seed: 0
       )
 
-    assert_receive {:gepa_evaluation, [:a, :b, :c], false}
+    assert_receive {:gepa_evaluation, [:a, :b, :c], true}
     assert_receive {:gepa_evaluation, trace_batch, true}
     assert MapSet.new(trace_batch) == MapSet.new([:a, :d])
-    assert_receive {:gepa_evaluation, proposal_batch, false}
+    assert_receive {:gepa_evaluation, proposal_batch, true}
     assert MapSet.new(proposal_batch) == MapSet.new([:a, :d])
-    assert_receive {:gepa_evaluation, [:b, :c], false}
+    assert_receive {:gepa_evaluation, [:b, :c], true}
     refute_receive {:gepa_evaluation, _, _}
 
     assert state.budget.metric_calls == 9

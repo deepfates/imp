@@ -191,8 +191,8 @@ defmodule Imp.Optimizer.GEPA.EvaluationCache.Disk do
   end
 
   defp restore_entry(payload) do
-    output = Report.restore_json_safe(payload["output"])
-    objectives = Report.restore_json_safe(payload["objective_scores"])
+    output = Report.decode_term(payload["output"])
+    objectives = Report.decode_term(payload["objective_scores"])
     score = payload["score"]
 
     if is_number(score) and valid_objectives?(objectives) do
@@ -233,9 +233,9 @@ defmodule Imp.Optimizer.GEPA.EvaluationCache.Disk do
 
   defp payload(output, score, objective_scores) do
     %{
-      "output" => Report.json_safe(output),
+      "output" => Report.encode_term(output),
       "score" => score,
-      "objective_scores" => Report.json_safe(objective_scores)
+      "objective_scores" => Report.encode_term(objective_scores)
     }
   end
 

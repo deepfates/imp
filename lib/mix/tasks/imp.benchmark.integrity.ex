@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Integrity do
 
     result =
       Imp.BenchmarkTruth.integrity(tasks,
-        out_dir: Keyword.get(opts, :out, "benchmarks/results")
+        out_dir: Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("integrity"))
       )
 
     Mix.shell().info("benchmark data integrity report: #{result.out_path}")

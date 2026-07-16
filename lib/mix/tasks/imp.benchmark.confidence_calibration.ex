@@ -35,7 +35,7 @@ defmodule Mix.Tasks.Imp.Benchmark.ConfidenceCalibration do
         min_bin_size: opts[:min_bin_size] || 5
       )
 
-    out = opts[:out] || "benchmarks/results"
+    out = opts[:out] || Imp.BenchmarkTruth.Paths.runs("confidence-calibration")
     File.mkdir_p!(out)
     stamp = DateTime.utc_now() |> Calendar.strftime("%Y%m%dT%H%M%SZ")
     path = Path.join(out, "confidence-calibration-live-#{stamp}.json")

@@ -64,16 +64,15 @@ defmodule Imp.Optimizer.GEPA.FrontierTest do
     assert Frontier.candidate_ids(candidates, :hybrid) == [:objective, :primary]
   end
 
-  test "hybrid policy keeps instance winners when optional objectives are absent" do
+  test "hybrid policy requires objectives just like upstream state initialization" do
     candidates = [
       {:left, result([1.0, 0.0])},
       {:right, result([0.0, 1.0])}
     ]
 
-    assert Frontier.mapping(candidates, :hybrid) == %{
-             {:instance, 0} => MapSet.new([:left]),
-             {:instance, 1} => MapSet.new([:right])
-           }
+    assert_raise ArgumentError, ~r/requires objective scores for candidate :left/, fn ->
+      Frontier.mapping(candidates, :hybrid)
+    end
   end
 
   test "cartesian policy preserves per-example objective specialists" do
@@ -152,14 +151,22 @@ defmodule Imp.Optimizer.GEPA.FrontierTest do
     end
   end
 
-  test "rejects duplicate IDs and unaligned primary scores" do
+  test "rejects duplicate IDs and allows sparse policy-selected score sets" do
     assert_raise ArgumentError, "GEPA frontier candidate IDs must be unique", fn ->
       Frontier.mapping([{:same, result([1.0])}, {:same, result([0.0])}], :instance)
     end
 
-    assert_raise ArgumentError, ~r/candidate :short has 1 scores; expected 2/, fn ->
-      Frontier.mapping([{:full, result([1.0, 0.0])}, {:short, result([1.0])}], :instance)
-    end
+    assert Frontier.mapping(
+             [
+               {:full, result([1.0, 0.0])},
+               {:short, Result.new([nil], [1.0], metadata: %{validation_ids: [9]})}
+             ],
+             :instance
+           ) == %{
+             {:instance, 0} => MapSet.new([:full]),
+             {:instance, 1} => MapSet.new([:full]),
+             {:instance, 9} => MapSet.new([:short])
+           }
   end
 
   test "rejects malformed primary scores and aggregate scores" do
@@ -194,9 +201,7 @@ defmodule Imp.Optimizer.GEPA.FrontierTest do
   end
 
   test "objective policies reject candidates without any reported objective" do
-    assert_raise ArgumentError, ~r/must report at least one objective/, fn ->
-      Frontier.mapping([{:empty, result([1.0], [%{}])}], :objective)
-    end
+    assert Frontier.mapping([{:empty, result([1.0], [%{}])}], :objective) == %{}
   end
 
   defp result(scores, objective_scores \\ nil) do

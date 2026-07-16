@@ -32,7 +32,6 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
       cases_path
       |> File.read!()
       |> Jason.decode!()
-      |> Imp.Persistence.Legacy.rlm_contract_fixture()
 
     imp_rows = Enum.map(fixture["cases"], &run_imp_case/1)
     dspy = run_dspy!(python, cases_path, out_dir)
@@ -220,7 +219,6 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
         path
         |> File.read!()
         |> Jason.decode!()
-        |> Imp.Persistence.Legacy.rlm_contract_result()
 
       {output, status} ->
         Mix.raise("DSPy RLM contract failed with status #{status}:\n#{output}")

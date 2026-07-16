@@ -3,6 +3,11 @@ defmodule Imp.SavingSecretSafetyTest do
 
   test "dump redacts secrets from portable program data at every nesting level" do
     secret = "sk-saving-secret-1234567890"
+    basic = "Basic " <> Base.encode64("saving-user:saving-pass")
+    session = "session=CANARY_SAVING_SESSION_ASSIGNMENT_42b9d"
+    image_secret = "sk-saving-image-url-1234567890"
+    prose = "Bearer authentication is an authorization mechanism."
+    ordinary_url = "https://example.test/public/image.png?version=4"
 
     demo =
       Imp.example(question: "saved example", answer: "saved answer", api_key: secret)
@@ -12,7 +17,19 @@ defmodule Imp.SavingSecretSafetyTest do
       Imp.predict("question -> answer",
         demos: [demo],
         config: [max_tokens: 256, provider_options: [authorization: "Bearer abcdefghijklmnop"]],
-        metadata: %{deployment_secret: secret, token_count: 7}
+        metadata: %{
+          deployment_secret: secret,
+          token_count: 7,
+          basic_header: basic,
+          cookie_line: session,
+          image: %Imp.Adapters.Types.Image{
+            url: "https://example.test/private/#{image_secret}",
+            data: "aW1hZ2U=",
+            mime_type: "image/png"
+          },
+          prose: prose,
+          ordinary_url: ordinary_url
+        }
       )
 
     state = Imp.dump(program)
@@ -20,12 +37,21 @@ defmodule Imp.SavingSecretSafetyTest do
 
     refute encoded =~ secret
     refute encoded =~ "Bearer abcdefghijklmnop"
+    refute encoded =~ basic
+    refute encoded =~ session
+    refute encoded =~ image_secret
 
     loaded = Imp.load(state)
     assert loaded.metadata.deployment_secret == "[REDACTED]"
     assert loaded.metadata.token_count == 7
+    assert loaded.metadata.basic_header == "[REDACTED]"
+    assert loaded.metadata.cookie_line == "[REDACTED]"
+    assert loaded.metadata.image.url == "[REDACTED]"
+    assert loaded.metadata.image.data == "aW1hZ2U="
+    assert loaded.metadata.prose == prose
+    assert loaded.metadata.ordinary_url == ordinary_url
     assert loaded.config[:max_tokens] == 256
-    assert {"authorization", "[REDACTED]"} in loaded.config[:provider_options]
+    assert loaded.config[:provider_options] == []
     assert Imp.Example.get(hd(loaded.demos), :api_key) == "[REDACTED]"
   end
 
@@ -57,6 +83,34 @@ defmodule Imp.SavingSecretSafetyTest do
     assert loaded.tools.lookup.schema.note == "[REDACTED]"
     assert loaded.tools.lookup.schema.token == :string
     assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
+  end
+
+  test "agent schemas preserve semantic credential names and sanitize mixed tagged envelopes" do
+    handler = fn inputs, runtime -> {:ok, inputs, runtime} end
+    registry = Imp.Saving.Registry.new(schema_handler: handler)
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key"}
+
+    hostile =
+      Map.new([
+        {:__imp_type__, "noop"},
+        {"__imp_type__", "map"},
+        {:entries, [[typed_key, "CANARY_SAVING_COLLISION"]]},
+        {"entries", []}
+      ])
+
+    agent =
+      Imp.Agent.new(:schema_agent, handler,
+        input_schema: %{token: :string, api_key: :string, hostile: hostile},
+        output_schema: %{authorization: :string}
+      )
+
+    state = Imp.dump(agent, registry: registry)
+    refute inspect(state) =~ "CANARY_SAVING_COLLISION"
+
+    loaded = Imp.load(state, registry: registry)
+    assert loaded.input_schema.token == :string
+    assert loaded.input_schema.api_key == :string
+    assert loaded.output_schema.authorization == :string
   end
 
   test "tool closures fail with an actionable registry requirement" do
@@ -91,8 +145,8 @@ defmodule Imp.SavingSecretSafetyTest do
 
     assert get_in(state, ["lm", :model, :id]) == model_path
     assert get_in(state, ["lm", :model, :model]) == model_path
-    assert get_in(state, ["lm", :model, :token]) == "[REDACTED]"
-    assert get_in(state, ["lm", :model, :extra, :authorization]) == "[REDACTED]"
+    refute Map.has_key?(state["lm"][:model], :token)
+    refute Map.has_key?(state["lm"][:model][:extra], :authorization)
     refute encoded =~ "runtime-secret"
     refute encoded =~ "model-descriptor-secret"
     refute encoded =~ "nested-secret"

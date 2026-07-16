@@ -53,11 +53,11 @@ defmodule Imp.Optimizer.Trajectory do
           error: term(),
           program_id: term(),
           rollout_id: term(),
-          events: [Event.t()],
-          usage: Usage.t(),
-          timing: Timing.t(),
-          cache: Cache.t() | nil,
-          named_parameters: [Parameter.t()],
+          events: list(),
+          usage: struct(),
+          timing: struct(),
+          cache: struct() | nil,
+          named_parameters: list(),
           metadata: map()
         }
 
@@ -156,7 +156,7 @@ defmodule Imp.Optimizer.Trajectory do
   end
 
   @doc "Loads and strictly validates a canonical trajectory wire map."
-  @spec load(map()) :: {:ok, t()} | {:error, DecodeError.t()}
+  @spec load(map()) :: {:ok, t()} | {:error, struct()}
   def load(state) do
     {:ok, load!(state)}
   rescue
@@ -870,15 +870,26 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp redact_value(value, keys) when is_map(value) do
     Map.new(value, fn {key, nested} ->
-      probe = Imp.Redaction.redact(%{key => :visible}, keys)
-
-      if Map.fetch!(probe, key) == "[REDACTED]" and not accounting_value?(key, nested),
+      if redacted_entry?(key, nested, keys) and not accounting_value?(key, nested),
         do: {key, "[REDACTED]"},
         else: {key, redact_value(nested, keys)}
     end)
   end
 
+  defp redact_value([key, nested], keys)
+       when is_atom(key) or is_binary(key) or is_map(key) do
+    if redacted_entry?(key, nested, keys) and not accounting_value?(key, nested),
+      do: [key, "[REDACTED]"],
+      else: [key, redact_value(nested, keys)]
+  end
+
   defp redact_value(value, keys) when is_list(value), do: Enum.map(value, &redact_value(&1, keys))
+
+  defp redact_value({key, nested}, keys) when is_atom(key) or is_binary(key) do
+    if redacted_entry?(key, nested, keys) and not accounting_value?(key, nested),
+      do: {key, "[REDACTED]"},
+      else: {key, redact_value(nested, keys)}
+  end
 
   defp redact_value(value, keys) when is_tuple(value),
     do: value |> Tuple.to_list() |> Enum.map(&redact_value(&1, keys)) |> List.to_tuple()
@@ -889,6 +900,19 @@ defmodule Imp.Optimizer.Trajectory do
     do:
       to_string(key) in ["input_tokens", "output_tokens", "total_tokens"] and
         is_integer(value) and value >= 0
+
+  defp redacted_key?(key, keys) do
+    case Imp.Redaction.redact({key, :visible}, keys) do
+      {^key, "[REDACTED]"} -> true
+      _other -> false
+    end
+  end
+
+  defp redacted_entry?(key, value, keys) do
+    if keys == Imp.Redaction.default_keys(),
+      do: Imp.Redaction.credential_entry?(key, value),
+      else: redacted_key?(key, keys)
+  end
 
   defp redact_attachment(value, preserved_fields, keys) do
     module = value.__struct__
@@ -1148,21 +1172,7 @@ defmodule Imp.Optimizer.TrajectoryRunner do
 
       {:error, reason} ->
         trace = Trace.finish()
-        result = safe_metric(metric, example, nil, trace)
-
-        %Trajectory{
-          index: index,
-          example: example,
-          prediction: nil,
-          trace: trace,
-          score: result.score,
-          feedback: result.feedback,
-          metric_metadata: result.metadata,
-          error: reason,
-          program_id: Keyword.get(opts, :program_id),
-          rollout_id: Keyword.get(opts, :rollout_id)
-        }
-        |> project_runtime(opts)
+        failed(index, example, trace, reason, opts)
     end
   rescue
     error ->

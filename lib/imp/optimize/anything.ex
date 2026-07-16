@@ -2,9 +2,9 @@ defmodule Imp.Optimize.Anything do
   @moduledoc """
   Optimizes text and named-component systems against evaluator feedback.
 
-  `Imp.Optimize.Anything.Config` controls reflection, budgets, selection,
-  caching, merging, stopping, and tracking. Runs return the immutable
-  `Imp.Optimize.Anything.Result` contract.
+  The `run/3` surface controls reflection, budgets, selection, caching,
+  merging, stopping, and tracking through its options. It returns an immutable
+  result value.
   """
 
   # These structs remain internal execution values for the independent GEPA
@@ -23,7 +23,7 @@ defmodule Imp.Optimize.Anything do
   alias Imp.Optimize.Anything.Runner
 
   @doc "Runs the canonical Optimize Anything engine and returns a Result."
-  @spec run(String.t() | map() | nil, function(), keyword()) :: Imp.Optimize.Anything.Result.t()
+  @spec run(String.t() | map() | nil, function(), keyword()) :: struct()
   def run(seed_candidate, evaluator, opts \\ [])
 
   def run(seed_candidate, evaluator, opts)

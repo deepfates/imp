@@ -5,15 +5,25 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
-REGISTRY_PATH = Path(__file__).resolve().parent.parent / "benchmarks" / "upstream_authority_registry.json"
-REQUIRED_AUTHORITIES = {"dspy_stable", "dspy_instruction_optimizers", "gepa_standalone", "req_llm"}
+REGISTRY_PATH = Path(__file__).resolve().parent.parent / "benchmarks" / "authorities.json"
+REQUIRED_AUTHORITIES = {
+    "dspy_stable",
+    "dspy_instruction_optimizers",
+    "gepa_v0_1_1_contract",
+    "optimize_anything_artifact",
+    "req_llm",
+    "swe_bench_verified",
+}
 REQUIRED_CONTRACTS = {
-    "dspy_stable_upstream_fidelity",
-    "req_llm_beam_runtime_dependency",
-    "t1_gepa_v011_structural_differential_contract",
-    "t1_instruction_optimizer_differential_contract",
+    "dspy_stable_upstream_fidelity": "dspy_stable",
+    "optimize_anything_swe_bench_flask_5014_dataset": "swe_bench_verified",
+    "optimize_anything_upstream_differential_protocol": "optimize_anything_artifact",
+    "req_llm_beam_runtime_dependency": "req_llm",
+    "t1_gepa_v011_structural_differential_contract": "gepa_v0_1_1_contract",
+    "t1_instruction_optimizer_differential_contract": "dspy_instruction_optimizers",
 }
 
 
@@ -21,15 +31,37 @@ def load_registry_authority(
     contract_id: str, path: Path = REGISTRY_PATH
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
-        registry = json.loads(path.read_text())
-        if registry.get("schema_version") != 1:
+        ledger = json.loads(path.read_text())
+        if ledger.get("schema_version") != 1:
             raise ValueError("unsupported schema_version")
-        authorities = registry["authorities"]
-        contracts = registry["contracts"]
-        if not REQUIRED_AUTHORITIES.issubset(authorities):
+        pinned_sources = ledger["pinned_sources"]
+        contracts = ledger["contracts"]
+        if not REQUIRED_AUTHORITIES.issubset(pinned_sources):
             raise ValueError("missing required authorities")
-        if not REQUIRED_CONTRACTS.issubset(contracts):
+        if not REQUIRED_CONTRACTS.keys() <= contracts.keys():
             raise ValueError("missing required contracts")
+        for required_contract, expected_authority in REQUIRED_CONTRACTS.items():
+            actual_authority = contracts[required_contract].get("authority")
+            if actual_authority != expected_authority:
+                raise ValueError(
+                    f"contract {required_contract} must bind authority "
+                    f"{expected_authority}, got {actual_authority!r}"
+                )
+
+        contract_ids_by_authority: dict[str, list[str]] = {}
+        for candidate_id, candidate in contracts.items():
+            authority_id = candidate["authority"]
+            contract_ids_by_authority.setdefault(authority_id, []).append(candidate_id)
+
+        authorities = {
+            authority_id: _project_authority(
+                authority_id,
+                pinned_sources[authority_id],
+                contract_ids,
+            )
+            for authority_id, contract_ids in contract_ids_by_authority.items()
+        }
+
         for candidate_id, candidate in authorities.items():
             required = (
                 "project",
@@ -62,9 +94,38 @@ def load_registry_authority(
         if sorted(declared_contracts) != sorted(contracts):
             raise ValueError("contract identifiers must be declared exactly once")
         authority = authorities[contracts[contract_id]["authority"]]
+        registry = {
+            "schema_version": 1,
+            "authorities": authorities,
+            "contracts": contracts,
+        }
         return registry, authority
     except (OSError, KeyError, TypeError, json.JSONDecodeError, ValueError) as exc:
         raise RuntimeError(f"invalid upstream authority registry {path.resolve()}: {exc}") from exc
+
+
+def _project_authority(
+    authority_id: str,
+    source: dict[str, Any],
+    contract_ids: list[str],
+) -> dict[str, Any]:
+    authority = dict(source)
+    repository = authority["repository"]
+    project = urlparse(repository).path.strip("/")
+    if not project:
+        raise ValueError(f"authority {authority_id} has an invalid repository URL")
+
+    source_hashes = authority.get("source_hashes")
+    if not source_hashes:
+        files = authority.get("files")
+        if not files:
+            raise ValueError(f"authority {authority_id} has no exact source hashes")
+        source_hashes = {entry["path"]: entry["sha256"] for entry in files}
+
+    authority["project"] = project
+    authority["source_hashes"] = source_hashes
+    authority["contract_ids"] = sorted(contract_ids)
+    return authority
 
 
 def source_hash_failures(actual_hashes: dict[str, str], authority: dict[str, Any]) -> list[str]:

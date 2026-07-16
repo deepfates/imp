@@ -211,7 +211,7 @@ The Chat adapter renders history turns before the current request, splitting
 each turn into prior user/assistant messages according to the active signature.
 `Imp.History.dump/1` and `Imp.History.load/1` give a JSON-safe boundary for
 application state, while `Imp.History.redact/1` supports safe inspection.
-Provider-native role messages remain explicit as `Imp.Adapters.Types.History`.
+Provider-native role messages remain explicit maps with role and content fields.
 
 ## The Canonical Path
 
@@ -353,80 +353,18 @@ Imp.nearest(knn, %{question: "France"})
 
 ## Request-Local Inference Search
 
-`Imp.Predict.Search.run/3` is the shared request-local engine for evaluating
-explicitly identified inference candidates. It is an advanced module API, not
-an optimizer and not a globally registered service. Every call owns its
-candidate list, budget admission, tasks, outcomes, and provenance; no search
-state survives the request.
+Use `Imp.best_of_n/3` for bounded candidate evaluation and `Imp.refine/3` for
+feedback-guided retries. Both keep candidate state, projected budgets,
+provenance, threshold stopping, and failure isolation within one request. They
+do not register a process or persist search state. The facade returns the
+highest-scoring successful prediction using deterministic tie handling, and
+reports projected accounting separately from provider billing.
 
-```elixir
-alias Imp.Predict.Search
-alias Imp.Predict.Search.Candidate
-
-candidates = [
-  Candidate.new(:direct, %{answer: "Paris"}, %{calls: 1, cost_units: 1}),
-  Candidate.new(:reasoned, %{answer: "Paris"}, %{calls: 1, cost_units: 2})
-]
-
-result =
-  Search.run(
-    candidates,
-    fn candidate, context ->
-      {:ok, candidate.value, score(candidate.value, context.outcomes)}
-    end,
-    mode: :sequential,
-    threshold: 1.0,
-    tie_policy: :first,
-    budget: %{calls: 2, cost_units: 3}
-  )
-```
-
-Candidate ids must be non-nil and unique. Projected budgets are
-multidimensional non-negative maps. A finite budget admits only the longest
-ordered prefix that fits; once a candidate exceeds any dimension, that
-candidate and all later candidates are marked `:budget_exceeded`. The result
-contains the selected `best` successful outcome, ordered `outcomes`,
-full-list `provenance`, `stop_reason`, admitted projected budget, and the
-executed outcomes' projected budget in `observed_budget`. The latter is not
-provider billing or measured token usage. Record actual provider usage
-separately when an evaluator can observe it.
-
-The evaluator returns `{:ok, value, metric_result}` or `{:error, reason}`.
-Metric results use normal `Imp.Metrics` normalization. Exceptions, throws,
-task exits, invalid returns, and timeouts become isolated failed outcomes.
-Selection is highest score with explicit `:first` or `:last` tie policy;
-threshold comparison is inclusive.
-
-`:sequential` mode supplies prior ordered outcomes to the next evaluator and
-stops before starting later candidates after reaching the threshold.
-`:concurrent` mode uses supervised tasks with `max_concurrency:` and cannot
-provide causal prior outcomes to concurrently evaluated candidates. A
-threshold can cancel work that has not completed, but already completed
-speculation remains in outcomes and projected-budget accounting. Result and
-provenance order always follows candidate order, not task completion order.
-
-`Imp.Predict.BestOfN` delegates attempt execution and metric selection to this
-engine in sequential, first-tie mode. It creates one projected `attempts: 1`
-candidate per rollout, stops at its threshold, selects the highest-scoring
-prediction, and optionally computes comparison feedback over successful
-predictions.
-
-`Imp.Predict.Refine` keeps the same sequential, first-tie semantics but owns its
-causal retry loop so it can enforce the DSPy `fail_count` boundary. After each
-below-threshold success it asks the wrapped program's LM with the DSPy
-`OfferFeedback` field contract: program and predictor definitions, inputs,
-trajectory, outputs, reward contract, threshold, reward value, and module
-names. The returned per-predictor advice becomes the next attempt's `hint_`.
-Feedback inputs are redacted before the advice call. An explicit unary
-`feedback_fn` takes precedence and receives
-the ordered successful-attempt history, preserving the callback API. Threshold
-comparison is inclusive, and exhaustion returns the highest-scoring successful
-prediction rather than simply the last attempt. Automatic advice is keyed by
-predictor name with an `N/A` fallback; program and module definitions are
-redacted Elixir metadata representations, not claims of Python source-string
-identity. The portable Refine artifact persists the program, metric callback,
-explicit feedback callback, attempt count, threshold, and `fail_count`, while
-old artifacts without the optional field load with the default budget.
+Sequential retries preserve ordered history for feedback. Concurrent batches
+are supervised and bounded by `max_concurrency`; speculative work that already
+completed remains visible in the result. Record actual provider usage through
+the provider or telemetry boundary rather than treating projected budgets as
+measured usage.
 
 ## Chain Of Thought
 
@@ -459,8 +397,8 @@ prediction.metadata[:reasoning_details]
 
 Streaming provider-native thinking chunks arrive as `%{reasoning: text}` chunks
 with `metadata.type == :reasoning`; ordinary answer text still streams as text.
-Outbound `Imp.Adapters.Types.Reasoning` values become ReqLLM thinking content
-parts for providers that support reasoning continuity.
+Outbound reasoning values become ReqLLM thinking content parts for providers
+that support reasoning continuity.
 
 ## Schema-Constrained JSON
 
@@ -581,9 +519,9 @@ query with previously retrieved passages, deduplicates documents, injects the
 combined context, and records per-hop retrieval metadata.
 RAG programs backed by `Imp.memory/2` can be saved and loaded with
 `Imp.dump/1`, `Imp.load/1`, `Imp.save!/2`, and `Imp.load!/1`; network
-retrievers remain host-owned dependencies. Callback-bearing programs use a
-named `Imp.Saving.Registry` supplied explicitly by the host when dumping and
-loading; functions are never written into artifacts.
+retrievers remain host-owned dependencies. Callback-bearing program graphs are
+persisted through a named `Imp.Saving.Registry` supplied explicitly by the
+host; functions are never written into artifacts.
 
 ## Local Embeddings
 
@@ -756,8 +694,10 @@ tool calls as recoverable observations, and invokes a typed finalizer on
 only when its trainset score improves. BetterTogether accepts named optimizers
 and atom, string, or repeated list strategies; with validation it retains the
 highest-scoring baseline/prefix candidate, and without validation it returns
-the latest successful prefix. Its provider-backed weight step still does not
-claim provider lifecycle completion or trained-model rebinding.
+the latest successful prefix. A typed asynchronous `TrainingJob` is polled
+under the configured deadline, rebound only after terminal success, and given a
+bounded cancellation attempt after timeout or refresh failure. This runtime
+contract does not claim that a paid-provider BetterTogether campaign has run.
 
 Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
@@ -769,9 +709,12 @@ cancellation endpoint, saved without credentials, restored with an explicitly
 reinjected transport and API key, and rebound to a compiled program only after
 the provider reports a non-empty model artifact. Submit, refresh, and cancel
 requests use stable idempotency keys and bounded retries. These lifecycle APIs
-do not imply that an account-specific paid training job has run. From a source
-checkout, the source-checkout-only `mix protocol.training.check` gate exercises the provider wire contracts
-locally.
+classify documented provider states before cleanup: known active jobs may be
+cancelled, known terminal jobs are preserved, and unknown states fail closed
+without a destructive cancellation guess. They do not imply that an
+account-specific paid training job has run. From a source checkout, the
+source-checkout-only `mix protocol.training.check` gate exercises the provider
+wire contracts locally.
 
 Fast-Slow Training has a separate provider-neutral orchestration surface. Build
 immutable configuration and state with `Imp.Training.FastSlow.Config` and
@@ -839,17 +782,8 @@ call per candidate. A `dataset:` selects multi-task optimization; adding a
 non-empty `valset:` selects held-out generalization.
 
 ```elixir
-alias Imp.Optimize.Anything
-alias Imp.Optimize.Anything.{Config, Result}
-
-config =
-  Config.new(
-    engine: [max_candidate_proposals: 4, max_metric_calls: 20],
-    reflection: [reflection_lm: reflection_lm]
-  )
-
 result =
-  Anything.run(
+  Imp.Optimize.Anything.run(
     %{planner: "Plan directly.", writer: "Answer clearly."},
     fn candidate, example ->
       score = evaluator.(candidate, example)
@@ -858,16 +792,18 @@ result =
     dataset: training_examples,
     valset: held_out_examples,
     objective: "Produce correct, concise answers.",
-    config: config
+    config: [
+      engine: [max_candidate_proposals: 4, max_metric_calls: 20],
+      reflection: [reflection_lm: reflection_lm]
+    ]
   )
-
-Result.best_candidate(result)
 ```
 
-`Result` retains candidate lineage, per-example validation scores, Pareto
+The result retains candidate lineage, per-example validation scores, Pareto
 frontiers, measured budgets, rejected proposals, history, and a resumable
-engine checkpoint. This `Config`/`Result`/`run` contract is the sole
-Optimize Anything surface.
+engine checkpoint. `Imp.Optimize.Anything.run/3` is the sole Optimize Anything
+entry point; its execution records remain implementation data rather than
+additional supported module APIs.
 
 ## Tools And ReAct
 
@@ -1084,8 +1020,12 @@ The controller initially sees only metadata for the serializable value. The
 `load/1` materializes it into the RLM variable space. `llm_query_batched/1`
 runs sub-LM calls concurrently through supervised BEAM tasks, preserves result
 order, and atomically reserves every item against the shared `max_llm_calls`
-ledger. Recursive children use that same ledger and deadline. If controller
-code submits malformed output, Imp records
+ledger. Per-item failures remain ordered string values beginning with `Error:`.
+The ledger scope is `subcalls_only`: sub-LM calls made inside recursive children
+share it, while root and child controller turns, extraction, and compaction
+generations do not consume it. The optional deadline is shared by the complete
+recursive call tree; omitting `max_time_ms` configures no RLM deadline. If
+controller code submits malformed output, Imp records
 the parse feedback as an observation and gives the controller another turn. If
 the loop exhausts its iteration budget, Imp runs an extract pass over the
 variables, observations, and trace to recover final structured output when
@@ -1125,10 +1065,10 @@ program; the Imp-native data boundary is `Imp.dump/1` and `Imp.load/1`, or
 their checksummed file equivalents `Imp.save!/2` and `Imp.load!/1`. DSPy's
 `module.save(path, save_program: true)` plus `dspy.load(path, allow_pickle:
 true)` serializes executable Python with `cloudpickle`. Imp intentionally has
-no executable-code artifact mode: it saves allowlisted program architecture as
-JSON, stores callback names through `Imp.Saving.Registry`, and requires the
-deploying application to rebind callbacks, tools, LMs, and credentials from
-trusted runtime code.
+no executable-code artifact mode: its documented artifact boundary is the
+allowlisted JSON program representation. Callback closures are stored only as
+names from `Imp.Saving.Registry`, and runtime credentials are rebound
+explicitly.
 
 Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
 credentials. Rebind a freshly configured LM explicitly before live use:

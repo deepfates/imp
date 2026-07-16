@@ -38,7 +38,7 @@ defmodule Mix.Tasks.Imp.Benchmark.AutoEvaluationContract do
               Keyword.get(
                 opts,
                 :out,
-                "benchmarks/results/auto-evaluation-differential-v1.json"
+                "benchmarks/runs/auto-evaluation-differential-v1.json"
               ),
             allow_dirty: Keyword.get(opts, :allow_dirty, false)
           )

@@ -9,12 +9,194 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract do
 
   use Mix.Task
 
-  alias Imp.Optimizer.{DemoCandidates, InstructionProposer, MIPROv2, SIMBA}
+  alias Imp.Optimizer.{
+    BootstrapFewShot,
+    DemoCandidates,
+    InstructionProposer,
+    MIPROv2,
+    Report,
+    SIMBA
+  }
+
   alias Imp.Optimizer.MIPROv2.Config
   alias Imp.Optimizer.SIMBA.Buckets
 
   @shortdoc "Run matched Imp/DSPy instruction-optimizer contracts"
   @default_out "tmp/instruction-optimizer-contract"
+  @bootstrap_fixture_id "bootstrap-repeated-predictor-calls-v3"
+  @bootstrap_imp_algorithm %{
+    "observed_via" => "BootstrapFewShot.compile/4 compiled predictor and optimizer report",
+    "digest" => "sha256",
+    "payload" => "erlang_term_trajectory_index_predictor_name_demos",
+    "branch_byte_index" => 0,
+    "branch_modulus" => 2,
+    "earlier_remainder" => 0,
+    "earlier_index_byte_index" => 1,
+    "probability_basis" => "uniform_sha256_branch_byte_parity",
+    "branch_probability_model" => %{"earlier" => 0.5, "final" => 0.5}
+  }
+  @bootstrap_imp_outcomes %{
+    "trace_set_0" => %{
+      "sha256" => "34fbc63abc20a7432db52aaffc7cb536ac6a3dc1ba1a855eb8e8e907b5047ae6",
+      "branch_byte" => 52,
+      "earlier_index_byte" => 251,
+      "branch" => "earlier",
+      "selected_index" => 2,
+      "selected_call_id" => "call_2",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 2,
+      "compiled_selected_call_id" => "call_2",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_2" => %{
+      "sha256" => "a35edd6a69fe99b9fbd548a8bd34bf8f8bbeb413b0f75b1ba0698ff98a56c64b",
+      "branch_byte" => 163,
+      "earlier_index_byte" => 94,
+      "branch" => "final",
+      "selected_index" => 3,
+      "selected_call_id" => "call_3",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 3,
+      "compiled_selected_call_id" => "call_3",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_3" => %{
+      "sha256" => "45162346f6f28da72c8d47fface2bd87d060c8c76bad5bb948c34da5e7fa4c1b",
+      "branch_byte" => 69,
+      "earlier_index_byte" => 22,
+      "branch" => "final",
+      "selected_index" => 3,
+      "selected_call_id" => "call_3",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 3,
+      "compiled_selected_call_id" => "call_3",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_4" => %{
+      "sha256" => "74fad33fd95e380dcc91e3b63c977abd9d2790741f08b8468df19a1eb6263f75",
+      "branch_byte" => 116,
+      "earlier_index_byte" => 250,
+      "branch" => "earlier",
+      "selected_index" => 1,
+      "selected_call_id" => "call_1",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 1,
+      "compiled_selected_call_id" => "call_1",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_5" => %{
+      "sha256" => "f152d8dc18d5668b5d8320a793019c9b89e25e7dbb70e17a9dfad34fbb6a4a2a",
+      "branch_byte" => 241,
+      "earlier_index_byte" => 82,
+      "branch" => "final",
+      "selected_index" => 3,
+      "selected_call_id" => "call_3",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 3,
+      "compiled_selected_call_id" => "call_3",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_13" => %{
+      "sha256" => "5c9dfa4a7585d287c0c76952d63609be9c5d4f133eeb33bb06566ac7c878a6ba",
+      "branch_byte" => 92,
+      "earlier_index_byte" => 157,
+      "branch" => "earlier",
+      "selected_index" => 1,
+      "selected_call_id" => "call_1",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 1,
+      "compiled_selected_call_id" => "call_1",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    },
+    "trace_set_30" => %{
+      "sha256" => "94d8bcff220445139375e634c6c4a178af688a4388440acb36b247e65455846f",
+      "branch_byte" => 148,
+      "earlier_index_byte" => 216,
+      "branch" => "earlier",
+      "selected_index" => 0,
+      "selected_call_id" => "call_0",
+      "compiled_demo_count" => 1,
+      "compiled_selected_index" => 0,
+      "compiled_selected_call_id" => "call_0",
+      "report_selection_count" => 1,
+      "report_selection_matches_compiled_demo" => true,
+      "trajectory_index" => 0,
+      "predictor_name" => "answerer",
+      "call_count" => 4
+    }
+  }
+
+  defmodule BootstrapRepeatedCallProgram do
+    @moduledoc false
+
+    defstruct [:answerer, :calls]
+
+    def optimizer_predictors(program), do: [answerer: program.answerer]
+
+    def update_optimizer_predictor(program, :answerer, update),
+      do: %{program | answerer: update.(program.answerer)}
+
+    def call(program, _inputs) do
+      result =
+        Enum.reduce_while(program.calls, {:ok, nil, []}, fn call, {:ok, _last, trace} ->
+          inputs = %{question: call["inputs"]["question"]}
+          expected_hint = call["outputs"]["hint"]
+
+          case Imp.call(program.answerer, inputs) do
+            {:ok, prediction} ->
+              if Imp.get(prediction, :hint) == expected_hint do
+                step = %{
+                  predictor: :answerer,
+                  inputs: inputs,
+                  outputs: Imp.Prediction.to_map(prediction)
+                }
+
+                {:cont, {:ok, prediction, trace ++ [step]}}
+              else
+                {:halt, {:error, :fixture_hint_mismatch}}
+              end
+
+            {:error, _reason} = error ->
+              {:halt, error}
+          end
+        end)
+
+      case result do
+        {:ok, nil, []} ->
+          {:error, :empty_fixture_trace}
+
+        {:ok, prediction, trace} ->
+          {:ok, %{prediction | metadata: Map.put(prediction.metadata, :optimizer_trace, trace)}}
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
 
   @impl true
   def run(args) do
@@ -81,6 +263,7 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract do
 
     mipro_budget_rows(mipro) ++
       mipro_demo_rows(mipro) ++
+      mipro_bootstrap_repeated_call_rows(mipro) ++
       mipro_rotation_rows(mipro) ++
       mipro_schedule_rows(mipro) ++
       mipro_categorical_rows(mipro) ++
@@ -166,6 +349,201 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract do
 
       row(id, expected, actual)
     end
+  end
+
+  defp mipro_bootstrap_repeated_call_rows(mipro) do
+    fixture = mipro["bootstrap_repeated_predictor_calls"]
+
+    selections =
+      Enum.map(fixture["cases"], fn fixture_case ->
+        {algorithm, outcome} = compile_bootstrap_fixture_case(fixture_case)
+        {fixture_case["id"], algorithm, outcome}
+      end)
+
+    [actual_imp_algorithm] =
+      selections
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.uniq()
+
+    actual_imp_outcomes = Map.new(selections, fn {id, _algorithm, outcome} -> {id, outcome} end)
+
+    expected =
+      bootstrap_fixture_contract(fixture, @bootstrap_imp_algorithm, @bootstrap_imp_outcomes)
+
+    actual =
+      bootstrap_fixture_contract(fixture, actual_imp_algorithm, actual_imp_outcomes)
+
+    [row("bootstrap_repeated_predictor_calls_behavior", expected, actual)]
+  end
+
+  defp bootstrap_fixture_contract(fixture, imp_algorithm, imp_outcomes) do
+    cases =
+      Enum.map(fixture["cases"], fn fixture_case ->
+        %{
+          "id" => fixture_case["id"],
+          "input" => Map.take(fixture_case, ["trajectory_index", "predictor_name", "calls"]),
+          "dspy" => fixture_case["dspy"],
+          "imp" => Map.fetch!(imp_outcomes, fixture_case["id"])
+        }
+      end)
+
+    %{
+      "fixture_id" => fixture["fixture_id"],
+      "scope" => fixture["scope"],
+      "source_hashes" => fixture["source_hashes"],
+      "algorithms" => %{"dspy" => fixture["algorithm"], "imp" => imp_algorithm},
+      "cases" => cases,
+      "comparison" => bootstrap_fixture_comparison(fixture["algorithm"], imp_algorithm, cases)
+    }
+  end
+
+  defp bootstrap_fixture_comparison(dspy_algorithm, imp_algorithm, cases) do
+    case_parity =
+      Map.new(cases, fn fixture_case ->
+        {fixture_case["id"],
+         fixture_case["dspy"]["selected_call_id"] ==
+           fixture_case["imp"]["compiled_selected_call_id"]}
+      end)
+
+    dspy_branches = cases |> Enum.map(& &1["dspy"]["branch"]) |> Enum.uniq() |> Enum.sort()
+    imp_branches = cases |> Enum.map(& &1["imp"]["branch"]) |> Enum.uniq() |> Enum.sort()
+
+    dspy_earlier_indices =
+      cases
+      |> Enum.filter(&(&1["dspy"]["branch"] == "earlier"))
+      |> Enum.map(& &1["dspy"]["selected_index"])
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    imp_earlier_indices =
+      cases
+      |> Enum.filter(&(&1["imp"]["branch"] == "earlier"))
+      |> Enum.map(& &1["imp"]["selected_index"])
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    %{
+      "dspy_runtime_calls_match_fixture" =>
+        Enum.all?(cases, fn fixture_case ->
+          fixture_case["dspy"]["runtime_predictor_call_count"] ==
+            length(fixture_case["input"]["calls"]) and
+            fixture_case["dspy"]["runtime_lm_call_count"] ==
+              length(fixture_case["input"]["calls"])
+        end),
+      "one_demo_per_predictor" =>
+        Enum.all?(cases, fn fixture_case ->
+          fixture_case["dspy"]["selected_count"] == 1 and
+            fixture_case["imp"]["compiled_demo_count"] == 1 and
+            fixture_case["imp"]["report_selection_count"] == 1 and
+            fixture_case["imp"]["report_selection_matches_compiled_demo"]
+        end),
+      "branch_probability_model_agreement" =>
+        dspy_algorithm["branch_probability_model"] == %{"earlier" => 0.5, "final" => 0.5} and
+          imp_algorithm["branch_probability_model"] == %{"earlier" => 0.5, "final" => 0.5},
+      "fixed_case_branch_coverage" => %{"dspy" => dspy_branches, "imp" => imp_branches},
+      "fixed_case_earlier_index_coverage" => %{
+        "dspy" => dspy_earlier_indices,
+        "imp" => imp_earlier_indices
+      },
+      "case_selection_parity" => case_parity,
+      "exact_selection_parity" => Enum.all?(case_parity, fn {_id, parity?} -> parity? end),
+      "mixed_case_selection_parity" =>
+        Enum.any?(case_parity, fn {_id, parity?} -> parity? end) and
+          Enum.any?(case_parity, fn {_id, parity?} -> not parity? end)
+    }
+  end
+
+  defp compile_bootstrap_fixture_case(fixture_case) do
+    Code.ensure_loaded!(BootstrapRepeatedCallProgram)
+    calls = fixture_case["calls"]
+
+    program = %BootstrapRepeatedCallProgram{
+      answerer: Imp.predict("question -> hint", lm: bootstrap_fixture_lm(calls)),
+      calls: calls
+    }
+
+    example =
+      Imp.example(question: "contract-#{fixture_case["id"]}")
+      |> Imp.with_inputs(:question)
+
+    compiled =
+      BootstrapFewShot.new(nil, max_bootstrapped_demos: 1, max_labeled_demos: 0)
+      |> BootstrapFewShot.compile(program, [example])
+
+    compiled_demos = compiled.answerer.demos
+    report = Report.fetch(compiled.answerer)
+
+    unless length(compiled_demos) == 1 do
+      Mix.raise(
+        "bootstrap fixture #{fixture_case["id"]} compiled #{length(compiled_demos)} demos: " <>
+          inspect(report, limit: :infinity)
+      )
+    end
+
+    [compiled_demo] = compiled_demos
+    report_selections = report.metadata.repeated_call_selections
+    [selection] = report_selections
+    compiled_selected_index = compiled_demo_index!(compiled_demo, calls)
+
+    outcome = %{
+      "sha256" => selection.sha256,
+      "branch_byte" => selection.branch_byte,
+      "earlier_index_byte" => selection.earlier_index_byte,
+      "branch" => Atom.to_string(selection.branch),
+      "selected_index" => selection.selected_index,
+      "selected_call_id" => call_id_at!(calls, selection.selected_index),
+      "compiled_demo_count" => length(compiled_demos),
+      "compiled_selected_index" => compiled_selected_index,
+      "compiled_selected_call_id" => call_id_at!(calls, compiled_selected_index),
+      "report_selection_count" => length(report_selections),
+      "report_selection_matches_compiled_demo" =>
+        selection.selected_index == compiled_selected_index,
+      "trajectory_index" => selection.trajectory_index,
+      "predictor_name" => Atom.to_string(selection.predictor),
+      "call_count" => selection.call_count
+    }
+
+    algorithm =
+      selection.algorithm
+      |> stringify_keys()
+      |> Map.put(
+        "observed_via",
+        "BootstrapFewShot.compile/4 compiled predictor and optimizer report"
+      )
+
+    {algorithm, outcome}
+  end
+
+  defp compiled_demo_index!(compiled_demo, calls) do
+    question = Imp.Example.get(compiled_demo, :question)
+    hint = Imp.Example.get(compiled_demo, :hint)
+
+    Enum.find_index(calls, fn call ->
+      call["inputs"]["question"] == question and call["outputs"]["hint"] == hint
+    end) || Mix.raise("compiled bootstrap demo does not match its fixed trace input")
+  end
+
+  defp call_id_at!(calls, index), do: calls |> Enum.fetch!(index) |> Map.fetch!("call_id")
+
+  defp bootstrap_fixture_lm(calls) do
+    responses =
+      Map.new(calls, fn call ->
+        {call["inputs"]["question"], call["outputs"]["hint"]}
+      end)
+
+    %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          prompt = inspect(messages, limit: :infinity)
+
+          case Enum.find(responses, fn {question, _hint} -> String.contains?(prompt, question) end) do
+            {_question, hint} -> %{hint: hint}
+            nil -> {:error, :fixture_question_not_found}
+          end
+        end
+      ]
+    }
   end
 
   defp mipro_rotation_rows(mipro) do
@@ -390,9 +768,14 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract do
       },
       %{
         "id" => "bootstrap_repeated_predictor_calls",
-        "dspy" => "upstream trace-to-demo selection",
-        "imp" => "retains the final call for each predictor",
-        "consequence" => "one demo per predictor is preserved without hash-level selection parity"
+        "dspy" =>
+          "Python random.Random seeded by Hasher.hash(tuple(demos)); rng.random() gates rng.choice(demos[:-1]) versus demos[-1]",
+        "imp" =>
+          "SHA-256 over the BEAM term {trajectory index, predictor name, demos}; digest-byte parity gates byte-modulo earlier index versus final",
+        "consequence" =>
+          "both return one demo and have a 1/2 earlier-or-final branch model under their respective uniform-randomness assumptions; this seven-case cross-runtime fixture checks branch/index shape and mixed exact outcomes, not empirical uniformity or Python RNG sequence parity",
+        "fixture_id" => @bootstrap_fixture_id,
+        "evidence_row" => "bootstrap_repeated_predictor_calls_behavior"
       },
       %{
         "id" => "grounded_proposer_call_graph",

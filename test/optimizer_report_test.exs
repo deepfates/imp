@@ -48,13 +48,154 @@ defmodule OptimizerReportTest do
     {train, dev}
   end
 
-  test "JSON-safe optimizer values preserve structured tuple errors" do
+  test "lossless term codec preserves structured tuple errors" do
     value = %{error: {:metric_error, {:provider, :offline}}, lineage: [nil, {:parent, 2}]}
 
-    encoded = Imp.Optimizer.Report.json_safe(value)
+    encoded = Imp.Optimizer.Report.encode_term(value)
 
-    assert Jason.encode!(encoded) |> Jason.decode!() |> Imp.Optimizer.Report.restore_json_safe() ==
+    assert Jason.encode!(encoded) |> Jason.decode!() |> Imp.Optimizer.Report.decode_term() ==
              value
+  end
+
+  test "lossless term codec preserves atom and string map keys distinctly" do
+    value = %{"alpha" => 2, alpha: 1}
+
+    encoded = Imp.Optimizer.Report.encode_term(value)
+
+    assert encoded["__imp_type__"] == "map"
+
+    assert encoded
+           |> Jason.encode!()
+           |> Jason.decode!()
+           |> Imp.Optimizer.Report.decode_term() == value
+  end
+
+  test "public report serialization drops credential-bearing fields" do
+    report =
+      Imp.Optimizer.Report.new(%{
+        optimizer: :credential_probe,
+        candidates: [%{api_key: "CANARY_REPORT_CANDIDATE", score: 1.0}],
+        metadata: %{authorization: "CANARY_REPORT_METADATA", label: "kept"}
+      })
+
+    dumped = Imp.Optimizer.Report.dump(report)
+    encoded = Jason.encode!(dumped)
+
+    refute encoded =~ "CANARY_REPORT_CANDIDATE"
+    refute encoded =~ "CANARY_REPORT_METADATA"
+    assert encoded =~ "[REDACTED]"
+
+    restored = Imp.Optimizer.Report.load(dumped)
+    assert restored.candidates == [%{api_key: "[REDACTED]", score: 1.0}]
+    assert restored.metadata == %{authorization: "[REDACTED]", label: "kept"}
+
+    refute Jason.encode!(Imp.Optimizer.Report.json_safe(report)) =~ "CANARY_REPORT"
+    refute Jason.encode!(Imp.Optimizer.Report.json_projection(report)) =~ "CANARY_REPORT"
+
+    safe_value =
+      Imp.Optimizer.Report.json_safe(%{
+        api_key: "CANARY_REPORT_VALUE",
+        nested: %{authorization: "CANARY_REPORT_NESTED"},
+        label: "kept"
+      })
+
+    safe_json = Jason.encode!(safe_value)
+    refute safe_json =~ "CANARY_REPORT_VALUE"
+    refute safe_json =~ "CANARY_REPORT_NESTED"
+    assert safe_json =~ "[REDACTED]"
+  end
+
+  test "plain JSON strings stay strings even when matching existing atoms" do
+    assert Imp.Optimizer.Report.decode_term(%{"alpha" => "alpha"}) == %{
+             "alpha" => "alpha"
+           }
+
+    report =
+      Imp.Optimizer.Report.new(%{
+        optimizer: "alpha",
+        metadata: %{"alpha" => "alpha"}
+      })
+
+    restored = report |> Imp.Optimizer.Report.dump() |> Imp.Optimizer.Report.load()
+
+    assert restored.optimizer == "alpha"
+    assert restored.metadata == %{"alpha" => "alpha"}
+  end
+
+  test "one-way JSON projections keep schema keys readable without silent collisions" do
+    assert Imp.Optimizer.Report.json_projection(%{score: 1.0, output: %{answer: "ok"}}) ==
+             %{"score" => 1.0, "output" => %{"answer" => "ok"}}
+
+    assert_raise ArgumentError, ~r/projection contains colliding JSON key "alpha"/, fn ->
+      Imp.Optimizer.Report.json_projection(%{"alpha" => 2, alpha: 1})
+    end
+  end
+
+  test "lossless term codec tags non-JSON map keys" do
+    value = %{0 => "zero", 1 => %{score: 0.75}, {:objective, 2} => :kept}
+
+    assert value ==
+             value
+             |> Imp.Optimizer.Report.encode_term()
+             |> Jason.encode!()
+             |> Jason.decode!()
+             |> Imp.Optimizer.Report.decode_term()
+  end
+
+  test "optimizer report attributes reject atom/string collisions" do
+    assert_raise ArgumentError, ~r/colliding attribute key "optimizer"/, fn ->
+      Imp.Optimizer.Report.new(%{:optimizer => :one, "optimizer" => :two})
+    end
+
+    assert_raise ArgumentError,
+                 ~r/optimizer report state contains colliding key "optimizer"/,
+                 fn ->
+                   Imp.Optimizer.Report.load(%{:optimizer => :one, "optimizer" => "two"})
+                 end
+  end
+
+  test "term decoder rejects decoded key collisions and malformed tagged maps" do
+    assert_raise ArgumentError, ~r/duplicate decoded key 1/, fn ->
+      Imp.Optimizer.Report.decode_term(%{
+        "__imp_type__" => "map",
+        "entries" => [[1, "one"], [1, "duplicate"]]
+      })
+    end
+  end
+
+  test "term decoder rejects non-canonical tagged and report states" do
+    assert_raise ArgumentError, ~r/malformed Imp atom JSON tag/, fn ->
+      Imp.Optimizer.Report.decode_term(%{
+        "__imp_type__" => "atom",
+        "value" => "alpha",
+        "extra" => true
+      })
+    end
+
+    assert_raise ArgumentError, ~r/malformed Imp tuple JSON tag/, fn ->
+      Imp.Optimizer.Report.decode_term(%{
+        "__imp_type__" => "tuple",
+        "items" => [],
+        "extra" => true
+      })
+    end
+
+    report_state = Imp.Optimizer.Report.dump(Imp.Optimizer.Report.new(optimizer: :alpha))
+
+    assert_raise ArgumentError, ~r/malformed optimizer report state/, fn ->
+      Imp.Optimizer.Report.load(Map.put(report_state, "extra", true))
+    end
+
+    assert_raise ArgumentError, ~r/malformed optimizer report state/, fn ->
+      Imp.Optimizer.Report.load(Map.put(report_state, "candidate_count", "many"))
+    end
+
+    assert_raise ArgumentError, ~r/malformed Imp optimizer report JSON tag/, fn ->
+      report_state
+      |> Map.put("__imp_type__", "optimizer_report")
+      |> Map.put("extra", true)
+      |> Imp.Optimizer.Report.decode_term()
+    end
   end
 
   test "random search attaches candidate history and best score" do
@@ -71,12 +212,13 @@ defmodule OptimizerReportTest do
 
     assert %Imp.Optimizer.Report{
              optimizer: :random_search,
-             best_score: 1.0,
-             candidate_count: 3
+             best_score: 100.0,
+             candidate_count: 6
            } =
              report
 
     assert Enum.all?(report.candidates, &Map.has_key?(&1, :score))
+    assert report.metadata.candidate_seeds == [-3, -2, -1, 0, 1, 2]
   end
 
   test "upstream bootstrap random-search aliases delegate to the canonical optimizer" do
@@ -274,10 +416,10 @@ defmodule OptimizerReportTest do
 
     restored =
       report
-      |> Imp.Optimizer.Report.json_safe()
+      |> Imp.Optimizer.Report.encode_term()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.Optimizer.Report.restore_json_safe()
+      |> Imp.Optimizer.Report.decode_term()
 
     assert %Imp.Optimizer.Report{} = restored
     assert restored.optimizer == :labeled_few_shot
@@ -322,6 +464,15 @@ defmodule OptimizerReportTest do
                  end
   end
 
+  test "optimizer report restoration rejects non-canonical wire tags" do
+    assert_raise ArgumentError, ~r/unsupported Imp JSON wire tag/, fn ->
+      Imp.Optimizer.Report.decode_term(%{
+        "__imp_type__" => "unknown",
+        "items" => [1, 2]
+      })
+    end
+  end
+
   test "labeled few-shot reports trainset enumeration failures" do
     program = Imp.predict("question -> answer", lm: lm())
 
@@ -361,7 +512,7 @@ defmodule OptimizerReportTest do
     assert String.contains?(reason, "Enumerable")
   end
 
-  test "random search treats zero requested trials as a baseline-only compile" do
+  test "random search retains DSPy's three baselines when randomized trials are zero" do
     {train, dev} = sets()
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: lm())
@@ -374,11 +525,11 @@ defmodule OptimizerReportTest do
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :random_search
-    assert report.best_score == 0.0
-    assert report.candidate_count == 0
+    assert report.best_score == 100.0
+    assert report.candidate_count == 3
     assert report.errors == []
-    assert report.metadata.baseline_score == 0.0
-    assert Enum.map(report.candidates, & &1.index) == [:baseline]
+    assert report.metadata.candidate_seeds == [-3, -2, -1]
+    assert Enum.sort(Enum.map(report.candidates, & &1.seed)) == [-3, -2, -1]
   end
 
   test "optimizer constructors reject invalid option containers at the boundary" do
@@ -447,26 +598,16 @@ defmodule OptimizerReportTest do
                  end
   end
 
-  test "random search returns the original program with diagnostics when all trials fail" do
+  test "random search rejects a non-enumerable valset" do
     {train, _dev} = sets()
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: lm())
 
-    compiled =
+    assert_raise Protocol.UndefinedError, fn ->
       metric
       |> Imp.Optimizer.RandomSearch.new(candidates: 2, demos_per_candidate: 1)
       |> Imp.Optimizer.RandomSearch.compile(program, train, :not_an_enumerable_devset)
-
-    report = Imp.Optimizer.Report.fetch(compiled)
-
-    assert report.optimizer == :random_search
-    assert report.best_score == nil
-    assert report.candidate_count == 0
-    assert report.candidates == []
-    assert report.metadata.status == :all_candidates_failed
-    assert length(report.errors) == 3
-    assert Enum.map(report.errors, & &1.metadata.index) == [1, 2, :baseline]
-    assert Enum.all?(report.errors, &String.contains?(&1.error, "Enumerable"))
+    end
   end
 
   test "bootstrap few-shot reports selected and rejected train examples" do
@@ -488,7 +629,7 @@ defmodule OptimizerReportTest do
     assert [%{passed?: false, selected?: false} = candidate] = report.candidates
     assert candidate.score == 0.0
     assert report.errors == []
-    assert compiled.demos == []
+    assert compiled.demos == train
   end
 
   test "bootstrap few-shot captures metric failures as optimizer diagnostics" do
@@ -511,7 +652,7 @@ defmodule OptimizerReportTest do
              report.candidates
   end
 
-  test "bootstrap few-shot reports trainset failures without erasing existing demos" do
+  test "bootstrap few-shot rejects a non-enumerable trainset" do
     {train, _dev} = sets()
     [existing_demo] = train
 
@@ -520,23 +661,12 @@ defmodule OptimizerReportTest do
       |> Imp.predict(lm: lm())
       |> Imp.Predict.Predict.with_demos([existing_demo])
 
-    compiled =
+    assert_raise Protocol.UndefinedError, fn ->
       Imp.Optimizer.BootstrapFewShot.new(Imp.Metrics.exact_match(:answer),
         max_bootstrapped_demos: 1
       )
       |> Imp.Optimizer.BootstrapFewShot.compile(program, :not_an_enumerable_trainset)
-
-    report = Imp.Optimizer.Report.fetch(compiled)
-
-    assert compiled.demos == [existing_demo]
-    assert report.optimizer == :bootstrap_few_shot
-    assert report.best_score == 0.0
-    assert report.candidate_count == 0
-    assert report.candidates == []
-    assert report.metadata.status == :with_errors
-    assert report.metadata.trainset_size == 0
-    assert [%{stage: :trainset, reason: reason}] = report.errors
-    assert String.contains?(reason, "Enumerable")
+    end
   end
 
   test "instruction search attaches candidate score report" do

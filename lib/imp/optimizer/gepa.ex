@@ -9,8 +9,9 @@ defmodule Imp.Optimizer.GEPA do
   per-instance Pareto archive in its internal optimization engine.
 
   The `:callbacks` option accepts callback modules or `{module, context}`
-  tuples implementing any subset of `Imp.Optimizer.GEPA.Callback`. Hooks are
-  synchronous and observational; failures are isolated from optimization.
+  tuples implementing any subset of the documented GEPA callback contract.
+  Hooks are synchronous and observational; failures are isolated from
+  optimization.
 
   `:component_feedback` maps predictor names to strict arity-one callbacks.
   These callbacks shape reflective minibatches and are part of optimization;
@@ -22,11 +23,11 @@ defmodule Imp.Optimizer.GEPA do
   applied by proposal slot. This is separate from ComBee aggregation: it does
   not combine worker proposals or use map-shuffle-reduce voting.
 
-  `:combee` accepts `true` or nested `Imp.Optimizer.GEPA.ComBee.Options`.
-  ComBee duplicates and deterministically shuffles reflection records, reduces
-  `floor(sqrt(n))` balanced groups concurrently, and performs one ordered final
-  reduction. `:proposal_timeout` bounds reflection work and inherits `:timeout`
-  when omitted; a finite nested ComBee timeout is an additional upper bound.
+  `:combee` accepts `true` or its documented keyword options. ComBee duplicates
+  and deterministically shuffles reflection records, reduces `floor(sqrt(n))`
+  balanced groups concurrently, and performs one ordered final reduction.
+  `:proposal_timeout` bounds reflection work and inherits `:timeout` when
+  omitted; a finite nested ComBee timeout is an additional upper bound.
   """
 
   alias Imp.Optimizer.GEPA.{
@@ -35,7 +36,8 @@ defmodule Imp.Optimizer.GEPA do
     ComBee,
     ComponentFeedback,
     Engine,
-    ProgramAdapter
+    ProgramAdapter,
+    ReflectionStrategy
   }
 
   alias Imp.Optimizer.Report
@@ -43,11 +45,14 @@ defmodule Imp.Optimizer.GEPA do
   defstruct [
     :metric,
     :reflection_lm,
+    :reflection_strategy,
     callbacks: [],
     component_feedback: %{},
     feedback_fn: nil,
     generations: 4,
     combee: false,
+    sampling_strategy: :single,
+    selection_strategy: :all_improvements,
     proposal_concurrency: 1,
     proposal_timeout: 30_000,
     max_concurrency: 1,
@@ -61,10 +66,12 @@ defmodule Imp.Optimizer.GEPA do
     evaluation_policy: :full,
     acceptance_policy: :strict_improvement,
     merge_acceptance_policy: :equal_or_better,
+    raise_on_exception: true,
     stopper: nil,
     max_metric_calls: :infinity,
     max_full_evaluations: :infinity,
-    max_reflection_calls: :infinity
+    max_reflection_calls: :infinity,
+    max_reflection_cost: nil
   ]
 
   @option_schema [
@@ -73,6 +80,8 @@ defmodule Imp.Optimizer.GEPA do
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     generations: [type: :non_neg_integer, default: 4],
     combee: [type: {:custom, ComBee.Options, :validate, []}, default: false],
+    sampling_strategy: [type: :any, default: :single],
+    selection_strategy: [type: :any, default: :all_improvements],
     proposal_concurrency: [
       type: {:custom, __MODULE__, :validate_proposal_concurrency, []},
       default: 1
@@ -92,11 +101,14 @@ defmodule Imp.Optimizer.GEPA do
     evaluation_policy: [type: :any, default: :full],
     acceptance_policy: [type: :any, default: :strict_improvement],
     merge_acceptance_policy: [type: :any, default: :equal_or_better],
+    raise_on_exception: [type: :boolean, default: true],
     stopper: [type: :any, default: nil],
     reflection_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
+    reflection_strategy: [type: :any, default: nil],
     max_metric_calls: [type: :any, default: :infinity],
     max_full_evaluations: [type: :any, default: :infinity],
-    max_reflection_calls: [type: :any, default: :infinity]
+    max_reflection_calls: [type: :any, default: :infinity],
+    max_reflection_cost: [type: :any, default: nil]
   ]
 
   @compile_option_schema [
@@ -113,6 +125,14 @@ defmodule Imp.Optimizer.GEPA do
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, 2, "Imp.Optimizer.GEPA.new/2", "metric")
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.GEPA.new/2")
+    reflection_strategy = ReflectionStrategy.validate!(opts[:reflection_strategy])
+    max_reflection_cost = validate_cost_limit!(opts[:max_reflection_cost])
+
+    if max_reflection_cost &&
+         not ReflectionStrategy.cost_observable?(reflection_strategy || opts[:reflection_lm]) do
+      raise ArgumentError,
+            ":max_reflection_cost requires a reflection strategy or LM with observable total_cost"
+    end
 
     %__MODULE__{
       metric: metric,
@@ -121,6 +141,8 @@ defmodule Imp.Optimizer.GEPA do
       feedback_fn: opts[:feedback_fn],
       generations: opts[:generations],
       combee: opts[:combee],
+      sampling_strategy: validate_sampling_strategy!(opts[:sampling_strategy]),
+      selection_strategy: validate_selection_strategy!(opts[:selection_strategy]),
       proposal_concurrency: opts[:proposal_concurrency],
       proposal_timeout: opts[:proposal_timeout] || opts[:timeout],
       max_concurrency: opts[:max_concurrency],
@@ -134,11 +156,14 @@ defmodule Imp.Optimizer.GEPA do
       evaluation_policy: opts[:evaluation_policy],
       acceptance_policy: opts[:acceptance_policy],
       merge_acceptance_policy: opts[:merge_acceptance_policy],
+      raise_on_exception: opts[:raise_on_exception],
       stopper: opts[:stopper],
       reflection_lm: opts[:reflection_lm],
+      reflection_strategy: reflection_strategy,
       max_metric_calls: validate_limit!(opts[:max_metric_calls], :max_metric_calls),
       max_full_evaluations: validate_limit!(opts[:max_full_evaluations], :max_full_evaluations),
-      max_reflection_calls: validate_limit!(opts[:max_reflection_calls], :max_reflection_calls)
+      max_reflection_calls: validate_limit!(opts[:max_reflection_calls], :max_reflection_calls),
+      max_reflection_cost: max_reflection_cost
     }
   end
 
@@ -186,6 +211,8 @@ defmodule Imp.Optimizer.GEPA do
       [
         max_iterations: optimizer.generations,
         combee: optimizer.combee,
+        sampling_strategy: optimizer.sampling_strategy,
+        selection_strategy: optimizer.selection_strategy,
         proposal_concurrency: optimizer.proposal_concurrency,
         proposal_timeout: optimizer.proposal_timeout,
         minibatch_size: optimizer.minibatch_size || min(3, length(trainset)),
@@ -197,11 +224,15 @@ defmodule Imp.Optimizer.GEPA do
         evaluation_policy: optimizer.evaluation_policy,
         acceptance_policy: optimizer.acceptance_policy,
         merge_acceptance_policy: optimizer.merge_acceptance_policy,
+        raise_on_exception: optimizer.raise_on_exception,
         callbacks: optimizer.callbacks,
         stopper: optimizer.stopper,
         max_metric_calls: optimizer.max_metric_calls,
         max_full_evaluations: optimizer.max_full_evaluations,
         max_reflection_calls: optimizer.max_reflection_calls,
+        max_reflection_cost: optimizer.max_reflection_cost,
+        reflection_strategy: optimizer.reflection_strategy,
+        reflection_cost_source: optimizer.reflection_strategy || optimizer.reflection_lm,
         evaluation_timeout: optimizer.timeout,
         resume_state: opts[:resume_state],
         checkpoint_fn: opts[:checkpoint_fn]
@@ -235,6 +266,8 @@ defmodule Imp.Optimizer.GEPA do
           generations: optimizer.generations,
           minibatch_size: state.combee_policy.effective_batch_size,
           proposal_concurrency: optimizer.proposal_concurrency,
+          sampling_strategy: optimizer.sampling_strategy,
+          selection_strategy: policy_name(optimizer.selection_strategy),
           proposal_timeout: optimizer.proposal_timeout,
           max_concurrency: optimizer.max_concurrency,
           timeout: optimizer.timeout,
@@ -251,6 +284,7 @@ defmodule Imp.Optimizer.GEPA do
           max_metric_calls: state.budget.max_metric_calls,
           reflection_calls: state.budget.reflection_calls,
           max_reflection_calls: state.budget.max_reflection_calls,
+          max_reflection_cost: optimizer.max_reflection_cost,
           full_evaluations: state.budget.full_evaluations,
           max_full_evaluations: state.budget.max_full_evaluations,
           rejected_candidates: length(state.rejected),
@@ -522,5 +556,34 @@ defmodule Imp.Optimizer.GEPA do
 
   def validate_proposal_concurrency(value) do
     {:error, "expected :auto or a positive integer, got: #{inspect(value)}"}
+  end
+
+  defp validate_sampling_strategy!(:single), do: :single
+
+  defp validate_sampling_strategy!({:same_parent, n} = strategy) when is_integer(n) and n > 0,
+    do: strategy
+
+  defp validate_sampling_strategy!({:independent, n} = strategy) when is_integer(n) and n > 0,
+    do: strategy
+
+  defp validate_sampling_strategy!({:pxn, p, n} = strategy)
+       when is_integer(p) and p > 0 and is_integer(n) and n > 0,
+       do: strategy
+
+  defp validate_sampling_strategy!(strategy) do
+    raise ArgumentError, "invalid GEPA sampling strategy: #{inspect(strategy)}"
+  end
+
+  defp validate_selection_strategy!(strategy) do
+    Imp.Optimizer.GEPA.ProposalSelection.validate!(strategy)
+    strategy
+  end
+
+  defp validate_cost_limit!(nil), do: nil
+  defp validate_cost_limit!(value) when is_number(value) and value >= 0, do: value * 1.0
+
+  defp validate_cost_limit!(value) do
+    raise ArgumentError,
+          ":max_reflection_cost must be nil or a non-negative number, got: #{inspect(value)}"
   end
 end

@@ -4,7 +4,7 @@ defmodule DashboardTest do
   import ExUnit.CaptureIO
 
   @local_mlx_fixture Path.expand(
-                       "../benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
+                       "../benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json",
                        __DIR__
                      )
 
@@ -350,6 +350,12 @@ defmodule DashboardTest do
 
     [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
     dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+
+    assert dashboard["schema_version"] == 3
+
+    assert Enum.all?(dashboard["lanes"], fn {_id, lane} ->
+             Map.has_key?(lane, "candidate_eligibility") and not Map.has_key?(lane, "admission")
+           end)
 
     refute dashboard["profile_ready"]
     assert dashboard["provider_free_overhead_regression_guard_passed"]
@@ -1434,7 +1440,7 @@ defmodule DashboardTest do
     assert deterministic_gate["status"] == "full"
     assert deterministic_gate["fresh"]
     assert deterministic_gate["artifact"]["git_sha"] == current_sha
-    assert deterministic_gate["admission"]["source_compatible"]
+    assert deterministic_gate["candidate_eligibility"]["source_compatible"]
 
     live_gate = dashboard["lanes"]["live_provider_smoke"]
     assert live_gate["status"] == "stale"
@@ -1478,7 +1484,49 @@ defmodule DashboardTest do
 
     assert lane["status"] == "missing"
     assert lane["artifact"] == nil
-    refute lane["admission"]["admitted"]
+    refute lane["candidate_eligibility"]["eligible"]
+  end
+
+  test "newer malformed gate evidence cannot mask an older valid candidate" do
+    root = tmp_dir("dashboard-gate-validator-fallback")
+    gate_dir = Path.join(root, "gate")
+    out_dir = Path.join(root, "out")
+    Enum.each([gate_dir, out_dir], &File.mkdir_p!/1)
+
+    valid_path = Path.join(gate_dir, "gate-evidence-product_package-valid.json")
+
+    write_gate_evidence!(gate_dir, "product_package", "package.check",
+      generated_at: DateTime.utc_now() |> DateTime.add(-60) |> DateTime.to_iso8601(),
+      name: Path.basename(valid_path)
+    )
+
+    write_json!(Path.join(gate_dir, "gate-evidence-product_package-malformed.json"), %{
+      "schema_version" => 1,
+      "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "git_sha" => dashboard_git_sha(),
+      "gate" => "different_gate",
+      "summary" => %{"mix_task" => "package.check", "passing" => true}
+    })
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--gate-dir",
+        gate_dir,
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+
+    lane =
+      dashboard_path |> File.read!() |> Jason.decode!() |> get_in(["lanes", "product_package"])
+
+    assert lane["status"] == "full"
+    assert lane["artifact"]["path"] == valid_path
+    assert lane["candidate_eligibility"]["eligible"]
   end
 
   test "failure recovery skips invalid tmp candidates and falls back to results" do

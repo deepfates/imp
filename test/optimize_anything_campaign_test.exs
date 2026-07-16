@@ -29,6 +29,7 @@ defmodule OptimizeAnythingCampaignTest do
     end
 
     out_dir = tmp_dir("optimize-anything-campaign")
+    checkpoint_dir = Path.join(out_dir, "checkpoints")
 
     %{artifact: artifact, out_path: path} =
       Campaign.run(
@@ -38,10 +39,19 @@ defmodule OptimizeAnythingCampaignTest do
         seeds: [17, 23, 31],
         max_proposals: 1,
         run_id: "oa-campaign-contract-test",
-        out_dir: out_dir
+        out_dir: out_dir,
+        checkpoint_dir: checkpoint_dir
       )
 
     assert Artifact.full_artifact?(artifact)
+    assert Imp.BenchmarkTruth.RunContext.verify!(artifact) == artifact
+
+    assert :ok =
+             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
+               "optimize_anything",
+               artifact
+             )
+
     assert File.regular?(path)
     assert Agent.get(queue, & &1) == []
     assert length(artifact["rows"]) == 3
@@ -54,7 +64,13 @@ defmodule OptimizeAnythingCampaignTest do
       assert length(row["reproducibility"]["runs"]) == 3
       assert Enum.all?(row["reproducibility"]["runs"], &(&1["lift"] > 0))
       assert Enum.all?(row["reproducibility"]["runs"], &File.regular?(&1["checkpoint"]))
+
+      assert row["reproducibility"]["source_commits"]["gepa"] ==
+               "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
     end
+
+    assert get_in(artifact, ["run_context", "source_commits", "gepa"]) ==
+             "gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   end
 
   test "campaign requires distinct reproducibility seeds" do

@@ -68,14 +68,15 @@ defmodule Mix.Tasks.Imp.Benchmark.ProviderTraining do
   end
 
   defp default_paths do
-    root = "benchmarks/results/provider-training"
+    run_root = Imp.BenchmarkTruth.Paths.runs("provider-training")
+    checkpoint_root = Imp.BenchmarkTruth.Paths.checkpoints("provider-training")
 
     %{
       dataset: "benchmarks/data/provider-training-banking77-v1.json",
-      checkpoint: Path.join(root, "openai-banking77-v2-job.json"),
-      state: Path.join(root, "openai-banking77-v2-state.json"),
-      artifact: Path.join(root, "openai-banking77-v2-campaign.json"),
-      program: Path.join(root, "openai-banking77-v2-program.json")
+      checkpoint: Path.join(checkpoint_root, "openai-banking77-v2-job.json"),
+      state: Path.join(checkpoint_root, "openai-banking77-v2-state.json"),
+      artifact: Path.join(run_root, "openai-banking77-v2-campaign.json"),
+      program: Path.join(run_root, "openai-banking77-v2-program.json")
     }
   end
 end

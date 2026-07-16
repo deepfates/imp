@@ -362,7 +362,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerExperimentTest do
 
   defp imp_artifact(options, fixture) do
     arms = Enum.map(Keyword.fetch!(options, :arms), &Atom.to_string/1)
-    configs = options |> Keyword.fetch!(:arm_configs) |> Imp.Optimizer.Report.json_safe()
+    configs = options |> Keyword.fetch!(:arm_configs) |> Imp.Optimizer.Report.encode_term()
 
     %{
       "schema_version" => 1,

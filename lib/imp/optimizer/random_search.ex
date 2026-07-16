@@ -1,80 +1,104 @@
 defmodule Imp.Optimizer.RandomSearch do
   @behaviour Imp.Optimizer
   @moduledoc """
-  Try random demo subsets and keep the program with the best dev score.
+  DSPy 3.2.1 BootstrapFewShotWithRandomSearch / BootstrapRS.
 
-  `RandomSearch` is a useful first optimizer because it is easy to reason
-  about: sample candidate demo sets from the train set, evaluate each candidate
-  on the dev set, and attach a report to the best program. The original
-  program is always evaluated as a baseline so random sampling cannot silently
-  regress a working program. Sampling uses explicit optimizer-local RNG state;
-  `:seed` defaults to `0`, and the final replayable policy checkpoint is stored
-  in the optimizer report.
-
-  ## Example
-
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-      ...> }
-      iex> program = Imp.predict("question -> answer", lm: lm)
-      iex> trainset = [
-      ...>   Imp.example(question: "Eiffel Tower city?", answer: "Paris")
-      ...>   |> Imp.with_inputs(:question)
-      ...> ]
-      iex> devset = [
-      ...>   Imp.example(question: "Capital of France?", answer: "Paris")
-      ...>   |> Imp.with_inputs(:question)
-      ...> ]
-      iex> metric = Imp.Metrics.exact_match(:answer)
-      iex> compiled =
-      ...>   metric
-      ...>   |> Imp.Optimizer.RandomSearch.new(candidates: 1, demos_per_candidate: 1)
-      ...>   |> Imp.Optimizer.RandomSearch.compile(program, trainset, devset)
-      iex> Imp.Optimizer.Report.fetch(compiled).optimizer
-      :random_search
-
-  Keep candidate counts small while developing. Raise them only after your
-  metric and dev set are trustworthy. If every candidate fails because the
-  evaluation setup is broken, `compile/4` returns the original program with an
-  optimizer report describing the failures instead of raising from inside the
-  search loop.
+  Candidate seeds, baseline scheduling, chained labeled-demo sampling, and tie
+  ordering match the authority. Seeded draws use Imp's deterministic
+  BEAM-native sampler, so they do not claim Python MT19937 sequence parity.
+  Candidate evaluation scores use DSPy's rounded percentage scale.
   """
 
-  alias Imp.Optimizer.SearchPolicy
-  alias Imp.Optimizer.SearchPolicy.Sampling
+  alias Imp.Optimizer.{BootstrapFewShot, Sampling}
 
-  defstruct [:metric, candidates: 8, demos_per_candidate: 4, seed: 0]
+  defstruct [
+    :metric,
+    teacher_settings: [],
+    max_bootstrapped_demos: 4,
+    max_labeled_demos: 16,
+    max_rounds: 1,
+    num_candidate_programs: 16,
+    num_threads: nil,
+    max_errors: nil,
+    stop_at_score: nil,
+    metric_threshold: nil,
+    seed: nil,
+    candidates: 16,
+    demos_per_candidate: 4
+  ]
 
   @option_schema [
-    candidates: [type: :non_neg_integer, default: 8],
-    demos_per_candidate: [type: :non_neg_integer, default: 4],
-    seed: [type: :integer, default: 0]
+    teacher_settings: [type: :keyword_list, default: []],
+    max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
+    max_labeled_demos: [type: :non_neg_integer, default: 16],
+    max_rounds: [type: :non_neg_integer, default: 1],
+    num_candidate_programs: [type: :non_neg_integer, default: 16],
+    num_threads: [type: {:custom, __MODULE__, :validate_optional_positive, []}, default: nil],
+    max_errors: [type: {:custom, __MODULE__, :validate_optional_max_errors, []}, default: nil],
+    stop_at_score: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
+    metric_threshold: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
+    # Historical Imp spellings. They are normalized immediately and do not
+    # change DSPy's fixed seed schedule.
+    candidates: [type: {:custom, __MODULE__, :validate_optional_non_negative, []}, default: nil],
+    demos_per_candidate: [
+      type: {:custom, __MODULE__, :validate_optional_non_negative, []},
+      default: nil
+    ],
+    seed: [type: {:custom, __MODULE__, :validate_optional_integer, []}, default: nil]
   ]
 
   def new(metric, opts \\ []) do
-    Imp.FunctionContract.validate!(
-      metric,
-      [2, 3],
-      "Imp.Optimizer.RandomSearch.new/2",
-      "metric"
-    )
-
+    Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.RandomSearch.new/2", "metric")
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.RandomSearch.new/2")
+
+    max_bootstrapped_demos = opts[:demos_per_candidate] || opts[:max_bootstrapped_demos]
+    num_candidate_programs = opts[:candidates] || opts[:num_candidate_programs]
 
     %__MODULE__{
       metric: metric,
-      candidates: opts[:candidates],
-      demos_per_candidate: opts[:demos_per_candidate],
-      seed: opts[:seed]
+      teacher_settings: opts[:teacher_settings],
+      max_bootstrapped_demos: max_bootstrapped_demos,
+      max_labeled_demos: opts[:max_labeled_demos],
+      max_rounds: opts[:max_rounds],
+      num_candidate_programs: num_candidate_programs,
+      num_threads: opts[:num_threads],
+      max_errors: opts[:max_errors],
+      stop_at_score: opts[:stop_at_score],
+      metric_threshold: opts[:metric_threshold],
+      seed: opts[:seed],
+      candidates: num_candidate_programs,
+      demos_per_candidate: max_bootstrapped_demos
     }
   end
+
+  def validate_optional_number(nil), do: {:ok, nil}
+  def validate_optional_number(value) when is_number(value), do: {:ok, value}
+  def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
+
+  def validate_optional_non_negative(nil), do: {:ok, nil}
+
+  def validate_optional_non_negative(value) when is_integer(value) and value >= 0,
+    do: {:ok, value}
+
+  def validate_optional_non_negative(_value),
+    do: {:error, "expected non negative integer"}
+
+  def validate_optional_integer(nil), do: {:ok, nil}
+  def validate_optional_integer(value) when is_integer(value), do: {:ok, value}
+  def validate_optional_integer(_value), do: {:error, "expected integer"}
+
+  def validate_optional_positive(nil), do: {:ok, nil}
+  def validate_optional_positive(value) when is_integer(value) and value > 0, do: {:ok, value}
+  def validate_optional_positive(_value), do: {:error, "expected nil or a positive integer"}
+
+  def validate_optional_max_errors(nil), do: {:ok, nil}
+  def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
   @impl true
   def __optimizer__,
     do: %{
       kind: :program,
-      datasets: %{trainset: :required, validation: :required},
+      datasets: %{trainset: :required, validation: :optional},
       result: :program
     }
 
@@ -86,165 +110,297 @@ defmodule Imp.Optimizer.RandomSearch do
          optimizer,
          program,
          Imp.Optimizer.fetch_dataset!(opts, :trainset),
-         Imp.Optimizer.fetch_dataset!(opts, :validation)
+         Keyword.get(opts, :validation)
        )}
     end
   end
 
-  def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    policy = SearchPolicy.new(Sampling, seed: optimizer.seed)
+  def compile(%__MODULE__{} = optimizer, student, trainset, valset \\ nil, opts \\ [])
+      when is_list(opts) do
+    trainset = Enum.to_list(trainset)
+    valset = materialize_valset(valset, trainset)
+    teacher = Keyword.get(opts, :teacher)
+    restrict = Keyword.get(opts, :restrict)
+    labeled_sample = Keyword.get(opts, :labeled_sample, true)
+    {max_errors, max_errors_source} = resolve_max_errors!(optimizer.max_errors)
+    optimizer = %{optimizer | max_errors: max_errors}
 
-    {sampled_results, baseline_result, policy} =
-      case new_evaluator(devset, optimizer.metric) do
-        {:ok, evaluator} ->
-          {sampled_results, policy} =
-            optimizer.candidates
-            |> candidate_indices()
-            |> Enum.map_reduce(policy, fn index, policy ->
-              build_and_evaluate_candidate(
-                index,
-                evaluator,
-                program,
-                trainset,
-                optimizer,
-                policy
-              )
-            end)
+    candidate_seeds =
+      optimizer.num_candidate_programs
+      |> seeds()
+      |> Enum.filter(&allowed?(&1, restrict))
 
-          {sampled_results,
-           evaluate_candidate(evaluator, program, %{index: :baseline, demos: []}), policy}
+    if candidate_seeds == [] do
+      raise RuntimeError, "RandomSearch restrict excluded every DSPy candidate seed"
+    end
 
-        {:error, error} ->
-          sampled_results =
-            optimizer.candidates
-            |> candidate_indices()
-            |> Enum.map(fn index -> {:error, error, %{index: index, demos: []}} end)
+    {records, errors} =
+      candidate_seeds
+      |> Enum.with_index()
+      |> Enum.reduce_while({[], []}, fn {seed, evaluation_order}, {records, errors} ->
+        {program, source_metadata} =
+          candidate_program(student, trainset, teacher, optimizer, seed, labeled_sample)
 
-          {sampled_results, {:error, error, %{index: :baseline, demos: []}}, policy}
-      end
+        result = evaluate!(program, valset, optimizer)
 
-    {best_score, best, report_candidates, errors, metadata} =
-      summarize(sampled_results ++ [baseline_result], program)
+        record =
+          Map.merge(source_metadata, %{
+            seed: seed,
+            score: result.score,
+            subscores: result.subscores,
+            program: program,
+            evaluation_order: evaluation_order
+          })
 
-    policy_dump = SearchPolicy.dump(policy)
+        records = records ++ [record]
+        errors = errors ++ contextualize_errors(result.errors, seed)
 
-    metadata =
-      Map.merge(metadata, %{
-        search_policy_id: policy_dump["policy"],
-        seed: optimizer.seed,
-        search_policy: policy_dump
-      })
-
-    best
-    |> Imp.Optimizer.Report.attach(
-      Imp.Optimizer.Report.new(%{
-        optimizer: :random_search,
-        best_score: best_score,
-        candidate_count: sampled_success_count(report_candidates),
-        candidates: report_candidates,
-        errors: errors,
-        metadata: metadata
-      })
-    )
-  end
-
-  defp new_evaluator(devset, metric) do
-    {:ok, Imp.Evaluate.new(devset, metric)}
-  rescue
-    error -> {:error, error}
-  catch
-    kind, reason -> {:error, {kind, reason}}
-  end
-
-  defp build_and_evaluate_candidate(
-         index,
-         evaluator,
-         program,
-         trainset,
-         optimizer,
-         policy
-       ) do
-    {shuffled, policy} = SearchPolicy.suggest(policy, {:shuffle, Enum.to_list(trainset)})
-    demos = Enum.take(shuffled, optimizer.demos_per_candidate)
-
-    candidate =
-      Imp.Optimizer.LabeledFewShot.compile(
-        %Imp.Optimizer.LabeledFewShot{k: optimizer.demos_per_candidate},
-        program,
-        demos
-      )
-
-    {evaluate_candidate(evaluator, candidate, %{index: index, demos: demos}), policy}
-  rescue
-    error -> {{:error, error, %{index: index, demos: []}}, policy}
-  catch
-    kind, reason -> {{:error, {kind, reason}, %{index: index, demos: []}}, policy}
-  end
-
-  defp evaluate_candidate(evaluator, candidate, metadata) do
-    Imp.Telemetry.span(
-      [:imp, :optimizer, :trial],
-      Map.merge(%{optimizer: :random_search}, metadata),
-      fn ->
-        result = Imp.Evaluate.run(evaluator, candidate)
-        {:ok, result.score, candidate, metadata}
-      end
-    )
-  rescue
-    error -> {:error, error, metadata}
-  catch
-    kind, reason -> {:error, {kind, reason}, metadata}
-  end
-
-  defp summarize(results, fallback) do
-    successes =
-      Enum.flat_map(results, fn
-        {:ok, score, candidate, metadata} -> [{score, candidate, metadata}]
-        _ -> []
+        if not is_nil(optimizer.stop_at_score) and result.score >= optimizer.stop_at_score do
+          {:halt, {records, errors}}
+        else
+          {:cont, {records, errors}}
+        end
       end)
 
-    errors =
-      Enum.flat_map(results, fn
-        {:error, error, metadata} -> [%{error: error_message(error), metadata: metadata}]
-        _ -> []
-      end)
+    ranked = Enum.sort_by(records, &{-&1.score, &1.evaluation_order})
+    best = hd(ranked)
 
     report_candidates =
-      Enum.map(successes, fn {score, _candidate, metadata} -> Map.put(metadata, :score, score) end)
+      Enum.map(ranked, fn candidate ->
+        candidate
+        |> Map.drop([:program, :evaluation_order])
+        |> Map.put(:demos, predictor_demos(candidate.program))
+      end)
 
-    case successes do
-      [] ->
-        {nil, fallback, [], errors, %{status: :all_candidates_failed}}
-
-      _ ->
-        {best_score, best, _metadata} =
-          Enum.max_by(successes, fn {score, _candidate, _metadata} -> score end)
-
-        metadata = %{
-          status: :ok,
-          baseline_score: baseline_score(report_candidates),
-          successful_candidates: length(report_candidates)
+    attach_report(
+      best.program,
+      Imp.Optimizer.Report.new(%{
+        optimizer: :random_search,
+        best_score: best.score,
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
+        errors: errors,
+        metadata: %{
+          status: if(errors == [], do: :ok, else: :with_errors),
+          candidate_seeds: Enum.map(records, & &1.seed),
+          evaluated_candidate_count: length(records),
+          valset_size: length(valset),
+          trainset_size: length(trainset),
+          stop_at_score: optimizer.stop_at_score,
+          max_errors: max_errors,
+          max_errors_source: max_errors_source,
+          score_scale: :percentage,
+          sampling_rng: :beam_native,
+          sampling_schedule: :dspy_3_2_1_seed_lifecycle
         }
+      })
+    )
+  end
 
-        {best_score, best, report_candidates, errors, metadata}
+  defp seeds(count) when count >= 0, do: Enum.to_list(-3..(count - 1))
+  defp allowed?(_seed, nil), do: true
+  defp allowed?(seed, restrict), do: seed in restrict
+
+  defp candidate_program(student, _trainset, _teacher, _optimizer, -3, _labeled_sample),
+    do: {reset_student(student), %{kind: :zero_shot}}
+
+  defp candidate_program(student, trainset, _teacher, optimizer, -2, labeled_sample) do
+    {labeled_student(student, trainset, optimizer.max_labeled_demos, labeled_sample),
+     %{kind: :labels_only}}
+  end
+
+  defp candidate_program(student, trainset, teacher, optimizer, -1, _labeled_sample) do
+    {bootstrap(student, trainset, teacher, optimizer, optimizer.max_bootstrapped_demos),
+     %{kind: :unshuffled_bootstrap, bootstrap_size: optimizer.max_bootstrapped_demos}}
+  end
+
+  defp candidate_program(student, trainset, teacher, optimizer, seed, _labeled_sample) do
+    {shuffled, _rng} = Sampling.shuffle(trainset, Sampling.new(seed))
+    {offset, _rng} = Sampling.integer(optimizer.max_bootstrapped_demos, Sampling.new(seed))
+    size = offset + 1
+
+    {bootstrap(student, shuffled, teacher, optimizer, size),
+     %{kind: :shuffled_bootstrap, bootstrap_size: size}}
+  end
+
+  defp bootstrap(student, trainset, teacher, optimizer, size) do
+    BootstrapFewShot.new(optimizer.metric,
+      teacher_settings: optimizer.teacher_settings,
+      max_bootstrapped_demos: size,
+      max_labeled_demos: optimizer.max_labeled_demos,
+      max_rounds: optimizer.max_rounds,
+      max_errors: optimizer.max_errors,
+      metric_threshold: optimizer.metric_threshold
+    )
+    |> BootstrapFewShot.compile(student, trainset, teacher: teacher || student)
+  end
+
+  defp labeled_student(student, trainset, max_labeled, sample?) do
+    {program, _rng} =
+      Enum.reduce(
+        Imp.ProgramParameters.predictors(student),
+        {reset_student(student), Sampling.new(0)},
+        fn %{name: name}, {program, rng} ->
+          {demos, rng} =
+            if sample? do
+              sample(trainset, min(max_labeled, length(trainset)), rng)
+            else
+              {Enum.take(trainset, max_labeled), rng}
+            end
+
+          {Imp.ProgramParameters.put_demos(program, name, demos), rng}
+        end
+      )
+
+    program
+  end
+
+  defp sample(_rows, 0, rng), do: {[], rng}
+
+  defp sample(rows, count, rng) do
+    {shuffled, rng} = Sampling.shuffle(rows, rng)
+    {Enum.take(shuffled, count), rng}
+  end
+
+  defp reset_student(program) do
+    Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+      Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+        predictor
+        |> Imp.Predict.Predict.with_demos([])
+        |> then(&%{&1 | metadata: Map.delete(&1.metadata, :optimizer_report)})
+      end)
+    end)
+  end
+
+  defp materialize_valset(nil, trainset), do: trainset
+
+  defp materialize_valset(valset, trainset) do
+    case Enum.to_list(valset) do
+      [] -> trainset
+      rows -> rows
     end
   end
 
-  defp candidate_indices(count) when count > 0, do: 1..count
-  defp candidate_indices(_count), do: []
+  defp evaluate!(program, valset, optimizer) do
+    max_concurrency =
+      optimizer.num_threads || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
-  defp sampled_success_count(candidates),
-    do: Enum.count(candidates, &(&1.index != :baseline))
+    result =
+      Imp.Evaluate.new(valset, optimizer.metric,
+        max_concurrency: max_concurrency,
+        max_errors: evaluator_error_limit(optimizer.max_errors)
+      )
+      |> Imp.Evaluate.run(program)
 
-  defp baseline_score(candidates) do
-    candidates
-    |> Enum.find(&(&1.index == :baseline))
-    |> case do
-      nil -> nil
-      candidate -> candidate.score
+    enforce_error_budget!(result.errors, optimizer.max_errors, :random_search_evaluation)
+
+    %{
+      score: dspy_percentage_score(result.rows),
+      subscores: Enum.map(result.rows, & &1.score),
+      errors: result.errors
+    }
+  end
+
+  defp dspy_percentage_score([]),
+    do: raise(ArithmeticError, "DSPy Evaluate cannot score an empty dataset")
+
+  defp dspy_percentage_score(rows) do
+    total = Enum.reduce(rows, 0, fn row, sum -> sum + row.score end)
+    round_half_even(100 * total / length(rows), 2)
+  end
+
+  defp round_half_even(value, _digits) when value == 0.0, do: value
+
+  defp round_half_even(value, digits) when is_float(value) do
+    <<sign::1, exponent::11, fraction::52>> = <<value::float-64>>
+
+    if exponent == 0x7FF do
+      value
+    else
+      significand = if exponent == 0, do: fraction, else: Bitwise.bsl(1, 52) + fraction
+      binary_exponent = if exponent == 0, do: -1074, else: exponent - 1023 - 52
+
+      {numerator, denominator} =
+        if binary_exponent >= 0 do
+          {Bitwise.bsl(significand, binary_exponent), 1}
+        else
+          {significand, Bitwise.bsl(1, -binary_exponent)}
+        end
+
+      factor = Integer.pow(10, digits)
+      scaled = numerator * factor
+      quotient = div(scaled, denominator)
+      remainder = rem(scaled, denominator)
+
+      rounded =
+        case compare(remainder * 2, denominator) do
+          :lt -> quotient
+          :gt -> quotient + 1
+          :eq -> if rem(quotient, 2) == 0, do: quotient, else: quotient + 1
+        end
+
+      signed = if sign == 1, do: -rounded, else: rounded
+      signed / factor
     end
   end
 
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
+  defp compare(left, right) when left < right, do: :lt
+  defp compare(left, right) when left > right, do: :gt
+  defp compare(_left, _right), do: :eq
+
+  defp evaluator_error_limit(:infinity), do: :infinity
+  defp evaluator_error_limit(max_errors), do: max(max_errors - 1, 0)
+
+  defp enforce_error_budget!([], _max_errors, _stage), do: :ok
+  defp enforce_error_budget!(_errors, :infinity, _stage), do: :ok
+
+  defp enforce_error_budget!(errors, max_errors, stage) do
+    if length(errors) >= max_errors do
+      raise RuntimeError,
+            "#{stage} error budget exhausted: #{length(errors)} errors (maximum #{max_errors})"
+    end
+  end
+
+  defp contextualize_errors(errors, seed) do
+    Enum.map(errors, &Map.merge(%{seed: seed, stage: :evaluation}, Map.new(&1)))
+  end
+
+  defp resolve_max_errors!(nil), do: resolve_settings_max_errors!()
+  defp resolve_max_errors!(value), do: {validate_max_errors!(value), :explicit}
+
+  defp resolve_settings_max_errors! do
+    {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), :settings}
+  end
+
+  defp validate_max_errors!(value) do
+    case Imp.Evaluate.validate_max_errors(value) do
+      {:ok, max_errors} ->
+        max_errors
+
+      {:error, message} ->
+        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+    end
+  end
+
+  defp predictor_demos(program) do
+    Map.new(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
+      {name, predictor.demos}
+    end)
+  end
+
+  defp attach_report(program, report) do
+    case Imp.ProgramAccess.predict(program) do
+      nil ->
+        Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+          Imp.ProgramParameters.update_predictor(
+            acc,
+            name,
+            &Imp.Optimizer.Report.attach(&1, report)
+          )
+        end)
+
+      _predictor ->
+        Imp.Optimizer.Report.attach(program, report)
+    end
+  end
 end

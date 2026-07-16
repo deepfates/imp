@@ -41,6 +41,26 @@ defmodule OptimizerLiftArtifactTest do
     assert length(lanes["qa_paraphrase"]["selected"]["demos"]) == 1
     assert length(lanes["retrieval_knn_few_shot"]["selected"]["demos"]) == 1
     assert lanes["instruction_following_exact"]["selected"]["instructions"] != []
+
+    copro = Enum.find(artifact["rows"], &(&1["optimizer"] == "COPRO"))
+    differential = copro["dspy"]["c1_differential"]
+
+    assert differential["status"] == "passing"
+    assert differential["source"]["version"] == "3.2.1"
+
+    assert differential["source"]["commit"] ==
+             "29448ae12756abdd14bd8796c819247ebb83673c"
+
+    assert differential["runtime_identity"]["authority_manifest_verified_files"] == 296
+    assert differential["observations"]["proposal_n"] == [3]
+
+    history_order =
+      for call <- differential["observations"]["proposal_call_history"],
+          response <- call["responses"] do
+        Map.take(response, ["instruction", "prefix"])
+      end
+
+    assert differential["observations"]["proposal_order"] == history_order
   end
 
   defp tmp_dir(name) do

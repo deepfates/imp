@@ -139,6 +139,9 @@ defmodule Imp.ProgramAccess do
 
   def get_metadata(%Avatar{metadata: metadata}, key), do: Map.get(metadata, key)
 
+  def get_metadata(%{__struct__: _module, metadata: metadata}, key) when is_map(metadata),
+    do: Map.get(metadata, key)
+
   def get_metadata(program, key) do
     case predict(program) do
       %Predict{metadata: metadata} -> Map.get(metadata, key)
@@ -190,6 +193,10 @@ defmodule Imp.ProgramAccess do
 
   def put_metadata(%Avatar{metadata: metadata} = program, key, value),
     do: %{program | metadata: Map.put(metadata, key, value)}
+
+  def put_metadata(%{__struct__: _module, metadata: metadata} = program, key, value)
+      when is_map(metadata),
+      do: %{program | metadata: Map.put(metadata, key, value)}
 
   def put_metadata(program, _key, _value), do: program
 

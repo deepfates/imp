@@ -75,9 +75,10 @@ Any claim that the native search is equivalent or better therefore requires a
 recorded decision-tape differential plus T3 effectiveness evidence.
 
 DSPy's bootstrap utility hashes repeated calls and deterministically chooses an
-earlier or final call. Imp currently retains one call per predictor and chooses
-the final call. This is a declared native deviation until a cross-runtime hash
-fixture proves the exact selection rule.
+earlier or final call. Imp retains the eligible calls for each predictor and
+uses a deterministic SHA-256-derived choice. This preserves stable multi-call
+selection on the BEAM, but it is not Python's exact hash/RNG sequence. Exact
+cross-runtime sampler-sequence parity remains explicitly false.
 
 ## SIMBA Contract
 
@@ -196,8 +197,9 @@ The task validates DSPy `3.3.0b1` and all six pinned source hashes before it
 compares effective budgets, demo arms, grounded-demo rotation, released
 minibatch study numbering, categorical shape, SIMBA bucket ordering and
 percentiles, winning-history selection, rollout IDs, tied-rule handling, and
-demo-eviction invariants. Its artifact keeps exact sampler-sequence parity,
-paper-protocol completion, and full optimizer parity false.
+demo-eviction invariants. Its artifact explicitly records exact
+sampler-sequence parity, paper-protocol completion, and full optimizer parity
+as false.
 
 The source-derived implementation and local contracts do not by themselves
 prove T1, T2, or T3. The upstream fidelity row remains red when the matched DSPy
@@ -216,7 +218,7 @@ mix imp.benchmark.instruction_optimizer_experiment \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \
-  --out benchmarks/results \
+  --out benchmarks/runs/instruction-optimizer-experiment \
   --plan
 ```
 
@@ -236,7 +238,7 @@ mix imp.benchmark.instruction_optimizer_experiment \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \
-  --out benchmarks/results
+  --out benchmarks/runs/instruction-optimizer-experiment
 ```
 
 The admitted economical preflight binds Claude Haiku 4.5 to the
@@ -250,7 +252,7 @@ campaign and one all-arm DSPy campaign and refuses to merge incomplete or
 identity-mismatched artifacts.
 
 The admitted one-seed artifact is
-`benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json`.
+`benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json`.
 Both runtimes completed every arm without failures. Baseline, MIPROv2, and
 SIMBA each scored `2/3` on that runtime's frozen test split, so this establishes
 live sampled execution and accounting but not optimizer lift or T3 parity.

@@ -24,7 +24,12 @@ defmodule Mix.Tasks.Imp.Benchmark.AxContract do
       Imp.BenchmarkTruth.AxContract.run!(
         ax_package_dir: Keyword.fetch!(opts, :ax_package_dir),
         ax_tarball: Keyword.fetch!(opts, :ax_tarball),
-        output: Keyword.get(opts, :out, "benchmarks/results/ax-contract.json"),
+        output:
+          Keyword.get(
+            opts,
+            :out,
+            Path.join(Imp.BenchmarkTruth.Paths.runs("ax-contract"), "ax-contract.json")
+          ),
         allow_dirty: Keyword.get(opts, :allow_dirty, false)
       )
 

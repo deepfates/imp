@@ -290,7 +290,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
                %{
                  report
                  | status: :error,
-                   failure: failure,
+                   failure: serializable_failure(failure),
                    final_calls: final_run.dispatched,
                    reflection_calls: report.reflection_calls + final_run.dispatched
                }}
@@ -298,7 +298,8 @@ defmodule Imp.Optimizer.GEPA.ComBee do
 
         {index, reason} ->
           failure = {:combee_first_level_failed, index, reason}
-          {:error, failure, %{report | status: :error, failure: failure}}
+
+          {:error, failure, %{report | status: :error, failure: serializable_failure(failure)}}
       end
     end
   end
@@ -440,7 +441,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
     report
     |> Map.from_struct()
     |> Map.new(fn {key, value} ->
-      {Atom.to_string(key), Imp.Optimizer.Report.json_safe(value)}
+      {Atom.to_string(key), Imp.Optimizer.Report.encode_term(value)}
     end)
   end
 
@@ -450,7 +451,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
   def load_report(report) when is_map(report) do
     values =
       Map.new(report, fn {key, value} ->
-        {String.to_existing_atom(key), Imp.Optimizer.Report.restore_json_safe(value)}
+        {String.to_existing_atom(key), Imp.Optimizer.Report.decode_term(value)}
       end)
 
     struct!(Report, values)
@@ -568,10 +569,24 @@ defmodule Imp.Optimizer.GEPA.ComBee do
       other -> {:error, {:invalid_proposal, other}}
     end
   rescue
-    error -> {:error, {:proposal_exception, Exception.message(error)}}
+    error -> {:error, {:proposal_exception, error, __STACKTRACE__}}
   catch
-    kind, reason -> {:error, {:proposal_throw, kind, reason}}
+    kind, reason -> {:error, {:proposal_throw, kind, reason, __STACKTRACE__}}
   end
+
+  defp serializable_failure({:combee_first_level_failed, index, reason}),
+    do: {:combee_first_level_failed, index, serializable_failure(reason)}
+
+  defp serializable_failure({:combee_final_aggregation_failed, reason}),
+    do: {:combee_final_aggregation_failed, serializable_failure(reason)}
+
+  defp serializable_failure({:proposal_exception, exception, _stacktrace}),
+    do: {:proposal_exception, Exception.message(exception)}
+
+  defp serializable_failure({:proposal_throw, kind, reason, _stacktrace}),
+    do: {:proposal_throw, kind, reason}
+
+  defp serializable_failure(reason), do: reason
 
   defp unwrap_coordinator_result({:ok, result}), do: result
   defp unwrap_coordinator_result({:error, reason}), do: {:error, reason}
@@ -689,7 +704,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
     report
     |> Map.from_struct()
     |> Map.new(fn {key, value} ->
-      {Atom.to_string(key), Imp.Optimizer.Report.json_safe(value)}
+      {Atom.to_string(key), Imp.Optimizer.Report.encode_term(value)}
     end)
   end
 
@@ -706,7 +721,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
 
     values =
       Map.new(report, fn {key, value} ->
-        {String.to_existing_atom(key), Imp.Optimizer.Report.restore_json_safe(value)}
+        {String.to_existing_atom(key), Imp.Optimizer.Report.decode_term(value)}
       end)
 
     values =

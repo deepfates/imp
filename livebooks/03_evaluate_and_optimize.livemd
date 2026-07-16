@@ -118,11 +118,8 @@ This is the broader Imp philosophy in miniature: define an artifact, define
 how to score it, then let the system propose and evaluate changes.
 
 ```elixir
-alias Imp.Optimize.Anything
-alias Imp.Optimize.Anything.{Config, Result}
-
 result =
-  Anything.run(
+  Imp.Optimize.Anything.run(
     "mode=slow",
     fn candidate ->
       cond do
@@ -131,8 +128,7 @@ result =
         true -> 0.0
       end
     end,
-    config:
-      Config.new(
+    config: [
         engine: [max_candidate_proposals: 2, parallel: false],
         reflection: [
           custom_candidate_proposer: fn candidate, component, _records, _iteration ->
@@ -143,10 +139,10 @@ result =
               else: current <> "\nmode=fast"
           end
         ]
-      )
+    ]
   )
 
-Result.best_candidate(result)
+result
 ```
 
 ## Live Evaluation Proof
@@ -242,29 +238,25 @@ The key idea is not "make a bigger prompt." The key idea is to preserve useful
 diagnostics from failures and use them as material for the next candidate.
 
 ```elixir
-alias Imp.Optimize.Anything
-alias Imp.Optimize.Anything.{Config, Result}
-
 result =
-  Anything.run(
+  Imp.Optimize.Anything.run(
     "Base",
     fn candidate, requirement ->
       if String.contains?(candidate, requirement), do: 1.0, else: {0.0, %{feedback: requirement}}
     end,
     dataset: ["Paris", "concise"],
     valset: ["Paris"],
-    config:
-      Config.new(
+    config: [
         engine: [max_candidate_proposals: 1, parallel: false],
         reflection: [
           custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
             "Paris\nconcise"
           end
         ]
-      )
+    ]
   )
 
-Result.best_candidate(result)
+result
 ```
 
 Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs

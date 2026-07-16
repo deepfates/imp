@@ -58,7 +58,10 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
         :checkpoint,
         Path.join(
           root,
-          "benchmarks/results/multimodal-checkpoints/#{payload["campaign_id"]}.json"
+          Path.join(
+            Imp.BenchmarkTruth.Paths.checkpoints("multimodal"),
+            "#{payload["campaign_id"]}.json"
+          )
         )
       )
 

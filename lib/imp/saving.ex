@@ -15,7 +15,6 @@ defmodule Imp.Saving do
   @artifact_type "imp_program_artifact"
   @artifact_schema_version 1
   @registry_context_key {__MODULE__, :registry}
-  @sensitive_keys ~w(api_key authorization token password secret access_token client_secret private_key x_api_key)
 
   def save!(program, path, opts \\ []) do
     directory = Path.dirname(path)
@@ -80,19 +79,6 @@ defmodule Imp.Saving do
     load(payload)
   end
 
-  defp load_artifact!(
-         %{
-           "artifact_type" => "dsex_program_artifact",
-           "schema_version" => @artifact_schema_version,
-           "payload_sha256" => checksum,
-           "payload" => payload
-         } = artifact
-       ) do
-    require_keys!(artifact, ["artifact_type", "schema_version", "payload_sha256", "payload"])
-    Imp.Persistence.Legacy.verify_checksum!(payload, checksum, "legacy saved Imp artifact")
-    payload |> Imp.Persistence.Legacy.normalize() |> load()
-  end
-
   defp load_artifact!(%{"artifact_type" => @artifact_type, "schema_version" => version}) do
     raise ArgumentError, "unsupported saved Imp artifact schema version: #{inspect(version)}"
   end
@@ -125,8 +111,8 @@ defmodule Imp.Saving do
       "type" => "rag",
       "program" => dump(rag.program),
       "retriever" => dump_retriever(rag.retriever),
-      "query_field" => Imp.Optimizer.Report.json_safe(rag.query_field),
-      "context_field" => Imp.Optimizer.Report.json_safe(rag.context_field),
+      "query_field" => Imp.Optimizer.Report.encode_term(rag.query_field),
+      "context_field" => Imp.Optimizer.Report.encode_term(rag.context_field),
       "k" => rag.k,
       "hops" => rag.hops
     }
@@ -137,7 +123,7 @@ defmodule Imp.Saving do
       "type" => "program_of_thought",
       "signature" => Imp.Signature.dump(pot.signature),
       "predict" => dump(pot.predict),
-      "output_field" => Imp.Optimizer.Report.json_safe(pot.output_field)
+      "output_field" => Imp.Optimizer.Report.encode_term(pot.output_field)
     }
   end
 
@@ -145,7 +131,7 @@ defmodule Imp.Saving do
     %{
       "type" => "multi_chain_comparison",
       "predict" => dump(comparison.predict),
-      "last_key" => Imp.Optimizer.Report.json_safe(comparison.last_key),
+      "last_key" => Imp.Optimizer.Report.encode_term(comparison.last_key),
       "m" => comparison.m
     }
   end
@@ -153,9 +139,9 @@ defmodule Imp.Saving do
   defp dump_state(%Imp.Predict.KNN{} = knn) do
     %{
       "type" => "knn",
-      "examples" => Imp.Optimizer.Report.json_safe(knn.retriever.examples),
+      "examples" => Imp.Optimizer.Report.encode_term(knn.retriever.examples),
       "k" => knn.retriever.k,
-      "field" => Imp.Optimizer.Report.json_safe(knn.field)
+      "field" => Imp.Optimizer.Report.encode_term(knn.field)
     }
   end
 
@@ -204,7 +190,7 @@ defmodule Imp.Saving do
       "assertions" =>
         Enum.map(assertions.assertions, fn assertion ->
           %{
-            "name" => Imp.Optimizer.Report.json_safe(assertion.name),
+            "name" => Imp.Optimizer.Report.encode_term(assertion.name),
             "predicate" => dump_callback!(assertion.predicate, "assertion predicate"),
             "message" => assertion.message
           }
@@ -318,12 +304,12 @@ defmodule Imp.Saving do
   defp dump_state(%Imp.Agent{} = agent) do
     %{
       "type" => "agent",
-      "name" => Imp.Optimizer.Report.json_safe(agent.name),
+      "name" => Imp.Optimizer.Report.encode_term(agent.name),
       "handler" => dump_callback!(agent.handler, "agent #{agent.name} handler"),
       "tools" => dump_tools(agent.tools, "agent #{agent.name}"),
       "children" => agent.children |> Map.values() |> Enum.map(&dump/1),
-      "input_schema" => Imp.Optimizer.Report.json_safe(agent.input_schema),
-      "output_schema" => Imp.Optimizer.Report.json_safe(agent.output_schema),
+      "input_schema" => Imp.Optimizer.Report.encode_term(agent.input_schema),
+      "output_schema" => Imp.Optimizer.Report.encode_term(agent.output_schema),
       "tool_policy" => dump_tool_policy(agent.tool_policy, "agent #{agent.name} tool policy")
     }
   end
@@ -343,7 +329,7 @@ defmodule Imp.Saving do
     metadata =
       state
       |> require_map!("metadata")
-      |> Imp.Optimizer.Report.restore_json_safe()
+      |> Imp.Optimizer.Report.decode_term()
 
     opts =
       [
@@ -377,8 +363,8 @@ defmodule Imp.Saving do
     Imp.Predict.RAG.new(
       load(Map.fetch!(state, "program")),
       load_retriever!(Map.fetch!(state, "retriever")),
-      query_field: Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "query_field")),
-      context_field: Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "context_field")),
+      query_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "query_field")),
+      context_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "context_field")),
       k: Map.fetch!(state, "k"),
       hops: Map.fetch!(state, "hops")
     )
@@ -388,7 +374,7 @@ defmodule Imp.Saving do
     require_keys!(state, @program_of_thought_required_keys)
     signature = Imp.Signature.load(Map.fetch!(state, "signature"))
     predict = load(Map.fetch!(state, "predict"))
-    output_field = Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "output_field"))
+    output_field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "output_field"))
 
     %Imp.Predict.ProgramOfThought{
       signature: signature,
@@ -400,7 +386,7 @@ defmodule Imp.Saving do
   def load(%{"type" => "multi_chain_comparison"} = state) do
     require_keys!(state, ["type", "predict", "last_key", "m"])
     predict = load(Map.fetch!(state, "predict"))
-    last_key = Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "last_key"))
+    last_key = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "last_key"))
     m = Map.fetch!(state, "m")
 
     unless match?(%Imp.Predict.Predict{}, predict) and is_integer(m) and m > 0 and
@@ -413,8 +399,8 @@ defmodule Imp.Saving do
 
   def load(%{"type" => "knn"} = state) do
     require_keys!(state, ["type", "examples", "k", "field"])
-    examples = Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "examples"))
-    field = Imp.Optimizer.Report.restore_json_safe(Map.fetch!(state, "field"))
+    examples = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "examples"))
+    field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "field"))
     retriever = Imp.Retrievers.KNN.new(examples, k: Map.fetch!(state, "k"), field: field)
     %Imp.Predict.KNN{retriever: retriever, field: field}
   end
@@ -442,7 +428,7 @@ defmodule Imp.Saving do
     metadata =
       state
       |> Map.get("metadata", %{})
-      |> Imp.Optimizer.Report.restore_json_safe()
+      |> Imp.Optimizer.Report.decode_term()
       |> require_map_value!("Avatar metadata")
 
     validate_avatar_predicts!(signature, actor, finisher)
@@ -506,7 +492,7 @@ defmodule Imp.Saving do
         require_keys!(assertion, ["name", "predicate", "message"])
 
         Imp.Assertion.new(
-          Imp.Optimizer.Report.restore_json_safe(assertion["name"]),
+          Imp.Optimizer.Report.decode_term(assertion["name"]),
           load_callback!(assertion["predicate"], [1, 2], "assertion predicate"),
           message: assertion["message"]
         )
@@ -707,7 +693,7 @@ defmodule Imp.Saving do
       "tool_policy"
     ])
 
-    name = Imp.Optimizer.Report.restore_json_safe(state["name"])
+    name = Imp.Optimizer.Report.decode_term(state["name"])
 
     children =
       state
@@ -728,15 +714,13 @@ defmodule Imp.Saving do
       load_callback!(state["handler"], [2, 3], "agent #{name} handler"),
       tools: Map.values(load_tools!(state["tools"], "agent #{name}")),
       children: children,
-      input_schema: Imp.Optimizer.Report.restore_json_safe(state["input_schema"]),
-      output_schema: Imp.Optimizer.Report.restore_json_safe(state["output_schema"]),
+      input_schema: Imp.Optimizer.Report.decode_term(state["input_schema"]),
+      output_schema: Imp.Optimizer.Report.decode_term(state["output_schema"]),
       tool_policy: load_tool_policy!(state["tool_policy"], "agent #{name} tool policy")
     )
   end
 
-  def load(%{"type" => type} = state)
-      when type in ~w(imp_optimizer_trajectory dsex_optimizer_trajectory),
-      do: state |> Imp.Persistence.Legacy.normalize() |> Trajectory.load!()
+  def load(%{"type" => "imp_optimizer_trajectory"} = state), do: Trajectory.load!(state)
 
   def load(%{"type" => type}) do
     raise ArgumentError, "unsupported saved Imp program type: #{inspect(type)}"
@@ -821,7 +805,9 @@ defmodule Imp.Saving do
   end
 
   defp redact_config_entries(entries) when is_list(entries) do
-    Enum.map(entries, fn
+    entries
+    |> Imp.Redaction.drop_credentials()
+    |> Enum.map(fn
       [key, value] ->
         value = redact_config_entries(value)
         redacted = redact_dump(%{key => value})
@@ -841,7 +827,8 @@ defmodule Imp.Saving do
 
   defp dump_portable_value!(value, context) do
     value
-    |> Imp.Optimizer.Report.json_safe()
+    |> Imp.Redaction.redact()
+    |> Imp.Optimizer.Report.encode_term()
     |> redact_dump()
     |> require_portable_json!(context)
   end
@@ -867,17 +854,43 @@ defmodule Imp.Saving do
     raise ArgumentError, "portable playbook persistence requires reject_secrets: true"
   end
 
-  defp redact_dump(%{provider: :req_llm, model: model} = value) do
-    Map.new(value, fn
-      {:model, _nested} -> {:model, redact_req_llm_model(model)}
+  defp redact_dump(%{"__imp_type__" => "map", "entries" => entries} = value)
+       when is_list(entries) do
+    entries =
+      Enum.map(entries, fn
+        [encoded_key, nested] ->
+          case json_safe_key_name(encoded_key) do
+            {:ok, key} when is_atom(key) or is_binary(key) ->
+              if Imp.Redaction.credential_entry?(key, nested),
+                do: [encoded_key, "[REDACTED]"],
+                else: [redact_dump(encoded_key), redact_dump(nested)]
+
+            :error ->
+              [redact_dump(encoded_key), redact_dump(nested)]
+          end
+
+        nested ->
+          redact_dump(nested)
+      end)
+
+    Map.put(value, "entries", entries)
+  end
+
+  defp redact_dump(%{provider: :req_llm, model: _model} = value) do
+    value
+    |> Imp.Redaction.drop_credentials()
+    |> Map.new(fn
+      {:model, nested} -> {:model, redact_req_llm_model(nested)}
       {key, nested} -> redact_req_llm_entry(key, nested)
     end)
   end
 
-  defp redact_dump(%{"provider" => provider, "model" => model} = value)
+  defp redact_dump(%{"provider" => provider, "model" => _model} = value)
        when provider in ["req_llm", :req_llm] do
-    Map.new(value, fn
-      {"model", _nested} -> {"model", redact_req_llm_model(model)}
+    value
+    |> Imp.Redaction.drop_credentials()
+    |> Map.new(fn
+      {"model", nested} -> {"model", redact_req_llm_model(nested)}
       {key, nested} -> redact_req_llm_entry(key, nested)
     end)
   end
@@ -886,24 +899,44 @@ defmodule Imp.Saving do
     Map.new(value, fn {key, nested} ->
       cond do
         to_string(key) == "schema" -> {key, Imp.Redaction.redact(nested, [])}
-        sensitive_key?(key) -> {key, "[REDACTED]"}
+        Imp.Redaction.credential_entry?(key, nested) -> {key, "[REDACTED]"}
         true -> {key, redact_dump(nested)}
       end
     end)
   end
 
+  defp redact_dump([key, value]) when is_atom(key) or is_binary(key) or is_map(key) do
+    if Imp.Redaction.credential_entry?(key, value),
+      do: [key, "[REDACTED]"],
+      else: [key, redact_dump(value)]
+  end
+
   defp redact_dump(value) when is_list(value), do: Enum.map(value, &redact_dump/1)
+
+  defp redact_dump({key, value}) when is_atom(key) or is_binary(key) do
+    if Imp.Redaction.credential_entry?(key, value),
+      do: [key, "[REDACTED]"],
+      else: [key, redact_dump(value)]
+  end
+
+  defp redact_dump(value) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map(&redact_dump/1)
+  end
+
   defp redact_dump(value) when is_binary(value), do: Imp.Redaction.redact(value, [])
   defp redact_dump(value), do: value
 
   defp redact_req_llm_model(model) when is_binary(model), do: model
 
   defp redact_req_llm_model(model) when is_map(model) do
-    Map.new(model, fn {key, value} ->
+    model
+    |> Imp.Redaction.drop_credentials()
+    |> Map.new(fn {key, value} ->
       normalized = key |> to_string() |> String.downcase()
 
       cond do
-        sensitive_key?(key) -> {key, "[REDACTED]"}
         normalized in ["id", "model"] and is_binary(value) -> {key, value}
         true -> {key, redact_dump(value)}
       end
@@ -913,16 +946,17 @@ defmodule Imp.Saving do
   defp redact_req_llm_model(model), do: redact_dump(model)
 
   defp redact_req_llm_entry(key, value) do
-    if sensitive_key?(key), do: {key, "[REDACTED]"}, else: {key, redact_dump(value)}
+    if Imp.Redaction.credential_entry?(key, value),
+      do: {key, "[REDACTED]"},
+      else: {key, redact_dump(value)}
   end
 
-  defp sensitive_key?(key) do
-    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
+  defp json_safe_key_name(%{"__imp_type__" => "atom", "value" => value})
+       when is_binary(value),
+       do: {:ok, value}
 
-    Enum.any?(@sensitive_keys, fn sensitive ->
-      normalized == sensitive or String.ends_with?(normalized, "_#{sensitive}")
-    end)
-  end
+  defp json_safe_key_name(value) when is_binary(value), do: {:ok, value}
+  defp json_safe_key_name(_value), do: :error
 
   defp dump_portable_signature!(signature, context) do
     signature
@@ -958,9 +992,9 @@ defmodule Imp.Saving do
     |> Enum.sort_by(&to_string(&1.name))
     |> Enum.map(fn tool ->
       %{
-        "name" => Imp.Optimizer.Report.json_safe(tool.name),
+        "name" => Imp.Optimizer.Report.encode_term(tool.name),
         "description" => tool.description,
-        "schema" => Imp.Optimizer.Report.json_safe(tool.schema),
+        "schema" => Imp.Optimizer.Report.encode_term(tool.schema),
         "runner" => dump_callback!(tool.run, "#{context} tool #{tool.name}")
       }
     end)
@@ -970,13 +1004,13 @@ defmodule Imp.Saving do
     states
     |> Enum.map(fn state ->
       require_keys!(state, ["name", "description", "schema", "runner"])
-      name = Imp.Optimizer.Report.restore_json_safe(state["name"])
+      name = Imp.Optimizer.Report.decode_term(state["name"])
 
       Imp.Tool.new(
         name,
         state["description"],
         load_callback!(state["runner"], 1, "#{context} tool #{name}"),
-        schema: Imp.Optimizer.Report.restore_json_safe(state["schema"])
+        schema: Imp.Optimizer.Report.decode_term(state["schema"])
       )
     end)
     |> Imp.Tool.index_tools!("saved #{context}")
@@ -987,7 +1021,7 @@ defmodule Imp.Saving do
   end
 
   defp dump_tool_policy(policy, _context) when not is_function(policy),
-    do: Imp.Optimizer.Report.json_safe(policy)
+    do: Imp.Optimizer.Report.encode_term(policy)
 
   defp dump_tool_policy(policy, context),
     do: %{"registry_callback" => dump_callback!(policy, context)}
@@ -996,7 +1030,7 @@ defmodule Imp.Saving do
     do: load_callback!(name, 2, context)
 
   defp load_tool_policy!(policy, context) do
-    policy = Imp.Optimizer.Report.restore_json_safe(policy)
+    policy = Imp.Optimizer.Report.decode_term(policy)
 
     case Imp.ToolPolicy.validate(policy) do
       {:ok, policy} -> policy
@@ -1156,15 +1190,20 @@ defmodule Imp.Saving do
   end
 
   defp decode_config(config) when is_list(config) do
-    Enum.map(config, fn
+    config
+    |> Imp.Redaction.drop_credentials()
+    |> Enum.map(fn
       {k, v} -> {decode_config_key(k), decode_config_value(k, v)}
       [k, v] -> {decode_config_key(k), decode_config_value(k, v)}
       other -> raise ArgumentError, "invalid saved Imp config entry: #{inspect(other)}"
     end)
   end
 
-  defp decode_config(config) when is_map(config),
-    do: Enum.map(config, fn {k, v} -> {decode_config_key(k), decode_config_value(k, v)} end)
+  defp decode_config(config) when is_map(config) do
+    config
+    |> Imp.Redaction.drop_credentials()
+    |> Enum.map(fn {k, v} -> {decode_config_key(k), decode_config_value(k, v)} end)
+  end
 
   defp decode_config(config) do
     raise ArgumentError, "saved Imp config must be a map or list, got: #{inspect(config)}"
@@ -1173,6 +1212,17 @@ defmodule Imp.Saving do
   defp decode_config_value(key, value)
        when key in [:provider_options, "provider_options"] and is_list(value),
        do: decode_config(value)
+
+  defp decode_config_value(key, value)
+       when key in [:headers, "headers"] and is_list(value) do
+    value
+    |> Imp.Redaction.drop_credentials()
+    |> Enum.map(fn
+      {header, header_value} -> {header, header_value}
+      [header, header_value] -> {header, header_value}
+      other -> raise ArgumentError, "invalid saved ReqLLM header: #{inspect(other)}"
+    end)
+  end
 
   defp decode_config_value(_key, value), do: value
 
@@ -1234,13 +1284,14 @@ defmodule Imp.Saving do
   end
 
   defp decode_req_llm!(model, opts) do
+    model = Imp.Redaction.drop_credentials(model)
     Imp.Clients.ReqLLM.new(model, opts: decode_config(opts))
   end
 
   defp dump_retriever(%Imp.Retrieve.Memory{} = retriever) do
     %{
       "type" => "memory",
-      "docs" => Imp.Optimizer.Report.json_safe(retriever.docs),
+      "docs" => Imp.Optimizer.Report.encode_term(retriever.docs),
       "k" => retriever.k
     }
   end
@@ -1252,7 +1303,7 @@ defmodule Imp.Saving do
 
   defp load_retriever!(%{"type" => "memory"} = state) do
     Imp.Retrieve.Memory.new(
-      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.restore_json_safe(),
+      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.decode_term(),
       k: Map.fetch!(state, "k")
     )
   end
@@ -1328,7 +1379,9 @@ defmodule Imp.Saving do
       "rollout_id" -> :rollout_id
       "native_json_schema" -> :native_json_schema
       "provider_options" -> :provider_options
+      "headers" -> :headers
       "base_url" -> :base_url
+      "request_id" -> :request_id
       other -> other
     end
   end
@@ -1361,7 +1414,7 @@ defmodule Imp.Saving do
   end
 
   defp load_demo!(%{"__imp_type__" => "example"} = demo) do
-    case Imp.Optimizer.Report.restore_json_safe(demo) do
+    case Imp.Optimizer.Report.decode_term(demo) do
       %Imp.Example{} = example ->
         example
 

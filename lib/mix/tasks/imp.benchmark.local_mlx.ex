@@ -32,7 +32,11 @@ defmodule Mix.Tasks.Imp.Benchmark.LocalMlx do
           Keyword.get(opts, :dataset, "benchmarks/data/provider-training-banking77-v1.json"),
         root: root,
         artifact:
-          Keyword.get(opts, :artifact, "benchmarks/results/local-mlx/local-mlx-#{stamp}.json"),
+          Keyword.get(
+            opts,
+            :artifact,
+            Path.join(Imp.BenchmarkTruth.Paths.runs("local-mlx"), "local-mlx-#{stamp}.json")
+          ),
         model_path: Keyword.get(opts, :model_path),
         executable: Keyword.get(opts, :executable, "uvx"),
         port: Keyword.get(opts, :port, 18_821),

@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_PATH = ROOT / "benchmarks" / "upstream_authority_registry.json"
+REGISTRY_PATH = ROOT / "benchmarks" / "authorities.json"
 
 
 @contextmanager
@@ -50,11 +50,11 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
         with fake_dspy_modules():
             cls.dspy_contract = runpy.run_path(str(ROOT / "scripts" / "dspy_instruction_optimizer_contract.py"))
         cls.gepa_contract = runpy.run_path(str(ROOT / "scripts" / "gepa_v011_contract.py"))
-        cls.registry = json.loads(REGISTRY_PATH.read_text())
+        cls.registry = cls.dspy_contract["UPSTREAM_REGISTRY"]
 
     def test_both_contracts_resolve_pins_from_script_relative_registry(self):
         dspy = self.registry["authorities"]["dspy_instruction_optimizers"]
-        gepa = self.registry["authorities"]["gepa_standalone"]
+        gepa = self.registry["authorities"]["gepa_v0_1_1_contract"]
 
         self.assertEqual(self.dspy_contract["REGISTRY_PATH"], REGISTRY_PATH)
         self.assertEqual(self.dspy_contract["EXPECTED_VERSION"], dspy["version"])
@@ -69,9 +69,16 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
         for contract in (self.dspy_contract, self.gepa_contract):
             drifted = json.loads(REGISTRY_PATH.read_text())
             authority_id = drifted["contracts"][contract["CONTRACT_ID"]]["authority"]
-            source = next(iter(drifted["authorities"][authority_id]["source_hashes"]))
-            actual_hashes = dict(drifted["authorities"][authority_id]["source_hashes"])
-            drifted["authorities"][authority_id]["source_hashes"][source] = "0" * 64
+            authority = contract["AUTHORITY"]
+            source = next(iter(authority["source_hashes"]))
+            actual_hashes = dict(authority["source_hashes"])
+            pinned = drifted["pinned_sources"][authority_id]
+            if "source_hashes" in pinned:
+                pinned["source_hashes"][source] = "0" * 64
+            else:
+                next(entry for entry in pinned["files"] if entry["path"] == source)[
+                    "sha256"
+                ] = "0" * 64
 
             with tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / "registry.json"
@@ -90,7 +97,7 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
 
     def test_both_contracts_reject_incomplete_registry(self):
         incomplete = json.loads(REGISTRY_PATH.read_text())
-        del incomplete["authorities"]["req_llm"]
+        del incomplete["pinned_sources"]["req_llm"]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "registry.json"
             path.write_text(json.dumps(incomplete))

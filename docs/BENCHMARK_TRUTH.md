@@ -74,7 +74,7 @@ small fixtures only when they are needed for deterministic tests.
 mix imp.benchmark.integrity \
   --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl \
   --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl \
-  --out benchmarks/results \
+  --out benchmarks/runs/integrity \
   --require-clean
 ```
 
@@ -209,6 +209,38 @@ DSPy `3.3.0b1`. It validates exact source hashes and compares MIPROv2 budgets,
 demo topology, proposal rotation, search-space shape, and full-evaluation cadence
 plus SIMBA bucket, finalist, rollout, tied-rule, and eviction invariants.
 
+The COPRO row in the lift artifact also carries a separate pinned, provider-free
+process differential against the stable authority, DSPy `3.2.1` at commit
+`29448ae12756abdd14bd8796c819247ebb83673c`. Prepare an absent environment with:
+
+```sh
+git clone https://github.com/stanfordnlp/dspy.git tmp/dspy-3.2.1
+git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c
+IMP_DSPY_VENV=tmp/dspy-parity-venv scripts/setup_dspy_parity_env.sh
+```
+
+Then run the focused fixture with:
+
+```sh
+PYTHONPATH=tmp/dspy-3.2.1 \
+  tmp/dspy-parity-venv/bin/python scripts/dspy_copro_isolation_differential.py
+```
+
+That fixture starts COPRO in a fresh worker process after installing mutable parent
+LM state. It verifies the canonical authority ledger, clean release commit/tag,
+all 296 source-manifest files, distribution version, COPRO source, and upstream
+test before binding fixture/script hashes. Proposal fan-out and order come from
+the isolated DSPy LM's actual call history and parsed response choices, independent
+of the expected-order assertion. The artifact records the tagged source's known
+`dspy.__version__ == "3.2.0"` metadata anomaly separately from the authoritative
+3.2.1 distribution/git identity. It also directly observes evaluation order and
+equal-score duplicate removal. First-record retention is separately source-supported
+by the pinned COPRO implementation's greater-than-or-equal score guard rather than
+claimed as an independently observable artifact result. The fixture also covers
+pinned `results_latest`/`results_best` statistics. This is narrow C1 behavioral
+evidence only: it does not claim exact Python RNG parity, provider behavior,
+effectiveness, or full optimizer parity.
+
 Run the resumable, paid one-seed AIME preflight from the shared Imp/DSPy
 manifest with:
 
@@ -218,7 +250,7 @@ mix imp.benchmark.instruction_optimizer_experiment \
   --runtime both \
   --python tmp/dspy-parity-venv/bin/python \
   --dspy-pythonpath tmp/dspy-current-target \
-  --out benchmarks/results
+  --out benchmarks/runs/instruction-optimizer-experiment
 ```
 
 This command pins DSPy and Optuna, verifies immutable split hashes, maps the
@@ -264,7 +296,7 @@ mix imp.benchmark.optimize_anything \
   --model gpt-5.4-2026-03-05 \
   --seeds 17,23,31 \
   --max-proposals 5 \
-  --out benchmarks/results
+  --out benchmarks/runs/optimize-anything
 ```
 
 The full lane optimizes three executable artifact classes: an Elixir retry
@@ -376,8 +408,8 @@ mix imp.benchmark.gepa_campaign \
 
 mix imp.benchmark.gepa_replication \
   --from-gepa-artifact path/to/gepa-artifact/experiment_runs_data \
-  --upstream-evidence benchmarks/results/gepa-upstream-evidence.json \
-  --imp-input benchmarks/results/imp-gepa-rows-*.json \
+  --upstream-evidence benchmarks/runs/gepa-replication/gepa-upstream-evidence.json \
+  --imp-input benchmarks/runs/gepa-campaign/imp-gepa-rows-*.json \
   --campaign-id gepa-full-YYYYMMDD \
   --artifact-model gpt-41-mini
 ```
@@ -423,7 +455,7 @@ python3 scripts/extract_gepa_upstream_evidence.py \
   path/to/experiment_runs_data.tar.gz \
   --upstream-repo path/to/gepa-artifact \
   --model gpt-41-mini \
-  --out benchmarks/results/gepa-upstream-evidence.json
+  --out benchmarks/runs/gepa-replication/gepa-upstream-evidence.json
 ```
 
 The extractor requires the six family/program pairs above and the `Baseline`,
@@ -535,7 +567,7 @@ mix imp.benchmark.rag_tool_agent \
   --dspy-model anthropic/claude-haiku-4-5-20251001 \
   --env-file .env \
   --python tmp/dspy-parity-venv/bin/python \
-  --out benchmarks/results/rag-tool-agent-live
+  --out benchmarks/runs/rag-tool-agent
 ```
 
 Live mode adds one retrieval-conditioned answer and one ReAct lookup row under
@@ -549,13 +581,14 @@ HTTP MCP JSON-RPC server. `full_rag_tool_agent_parity` remains false unless all
 provider-free and live rows pass. Quota or provider errors are retained as
 failed evidence, never converted into missing or passing rows.
 
-The admitted revision-bound run is
-`benchmarks/results/rag-tool-agent-live/rag-tool-agent-parity-haiku45-7105b5e-20260715.json`.
-It binds the runner to commit `7105b5e63d326a0cdae5086ed9ff91d56c41ca4d`,
+The tracked pre-cutover run under `benchmarks/results/rag-tool-agent-live/`
+binds the runner to commit `7105b5e63d326a0cdae5086ed9ff91d56c41ca4d`,
 uses `claude-haiku-4-5-20251001` over Anthropic Messages on both runtimes, and
 passes 15/15 rows. The two matched live rows record exact answers and traces,
-complete provider usage, and about $0.0076 total cost. This establishes bounded
-production behavior, not research-scale retrieval or tool-use quality.
+complete provider usage, and about $0.0076 total cost. It is historical evidence
+for that revision, not current-release admission or research-scale retrieval or
+tool-use quality. Fresh candidates are written under
+`benchmarks/runs/rag-tool-agent/`.
 
 ## Run RLM Benchmark Parity
 
@@ -594,7 +627,7 @@ OPENAI_API_KEY=... OPENAI_MODEL=... mix benchmark.live.check
 ```
 
 This fetches two fresh rows from GSM8K and HotPotQA, runs Imp programs against
-a live provider, and writes a result artifact under `benchmarks/results/`.
+a live provider, and writes a run artifact under `benchmarks/runs/benchmark/`.
 
 ## Run Imp vs DSPy Parity
 
@@ -950,7 +983,7 @@ Aggregate chunk artifacts into a campaign report:
 mix imp.benchmark.parity.aggregate \
   --provider req_llm \
   --model "$CURRENT_LOW_COST_MODEL" \
-  --in "benchmarks/results/imp-dspy-parity-${CURRENT_LOW_COST_MODEL}-*.json" \
+  --in "benchmarks/runs/parity/imp-dspy-parity-${CURRENT_LOW_COST_MODEL}-*.json" \
   --max-concurrency 8
 ```
 

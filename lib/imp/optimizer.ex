@@ -13,6 +13,21 @@ defmodule Imp.Optimizer.TrainingResult do
         }
 end
 
+defmodule Imp.Optimizer.TrainingError do
+  @moduledoc "Terminal training failure with the unrebound program and provider diagnostics."
+
+  @enforce_keys [:reason, :program]
+  defstruct [:reason, :program, :job, status: :failed, metadata: %{}]
+
+  @type t :: %__MODULE__{
+          reason: term(),
+          program: struct(),
+          job: term() | nil,
+          status: atom() | {:unknown, String.t()},
+          metadata: map()
+        }
+end
+
 defmodule Imp.Optimizer do
   @moduledoc """
   Canonical execution contract for program and training optimizers.
@@ -78,6 +93,22 @@ defmodule Imp.Optimizer do
   end
 
   def run(_optimizer, _program, opts, _expected_kind),
+    do: {:error, {:invalid_optimizer_options, opts}}
+
+  @doc false
+  @spec run_resolved(struct(), term(), keyword(), capabilities()) ::
+          {:ok, term()} | {:error, term()}
+  def run_resolved(optimizer, program, opts, capabilities) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      with :ok <- validate_capabilities(capabilities) do
+        execute(optimizer, program, opts, capabilities)
+      end
+    else
+      {:error, {:invalid_optimizer_options, opts}}
+    end
+  end
+
+  def run_resolved(_optimizer, _program, opts, _capabilities),
     do: {:error, {:invalid_optimizer_options, opts}}
 
   @doc "Runs an optimizer once against the named datasets available to a composed workflow."

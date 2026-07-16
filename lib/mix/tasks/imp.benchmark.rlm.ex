@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
   @shortdoc "Run RLM benchmark parity evidence"
 
   @default_data "test/fixtures/benchmarks/hotpotqa-small.jsonl"
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("rlm")
 
   @impl true
   def run(args) do
@@ -391,7 +391,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
   end
 
   defp normalize(value) do
-    value = Imp.Optimizer.Report.json_safe(value)
+    value = Imp.Optimizer.Report.encode_term(value)
     Jason.encode!(value)
     value
   rescue

@@ -93,7 +93,7 @@ defmodule Imp.Optimize.Anything.BestOutputWriter do
         score: score,
         output: output
       }
-      |> Report.json_safe()
+      |> Report.json_projection()
       |> Jason.encode!(pretty: true)
 
     temporary = path <> ".tmp-#{System.unique_integer([:positive])}"

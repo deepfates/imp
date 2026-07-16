@@ -43,7 +43,7 @@
   },
   "source_commits": {
     "dspy": "stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
-    "dsex": "resolved from campaign git_sha",
+    "imp": "resolved from campaign git_sha",
     "gepa_artifact": "gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
   }
 }

@@ -20,7 +20,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
 
   use Mix.Task
 
-  alias Imp.BenchmarkTruth.ParitySidecar
+  alias Imp.BenchmarkTruth.{ArtifactFile, ParitySidecar}
 
   @shortdoc "Run Imp-vs-DSPy live parity comparison"
   @full_lengths %{"gsm8k" => 1319, "hotpotqa" => 7405}
@@ -45,7 +45,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
     api_key_env = api_key_env(opts)
     api_key = System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
     models = models(opts, api_key)
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("parity"))
     max_examples = Keyword.get(opts, :max_examples, 20)
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     generation_opts = generation_opts(opts)
@@ -167,12 +167,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
     report = parity_report(imp.report, dspy, generation_opts, campaign_id, runner_order)
 
     out_path =
-      Path.join(
+      ArtifactFile.write_json_in!(
         out_dir,
-        "imp-dspy-parity-#{model_slug(model)}-vs-#{model_slug(dspy_model)}-#{timestamp_slug()}.json"
+        ArtifactFile.artifact_name("imp-dspy-parity", [model, dspy_model]),
+        report
       )
-
-    File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
 
     Mix.shell().info("imp report: #{imp.out_path}")
     Mix.shell().info("dspy report: #{dspy_path}")
@@ -1027,13 +1026,4 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
       _other -> nil
     end
   end
-
-  defp timestamp_slug do
-    DateTime.utc_now()
-    |> DateTime.truncate(:second)
-    |> DateTime.to_iso8601()
-    |> String.replace(~r/[^0-9A-Za-z]/, "")
-  end
-
-  defp model_slug(model), do: String.replace(model, ~r/[^0-9A-Za-z_.-]/, "_")
 end

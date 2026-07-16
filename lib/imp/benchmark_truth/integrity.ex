@@ -4,7 +4,7 @@ defmodule Imp.BenchmarkTruth.Integrity do
   @type task_name :: :gsm8k | :hotpotqa
 
   def check(tasks, opts \\ []) do
-    out_dir = Keyword.get(opts, :out_dir, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out_dir, Imp.BenchmarkTruth.Paths.runs("integrity"))
     File.mkdir_p!(out_dir)
 
     task_results =

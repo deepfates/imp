@@ -100,7 +100,7 @@
       "[[ ## next_thought ## ]]\nThe lookup result is enough.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
       "[[ ## reasoning ## ]]\nThe lookup observation says Paris.\n[[ ## answer ## ]]\nParis"
     ],
-    "dsex_responses": [
+    "imp_responses": [
       {
         "tool_calls": [
           {
@@ -135,7 +135,7 @@
       }
     ],
     "intentional_deviations": [
-      "DSPy 2.6 ReAct represents actions with next_tool_name/next_tool_args fields and a finish control tool followed by extraction; DSEx ReAct uses provider function-tool calls with a reserved submit tool. This fixture asserts normalized external tool trajectory and final output parity."
+      "DSPy 2.6 ReAct represents actions with next_tool_name/next_tool_args fields and a finish control tool followed by extraction; Imp ReAct uses provider function-tool calls with a reserved submit tool. This fixture asserts normalized external tool trajectory and final output parity."
     ]
   },
   {
@@ -192,7 +192,7 @@
       "[[ ## next_thought ## ]]\nNow finish.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
       "[[ ## reasoning ## ]]\nLookup returned Paris and uppercase returned PARIS.\n[[ ## answer ## ]]\nPARIS"
     ],
-    "dsex_responses": [
+    "imp_responses": [
       {
         "tool_calls": [
           {
@@ -240,7 +240,7 @@
       }
     ],
     "intentional_deviations": [
-      "DSPy ReAct emits one tool action per iteration; DSEx can execute multiple provider tool calls from one assistant turn. This fixture asserts normalized external tool order and final output parity."
+      "DSPy ReAct emits one tool action per iteration; Imp can execute multiple provider tool calls from one assistant turn. This fixture asserts normalized external tool order and final output parity."
     ]
   },
   {
@@ -276,7 +276,7 @@
     "responses": [
       "[[ ## next_thought ## ]]\nTry the lookup.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"unknown-fact\"}"
     ],
-    "dsex_responses": [
+    "imp_responses": [
       {
         "tool_calls": [
           {
@@ -290,7 +290,7 @@
     ],
     "expected_status": "error",
     "intentional_deviations": [
-      "DSPy records tool failure as trajectory pressure and exhausts the fixture queue here; DSEx raises the tool error immediately. This fixture asserts shared error status and retains both error traces for review."
+      "DSPy records tool failure as trajectory pressure and exhausts the fixture queue here; Imp raises the tool error immediately. This fixture asserts shared error status and retains both error traces for review."
     ]
   },
   {
@@ -309,7 +309,7 @@
     "expected_status": "error",
     "expected_error_contains": "score",
     "intentional_deviations": [
-      "Both DSPy and DSEx retry ChatAdapter parse failure through JSON-style output handling; this fixture deliberately gives the retry another incomplete response, so shared error status and trace retention are asserted."
+      "Both DSPy and Imp retry ChatAdapter parse failure through JSON-style output handling; this fixture deliberately gives the retry another incomplete response, so shared error status and trace retention are asserted."
     ]
   }
 ]

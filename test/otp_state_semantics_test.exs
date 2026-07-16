@@ -137,6 +137,52 @@ defmodule OTPStateSemanticsTest do
     end
   end
 
+  test "max_errors defaults to ten and settings reject unresolved values" do
+    assert Imp.settings().max_errors == 10
+
+    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+      Imp.configure(max_errors: -1)
+    end
+
+    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+      Imp.context([max_errors: nil], fn -> :ok end)
+    end
+
+    assert Imp.settings().max_errors == 10
+    assert Imp.context([max_errors: 0], fn -> Imp.settings().max_errors end) == 0
+    assert Imp.context([max_errors: :infinity], fn -> Imp.settings().max_errors end) == :infinity
+  end
+
+  test "known string setting keys canonicalize safely and reject mixed-form collisions" do
+    Imp.configure(%{"max_errors" => 4, "async_max_workers" => 3})
+
+    assert Imp.settings().max_errors == 4
+    assert Imp.settings().async_max_workers == 3
+    refute Map.has_key?(Imp.settings(), "max_errors")
+    refute Map.has_key?(Imp.settings(), "async_max_workers")
+
+    assert Imp.context(%{"max_errors" => :infinity, "lm" => :string_lm}, fn ->
+             {Imp.settings().max_errors, Imp.settings().lm}
+           end) == {:infinity, :string_lm}
+
+    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+      Imp.configure(%{"max_errors" => -1})
+    end
+
+    colliding = Map.put(%{"max_errors" => 5}, :max_errors, 6)
+
+    assert_raise ArgumentError, ~r/colliding setting keys/, fn ->
+      Imp.configure(colliding)
+    end
+
+    unknown = "untrusted_setting_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
+
+    Imp.configure(%{unknown => :preserved})
+    assert Imp.settings()[unknown] == :preserved
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
+  end
+
   test "supervisor restarts settings with defaults after a crash" do
     Imp.configure(lm: :temporary)
     old = Process.whereis(Imp.Settings)

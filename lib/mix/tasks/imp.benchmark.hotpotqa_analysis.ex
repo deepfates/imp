@@ -31,8 +31,14 @@ defmodule Mix.Tasks.Imp.Benchmark.HotpotqaAnalysis do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
-    input_glob = Keyword.get(opts, :in, "benchmarks/results/imp-dspy-parity-*.json")
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    input_glob =
+      Keyword.get(
+        opts,
+        :in,
+        Path.join(Imp.BenchmarkTruth.Paths.runs("parity"), "imp-dspy-parity-*.json")
+      )
+
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("hotpotqa-analysis"))
     campaign_id = Keyword.get(opts, :campaign_id) || Mix.raise("--campaign-id is required")
     hotpotqa_path = Keyword.get(opts, :hotpotqa) || Mix.raise("--hotpotqa is required")
 

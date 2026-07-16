@@ -18,8 +18,8 @@ defmodule Imp.Predict.RLM.Runtime do
     %{runtime | inputs: Map.put(runtime.inputs, key, value)}
   end
 
-  def observe_recursion(%__MODULE__{} = runtime, depth, trace \\ []) do
-    event = %{action: :recurse, depth: depth, trace: trace}
+  def observe_recursion(%__MODULE__{} = runtime, depth, trace \\ [], action \\ :recurse) do
+    event = %{action: action, depth: depth, trace: trace}
 
     %{
       runtime

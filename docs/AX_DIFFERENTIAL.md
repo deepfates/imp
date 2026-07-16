@@ -30,7 +30,7 @@ Run the clean provider-free differential from the repository root:
 mix imp.benchmark.ax_contract \
   --ax-package-dir /tmp/imp-ax-23/package \
   --ax-tarball /tmp/imp-ax-23/ax-llm-ax-23.0.0.tgz \
-  --out benchmarks/results/ax-contract.json
+  --out benchmarks/runs/ax-contract/ax-contract.json
 ```
 
 The sidecar makes no provider or network calls. The Mix task verifies the npm

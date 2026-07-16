@@ -4,7 +4,7 @@
   "family": "AIMEBench",
   "model": {
     "logical": "gpt-4.1-mini-2025-04-14",
-    "dsex": "openai:gpt-4.1-mini-2025-04-14",
+    "imp": "openai:gpt-4.1-mini-2025-04-14",
     "dspy": "openai/gpt-4.1-mini-2025-04-14"
   },
   "seed": 17,
@@ -89,6 +89,6 @@
   },
   "source_commits": {
     "dspy": "https://github.com/stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
-    "dsex": "resolved from campaign git_sha"
+    "imp": "resolved from campaign git_sha"
   }
 }

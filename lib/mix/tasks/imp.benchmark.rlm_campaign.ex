@@ -5,7 +5,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmCampaign do
       mix imp.benchmark.rlm_campaign --plan
       mix imp.benchmark.rlm_campaign --plan --family oolong --approach direct,rlm --runtime both --row-limit 1
       mix imp.benchmark.rlm_campaign --dry-run --manifest benchmarks/config/rlm-paper-protocol-v3.json
-      mix imp.benchmark.rlm_campaign --runtime both --out benchmarks/results
+      mix imp.benchmark.rlm_campaign --runtime both --out benchmarks/runs/rlm-campaign
 
   `--plan` emits exact jobs for selected pinned families and performs no
   provider calls. `--dry-run` also performs no provider calls. Execution is
@@ -73,9 +73,13 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmCampaign do
             manifest_path,
             campaign_opts ++
               [
-                out: Keyword.get(opts, :out, "benchmarks/results"),
+                out: Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("rlm-campaign")),
                 checkpoint_dir:
-                  Keyword.get(opts, :checkpoint_dir, "benchmarks/results/rlm-checkpoints"),
+                  Keyword.get(
+                    opts,
+                    :checkpoint_dir,
+                    Imp.BenchmarkTruth.Paths.checkpoints("rlm-campaign")
+                  ),
                 python: Keyword.get(opts, :python, default_python())
               ]
           )

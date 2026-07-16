@@ -420,7 +420,7 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
       |> Engine.dump_state()
       |> json_round_trip()
 
-    assert checkpoint["schema_version"] == 4
+    assert checkpoint["schema_version"] == 7
     assert checkpoint["combee_policy"]["effective_batch_size"] == 2
 
     resumed =

@@ -145,7 +145,7 @@ defmodule Imp.Optimizer.Playbook do
 
   @doc "Proposes, evaluates, and transactionally promotes one playbook delta."
   @spec compile(t(), struct(), [row()], [row()], [row()], keyword()) ::
-          {:ok, Result.t()} | {:error, term()}
+          {:ok, struct()} | {:error, term()}
   def compile(%__MODULE__{} = optimizer, program, trainset, promotionset, auditset, opts \\ []) do
     with {:ok, optimizer, opts} <- apply_runtime_options(optimizer, opts),
          :ok <- validate_compile_options(opts),
@@ -166,7 +166,7 @@ defmodule Imp.Optimizer.Playbook do
   end
 
   @doc "Restores a completed checkpoint against fresh runtime-bound program callbacks."
-  @spec restore(map(), struct(), ProgramParameters.name()) :: {:ok, Result.t()} | {:error, term()}
+  @spec restore(map(), struct(), ProgramParameters.name()) :: {:ok, struct()} | {:error, term()}
   def restore(checkpoint, program, parameter \\ :playbook) do
     with {:ok, payload} <- verify_checkpoint(checkpoint),
          "complete" <- payload["status"],
@@ -185,7 +185,7 @@ defmodule Imp.Optimizer.Playbook do
   end
 
   @doc "Returns the exact pre-promotion program preserved by a result."
-  @spec rollback(Result.t()) :: struct()
+  @spec rollback(struct()) :: struct()
   def rollback(%Result{
         baseline_program: program,
         baseline_playbook: baseline,

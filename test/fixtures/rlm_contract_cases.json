@@ -150,11 +150,11 @@
       "expected": {"status": "submitted", "output": "trace-kept", "subcalls": 0, "trace_shape": {"entries": 3, "output_contains": ["phase-one", "trace-kept", "FINAL:"]}}
     },
     {
-      "id": "dsex_symbolic_recurse_extension",
-      "invariant": "DSEx exposes an explicit symbolic recurse/2 helper; current DSPy RLM exposes llm_query tools but no recurse helper.",
+      "id": "imp_symbolic_recurse_extension",
+      "invariant": "Imp exposes an explicit symbolic recurse/2 helper; current DSPy RLM exposes llm_query tools but no recurse helper.",
       "disposition": "deviation",
       "required": false,
-      "deviation": "Declared DSEx extension: not executed as a Python matched case because injecting recurse would fabricate upstream DSPy behavior.",
+      "deviation": "Declared Imp extension: not executed as a Python matched case because injecting recurse would fabricate upstream DSPy behavior.",
       "inputs": {"context": "branch", "query": "symbolic recursion"},
       "python_controller_code_turns": ["# Unsupported upstream: recurse('branch', depth=2)"],
       "elixir_controller_code_turns": ["recurse(\"question -> answer\", %{question: \"branch\"})"],

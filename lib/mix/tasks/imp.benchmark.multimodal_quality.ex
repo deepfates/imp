@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Imp.Benchmark.MultimodalQuality do
 
     mode = mode!(opts)
     manifest = manifest_path!(opts)
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("multimodal"))
 
     runner_opts =
       [

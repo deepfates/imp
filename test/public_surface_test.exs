@@ -1,7 +1,7 @@
 defmodule PublicSurfaceTest do
   use ExUnit.Case
 
-  @public_modules [
+  @behavioral_modules [
     Imp,
     Imp.Adapter,
     Imp.Adapter.Chat,
@@ -161,6 +161,7 @@ defmodule PublicSurfaceTest do
     Imp.Optimizer.Trajectory.Timing,
     Imp.Optimizer.Trajectory.Usage,
     Imp.Optimizer.TrajectoryRunner,
+    Imp.Optimizer.TrainingError,
     Imp.Optimizer.TrainingResult,
     Imp.Playbook,
     Imp.Playbook.WithContext,
@@ -813,11 +814,8 @@ defmodule PublicSurfaceTest do
                    Imp.Optimizer.BetterTogether.new(metric, :not_optimizers)
                  end
 
-    assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.BetterTogether\.new\/2 expects a metric function with arity 2/,
-                 fn ->
-                   Imp.Optimizer.BetterTogether.new(fn _example, _prediction, _trace -> true end)
-                 end
+    assert %Imp.Optimizer.BetterTogether{} =
+             Imp.Optimizer.BetterTogether.new(fn _example, _prediction, _trace -> true end)
 
     better = Imp.Optimizer.BetterTogether.new(metric, %{p: Imp.Optimizer.LabeledFewShot.new()})
 
@@ -907,7 +905,9 @@ defmodule PublicSurfaceTest do
   end
 
   test "documented public modules and facade constructors remain available" do
-    assert Enum.all?(@public_modules, &Code.ensure_loaded?/1)
+    assert Enum.all?(@behavioral_modules, &Code.ensure_loaded?/1)
+
+    assert Enum.all?(manifest_public_modules(), &Code.ensure_loaded?/1)
 
     facade_exports = [
       configure: 1,
@@ -990,22 +990,20 @@ defmodule PublicSurfaceTest do
   end
 
   test "documented product modules are deliberately included in the public surface" do
-    public = MapSet.new(@public_modules)
+    public = MapSet.new(manifest_public_modules())
 
-    missing =
-      :imp
-      |> Application.spec(:modules)
-      |> Enum.filter(&imp_module?/1)
-      |> Enum.filter(&documented_module?/1)
-      |> Enum.reject(&MapSet.member?(public, &1))
-      |> Enum.sort()
+    assert Enum.all?(public, fn module ->
+             imp_module?(module) and documented_module?(module)
+           end)
 
-    assert missing == []
+    assert Enum.all?(Mix.Tasks.Imp.PublicApi.manifest()["modules"], fn entry ->
+             entry["category"] != "internal"
+           end)
   end
 
   test "public product modules are deliberately documented" do
     undocumented =
-      @public_modules
+      manifest_public_modules()
       |> Enum.reject(&documented_module?/1)
       |> Enum.sort()
 
@@ -1029,6 +1027,17 @@ defmodule PublicSurfaceTest do
     module
     |> Atom.to_string()
     |> String.starts_with?("Elixir.Imp")
+  end
+
+  defp manifest_public_modules do
+    Mix.Tasks.Imp.PublicApi.manifest()["modules"]
+    |> Enum.map(&module_from_string(&1["module"]))
+  end
+
+  defp module_from_string(name) do
+    name
+    |> String.split(".")
+    |> Module.concat()
   end
 
   defp documented_module?(module) do

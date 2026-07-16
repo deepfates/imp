@@ -138,6 +138,40 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     assert encoded =~ "[REDACTED]"
   end
 
+  test "serialization redacts credential tuple and keyword pairs without changing tuple shape" do
+    authorization = "CANARY_TRAJECTORY_TUPLE_AUTHORIZATION_31b7c"
+    session = "CANARY_TRAJECTORY_KEYWORD_SESSION_a024e"
+
+    trajectory =
+      Trajectory.project(:evaluation, %{
+        index: 0,
+        example: %{question: "pair boundaries"},
+        prediction: %{answer: "ok"},
+        score: 1.0,
+        trace: [
+          {"authorization", authorization},
+          [session: session],
+          {:status, {"request_id", "request-42"}},
+          {:ordinary, 7, "retained"}
+        ]
+      })
+
+    wire = Trajectory.dump(trajectory)
+    encoded = Jason.encode!(wire)
+
+    refute encoded =~ authorization
+    refute encoded =~ session
+
+    assert {:ok, restored} = Trajectory.load(wire)
+
+    assert restored.trace == [
+             {"authorization", "[REDACTED]"},
+             [session: "[REDACTED]"],
+             {:status, {"request_id", "request-42"}},
+             {:ordinary, 7, "retained"}
+           ]
+  end
+
   test "accounting field names only bypass key redaction for valid numeric counts" do
     trajectory =
       Trajectory.project(:evaluation, %{
@@ -192,6 +226,21 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     assert_raise ArgumentError, ~r/contains both :score and "score"/, fn ->
       Trajectory.project(:evaluation, %{:score => 1.0, "score" => 0.0, index: 0})
     end
+  end
+
+  test "redaction preserves semantic credential-named schema descriptors" do
+    trajectory =
+      Trajectory.project(:evaluation, %{
+        index: 0,
+        example: %{schema: %{token: :string, api_key: :string}, token: "actual-secret"},
+        prediction: %{},
+        score: 0.0,
+        trace: []
+      })
+
+    redacted = Trajectory.redact(trajectory)
+    assert redacted.example.schema == %{token: :string, api_key: :string}
+    assert redacted.example.token == "[REDACTED]"
   end
 
   test "typed payload tags reject extra keys" do

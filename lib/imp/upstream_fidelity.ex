@@ -437,16 +437,27 @@ defmodule Imp.UpstreamFidelity do
     %{
       id: "optimization.gepa",
       category: :optimization,
-      upstream: ["GEPA", "GEPA advanced", "GEPA 0.1.1 result contract"],
-      source: "dspy/teleprompt/gepa; github.com/gepa-ai/gepa; arXiv:2507.19457",
-      disposition: :conformant,
+      upstream: [
+        "GEPA",
+        "GEPA advanced",
+        "GEPA 0.1.4 standalone API",
+        "GEPA 0.1.1 historical result contract"
+      ],
+      source:
+        "gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975 (standalone v0.1.4 structural authority)",
+      disposition: :gap,
+      release_blocking: false,
+      local_conformance: :structural,
+      evidence_rung: "C1",
+      claim_boundary:
+        "local structural and behavioral conformance only; this is not paper-family reproduction evidence",
       ticket: "de-izej",
       imp: [Imp.Optimizer.GEPA, Imp.Optimize.Anything],
       invariants: [
-        "reflective mutation uses per-example feedback and trajectories",
-        "candidate lineage and Pareto state are retained",
-        "result shape is source-versioned",
-        "paper families reproduce under matched budgets"
+        "the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure",
+        "reflective mutation uses per-example feedback and trajectories in focused local tests",
+        "candidate lineage, Pareto state, and source-versioned results are retained locally",
+        "C1 conformance does not establish matched upstream or paper-family outcomes"
       ],
       evidence: %{
         tests: [
@@ -457,7 +468,10 @@ defmodule Imp.UpstreamFidelity do
         ],
         docs: ["docs/ADVANCED.md", "docs/RESEARCH_LANDSCAPE.md"],
         missing: [
-          "the six-family matched campaign remains required for paper-replication and dominance claims"
+          "C2 matched upstream differential evidence",
+          "C3 matched live-provider evidence",
+          "C4 full paper-family campaign evidence",
+          "C5 independently reproduced outcome evidence"
         ]
       }
     },
@@ -509,7 +523,9 @@ defmodule Imp.UpstreamFidelity do
           "docs/COVERAGE_MATRIX.md",
           "docs/UPSTREAM_FIDELITY_AUDIT.md"
         ],
-        artifacts: ["benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"],
+        artifacts: [
+          "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json"
+        ],
         missing: [
           "paid-provider weight-training execution evidence",
           "BetterTogether paid-provider lifecycle completion",
@@ -821,6 +837,7 @@ defmodule Imp.UpstreamFidelity do
       summary: %{
         total: length(rows),
         conformant: Enum.count(rows, &(&1.status == :conformant)),
+        local_conformance: Enum.count(rows, &(Map.get(&1, :local_conformance) == :structural)),
         elixir_native_equivalent: Enum.count(rows, &(&1.status == :elixir_native_equivalent)),
         tracking: Enum.count(rows, &(&1.status == :tracking)),
         gaps: Enum.count(rows, &(&1.status == :gap)),

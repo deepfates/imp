@@ -67,6 +67,22 @@
       "manifest": null,
       "artifact_validator": null
     },
+    "rlm_runtime_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.rlm_runtime_differential",
+      "args": [
+        "--manifest",
+        "benchmarks/config/rlm-runtime-differential-v1.json"
+      ],
+      "manifest": "benchmarks/config/rlm-runtime-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.RLMRuntimeDifferential",
+        "function": "validate_artifact!",
+        "arity": 2
+      }
+    },
     "rlm_paper": {
       "mode": "live",
       "max_tier": "t3",
@@ -341,7 +357,7 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/results/multimodal-quality-live-20260713T224355Z.json",
+        "artifact": "benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json",
         "artifact_sha256": "02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e",
         "protocol_id": "multimodal_live"
       }
@@ -482,6 +498,7 @@
       "classification": "adaptation",
       "protocol_ids": [
         "rlm_contract",
+        "rlm_runtime_differential",
         "rlm_paper"
       ],
       "admitted_evidence": {
@@ -536,7 +553,7 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/results/auto-evaluation-differential-v1.json",
+        "artifact": "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json",
         "artifact_sha256": "9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0",
         "protocol_id": "auto_evaluation_contract"
       }
@@ -559,7 +576,7 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/results/auto-evaluation-differential-v1.json",
+        "artifact": "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json",
         "artifact_sha256": "9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0",
         "protocol_id": "auto_evaluation_contract"
       }
@@ -796,7 +813,7 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json",
+        "artifact": "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json",
         "artifact_sha256": "e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76",
         "protocol_id": "instruction_live"
       }
@@ -821,7 +838,7 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json",
+        "artifact": "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json",
         "artifact_sha256": "e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76",
         "protocol_id": "instruction_live"
       }
@@ -923,7 +940,7 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
+        "artifact": "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json",
         "artifact_sha256": "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16",
         "protocol_id": "local_mlx"
       }
@@ -1045,7 +1062,7 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/results/optimize-anything-replication-20260713T092840Z.json",
+        "artifact": "benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json",
         "artifact_sha256": "080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653",
         "protocol_id": "optimize_anything"
       }

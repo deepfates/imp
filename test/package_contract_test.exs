@@ -7,7 +7,7 @@ defmodule PackageContractTest do
     "lib/imp.ex",
     "lib/imp/clients/req_llm.ex",
     "lib/imp/lm/static.ex",
-    "lib/mix/tasks/imp.package.clean_room.ex",
+    "priv/public_api.json",
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
@@ -46,7 +46,15 @@ defmodule PackageContractTest do
     "docs/maintainers/RELEASE.md",
     "docs/maintainers/EVIDENCE.md",
     "lib/imp/legacy_identity_audit.ex",
-    "lib/imp/benchmarks.ex"
+    "lib/imp/benchmarks.ex",
+    "lib/mix/tasks/imp.evidence.admit.ex",
+    "lib/mix/tasks/imp.public_api.ex",
+    "lib/mix/tasks/imp.package.clean_room.ex",
+    "lib/imp/evidence_authorities.ex",
+    "lib/imp/research_portfolio.ex",
+    "lib/imp/upstream_authority_registry.ex",
+    "lib/imp/upstream_fidelity.ex",
+    "priv/public_api_policy.json"
   ]
 
   @documented_module_allowlist MapSet.new([
@@ -129,6 +137,7 @@ defmodule PackageContractTest do
       |> Enum.sort()
 
     assert_release_files(files)
+    assert_manifest_sources_are_shipped(output_dir, files)
     assert_unpacked_mix_surface(output_dir)
     assert_unpacked_package_can_be_consumed(output_dir)
   end
@@ -210,6 +219,8 @@ defmodule PackageContractTest do
     for file <- @excluded_files do
       refute file in files
     end
+
+    refute Enum.any?(files, &String.starts_with?(&1, "lib/mix/tasks/"))
   end
 
   defp package_tmp_dir do
@@ -292,6 +303,45 @@ defmodule PackageContractTest do
 
     unless Code.ensure_loaded?(Imp) and Application.get_application(Imp) == :imp do
       raise "package consumer could not resolve Imp through :imp"
+    end
+
+    canonicalize = fn path ->
+      {resolved, 0} = System.cmd("realpath", [Path.expand(path)])
+      String.trim(resolved)
+    end
+
+    manifest =
+      #{inspect(Path.join(package_dir, "priv/public_api.json"))}
+      |> File.read!()
+      |> Jason.decode!()
+
+    for entry <- manifest["modules"] do
+      module = Module.concat(String.split(entry["module"], "."))
+
+      unless module in Application.spec(:imp, :modules) do
+        raise "manifest module is absent from the unpacked application: \#{entry["module"]}"
+      end
+
+      unless Code.ensure_loaded?(module) do
+        raise "manifest module could not be loaded from the unpacked artifact: \#{entry["module"]}"
+      end
+
+      source =
+        module.module_info(:compile)
+        |> Keyword.fetch!(:source)
+        |> List.to_string()
+        |> Path.expand()
+        |> canonicalize.()
+
+      expected_source =
+        #{inspect(package_dir)}
+        |> Path.join(entry["source"])
+        |> Path.expand()
+        |> canonicalize.()
+
+      unless source == expected_source do
+        raise "manifest source binding mismatch for \#{entry["module"]}: expected \#{expected_source}, got \#{source}"
+      end
     end
 
     lm = %{
@@ -472,6 +522,23 @@ defmodule PackageContractTest do
       System.tmp_dir!(),
       "imp-package-consumer-#{System.unique_integer([:positive])}"
     ])
+  end
+
+  defp assert_manifest_sources_are_shipped(output_dir, files) do
+    manifest =
+      output_dir
+      |> Path.join("priv/public_api.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    entries = manifest["modules"]
+    assert entries != []
+
+    for entry <- entries do
+      source = entry["source"]
+      assert source in files, "manifest source missing from unpacked package: #{source}"
+      assert File.regular?(Path.join(output_dir, source))
+    end
   end
 
   defp documented_module_references(paths) do

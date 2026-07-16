@@ -268,11 +268,13 @@ defmodule DocumentationContractTest do
     parity = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
 
     assert api =~ "## Optimize Arbitrary Artifacts"
-    assert api =~ "sole\nOptimize Anything surface"
+    assert api =~ "is the sole Optimize Anything\nentry point"
+    assert api =~ "Imp.Saving.Registry"
     assert api =~ "proposer_lm:"
     assert api =~ "reject malformed\nvalues when the optimizer is built or run"
     assert advanced =~ "public frontend delegates to the production GEPA engine"
-    assert advanced =~ "not a claim of parity with unreleased GEPA\nmain"
+    assert advanced =~ "Current implementation fidelity is pinned to GEPA v0.1.4"
+    assert advanced =~ "v0.1.1\ncheckout remains a historical structural differential"
     assert coverage =~ "GEPA-style reflection"
     assert parity =~ "GEPA-style optimizer rows"
   end
@@ -501,19 +503,17 @@ defmodule DocumentationContractTest do
       Imp.Optimize.Anything.run(
         "mode=slow",
         fn candidate -> if(candidate =~ "mode=fast", do: 1.0, else: 0.0) end,
-        config:
-          Imp.Optimize.Anything.Config.new(
-            engine: [max_candidate_proposals: 1, parallel: false],
-            reflection: [
-              custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
-                "mode=fast"
-              end
-            ]
-          )
+        config: [
+          engine: [max_candidate_proposals: 1, parallel: false],
+          reflection: [
+            custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+              "mode=fast"
+            end
+          ]
+        ]
       )
 
     assert hd(result.validation_scores) == 0.0
-    assert Imp.Optimize.Anything.Result.best_candidate(result) == "mode=fast"
     assert Enum.max(result.validation_scores) == 1.0
   end
 

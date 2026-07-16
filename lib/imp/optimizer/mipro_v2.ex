@@ -575,7 +575,7 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     digest =
       payload
-      |> Report.json_safe()
+      |> Report.encode_term()
       |> :erlang.term_to_binary([:deterministic])
       |> then(&:crypto.hash(:sha256, &1))
       |> Base.encode16(case: :lower)

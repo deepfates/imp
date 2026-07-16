@@ -5,14 +5,15 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
   @sha256 ~r/\A[0-9a-f]{64}\z/
   @manifest_only_error "--manifest cannot be combined with scientific or output CLI overrides"
 
+  alias Imp.BenchmarkTruth.Paths
+
   def load!(path) do
-    expanded_path = Path.expand(path)
+    expanded_path = Paths.canonical_path!(path)
 
     manifest =
       expanded_path
       |> File.read!()
       |> Jason.decode!()
-      |> Imp.Persistence.Legacy.gepa_manifest()
 
     manifest
     |> validate!(expanded_path)
@@ -56,7 +57,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
     validate_output!(manifest["output"])
 
     manifest
-    |> Map.put("manifest_path", Path.expand(path))
+    |> Map.put("manifest_path", Paths.canonical_path!(path))
     |> Map.put("manifest_sha256", sha256_file!(path))
   end
 
@@ -216,6 +217,16 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
 
     require_string!(environment["python_env"], "environment.python_env")
     require_string!(environment["gepa_root_env"], "environment.gepa_root_env")
+
+    require!(
+      environment["python_env"] == "IMP_GEPA_PYTHON",
+      "environment.python_env must be IMP_GEPA_PYTHON"
+    )
+
+    require!(
+      environment["gepa_root_env"] == "IMP_GEPA_ROOT",
+      "environment.gepa_root_env must be IMP_GEPA_ROOT"
+    )
   end
 
   defp validate_request!(request) do
@@ -363,7 +374,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
 
   defp verify_dataset!(manifest) do
     manifest_dir = Path.dirname(manifest["manifest_path"])
-    root = Path.expand(manifest["dataset"]["root"], manifest_dir)
+    root = Paths.canonical_path!(manifest["dataset"]["root"], manifest_dir)
     families_path = Path.join(root, "families.json")
 
     require!(
@@ -385,10 +396,13 @@ defmodule Imp.BenchmarkTruth.GepaCampaignManifest do
 
     manifest
     |> put_in(["dataset", "resolved_root"], root)
-    |> put_in(["output", "resolved_out_dir"], Path.expand(output["out_dir"], manifest_dir))
+    |> put_in(
+      ["output", "resolved_out_dir"],
+      Paths.canonical_path!(output["out_dir"], manifest_dir)
+    )
     |> put_in(
       ["output", "resolved_checkpoint_dir"],
-      Path.expand(output["checkpoint_dir"], manifest_dir)
+      Paths.canonical_path!(output["checkpoint_dir"], manifest_dir)
     )
   end
 

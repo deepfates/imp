@@ -43,6 +43,42 @@ The runtime enforces:
 - bounded, redacted traces that replace oversized terms with type, size, and
   digest metadata.
 
+## Standalone Runtime Differential
+
+`mix` `imp.benchmark.rlm_runtime_differential` compares Imp with the pinned
+standalone `alexzhang13/rlm` runtime at commit
+`72d6940142ddfb84ee6be573dc999a37e633e671`. It executes both implementations
+through traced or wrapped public provider-free runtime calls and covers
+environment and REPL continuity, protected context aliases, persistent
+sessions, a public compaction prompt transition, recursive depth, bounded
+fanout, deadlines, and failure semantics.
+
+The manifest requires eight matched observations and records one intentional
+difference:
+
+- the standalone local environment permits Python imports, while Imp executes
+  an allowlisted Elixir AST and never embeds Python in its production runtime;
+
+Failed generated cells are transactional for ordinary assignments in both
+runtimes. Imp retains completed effect-journal entries and explicitly loaded or
+protected values so a repair neither replays an external effect nor loses an
+authoritative loaded context.
+
+The compaction row does not claim equivalence of private history storage. It
+observes only a bounded public `RLM.completion` transition: a summary request
+over the same digest-bound trajectory, then a shorter next root prompt containing
+the summary but neither the complete prior trajectory nor any of 16 probes
+interleaved across it. The pinned upstream public result exposes no deterministic
+compaction-history metadata, so no stronger public compaction-equivalence claim
+is made.
+
+The differential can establish C1 behavioral conformance for its named
+observations and C2 provider-free operation. It cannot establish live-provider
+quality, DSPy-adapter conformance, long-context effectiveness, or paper-scale
+reproduction. Its artifact is admissible only when the validator recomputes
+every row and summary and verifies the pinned upstream checkout plus committed
+Imp and harness source hashes.
+
 ## Evidence Tiers
 
 ### T0: Contract Replay
@@ -53,7 +89,14 @@ wiring only. Gold-derived outputs, tiny contexts, and intentionally different
 traces make it ineligible for parity, effectiveness, latency, or uncertainty
 claims.
 
-### T1: Current-Upstream Operational Contract
+### T1A: Standalone Runtime Differential
+
+From a source checkout, `mix` `imp.benchmark.rlm_runtime_differential` executes
+the nine-case differential described above. This is the strongest provider-free
+evidence for the BEAM-native runtime itself; the single declared deviation is
+preregistered and narrowly scoped to the local code capability probe.
+
+### T1B: Current DSPy Operational Contract
 
 From a source checkout, `mix benchmark.rlm.contract.check` executes twelve
 required matched cases in
@@ -234,10 +277,11 @@ pinned rates.
 This is valid T2 operational evidence only. Every answer scored zero, one row
 cannot establish effectiveness, and the bootstrap interval is mechanically
 zero-width. Simple retrieval selected effectively the full context on this
-row, and neither RLM made recursive subcalls. The runtimes also expose different
-`max_llm_calls` scopes. Traces are bounded and usage/cost audits reconcile, but
-these limitations make expansion unjustified. The campaign was not expanded;
-unavailable families and exact T3 remain red.
+row, and neither RLM made recursive subcalls. Imp's campaign call-count guard is
+explicitly `subcalls_only`; the standalone reference exposes USD and token
+budgets rather than this `max_llm_calls` option. Traces are bounded and
+usage/cost audits reconcile, but these limitations make expansion unjustified.
+The campaign was not expanded; unavailable families and exact T3 remain red.
 
 ### 2026-07-15 corrected bounded pilot
 
@@ -319,10 +363,13 @@ T2 evidence and cannot satisfy T3.
 - The chunk-and-summarize lane is not the paper's iterative threshold-based
   compaction agent.
 - The campaign currently runs one configured RLM depth and does not execute the
-  paper's depth 0--3 matrix. Imp's shared `max_llm_calls` budget covers root,
-  submodel, and extraction calls. DSPy 3.3.0b1 applies `max_llm_calls` to
-  subcalls. These scopes are recorded separately and mechanically fail
-  equivalence.
+  paper's depth 0--3 matrix. Imp intentionally defines `max_llm_calls` as
+  `subcalls_only`: it charges one-shot `llm_query*` calls, depth-limit
+  `rlm_query*` fallbacks, and sub-LM work inside recursive children. Root and
+  child controller turns, extraction, and compaction generations are excluded.
+  DSPy 3.3.0b1 also applies its call-count option to subcalls; the standalone
+  reference instead exposes USD and token budgets, so no standalone
+  call-count-budget equivalence is claimed.
 - Rows use bounded campaign concurrency although the paper reports blocking,
   sequential calls; campaign wall time is therefore not paper-runtime parity.
 - Python comparison uses the pinned DSPy 3.3.0b1 `dspy.RLM`, not the standalone
@@ -334,8 +381,11 @@ T2 evidence and cannot satisfy T3.
 - `test/rlm_interpreter_test.exs`
 - `test/rlm_budget_test.exs`
 - `test/rlm_test.exs`
+- `test/rlm_standalone_runtime_test.exs`
+- `test/rlm_runtime_differential_test.exs`
 - `test/rlm_contract_artifact_test.exs`
 - `test/live_provider_e2e_test.exs`
+- Source checkout: `mix` `imp.benchmark.rlm_runtime_differential`
 - Source checkout: `mix benchmark.rlm.contract.check`
 - Source checkout: `mix imp.benchmark.rlm_campaign --plan`
 - Source checkout: `LIVE_PROVIDER=1 mix live.check`

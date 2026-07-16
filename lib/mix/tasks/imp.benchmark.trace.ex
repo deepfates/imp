@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   @shortdoc "Run Imp-vs-DSPy golden trace parity fixtures"
 
   @default_fixtures "test/fixtures/golden_trace/cases.json"
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("golden-trace")
 
   @impl true
   def run(args) do
@@ -70,7 +70,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   defp run_imp_case(case) do
     {:ok, queue} =
       Agent.start_link(fn ->
-        case["imp_responses"] || case["dsex_responses"] || case["responses"]
+        case["imp_responses"] || case["responses"]
       end)
 
     {:ok, calls} = Agent.start_link(fn -> [] end)

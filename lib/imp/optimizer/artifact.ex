@@ -74,7 +74,7 @@ defmodule Imp.Optimizer.Artifact do
           value |> Report.dump() |> sanitize()
 
         value when is_map(value) ->
-          value |> Report.json_safe() |> sanitize()
+          value |> Report.encode_term() |> sanitize()
 
         value ->
           raise ArgumentError,
@@ -156,7 +156,6 @@ defmodule Imp.Optimizer.Artifact do
     path
     |> File.read!()
     |> Jason.decode!()
-    |> Imp.Persistence.Legacy.optimizer_artifact!()
     |> validate!()
   end
 
@@ -428,8 +427,8 @@ defmodule Imp.Optimizer.Artifact do
       {identity,
        %{
          "signature" => Imp.Signature.dump(predictor.signature),
-         "demos" => Report.json_safe(predictor.demos),
-         "config" => Report.json_safe(predictor.config)
+         "demos" => Report.encode_term(predictor.demos),
+         "config" => Report.encode_term(predictor.config)
        }}
     end)
   end
@@ -509,27 +508,25 @@ defmodule Imp.Optimizer.Artifact do
 
   defp sanitize(value) do
     value
-    |> Redaction.redact()
-    |> drop_sensitive_keys()
+    |> Redaction.drop_credentials()
     |> json_normalize!("optimizer artifact metadata")
   end
 
-  defp drop_sensitive_keys(map) when is_map(map) do
-    Map.new(map, fn {key, value} -> {key, drop_sensitive_keys(value)} end)
-    |> Map.reject(fn {key, _value} -> sensitive_key?(key) end)
-  end
+  defp contains_sensitive_key?(%{"__imp_type__" => "map", "entries" => entries})
+       when is_list(entries) do
+    Enum.any?(entries, fn
+      [encoded_key, value] ->
+        sensitive_entry?(encoded_key, value) or contains_sensitive_key?(value)
 
-  defp drop_sensitive_keys(list) when is_list(list), do: Enum.map(list, &drop_sensitive_keys/1)
-  defp drop_sensitive_keys(value), do: value
-
-  defp reject_sensitive_keys!(value) do
-    if contains_sensitive_key?(value) do
-      raise ArgumentError, "optimizer artifact contains a credential-bearing key"
-    end
+      value ->
+        contains_sensitive_key?(value)
+    end)
   end
 
   defp contains_sensitive_key?(map) when is_map(map) do
-    Enum.any?(map, fn {key, value} -> sensitive_key?(key) or contains_sensitive_key?(value) end)
+    Enum.any?(map, fn {key, value} ->
+      sensitive_entry?(key, value) or contains_sensitive_key?(value)
+    end)
   end
 
   defp contains_sensitive_key?(list) when is_list(list),
@@ -537,14 +534,13 @@ defmodule Imp.Optimizer.Artifact do
 
   defp contains_sensitive_key?(_value), do: false
 
-  defp sensitive_key?(key) do
-    normalized = key |> to_string() |> String.downcase() |> String.replace("-", "_")
-
-    Enum.any?(Redaction.default_keys(), fn sensitive ->
-      sensitive = sensitive |> to_string() |> String.downcase() |> String.replace("-", "_")
-      normalized == sensitive or String.ends_with?(normalized, "_#{sensitive}")
-    end)
+  defp reject_sensitive_keys!(value) do
+    if contains_sensitive_key?(value) do
+      raise ArgumentError, "optimizer artifact contains a credential-bearing key"
+    end
   end
+
+  defp sensitive_entry?(key, value), do: Redaction.credential_entry?(key, value)
 
   defp security_proof do
     %{
@@ -556,6 +552,8 @@ defmodule Imp.Optimizer.Artifact do
   end
 
   defp json_normalize!(value, context) do
+    reject_json_key_collisions!(value, context)
+
     case Jason.encode(value) do
       {:ok, encoded} ->
         Jason.decode!(encoded)
@@ -565,6 +563,32 @@ defmodule Imp.Optimizer.Artifact do
               "#{context} must not contain runtime functions or non-JSON values: #{Exception.message(error)}"
     end
   end
+
+  defp reject_json_key_collisions!(value, context) when is_map(value) do
+    normalized_keys = Enum.map(Map.keys(value), &normalized_json_key/1)
+
+    if length(normalized_keys) != MapSet.size(MapSet.new(normalized_keys)) do
+      raise ArgumentError, "#{context} contains map keys that collide after JSON normalization"
+    end
+
+    Enum.each(value, fn {key, nested} ->
+      reject_json_key_collisions!(key, context)
+      reject_json_key_collisions!(nested, context)
+    end)
+  end
+
+  defp reject_json_key_collisions!(value, context) when is_list(value),
+    do: Enum.each(value, &reject_json_key_collisions!(&1, context))
+
+  defp reject_json_key_collisions!(value, context) when is_tuple(value),
+    do: value |> Tuple.to_list() |> Enum.each(&reject_json_key_collisions!(&1, context))
+
+  defp reject_json_key_collisions!(_value, _context), do: :ok
+
+  defp normalized_json_key(key) when is_atom(key), do: {:json, Atom.to_string(key)}
+  defp normalized_json_key(key) when is_binary(key), do: {:json, key}
+  defp normalized_json_key(key) when is_integer(key), do: {:json, Integer.to_string(key)}
+  defp normalized_json_key(key), do: {:term, :erlang.term_to_binary(key, [:deterministic])}
 
   defp value_type(%module{}), do: module
   defp value_type(value) when is_map(value), do: :map

@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
 
   @shortdoc "Validate GEPA paper-replication rows"
 
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("gepa-replication")
 
   @impl true
   def run(args) do
@@ -583,7 +583,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
             engine: [max_candidate_proposals: length(requirements), parallel: false],
             reflection: [
               custom_candidate_proposer: fn candidate, component, _records, iteration ->
-                requirement = Enum.at(requirements, iteration)
+                requirement = Enum.fetch!(requirements, iteration - 1)
                 Map.fetch!(candidate, component) <> "\n" <> requirement
               end
             ]

@@ -62,20 +62,20 @@ defmodule Imp.History do
   def dump(%__MODULE__{messages: messages}) do
     %{
       "type" => "history",
-      "messages" => Imp.Optimizer.Report.json_safe(messages)
+      "messages" => Imp.Optimizer.Report.encode_term(messages)
     }
   end
 
   @doc "Loads a JSON-safe history map produced by `dump/1`."
   def load(%{"type" => "history", "messages" => messages}) when is_list(messages) do
     messages
-    |> Imp.Optimizer.Report.restore_json_safe()
+    |> Imp.Optimizer.Report.decode_term()
     |> new()
   end
 
   def load(%{"messages" => messages}) when is_list(messages) do
     messages
-    |> Imp.Optimizer.Report.restore_json_safe()
+    |> Imp.Optimizer.Report.decode_term()
     |> new()
   end
 

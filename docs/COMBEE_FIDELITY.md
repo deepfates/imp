@@ -182,10 +182,10 @@ Imp.Optimizer.GEPA.new(metric,
 for an offline fit. Runtime reports use `measurement_source: :runtime_trials`
 and include ordered trial iteration, batch, delay, metric calls, reflection
 calls, status, and failure reason.
-`on_combee_aggregation` exposes `Imp.Optimizer.GEPA.ComBee.Report`, including
-group sizes, source-copy assignments, call counts, status, and deterministic
-failure identity. The optimizer report includes resolved policy and ordered
-aggregation reports under `metadata.combee`.
+`on_combee_aggregation` contributes normalized aggregation metadata to the
+public optimizer report under `metadata.combee.aggregations`, including group
+sizes, source-copy assignments, call counts, status, and deterministic failure
+identity. The report is available through `Imp.Optimizer.Report.fetch/1`.
 
 ## Campaign restart policy
 

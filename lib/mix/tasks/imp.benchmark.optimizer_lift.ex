@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   @shortdoc "Run Imp-vs-DSPy optimizer lift parity checks"
 
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimizer-lift")
 
   @impl true
   def run(args) do
@@ -778,6 +778,16 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
   defp normalize(value) when is_tuple(value), do: value |> Tuple.to_list() |> normalize()
   defp normalize(value) when is_boolean(value) or is_nil(value), do: value
   defp normalize(value) when is_atom(value), do: to_string(value)
+
+  defp normalize(value) when is_function(value) do
+    %{
+      "runtime_type" => "function",
+      "module" => value |> :erlang.fun_info(:module) |> elem(1) |> to_string(),
+      "name" => value |> :erlang.fun_info(:name) |> elem(1) |> to_string(),
+      "arity" => value |> :erlang.fun_info(:arity) |> elem(1)
+    }
+  end
+
   defp normalize(value), do: value
 
   defp git_sha do

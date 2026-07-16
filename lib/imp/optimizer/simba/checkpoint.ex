@@ -15,11 +15,11 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
         "completed_steps" => state.completed_steps,
         "population" => dump_population(state.population),
         "winning_programs" => Enum.map(state.winning_programs, &dump_program/1),
-        "trial_logs" => Report.json_safe(state.trial_logs),
+        "trial_logs" => Report.encode_term(state.trial_logs),
         "order" => state.order,
         "cursor" => state.cursor,
         "poisson_rng" => Sampling.dump(state.poisson_rng),
-        "errors" => Report.json_safe(state.errors),
+        "errors" => Report.encode_term(state.errors),
         "trajectory_calls" => state.trajectory_calls,
         "candidate_evaluation_calls" => state.candidate_evaluation_calls,
         "final_evaluation_calls" => state.final_evaluation_calls,
@@ -151,9 +151,9 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
                                                                  predictor: predictor
                                                                } ->
           %{
-            "name" => Report.json_safe(name),
+            "name" => Report.encode_term(name),
             "instruction" => predictor.signature.instructions,
-            "demos" => Report.json_safe(predictor.demos)
+            "demos" => Report.encode_term(predictor.demos)
           }
         end)
     }
@@ -167,7 +167,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
       Enum.map(snapshots, fn
         %{"name" => name, "instruction" => instruction, "demos" => demos}
         when is_binary(instruction) and is_list(demos) ->
-          %{name: Report.restore_json_safe(name), instruction: instruction, demos: demos}
+          %{name: Report.decode_term(name), instruction: instruction, demos: demos}
 
         value ->
           raise ArgumentError,
@@ -179,7 +179,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
     end
 
     Enum.reduce(decoded, runtime_program, fn snapshot, program ->
-      demos = Report.restore_json_safe(snapshot.demos)
+      demos = Report.decode_term(snapshot.demos)
 
       unless is_list(demos) do
         raise ArgumentError, "SIMBA checkpoint predictor demos must be a list"
@@ -210,7 +210,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
       "program" => dump_program(evaluation.program),
       "score" => evaluation.score,
       "scores" => evaluation.scores,
-      "errors" => Report.json_safe(evaluation.errors)
+      "errors" => Report.encode_term(evaluation.errors)
     }
   end
 
@@ -234,7 +234,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
           program: load_program!(program, runtime_program),
           score: score,
           scores: scores,
-          errors: Report.restore_json_safe(errors)
+          errors: Report.decode_term(errors)
         }
 
       value ->
@@ -271,7 +271,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
   defp load_id_records!(value, name, _expected_ids, _value_key),
     do: raise(ArgumentError, "SIMBA checkpoint #{name} must be a list, got: #{inspect(value)}")
 
-  defp load_list!(value, _name) when is_list(value), do: Report.restore_json_safe(value)
+  defp load_list!(value, _name) when is_list(value), do: Report.decode_term(value)
 
   defp load_list!(value, name),
     do: raise(ArgumentError, "SIMBA checkpoint #{name} must be a list, got: #{inspect(value)}")

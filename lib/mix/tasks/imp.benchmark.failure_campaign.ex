@@ -34,12 +34,25 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
+    live? = Keyword.get(opts, :live, false)
+
     run_context =
       Imp.BenchmarkTruth.RunContext.capture_git!(
-        require_clean: Keyword.get(opts, :require_clean, false)
+        require_clean: Keyword.get(opts, :require_clean, false),
+        inputs: %{
+          "protocol_id" => "failure_campaign",
+          "iterations" => Keyword.get(opts, :iterations, 10),
+          "max_concurrency" => Keyword.get(opts, :max_concurrency, 4),
+          "iteration_timeout_ms" => Keyword.get(opts, :iteration_timeout_ms, 15_000),
+          "live" => live?,
+          "live_iterations" => Keyword.get(opts, :live_iterations, 2),
+          "live_timeout_ms" => Keyword.get(opts, :live_timeout_ms, 30_000),
+          "model" => Keyword.get(opts, :model, "gpt-4.1-mini"),
+          "agent_model" =>
+            Keyword.get(opts, :agent_model, Keyword.get(opts, :model, "gpt-4.1-mini"))
+        }
       )
 
-    live? = Keyword.get(opts, :live, false)
     api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
     api_key = if live?, do: System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
 
@@ -63,7 +76,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
           )
       )
 
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("failure-recovery"))
     File.mkdir_p!(out_dir)
     path = Path.join(out_dir, "failure-campaign-#{timestamp_slug()}.json")
 

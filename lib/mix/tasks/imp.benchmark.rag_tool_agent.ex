@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
 
   @shortdoc "Run RAG/tool/agent parity and production-semantics checks"
 
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("rag-tool-agent")
   @live_row_ids ["live_rag_memory_retrieval", "live_mcp_lookup_tool"]
   @live_settings %{
     "temperature" => 0.0,

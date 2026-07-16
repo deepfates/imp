@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
   @moduledoc """
   Run the deterministic Fast-Slow protocol campaign.
 
-      mix imp.benchmark.fast_slow --out benchmarks/results/fast-slow-protocol.json
+      mix imp.benchmark.fast_slow --out benchmarks/runs/fast-slow/fast-slow-protocol.json
 
   This campaign verifies orchestration and recovery behavior. Its held-out
   quality measurements are synthetic and are not provider or research evidence.
@@ -15,7 +15,10 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
   alias Mix.Tasks.Imp.Benchmark.FastSlow.Backend
 
   @shortdoc "Run deterministic Fast-Slow protocol evidence"
-  @default_out "benchmarks/results/fast-slow-protocol.json"
+  @default_out Path.join(
+                 Imp.BenchmarkTruth.Paths.runs("fast-slow"),
+                 "fast-slow-protocol.json"
+               )
   @modes ~w(prompt_only slow_only combined)
 
   @impl true

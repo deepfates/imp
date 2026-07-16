@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
 
   @shortdoc "Run provider-free Imp-vs-DSPy overhead benchmarks"
 
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("overhead")
 
   @impl true
   def run(args) do

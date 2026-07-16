@@ -1,0 +1,6562 @@
+{
+  "app": "imp",
+  "categories": [
+    {
+      "callbacks": false,
+      "name": "advanced",
+      "support": "supported",
+      "types": true
+    },
+    {
+      "callbacks": false,
+      "name": "facade",
+      "support": "facade",
+      "types": false
+    },
+    {
+      "callbacks": false,
+      "name": "internal",
+      "support": "excluded",
+      "types": false
+    },
+    {
+      "callbacks": true,
+      "name": "spi",
+      "support": "implementer",
+      "types": true
+    },
+    {
+      "callbacks": false,
+      "name": "stable",
+      "support": "stable",
+      "types": true
+    }
+  ],
+  "excluded_modules": [
+    {
+      "category": "internal",
+      "module": "Imp.Agent.Runtime",
+      "source": "lib/imp/agent/runtime.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Observability.Inspection",
+      "source": "lib/imp/observability/inspection.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Engine",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Merge",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Refiner",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Reflection",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Tracking",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Result",
+      "source": "lib/imp/optimize/anything/result.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Avatar.EvalResult",
+      "source": "lib/imp/optimizer/avatar_models.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Acceptance",
+      "source": "lib/imp/optimizer/gepa/acceptance.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Adapter",
+      "source": "lib/imp/optimizer/gepa/adapter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Callback",
+      "source": "lib/imp/optimizer/gepa/callback.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Candidate",
+      "source": "lib/imp/optimizer/gepa/candidate.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.CandidateSelector",
+      "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee",
+      "source": "lib/imp/optimizer/gepa/combee.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.BatchController",
+      "source": "lib/imp/optimizer/gepa/combee/batch_controller.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.BatchController.Options",
+      "source": "lib/imp/optimizer/gepa/combee/batch_controller.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.BatchController.Report",
+      "source": "lib/imp/optimizer/gepa/combee/batch_controller.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.BatchController.Trial",
+      "source": "lib/imp/optimizer/gepa/combee/batch_controller.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.Options",
+      "source": "lib/imp/optimizer/gepa/combee/options.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.Plan",
+      "source": "lib/imp/optimizer/gepa/combee.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.Policy",
+      "source": "lib/imp/optimizer/gepa/combee.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComBee.Report",
+      "source": "lib/imp/optimizer/gepa/combee.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ComponentFeedback",
+      "source": "lib/imp/optimizer/gepa/component_feedback.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ConfidenceAdapter",
+      "source": "lib/imp/optimizer/gepa/confidence_adapter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Evaluation",
+      "source": "lib/imp/optimizer/gepa/evaluation.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache.Backend",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache/backend.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache.Disk",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache/disk.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache.Entry",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache.Memory",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache/memory.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationPolicy",
+      "source": "lib/imp/optimizer/gepa/evaluation_policy.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Frontier",
+      "source": "lib/imp/optimizer/gepa/frontier.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Merge",
+      "source": "lib/imp/optimizer/gepa/merge.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ModuleSelector",
+      "source": "lib/imp/optimizer/gepa/module_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Pareto",
+      "source": "lib/imp/optimizer/gepa/pareto.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Result",
+      "source": "lib/imp/optimizer/gepa/result.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Stopper",
+      "source": "lib/imp/optimizer/gepa/stopper.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Stopper.State",
+      "source": "lib/imp/optimizer/gepa/stopper.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Parameter.Change",
+      "source": "lib/imp/optimizer/parameter/change.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Parameter.Set",
+      "source": "lib/imp/optimizer/parameter/set.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Playbook.Result",
+      "source": "lib/imp/optimizer/playbook.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Playbook.Usage",
+      "source": "lib/imp/optimizer/playbook.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Cache",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.DecodeError",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Event",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Failure",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Parameter",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Timing",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trajectory.Usage",
+      "source": "lib/imp/optimizer/trajectory_types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Avatar.Action",
+      "source": "lib/imp/predict/avatar_models.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Avatar.ActionOutput",
+      "source": "lib/imp/predict/avatar_models.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.SandboxSerializable",
+      "source": "lib/imp/predict/rlm/sandbox_serializable.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Search.Candidate",
+      "source": "lib/imp/predict/search.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Search.Result",
+      "source": "lib/imp/predict/search.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Tasks",
+      "source": "lib/imp/tasks.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Tracking.WandB.Backend",
+      "source": "lib/imp/tracking/wandb/backend.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Tracking.WandB.Transport",
+      "source": "lib/imp/tracking/wandb/transport.ex"
+    }
+  ],
+  "modules": [
+    {
+      "callbacks": [],
+      "category": "facade",
+      "functions": [
+        "append_history/2",
+        "assert/3",
+        "assertion/3",
+        "avatar/3",
+        "best_of_n/3",
+        "call/2",
+        "chain_of_thought/2",
+        "classification/3",
+        "classification_report/2",
+        "code_act/3",
+        "configure/1",
+        "context/2",
+        "disable_logging/0",
+        "dump/1",
+        "dump/2",
+        "enable_logging/0",
+        "evaluate/4",
+        "exact_match/1",
+        "example/1",
+        "extractive_qa/3",
+        "get/3",
+        "history/1",
+        "inputs/1",
+        "inspect_history/2",
+        "knn/3",
+        "labels/1",
+        "load!/1",
+        "load!/2",
+        "load/1",
+        "load/2",
+        "majority/2",
+        "memory/2",
+        "multi_chain_comparison/2",
+        "nearest/2",
+        "optimize/3",
+        "optimize/4",
+        "optimize/5",
+        "optimizer_capabilities/1",
+        "parallel/3",
+        "predict/2",
+        "prediction/1",
+        "program_of_thought/2",
+        "rag/3",
+        "react/3",
+        "react_v2/3",
+        "refine/3",
+        "req_llm/2",
+        "retrieve/3",
+        "rlm/2",
+        "rlm_serializable/3",
+        "save!/2",
+        "save!/3",
+        "settings/0",
+        "signature/2",
+        "subscribe_optimizer_progress/1",
+        "to_map/1",
+        "tool/4",
+        "trace/2",
+        "train/4",
+        "unsubscribe_optimizer_progress/1",
+        "with_demos/2",
+        "with_inputs/2",
+        "with_lm/2",
+        "with_playbook/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp",
+      "signatures": {
+        "functions": {
+          "append_history/2": [
+            "append_history(history, turn)"
+          ],
+          "assert/3": [
+            "assert(program, assertions, opts \\\\ [])"
+          ],
+          "assertion/3": [
+            "assertion(name, predicate, opts \\\\ [])"
+          ],
+          "avatar/3": [
+            "avatar(signature, tools, opts \\\\ [])"
+          ],
+          "best_of_n/3": [
+            "best_of_n(program, metric, opts \\\\ [])"
+          ],
+          "call/2": [
+            "call(program, inputs)"
+          ],
+          "chain_of_thought/2": [
+            "chain_of_thought(signature, opts \\\\ [])"
+          ],
+          "classification/3": [
+            "classification(prediction, label, opts \\\\ [])"
+          ],
+          "classification_report/2": [
+            "classification_report(rows, opts \\\\ [])"
+          ],
+          "code_act/3": [
+            "code_act(signature, tools \\\\ [], opts \\\\ [])"
+          ],
+          "configure/1": [
+            "configure(opts)"
+          ],
+          "context/2": [
+            "context(opts, fun)"
+          ],
+          "disable_logging/0": [
+            "disable_logging()"
+          ],
+          "dump/1": [
+            "dump(program)"
+          ],
+          "dump/2": [
+            "dump(program, opts)"
+          ],
+          "enable_logging/0": [
+            "enable_logging()"
+          ],
+          "evaluate/4": [
+            "evaluate(program, devset, metric, opts \\\\ [])"
+          ],
+          "exact_match/1": [
+            "exact_match(field \\\\ :answer)"
+          ],
+          "example/1": [
+            "example(fields)"
+          ],
+          "extractive_qa/3": [
+            "extractive_qa(prediction, answer, opts \\\\ [])"
+          ],
+          "get/3": [
+            "get(container, key, default \\\\ nil)"
+          ],
+          "history/1": [
+            "history(messages \\\\ [])"
+          ],
+          "inputs/1": [
+            "inputs(example)"
+          ],
+          "inspect_history/2": [
+            "inspect_history(history, opts \\\\ [])"
+          ],
+          "knn/3": [
+            "knn(k, trainset, opts \\\\ [])"
+          ],
+          "labels/1": [
+            "labels(example)"
+          ],
+          "load!/1": [
+            "load!(path)"
+          ],
+          "load!/2": [
+            "load!(path, opts)"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "load/2": [
+            "load(state, opts)"
+          ],
+          "majority/2": [
+            "majority(predictions, opts \\\\ [])"
+          ],
+          "memory/2": [
+            "memory(docs, opts \\\\ [])"
+          ],
+          "multi_chain_comparison/2": [
+            "multi_chain_comparison(signature, opts \\\\ [])"
+          ],
+          "nearest/2": [
+            "nearest(knn, inputs)"
+          ],
+          "optimize/3": [
+            "optimize(program, optimizer, trainset)"
+          ],
+          "optimize/4": [
+            "optimize(program, optimizer, trainset, validation)"
+          ],
+          "optimize/5": [
+            "optimize(program, optimizer, trainset, validation, opts)"
+          ],
+          "optimizer_capabilities/1": [
+            "optimizer_capabilities(optimizer)"
+          ],
+          "parallel/3": [
+            "parallel(program, inputs, opts \\\\ [])"
+          ],
+          "predict/2": [
+            "predict(signature, opts \\\\ [])"
+          ],
+          "prediction/1": [
+            "prediction(fields)"
+          ],
+          "program_of_thought/2": [
+            "program_of_thought(signature, opts \\\\ [])"
+          ],
+          "rag/3": [
+            "rag(program, retriever, opts \\\\ [])"
+          ],
+          "react/3": [
+            "react(signature, tools, opts \\\\ [])"
+          ],
+          "react_v2/3": [
+            "react_v2(signature, tools, opts \\\\ [])"
+          ],
+          "refine/3": [
+            "refine(program, metric, opts \\\\ [])"
+          ],
+          "req_llm/2": [
+            "req_llm(model_spec, opts \\\\ [])"
+          ],
+          "retrieve/3": [
+            "retrieve(retriever, query, opts \\\\ [])"
+          ],
+          "rlm/2": [
+            "rlm(signature, opts \\\\ [])"
+          ],
+          "rlm_serializable/3": [
+            "rlm_serializable(name, loader, opts \\\\ [])"
+          ],
+          "save!/2": [
+            "save!(program, path)"
+          ],
+          "save!/3": [
+            "save!(program, path, opts)"
+          ],
+          "settings/0": [
+            "settings()"
+          ],
+          "signature/2": [
+            "signature(spec, instructions \\\\ nil)"
+          ],
+          "subscribe_optimizer_progress/1": [
+            "subscribe_optimizer_progress(opts \\\\ [])"
+          ],
+          "to_map/1": [
+            "to_map(container)"
+          ],
+          "tool/4": [
+            "tool(name, description, run, opts \\\\ [])"
+          ],
+          "trace/2": [
+            "trace(fun, opts \\\\ [])"
+          ],
+          "train/4": [
+            "train(program, optimizer, trainset, opts \\\\ [])"
+          ],
+          "unsubscribe_optimizer_progress/1": [
+            "unsubscribe_optimizer_progress(subscription)"
+          ],
+          "with_demos/2": [
+            "with_demos(program_or_example, demos)"
+          ],
+          "with_inputs/2": [
+            "with_inputs(example, keys)"
+          ],
+          "with_lm/2": [
+            "with_lm(program, lm)"
+          ],
+          "with_playbook/2": [
+            "with_playbook(program, playbook)"
+          ]
+        }
+      },
+      "source": "lib/imp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [
+        {
+          "name": "format/3",
+          "optional": false
+        },
+        {
+          "name": "parse/3",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "format/4",
+        "parse/4",
+        "validate_adapter/1"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Adapter",
+      "signatures": {
+        "callbacks": {
+          "format/3": [],
+          "parse/3": []
+        },
+        "functions": {
+          "format/4": [
+            "format(adapter, signature, inputs, opts \\\\ [])"
+          ],
+          "parse/4": [
+            "parse(adapter, signature, raw, opts \\\\ [])"
+          ],
+          "validate_adapter/1": [
+            "validate_adapter(module)"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.Chat",
+      "signatures": {},
+      "source": "lib/imp/adapter/chat.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "lm_opts/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.JSON",
+      "signatures": {
+        "functions": {
+          "lm_opts/2": [
+            "lm_opts(signature, opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/json.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.TwoStep",
+      "signatures": {},
+      "source": "lib/imp/adapter/two_step.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.XML",
+      "signatures": {},
+      "source": "lib/imp/adapter/xml.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.AdapterParseError",
+      "signatures": {},
+      "source": "lib/imp/exceptions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "content_from_openai/1",
+        "content_to_openai/1",
+        "from_openai/1",
+        "to_openai/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapters.Types",
+      "signatures": {
+        "functions": {
+          "content_from_openai/1": [
+            "content_from_openai(values)"
+          ],
+          "content_to_openai/1": [
+            "content_to_openai(values)"
+          ],
+          "from_openai/1": [
+            "from_openai(value)"
+          ],
+          "to_openai/1": [
+            "to_openai(image)"
+          ]
+        }
+      },
+      "source": "lib/imp/adapters/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "from_map/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapters.Types.ToolCall",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(call)"
+          ],
+          "from_map/1": [
+            "from_map(call)"
+          ],
+          "new/3": [
+            "new(name, arguments \\\\ %{}, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapters/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapters.Types.ToolCallResults",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(tool_call_results)"
+          ],
+          "new/1": [
+            "new(results \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapters/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "from_dict_list/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapters.Types.ToolCalls",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(tool_calls)"
+          ],
+          "from_dict_list/1": [
+            "from_dict_list(tool_calls)"
+          ],
+          "new/1": [
+            "new(tool_calls \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapters/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapters.Types.ToolResult",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(result)"
+          ],
+          "new/3": [
+            "new(name, result, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapters/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "call_child/4",
+        "call_tool/4",
+        "new/3",
+        "run/3",
+        "stream/3",
+        "stream_events/3",
+        "validate_children/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Agent",
+      "signatures": {
+        "functions": {
+          "call_child/4": [
+            "call_child(agent, name, input, runtime)"
+          ],
+          "call_tool/4": [
+            "call_tool(agent, name, input, runtime)"
+          ],
+          "new/3": [
+            "new(name, handler, opts \\\\ [])"
+          ],
+          "run/3": [
+            "run(agent, inputs, runtime \\\\ Runtime.new())"
+          ],
+          "stream/3": [
+            "stream(agent, inputs, runtime \\\\ Runtime.new())"
+          ],
+          "stream_events/3": [
+            "stream_events(agent, inputs, runtime \\\\ Runtime.new())"
+          ],
+          "validate_children/1": [
+            "validate_children(children)"
+          ]
+        }
+      },
+      "source": "lib/imp/agent.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Assertion",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(name, predicate, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/assertion.ex",
+      "struct_fields": [
+        "message",
+        "name",
+        "predicate"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "clear/0",
+        "configure/1",
+        "fetch_or_store/2",
+        "get/2",
+        "policy/0",
+        "put/2",
+        "reset_stats/0",
+        "start_link/1",
+        "stats/0"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Cache",
+      "signatures": {
+        "functions": {
+          "child_spec/1": [
+            "child_spec(init_arg)"
+          ],
+          "clear/0": [
+            "clear()"
+          ],
+          "configure/1": [
+            "configure(opts \\\\ [])"
+          ],
+          "fetch_or_store/2": [
+            "fetch_or_store(key, fun)"
+          ],
+          "get/2": [
+            "get(key, default \\\\ nil)"
+          ],
+          "policy/0": [
+            "policy()"
+          ],
+          "put/2": [
+            "put(key, value)"
+          ],
+          "reset_stats/0": [
+            "reset_stats()"
+          ],
+          "start_link/1": [
+            "start_link(opts)"
+          ],
+          "stats/0": [
+            "stats()"
+          ]
+        }
+      },
+      "source": "lib/imp/cache.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "token_logprobs/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Capabilities",
+      "signatures": {
+        "functions": {
+          "token_logprobs/1": [
+            "token_logprobs(metadata)"
+          ]
+        },
+        "types": {
+          "unavailable_reason/0": []
+        }
+      },
+      "source": "lib/imp/capabilities.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "unavailable_reason/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Clients.DatabricksTrainer",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.HTTPTrainer",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(provider, submit_url, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1",
+        "verify_job/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.MLXLMTrainer",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ],
+          "verify_job/1": [
+            "verify_job(job)"
+          ]
+        },
+        "types": {
+          "runner/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/mlx_lm_trainer.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "runner/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Clients.OpenAITrainer",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "fulfill/2",
+        "merge_status/2",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.ReinforcementSession",
+      "signatures": {
+        "functions": {
+          "fulfill/2": [
+            "fulfill(session, batch_ids)"
+          ],
+          "merge_status/2": [
+            "merge_status(session, updated)"
+          ],
+          "new/1": [
+            "new(attrs \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "cache_key/3",
+        "dump/1",
+        "generate/3",
+        "generate_async/3",
+        "new/2",
+        "validate_req_module/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.ReqLLM",
+      "signatures": {
+        "functions": {
+          "cache_key/3": [
+            "cache_key(lm, messages, opts)"
+          ],
+          "dump/1": [
+            "dump(lm)"
+          ],
+          "generate/3": [
+            "generate(lm, messages, opts)"
+          ],
+          "generate_async/3": [
+            "generate_async(lm, messages, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(model_spec, opts \\\\ [])"
+          ],
+          "validate_req_module/1": [
+            "validate_req_module(module)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/req_llm.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "req_llm_dispatcher/2",
+        "resume/3",
+        "run/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Clients.ReqLLMBatch",
+      "signatures": {
+        "functions": {
+          "req_llm_dispatcher/2": [
+            "req_llm_dispatcher(client, call_opts \\\\ [])"
+          ],
+          "resume/3": [
+            "resume(checkpoint, dispatcher, opts \\\\ [])"
+          ],
+          "run/3": [
+            "run(requests, dispatcher, opts)"
+          ]
+        },
+        "types": {
+          "context/0": [],
+          "dispatcher/0": [],
+          "outcome/0": [],
+          "request/0": [],
+          "summary/0": []
+        }
+      },
+      "source": "lib/imp/clients/req_llm_batch.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "context/0"
+        },
+        {
+          "kind": "type",
+          "name": "dispatcher/0"
+        },
+        {
+          "kind": "type",
+          "name": "outcome/0"
+        },
+        {
+          "kind": "type",
+          "name": "request/0"
+        },
+        {
+          "kind": "type",
+          "name": "summary/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
+          "name": "final_model_artifact/1",
+          "optional": true
+        },
+        {
+          "name": "final_model_artifact/2",
+          "optional": true
+        },
+        {
+          "name": "finetune/3",
+          "optional": true
+        },
+        {
+          "name": "finetune/4",
+          "optional": true
+        },
+        {
+          "name": "reinforcement_status/1",
+          "optional": true
+        },
+        {
+          "name": "reinforcement_status/2",
+          "optional": true
+        },
+        {
+          "name": "reinforcement_step/3",
+          "optional": true
+        },
+        {
+          "name": "reinforcement_step/4",
+          "optional": true
+        },
+        {
+          "name": "start_reinforcement/2",
+          "optional": true
+        },
+        {
+          "name": "start_reinforcement/3",
+          "optional": true
+        },
+        {
+          "name": "supported_methods/0",
+          "optional": true
+        },
+        {
+          "name": "supported_methods/1",
+          "optional": true
+        },
+        {
+          "name": "terminate_reinforcement/1",
+          "optional": true
+        },
+        {
+          "name": "terminate_reinforcement/2",
+          "optional": true
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "final_model_artifact/2",
+        "finetune/4",
+        "reinforcement_status/2",
+        "reinforcement_step/4",
+        "start_reinforcement/3",
+        "supports_method/2",
+        "terminate_reinforcement/2",
+        "validate_provider/1"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Clients.Trainer",
+      "signatures": {
+        "callbacks": {
+          "final_model_artifact/1": [],
+          "final_model_artifact/2": [],
+          "finetune/3": [],
+          "finetune/4": [],
+          "reinforcement_status/1": [],
+          "reinforcement_status/2": [],
+          "reinforcement_step/3": [],
+          "reinforcement_step/4": [],
+          "start_reinforcement/2": [],
+          "start_reinforcement/3": [],
+          "supported_methods/0": [],
+          "supported_methods/1": [],
+          "terminate_reinforcement/1": [],
+          "terminate_reinforcement/2": []
+        },
+        "functions": {
+          "final_model_artifact/2": [
+            "final_model_artifact(provider, session)"
+          ],
+          "finetune/4": [
+            "finetune(provider, lm, examples, opts \\\\ [])"
+          ],
+          "reinforcement_status/2": [
+            "reinforcement_status(provider, session)"
+          ],
+          "reinforcement_step/4": [
+            "reinforcement_step(provider, session, groups, opts \\\\ [])"
+          ],
+          "start_reinforcement/3": [
+            "start_reinforcement(provider, lm, opts \\\\ [])"
+          ],
+          "supports_method/2": [
+            "supports_method(provider, method)"
+          ],
+          "terminate_reinforcement/2": [
+            "terminate_reinforcement(provider, session)"
+          ],
+          "validate_provider/1": [
+            "validate_provider(provider)"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "active_status?/1",
+        "cancel/1",
+        "complete/2",
+        "dump/1",
+        "fail/2",
+        "load!/2",
+        "load/2",
+        "new/1",
+        "normalize_status/1",
+        "rebind/3",
+        "refresh/1",
+        "save!/2",
+        "terminal_status?/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.TrainingJob",
+      "signatures": {
+        "functions": {
+          "active_status?/1": [
+            "active_status?(status)"
+          ],
+          "cancel/1": [
+            "cancel(job)"
+          ],
+          "complete/2": [
+            "complete(job, result_model)"
+          ],
+          "dump/1": [
+            "dump(job)"
+          ],
+          "fail/2": [
+            "fail(job, reason)"
+          ],
+          "load!/2": [
+            "load!(path, opts \\\\ [])"
+          ],
+          "load/2": [
+            "load(state, opts \\\\ [])"
+          ],
+          "new/1": [
+            "new(attrs)"
+          ],
+          "normalize_status/1": [
+            "normalize_status(status)"
+          ],
+          "rebind/3": [
+            "rebind(job, program, opts \\\\ [])"
+          ],
+          "refresh/1": [
+            "refresh(job)"
+          ],
+          "save!/2": [
+            "save!(job, path)"
+          ],
+          "terminal_status?/1": [
+            "terminal_status?(status)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/training.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "evaluate/3",
+        "feedback/8"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Confidence",
+      "signatures": {
+        "functions": {
+          "evaluate/3": [
+            "evaluate(example, prediction, opts)"
+          ],
+          "feedback/8": [
+            "feedback(correct?, expected, got, joint_logprob, alternatives, context, high, low)"
+          ]
+        },
+        "types": {
+          "fallback/0": []
+        }
+      },
+      "source": "lib/imp/confidence.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "fallback/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "authoritative?/1",
+        "calibrate/2",
+        "compare_brier/2",
+        "evaluate_histogram/3",
+        "fit_histogram/2",
+        "histogram_summary/1",
+        "report/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Confidence.Calibration",
+      "signatures": {
+        "functions": {
+          "authoritative?/1": [
+            "authoritative?(histogram)"
+          ],
+          "calibrate/2": [
+            "calibrate(calibrator, raw_confidence)"
+          ],
+          "compare_brier/2": [
+            "compare_brier(raw_report, calibrated_report)"
+          ],
+          "evaluate_histogram/3": [
+            "evaluate_histogram(calibrator, records, opts \\\\ [])"
+          ],
+          "fit_histogram/2": [
+            "fit_histogram(records, opts \\\\ [])"
+          ],
+          "histogram_summary/1": [
+            "histogram_summary(calibrator)"
+          ],
+          "report/2": [
+            "report(records, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "record/0": []
+        }
+      },
+      "source": "lib/imp/confidence/calibration.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "record/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "score/3"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Confidence.Scoring",
+      "signatures": {
+        "callbacks": {
+          "describe/1": [],
+          "score/3": []
+        },
+        "functions": {
+          "score/3": [
+            "score(strategy, correct?, joint_logprob)"
+          ]
+        }
+      },
+      "source": "lib/imp/confidence/scoring.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Confidence.Scoring.LinearBlend",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/confidence/scoring.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Confidence.Scoring.Sigmoid",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/confidence/scoring.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Confidence.Scoring.Threshold",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/confidence/scoring.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.ContextWindowExceededError",
+      "signatures": {},
+      "source": "lib/imp/exceptions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Core",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.Assistant",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.Developer",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.LMConfig",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.LMRequest",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.LMResponse",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.Message",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [
+        "content",
+        "metadata",
+        "role"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.System",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.ToolCall",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.ToolResult",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Core.User",
+      "signatures": {},
+      "source": "lib/imp/core.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "csv/3",
+        "from_records/3",
+        "gsm8k/1",
+        "hotpotqa/1",
+        "jsonl/3",
+        "split/2",
+        "validate_train_fraction/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets",
+      "signatures": {
+        "functions": {
+          "csv/3": [
+            "csv(path, input_keys, opts \\\\ [])"
+          ],
+          "from_records/3": [
+            "from_records(records, input_keys, opts \\\\ [])"
+          ],
+          "gsm8k/1": [
+            "gsm8k(path)"
+          ],
+          "hotpotqa/1": [
+            "hotpotqa(path)"
+          ],
+          "jsonl/3": [
+            "jsonl(path, input_keys, opts \\\\ [])"
+          ],
+          "split/2": [
+            "split(examples, opts \\\\ [])"
+          ],
+          "validate_train_fraction/1": [
+            "validate_train_fraction(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "load/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets.Colors",
+      "signatures": {
+        "functions": {
+          "load/1": [
+            "load(records)"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "load/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets.DataLoader",
+      "signatures": {
+        "functions": {
+          "load/3": [
+            "load(path, input_keys, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Datasets.Dataset",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(examples, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "load/1",
+        "metric/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets.GSM8K",
+      "signatures": {
+        "functions": {
+          "load/1": [
+            "load(path)"
+          ],
+          "metric/3": [
+            "metric(example, prediction, trace \\\\ nil)"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "load/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets.HotPotQA",
+      "signatures": {
+        "functions": {
+          "load/1": [
+            "load(path)"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "load/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Datasets.MATH",
+      "signatures": {
+        "functions": {
+          "load/1": [
+            "load(path)"
+          ]
+        }
+      },
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "embed/3",
+        "validate_texts!/2"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Embeddings",
+      "signatures": {
+        "callbacks": {
+          "embed/2": []
+        },
+        "functions": {
+          "embed/3": [
+            "embed(embedder, texts, opts \\\\ [])"
+          ],
+          "validate_texts!/2": [
+            "validate_texts!(texts, context)"
+          ]
+        }
+      },
+      "source": "lib/imp/embeddings.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Embeddings.BagOfWords",
+      "signatures": {},
+      "source": "lib/imp/embeddings.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Error",
+      "signatures": {},
+      "source": "lib/imp/exceptions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "retryable?/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Errors",
+      "signatures": {
+        "functions": {
+          "retryable?/1": [
+            "retryable?(arg1)"
+          ]
+        }
+      },
+      "source": "lib/imp/exceptions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/3",
+        "run/2",
+        "validate_max_errors/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Evaluate",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(devset, metric, opts \\\\ [])"
+          ],
+          "run/2": [
+            "run(evaluator, program)"
+          ],
+          "validate_max_errors/1": [
+            "validate_max_errors(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/evaluate.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Evaluate.CompleteAndGrounded",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/evaluate/auto_evaluation.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Evaluate.Result",
+      "signatures": {},
+      "source": "lib/imp/evaluate.ex",
+      "struct_fields": [
+        "errors",
+        "rows",
+        "score"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Evaluate.SemanticF1",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/evaluate/auto_evaluation.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "delete/2",
+        "fetch!/2",
+        "get/3",
+        "inputs/1",
+        "items/1",
+        "keys/1",
+        "labels/1",
+        "new/1",
+        "put/3",
+        "to_map/1",
+        "values/1",
+        "with_demos/2",
+        "with_inputs/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Example",
+      "signatures": {
+        "functions": {
+          "delete/2": [
+            "delete(example, key)"
+          ],
+          "fetch!/2": [
+            "fetch!(example, key)"
+          ],
+          "get/3": [
+            "get(example, key, default \\\\ nil)"
+          ],
+          "inputs/1": [
+            "inputs(example)"
+          ],
+          "items/1": [
+            "items(example)"
+          ],
+          "keys/1": [
+            "keys(example)"
+          ],
+          "labels/1": [
+            "labels(example)"
+          ],
+          "new/1": [
+            "new(fields \\\\ %{})"
+          ],
+          "put/3": [
+            "put(example, key, value)"
+          ],
+          "to_map/1": [
+            "to_map(example)"
+          ],
+          "values/1": [
+            "values(example)"
+          ],
+          "with_demos/2": [
+            "with_demos(example, demos)"
+          ],
+          "with_inputs/2": [
+            "with_inputs(example, keys)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/example.ex",
+      "struct_fields": [
+        "demos",
+        "fields",
+        "input_keys"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "run/3",
+        "start/3",
+        "stop/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ExternalCommand",
+      "signatures": {
+        "functions": {
+          "run/3": [
+            "run(executable, argv, opts \\\\ [])"
+          ],
+          "start/3": [
+            "start(executable, argv, opts \\\\ [])"
+          ],
+          "stop/2": [
+            "stop(handle, timeout \\\\ 10000)"
+          ]
+        },
+        "types": {
+          "result/0": []
+        }
+      },
+      "source": "lib/imp/external_command.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "result/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.ExternalCommand.Handle",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/external_command.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "post/5",
+        "request/6",
+        "stream/5",
+        "validate_transport/1"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.HTTP",
+      "signatures": {
+        "callbacks": {
+          "post/4": [],
+          "request/5": [],
+          "stream/4": []
+        },
+        "functions": {
+          "post/5": [
+            "post(transport, url, headers, body, opts \\\\ [])"
+          ],
+          "request/6": [
+            "request(transport, method, url, headers, body, opts \\\\ [])"
+          ],
+          "stream/5": [
+            "stream(transport, url, headers, body, opts \\\\ [])"
+          ],
+          "validate_transport/1": [
+            "validate_transport(transport)"
+          ]
+        },
+        "types": {
+          "method/0": []
+        }
+      },
+      "source": "lib/imp/http.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "method/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "append/2",
+        "dump/1",
+        "load/1",
+        "messages/1",
+        "new/1",
+        "redact/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.History",
+      "signatures": {
+        "functions": {
+          "append/2": [
+            "append(history, turn)"
+          ],
+          "dump/1": [
+            "dump(history)"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "messages/1": [
+            "messages(history)"
+          ],
+          "new/1": [
+            "new(messages \\\\ [])"
+          ],
+          "redact/2": [
+            "redact(history, keys \\\\ Imp.Redaction.default_keys())"
+          ]
+        },
+        "types": {
+          "field_key/0": [],
+          "t/0": [],
+          "turn/0": []
+        }
+      },
+      "source": "lib/imp/history.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "field_key/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        },
+        {
+          "kind": "type",
+          "name": "turn/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "generate/3",
+        "validate_lm/1"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.LM",
+      "signatures": {
+        "callbacks": {
+          "generate/2": [],
+          "stream/3": []
+        },
+        "functions": {
+          "generate/3": [
+            "generate(lm, messages, opts \\\\ [])"
+          ],
+          "validate_lm/1": [
+            "validate_lm(module)"
+          ]
+        }
+      },
+      "source": "lib/imp/lm.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "metadata/1",
+        "output/1",
+        "split/1",
+        "unwrap/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.LM.Result",
+      "signatures": {
+        "functions": {
+          "metadata/1": [
+            "metadata(value)"
+          ],
+          "output/1": [
+            "output(value)"
+          ],
+          "split/1": [
+            "split(value)"
+          ],
+          "unwrap/1": [
+            "unwrap(error)"
+          ]
+        },
+        "types": {
+          "metadata/0": [],
+          "output/0": []
+        }
+      },
+      "source": "lib/imp/lm/result.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "metadata/0"
+        },
+        {
+          "kind": "type",
+          "name": "output/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.LM.Static",
+      "signatures": {},
+      "source": "lib/imp/lm/static.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.LMError",
+      "signatures": {},
+      "source": "lib/imp/exceptions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "extract/4"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Logprobs",
+      "signatures": {
+        "functions": {
+          "extract/4": [
+            "extract(content, logprobs, field_path, enum_values)"
+          ]
+        },
+        "types": {
+          "alternative/0": [],
+          "extraction/0": []
+        }
+      },
+      "source": "lib/imp/logprobs.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "alternative/0"
+        },
+        {
+          "kind": "type",
+          "name": "extraction/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "import_tools/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.MCP",
+      "signatures": {
+        "functions": {
+          "import_tools/1": [
+            "import_tools(catalog)"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "list_tools/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.Catalog",
+      "signatures": {
+        "functions": {
+          "list_tools/1": [
+            "list_tools(catalog)"
+          ],
+          "new/1": [
+            "new(tools)"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "list_tools/1",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.HTTPClient",
+      "signatures": {
+        "functions": {
+          "list_tools/1": [
+            "list_tools(client)"
+          ],
+          "new/2": [
+            "new(url, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "encode/3",
+        "list_tools/1",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.StdioClient",
+      "signatures": {
+        "functions": {
+          "encode/3": [
+            "encode(method, params \\\\ %{}, id \\\\ next_id())"
+          ],
+          "list_tools/1": [
+            "list_tools(client)"
+          ],
+          "new/2": [
+            "new(command, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "headers/1",
+        "list_tools/1",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.StreamableHTTPClient",
+      "signatures": {
+        "functions": {
+          "headers/1": [
+            "headers(client)"
+          ],
+          "list_tools/1": [
+            "list_tools(client)"
+          ],
+          "new/2": [
+            "new(url, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "answer_passage_match/2",
+        "answer_type/1",
+        "classification/3",
+        "classification_report/2",
+        "em/2",
+        "exact_match/1",
+        "extractive_qa/3",
+        "f1/2",
+        "feedback/1",
+        "normalize_result/1",
+        "normalize_text/1",
+        "pass?/1",
+        "retrieval_recall/3",
+        "score/1",
+        "span_relation/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Metrics",
+      "signatures": {
+        "functions": {
+          "answer_passage_match/2": [
+            "answer_passage_match(answer_field \\\\ :answer, context_field \\\\ :context)"
+          ],
+          "answer_type/1": [
+            "answer_type(answer)"
+          ],
+          "classification/3": [
+            "classification(prediction, label, opts \\\\ [])"
+          ],
+          "classification_report/2": [
+            "classification_report(rows, opts \\\\ [])"
+          ],
+          "em/2": [
+            "em(prediction, answers)"
+          ],
+          "exact_match/1": [
+            "exact_match(field \\\\ :answer)"
+          ],
+          "extractive_qa/3": [
+            "extractive_qa(prediction, answer, opts \\\\ [])"
+          ],
+          "f1/2": [
+            "f1(prediction, answers)"
+          ],
+          "feedback/1": [
+            "feedback(value)"
+          ],
+          "normalize_result/1": [
+            "normalize_result(result)"
+          ],
+          "normalize_text/1": [
+            "normalize_text(value)"
+          ],
+          "pass?/1": [
+            "pass?(value)"
+          ],
+          "retrieval_recall/3": [
+            "retrieval_recall(prediction, expected_ids, opts \\\\ [])"
+          ],
+          "score/1": [
+            "score(value)"
+          ],
+          "span_relation/2": [
+            "span_relation(prediction, answer)"
+          ]
+        }
+      },
+      "source": "lib/imp/metrics.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Metrics.Result",
+      "signatures": {},
+      "source": "lib/imp/metrics.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [
+        {
+          "name": "call/2",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "call/2"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Module",
+      "signatures": {
+        "callbacks": {
+          "call/2": []
+        },
+        "functions": {
+          "call/2": [
+            "call(program, inputs)"
+          ]
+        }
+      },
+      "source": "lib/imp/module.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "disable_logging/0",
+        "enable_logging/0",
+        "inspect_artifact/2",
+        "inspect_history/2",
+        "log/3",
+        "logging_enabled?/0",
+        "render_inspection/2",
+        "status/1",
+        "subscribe_optimizer/1",
+        "trace/2",
+        "unsubscribe_optimizer/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Observability",
+      "signatures": {
+        "functions": {
+          "disable_logging/0": [
+            "disable_logging()"
+          ],
+          "enable_logging/0": [
+            "enable_logging()"
+          ],
+          "inspect_artifact/2": [
+            "inspect_artifact(value, opts \\\\ [])"
+          ],
+          "inspect_history/2": [
+            "inspect_history(history, opts \\\\ [])"
+          ],
+          "log/3": [
+            "log(level, message, metadata \\\\ [])"
+          ],
+          "logging_enabled?/0": [
+            "logging_enabled?()"
+          ],
+          "render_inspection/2": [
+            "render_inspection(value, opts \\\\ [])"
+          ],
+          "status/1": [
+            "status(value)"
+          ],
+          "subscribe_optimizer/1": [
+            "subscribe_optimizer(opts \\\\ [])"
+          ],
+          "trace/2": [
+            "trace(fun, opts \\\\ [])"
+          ],
+          "unsubscribe_optimizer/1": [
+            "unsubscribe_optimizer(subscription)"
+          ]
+        }
+      },
+      "source": "lib/imp/observability.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Observability.ProgressSubscription",
+      "signatures": {},
+      "source": "lib/imp/observability.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Observability.Status",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/observability/status.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Observability.Trace",
+      "signatures": {},
+      "source": "lib/imp/observability.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "run/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimize.Anything",
+      "signatures": {
+        "functions": {
+          "run/3": [
+            "run(seed_candidate, evaluator, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimize/anything.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "capabilities/1",
+        "run/3",
+        "run/4",
+        "run_with_datasets/4"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Optimizer",
+      "signatures": {
+        "callbacks": {
+          "run/3": []
+        },
+        "functions": {
+          "capabilities/1": [
+            "capabilities(optimizer)"
+          ],
+          "run/3": [
+            "run(optimizer, program, opts)"
+          ],
+          "run/4": [
+            "run(optimizer, program, opts, expected_kind)"
+          ],
+          "run_with_datasets/4": [
+            "run_with_datasets(optimizer, program, available_datasets, allowed_kinds \\\\ :any)"
+          ]
+        },
+        "types": {
+          "capabilities/0": [],
+          "kind/0": [],
+          "requirement/0": []
+        }
+      },
+      "source": "lib/imp/optimizer.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "capabilities/0"
+        },
+        {
+          "kind": "type",
+          "name": "kind/0"
+        },
+        {
+          "kind": "type",
+          "name": "requirement/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "apply/4",
+        "candidate/3",
+        "compare/4",
+        "inspect/1",
+        "new/3",
+        "promote/2",
+        "read!/1",
+        "rollback/1",
+        "write!/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.Artifact",
+      "signatures": {
+        "functions": {
+          "apply/4": [
+            "apply(artifact, program, selection \\\\ :champion, opts \\\\ [])"
+          ],
+          "candidate/3": [
+            "candidate(id, program, opts \\\\ [])"
+          ],
+          "compare/4": [
+            "compare(artifact, left, right, opts \\\\ [])"
+          ],
+          "inspect/1": [
+            "inspect(artifact)"
+          ],
+          "new/3": [
+            "new(champion, challengers \\\\ [], opts \\\\ [])"
+          ],
+          "promote/2": [
+            "promote(artifact, candidate_id)"
+          ],
+          "read!/1": [
+            "read!(path)"
+          ],
+          "rollback/1": [
+            "rollback(artifact)"
+          ],
+          "write!/2": [
+            "write!(artifact, path)"
+          ]
+        },
+        "types": {
+          "artifact/0": [],
+          "candidate/0": [],
+          "selection/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/artifact.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "artifact/0"
+        },
+        {
+          "kind": "type",
+          "name": "candidate/0"
+        },
+        {
+          "kind": "type",
+          "name": "selection/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Avatar",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(optimizer, student, trainset)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/avatar.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "new/2",
+        "validate_optimizer_compile_args/1",
+        "validate_strategy/1",
+        "validate_valset_ratio/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.BetterTogether",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(bt, student, trainset, valset, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, optimizers \\\\ %{})"
+          ],
+          "validate_optimizer_compile_args/1": [
+            "validate_optimizer_compile_args(value)"
+          ],
+          "validate_strategy/1": [
+            "validate_strategy(strategy)"
+          ],
+          "validate_valset_ratio/1": [
+            "validate_valset_ratio(value)"
+          ]
+        },
+        "types": {
+          "step_request/0": [],
+          "teacher/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/better_together.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "step_request/0"
+        },
+        {
+          "kind": "type",
+          "name": "teacher/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/4",
+        "new/0",
+        "new/1",
+        "new/2",
+        "validate_optional_max_errors/1",
+        "validate_optional_number/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.BootstrapFewShot",
+      "signatures": {
+        "functions": {
+          "compile/4": [
+            "compile(optimizer, student, trainset, opts \\\\ [])"
+          ],
+          "new/0": [
+            "new()"
+          ],
+          "new/1": [
+            "new(opts)"
+          ],
+          "new/2": [
+            "new(metric, opts)"
+          ],
+          "validate_optional_max_errors/1": [
+            "validate_optional_max_errors(value)"
+          ],
+          "validate_optional_number/1": [
+            "validate_optional_number(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/bootstrap_few_shot.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "new/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.BootstrapFewShotWithRandomSearch",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(optimizer, program, trainset, devset \\\\ nil, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/bootstrap_rs.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "new/2",
+        "validate_teacher/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.BootstrapFinetune",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(optimizer, program, trainset)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ],
+          "validate_teacher/1": [
+            "validate_teacher(teachers)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/bootstrap_finetune.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "new/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.BootstrapRS",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(optimizer, program, trainset, devset \\\\ nil, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/bootstrap_rs.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "new/2",
+        "validate_optional_max_errors/1",
+        "validate_optional_positive/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.COPRO",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(optimizer, program, trainset, devset \\\\ [], eval_opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ],
+          "validate_optional_max_errors/1": [
+            "validate_optional_max_errors(value)"
+          ],
+          "validate_optional_positive/1": [
+            "validate_optional_positive(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/copro.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/2",
+        "new/1",
+        "validate_reduce_fn/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Ensemble",
+      "signatures": {
+        "functions": {
+          "compile/2": [
+            "compile(ensemble, programs)"
+          ],
+          "new/1": [
+            "new(opts \\\\ [])"
+          ],
+          "validate_reduce_fn/1": [
+            "validate_reduce_fn(reduce_fn)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/ensemble.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "compile_with_report/5",
+        "new/2",
+        "validate_feedback_fn/1",
+        "validate_proposal_concurrency/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.GEPA",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(optimizer, program, trainset, devset, opts \\\\ [])"
+          ],
+          "compile_with_report/5": [
+            "compile_with_report(optimizer, program, trainset, devset, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ],
+          "validate_feedback_fn/1": [
+            "validate_feedback_fn(feedback_fn)"
+          ],
+          "validate_proposal_concurrency/1": [
+            "validate_proposal_concurrency(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/gepa.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "compile/4",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.GRPO",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(optimizer, program, trainset)"
+          ],
+          "compile/4": [
+            "compile(optimizer, program, trainset, opts)"
+          ],
+          "new/2": [
+            "new(reward_fn, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/grpo.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/4",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.InferRules",
+      "signatures": {
+        "functions": {
+          "compile/4": [
+            "compile(infer_rules, program, trainset, devset)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/infer_rules.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "propose/3",
+        "propose_with_report/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.InstructionProposer",
+      "signatures": {
+        "functions": {
+          "propose/3": [
+            "propose(program, trainset, opts \\\\ [])"
+          ],
+          "propose_with_report/3": [
+            "propose_with_report(program, trainset, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/instruction_proposer.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "candidate_instructions/3",
+        "compile/6",
+        "current_instruction/1",
+        "put_instruction/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.InstructionSearch",
+      "signatures": {
+        "functions": {
+          "candidate_instructions/3": [
+            "candidate_instructions(program, trainset, opts \\\\ [])"
+          ],
+          "compile/6": [
+            "compile(program, metric, trainset, devset, candidates, opts \\\\ [])"
+          ],
+          "current_instruction/1": [
+            "current_instruction(program)"
+          ],
+          "put_instruction/2": [
+            "put_instruction(program, instruction)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/instruction_search.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/2",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.KNNFewShot",
+      "signatures": {
+        "functions": {
+          "compile/2": [
+            "compile(optimizer, student)"
+          ],
+          "new/3": [
+            "new(k, trainset, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/knn_few_shot.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.LabeledFewShot",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(labeled_few_shot, program, trainset)"
+          ],
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/labeled_few_shot.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "compile/4",
+        "compile/5",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.MIPROv2",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(optimizer, program, opts)"
+          ],
+          "compile/4": [
+            "compile(optimizer, program, trainset, valset)"
+          ],
+          "compile/5": [
+            "compile(optimizer, program, trainset, valset, opts)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/mipro_v2.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "content_digest/2",
+        "dump/1",
+        "kinds/0",
+        "load!/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Parameter",
+      "signatures": {
+        "functions": {
+          "content_digest/2": [
+            "content_digest(kind, value)"
+          ],
+          "dump/1": [
+            "dump(parameter)"
+          ],
+          "kinds/0": [
+            "kinds()"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "new/3": [
+            "new(id, kind, value)"
+          ]
+        },
+        "types": {
+          "json_value/0": [],
+          "kind/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/parameter.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "json_value/0"
+        },
+        {
+          "kind": "type",
+          "name": "kind/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/6",
+        "new/1",
+        "restore/3",
+        "retained_bytes/1",
+        "rollback/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Playbook",
+      "signatures": {
+        "functions": {
+          "compile/6": [
+            "compile(optimizer, program, trainset, promotionset, auditset, opts \\\\ [])"
+          ],
+          "new/1": [
+            "new(opts)"
+          ],
+          "restore/3": [
+            "restore(checkpoint, program, parameter \\\\ :playbook)"
+          ],
+          "retained_bytes/1": [
+            "retained_bytes(playbook)"
+          ],
+          "rollback/1": [
+            "rollback(result)"
+          ]
+        },
+        "types": {
+          "row/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/playbook.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "row/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/5",
+        "new/2",
+        "validate_optional_integer/1",
+        "validate_optional_max_errors/1",
+        "validate_optional_non_negative/1",
+        "validate_optional_number/1",
+        "validate_optional_positive/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.RandomSearch",
+      "signatures": {
+        "functions": {
+          "compile/5": [
+            "compile(optimizer, student, trainset, valset \\\\ nil, opts \\\\ [])"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ],
+          "validate_optional_integer/1": [
+            "validate_optional_integer(value)"
+          ],
+          "validate_optional_max_errors/1": [
+            "validate_optional_max_errors(value)"
+          ],
+          "validate_optional_non_negative/1": [
+            "validate_optional_non_negative(value)"
+          ],
+          "validate_optional_number/1": [
+            "validate_optional_number(value)"
+          ],
+          "validate_optional_positive/1": [
+            "validate_optional_positive(value)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/random_search.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "attach/2",
+        "decode_term/1",
+        "dump/1",
+        "encode_term/1",
+        "fetch/1",
+        "json_safe/1",
+        "load/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Report",
+      "signatures": {
+        "functions": {
+          "attach/2": [
+            "attach(program, report)"
+          ],
+          "decode_term/1": [
+            "decode_term(value)"
+          ],
+          "dump/1": [
+            "dump(report)"
+          ],
+          "encode_term/1": [
+            "encode_term(value)"
+          ],
+          "fetch/1": [
+            "fetch(program)"
+          ],
+          "json_safe/1": [
+            "json_safe(value)"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "new/1": [
+            "new(attrs \\\\ %{})"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/report.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/3",
+        "compile/4",
+        "compile/5",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.SIMBA",
+      "signatures": {
+        "functions": {
+          "compile/3": [
+            "compile(optimizer, program, trainset)"
+          ],
+          "compile/4": [
+            "compile(optimizer, program, trainset, final_set_or_opts)"
+          ],
+          "compile/5": [
+            "compile(optimizer, program, trainset, final_set, opts)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/simba.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "choose/2",
+        "dump/1",
+        "integer/2",
+        "load!/1",
+        "new/1",
+        "percentile/2",
+        "poisson/2",
+        "shuffle/2",
+        "softmax_choose/3",
+        "uniform/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.Sampling",
+      "signatures": {
+        "functions": {
+          "choose/2": [
+            "choose(values, state)"
+          ],
+          "dump/1": [
+            "dump(state)"
+          ],
+          "integer/2": [
+            "integer(count, state)"
+          ],
+          "load!/1": [
+            "load!(value)"
+          ],
+          "new/1": [
+            "new(seed)"
+          ],
+          "percentile/2": [
+            "percentile(values, percentile)"
+          ],
+          "poisson/2": [
+            "poisson(lambda, state)"
+          ],
+          "shuffle/2": [
+            "shuffle(values, state)"
+          ],
+          "softmax_choose/3": [
+            "softmax_choose(scored, temperature, state)"
+          ],
+          "uniform/1": [
+            "uniform(state)"
+          ]
+        },
+        "types": {
+          "state/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/sampling.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "state/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compile/4",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.SignatureOptimizer",
+      "signatures": {
+        "functions": {
+          "compile/4": [
+            "compile(optimizer, program, trainset, devset)"
+          ],
+          "new/2": [
+            "new(metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/signature_optimizer.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.TrainingError",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.TrainingResult",
+      "signatures": {
+        "types": {
+          "status/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "status/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "dump/1",
+        "load!/1",
+        "load/1",
+        "project/3",
+        "redact/2",
+        "schema_version/0",
+        "validate!/1",
+        "validate_aligned!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Trajectory",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(trajectory)"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "project/3": [
+            "project(runtime, value, opts \\\\ [])"
+          ],
+          "redact/2": [
+            "redact(trajectory, keys \\\\ Imp.Redaction.default_keys())"
+          ],
+          "schema_version/0": [
+            "schema_version()"
+          ],
+          "validate!/1": [
+            "validate!(trajectory)"
+          ],
+          "validate_aligned!/1": [
+            "validate_aligned!(trajectories)"
+          ]
+        },
+        "types": {
+          "runtime/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/trajectory.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "runtime/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "run/4"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.TrajectoryRunner",
+      "signatures": {
+        "functions": {
+          "run/4": [
+            "run(program, examples, metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/trajectory.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "apply_delta/2",
+        "dump/1",
+        "fetch/2",
+        "load!/1",
+        "new/1",
+        "render/1",
+        "serialize/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook",
+      "signatures": {
+        "functions": {
+          "apply_delta/2": [
+            "apply_delta(playbook, operations)"
+          ],
+          "dump/1": [
+            "dump(playbook)"
+          ],
+          "fetch/2": [
+            "fetch(playbook, id)"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "new/1": [
+            "new(opts \\\\ [])"
+          ],
+          "render/1": [
+            "render(playbook)"
+          ],
+          "serialize/1": [
+            "serialize(playbook)"
+          ]
+        },
+        "types": {
+          "error/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "error/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Delta",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(operations, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "operation/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/delta.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "operation/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2",
+        "normalize/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Entry",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(content, opts \\\\ [])"
+          ],
+          "normalize/1": [
+            "normalize(content)"
+          ]
+        },
+        "types": {
+          "status/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/entry.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "status/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Operation.Add",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(content, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/operation/add.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Operation.Merge",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(ids, content, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/operation/merge.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Operation.Remove",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(id, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/operation/remove.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Operation.Revise",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(id, content, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/operation/revise.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Operation.UpdateCounters",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(id, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/operation/update_counters.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Policy",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/policy.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Provenance",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/provenance.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.Tombstone",
+      "signatures": {
+        "types": {
+          "operation/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/tombstone.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "operation/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Playbook.WithContext",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(program, playbook)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/playbook/with_context.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "default_normalize/1",
+        "majority/2",
+        "validate_normalize/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Predict.Aggregation",
+      "signatures": {
+        "functions": {
+          "default_normalize/1": [
+            "default_normalize(value)"
+          ],
+          "majority/2": [
+            "majority(predictions, opts \\\\ [])"
+          ],
+          "validate_normalize/1": [
+            "validate_normalize(normalize)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/aggregation.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.Assertions",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(wrapper, inputs)"
+          ],
+          "new/3": [
+            "new(program, assertions, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/assertions.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "current_instruction/1",
+        "new/3",
+        "put_instruction/2",
+        "with_lm/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.Avatar",
+      "signatures": {
+        "functions": {
+          "current_instruction/1": [
+            "current_instruction(avatar)"
+          ],
+          "new/3": [
+            "new(signature, tools, opts \\\\ [])"
+          ],
+          "put_instruction/2": [
+            "put_instruction(avatar, instruction)"
+          ],
+          "with_lm/2": [
+            "with_lm(avatar, lm)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/avatar.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/3",
+        "validate_feedback_fn/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.BestOfN",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(best, inputs)"
+          ],
+          "new/3": [
+            "new(program, metric, opts \\\\ [])"
+          ],
+          "validate_feedback_fn/1": [
+            "validate_feedback_fn(feedback_fn)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/best_of_n.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.ChainOfThought",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/chain_of_thought.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.CodeAct",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(signature, tools \\\\ [], opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/predict/code_act.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.KNN",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(knn, inputs)"
+          ],
+          "new/3": [
+            "new(k, trainset, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/knn.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/2",
+        "validate_m/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.MultiChainComparison",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(mcc, inputs)"
+          ],
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ],
+          "validate_m/1": [
+            "validate_m(m)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/multi_chain_comparison.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "map/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Predict.Parallel",
+      "signatures": {
+        "functions": {
+          "map/3": [
+            "map(program, inputs, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/parallel.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "dump/1",
+        "new/2",
+        "with_demos/2",
+        "with_lm/2",
+        "with_signature/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.Predict",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(predict, inputs)"
+          ],
+          "dump/1": [
+            "dump(predict)"
+          ],
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ],
+          "with_demos/2": [
+            "with_demos(predict, demos)"
+          ],
+          "with_lm/2": [
+            "with_lm(predict, lm)"
+          ],
+          "with_signature/2": [
+            "with_signature(predict, signature)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/predict.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2",
+        "validate_output_field/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.ProgramOfThought",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ],
+          "validate_output_field/1": [
+            "validate_output_field(field)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/predict/program_of_thought.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.RAG",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(rag, inputs)"
+          ],
+          "new/3": [
+            "new(program, retriever, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/rag.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "close/1",
+        "new/2",
+        "sandbox_serializable/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.RLM",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(rlm, inputs)"
+          ],
+          "close/1": [
+            "close(rlm)"
+          ],
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ],
+          "sandbox_serializable/3": [
+            "sandbox_serializable(name, loader, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/rlm.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.ReAct",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(signature, tools, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/react.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.ReActV2",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(signature, tools, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/react_v2.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "call/2",
+        "new/3",
+        "validate_feedback_fn/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.Refine",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(refine, inputs)"
+          ],
+          "new/3": [
+            "new(program, metric, opts \\\\ [])"
+          ],
+          "validate_feedback_fn/1": [
+            "validate_feedback_fn(feedback_fn)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict/refine.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "run/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Predict.Search",
+      "signatures": {
+        "functions": {
+          "run/3": [
+            "run(candidates, evaluator, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "evaluator/0": []
+        }
+      },
+      "source": "lib/imp/predict/search.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "evaluator/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "fetch!/2",
+        "from_example/2",
+        "get/3",
+        "new/2",
+        "put/3",
+        "to_map/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Prediction",
+      "signatures": {
+        "functions": {
+          "fetch!/2": [
+            "fetch!(prediction, key)"
+          ],
+          "from_example/2": [
+            "from_example(example, opts \\\\ [])"
+          ],
+          "get/3": [
+            "get(prediction, key, default \\\\ nil)"
+          ],
+          "new/2": [
+            "new(fields \\\\ %{}, opts \\\\ [])"
+          ],
+          "put/3": [
+            "put(prediction, key, value)"
+          ],
+          "to_map/1": [
+            "to_map(prediction)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/prediction.ex",
+      "struct_fields": [
+        "completions",
+        "fields",
+        "metadata",
+        "score"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "apply_changes/2",
+        "apply_changes_with_snapshot/2",
+        "diff/2",
+        "parameters/1",
+        "playbooks/1",
+        "predictors/1",
+        "put_config/3",
+        "put_demos/3",
+        "put_instruction/3",
+        "put_playbook/3",
+        "put_tool_description/3",
+        "put_tool_schema/3",
+        "snapshot/1",
+        "update_playbook/3",
+        "update_predictor/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ProgramParameters",
+      "signatures": {
+        "functions": {
+          "apply_changes/2": [
+            "apply_changes(program, changes)"
+          ],
+          "apply_changes_with_snapshot/2": [
+            "apply_changes_with_snapshot(program, changes)"
+          ],
+          "diff/2": [
+            "diff(source, target)"
+          ],
+          "parameters/1": [
+            "parameters(program)"
+          ],
+          "playbooks/1": [
+            "playbooks(program)"
+          ],
+          "predictors/1": [
+            "predictors(program)"
+          ],
+          "put_config/3": [
+            "put_config(program, name, config)"
+          ],
+          "put_demos/3": [
+            "put_demos(program, name, demos)"
+          ],
+          "put_instruction/3": [
+            "put_instruction(program, name, instruction)"
+          ],
+          "put_playbook/3": [
+            "put_playbook(program, name, playbook)"
+          ],
+          "put_tool_description/3": [
+            "put_tool_description(program, name, description)"
+          ],
+          "put_tool_schema/3": [
+            "put_tool_schema(program, name, schema)"
+          ],
+          "snapshot/1": [
+            "snapshot(program)"
+          ],
+          "update_playbook/3": [
+            "update_playbook(program, name, update)"
+          ],
+          "update_predictor/3": [
+            "update_predictor(program, name, update)"
+          ]
+        },
+        "types": {
+          "entry/0": [],
+          "name/0": [],
+          "playbook_entry/0": []
+        }
+      },
+      "source": "lib/imp/program_parameters.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "entry/0"
+        },
+        {
+          "kind": "type",
+          "name": "name/0"
+        },
+        {
+          "kind": "type",
+          "name": "playbook_entry/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "default_keys/0",
+        "drop_credentials/1",
+        "redact/2",
+        "validate_keys/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Redaction",
+      "signatures": {
+        "functions": {
+          "default_keys/0": [
+            "default_keys()"
+          ],
+          "drop_credentials/1": [
+            "drop_credentials(value)"
+          ],
+          "redact/2": [
+            "redact(value, keys \\\\ [:api_key, :authorization, :proxy_authorization, :auth, :bearer, :session, :token, :api_token, :auth_token, :bearer_token, :refresh_token, :id_token, :session_token, :password, :secret, :access_token, :access_key, :access_key_id, :secret_key, :secret_access_key, :client_secret, :private_key, :private_token, :service_account_key, :credential, :credentials, :\"x-api-key\"])"
+          ],
+          "validate_keys/1": [
+            "validate_keys(keys)"
+          ]
+        }
+      },
+      "source": "lib/imp/redaction.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [
+        {
+          "name": "retrieve/2",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "retrieve/3"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Retrieve",
+      "signatures": {
+        "callbacks": {
+          "retrieve/2": []
+        },
+        "functions": {
+          "retrieve/3": [
+            "retrieve(retriever, query, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/retrieve.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Retrieve.Memory",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(docs, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/retrieve.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Retrievers.Databricks",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(endpoint_url, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/retrievers/http.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/2",
+        "normalize_doc/1",
+        "validate_retry_backoff/1",
+        "validate_retry_statuses/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Retrievers.HTTP",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(url, opts \\\\ [])"
+          ],
+          "normalize_doc/1": [
+            "normalize_doc(doc)"
+          ],
+          "validate_retry_backoff/1": [
+            "validate_retry_backoff(value)"
+          ],
+          "validate_retry_statuses/1": [
+            "validate_retry_statuses(statuses)"
+          ]
+        }
+      },
+      "source": "lib/imp/retrievers/http.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "call/2",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Retrievers.KNN",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(knn, query)"
+          ],
+          "new/2": [
+            "new(examples, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/retrievers/knn.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Retrievers.Weaviate",
+      "signatures": {
+        "functions": {
+          "new/3": [
+            "new(base_url, class_name, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/retrievers/http.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "eval/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Sandbox",
+      "signatures": {
+        "functions": {
+          "eval/2": [
+            "eval(expression, vars \\\\ %{})"
+          ]
+        }
+      },
+      "source": "lib/imp/sandbox.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "dump/1",
+        "dump/2",
+        "load!/2",
+        "load/1",
+        "load/2",
+        "save!/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Saving",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(program)"
+          ],
+          "dump/2": [
+            "dump(program, opts)"
+          ],
+          "load!/2": [
+            "load!(path, opts \\\\ [])"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "load/2": [
+            "load(state, opts)"
+          ],
+          "save!/3": [
+            "save!(program, path, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/saving.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Saving.Registry",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(entries \\\\ %{})"
+          ]
+        }
+      },
+      "source": "lib/imp/saving/registry.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "json_schema/1",
+        "retry_feedback/1",
+        "validate_field/2",
+        "validate_fields/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Schema",
+      "signatures": {
+        "functions": {
+          "json_schema/1": [
+            "json_schema(fields)"
+          ],
+          "retry_feedback/1": [
+            "retry_feedback(errors)"
+          ],
+          "validate_field/2": [
+            "validate_field(field, value)"
+          ],
+          "validate_fields/2": [
+            "validate_fields(fields, values)"
+          ]
+        }
+      },
+      "source": "lib/imp/schema.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "configure/1",
+        "context/2",
+        "fetch!/1",
+        "get/0",
+        "reset/0",
+        "start_link/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Settings",
+      "signatures": {
+        "functions": {
+          "child_spec/1": [
+            "child_spec(arg)"
+          ],
+          "configure/1": [
+            "configure(opts)"
+          ],
+          "context/2": [
+            "context(opts, fun)"
+          ],
+          "fetch!/1": [
+            "fetch!(key)"
+          ],
+          "get/0": [
+            "get()"
+          ],
+          "reset/0": [
+            "reset()"
+          ],
+          "start_link/1": [
+            "start_link(opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/settings.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "dump/1",
+        "ensure/1",
+        "extend/3",
+        "field_names/1",
+        "input_names/1",
+        "json_schema/1",
+        "load/1",
+        "new/2",
+        "output_names/1",
+        "prepend_output/2",
+        "to_spec/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Signature",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(signature)"
+          ],
+          "ensure/1": [
+            "ensure(value)"
+          ],
+          "extend/3": [
+            "extend(signature, fields, kind)"
+          ],
+          "field_names/1": [
+            "field_names(signature)"
+          ],
+          "input_names/1": [
+            "input_names(signature)"
+          ],
+          "json_schema/1": [
+            "json_schema(signature)"
+          ],
+          "load/1": [
+            "load(state)"
+          ],
+          "new/2": [
+            "new(spec, instructions \\\\ nil)"
+          ],
+          "output_names/1": [
+            "output_names(signature)"
+          ],
+          "prepend_output/2": [
+            "prepend_output(signature, field)"
+          ],
+          "to_spec/1": [
+            "to_spec(signature)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/signature.ex",
+      "struct_fields": [
+        "inputs",
+        "instructions",
+        "metadata",
+        "outputs"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "constrained/2",
+        "dump/1",
+        "load/1",
+        "new/2",
+        "optional/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Signature.Field",
+      "signatures": {
+        "functions": {
+          "constrained/2": [
+            "constrained(field, constraints)"
+          ],
+          "dump/1": [
+            "dump(field)"
+          ],
+          "load/1": [
+            "load(map)"
+          ],
+          "new/2": [
+            "new(field, kind)"
+          ],
+          "optional/1": [
+            "optional(field)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/signature/field.ex",
+      "struct_fields": [
+        "desc",
+        "kind",
+        "metadata",
+        "name",
+        "prefix",
+        "type"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "collect/3",
+        "incremental_fields/2",
+        "stream/3",
+        "validate_chunker/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Streaming",
+      "signatures": {
+        "functions": {
+          "collect/3": [
+            "collect(program, inputs, opts \\\\ [])"
+          ],
+          "incremental_fields/2": [
+            "incremental_fields(chunks, signature)"
+          ],
+          "stream/3": [
+            "stream(program, inputs, opts \\\\ [])"
+          ],
+          "validate_chunker/1": [
+            "validate_chunker(chunker)"
+          ]
+        }
+      },
+      "source": "lib/imp/streaming.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Streaming.Messages",
+      "signatures": {},
+      "source": "lib/imp/streaming/messages.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Streaming.Messages.StatusMessage",
+      "signatures": {},
+      "source": "lib/imp/streaming/messages.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "push/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Streaming.Messages.StatusMessageProvider",
+      "signatures": {
+        "functions": {
+          "push/2": [
+            "push(provider, message)"
+          ]
+        }
+      },
+      "source": "lib/imp/streaming/messages.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "attach/2",
+        "new/1",
+        "record/2",
+        "validate_adapter/1",
+        "validate_callback/1",
+        "validate_field/1",
+        "validate_framing/1",
+        "validate_name/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Streaming.Messages.StreamListener",
+      "signatures": {
+        "functions": {
+          "attach/2": [
+            "attach(listener, enumerable)"
+          ],
+          "new/1": [
+            "new(opts \\\\ [])"
+          ],
+          "record/2": [
+            "record(listener, event)"
+          ],
+          "validate_adapter/1": [
+            "validate_adapter(adapter)"
+          ],
+          "validate_callback/1": [
+            "validate_callback(callback)"
+          ],
+          "validate_field/1": [
+            "validate_field(field)"
+          ],
+          "validate_framing/1": [
+            "validate_framing(framing)"
+          ],
+          "validate_name/1": [
+            "validate_name(name)"
+          ]
+        }
+      },
+      "source": "lib/imp/streaming/messages.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Streaming.Messages.StreamResponse",
+      "signatures": {},
+      "source": "lib/imp/streaming/messages.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "execute/3",
+        "span/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Telemetry",
+      "signatures": {
+        "functions": {
+          "execute/3": [
+            "execute(event, measurements, metadata)"
+          ],
+          "span/3": [
+            "span(event_prefix, metadata, fun)"
+          ]
+        }
+      },
+      "source": "lib/imp/telemetry.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "call/2",
+        "index_tools!/2",
+        "new/4",
+        "normalize_arguments/1",
+        "resolve_name/2",
+        "validate_tools/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Tool",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(tool, arg)"
+          ],
+          "index_tools!/2": [
+            "index_tools!(tools, context)"
+          ],
+          "new/4": [
+            "new(name, description, run, opts \\\\ [])"
+          ],
+          "normalize_arguments/1": [
+            "normalize_arguments(arguments)"
+          ],
+          "resolve_name/2": [
+            "resolve_name(tools, name)"
+          ],
+          "validate_tools/1": [
+            "validate_tools(tools)"
+          ]
+        }
+      },
+      "source": "lib/imp/tool.ex",
+      "struct_fields": [
+        "description",
+        "name",
+        "run",
+        "schema"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [
+        {
+          "name": "finish/2",
+          "optional": false
+        },
+        {
+          "name": "log/2",
+          "optional": false
+        },
+        {
+          "name": "start/1",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Tracking.Backend",
+      "signatures": {
+        "callbacks": {
+          "finish/2": [],
+          "log/2": [],
+          "start/1": []
+        },
+        "types": {
+          "event/0": [],
+          "status/0": []
+        }
+      },
+      "source": "lib/imp/tracking/backend.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "event/0"
+        },
+        {
+          "kind": "type",
+          "name": "status/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "log_artifact/4",
+        "log_config/2",
+        "log_metrics/3",
+        "log_summary/2",
+        "log_table/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Tracking.MLflow",
+      "signatures": {
+        "functions": {
+          "log_artifact/4": [
+            "log_artifact(state, path, body, content_type \\\\ \"application/octet-stream\")"
+          ],
+          "log_config/2": [
+            "log_config(state, config)"
+          ],
+          "log_metrics/3": [
+            "log_metrics(state, metrics, opts \\\\ [])"
+          ],
+          "log_summary/2": [
+            "log_summary(state, summary)"
+          ],
+          "log_table/3": [
+            "log_table(state, path, data)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/tracking/mlflow.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "finish/2",
+        "log/2",
+        "start/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Tracking.Session",
+      "signatures": {
+        "functions": {
+          "finish/2": [
+            "finish(session, status \\\\ :finished)"
+          ],
+          "log/2": [
+            "log(session, event)"
+          ],
+          "start/2": [
+            "start(backends, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "backend_entry/0": [],
+          "backend_spec/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/tracking/session.ex",
+      "struct_fields": [
+        "backends",
+        "owner"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "backend_entry/0"
+        },
+        {
+          "kind": "type",
+          "name": "backend_spec/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
+          "name": "request/5",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Tracking.Transport",
+      "signatures": {
+        "callbacks": {
+          "request/5": []
+        },
+        "types": {
+          "headers/0": [],
+          "method/0": [],
+          "response/0": []
+        }
+      },
+      "source": "lib/imp/tracking/transport.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "headers/0"
+        },
+        {
+          "kind": "type",
+          "name": "method/0"
+        },
+        {
+          "kind": "type",
+          "name": "response/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Tracking.Transport.Req",
+      "signatures": {},
+      "source": "lib/imp/tracking/transport/req.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "finish/2",
+        "init/2",
+        "log/3",
+        "log_html/4",
+        "log_table/5",
+        "merge_summary/2",
+        "new/1",
+        "replace_summary/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Tracking.WandB",
+      "signatures": {
+        "functions": {
+          "finish/2": [
+            "finish(client, outcome \\\\ :success)"
+          ],
+          "init/2": [
+            "init(client, opts)"
+          ],
+          "log/3": [
+            "log(client, metrics, opts \\\\ [])"
+          ],
+          "log_html/4": [
+            "log_html(client, key, html, opts \\\\ [])"
+          ],
+          "log_table/5": [
+            "log_table(client, key, columns, rows, opts \\\\ [])"
+          ],
+          "merge_summary/2": [
+            "merge_summary(client, values)"
+          ],
+          "new/1": [
+            "new(opts)"
+          ],
+          "replace_summary/2": [
+            "replace_summary(client, summary)"
+          ]
+        },
+        "types": {
+          "outcome/0": [],
+          "status_mode/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/tracking/wandb/client.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "outcome/0"
+        },
+        {
+          "kind": "type",
+          "name": "status_mode/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "build/4"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Training.ChatDataset",
+      "signatures": {
+        "functions": {
+          "build/4": [
+            "build(examples, signature, adapter, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "dataset/0": []
+        }
+      },
+      "source": "lib/imp/training/chat_dataset.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "dataset/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "dump/1",
+        "new!/6"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.AdvantageGroup",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(group)"
+          ],
+          "new!/6": [
+            "new!(rollouts, group_id, cycle, group_size, prompt_count, epsilon \\\\ 1.0e-6)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/rollout.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
+          "name": "generate_rollout/4",
+          "optional": false
+        },
+        {
+          "name": "optimize_fast/4",
+          "optional": false
+        },
+        {
+          "name": "prefetch/4",
+          "optional": false
+        },
+        {
+          "name": "replay_safe?/2",
+          "optional": false
+        },
+        {
+          "name": "update_slow/5",
+          "optional": false
+        },
+        {
+          "name": "validate_prefetch_progression/4",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Backend",
+      "signatures": {
+        "callbacks": {
+          "generate_rollout/4": [],
+          "optimize_fast/4": [],
+          "prefetch/4": [],
+          "replay_safe?/2": [],
+          "update_slow/5": [],
+          "validate_prefetch_progression/4": []
+        },
+        "types": {
+          "backend_context/0": [],
+          "data_minibatch/0": [],
+          "error_reason/0": [],
+          "gepa_result/0": [],
+          "live_rollout_result/0": [],
+          "rollout_slot/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/backend.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "backend_context/0"
+        },
+        {
+          "kind": "type",
+          "name": "data_minibatch/0"
+        },
+        {
+          "kind": "type",
+          "name": "error_reason/0"
+        },
+        {
+          "kind": "type",
+          "name": "gepa_result/0"
+        },
+        {
+          "kind": "type",
+          "name": "live_rollout_result/0"
+        },
+        {
+          "kind": "type",
+          "name": "rollout_slot/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "charge/3",
+        "new!/1",
+        "validate!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Budget",
+      "signatures": {
+        "functions": {
+          "charge/3": [
+            "charge(budget, key, amount)"
+          ],
+          "new!/1": [
+            "new!(limits)"
+          ],
+          "validate!/1": [
+            "validate!(budget)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/1",
+        "validate!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.CachedTrajectory",
+      "signatures": {
+        "functions": {
+          "new!/1": [
+            "new!(attrs)"
+          ],
+          "validate!/1": [
+            "validate!(trajectory)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/reuse_cache.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "dump/2",
+        "encode!/2",
+        "load!/2",
+        "read!/2",
+        "write!/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Checkpoint",
+      "signatures": {
+        "functions": {
+          "dump/2": [
+            "dump(config, state)"
+          ],
+          "encode!/2": [
+            "encode!(config, state)"
+          ],
+          "load!/2": [
+            "load!(checkpoint, config)"
+          ],
+          "read!/2": [
+            "read!(path, config)"
+          ],
+          "write!/3": [
+            "write!(path, config, state)"
+          ]
+        }
+      },
+      "source": "lib/imp/training/fast_slow/checkpoint.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "compatibility/1",
+        "digest/1",
+        "fingerprint/1",
+        "json_safe!/2",
+        "new!/1",
+        "persisted_safe!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Config",
+      "signatures": {
+        "functions": {
+          "compatibility/1": [
+            "compatibility(config)"
+          ],
+          "digest/1": [
+            "digest(value)"
+          ],
+          "fingerprint/1": [
+            "fingerprint(config)"
+          ],
+          "json_safe!/2": [
+            "json_safe!(value, path \\\\ [])"
+          ],
+          "new!/1": [
+            "new!(options)"
+          ],
+          "persisted_safe!/1": [
+            "persisted_safe!(value)"
+          ]
+        },
+        "types": {
+          "json_scalar/0": [],
+          "json_value/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/config.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "json_scalar/0"
+        },
+        {
+          "kind": "type",
+          "name": "json_value/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.DatasetState",
+      "signatures": {
+        "functions": {
+          "new!/3": [
+            "new!(cursor, epoch, rng)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Event",
+      "signatures": {
+        "functions": {
+          "new!/1": [
+            "new!(attrs)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/event.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "consume!/1",
+        "new!/3",
+        "validate!/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Lookahead",
+      "signatures": {
+        "functions": {
+          "consume!/1": [
+            "consume!(lookahead)"
+          ],
+          "new!/3": [
+            "new!(cycle, dataset_cursor, minibatches)"
+          ],
+          "validate!/2": [
+            "validate!(lookahead, expected_t \\\\ nil)"
+          ]
+        },
+        "types": {
+          "minibatch/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "minibatch/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/3",
+        "reconcile/3",
+        "validate!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.OperationIntent",
+      "signatures": {
+        "functions": {
+          "new!/3": [
+            "new!(kind, cycle, payload)"
+          ],
+          "reconcile/3": [
+            "reconcile(intent, state, result \\\\ nil)"
+          ],
+          "validate!/1": [
+            "validate!(intent)"
+          ]
+        },
+        "types": {
+          "reconciliation/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/event.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "reconciliation/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/3",
+        "validate!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.PromptPopulation",
+      "signatures": {
+        "functions": {
+          "new!/3": [
+            "new!(revision, candidates, metadata \\\\ %{})"
+          ],
+          "validate!/1": [
+            "validate!(population)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "claim/4",
+        "new!/3",
+        "next_cycle/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.ReuseCache",
+      "signatures": {
+        "functions": {
+          "claim/4": [
+            "claim(cache, problem_id, input_digest, prompt_digest)"
+          ],
+          "new!/3": [
+            "new!(cycle, theta_id, trajectories \\\\ [])"
+          ],
+          "next_cycle/3": [
+            "next_cycle(reuse_cache, cycle, theta_id)"
+          ]
+        },
+        "types": {
+          "key/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/reuse_cache.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "key/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "claim/2",
+        "complete!/5",
+        "fail!/3",
+        "new!/1",
+        "reusable?/3",
+        "validate!/1",
+        "validate_complete_group!/5"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Rollout",
+      "signatures": {
+        "functions": {
+          "claim/2": [
+            "claim(rollout, claim_id)"
+          ],
+          "complete!/5": [
+            "complete!(rollout, claim_id, output, score, metrics)"
+          ],
+          "fail!/3": [
+            "fail!(rollout, claim_id, failure)"
+          ],
+          "new!/1": [
+            "new!(attrs)"
+          ],
+          "reusable?/3": [
+            "reusable?(rollout, cycle, identity)"
+          ],
+          "validate!/1": [
+            "validate!(rollout)"
+          ],
+          "validate_complete_group!/5": [
+            "validate_complete_group!(rollouts, group_id, cycle, expected_size, prompt_count \\\\ nil)"
+          ]
+        },
+        "types": {
+          "status/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/rollout.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "status/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "batch_digest/1",
+        "dump_context!/2",
+        "input_digest/1",
+        "load_context!/2",
+        "run/4"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Runner",
+      "signatures": {
+        "functions": {
+          "batch_digest/1": [
+            "batch_digest(batch)"
+          ],
+          "dump_context!/2": [
+            "dump_context!(context, state)"
+          ],
+          "input_digest/1": [
+            "input_digest(problem)"
+          ],
+          "load_context!/2": [
+            "load_context!(dump, state)"
+          ],
+          "run/4": [
+            "run(state, backend, context \\\\ %Context{}, options \\\\ [])"
+          ]
+        },
+        "types": {
+          "checkpoint_fn/0": [],
+          "checkpoint_snapshot/0": [],
+          "result/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/runner.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "checkpoint_fn/0"
+        },
+        {
+          "kind": "type",
+          "name": "checkpoint_snapshot/0"
+        },
+        {
+          "kind": "type",
+          "name": "result/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Runner.Context",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/runner.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "charge_budget/3",
+        "claim_cached/4",
+        "claim_rollout/3",
+        "complete/3",
+        "complete_rollout/6",
+        "complete_slow_step/2",
+        "new!/4",
+        "next_cycle/2",
+        "put_dataset/2",
+        "put_intent/2",
+        "put_lookahead/2",
+        "put_reuse_cache/2",
+        "put_rollout/2",
+        "reconcile_intent/4",
+        "record_event/2",
+        "revise_prompts/3",
+        "set_stage/2",
+        "terminate/3",
+        "validate!/1",
+        "validate_complete_group!/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.State",
+      "signatures": {
+        "functions": {
+          "charge_budget/3": [
+            "charge_budget(state, key, amount)"
+          ],
+          "claim_cached/4": [
+            "claim_cached(state, problem_id, input_digest, prompt_digest)"
+          ],
+          "claim_rollout/3": [
+            "claim_rollout(state, rollout_id, claim_id)"
+          ],
+          "complete/3": [
+            "complete(state, dataset, details \\\\ %{})"
+          ],
+          "complete_rollout/6": [
+            "complete_rollout(state, rollout_id, claim_id, output, score, metrics)"
+          ],
+          "complete_slow_step/2": [
+            "complete_slow_step(state, payload)"
+          ],
+          "new!/4": [
+            "new!(config, theta_payload, prompt_candidates, options \\\\ [])"
+          ],
+          "next_cycle/2": [
+            "next_cycle(state, dataset)"
+          ],
+          "put_dataset/2": [
+            "put_dataset(state, dataset)"
+          ],
+          "put_intent/2": [
+            "put_intent(state, intent)"
+          ],
+          "put_lookahead/2": [
+            "put_lookahead(state, lookahead)"
+          ],
+          "put_reuse_cache/2": [
+            "put_reuse_cache(state, cache)"
+          ],
+          "put_rollout/2": [
+            "put_rollout(state, rollout)"
+          ],
+          "reconcile_intent/4": [
+            "reconcile_intent(state, id, reconciliation, result \\\\ nil)"
+          ],
+          "record_event/2": [
+            "record_event(state, event)"
+          ],
+          "revise_prompts/3": [
+            "revise_prompts(state, candidates, metadata \\\\ %{})"
+          ],
+          "set_stage/2": [
+            "set_stage(state, next)"
+          ],
+          "terminate/3": [
+            "terminate(state, reason, details \\\\ %{})"
+          ],
+          "validate!/1": [
+            "validate!(state)"
+          ],
+          "validate_complete_group!/2": [
+            "validate_complete_group!(state, group_id)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Terminal",
+      "signatures": {
+        "functions": {
+          "new!/3": [
+            "new!(reason, cycle, details \\\\ %{})"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new!/3",
+        "validate!/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Training.FastSlow.Theta",
+      "signatures": {
+        "functions": {
+          "new!/3": [
+            "new!(cycle, payload, parent_id \\\\ nil)"
+          ],
+          "validate!/1": [
+            "validate!(theta)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/training/fast_slow/state.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    }
+  ],
+  "package_version": "0.1.0",
+  "schema_version": 3,
+  "scope": "Curated Imp API compiled from package-shipped sources. Exports come from non-hidden documentation entries; callbacks, types, and struct fields are category- and policy-gated."
+}

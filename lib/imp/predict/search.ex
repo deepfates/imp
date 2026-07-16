@@ -80,7 +80,7 @@ defmodule Imp.Predict.Search do
 
   alias Imp.Predict.Search.{Candidate, Result}
 
-  @type evaluator :: (Candidate.t(), map() -> {:ok, term(), term()} | {:error, term()})
+  @type evaluator :: (map(), map() -> {:ok, term(), term()} | {:error, term()})
 
   @option_schema [
     mode: [type: {:in, [:sequential, :concurrent]}, default: :sequential],
@@ -92,7 +92,7 @@ defmodule Imp.Predict.Search do
   ]
 
   @doc "Runs a bounded, deterministic candidate search."
-  @spec run([Candidate.t()], evaluator(), keyword()) :: Result.t()
+  @spec run([map()], evaluator(), keyword()) :: struct()
   def run(candidates, evaluator, opts \\ [])
 
   def run(candidates, evaluator, opts)

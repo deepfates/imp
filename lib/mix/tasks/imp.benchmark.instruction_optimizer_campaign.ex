@@ -6,7 +6,7 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerCampaign do
         --dataset-root benchmarks/data/gepa-campaign-full \
         --config benchmarks/config/instruction-optimizer-aime-preflight.json \
         --api-key-env OPENAI_API_KEY \
-        --out benchmarks/results
+        --out benchmarks/runs/instruction-optimizer-campaign
 
   The JSON config pins the campaign/model/seed, optimizer arms and effective
   configs, conservative reservation pricing, and hard request/token/USD caps.
@@ -62,9 +62,18 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerCampaign do
         pricing: Map.fetch!(config, "reservation_pricing"),
         max_output_tokens: max_tokens,
         source_commits: Map.fetch!(config, "source_commits"),
-        out_dir: Keyword.get(opts, :out, "benchmarks/results"),
+        out_dir:
+          Keyword.get(
+            opts,
+            :out,
+            Imp.BenchmarkTruth.Paths.runs("instruction-optimizer-campaign")
+          ),
         checkpoint_dir:
-          Keyword.get(opts, :checkpoint_dir, "benchmarks/results/optimizer-checkpoints")
+          Keyword.get(
+            opts,
+            :checkpoint_dir,
+            Imp.BenchmarkTruth.Paths.checkpoints("instruction-optimizer-campaign")
+          )
       )
 
     Mix.shell().info("Instruction optimizer preflight: #{result.path}")

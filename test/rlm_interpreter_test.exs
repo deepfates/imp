@@ -11,6 +11,24 @@ defmodule Imp.Predict.RLM.InterpreterTest do
     assert interpreter.vars.total == 5
   end
 
+  test "a failed cell rolls back ordinary assignments while retaining protected values" do
+    interpreter = Interpreter.new(%{context: "original"}, %{}, nil)
+    assert {:ok, interpreter} = Interpreter.put_protected(interpreter, "context", "protected")
+
+    assert {:error, {:function_not_allowed, :missing}, next} =
+             Interpreter.execute(
+               interpreter,
+               ~S|scratch = context <> "-saved"
+missing()|
+             )
+
+    refute Map.has_key?(next.vars, :scratch)
+    refute Map.has_key?(next.vars, "scratch")
+    assert next.vars.context == "protected"
+
+    assert {:ok, "protected", _next} = Interpreter.execute(next, "context")
+  end
+
   test "effects in comprehensions yield and resume deterministically" do
     interpreter = Interpreter.new(%{}, %{"llm_query" => :llm_query}, nil)
     source = ~S|for prompt <- ["a", "b", "c"], do: llm_query(prompt)|
@@ -112,7 +130,7 @@ defmodule Imp.Predict.RLM.InterpreterTest do
              Interpreter.execute(interpreter, "123456789")
   end
 
-  test "bounds intermediate and persisted value growth" do
+  test "bounds intermediate value growth without leaking a failed cell binding" do
     interpreter =
       Interpreter.new(%{}, %{}, nil,
         max_steps: 1_000,
@@ -127,8 +145,7 @@ defmodule Imp.Predict.RLM.InterpreterTest do
              Interpreter.execute(interpreter, source)
 
     assert bytes > 1_000
-    assert is_binary(interpreter.vars.x)
-    assert :erlang.external_size(interpreter.vars.x) <= 1_000
+    refute Map.has_key?(interpreter.vars, :x)
   end
 
   test "bounds external effects per controller turn" do

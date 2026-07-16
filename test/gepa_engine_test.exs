@@ -290,6 +290,7 @@ defmodule Imp.Optimizer.GEPA.EngineTest do
           {:error, :malformed_provider_output}
         end,
         max_iterations: 10,
+        raise_on_exception: false,
         stopper: Stopper.consecutive_outcome(:proposal_error, 3)
       )
 

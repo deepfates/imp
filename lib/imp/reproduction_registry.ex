@@ -5,6 +5,30 @@ defmodule Imp.ReproductionRegistry do
   @classifications ~w(replication adaptation native_extension)
   @protocol_modes ~w(provider_free live)
 
+  def admitted_path(protocol_id, sha256)
+      when is_binary(protocol_id) and is_binary(sha256) do
+    unless Regex.match?(~r/^[a-z0-9][a-z0-9_]*$/, protocol_id),
+      do: raise(ArgumentError, "invalid evidence protocol id")
+
+    unless Regex.match?(~r/^[0-9a-f]{64}$/, sha256),
+      do: raise(ArgumentError, "invalid admitted artifact SHA-256")
+
+    Path.join(Imp.BenchmarkTruth.Paths.admitted(protocol_id), sha256 <> ".json")
+  end
+
+  def admitted_path(_protocol_id, _sha256),
+    do: raise(ArgumentError, "protocol id and SHA-256 must be strings")
+
+  def validate_protocol_artifact!(%{"protocols" => protocols}, protocol_id, artifact)
+      when is_binary(protocol_id) and is_map(artifact) do
+    protocol =
+      Map.get(protocols, protocol_id) ||
+        raise(ArgumentError, "unknown evidence protocol #{protocol_id}")
+
+    validate_artifact!(artifact, protocol["artifact_validator"], protocol_id, "admission")
+    artifact
+  end
+
   def load!(path \\ "benchmarks/reproductions.json", opts \\ []) do
     registry = path |> File.read!() |> Jason.decode!()
     authority_path = Keyword.get(opts, :authority_path, "benchmarks/authorities.json")
@@ -33,7 +57,6 @@ defmodule Imp.ReproductionRegistry do
     validate_surface_token_coverage!(features, authority_by_id)
     Enum.each(protocols, &validate_protocol!(&1, root))
     Enum.each(features, &validate_feature!(&1, authority_by_id, protocols, root))
-    validate_unadmitted_protocols!(protocols, features)
     registry
   end
 
@@ -115,6 +138,10 @@ defmodule Imp.ReproductionRegistry do
 
   defp validate_protocol!({id, protocol}, root) when is_binary(id) and is_map(protocol) do
     require_nonempty!(id, "protocol id")
+
+    unless Regex.match?(~r/^[a-z0-9][a-z0-9_]*$/, id),
+      do: raise(ArgumentError, "protocol id must be safe for evidence paths: #{id}")
+
     require_member!(protocol["mode"], @protocol_modes, "protocol #{id} mode")
     require_member!(protocol["max_tier"], @tiers -- ["none"], "protocol #{id} max_tier")
     require_task!(protocol["task"], "protocol #{id}")
@@ -125,6 +152,11 @@ defmodule Imp.ReproductionRegistry do
     case protocol["manifest"] do
       nil -> :ok
       path -> require_file!(path, root, "protocol #{id} manifest")
+    end
+
+    case protocol["artifact_validator"] do
+      nil -> :ok
+      validator -> validate_artifact_validator!(validator, id)
     end
   end
 
@@ -164,21 +196,6 @@ defmodule Imp.ReproductionRegistry do
 
   defp validate_artifact_validator!(_, id),
     do: raise(ArgumentError, "protocol #{id} must declare a pure module artifact validator")
-
-  defp validate_unadmitted_protocols!(protocols, features) do
-    admitted_protocol_ids =
-      for %{"admitted_evidence" => %{"artifact" => artifact, "protocol_id" => protocol_id}}
-          when is_binary(artifact) and is_binary(protocol_id) <- features,
-          into: MapSet.new(),
-          do: protocol_id
-
-    Enum.each(protocols, fn {id, protocol} ->
-      if id not in admitted_protocol_ids and protocol["artifact_validator"] not in [nil] do
-        raise ArgumentError,
-              "protocol #{id} must not declare an artifact validator without admitted artifacts"
-      end
-    end)
-  end
 
   defp validate_feature!(feature, authority_by_id, protocols, root) do
     id = feature["id"]
@@ -251,11 +268,19 @@ defmodule Imp.ReproductionRegistry do
           do:
             raise(ArgumentError, "feature #{id} admitted artifact must be immutable, not a glob")
 
-        require_file!(artifact, root, "feature #{id} admitted artifact")
         expected_sha256 = evidence["artifact_sha256"]
 
         unless is_binary(expected_sha256) and Regex.match?(~r/^[0-9a-f]{64}$/, expected_sha256),
           do: raise(ArgumentError, "feature #{id} admitted artifact must have a SHA-256 digest")
+
+        expected_path = admitted_path(protocol_id, expected_sha256)
+
+        unless artifact == expected_path do
+          raise ArgumentError,
+                "feature #{id} admitted artifact must use its content-addressed path #{expected_path}"
+        end
+
+        require_file!(artifact, root, "feature #{id} admitted artifact")
 
         artifact_body = File.read!(Path.join(root, artifact))
 
@@ -302,8 +327,12 @@ defmodule Imp.ReproductionRegistry do
       end
     rescue
       error ->
-        raise ArgumentError,
-              "feature #{feature_id} admitted artifact failed protocol #{protocol_id} validation: #{Exception.message(error)}"
+        reraise ArgumentError,
+                [
+                  message:
+                    "feature #{feature_id} admitted artifact failed protocol #{protocol_id} validation: #{Exception.message(error)}"
+                ],
+                __STACKTRACE__
     end
   end
 

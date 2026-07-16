@@ -38,28 +38,17 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
   def validate!("optimize_anything", artifact) do
     validation = OptimizeAnythingArtifact.validate_rows(artifact["rows"], mode: :full)
 
-    require!(
-      artifact["schema_version"] == 1 and
-        artifact["runner"] == "ds" <> "ex-optimize-anything-replication" and
-        artifact["source"] == %{
-          "max_proposals" => 5,
-          "mode" => "live_campaign",
-          "model" => "gpt-5.4-2026-03-05",
-          "provider" => "openai",
-          "run_id" => "oa-20260713T092708Z-3042",
-          "seeds" => [17, 23, 31]
-        } and
-        artifact["summary"] == %{
-          "all_passing" => true,
-          "duplicate_classes" => [],
-          "effectiveness_authorized" => true,
-          "evidence_level" => "full",
-          "invalid_rows" => [],
-          "missing_classes" => [],
-          "unknown_classes" => []
-        } and validation.authorizes_effectiveness,
-      "invalid optimize-anything artifact"
-    )
+    case artifact["runner"] do
+      "imp-optimize-anything-replication" ->
+        validate_current_optimize_anything!(artifact, validation)
+
+      runner ->
+        if runner == "ds" <> "ex-optimize-anything-replication" do
+          validate_historical_optimize_anything!(artifact, validation)
+        else
+          raise ArgumentError, "invalid optimize-anything runner #{inspect(runner)}"
+        end
+    end
   end
 
   def validate!("multimodal_live", artifact) do
@@ -198,6 +187,98 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
 
   def validate!(protocol_id, _artifact),
     do: raise(ArgumentError, "no artifact contract for protocol #{protocol_id}")
+
+  defp validate_current_optimize_anything!(artifact, validation) do
+    RunContext.verify!(artifact)
+    source = artifact["source"] || %{}
+    seeds = source["seeds"]
+    gepa_commit = current_gepa_commit!()
+
+    require!(
+      OptimizeAnythingArtifact.full_artifact?(artifact) and
+        valid_current_optimize_anything_source?(source) and
+        artifact["summary"] == optimize_anything_summary(validation) and
+        get_in(artifact, ["run_context", "inputs"]) == source and
+        get_in(artifact, ["run_context", "source_commits", "gepa"]) ==
+          "gepa-ai/gepa@#{gepa_commit}" and
+        Enum.all?(artifact["rows"], fn row ->
+          row["provider"] == source["provider"] and row["model"] == source["model"] and
+            get_in(row, ["provenance", "git_sha"]) == artifact["git_sha"] and
+            get_in(row, ["reproducibility", "source_commits"]) == %{
+              "imp" => artifact["git_sha"],
+              "gepa" => gepa_commit
+            } and run_seeds(row) == Enum.sort(seeds)
+        end),
+      "invalid current optimize-anything artifact"
+    )
+  end
+
+  defp validate_historical_optimize_anything!(artifact, validation) do
+    require!(
+      artifact["schema_version"] == 1 and
+        artifact["runner"] == "ds" <> "ex-optimize-anything-replication" and
+        artifact["source"] == %{
+          "max_proposals" => 5,
+          "mode" => "live_campaign",
+          "model" => "gpt-5.4-2026-03-05",
+          "provider" => "openai",
+          "run_id" => "oa-20260713T092708Z-3042",
+          "seeds" => [17, 23, 31]
+        } and
+        artifact["summary"] == %{
+          "all_passing" => true,
+          "duplicate_classes" => [],
+          "effectiveness_authorized" => true,
+          "evidence_level" => "full",
+          "invalid_rows" => [],
+          "missing_classes" => [],
+          "unknown_classes" => []
+        } and validation.authorizes_effectiveness,
+      "invalid optimize-anything artifact"
+    )
+  end
+
+  defp valid_current_optimize_anything_source?(source) do
+    seeds = source["seeds"]
+
+    Enum.sort(Map.keys(source)) == ~w(max_proposals mode model provider run_id seeds) and
+      source["mode"] == "live_campaign" and nonempty_string?(source["run_id"]) and
+      nonempty_string?(source["provider"]) and nonempty_string?(source["model"]) and
+      is_integer(source["max_proposals"]) and source["max_proposals"] > 0 and
+      is_list(seeds) and length(seeds) >= 3 and seeds == Enum.uniq(seeds) and
+      Enum.all?(seeds, &is_integer/1)
+  end
+
+  defp optimize_anything_summary(validation) do
+    %{
+      "all_passing" => true,
+      "duplicate_classes" => validation.duplicate_classes,
+      "effectiveness_authorized" => true,
+      "evidence_level" => "full",
+      "invalid_rows" => validation.invalid_rows,
+      "missing_classes" => validation.missing_classes,
+      "unknown_classes" => validation.unknown_classes
+    }
+  end
+
+  defp current_gepa_commit! do
+    "benchmarks/authorities.json"
+    |> Imp.EvidenceAuthorities.load!()
+    |> get_in(["pinned_sources", "gepa_standalone", "commit"])
+    |> case do
+      commit when is_binary(commit) and byte_size(commit) == 40 -> commit
+      value -> raise ArgumentError, "invalid canonical GEPA authority #{inspect(value)}"
+    end
+  end
+
+  defp run_seeds(row) do
+    row
+    |> get_in(["reproducibility", "runs"])
+    |> Enum.map(& &1["seed"])
+    |> Enum.sort()
+  end
+
+  defp nonempty_string?(value), do: is_binary(value) and value != ""
 
   defp multimodal_runner do
     %{

@@ -90,7 +90,18 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
     assert_port_available!(port)
 
     context =
-      RunContext.capture_git!(cwd: cwd, require_clean: Keyword.get(opts, :require_clean, true))
+      RunContext.capture_git!(
+        cwd: cwd,
+        require_clean: Keyword.get(opts, :require_clean, true),
+        inputs: %{
+          "protocol_id" => "local_mlx",
+          "dataset_file_sha256" => @dataset_file_sha256,
+          "dataset_payload_sha256" => @dataset_payload_sha256,
+          "model" => "#{@model}@#{@revision}",
+          "model_tree_sha256" => @model_tree_sha256,
+          "mlx_lm_version" => @mlx_lm_version
+        }
+      )
 
     ensure_fresh_root!(root)
     dataset = load_dataset!(dataset_path)
@@ -393,6 +404,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
 
       lm_opts = [
         api_key: "local",
+        cache: false,
         temperature: 0,
         max_tokens: 32,
         timeout: 120_000

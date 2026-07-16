@@ -4,14 +4,16 @@ This note records the outside view used to shape Imp. It separates scientific
 authorities, implementation comparators, production complements, and recent
 work that is promising but too new to become a release claim.
 
-The review was refreshed on 2026-07-12. Moving repositories must still be
+The review was refreshed on 2026-07-15. Moving repositories must still be
 re-pinned before their behavior is used in a differential gate.
 
 ## Current GEPA And Optimize Anything Snapshot
 
-The released implementation authority is GEPA `v0.1.1` at
-`b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. Optimize Anything was introduced
-in `v0.1.0`; by `v0.1.1` it already included the unified single-task,
+The current released implementation authority is GEPA `v0.1.4` at
+`8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`. That tag still reports package
+version `0.1.3` in `pyproject.toml`; the ledger records tag identity and source
+identity separately. Optimize Anything was introduced in `v0.1.0`; by
+`v0.1.1` it already included the unified single-task,
 multi-task, and held-out generalization modes, seeded and seedless operation,
 string or named-component candidates, objective and background context, typed
 and image side information, refiners, content-addressed evaluation caching,
@@ -27,14 +29,13 @@ The paper distinguishes multi-task search, which returns a specialized winner
 for each related task, from generalization, which returns one artifact selected
 on a held-out validation set.
 
-GEPA `main` at `92dadfffbe98c8ecf508179a1cab09c1bb85cd32` is 68 commits beyond the
-release but still reports package version `0.1.1`. Its material unreleased
-deltas are richer callback and tracker events, dynamic trainsets, opaque adapter
-checkpoint state, configurable strict/equal/custom acceptance, concurrent
-proposal pipelines with sequential acceptance, refiner and reflection cost
-accounting, a unified retrying LM layer, `ConfidenceAdapter`, and a LangChain
-adapter. The release pin defines parity; this moving snapshot defines a separate
-forward-compatibility horizon and must not silently replace the release.
+The `v0.1.4` release incorporates the material post-`v0.1.1` surface: a
+`ReflectionLM` protocol, batched parallel proposal generation with sequential
+acceptance, configurable acceptance strategies, reflection-cost accounting,
+richer callbacks and experiment tracking, `ConfidenceAdapter`, and a LangChain
+adapter. The exact `v0.1.1` checkout remains a historical executable contract
+for the existing provider-free differential; it no longer defines the current
+public compatibility horizon.
 
 ## Where The Work Comes From
 
@@ -143,7 +144,7 @@ released.
 | System | Role for Imp | Pin or authority policy |
 | --- | --- | --- |
 | [DSPy](https://github.com/stanfordnlp/dspy) | Primary compatibility authority for signatures, modules, runtime semantics, and named optimizers. | Pin an exact release, commit, source hashes, and relevant tests for each claim. Current instruction-optimizer gates use `3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`. |
-| [GEPA](https://github.com/gepa-ai/gepa) | Primary standalone implementation authority for generic reflective text optimization. | Release `v0.1.1` resolves to `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. Current `main` is separate and must not silently replace the release pin. |
+| [GEPA](https://github.com/gepa-ai/gepa) | Primary standalone implementation authority for generic reflective text optimization. | Current release `v0.1.4` resolves to `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`; `v0.1.1` remains an explicitly historical differential contract. |
 | [Ax](https://github.com/ax-llm/ax) | Strongest independent implementation comparator for a typed TypeScript interpretation of DSPy-style programming. | Release `23.0.0` resolves to `eb5835e54ba0c5b2fbac380daed1cb87faeefd5e`. Use for API and behavioral comparison, not as scientific authority. |
 | [BAML](https://github.com/BoundaryML/baml) | Comparator for compiler diagnostics, generated typed clients, and partial structured streaming. | Study its contracts; do not add a separate Imp language unless Elixir modules and macros are demonstrably insufficient. |
 | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow), [TextGrad](https://github.com/zou-group/textgrad), and [SAMMO](https://github.com/microsoft/sammo) | Comparators for explicit parameter graphs, textual feedback, and structure-aware prompt transformations. | Borrow mechanisms only after pinning code and paper protocols independently. |

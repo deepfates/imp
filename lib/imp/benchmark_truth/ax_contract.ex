@@ -36,7 +36,12 @@ defmodule Imp.BenchmarkTruth.AxContract do
       RunContext.capture_git!(
         cwd: cwd,
         require_clean: not Keyword.get(opts, :allow_dirty, false),
-        source_commits: %{"ax" => "ax-llm/ax@#{@ax_commit}"}
+        source_commits: %{"ax" => "ax-llm/ax@#{@ax_commit}"},
+        inputs: %{
+          "protocol_id" => "ax_contract",
+          "npm_integrity" => @npm_integrity,
+          "tarball_sha256" => "sha256:" <> sha256(File.read!(tarball))
+        }
       )
 
     verify_package!(tarball, package_dir)

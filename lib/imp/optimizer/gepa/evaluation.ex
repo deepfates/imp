@@ -23,4 +23,19 @@ defmodule Imp.Optimizer.GEPA.Evaluation do
     |> Adapter.evaluate(batch, candidate, opts)
     |> Result.validate!(length(batch), candidate, capture_traces)
   end
+
+  @doc "Evaluates and validates ordered candidate/batch pairs through the adapter batch seam."
+  @spec batch_evaluate(Adapter.t(), [{Candidate.t(), [term()]}], keyword()) :: [Result.t()]
+  def batch_evaluate(adapter, items, opts \\ []) when is_list(items) and is_list(opts) do
+    results = Adapter.batch_evaluate(adapter, items, opts)
+
+    unless is_list(results) and length(results) == length(items) do
+      raise ArgumentError,
+            "GEPA adapter batch_evaluate/3 must return one result per item"
+    end
+
+    Enum.zip_with(items, results, fn {candidate, batch}, result ->
+      Result.validate!(result, length(batch), candidate, true)
+    end)
+  end
 end

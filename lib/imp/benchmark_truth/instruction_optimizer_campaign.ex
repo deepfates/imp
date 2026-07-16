@@ -83,7 +83,10 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     source_commits =
       Map.put(Keyword.fetch!(opts, :source_commits), "imp", "deepfates/imp@#{git_sha}")
 
-    out_dir = Keyword.get(opts, :out_dir, "benchmarks/results") |> Path.expand()
+    out_dir =
+      opts
+      |> Keyword.get(:out_dir, Imp.BenchmarkTruth.Paths.runs("instruction-optimizer-campaign"))
+      |> Path.expand()
 
     checkpoint_dir =
       Keyword.get(opts, :checkpoint_dir, Path.join(out_dir, "optimizer-checkpoints"))
@@ -127,8 +130,8 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
       "seed" => context.seed,
       "model" => context.model,
       "arms" => Enum.map(context.arms, &Atom.to_string/1),
-      "arm_configs" => Report.json_safe(context.arm_configs),
-      "budget" => Report.json_safe(context.budget),
+      "arm_configs" => Report.encode_term(context.arm_configs),
+      "budget" => Report.encode_term(context.budget),
       "budget_scope" => "per_arm",
       "pricing" => context.pricing,
       "max_output_tokens" => context.max_output_tokens,
@@ -204,7 +207,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
           "invocation_wall_seconds" => elapsed_seconds(arm_started)
         },
         "failures" => row_failures(progress),
-        "optimizer_report" => report && Report.dump(report),
+        "optimizer_report" => report && Report.json_projection(report),
         "program" => progress["program"],
         "scope" => "research_preflight_not_t3"
       }
@@ -501,7 +504,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
   defp reservation_failures(_budget), do: []
 
   defp json_safe_error(nil), do: nil
-  defp json_safe_error(error), do: Report.json_safe(error)
+  defp json_safe_error(error), do: Report.encode_term(error)
 
   defp failure_error?(nil), do: false
 

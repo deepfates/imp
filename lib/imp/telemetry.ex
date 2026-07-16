@@ -16,6 +16,7 @@ defmodule Imp.Telemetry do
 
   """
   def execute(event, measurements, metadata) do
+    measurements = Imp.Redaction.redact(measurements)
     metadata = Imp.Redaction.redact(metadata)
 
     if Code.ensure_loaded?(:telemetry) and function_exported?(:telemetry, :execute, 3) do

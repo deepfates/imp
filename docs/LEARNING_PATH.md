@@ -207,11 +207,12 @@ redacted RLM trace before increasing them.
 
 ## 7. Persist Programs, Not Secrets
 
-`Imp.dump/1` and `Imp.load/1` round-trip a portable program representation.
-`Imp.save!/2` and `Imp.load!/1` use JSON artifacts. Provider credentials are
-not persisted; rebind a loaded program with `Imp.with_lm/2` or a scoped
-`Imp.context/2`. Functions such as tools and custom metrics require named
-entries in `Imp.Saving.Registry` before they can be saved.
+`Imp.dump/1` and `Imp.load/1` round-trip a portable, data-only program
+representation. `Imp.save!/2` and `Imp.load!/1` use checksummed JSON artifacts.
+Provider credentials are not persisted; rebind a loaded program with
+`Imp.with_lm/2` or a scoped `Imp.context/2`. Callback-bearing programs store
+trusted callback names, never closures; supply an `Imp.Saving.Registry` when
+dumping and loading them.
 
 ```elixir
 # learning-path-contract: persistence
@@ -274,8 +275,8 @@ the program server. Its behavior is exercised by
 For an application deployment, keep the artifact path, model name, API key,
 maximum concurrency, shutdown timeout, retry policy, and retention policy in
 runtime configuration. Evaluate the candidate before promotion, load the
-artifact through a trusted registry, rebind the live LM, and observe status,
-latency, validation errors, and costs after rollout.
+artifact through its trusted callback registry when needed, rebind the live LM,
+and observe status, latency, validation errors, and costs after rollout.
 
 ## Live Provider Boundary
 

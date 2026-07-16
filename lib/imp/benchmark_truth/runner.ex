@@ -1,7 +1,7 @@
 defmodule Imp.BenchmarkTruth.Runner do
   @moduledoc false
 
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("benchmark")
 
   def run(opts \\ []) do
     mode = Keyword.get(opts, :mode, :fixture)

@@ -13,6 +13,7 @@ import inspect
 import json
 import random
 import sys
+import threading
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -38,14 +39,13 @@ EXPECTED_COMMIT = AUTHORITY["commit"]
 
 import dspy
 from dspy.propose import grounded_proposer
+from dspy.teleprompt import bootstrap as bootstrap_module
 from dspy.teleprompt import mipro_optimizer_v2, simba, simba_utils, utils
 
 
 SOURCE_PINS = {
     "dspy/propose/grounded_proposer.py": grounded_proposer,
-    "dspy/teleprompt/bootstrap.py": (
-        __import__("dspy.teleprompt.bootstrap", fromlist=["bootstrap"])
-    ),
+    "dspy/teleprompt/bootstrap.py": bootstrap_module,
     "dspy/teleprompt/mipro_optimizer_v2.py": mipro_optimizer_v2,
     "dspy/teleprompt/simba.py": simba,
     "dspy/teleprompt/simba_utils.py": simba_utils,
@@ -54,6 +54,113 @@ SOURCE_PINS = {
 
 if set(SOURCE_PINS) != set(AUTHORITY["source_hashes"]):
     raise RuntimeError("DSPy contract source set is incompatible with the upstream authority registry")
+
+REPEATED_CALL_RUNTIME_SOURCE_PINS = (
+    {
+        "path": "dspy/predict/predict.py",
+        "sha256": "25acd81c09875e52442452fb318eff62161513de6fa08271e6a6766eb8d81a23",
+    },
+    {
+        "path": "dspy/utils/dummies.py",
+        "sha256": "e62b4cdaea8468277f4b11527d8c288e70a95a89d686982f089f1c26bf62a50c",
+    },
+    {
+        "path": "dspy/utils/hasher.py",
+        "sha256": "e04ed4699ddf39f2cf9992016b2ebbde715e0f16f255eec6f158a9fe86f477d2",
+    },
+)
+REPEATED_CALL_TRACE_EXPRESSION = "trace.append((self, {**kwargs}, pred))"
+REPEATED_CALL_SELECTION_EXPRESSION = (
+    "demos = [rng.choice(demos[:-1]) if rng.random() < 0.5 else demos[-1]]"
+)
+REPEATED_CALL_CASE_SPECS = (
+    {"id": "trace_set_0", "trace_set": 0},
+    {"id": "trace_set_2", "trace_set": 2},
+    {"id": "trace_set_3", "trace_set": 3},
+    {"id": "trace_set_4", "trace_set": 4},
+    {"id": "trace_set_5", "trace_set": 5},
+    {"id": "trace_set_13", "trace_set": 13},
+    {"id": "trace_set_30", "trace_set": 30},
+)
+EXPECTED_DSPY_REPEATED_CALL_OUTCOMES = {
+    "trace_set_0": {
+        "hasher_seed": "0460c53e6c18f543c88ad72c26a1cda739768f1a0c7ae6222eb47f71b6817e84",
+        "rng_draw": 0.7157076233012117,
+        "branch": "final",
+        "selected_index": 3,
+        "selected_call_id": "call_3",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_2": {
+        "hasher_seed": "2e37eef58a2ff9d19682684a2eb368c5cdc7856effd8a0b7bc91c91315a92644",
+        "rng_draw": 0.8601016835594661,
+        "branch": "final",
+        "selected_index": 3,
+        "selected_call_id": "call_3",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_3": {
+        "hasher_seed": "de3f5ae5261e369be2eb3bcc1f893af058ce02155c9e5b11c081f3a0d66e461a",
+        "rng_draw": 0.2573183427206168,
+        "branch": "earlier",
+        "selected_index": 0,
+        "selected_call_id": "call_0",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_4": {
+        "hasher_seed": "524ee8bb69ee7de2b014e71bd5ec5559849db9cd64ba1f485c1d2454d70ddf19",
+        "rng_draw": 0.748174734575589,
+        "branch": "final",
+        "selected_index": 3,
+        "selected_call_id": "call_3",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_5": {
+        "hasher_seed": "20708280eab2905c622c1ae25ec213371c6834f1aeb973a4fd387da7ef4d55f1",
+        "rng_draw": 0.2170616038822879,
+        "branch": "earlier",
+        "selected_index": 1,
+        "selected_call_id": "call_1",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_13": {
+        "hasher_seed": "3f8a151ec65a0bf07918da5a0c9d57d1f510a1c6ed92ca26e4e2267bd1f915bd",
+        "rng_draw": 0.3303275522921808,
+        "branch": "earlier",
+        "selected_index": 2,
+        "selected_call_id": "call_2",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+    "trace_set_30": {
+        "hasher_seed": "b3f7ac72c6942122bc819a1bc11aed0c2ca007053090744f95364753870f99e7",
+        "rng_draw": 0.5050866552652811,
+        "branch": "final",
+        "selected_index": 3,
+        "selected_call_id": "call_3",
+        "selected_count": 1,
+        "runtime_predictor_call_count": 4,
+        "runtime_lm_call_count": 4,
+        "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+    },
+}
 
 
 class DummyProgram:
@@ -111,11 +218,195 @@ def validate_pins() -> list[dict[str, str]]:
             }
         )
 
+    dspy_root = Path(inspect.getsourcefile(dspy) or "").resolve().parent
+    for pin in REPEATED_CALL_RUNTIME_SOURCE_PINS:
+        source_path = dspy_root / Path(pin["path"]).relative_to("dspy")
+        actual_hash = sha256(source_path) if source_path.is_file() else "missing"
+        if actual_hash != pin["sha256"]:
+            failures.append(
+                f"{pin['path']}: expected {pin['sha256']}, got {actual_hash}"
+            )
+
     failures.extend(source_hash_failures(actual_hashes))
 
     if failures:
         raise RuntimeError("pinned DSPy validation failed:\n- " + "\n- ".join(failures))
     return sources
+
+
+def repeated_predictor_call_fixture() -> dict[str, Any]:
+    from dspy.utils.hasher import Hasher
+
+    class RepeatedCallTraceProgram(dspy.Module):
+        """Provider-free program that makes fixed calls through DSPy's predictor runtime."""
+
+        def __init__(self, calls: list[dict[str, Any]]) -> None:
+            super().__init__()
+            self.answerer = dspy.Predict("question -> hint")
+            self.calls = calls
+            self.runtime_trace: list[tuple[Any, Any, Any]] = []
+
+        def forward(self, question: str) -> dspy.Prediction:
+            del question
+            for call in self.calls:
+                prediction = self.answerer(**call["inputs"])
+                if prediction["hint"] != call["outputs"]["hint"]:
+                    raise RuntimeError("DSPy DummyLM returned an unexpected fixture output")
+            self.runtime_trace = list(dspy.settings.trace)
+            return dspy.Prediction(hint="fixture-complete")
+
+    bootstrap_source = inspect.getsource(
+        bootstrap_module.BootstrapFewShot._bootstrap_one_example
+    )
+    if REPEATED_CALL_SELECTION_EXPRESSION not in bootstrap_source:
+        raise RuntimeError("pinned DSPy repeated-call selection expression drifted")
+    predict_source = inspect.getsource(dspy.Predict._forward_postprocess)
+    if REPEATED_CALL_TRACE_EXPRESSION not in predict_source:
+        raise RuntimeError("pinned DSPy predictor trace expression drifted")
+
+    cases = []
+    for spec in REPEATED_CALL_CASE_SPECS:
+        trace_set = spec["trace_set"]
+        calls = [
+            {
+                "call_id": f"call_{index}",
+                "inputs": {"question": f"fixture-{trace_set}-q-{index}"},
+                "outputs": {"hint": f"fixture-{trace_set}-h-{index}"},
+            }
+            for index in range(4)
+        ]
+        program = RepeatedCallTraceProgram(calls)
+        fixture_lm = dspy.utils.DummyLM([call["outputs"] for call in calls])
+        bootstrap = object.__new__(bootstrap_module.BootstrapFewShot)
+        bootstrap.teacher = program
+        bootstrap.teacher_settings = {"lm": fixture_lm}
+        bootstrap.metric = None
+        bootstrap.metric_threshold = None
+        bootstrap.max_errors = 10
+        bootstrap.error_count = 0
+        bootstrap.error_lock = threading.Lock()
+        bootstrap.predictor2name = {id(program.answerer): "answerer"}
+        bootstrap.name2traces = {"answerer": []}
+
+        example = dspy.Example(question=f"fixture-{trace_set}").with_inputs("question")
+        if not bootstrap._bootstrap_one_example(example, round_idx=0):
+            raise RuntimeError(f"DSPy bootstrap rejected repeated-call fixture {spec['id']}")
+
+        runtime_steps = [
+            step for step in program.runtime_trace if step[0] is program.answerer
+        ]
+        if len(runtime_steps) != len(calls):
+            raise RuntimeError(
+                f"DSPy repeated-call fixture {spec['id']} executed "
+                f"{len(runtime_steps)} predictor calls instead of {len(calls)}"
+            )
+        if len(fixture_lm.history) != len(calls):
+            raise RuntimeError(
+                f"DSPy repeated-call fixture {spec['id']} made "
+                f"{len(fixture_lm.history)} LM calls instead of {len(calls)}"
+            )
+        for call, (_predictor, inputs, outputs) in zip(calls, runtime_steps, strict=True):
+            if inputs != call["inputs"] or outputs["hint"] != call["outputs"]["hint"]:
+                raise RuntimeError(
+                    f"DSPy repeated-call fixture {spec['id']} runtime trace diverged from its calls"
+                )
+
+        demos = [
+            dspy.Example(augmented=True, **inputs, **outputs)
+            for _predictor, inputs, outputs in runtime_steps
+        ]
+
+        observed_demos = bootstrap.name2traces["answerer"]
+        if len(observed_demos) != 1:
+            raise RuntimeError(
+                f"DSPy repeated-call fixture {spec['id']} selected "
+                f"{len(observed_demos)} demos instead of one"
+            )
+
+        observed_demo = observed_demos[0]
+        observed_index = next(
+            index
+            for index, call in enumerate(calls)
+            if observed_demo["question"] == call["inputs"]["question"]
+            and observed_demo["hint"] == call["outputs"]["hint"]
+        )
+
+        hasher_seed = Hasher.hash(tuple(demos))
+        rng = random.Random(hasher_seed)
+        rng_draw = rng.random()
+
+        if rng_draw < 0.5:
+            selected_demo = rng.choice(demos[:-1])
+            branch = "earlier"
+        else:
+            selected_demo = demos[-1]
+            branch = "final"
+
+        selected_index = next(
+            index for index, demo in enumerate(demos) if demo is selected_demo
+        )
+        if observed_index != selected_index:
+            raise RuntimeError(
+                f"DSPy source behavior and Hasher/RNG projection disagree for {spec['id']}: "
+                f"source selected {observed_index}, projection selected {selected_index}"
+            )
+
+        outcome = {
+            "hasher_seed": hasher_seed,
+            "rng_draw": rng_draw,
+            "branch": branch,
+            "selected_index": observed_index,
+            "selected_call_id": calls[observed_index]["call_id"],
+            "selected_count": len(observed_demos),
+            "runtime_predictor_call_count": len(runtime_steps),
+            "runtime_lm_call_count": len(fixture_lm.history),
+            "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+        }
+        expected = EXPECTED_DSPY_REPEATED_CALL_OUTCOMES[spec["id"]]
+        if outcome != expected:
+            raise RuntimeError(
+                f"pinned DSPy repeated-call fixture drift for {spec['id']}: "
+                f"expected {expected!r}, got {outcome!r}"
+            )
+
+        cases.append(
+            {
+                "id": spec["id"],
+                "trajectory_index": 0,
+                "predictor_name": "answerer",
+                "calls": calls,
+                "dspy": outcome,
+            }
+        )
+
+    return {
+        "fixture_id": "bootstrap-repeated-predictor-calls-v3",
+        "scope": (
+            "seven fixed trace inputs executed through both predictor runtimes; "
+            "branch and earlier-index coverage, not an empirical distribution estimate"
+        ),
+        "source_hashes": {
+            "dspy/teleprompt/bootstrap.py": AUTHORITY["source_hashes"][
+                "dspy/teleprompt/bootstrap.py"
+            ],
+            **{pin["path"]: pin["sha256"] for pin in REPEATED_CALL_RUNTIME_SOURCE_PINS},
+        },
+        "algorithm": {
+            "observed_via": "repeated dspy.Predict calls through BootstrapFewShot._bootstrap_one_example",
+            "runtime_call_probe": "DummyLM.history plus dspy.Predict trace identity",
+            "trace_source_expression": REPEATED_CALL_TRACE_EXPRESSION,
+            "source_expression": REPEATED_CALL_SELECTION_EXPRESSION,
+            "rng": "Python random.Random",
+            "seed": "Hasher.hash(tuple(demos))",
+            "branch_draw": "rng.random()",
+            "earlier_when": "branch_draw < 0.5",
+            "earlier_choice": "rng.choice(demos[:-1])",
+            "final_choice": "demos[-1]",
+            "probability_basis": "uniform random.Random.random() variate",
+            "branch_probability_model": {"earlier": 0.5, "final": 0.5},
+        },
+        "cases": cases,
+    }
 
 
 def bare_mipro(auto: str | None, seed: int = 9) -> mipro_optimizer_v2.MIPROv2:
@@ -457,6 +748,7 @@ def build_artifact(sources: list[dict[str, str]]) -> dict[str, Any]:
         },
         "mipro_v2": {
             "budgets": mipro_budgets(),
+            "bootstrap_repeated_predictor_calls": repeated_predictor_call_fixture(),
             "demo_arm_topology": demo_arm_topology(),
             "proposal_rotation": proposal_rotation(),
             "released_minibatch_schedule": {

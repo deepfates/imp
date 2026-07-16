@@ -4,7 +4,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
   alias Imp.BenchmarkTruth.LocalMLXCampaign
 
   @artifact_path Path.expand(
-                   "../benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
+                   "../benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json",
                    __DIR__
                  )
 
@@ -222,7 +222,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
     assert {:ok, ^current} = LocalMLXCampaign.validate_artifact(current)
   end
 
-  test "serves baseline, adapter, and fused lanes with exact model and adapter requests" do
+  test "serves every lane without reusing a cache entry for redacted model paths" do
     root = Path.join(System.tmp_dir!(), "imp-fake-mlx-#{System.unique_integer([:positive])}")
     script = Path.join(root, "fake_mlx_server.py")
     port = free_port()
@@ -239,6 +239,15 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
       {"adapter", Path.join(root, "adapter")},
       {"fused", nil}
     ]
+
+    probe_messages = [%{role: :user, content: "probe"}]
+    base_url = "http://127.0.0.1:#{port}/v1"
+
+    baseline_lm = local_mlx_lm(Path.join(root, "baseline"), api_key: "local", base_url: base_url)
+    fused_lm = local_mlx_lm(Path.join(root, "fused"), api_key: "local", base_url: base_url)
+
+    refute Imp.Clients.ReqLLM.cache_key(baseline_lm, probe_messages, []) ==
+             Imp.Clients.ReqLLM.cache_key(fused_lm, probe_messages, [])
 
     for {name, adapter_path} <- lanes do
       model_path = Path.join(root, name)

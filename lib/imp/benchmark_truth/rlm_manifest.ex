@@ -14,7 +14,7 @@ defmodule Imp.BenchmarkTruth.RLMManifest do
   }
 
   def load!(path, opts \\ []) do
-    manifest = path |> File.read!() |> Jason.decode!() |> Imp.Persistence.Legacy.rlm_manifest()
+    manifest = path |> File.read!() |> Jason.decode!()
     validate!(manifest, path, opts)
   rescue
     error in Jason.DecodeError ->

@@ -1,7 +1,7 @@
 defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   @moduledoc false
 
-  alias Imp.BenchmarkTruth.ArtifactFile
+  alias Imp.BenchmarkTruth.{ArtifactFile, RunContext}
 
   alias Imp.BenchmarkTruth.OptimizeAnything.{
     AgentConfig,
@@ -13,7 +13,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   alias Imp.Optimize.Anything, as: OptimizeAnything
   alias Imp.Optimize.Anything.{Config, Result}
 
-  @gepa_commit "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
   @evaluators [CodeArtifact, AgentConfig, SchedulingHeuristic]
   @default_seeds [0, 1, 2]
 
@@ -22,16 +21,42 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
     lm = Keyword.fetch!(opts, :lm)
     model = Keyword.fetch!(opts, :model)
     provider = Keyword.fetch!(opts, :provider)
-    out_dir = Keyword.get(opts, :out_dir, "benchmarks/results")
+
+    out_dir =
+      Keyword.get(opts, :out_dir, Imp.BenchmarkTruth.Paths.runs("optimize-anything"))
+
+    checkpoint_root =
+      Keyword.get(
+        opts,
+        :checkpoint_dir,
+        Imp.BenchmarkTruth.Paths.checkpoints("optimize-anything")
+      )
+
     seeds = validate_seeds!(Keyword.get(opts, :seeds, @default_seeds))
     max_proposals = Keyword.get(opts, :max_proposals, 3)
     run_id = Keyword.get(opts, :run_id, run_id())
-    git_sha = git_sha()
+    gepa_commit = current_gepa_commit!()
 
     unless is_integer(max_proposals) and max_proposals > 0 do
       raise ArgumentError, ":max_proposals must be a positive integer"
     end
 
+    source = %{
+      "mode" => "live_campaign",
+      "run_id" => run_id,
+      "provider" => provider,
+      "model" => model,
+      "seeds" => seeds,
+      "max_proposals" => max_proposals
+    }
+
+    run_context =
+      RunContext.capture_git!(
+        source_commits: %{"gepa" => "gepa-ai/gepa@#{gepa_commit}"},
+        inputs: source
+      )
+
+    git_sha = run_context.code_revision
     File.mkdir_p!(out_dir)
 
     context = %{
@@ -40,9 +65,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       model: model,
       seeds: seeds,
       max_proposals: max_proposals,
-      out_dir: out_dir,
+      checkpoint_root: checkpoint_root,
       run_id: run_id,
-      git_sha: git_sha
+      git_sha: git_sha,
+      gepa_commit: gepa_commit
     }
 
     rows =
@@ -54,18 +80,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       Artifact.build(rows,
         mode: :full,
         git_sha: git_sha,
-        source: %{
-          "mode" => "live_campaign",
-          "run_id" => run_id,
-          "provider" => provider,
-          "model" => model,
-          "seeds" => seeds,
-          "max_proposals" => max_proposals
-        }
+        source: source
       )
 
     path = Path.join(out_dir, "optimize-anything-replication-#{timestamp_slug()}.json")
-    path = ArtifactFile.write_json!(path, artifact)
+    %{artifact: artifact, path: path} = ArtifactFile.write_run_json!(path, artifact, run_context)
 
     unless Artifact.full_artifact?(artifact) do
       raise "Optimize Anything live campaign did not produce full effectiveness evidence; inspect #{path}"
@@ -89,9 +108,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       model: model,
       seeds: seeds,
       max_proposals: max_proposals,
-      out_dir: out_dir,
+      checkpoint_root: checkpoint_root,
       run_id: run_id,
-      git_sha: git_sha
+      git_sha: git_sha,
+      gepa_commit: gepa_commit
     } = context
 
     baseline_score = score(evaluator, evaluator.baseline(), evaluator.valset())
@@ -99,7 +119,16 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
 
     runs =
       Enum.map(seeds, fn seed ->
-        run_seed(evaluator, lm, seed, max_proposals, out_dir, run_id, baseline_score, git_sha)
+        run_seed(
+          evaluator,
+          lm,
+          seed,
+          max_proposals,
+          checkpoint_root,
+          run_id,
+          baseline_score,
+          git_sha
+        )
       end)
 
     lifts = Enum.map(runs, &(&1.optimized_score - baseline_score))
@@ -155,17 +184,35 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
         "evaluator_version" => evaluator.id(),
         "dataset_source" => "embedded Imp benchmark truth corpus with executable evaluators",
         "environment" => "Elixir #{System.version()} / OTP #{System.otp_release()}",
-        "source_commits" => %{"imp" => git_sha, "gepa" => @gepa_commit},
+        "source_commits" => %{"imp" => git_sha, "gepa" => gepa_commit},
         "runs" => Enum.map(runs, &reproducibility_run/1)
       }
     }
   end
 
-  defp run_seed(evaluator, lm, seed, max_proposals, out_dir, run_id, baseline_score, git_sha) do
+  defp current_gepa_commit! do
+    "benchmarks/authorities.json"
+    |> Imp.EvidenceAuthorities.load!()
+    |> get_in(["pinned_sources", "gepa_standalone", "commit"])
+    |> case do
+      commit when is_binary(commit) and byte_size(commit) == 40 -> commit
+      value -> raise "canonical GEPA authority has an invalid commit: #{inspect(value)}"
+    end
+  end
+
+  defp run_seed(
+         evaluator,
+         lm,
+         seed,
+         max_proposals,
+         checkpoint_root,
+         run_id,
+         baseline_score,
+         git_sha
+       ) do
     run_dir =
       Path.join([
-        out_dir,
-        "optimize-anything-runs",
+        checkpoint_root,
         run_id,
         evaluator.artifact_class(),
         Integer.to_string(seed)
@@ -318,13 +365,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   defp digest(value) do
     encoded = :erlang.term_to_binary(value, [:deterministic])
     "sha256:" <> (:crypto.hash(:sha256, encoded) |> Base.encode16(case: :lower))
-  end
-
-  defp git_sha do
-    case System.cmd("git", ["rev-parse", "--verify", "HEAD"], stderr_to_stdout: true) do
-      {sha, 0} -> String.trim(sha)
-      _ -> "unknown"
-    end
   end
 
   defp run_id,

@@ -108,6 +108,9 @@ end
 defmodule Imp.Clients.TrainingJob do
   @moduledoc "Provider-neutral finetuning or reinforcement-training job."
 
+  @active_statuses [:created, :submitted, :pending, :running]
+  @terminal_statuses [:succeeded, :failed, :cancelled, :artifact_missing]
+
   @type t :: %__MODULE__{
           id: String.t(),
           provider: atom(),
@@ -368,11 +371,15 @@ defmodule Imp.Clients.TrainingJob do
       :succeeded
       iex> Imp.Clients.TrainingJob.normalize_status("queued")
       :pending
+      iex> Imp.Clients.TrainingJob.normalize_status("validating_files")
+      :pending
       iex> Imp.Clients.TrainingJob.normalize_status("provider-paused")
       {:unknown, "provider-paused"}
   """
-  def normalize_status(status) when is_atom(status), do: status
   def normalize_status({:unknown, status}) when is_binary(status), do: {:unknown, status}
+
+  def normalize_status(status) when is_atom(status),
+    do: status |> Atom.to_string() |> normalize_status()
 
   def normalize_status(status) when is_binary(status) do
     case String.downcase(status) do
@@ -380,7 +387,7 @@ defmodule Imp.Clients.TrainingJob do
       normalized when normalized in ["failed", "error"] -> :failed
       normalized when normalized in ["cancelled", "canceled"] -> :cancelled
       normalized when normalized in ["running", "in_progress"] -> :running
-      normalized when normalized in ["pending", "queued"] -> :pending
+      normalized when normalized in ["pending", "queued", "validating_files"] -> :pending
       "artifact_missing" -> :artifact_missing
       "created" -> :created
       "submitted" -> :submitted
@@ -389,6 +396,12 @@ defmodule Imp.Clients.TrainingJob do
   end
 
   def normalize_status(other), do: {:unknown, to_string(other)}
+
+  @doc "Returns whether a provider status is a known nonterminal lifecycle state."
+  def active_status?(status), do: normalize_status(status) in @active_statuses
+
+  @doc "Returns whether a provider status is a known terminal lifecycle state."
+  def terminal_status?(status), do: normalize_status(status) in @terminal_statuses
 
   defp normalize_attrs!(attrs) do
     Map.new(attrs, fn
@@ -462,7 +475,9 @@ defmodule Imp.Clients.TrainingJob do
   defp decode_status_response(job, response, operation) do
     case Jason.decode(response) do
       {:ok, decoded} when is_map(decoded) ->
-        {:ok, merge_status(job, decoded)}
+        decoded
+        |> then(&merge_status(job, &1))
+        |> operation_status_result(operation)
 
       {:ok, decoded} ->
         {:error, {invalid_operation_response(operation), decoded}}
@@ -471,6 +486,14 @@ defmodule Imp.Clients.TrainingJob do
         {:error, {invalid_operation_response(operation), Exception.message(reason)}}
     end
   end
+
+  defp operation_status_result(%__MODULE__{status: :cancelled} = job, :cancel),
+    do: {:ok, job}
+
+  defp operation_status_result(%__MODULE__{} = job, :cancel),
+    do: {:error, {:training_cancel_incomplete, job.status, job.metadata}}
+
+  defp operation_status_result(%__MODULE__{} = job, _operation), do: {:ok, job}
 
   defp merge_status(job, decoded) do
     enforce_artifact(%{

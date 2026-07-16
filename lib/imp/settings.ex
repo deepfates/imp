@@ -18,11 +18,20 @@ defmodule Imp.Settings do
     adapter: Imp.Adapter.Chat,
     retriever: nil,
     callbacks: [],
-    async_max_workers: 8
+    async_max_workers: 8,
+    max_errors: 10
   }
   @context_key :imp_context_stack
   @snapshot_key :imp_settings_snapshot
   @unset :imp_settings_unset
+  @known_string_keys %{
+    "adapter" => :adapter,
+    "async_max_workers" => :async_max_workers,
+    "callbacks" => :callbacks,
+    "lm" => :lm,
+    "max_errors" => :max_errors,
+    "retriever" => :retriever
+  }
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
@@ -211,27 +220,59 @@ defmodule Imp.Settings do
 
   defp normalize_settings(settings, context) when is_list(settings) or is_map(settings) do
     settings
-    |> Enum.reduce(%{}, fn
-      {:async_max_workers, value}, normalized when is_integer(value) and value > 0 ->
-        Map.put(normalized, :async_max_workers, value)
+    |> Enum.reduce({%{}, %{}}, fn
+      {raw_key, value}, {normalized, seen} ->
+        key = normalize_setting_key(raw_key)
+        reject_colliding_key!(seen, key, raw_key, context)
 
-      {:async_max_workers, value}, _normalized ->
-        raise ArgumentError,
-              "#{context} expects :async_max_workers to be a positive integer; got: #{inspect(value)}"
+        {put_validated_setting(normalized, key, value, context), Map.put(seen, key, raw_key)}
 
-      {key, value}, normalized ->
-        Map.put(normalized, key, value)
-
-      invalid_entry, _normalized ->
+      invalid_entry, _acc ->
         raise ArgumentError,
               "#{context} expects settings as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
     end)
+    |> elem(0)
   end
 
   defp normalize_settings(settings, context) do
     raise ArgumentError,
           "#{context} expects settings as a map or settings pair list; got: #{inspect(settings)}"
   end
+
+  defp normalize_setting_key(key) when is_binary(key), do: Map.get(@known_string_keys, key, key)
+  defp normalize_setting_key(key), do: key
+
+  defp reject_colliding_key!(seen, key, raw_key, context) do
+    case Map.fetch(seen, key) do
+      {:ok, previous_key} when previous_key != raw_key ->
+        raise ArgumentError,
+              "#{context} received colliding setting keys #{inspect(previous_key)} and #{inspect(raw_key)}"
+
+      _other ->
+        :ok
+    end
+  end
+
+  defp put_validated_setting(normalized, :async_max_workers, value, _context)
+       when is_integer(value) and value > 0,
+       do: Map.put(normalized, :async_max_workers, value)
+
+  defp put_validated_setting(_normalized, :async_max_workers, value, context) do
+    raise ArgumentError,
+          "#{context} expects :async_max_workers to be a positive integer; got: #{inspect(value)}"
+  end
+
+  defp put_validated_setting(normalized, :max_errors, value, _context)
+       when value == :infinity or (is_integer(value) and value >= 0),
+       do: Map.put(normalized, :max_errors, value)
+
+  defp put_validated_setting(_normalized, :max_errors, value, context) do
+    raise ArgumentError,
+          "#{context} expects :max_errors to be :infinity or a non-negative integer; got: #{inspect(value)}"
+  end
+
+  defp put_validated_setting(normalized, key, value, _context),
+    do: Map.put(normalized, key, value)
 
   defp restore_process_value(key, @unset), do: Process.delete(key)
   defp restore_process_value(key, value), do: Process.put(key, value)

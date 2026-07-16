@@ -1,7 +1,7 @@
 defmodule Imp.OptimizerContractTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Optimizer.TrainingResult
+  alias Imp.Optimizer.{TrainingError, TrainingResult}
 
   defmodule CapturingProgramOptimizer do
     @behaviour Imp.Optimizer
@@ -261,7 +261,7 @@ defmodule Imp.OptimizerContractTest do
     assert {:error, {:training_not_started, :trainer_required, %Imp.Predict.Predict{} = compiled}} =
              Imp.train(program, trainer, [])
 
-    assert Imp.Optimizer.Report.fetch(compiled).optimizer == :bootstrap_few_shot
+    assert Imp.Optimizer.Report.fetch(compiled).optimizer == :bootstrap_finetune
 
     assert {:error, {:optimizer_kind_mismatch, :training, :program}} =
              Imp.train(program, Imp.Optimizer.LabeledFewShot.new(), [])
@@ -395,7 +395,14 @@ defmodule Imp.OptimizerContractTest do
         trainer: trainer_for.(%{id: "failed", status: :failed})
       )
 
-    assert {:error, {:training_failed, :failed, %{}}} = Imp.train(program, failed, [])
+    assert {:error,
+            %TrainingError{
+              reason: {:training_failed, :failed, %{}},
+              program: failed_program,
+              status: :failed
+            }} = Imp.train(program, failed, [])
+
+    assert Imp.Optimizer.Report.fetch(failed_program).metadata.status == :error
   end
 
   test "capability callback failures are normalized at the optimizer boundary" do

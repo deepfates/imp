@@ -132,7 +132,7 @@ defmodule Imp.ProgramParameters do
   end
 
   @doc "Returns a revisioned, data-only snapshot of every exposed parameter."
-  @spec snapshot(struct()) :: Set.t()
+  @spec snapshot(struct()) :: struct()
   def snapshot(%_module{} = program) do
     descriptors = descriptors(program)
     fresh = Set.new(program_id(program), Enum.map(descriptors, &descriptor_parameter/1))
@@ -144,15 +144,15 @@ defmodule Imp.ProgramParameters do
   end
 
   @doc "Returns the typed parameters in the current snapshot."
-  @spec parameters(struct()) :: [Parameter.t()]
+  @spec parameters(struct()) :: [struct()]
   def parameters(program), do: snapshot(program).parameters
 
   @doc "Returns only the minimal digest-guarded changes from `source` to `target`."
-  @spec diff(struct(), struct()) :: [Change.t()]
+  @spec diff(struct(), struct()) :: [struct()]
   def diff(source, target), do: Set.diff(snapshot(source), snapshot(target))
 
   @doc "Applies every change or returns an error without yielding a partial program."
-  @spec apply_changes(struct(), [Change.t() | map()]) :: {:ok, struct()} | {:error, term()}
+  @spec apply_changes(struct(), [struct() | map()]) :: {:ok, struct()} | {:error, term()}
   def apply_changes(program, changes) do
     with {:ok, updated, _snapshot} <- apply_changes_with_snapshot(program, changes) do
       {:ok, updated}
@@ -160,8 +160,8 @@ defmodule Imp.ProgramParameters do
   end
 
   @doc "Applies changes and also returns the committed parameter snapshot."
-  @spec apply_changes_with_snapshot(struct(), [Change.t() | map()]) ::
-          {:ok, struct(), Set.t()} | {:error, term()}
+  @spec apply_changes_with_snapshot(struct(), [struct() | map()]) ::
+          {:ok, struct(), struct()} | {:error, term()}
   def apply_changes_with_snapshot(%_module{} = program, changes) when is_list(changes) do
     current = snapshot(program)
     descriptors_by_id = descriptors(program) |> Map.new(&{&1.id, &1})

@@ -1,34 +1,70 @@
 defmodule Imp.Optimizer.COPRO do
   @behaviour Imp.Optimizer
-  @moduledoc "Coordinate prompt optimizer over instruction candidates."
+  @moduledoc """
+  DSPy 3.2.1 coordinate prompt optimizer.
 
-  defstruct [:metric, :proposer_lm, breadth: 5, depth: 2, extra_instructions: []]
+  COPRO searches, stores, compares, and deduplicates `(instruction, prefix)`
+  metadata exactly as the authority does. DSPy 3.2.1 simultaneously declares
+  field `prefix` deprecated and ineffective, and Imp's DSPy-compatible adapter
+  path likewise does not render it. Only instruction changes affect task prompts.
+
+  A configured proposal LM may return the whole requested JSON batch. If it
+  returns one candidate, Imp performs ordered, bounded fan-out with distinct
+  rollout IDs until the requested batch is complete. When no proposal LM exists
+  in the optimizer or Imp settings, deterministic native fallback proposals keep
+  the optimizer executable.
+
+  For statistics fidelity, `results_latest` preserves 3.2.1's cumulative
+  `latest_scores` behavior across predictors within each depth.
+  """
+
+  defstruct [
+    :metric,
+    :proposer_lm,
+    breadth: 10,
+    depth: 3,
+    init_temperature: 1.4,
+    track_stats: false,
+    extra_instructions: [],
+    proposal_max_concurrency: 4
+  ]
 
   @option_schema [
-    breadth: [type: :non_neg_integer, default: 5],
-    depth: [type: :non_neg_integer, default: 2],
+    breadth: [type: :non_neg_integer, default: 10],
+    depth: [type: :non_neg_integer, default: 3],
+    init_temperature: [type: {:or, [:integer, :float]}, default: 1.4],
+    track_stats: [type: :boolean, default: false],
     proposer_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
-    extra_instructions: [type: {:list, :string}, default: []]
+    extra_instructions: [type: {:list, :string}, default: []],
+    proposal_max_concurrency: [type: :pos_integer, default: 4]
+  ]
+
+  @eval_option_schema [
+    num_threads: [type: {:custom, __MODULE__, :validate_optional_positive, []}, default: nil],
+    max_errors: [type: {:custom, __MODULE__, :validate_optional_max_errors, []}, default: nil]
   ]
 
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.COPRO.new/2", "metric")
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.COPRO.new/2")
 
-    %__MODULE__{
-      metric: metric,
-      breadth: opts[:breadth],
-      depth: opts[:depth],
-      proposer_lm: opts[:proposer_lm],
-      extra_instructions: opts[:extra_instructions]
-    }
+    if opts[:breadth] <= 1, do: raise(ArgumentError, "Breadth must be greater than 1")
+
+    struct(__MODULE__, Map.new(opts) |> Map.put(:metric, metric))
   end
+
+  def validate_optional_positive(nil), do: {:ok, nil}
+  def validate_optional_positive(value) when is_integer(value) and value > 0, do: {:ok, value}
+  def validate_optional_positive(_value), do: {:error, "expected nil or a positive integer"}
+
+  def validate_optional_max_errors(nil), do: {:ok, nil}
+  def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
   @impl true
   def __optimizer__,
     do: %{
       kind: :program,
-      datasets: %{trainset: :required, validation: :required},
+      datasets: %{trainset: :required, validation: :optional},
       result: :program
     }
 
@@ -40,123 +76,643 @@ defmodule Imp.Optimizer.COPRO do
          optimizer,
          program,
          Imp.Optimizer.fetch_dataset!(opts, :trainset),
-         Imp.Optimizer.fetch_dataset!(opts, :validation)
+         Keyword.get(opts, :validation, [])
        )}
     end
   end
 
-  def compile(%__MODULE__{depth: 0} = optimizer, program, trainset, devset) do
-    baseline =
-      Imp.Optimizer.InstructionSearch.compile(
-        program,
-        optimizer.metric,
-        trainset,
-        devset,
-        []
-      )
+  # `devset` remains accepted for the Imp optimizer contract. DSPy's COPRO
+  # scores coordinate candidates on `trainset`, so it is not used for selection.
+  def compile(%__MODULE__{} = optimizer, program, trainset, _devset \\ [], eval_opts \\ []) do
+    trainset = Enum.to_list(trainset)
+    predictors = Imp.ProgramParameters.predictors(program)
 
-    baseline_report = Imp.Optimizer.Report.fetch(baseline)
+    if predictors == [],
+      do: raise(ArgumentError, "COPRO requires at least one optimizer predictor")
 
-    Imp.Optimizer.Report.attach(
-      baseline,
-      Imp.Optimizer.Report.new(%{
-        optimizer: :copro,
-        best_score: baseline_report.best_score,
-        candidate_count: 0,
-        candidates: [],
-        errors: baseline_report.errors,
-        metadata: %{
-          breadth: optimizer.breadth,
-          depth: 0,
-          rounds: [],
-          baseline_score: baseline_report.metadata[:baseline_score],
-          status: :baseline_only
-        }
-      })
-    )
-  end
+    eval_opts =
+      Imp.Options.validate!(eval_opts, @eval_option_schema, "Imp.Optimizer.COPRO.compile/5")
 
-  def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    {compiled, round_reports} =
-      1..optimizer.depth
-      |> Enum.reduce({program, []}, fn round, {current, reports} ->
-        {candidates, proposal_errors} =
-          candidate_instructions(current, trainset,
-            lm: optimizer.proposer_lm,
-            scores: round_score_summary(reports),
-            extra_instructions: optimizer.extra_instructions
-          )
+    {max_errors, max_errors_source} = resolve_max_errors!(eval_opts[:max_errors])
+    eval_opts = Keyword.put(eval_opts, :max_errors, max_errors)
 
-        next =
-          Imp.Optimizer.InstructionSearch.compile(
-            current,
-            optimizer.metric,
-            trainset,
-            devset,
-            Enum.take(candidates, optimizer.breadth)
-          )
-
-        report = Imp.Optimizer.Report.fetch(next)
-
-        report =
-          report
-          |> Map.update!(:errors, &(proposal_errors ++ &1))
-          |> Map.put(:metadata, Map.put(report.metadata, :round, round))
-
-        {next, reports ++ [report]}
+    initial =
+      Map.new(predictors, fn %{name: name, predictor: predictor} ->
+        {name, initial_pairs(predictor, optimizer)}
       end)
 
-    final_report = List.last(round_reports)
+    state = %{
+      current: program,
+      latest: initial,
+      all: initial,
+      evaluated: Map.new(predictors, &{&1.name, %{}}),
+      errors: [],
+      total_calls: 0,
+      rounds: [],
+      last_depth: nil,
+      results_best: stats_for(predictors),
+      results_latest: stats_for(predictors)
+    }
 
-    Imp.Optimizer.Report.attach(
-      compiled,
-      Imp.Optimizer.Report.new(%{
-        optimizer: :copro,
-        best_score: final_report.best_score,
-        candidate_count: Enum.reduce(round_reports, 0, &(&1.candidate_count + &2)),
-        candidates:
-          Enum.flat_map(round_reports, fn report ->
-            round = report.metadata.round
-            Enum.map(report.candidates, &Map.put(&1, :round, round))
-          end),
-        errors:
-          Enum.flat_map(round_reports, fn report ->
-            round = report.metadata.round
-            Enum.map(report.errors, &Map.put(&1, :round, round))
-          end),
-        metadata: %{
+    depths = if optimizer.depth == 0, do: [], else: Enum.to_list(0..(optimizer.depth - 1))
+
+    state =
+      Enum.reduce(depths, state, fn depth, state ->
+        run_round(depth, state, predictors, trainset, optimizer, eval_opts)
+      end)
+
+    finalize(state, predictors, optimizer, max_errors, max_errors_source)
+  end
+
+  defp run_round(depth, state, predictors, trainset, optimizer, eval_opts) do
+    {state, round_records, _latest_scores} =
+      Enum.reduce(predictors, {state, [], []}, fn %{name: name},
+                                                  {state, round_records, latest_scores} ->
+        pairs = if length(predictors) > 1, do: state.all[name], else: state.latest[name]
+        pair_count = length(pairs)
+
+        {evaluated, errors, calls, latest_scores, records} =
+          Enum.reduce(
+            Enum.with_index(pairs),
+            {state.evaluated[name], state.errors, state.total_calls, latest_scores, []},
+            fn {pair, ordinal}, {evaluated, errors, calls, latest_scores, records} ->
+              candidate = put_pair(state.current, name, pair)
+              result = evaluate!(candidate, trainset, optimizer.metric, eval_opts)
+
+              record = %{
+                score: result.score,
+                subscores: result.subscores,
+                program: candidate,
+                instruction: elem(pair, 0),
+                prefix: elem(pair, 1),
+                depth: depth
+              }
+
+              evaluated = retain_candidate(evaluated, pair, record)
+
+              latest_scores =
+                if pair_count - optimizer.breadth <= ordinal,
+                  do: latest_scores ++ [result.score],
+                  else: latest_scores
+
+              errors =
+                errors ++
+                  contextualize_errors(result.errors, name, depth, ordinal)
+
+              {evaluated, errors, calls + 1, latest_scores, records ++ [record]}
+            end
+          )
+
+        best = evaluated |> ordered_records() |> stable_score_sort() |> hd()
+        current = put_pair(state.current, name, {best.instruction, best.prefix})
+
+        state =
+          %{
+            state
+            | current: current,
+              evaluated: Map.put(state.evaluated, name, evaluated),
+              errors: errors,
+              total_calls: calls
+          }
+          |> put_latest_stats(name, depth, latest_scores, optimizer.track_stats)
+
+        records = Enum.map(records, &Map.put(&1, :predictor, name))
+        {state, round_records ++ records, latest_scores}
+      end)
+
+    report_candidates =
+      Enum.map(round_records, &Map.drop(&1, [:program, :insertion_order]))
+
+    state = %{
+      state
+      | rounds: state.rounds ++ [%{depth: depth, candidates: report_candidates}],
+        last_depth: depth
+    }
+
+    if depth == optimizer.depth - 1 do
+      state
+    else
+      {latest, all, results_best} = next_pairs(state, predictors, depth, optimizer)
+      %{state | latest: latest, all: all, results_best: results_best}
+    end
+  end
+
+  defp retain_candidate(evaluated, pair, record) do
+    case Map.fetch(evaluated, pair) do
+      :error ->
+        Map.put(evaluated, pair, Map.put(record, :insertion_order, map_size(evaluated)))
+
+      {:ok, %{score: previous}} when previous >= record.score ->
+        evaluated
+
+      {:ok, previous} ->
+        Map.put(evaluated, pair, Map.put(record, :insertion_order, previous.insertion_order))
+    end
+  end
+
+  defp ordered_records(evaluated),
+    do: evaluated |> Map.values() |> Enum.sort_by(& &1.insertion_order)
+
+  defp stable_score_sort(records),
+    do: Enum.sort_by(records, &{-&1.score, &1.insertion_order})
+
+  defp next_pairs(state, predictors, depth, optimizer) do
+    Enum.reduce(predictors, {%{}, state.all, state.results_best}, fn %{
+                                                                       name: name,
+                                                                       predictor: predictor
+                                                                     },
+                                                                     {latest, all, results_best} ->
+      records = state.evaluated[name] |> ordered_records() |> stable_score_sort()
+      top = Enum.take(records, optimizer.breadth)
+      history = Enum.reverse(top)
+      generated = proposal_pairs(predictor, history, optimizer, optimizer.breadth)
+      latest = Map.put(latest, name, generated)
+      all = Map.update!(all, name, &(&1 ++ generated))
+      results_best = put_best_stats(results_best, name, depth, records, optimizer.track_stats)
+      {latest, all, results_best}
+    end)
+  end
+
+  defp finalize(state, predictors, optimizer, max_errors, max_errors_source) do
+    results_best = append_final_best_stats(state, predictors, optimizer)
+
+    candidates =
+      predictors
+      |> Enum.flat_map(fn %{name: name} ->
+        state.evaluated[name]
+        |> ordered_records()
+        |> Enum.map(&Map.put(&1, :predictor, name))
+      end)
+      |> Enum.with_index()
+      |> Enum.sort_by(fn {candidate, global_order} -> {-candidate.score, global_order} end)
+      |> Enum.map(&elem(&1, 0))
+      |> drop_duplicates()
+
+    case candidates do
+      [] ->
+        raise RuntimeError, "COPRO did not produce an evaluated candidate"
+
+      [best | _] ->
+        metadata = %{
           breadth: optimizer.breadth,
           depth: optimizer.depth,
-          rounds: round_reports,
-          status: if(Enum.any?(round_reports, &(&1.errors != [])), do: :with_errors, else: :ok)
+          total_calls: state.total_calls,
+          rounds: state.rounds,
+          evaluation_dataset: :trainset,
+          score_scale: :percentage,
+          prefix_behavior: :stored_compared_but_not_rendered,
+          proposal_mode: proposal_mode(optimizer),
+          proposal_batching: :whole_batch_or_ordered_bounded_fanout,
+          latest_score_scope: :cumulative_across_predictors_per_depth,
+          max_errors: max_errors,
+          max_errors_source: max_errors_source,
+          status: if(state.errors == [], do: :ok, else: :with_errors)
         }
-      })
+
+        metadata =
+          if optimizer.track_stats do
+            Map.merge(metadata, %{
+              results_best: results_best,
+              results_latest: state.results_latest
+            })
+          else
+            metadata
+          end
+
+        report =
+          Imp.Optimizer.Report.new(%{
+            optimizer: :copro,
+            best_score: best.score,
+            candidate_count: length(candidates),
+            candidates: Enum.map(candidates, &Map.drop(&1, [:program, :insertion_order])),
+            errors: state.errors,
+            metadata: metadata
+          })
+
+        attach_report(best.program, report)
+    end
+  end
+
+  defp append_final_best_stats(state, _predictors, %{track_stats: false}),
+    do: state.results_best
+
+  defp append_final_best_stats(%{last_depth: nil} = state, _predictors, _optimizer),
+    do: state.results_best
+
+  defp append_final_best_stats(state, predictors, _optimizer) do
+    Enum.reduce(predictors, state.results_best, fn %{name: name}, stats ->
+      records = state.evaluated[name] |> ordered_records() |> stable_score_sort()
+      put_best_stats(stats, name, state.last_depth, records, true)
+    end)
+  end
+
+  defp initial_pairs(predictor, optimizer) do
+    base = {predictor.signature.instructions, output_prefix(predictor)}
+    proposal_pairs(predictor, [], optimizer, optimizer.breadth - 1) ++ [base]
+  end
+
+  defp proposal_mode(optimizer) do
+    if optimizer.proposer_lm || Imp.Settings.snapshot() |> Map.fetch!(:lm),
+      do: :language_model,
+      else: :deterministic_native_fallback
+  end
+
+  defp proposal_pairs(_predictor, _history, _optimizer, 0), do: []
+
+  defp proposal_pairs(predictor, history, optimizer, count) do
+    case optimizer.proposer_lm || Imp.Settings.snapshot() |> Map.fetch!(:lm) do
+      nil -> fallback_pairs(predictor, optimizer, count)
+      lm -> provider_proposal_pairs!(lm, predictor, history, optimizer, count)
+    end
+  end
+
+  defp provider_proposal_pairs!(lm, predictor, history, optimizer, count) do
+    prefix = output_prefix(predictor)
+
+    first_raw =
+      request_proposals!(lm, predictor, history, optimizer, count,
+        rollout_id: 0,
+        candidate_index: 1
+      )
+
+    first_pairs = parse_pairs(first_raw, prefix, count)
+
+    if first_pairs == [] do
+      raise RuntimeError, "COPRO proposal LM returned no instruction/prefix candidate"
+    end
+
+    missing = count - length(first_pairs)
+
+    if missing <= 0 do
+      Enum.take(first_pairs, count)
+    else
+      first_pairs ++
+        fan_out_proposals!(
+          lm,
+          predictor,
+          history,
+          optimizer,
+          prefix,
+          length(first_pairs),
+          missing
+        )
+    end
+  end
+
+  defp fan_out_proposals!(lm, predictor, history, optimizer, prefix, completed, missing) do
+    1..missing
+    |> Imp.Tasks.async_stream(
+      fn rollout_id ->
+        case request_proposals(lm, predictor, history, optimizer, 1,
+               rollout_id: rollout_id,
+               candidate_index: completed + rollout_id
+             ) do
+          {:ok, raw} ->
+            case parse_pairs(raw, prefix, 1) do
+              [pair] -> {:ok, pair}
+              [] -> {:error, :missing_candidate}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      ordered: true,
+      max_concurrency: min(missing, optimizer.proposal_max_concurrency),
+      timeout: :infinity
     )
+    |> Enum.map(fn
+      {:ok, {:ok, pair}} ->
+        pair
+
+      {:ok, {:error, reason}} ->
+        raise RuntimeError, "COPRO proposal fan-out failed: #{inspect(reason)}"
+
+      {:exit, reason} ->
+        raise RuntimeError, "COPRO proposal fan-out exited: #{inspect(reason)}"
+    end)
   end
 
-  defp candidate_instructions(program, trainset, opts) do
-    {Imp.Optimizer.InstructionSearch.candidate_instructions(program, trainset, opts), []}
-  rescue
-    error ->
-      {fallback_candidate(program, opts),
-       [%{stage: :instruction_proposal, reason: error_message(error)}]}
-  catch
-    kind, reason ->
-      {fallback_candidate(program, opts),
-       [%{stage: :instruction_proposal, reason: error_message({kind, reason})}]}
+  defp request_proposals!(lm, predictor, history, optimizer, count, opts) do
+    case request_proposals(lm, predictor, history, optimizer, count, opts) do
+      {:ok, raw} -> raw
+      {:error, reason} -> raise RuntimeError, "COPRO proposal LM failed: #{inspect(reason)}"
+    end
   end
 
-  defp fallback_candidate(program, opts) do
-    base = Imp.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
-    [base | Keyword.get(opts, :extra_instructions, [])]
+  defp request_proposals(lm, predictor, history, optimizer, count, opts) do
+    messages = proposal_messages(predictor, history, count, opts[:candidate_index])
+
+    Imp.LM.generate(lm, messages,
+      temperature: optimizer.init_temperature,
+      rollout_id: opts[:rollout_id]
+    )
+    |> Imp.LM.Result.unwrap()
   end
 
-  defp round_score_summary(reports) do
-    reports
-    |> Enum.flat_map(& &1.candidates)
-    |> Enum.map(&Map.take(&1, [:instruction, :score, :round]))
+  defp fallback_pairs(predictor, optimizer, count) do
+    prefix = output_prefix(predictor)
+    instruction = predictor.signature.instructions
+
+    pool =
+      Enum.map(optimizer.extra_instructions, &{&1, prefix}) ++
+        Enum.map(
+          [
+            instruction <> "\nBe concise and exact.",
+            instruction <> "\nUse the demonstrations as ground truth patterns.",
+            instruction <> "\nReturn only the requested output fields."
+          ],
+          &{&1, prefix}
+        )
+
+    pool
+    |> Stream.cycle()
+    |> Stream.with_index()
+    |> Enum.take(count)
+    |> Enum.map(fn {{candidate, candidate_prefix}, index} ->
+      if index < length(pool) do
+        {candidate, candidate_prefix}
+      else
+        {candidate <> "\nAlternative #{index + 1}.", candidate_prefix}
+      end
+    end)
   end
 
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
+  defp proposal_messages(predictor, history, count, candidate_index) do
+    attempts =
+      history
+      |> Enum.with_index(1)
+      |> Enum.flat_map(fn {record, index} ->
+        [
+          "Instruction ##{index}: #{record.instruction}",
+          "Prefix ##{index}: #{record.prefix}",
+          "Resulting Score ##{index}: #{record.score}"
+        ]
+      end)
+
+    response_schema = %{
+      type: "array",
+      minItems: count,
+      maxItems: count,
+      items: %{
+        type: "object",
+        required: ["proposed_instruction", "proposed_prefix_for_output_field"],
+        properties: %{
+          proposed_instruction: %{type: "string"},
+          proposed_prefix_for_output_field: %{type: "string"}
+        }
+      }
+    }
+
+    payload = %{
+      attempted_instructions: attempts,
+      basic_instruction: predictor.signature.instructions,
+      requested_candidate_count: count,
+      response_schema: response_schema,
+      signature: Imp.Signature.to_spec(predictor.signature)
+    }
+
+    payload =
+      if is_nil(candidate_index),
+        do: payload,
+        else: Map.put(payload, :candidate_index, candidate_index)
+
+    [
+      %{
+        role: :system,
+        content:
+          "Return exactly #{count} instruction/output-prefix candidate(s) as one JSON array matching the supplied schema."
+      },
+      %{role: :user, content: Jason.encode!(payload)}
+    ]
+  end
+
+  defp parse_pairs(raw, prefix, count) do
+    raw
+    |> decode_raw()
+    |> Enum.flat_map(fn
+      %{
+        "proposed_instruction" => instruction,
+        "proposed_prefix_for_output_field" => proposed_prefix
+      } ->
+        [{clean(instruction), clean(proposed_prefix)}]
+
+      %{proposed_instruction: instruction, proposed_prefix_for_output_field: proposed_prefix} ->
+        [{clean(instruction), clean(proposed_prefix)}]
+
+      instruction when is_binary(instruction) ->
+        [{clean(instruction), prefix}]
+
+      _ ->
+        []
+    end)
+    |> Enum.reject(fn {instruction, _prefix} -> instruction == "" end)
+    |> Enum.take(count)
+  end
+
+  defp decode_raw(raw) when is_list(raw), do: raw
+  defp decode_raw(%{} = raw), do: [raw]
+
+  defp decode_raw(raw) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, values} when is_list(values) -> values
+      {:ok, value} -> [value]
+      {:error, _} -> String.split(raw, "\n", trim: true)
+    end
+  end
+
+  defp decode_raw(_raw), do: []
+  defp clean(value), do: value |> to_string() |> String.trim("\"") |> String.trim()
+
+  defp evaluate!(program, trainset, metric, eval_opts) do
+    max_errors = eval_opts[:max_errors]
+
+    max_concurrency =
+      eval_opts[:num_threads] || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
+
+    result =
+      Imp.Evaluate.new(trainset, metric,
+        max_concurrency: max_concurrency,
+        max_errors: evaluator_error_limit(max_errors)
+      )
+      |> Imp.Evaluate.run(program)
+
+    enforce_error_budget!(result.errors, max_errors)
+
+    %{
+      score: dspy_percentage_score(result.rows),
+      subscores: Enum.map(result.rows, & &1.score),
+      errors: result.errors
+    }
+  end
+
+  defp dspy_percentage_score([]),
+    do: raise(ArithmeticError, "DSPy Evaluate cannot score an empty dataset")
+
+  defp dspy_percentage_score(rows) do
+    total = Enum.reduce(rows, 0, fn row, sum -> sum + row.score end)
+    round_half_even(100 * total / length(rows), 2)
+  end
+
+  defp round_half_even(value, _digits) when value == 0.0, do: value
+
+  defp round_half_even(value, digits) when is_float(value) do
+    <<sign::1, exponent::11, fraction::52>> = <<value::float-64>>
+
+    if exponent == 0x7FF do
+      value
+    else
+      significand = if exponent == 0, do: fraction, else: Bitwise.bsl(1, 52) + fraction
+      binary_exponent = if exponent == 0, do: -1074, else: exponent - 1023 - 52
+
+      {numerator, denominator} =
+        if binary_exponent >= 0 do
+          {Bitwise.bsl(significand, binary_exponent), 1}
+        else
+          {significand, Bitwise.bsl(1, -binary_exponent)}
+        end
+
+      factor = Integer.pow(10, digits)
+      scaled = numerator * factor
+      quotient = div(scaled, denominator)
+      remainder = rem(scaled, denominator)
+
+      rounded =
+        case compare(remainder * 2, denominator) do
+          :lt -> quotient
+          :gt -> quotient + 1
+          :eq -> if rem(quotient, 2) == 0, do: quotient, else: quotient + 1
+        end
+
+      signed = if sign == 1, do: -rounded, else: rounded
+      signed / factor
+    end
+  end
+
+  defp compare(left, right) when left < right, do: :lt
+  defp compare(left, right) when left > right, do: :gt
+  defp compare(_left, _right), do: :eq
+
+  defp evaluator_error_limit(:infinity), do: :infinity
+  defp evaluator_error_limit(max_errors), do: max(max_errors - 1, 0)
+
+  defp enforce_error_budget!([], _max_errors), do: :ok
+  defp enforce_error_budget!(_errors, :infinity), do: :ok
+
+  defp enforce_error_budget!(errors, max_errors) do
+    if length(errors) >= max_errors do
+      raise RuntimeError,
+            "COPRO evaluation error budget exhausted: #{length(errors)} errors (maximum #{max_errors})"
+    end
+  end
+
+  defp contextualize_errors(errors, predictor, depth, ordinal) do
+    Enum.map(errors, fn error ->
+      Map.merge(
+        %{predictor: predictor, depth: depth, candidate_index: ordinal, stage: :evaluation},
+        Map.new(error)
+      )
+    end)
+  end
+
+  defp resolve_max_errors!(nil), do: resolve_settings_max_errors!()
+  defp resolve_max_errors!(value), do: {validate_max_errors!(value), :explicit}
+
+  defp resolve_settings_max_errors! do
+    {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), :settings}
+  end
+
+  defp validate_max_errors!(value) do
+    case Imp.Evaluate.validate_max_errors(value) do
+      {:ok, max_errors} ->
+        max_errors
+
+      {:error, message} ->
+        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+    end
+  end
+
+  defp put_pair(program, name, {instruction, prefix}) do
+    Imp.ProgramParameters.update_predictor(program, name, fn predictor ->
+      signature = predictor.signature
+      output_index = length(signature.outputs) - 1
+      outputs = List.update_at(signature.outputs, output_index, &%{&1 | prefix: prefix})
+
+      Imp.Predict.Predict.with_signature(predictor, %{
+        signature
+        | instructions: instruction,
+          outputs: outputs
+      })
+    end)
+  end
+
+  defp output_prefix(predictor),
+    do: predictor.signature.outputs |> List.last() |> Map.fetch!(:prefix)
+
+  defp drop_duplicates(candidates) do
+    Enum.reduce(candidates, [], fn candidate, kept ->
+      duplicate? =
+        Enum.any?(kept, fn retained ->
+          candidate.score == retained.score and same_program?(candidate.program, retained.program)
+        end)
+
+      if duplicate?, do: kept, else: kept ++ [candidate]
+    end)
+  end
+
+  defp same_program?(left, right) do
+    Enum.map(Imp.ProgramParameters.predictors(left), &signature_pair(&1.predictor)) ==
+      Enum.map(Imp.ProgramParameters.predictors(right), &signature_pair(&1.predictor))
+  end
+
+  defp signature_pair(predictor), do: {predictor.signature.instructions, output_prefix(predictor)}
+
+  defp attach_report(program, report) do
+    case Imp.ProgramAccess.predict(program) do
+      nil ->
+        Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+          Imp.ProgramParameters.update_predictor(
+            acc,
+            name,
+            &Imp.Optimizer.Report.attach(&1, report)
+          )
+        end)
+
+      _predictor ->
+        Imp.Optimizer.Report.attach(program, report)
+    end
+  end
+
+  defp stats_for(predictors),
+    do: Map.new(predictors, &{&1.name, %{depth: [], max: [], average: [], min: [], std: []}})
+
+  defp put_latest_stats(state, _name, _depth, _scores, false), do: state
+
+  defp put_latest_stats(state, name, depth, scores, true) when scores != [] do
+    Map.update!(state.results_latest, name, &append_stats(&1, depth, scores))
+    |> then(&%{state | results_latest: &1})
+  end
+
+  defp put_latest_stats(state, _name, _depth, _scores, true), do: state
+  defp put_best_stats(stats, _name, _depth, _records, false), do: stats
+
+  defp put_best_stats(stats, name, depth, records, true) when records != [] do
+    scores = records |> Enum.take(10) |> Enum.map(& &1.score)
+    Map.update!(stats, name, &append_stats(&1, depth, scores))
+  end
+
+  defp put_best_stats(stats, _name, _depth, _records, true), do: stats
+
+  defp append_stats(stats, depth, scores) do
+    average = Enum.sum(scores) / length(scores)
+    variance = Enum.sum(Enum.map(scores, &:math.pow(&1 - average, 2))) / length(scores)
+
+    %{
+      depth: stats.depth ++ [depth],
+      max: stats.max ++ [Enum.max(scores)],
+      average: stats.average ++ [average],
+      min: stats.min ++ [Enum.min(scores)],
+      std: stats.std ++ [:math.sqrt(variance)]
+    }
+  end
 end

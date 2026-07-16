@@ -65,7 +65,14 @@ defmodule Imp.BenchmarkTruth.AutoEvaluationContract do
       RunContext.capture_git!(
         cwd: Keyword.get(opts, :cwd, File.cwd!()),
         require_clean: not Keyword.get(opts, :allow_dirty, false),
-        source_commits: %{"dspy" => "stanfordnlp/dspy@#{@authority["commit"]}"}
+        source_commits: %{"dspy" => "stanfordnlp/dspy@#{@authority["commit"]}"},
+        inputs: %{
+          "protocol_id" => "auto_evaluation_contract",
+          "manifest" => %{
+            "path" => Path.relative_to_cwd(Path.expand(manifest_path)),
+            "sha256" => manifest["sha256"]
+          }
+        }
       )
 
     artifact = %{

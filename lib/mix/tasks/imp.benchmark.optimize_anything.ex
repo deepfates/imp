@@ -2,10 +2,10 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
   @moduledoc """
   Validate and emit Optimize Anything replication evidence.
 
-      mix imp.benchmark.optimize_anything --input path/to/rows.json --out benchmarks/results
+      mix imp.benchmark.optimize_anything --input path/to/rows.json --out benchmarks/runs/optimize-anything
       mix imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything
       mix imp.benchmark.optimize_anything --live --provider openai \
-        --model gpt-5.4-2026-03-05 --seeds 17,23,31 --out benchmarks/results
+        --model gpt-5.4-2026-03-05 --seeds 17,23,31 --out benchmarks/runs/optimize-anything
 
   Input mode requires complete live evidence for every artifact class. Smoke
   mode emits deterministic local rows that validate the evidence pipeline but
@@ -18,7 +18,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
   alias Imp.BenchmarkTruth.OptimizeAnything.{Artifact, Campaign}
 
   @shortdoc "Validate Optimize Anything replication evidence"
-  @default_out_dir "benchmarks/results"
+  @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimize-anything")
 
   @impl true
   def run(args) do

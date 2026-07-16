@@ -140,11 +140,29 @@ defmodule AuthorityInventoryTest do
     assert pins["gepa_standalone"] == %{
              "role" => "algorithm_authority",
              "repository" => "https://github.com/gepa-ai/gepa",
+             "version" => "0.1.4",
+             "git_ref" => "refs/tags/v0.1.4",
+             "commit" => "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+             "paper" => "https://arxiv.org/abs/2507.19457v2"
+           }
+
+    historical = pins["gepa_v0_1_1_contract"]
+
+    assert Map.take(historical, ~w(role repository version git_ref commit paper)) == %{
+             "role" => "historical_executable_contract",
+             "repository" => "https://github.com/gepa-ai/gepa",
              "version" => "0.1.1",
              "git_ref" => "refs/tags/v0.1.1",
              "commit" => "b4dbb55b7601dac448cdb836d5a401ca7d9eb920",
              "paper" => "https://arxiv.org/abs/2507.19457v2"
            }
+
+    assert historical["metadata"] == %{"project_version" => "0.1.0"}
+    assert map_size(historical["source_hashes"]) == 7
+
+    assert Enum.all?(historical["source_hashes"], fn {_path, hash} ->
+             hash =~ ~r/^[0-9a-f]{64}$/
+           end)
 
     assert pins["ax_typescript"]["role"] == "independent_implementation_comparator"
     assert pins["ax_typescript"]["commit"] == "eb5835e54ba0c5b2fbac380daed1cb87faeefd5e"
@@ -174,7 +192,7 @@ defmodule AuthorityInventoryTest do
     assert family["local_differential"]["status"] == "partial"
 
     assert family["local_differential"]["artifacts"] == [
-             "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json"
+             "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json"
            ]
 
     assert family["notes"] =~ "not paid-provider"

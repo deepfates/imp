@@ -9,6 +9,13 @@ defmodule LegacyIdentityAuditTest do
     assert report.violations == []
   end
 
+  test "the cutover does not allowlist the removed compatibility module or test" do
+    allowlisted = Audit.policy().allowlisted_files
+
+    refute Map.has_key?(allowlisted, "lib/imp/persistence/legacy.ex")
+    refute Map.has_key?(allowlisted, "test/persistence_legacy_test.exs")
+  end
+
   test "historical benchmark results remain allowlisted by path policy" do
     legacy = "DS" <> "Ex"
 

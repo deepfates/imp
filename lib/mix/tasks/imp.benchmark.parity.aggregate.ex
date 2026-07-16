@@ -13,6 +13,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Aggregate do
 
   use Mix.Task
 
+  alias Imp.BenchmarkTruth.ArtifactFile
+
   @shortdoc "Aggregate Imp-vs-DSPy parity chunk reports"
   @full_lengths %{"gsm8k" => 1319, "hotpotqa" => 7405}
   @max_disagreement_examples 20
@@ -40,13 +42,20 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Aggregate do
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
 
-    input_glob = Keyword.get(opts, :in, "benchmarks/results/imp-dspy-parity-*.json")
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    input_glob =
+      Keyword.get(
+        opts,
+        :in,
+        Path.join(Imp.BenchmarkTruth.Paths.runs("parity"), "imp-dspy-parity-*.json")
+      )
+
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("parity"))
     File.mkdir_p!(out_dir)
 
     reports =
       input_glob
       |> Path.wildcard()
+      |> Enum.filter(&parity_source_report_path?/1)
       |> Enum.map(&load_report/1)
       |> filter_model(Keyword.get(opts, :model))
       |> filter_provider(Keyword.get(opts, :provider))
@@ -69,12 +78,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Aggregate do
       )
 
     out_path =
-      Path.join(
+      ArtifactFile.write_json_in!(
         out_dir,
-        "imp-dspy-parity-campaign-#{model_slug(aggregate["provider"])}-#{model_slug(aggregate["model"])}-#{timestamp_slug()}.json"
+        ArtifactFile.artifact_name("imp-dspy-parity-campaign", [
+          aggregate["provider"],
+          aggregate["model"]
+        ]),
+        aggregate
       )
-
-    File.write!(out_path, Jason.encode!(aggregate, pretty: true) <> "\n")
 
     Mix.shell().info("parity campaign report: #{out_path}")
 
@@ -88,6 +99,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Aggregate do
   defp load_report(path) do
     report = path |> File.read!() |> Jason.decode!()
     Map.put(report, "__path__", path)
+  end
+
+  defp parity_source_report_path?(path) do
+    not String.starts_with?(Path.basename(path), "imp-dspy-parity-campaign-")
   end
 
   defp filter_model(reports, nil), do: reports
@@ -1217,16 +1232,4 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Aggregate do
       _other -> nil
     end
   end
-
-  defp timestamp_slug do
-    DateTime.utc_now()
-    |> DateTime.truncate(:second)
-    |> DateTime.to_iso8601()
-    |> String.replace(~r/[^0-9A-Za-z]/, "")
-  end
-
-  defp model_slug(model) when is_binary(model),
-    do: String.replace(model, ~r/[^0-9A-Za-z_.-]/, "_")
-
-  defp model_slug(model), do: model |> inspect() |> String.replace(~r/[^0-9A-Za-z_.-]/, "_")
 end

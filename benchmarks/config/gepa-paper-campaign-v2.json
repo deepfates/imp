@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "campaign_id": "dsex-gepa-paper-campaign-v2",
+  "campaign_id": "imp-gepa-paper-campaign-v2",
   "dataset": {
     "root": "../data/gepa-campaign-full",
     "families_manifest_sha256": "dc66389d266bc3695fef9c8d0bcfcef0a79c4bebab0ec70bab1d961800e0c87d",
@@ -44,8 +44,8 @@
   "environment": {
     "hover_upstream_bm25": true,
     "ifbench_upstream_descriptions": true,
-    "python_env": "DSEX_GEPA_PYTHON",
-    "gepa_root_env": "DSEX_GEPA_ROOT"
+    "python_env": "IMP_GEPA_PYTHON",
+    "gepa_root_env": "IMP_GEPA_ROOT"
   },
   "request": {
     "provider": "req_llm",
@@ -126,8 +126,8 @@
     "gepa_artifact": "gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
   },
   "output": {
-    "out_dir": "../results",
-    "checkpoint_dir": "../results/gepa-checkpoints",
+    "out_dir": "../runs/gepa-campaign",
+    "checkpoint_dir": "../checkpoints/gepa-campaign",
     "artifact_naming": "timestamped_no_overwrite",
     "checkpoint_reuse": "matching_campaign_contract_only"
   }

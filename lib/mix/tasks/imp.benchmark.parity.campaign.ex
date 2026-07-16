@@ -26,6 +26,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
 
   use Mix.Task
 
+  alias Imp.BenchmarkTruth.ArtifactFile
+
   @shortdoc "Advance a chunked Imp-vs-DSPy parity campaign"
 
   @impl true
@@ -63,7 +65,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
     Mix.Task.run("app.start")
 
     model = Keyword.get(opts, :model) || Mix.raise("--model is required")
-    out_dir = Keyword.get(opts, :out, "benchmarks/results")
+    out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("parity"))
     chunks = Keyword.get(opts, :chunks, 1)
     campaign_id = Keyword.get(opts, :campaign_id) || default_campaign_id(model)
 
@@ -176,7 +178,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
         "--model",
         model,
         "--in",
-        Path.join(out_dir, "imp-dspy-parity-#{model_slug(model)}-*.json"),
+        Path.join(out_dir, "imp-dspy-parity-*.json"),
         "--campaign-id",
         campaign_id,
         "--out",
@@ -202,10 +204,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
 
   defp latest_campaign!(model, out_dir, campaign_id) do
     out_dir
-    |> Path.join("imp-dspy-parity-campaign-req_llm-#{model_slug(model)}-*.json")
+    |> Path.join("imp-dspy-parity-campaign-*.json")
     |> Path.wildcard()
     |> Enum.filter(fn path ->
-      path |> File.read!() |> Jason.decode!() |> Map.get("campaign_id") == campaign_id
+      case path |> File.read!() |> Jason.decode!() do
+        %{"campaign_id" => ^campaign_id, "model" => ^model} -> true
+        _other -> false
+      end
     end)
     |> Enum.sort()
     |> List.last()
@@ -382,13 +387,20 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
 
   defp campaign_reports(model, out_dir, campaign_id) do
     out_dir
-    |> Path.join("imp-dspy-parity-#{model_slug(model)}-*.json")
+    |> Path.join("imp-dspy-parity-*.json")
     |> Path.wildcard()
+    |> Enum.filter(&parity_source_report_path?/1)
     |> Enum.filter(fn path ->
       try do
         case path |> File.read!() |> Jason.decode!() do
-          %{"campaign_id" => ^campaign_id} -> true
-          _other -> false
+          %{
+            "campaign_id" => ^campaign_id,
+            "imp" => %{"model" => %{"model" => ^model}}
+          } ->
+            true
+
+          _other ->
+            false
         end
       rescue
         _ -> false
@@ -421,14 +433,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity.Campaign do
   defp positive_error_count?([]), do: false
   defp positive_error_count?(_errors), do: false
 
-  defp default_campaign_id(model), do: "req_llm-#{model_slug(model)}-#{timestamp_slug()}"
-
-  defp model_slug(model), do: String.replace(model, ~r/[^0-9A-Za-z_.-]/, "_")
-
-  defp timestamp_slug do
-    DateTime.utc_now()
-    |> DateTime.truncate(:second)
-    |> DateTime.to_iso8601()
-    |> String.replace(~r/[^0-9A-Za-z]/, "")
+  defp parity_source_report_path?(path) do
+    not String.starts_with?(Path.basename(path), "imp-dspy-parity-campaign-")
   end
+
+  defp default_campaign_id(model), do: ArtifactFile.run_name("req_llm", [model])
 end

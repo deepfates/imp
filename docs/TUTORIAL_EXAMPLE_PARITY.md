@@ -20,7 +20,7 @@ checks, not Mix tasks shipped in the Hex package.
 | Recursive control | [04 Tools, Agents, MCP, And RLM](../livebooks/04_tools_agents_mcp_rlm.livemd) | `mix benchmark.rlm.contract.check` | Supported bounded-control tutorial; paper-scale effectiveness is not claimed |
 | Image and native document inputs | Typed multimodal input adapters | `mix test test/multimodal_adapter_test.exs` | Supported only at the documented typed-input and evidence boundary |
 | Audio | Typed multimodal input adapters | `mix test test/multimodal_adapter_test.exs` | Intentional omission of a live-audio reasoning claim; encoding coverage is not a quality claim |
-| Streaming and async work | [API Guide: Streaming](API_GUIDE.md#streaming) and `Imp.Tasks` | `mix test test/runtime_async_stream_cache_test.exs test/req_llm_client_test.exs` | Supported runtime APIs |
+| Streaming and async work | [API Guide: Streaming](API_GUIDE.md#streaming) and `Imp.Streaming` | `mix test test/runtime_async_stream_cache_test.exs test/req_llm_client_test.exs` | Supported runtime APIs |
 | Privacy-conscious delegation | GEPA replication benchmark | `mix benchmark.gepa_replication.check` | Benchmark-only research lane; no application tutorial or production privacy claim |
 | Financial analysis | Typed programs, schemas, tools, and evaluation in the [API Guide](API_GUIDE.md) | `mix test test/schema_constraints_test.exs test/metric_contract_test.exs` | Intentional omission of domain-specific financial advice or decisioning |
 | Games and code examples | [API Guide: Which Program Shape?](API_GUIDE.md#which-program-shape) and the sandboxed `Imp.code_act/3` path | `mix test test/program_of_thought_fidelity_test.exs` | Supported code-control primitive; no game engine abstraction |

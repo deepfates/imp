@@ -67,7 +67,7 @@ defmodule Imp.ReproductionRegistryTest do
         String.duplicate("0", 64)
       )
 
-    assert_raise ArgumentError, ~r/artifact digest mismatch/, fn ->
+    assert_raise ArgumentError, ~r/must use its content-addressed path/, fn ->
       ReproductionRegistry.validate!(tampered, authorities, File.cwd!())
     end
 
@@ -108,23 +108,31 @@ defmodule Imp.ReproductionRegistryTest do
     end)
   end
 
-  test "rejects validators claimed by protocols without admitted artifacts" do
+  test "allows validators before first admission and validates their module contract" do
     registry = read_json!(@registry)
     authorities = read_json!(@authorities)
 
-    forged =
+    validator = %{
+      "mode" => "module",
+      "module" => "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+      "function" => "validate!",
+      "arity" => 2
+    }
+
+    valid =
+      put_in(registry, ["protocols", "package_gate", "artifact_validator"], validator)
+
+    assert ReproductionRegistry.validate!(valid, authorities, File.cwd!()) == valid
+
+    malformed =
       put_in(registry, ["protocols", "package_gate", "artifact_validator"], %{
-        "mode" => "module",
-        "module" => "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
-        "function" => "validate!",
-        "arity" => 2
+        validator
+        | "arity" => 1
       })
 
-    assert_raise ArgumentError,
-                 ~r/must not declare an artifact validator without admitted artifacts/,
-                 fn ->
-                   ReproductionRegistry.validate!(forged, authorities, File.cwd!())
-                 end
+    assert_raise ArgumentError, ~r/must declare a pure module artifact validator/, fn ->
+      ReproductionRegistry.validate!(malformed, authorities, File.cwd!())
+    end
   end
 
   test "rejects a source-manifest omission inherited from the authority ledger" do
@@ -157,11 +165,21 @@ defmodule Imp.ReproductionRegistryTest do
 
     artifact = artifact_path |> File.read!() |> Jason.decode!() |> mutate.()
 
+    protocol_id =
+      get_in(registry, ["features", Access.at(feature_index), "admitted_evidence", "protocol_id"])
+
+    bytes = Jason.encode!(artifact, pretty: true)
+
     forged_path =
-      "benchmarks/results/reproduction-registry-forged-#{System.unique_integer([:positive])}.json"
+      Path.join([
+        "benchmarks/evidence/admitted",
+        protocol_id,
+        sha256(bytes) <> ".json"
+      ])
 
     on_exit(fn -> File.rm!(forged_path) end)
-    File.write!(forged_path, Jason.encode!(artifact, pretty: true))
+    File.mkdir_p!(Path.dirname(forged_path))
+    File.write!(forged_path, bytes)
 
     forged =
       registry
@@ -171,14 +189,17 @@ defmodule Imp.ReproductionRegistryTest do
       )
       |> put_in(
         ["features", Access.at(feature_index), "admitted_evidence", "artifact_sha256"],
-        forged_path
-        |> File.read!()
-        |> then(&:crypto.hash(:sha256, &1))
-        |> Base.encode16(case: :lower)
+        sha256(bytes)
       )
 
     assert_raise ArgumentError, ~r/admitted artifact failed protocol/, fn ->
       ReproductionRegistry.validate!(forged, authorities, File.cwd!())
     end
+  end
+
+  defp sha256(bytes) do
+    bytes
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 end
