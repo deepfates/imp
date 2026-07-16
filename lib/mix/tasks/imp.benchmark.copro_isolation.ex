@@ -119,10 +119,10 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
             "COPRO C1 admission requires an artifact captured from a clean checkout"
     end
 
-    unless artifact["git_sha"] == current_git_sha!() and
+    unless committed_sources_match?(artifact["git_sha"], bindings) and
              get_in(artifact, ["run_context", "inputs"]) == bindings and
              artifact["source_bindings"] == bindings do
-      raise ArgumentError, "COPRO C1 artifact is not bound to the current committed Imp source"
+      raise ArgumentError, "COPRO C1 artifact is not bound to committed Imp source"
     end
 
     expected = build_artifact!(artifact["dspy_report"], bindings)
@@ -397,12 +397,27 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
       )
   end
 
-  defp current_git_sha! do
-    case System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true) do
-      {sha, 0} -> String.trim(sha)
-      {_output, _status} -> raise ArgumentError, "cannot resolve current Imp source revision"
-    end
+  defp committed_sources_match?(git_sha, bindings)
+       when is_binary(git_sha) and is_map(bindings) do
+    files = [
+      {@task_path, "task_sha256"},
+      {@script_path, "script_sha256"},
+      {@config_path, "config_sha256"},
+      {@authority_path, "authority_manifest_sha256"},
+      {@ledger_path, "authority_ledger_sha256"},
+      {@imp_source_path, "imp_copro_source_sha256"}
+    ]
+
+    Regex.match?(~r/^[0-9a-f]{40}$/, git_sha) and
+      Enum.all?(files, fn {path, binding_key} ->
+        case System.cmd("git", ["show", "#{git_sha}:#{path}"], stderr_to_stdout: true) do
+          {bytes, 0} -> "sha256:" <> raw_sha256(bytes) == bindings[binding_key]
+          {_output, _status} -> false
+        end
+      end)
   end
+
+  defp committed_sources_match?(_git_sha, _bindings), do: false
 
   defp default_python, do: Path.expand("tmp/dspy-parity-venv/bin/python")
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
