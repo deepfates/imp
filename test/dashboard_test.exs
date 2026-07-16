@@ -366,8 +366,10 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["total"] ==
              length(dashboard["claims"]["claims"])
 
-    assert dashboard["claims"]["summary"]["blocked"] == 7
-    assert dashboard["claims"]["summary"]["informational"] == 1
+    assert dashboard["claims"]["summary"]["blocked"] ==
+             length(dashboard["claims"]["blocking_requirements"])
+
+    assert dashboard["claims"]["summary"]["informational"] == 2
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -381,7 +383,7 @@ defmodule DashboardTest do
     assert [
              "claim.dspy_semantics.golden_trace",
              "claim.failure_recovery.deterministic_t0",
-             "claim.optimizer_lift.full",
+             "claim.optimizer.copro.semantic_conformance",
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
@@ -404,24 +406,29 @@ defmodule DashboardTest do
              "deterministic_complete"
            ])
 
-    assert Enum.map(
-             dashboard["claims"]["blocking_requirements"],
-             &{&1["claim_id"], &1["missing_requirements"]}
-           ) == [
-             {"claim.docs.livebooks_real_provider", ["live.provider.smoke"]},
-             {"claim.live_matched_model.full_parity", ["live_matched_model.full"]},
-             {"claim.gepa_replication.full", ["gepa_replication.full"]},
-             {"claim.optimize_anything.non_prompt_effectiveness",
-              ["optimize_anything.non_prompt.full"]},
-             {"claim.rag_tools_agents.comparative_effectiveness",
-              ["rag_tool_agent.comparative_effectiveness"]},
-             {"claim.rlm.provider_free_benchmark", ["rlm_benchmark.full"]},
-             {"claim.failure_recovery.live",
-              [
-                "provider_retry_timeout_idempotency_live",
-                "retrieval_and_tool_agent_recovery_live"
-              ]}
-           ]
+    blockers =
+      Map.new(
+        dashboard["claims"]["blocking_requirements"],
+        &{&1["claim_id"], &1["missing_requirements"]}
+      )
+
+    assert blockers["claim.docs.livebooks_real_provider"] == ["live.provider.smoke"]
+    assert blockers["claim.live_matched_model.full_parity"] == ["live_matched_model.full"]
+    assert blockers["claim.gepa_replication.full"] == ["gepa_replication.full"]
+
+    assert blockers["claim.optimize_anything.non_prompt_effectiveness"] ==
+             ["optimize_anything.non_prompt.full"]
+
+    assert blockers["claim.rag.hotpot_retrieval.effectiveness"] ==
+             ["rag.hotpot_retrieval.effectiveness"]
+
+    assert blockers["claim.tools.bfcl_selection.effectiveness"] ==
+             ["tools.bfcl_selection.effectiveness"]
+
+    assert blockers["claim.agents.failure_recovery.effectiveness"] ==
+             ["agents.failure_recovery.effectiveness"]
+
+    assert blockers["claim.rlm.provider_free_benchmark"] == ["rlm_benchmark.full"]
 
     active_live_claim =
       Enum.find(
@@ -895,7 +902,10 @@ defmodule DashboardTest do
       refute optimizer_lane["summary"]["full_optimizer_parity"]
 
       optimizer_claim =
-        Enum.find(dashboard["claims"]["claims"], &(&1["id"] == "claim.optimizer_lift.full"))
+        Enum.find(
+          dashboard["claims"]["claims"],
+          &(&1["id"] == "claim.optimizer.bootstrap_few_shot.effectiveness")
+        )
 
       assert optimizer_claim["evidence_state"] == "missing"
     end)

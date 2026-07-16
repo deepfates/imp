@@ -253,34 +253,46 @@ defmodule Imp.Optimizer.GRPO do
       restore_or_initialize_state(program, session, optimizer.seed, resume_data)
 
     result =
-      if resume_data && resume_data[:checkpoint_phase] in [:terminating, :termination_failed] do
-        {:ok, initial_state}
-      else
-        try do
-          with :ok <-
-                 maybe_initial_validation(
-                   optimizer,
-                   initial_state.program,
-                   trainset,
-                   valset,
-                   next_step
-                 ),
-               {:ok, state} <-
-                 run_steps(
-                   optimizer,
-                   trainset,
-                   valset,
-                   initial_state,
-                   next_step,
-                   identity
-                 ) do
-            {:ok, state}
+      cond do
+        resume_data && resume_data[:checkpoint_phase] in [:terminating, :termination_failed] ->
+          {:ok, initial_state}
+
+        resume_data && is_map(resume_data[:step_intent]) ->
+          safely_resume_step_intent(
+            optimizer,
+            trainset,
+            valset,
+            initial_state,
+            resume_data[:step_intent],
+            identity
+          )
+
+        true ->
+          try do
+            with :ok <-
+                   maybe_initial_validation(
+                     optimizer,
+                     initial_state.program,
+                     trainset,
+                     valset,
+                     next_step
+                   ),
+                 {:ok, state} <-
+                   run_steps(
+                     optimizer,
+                     trainset,
+                     valset,
+                     initial_state,
+                     next_step,
+                     identity
+                   ) do
+              {:ok, state}
+            end
+          rescue
+            error -> {:error, {:grpo_execution_failed, Exception.message(error)}}
+          catch
+            kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}}
           end
-        rescue
-          error -> {:error, {:grpo_execution_failed, Exception.message(error)}}
-        catch
-          kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}}
-        end
       end
 
     case result do
@@ -317,6 +329,9 @@ defmodule Imp.Optimizer.GRPO do
       {:error, reason, state} ->
         terminate_after_failure(optimizer, state, identity, reason)
 
+      {:step_outcome_unknown, reason} ->
+        {:error, reason}
+
       {:error, reason} ->
         terminate_after_failure(optimizer, initial_state, identity, reason)
     end
@@ -329,28 +344,30 @@ defmodule Imp.Optimizer.GRPO do
   defp run_steps(optimizer, trainset, valset, state, next_step, identity) do
     Enum.reduce_while(next_step..(optimizer.num_train_steps - 1), {:ok, state}, fn step,
                                                                                    {:ok, state} ->
-      case run_step(optimizer, trainset, valset, step, state) do
+      case run_step(optimizer, trainset, valset, step, state, identity) do
         {:ok, state} ->
           maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
           {:cont, {:ok, state}}
 
         {:error, reason, state} ->
           {:halt, {:error, reason, state}}
+
+        {:step_outcome_unknown, reason} ->
+          {:halt, {:step_outcome_unknown, reason}}
       end
     end)
   end
 
-  defp run_step(optimizer, trainset, valset, step, state) do
+  defp run_step(optimizer, trainset, valset, step, state, identity) do
     with {:ok, selected, state} <- select_examples(optimizer, trainset, step, state),
          {:ok, session} <- await_pending(optimizer, state.session, optimizer.max_status_polls) do
       state = %{state | session: session}
 
       with {:ok, groups, state} <- build_groups(optimizer, state.program, selected, step, state),
            {:ok, batches, state} <- assign_batches(groups, session, state),
-           {:ok, stepped} <-
-             bounded_callback(optimizer, :reinforcement_step, fn ->
-               Trainer.reinforcement_step(optimizer.trainer, session, batches)
-             end) do
+           step_intent <- step_intent(identity, step, batches),
+           :ok <- checkpoint_step_intent(optimizer, state, identity, step, step_intent),
+           {:ok, stepped} <- submit_step(optimizer, session, batches, step_intent) do
         program = rebind_current_model(state.program, stepped.current_model)
         state = %{state | session: stepped, program: program}
 
@@ -359,10 +376,148 @@ defmodule Imp.Optimizer.GRPO do
           {:error, reason} -> {:error, reason, state}
         end
       else
+        {:step_outcome_unknown, reason} -> {:step_outcome_unknown, reason}
         {:error, reason} -> {:error, reason, state}
       end
     else
       {:error, reason} -> {:error, reason, state}
+    end
+  end
+
+  defp submit_step(optimizer, session, batches, step_intent) do
+    step_id = Map.fetch!(step_intent, :id)
+
+    case bounded_callback(optimizer, :reinforcement_step, fn ->
+           Trainer.reinforcement_step(optimizer.trainer, session, batches,
+             step_id: step_id,
+             idempotency_key: step_id
+           )
+         end) do
+      {:ok, stepped} ->
+        {:ok, stepped}
+
+      {:error, reason} ->
+        if uncertain_step_callback_failure?(reason) do
+          {:step_outcome_unknown, {:grpo_step_outcome_unknown, step_id, reason}}
+        else
+          {:error, reason}
+        end
+    end
+  end
+
+  defp uncertain_step_callback_failure?(
+         {:reinforcement_callback_timeout, :reinforcement_step, _}
+       ),
+       do: true
+
+  defp uncertain_step_callback_failure?({:reinforcement_callback_exit, :reinforcement_step, _}),
+    do: true
+
+  defp uncertain_step_callback_failure?(_reason), do: false
+
+  defp checkpoint_step_intent(optimizer, state, identity, step, step_intent) do
+    maybe_checkpoint(
+      optimizer,
+      :running,
+      checkpoint_data(state, identity, step) |> Map.put(:step_intent, step_intent)
+    )
+  end
+
+  defp step_intent(identity, step, batches) do
+    batch_ids = Enum.map(batches, &fetch(&1, :batch_id))
+
+    payload = %{
+      dispatch_id: Map.fetch!(identity, :dispatch_id),
+      step: step,
+      batch_ids: batch_ids,
+      batches_digest: digest(batches)
+    }
+
+    Map.merge(payload, %{id: "grpo-step:" <> digest(payload), batches: batches})
+  end
+
+  defp resume_step_intent(optimizer, trainset, valset, state, intent, identity) do
+    with :ok <- verify_step_intent(intent, identity),
+         {:ok, refreshed} <-
+           bounded_callback(optimizer, :reinforcement_status, fn ->
+             Trainer.reinforcement_status(optimizer.trainer, state.session)
+           end) do
+      batch_ids = Map.fetch!(intent, :batch_ids)
+      fulfilled = Enum.filter(batch_ids, &(&1 in refreshed.fulfilled_batch_ids))
+      pending = Enum.filter(batch_ids, &(&1 in refreshed.pending_batch_ids))
+      state = %{state | session: refreshed}
+
+      cond do
+        length(fulfilled) == length(batch_ids) ->
+          complete_recovered_step(optimizer, trainset, valset, state, intent, identity)
+
+        fulfilled == [] and length(pending) == length(batch_ids) ->
+          case submit_step(optimizer, refreshed, Map.fetch!(intent, :batches), intent) do
+            {:ok, stepped} ->
+              state = %{state | session: stepped}
+              complete_recovered_step(optimizer, trainset, valset, state, intent, identity)
+
+            {:step_outcome_unknown, reason} ->
+              {:step_outcome_unknown, reason}
+
+            {:error, reason} ->
+              {:error, reason, state}
+          end
+
+        true ->
+          {:step_outcome_unknown,
+           {:grpo_step_recovery_ambiguous, Map.fetch!(intent, :id),
+            %{
+              intended_batch_ids: batch_ids,
+              fulfilled_batch_ids: fulfilled,
+              pending_batch_ids: pending
+            }}}
+      end
+    else
+      {:error, reason} -> {:step_outcome_unknown, reason}
+    end
+  end
+
+  defp safely_resume_step_intent(optimizer, trainset, valset, state, intent, identity) do
+    resume_step_intent(optimizer, trainset, valset, state, intent, identity)
+  rescue
+    error -> {:error, {:grpo_execution_failed, Exception.message(error)}, state}
+  catch
+    kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}, state}
+  end
+
+  defp verify_step_intent(intent, identity) do
+    payload = %{
+      dispatch_id: Map.fetch!(identity, :dispatch_id),
+      step: Map.fetch!(intent, :step),
+      batch_ids: Map.fetch!(intent, :batch_ids),
+      batches_digest: digest(Map.fetch!(intent, :batches))
+    }
+
+    expected = "grpo-step:" <> digest(payload)
+
+    if Map.fetch!(intent, :id) == expected and
+         Map.fetch!(intent, :batches_digest) == payload.batches_digest do
+      :ok
+    else
+      {:error, :grpo_step_intent_integrity_mismatch}
+    end
+  rescue
+    KeyError -> {:error, :invalid_grpo_step_intent}
+  end
+
+  defp complete_recovered_step(optimizer, trainset, valset, state, intent, identity) do
+    step = Map.fetch!(intent, :step)
+    program = rebind_current_model(state.program, state.session.current_model)
+    state = %{state | program: program}
+
+    case maybe_validate(optimizer, program, trainset, valset, step) do
+      :ok ->
+        maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
+        run_steps(optimizer, trainset, valset, state, step + 1, identity)
+
+      {:error, reason} ->
+        {:error, reason, state}
     end
   end
 
@@ -517,10 +672,27 @@ defmodule Imp.Optimizer.GRPO do
   defp checkpoint_identity(optimizer, lm, trainset, valset) do
     identity = %{
       model: if(is_map(lm), do: Map.get(lm, :model, Map.get(lm, "model")), else: inspect(lm)),
+      provider: compatibility_identity(optimizer.trainer),
       seed: optimizer.seed,
       num_train_steps: optimizer.num_train_steps,
       examples_per_step: optimizer.num_dspy_examples_per_grpo_step,
       rollouts_per_step: optimizer.num_rollouts_per_grpo_step,
+      grouping: %{
+        mode: optimizer.variably_invoked_predictor_grouping_mode,
+        fill_strategy: optimizer.variably_invoked_predictor_fill_strategy
+      },
+      reward_policy: %{
+        reward_fn: callback_identity(optimizer.reward_fn),
+        failure_score: optimizer.failure_score,
+        format_failure_score: optimizer.format_failure_score
+      },
+      validation_policy: %{
+        validation_fn: callback_identity(optimizer.validation_fn),
+        use_train_as_val: optimizer.use_train_as_val,
+        num_steps_for_val: optimizer.num_steps_for_val,
+        report_train_scores: optimizer.report_train_scores
+      },
+      train_kwargs: compatibility_identity(optimizer.train_kwargs),
       trainset: Enum.map(trainset, &Imp.Example.to_map/1),
       valset: if(is_list(valset), do: Enum.map(valset, &Imp.Example.to_map/1), else: nil)
     }
@@ -548,6 +720,90 @@ defmodule Imp.Optimizer.GRPO do
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end
+
+  defp callback_identity(nil), do: nil
+
+  defp callback_identity(callback) when is_function(callback) do
+    [:module, :name, :arity, :type, :uniq, :index]
+    |> Map.new(fn key -> {key, callback |> :erlang.fun_info(key) |> elem(1)} end)
+    |> Map.put(
+      :environment,
+      callback |> :erlang.fun_info(:env) |> elem(1) |> compatibility_identity()
+    )
+  end
+
+  defp compatibility_identity(%module{} = struct) do
+    struct
+    |> Map.from_struct()
+    |> Map.put(:__imp_provider_module__, module)
+    |> compatibility_identity()
+  end
+
+  defp compatibility_identity(map) when is_map(map) do
+    Enum.reduce(map, %{}, fn {key, value}, acc ->
+      cond do
+        runtime_identity_key?(key) ->
+          acc
+
+        Imp.Redaction.credential_entry?(key, value) ->
+          Map.put(acc, key, :credential_present)
+
+        true ->
+          Map.put(acc, key, compatibility_identity(value))
+      end
+    end)
+  end
+
+  defp compatibility_identity(list) when is_list(list) do
+    if Keyword.keyword?(list) do
+      list
+      |> Enum.map(fn {key, value} ->
+        if Imp.Redaction.credential_entry?(key, value) do
+          {key, :credential_present}
+        else
+          {key, compatibility_identity(value)}
+        end
+      end)
+      |> Enum.sort_by(fn {key, _value} -> Atom.to_string(key) end)
+    else
+      Enum.map(list, &compatibility_identity/1)
+    end
+  end
+
+  defp compatibility_identity(tuple) when is_tuple(tuple) do
+    tuple
+    |> Tuple.to_list()
+    |> Enum.map(&compatibility_identity/1)
+    |> List.to_tuple()
+  end
+
+  defp compatibility_identity(callback) when is_function(callback),
+    do: callback_identity(callback)
+
+  defp compatibility_identity(value) when is_pid(value), do: :runtime_pid
+  defp compatibility_identity(value) when is_port(value), do: :runtime_port
+  defp compatibility_identity(value) when is_reference(value), do: :runtime_reference
+
+  defp compatibility_identity(value) when is_binary(value) do
+    if Imp.Redaction.redact(value) == value, do: value, else: :credential_present
+  end
+
+  defp compatibility_identity(value), do: value
+
+  defp runtime_identity_key?(key) when is_atom(key) or is_binary(key) do
+    normalized = key |> to_string() |> String.downcase()
+
+    normalized in ~w(owner state transport dispatch_observer pid task process runtime) or
+      String.starts_with?(normalized, "runtime_") or
+      String.ends_with?(normalized, [
+        "_pid",
+        "_process",
+        "_runtime",
+        "_transport"
+      ])
+  end
+
+  defp runtime_identity_key?(_key), do: false
 
   defp select_examples(optimizer, trainset, step, state) do
     width = optimizer.num_dspy_examples_per_grpo_step

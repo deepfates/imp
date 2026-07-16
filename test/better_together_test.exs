@@ -1750,4 +1750,53 @@ defmodule BetterTogetherTest do
       )
     end
   end
+
+  test "bounds the full BootstrapFinetune preparation and launch phase" do
+    owner = self()
+
+    student =
+      Imp.predict("question -> answer",
+        lm: %{
+          module: Imp.LM.Static,
+          model: "hung-teacher-trace",
+          opts: [
+            handler: fn _messages, _opts ->
+              send(owner, :hung_training_preparation_started)
+              receive do: (:never -> :ok)
+            end
+          ]
+        }
+      )
+
+    trainer = fn _lm, _examples, _opts ->
+      {:ok, Imp.Clients.TrainingJob.new(%{id: "must-not-launch", status: :running})}
+    end
+
+    started_at = System.monotonic_time(:millisecond)
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+      })
+      |> BetterTogether.compile(student, examples(), nil,
+        strategy: :w,
+        valset_ratio: 0,
+        training_launch_timeout: 20,
+        training_cancellation_timeout: 20,
+        shuffle_trainset_between_steps: false
+      )
+
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert_received :hung_training_preparation_started
+    assert elapsed < 500
+
+    assert [
+             %{
+               error:
+                 {:training_step_launch_timeout, Imp.Optimizer.BootstrapFinetune, 20, [], [],
+                  :provider_acceptance_after_callback_timeout_cannot_be_observed}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+  end
 end

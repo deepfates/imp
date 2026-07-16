@@ -139,7 +139,7 @@ defmodule ClaimsInventoryTest do
     assert claim["statement"] =~ "exact paper authority"
   end
 
-  test "RAG operational contracts stay separate from comparative effectiveness" do
+  test "RAG, BFCL, and failure claims stay separated by authority and rung" do
     operational =
       Enum.find(
         read_claims!(),
@@ -151,16 +151,60 @@ defmodule ClaimsInventoryTest do
     assert [%{"evidence" => "passing"}] = operational["requirements"]
     assert hd(operational["limitations"]) =~ "does not establish HotPotQA"
 
-    comparative =
-      Enum.find(
-        read_claims!(),
-        &(&1["id"] == "claim.rag_tools_agents.comparative_effectiveness")
-      )
+    claims = Map.new(read_claims!(), &{&1["id"], &1})
 
-    assert comparative["claim_state"] == "target"
-    assert comparative["target_rung"] == "C4"
-    assert comparative["statement"] =~ "operational smoke rows"
-    assert hd(comparative["requirements"])["threshold"] =~ "pinned BFCL"
+    assert claims["claim.rag.hotpot_retrieval.differential"]["target_rung"] == "C1"
+    assert claims["claim.rag.hotpot_retrieval.effectiveness"]["target_rung"] == "C3"
+    assert claims["claim.tools.bfcl_scorer.conformance"]["target_rung"] == "C1"
+    assert claims["claim.tools.bfcl_selection.effectiveness"]["target_rung"] == "C3"
+    assert claims["claim.agents.failure_injected.runtime_differential"]["target_rung"] == "C2"
+    assert claims["claim.agents.failure_recovery.effectiveness"]["target_rung"] == "C3"
+
+    assert claims["claim.tools.bfcl_scorer.conformance"]["limitations"] |> hd() =~
+             "No official BFCL"
+
+    assert claims["claim.agents.failure_injected.runtime_differential"]["limitations"]
+           |> hd() =~ "actions are held constant"
+  end
+
+  test "optimizer claims are family-specific and separate semantics from effectiveness" do
+    claims = Map.new(read_claims!(), &{&1["id"], &1})
+
+    for family <- ~w(bootstrap_few_shot random_search) do
+      semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
+      effectiveness = claims["claim.optimizer.#{family}.effectiveness"]
+      assert semantic["target_rung"] == "C1"
+      assert semantic["claim_type"] == "conformance"
+      assert effectiveness["target_rung"] == "C3"
+      assert effectiveness["claim_type"] == "functional_effectiveness"
+    end
+
+    copro = claims["claim.optimizer.copro.semantic_conformance"]
+    assert copro["claim_state"] == "asserted"
+    assert copro["target_rung"] == "C1"
+    assert copro["sources"] |> Enum.any?(&String.contains?(&1, "dcad73d7"))
+    assert hd(copro["limitations"]) =~ "excludes exact Python RNG parity"
+
+    refute Map.has_key?(claims, "claim.optimizer_lift.full")
+  end
+
+  test "OA failure and evaluation quality gaps remain explicit" do
+    claims = Map.new(read_claims!(), &{&1["id"], &1})
+    oa = claims["claim.optimize_anything.non_prompt_effectiveness"]
+
+    assert oa["claim_state"] == "asserted"
+    assert oa["release"] == "v0.1"
+    assert Enum.any?(oa["limitations"], &String.contains?(&1, "produced no admissible artifact"))
+    assert oa["statement"] =~ "current evidence does not establish"
+
+    assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==
+             "target"
+
+    assert claims["claim.evaluation.auto_evaluation.semantic_conformance"]["target_rung"] ==
+             "C1"
+
+    assert claims["claim.evaluation.natural_judge.effectiveness"]["target_rung"] == "C3"
+    assert claims["claim.evaluation.refine_advice.effectiveness"]["target_rung"] == "C3"
   end
 
   test "local MLX effectiveness claim remains narrow and independently gated" do

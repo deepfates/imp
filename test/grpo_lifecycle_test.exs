@@ -3,7 +3,7 @@ defmodule GRPOLifecycleTest do
 
   defmodule DurableTrainer do
     @behaviour Imp.Clients.Trainer
-    defstruct [:owner, :state, :mode]
+    defstruct [:owner, :state, :runtime_mode, identity: :fixture]
 
     @impl true
     def supported_methods(_trainer), do: [:grpo]
@@ -18,13 +18,18 @@ defmodule GRPOLifecycleTest do
           id: "durable-session",
           provider: :fixture,
           model: lm,
-          pending_batch_ids: if(trainer.mode == :zero_steps, do: [], else: [1])
+          pending_batch_ids:
+            case trainer.runtime_mode do
+              :zero_steps -> []
+              :partial_step_then_hang -> [1, 2]
+              _other -> [1]
+            end
         })
 
       Agent.update(trainer.state, &Map.put(&1, dispatch_id, session))
       send(trainer.owner, {:grpo_accepted, dispatch_id})
 
-      if trainer.mode == :accepted_then_hang, do: Process.sleep(1_000)
+      if trainer.runtime_mode == :accepted_then_hang, do: Process.sleep(1_000)
       {:ok, session}
     end
 
@@ -41,16 +46,33 @@ defmodule GRPOLifecycleTest do
     @impl true
     def reinforcement_status(trainer, session) do
       send(trainer.owner, :grpo_status)
-      if trainer.mode == :hung_status, do: Process.sleep(1_000)
+      if trainer.runtime_mode == :hung_status, do: Process.sleep(1_000)
       {:ok, session}
     end
 
     @impl true
-    def reinforcement_step(trainer, session, groups, _opts) do
-      send(trainer.owner, :grpo_step)
+    def reinforcement_step(trainer, session, groups, opts) do
+      send(trainer.owner, {:grpo_step, opts})
+      send(trainer.owner, {:grpo_step_batches, groups})
       ids = Enum.map(groups, & &1.batch_id)
-      updated = Imp.Clients.ReinforcementSession.fulfill(session, ids)
-      update_session(trainer.state, updated)
+
+      case trainer.runtime_mode do
+        :pending_step_then_hang ->
+          Process.sleep(1_000)
+
+        :partial_step_then_hang ->
+          session
+          |> Imp.Clients.ReinforcementSession.fulfill(Enum.take(ids, 1))
+          |> then(&update_session(trainer.state, &1))
+
+          Process.sleep(1_000)
+
+        mode ->
+          updated = Imp.Clients.ReinforcementSession.fulfill(session, ids)
+          update_session(trainer.state, updated)
+          if mode == :accepted_step_then_hang, do: Process.sleep(1_000)
+      end
+
       {:ok, session}
     end
 
@@ -58,7 +80,7 @@ defmodule GRPOLifecycleTest do
     def terminate_reinforcement(trainer, session) do
       send(trainer.owner, :grpo_terminate)
 
-      case trainer.mode do
+      case trainer.runtime_mode do
         :termination_error ->
           {:error, :provider_refused_termination}
 
@@ -144,7 +166,7 @@ defmodule GRPOLifecycleTest do
     assert {:error, {:grpo_termination_failed, :provider_refused_termination}} =
              Imp.Optimizer.GRPO.compile(first, program(), trainset())
 
-    assert_received :grpo_step
+    assert_received {:grpo_step, _opts}
 
     assert %{phase: :termination_failed, data: %{next_step: 1}} =
              Imp.Optimizer.GRPO.Checkpoint.load!(context.path)
@@ -170,21 +192,120 @@ defmodule GRPOLifecycleTest do
              Imp.Optimizer.GRPO.Checkpoint.load!(context.path)
   end
 
+  test "an accepted reinforcement effect is recovered without replay", context do
+    first =
+      optimizer(trainer(context, :accepted_step_then_hang), context.path, num_train_steps: 1)
+
+    assert {:error,
+            {:grpo_step_outcome_unknown, step_id,
+             {:reinforcement_callback_timeout, :reinforcement_step, 25}}} =
+             Imp.Optimizer.GRPO.compile(first, program(), trainset())
+
+    assert_received {:grpo_step, first_opts}
+    assert first_opts[:step_id] == step_id
+    assert first_opts[:idempotency_key] == step_id
+
+    assert %{phase: :running, data: %{next_step: 0, step_intent: %{id: ^step_id}}} =
+             Imp.Optimizer.GRPO.Checkpoint.load!(context.path)
+
+    resumed = %{first | trainer: trainer(context, :ok)}
+    assert {:ok, _compiled} = Imp.Optimizer.GRPO.compile(resumed, program(), trainset())
+    refute_received {:grpo_step, _opts}
+    assert_received :grpo_terminate
+    refute File.exists?(context.path)
+  end
+
+  test "a demonstrably pending reinforcement intent replays exact batches with the stable key",
+       context do
+    first = optimizer(trainer(context, :pending_step_then_hang), context.path, num_train_steps: 1)
+
+    assert {:error, {:grpo_step_outcome_unknown, step_id, _timeout}} =
+             Imp.Optimizer.GRPO.compile(first, program(), trainset())
+
+    assert_received {:grpo_step, first_opts}
+    assert_received {:grpo_step_batches, first_batches}
+    resumed = %{first | trainer: trainer(context, :ok)}
+    assert {:ok, _compiled} = Imp.Optimizer.GRPO.compile(resumed, program(), trainset())
+    assert_received {:grpo_step, second_opts}
+    assert_received {:grpo_step_batches, second_batches}
+    assert first_opts[:step_id] == step_id
+    assert second_opts[:step_id] == step_id
+    assert second_opts[:idempotency_key] == step_id
+    assert second_batches == first_batches
+  end
+
+  test "a partially visible reinforcement effect is not guessed or replayed", context do
+    first =
+      optimizer(trainer(context, :partial_step_then_hang), context.path,
+        num_train_steps: 1,
+        num_rollouts_per_grpo_step: 2
+      )
+
+    assert {:error, {:grpo_step_outcome_unknown, step_id, _timeout}} =
+             Imp.Optimizer.GRPO.compile(first, program(), trainset())
+
+    assert_received {:grpo_step, _opts}
+    resumed = %{first | trainer: trainer(context, :ok)}
+
+    assert {:error,
+            {:grpo_step_recovery_ambiguous, ^step_id,
+             %{fulfilled_batch_ids: [1], intended_batch_ids: [1, 2], pending_batch_ids: [2]}}} =
+             Imp.Optimizer.GRPO.compile(resumed, program(), trainset())
+
+    refute_received {:grpo_step, _opts}
+    refute_received :grpo_terminate
+    assert File.regular?(context.path)
+  end
+
+  test "checkpoint resume rejects every training-semantic identity drift", context do
+    first = optimizer(trainer(context, :accepted_then_hang), context.path, num_train_steps: 0)
+
+    assert {:error, {:reinforcement_callback_timeout, :start_reinforcement, 25}} =
+             Imp.Optimizer.GRPO.compile(first, program(), trainset())
+
+    variants = [
+      %{first | variably_invoked_predictor_grouping_mode: :ragged},
+      %{
+        first
+        | variably_invoked_predictor_grouping_mode: :fill,
+          variably_invoked_predictor_fill_strategy: :max
+      },
+      %{first | failure_score: 0.25},
+      %{first | format_failure_score: -2.0},
+      %{first | reward_fn: reward(0.5)},
+      %{first | validation_fn: fn _program, _dataset, _context -> :ok end},
+      %{first | num_steps_for_val: 3},
+      %{first | report_train_scores: true, use_train_as_val: true},
+      %{first | train_kwargs: [learning_rate: 0.001]},
+      %{first | trainer: %{trainer(context, :ok) | identity: :other_provider}}
+    ]
+
+    for variant <- variants do
+      assert {:error, {:grpo_checkpoint_failed, "GRPO session checkpoint identity mismatch"}} =
+               Imp.Optimizer.GRPO.compile(variant, program(), trainset())
+    end
+  end
+
   defp trainer(context, mode),
-    do: %DurableTrainer{owner: self(), state: context.state, mode: mode}
+    do: %DurableTrainer{owner: self(), state: context.state, runtime_mode: mode}
 
   defp optimizer(trainer, checkpoint_path, opts) do
     Imp.Optimizer.GRPO.new(
-      fn _example, _prediction -> 1.0 end,
-      [
-        trainer: trainer,
-        checkpoint_path: checkpoint_path,
-        callback_timeout_ms: 25,
-        status_poll_interval_ms: 0,
-        num_rollouts_per_grpo_step: 1
-      ] ++ opts
+      reward(1.0),
+      Keyword.merge(
+        [
+          trainer: trainer,
+          checkpoint_path: checkpoint_path,
+          callback_timeout_ms: 25,
+          status_poll_interval_ms: 0,
+          num_rollouts_per_grpo_step: 1
+        ],
+        opts
+      )
     )
   end
+
+  defp reward(value), do: fn _example, _prediction -> value end
 
   defp program do
     lm = %{

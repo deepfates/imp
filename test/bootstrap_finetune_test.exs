@@ -880,4 +880,83 @@ defmodule BootstrapFinetuneTest do
     assert report.metadata.terminal_reason ==
              {:bootstrap_finetune_training_start_failed, failed_key, :provider_capacity, []}
   end
+
+  test "direct training bounds a provider callback that never returns" do
+    owner = self()
+    training_lm = lm("hung-launch", %{answer: "answer"})
+    program = Imp.predict("question -> answer", lm: training_lm)
+
+    trainer = fn _lm, _examples, _opts ->
+      send(owner, :hung_launch_started)
+      receive do: (:never -> :ok)
+    end
+
+    optimizer =
+      BootstrapFinetune.new(&always_pass/2,
+        trainer: trainer,
+        launch_timeout: 20,
+        cancellation_timeout: 20
+      )
+
+    started_at = System.monotonic_time(:millisecond)
+    result = BootstrapFinetune.compile(optimizer, program, [train_example()])
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert_received :hung_launch_started
+    assert elapsed < 500
+
+    assert %{
+             error:
+               {:bootstrap_finetune_training_start_failed, _key,
+                {:bootstrap_finetune_launch_timeout, 20}, []}
+           } = result
+  end
+
+  test "direct terminal cleanup bounds a provider cancellation that never returns" do
+    failed_lm = lm("failed-cleanup", %{first_answer: "one"})
+    running_lm = lm("hung-cleanup", %{second_answer: "two"})
+    program = two_predictor_program(failed_lm, running_lm)
+    owner = self()
+
+    trainer = fn
+      %{model: "failed-cleanup"}, _examples, _opts ->
+        {:ok, TrainingJob.new(%{id: "failed-cleanup", status: :failed})}
+
+      %{model: "hung-cleanup"}, _examples, _opts ->
+        {:ok,
+         TrainingJob.new(%{
+           id: "hung-cleanup",
+           status: :running,
+           cancel_url: "https://training.example/jobs/hung-cleanup/cancel",
+           cancel_body: :empty,
+           max_attempts: 1,
+           transport: fn _url, _headers, _body, _opts ->
+             send(owner, :hung_direct_cleanup_started)
+             receive do: (:never -> :ok)
+           end
+         })}
+    end
+
+    optimizer =
+      BootstrapFinetune.new(&always_pass/2,
+        trainer: trainer,
+        cancellation_timeout: 20
+      )
+
+    started_at = System.monotonic_time(:millisecond)
+    result = Imp.train(program, optimizer, [train_example()])
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert_received :hung_direct_cleanup_started
+    assert elapsed < 500
+
+    assert {:error,
+            %TrainingError{
+              reason:
+                {:training_plan_failed, [_failed], _jobs,
+                 [%{result: {:error, {:training_cancel_timeout, timeout}}}]}
+            }} = result
+
+    assert timeout in 0..20
+  end
 end

@@ -66,6 +66,8 @@ defmodule Imp.Optimizer.BootstrapFinetune do
   alias Imp.Optimizer.BootstrapFinetune.TrainingPlan
 
   @source_field :imp_bootstrap_source
+  @default_launch_timeout 300_000
+  @default_cancellation_timeout 5_000
 
   defstruct [
     :metric,
@@ -76,7 +78,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     max_concurrency: 8,
     multitask: true,
     exclude_demos: false,
-    train_kwargs: []
+    train_kwargs: [],
+    launch_timeout: @default_launch_timeout,
+    cancellation_timeout: @default_cancellation_timeout,
+    lifecycle_observer: nil
   ]
 
   @option_schema [
@@ -87,7 +92,9 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     max_concurrency: [type: :pos_integer, default: 8],
     multitask: [type: :boolean, default: true],
     exclude_demos: [type: :boolean, default: false],
-    train_kwargs: [type: {:custom, __MODULE__, :validate_train_kwargs, []}, default: []]
+    train_kwargs: [type: {:custom, __MODULE__, :validate_train_kwargs, []}, default: []],
+    launch_timeout: [type: :pos_integer, default: @default_launch_timeout],
+    cancellation_timeout: [type: :pos_integer, default: @default_cancellation_timeout]
   ]
 
   def new(metric, opts \\ []) do
@@ -186,7 +193,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
         %{program: compiled, plan: %TrainingPlan{} = plan} ->
           case __resolve_training_plan__(optimizer, compiled, plan) do
             {:error, %TrainingError{} = failure} ->
-              {:error, __cancel_training_error__(failure, :pending)}
+              {:error,
+               __cancel_training_error__(failure, :pending,
+                 deadline: cancellation_deadline(optimizer)
+               )}
 
             result ->
               result
@@ -209,7 +219,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
 
   def __cancel_training_plan__(%TrainingPlan{} = plan, scope, opts)
       when scope in [:all_started, :pending] and is_list(opts) do
-    deadline = Keyword.get(opts, :deadline, :infinity)
+    deadline =
+      Keyword.get_lazy(opts, :deadline, fn ->
+        monotonic_ms() + @default_cancellation_timeout
+      end)
 
     if deadline == :infinity do
       cancel_training_plan_sync(plan, scope)
@@ -273,6 +286,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
          {:ok, plan} <- configure_plan(plan, optimizer),
          :ok <- validate_job_concurrency(plan, optimizer.max_concurrency),
          prepared <- attach_report(program, optimizer, trainset, teachers, plan, candidates) do
+      notify_lifecycle(optimizer, {:plan, plan})
       start_training(optimizer, prepared, plan)
     else
       {:error, reason} -> %{program: program, error: reason}
@@ -605,6 +619,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
           teacher_count: length(teachers),
           training_job_count: length(plan.entries),
           max_concurrency: optimizer.max_concurrency,
+          launch_timeout: optimizer.launch_timeout,
+          cancellation_timeout: optimizer.cancellation_timeout,
+          launch_timeout_semantics:
+            :bounds_local_callback_but_cannot_disprove_late_provider_acceptance,
           multitask: optimizer.multitask,
           predictor_data_filter: :named_predictor_correctness_deviation,
           status: :ok
@@ -670,8 +688,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
       examples = training_examples(optimizer.trainer, entry)
 
       with {:ok, opts} <- trainer_opts(optimizer, entry),
-           {:ok, job} <- Trainer.finetune(optimizer.trainer, entry.lm, examples, opts) do
-        {:cont, {:ok, started ++ [%{entry | job: job}]}}
+           {:ok, job} <- bounded_finetune(optimizer, entry.lm, examples, opts) do
+        started = started ++ [%{entry | job: job}]
+        notify_lifecycle(optimizer, {:started, index, job})
+        {:cont, {:ok, started}}
       else
         {:error, reason} ->
           failed_plan = %{
@@ -687,7 +707,10 @@ defmodule Imp.Optimizer.BootstrapFinetune do
         training_started(program, %{plan | entries: entries})
 
       {:error, key, reason, failed_plan} ->
-        {cancelled_plan, outcomes} = __cancel_training_plan__(failed_plan, :all_started)
+        {cancelled_plan, outcomes} =
+          __cancel_training_plan__(failed_plan, :all_started,
+            deadline: cancellation_deadline(optimizer)
+          )
 
         terminal_reason =
           {:bootstrap_finetune_training_start_failed, key, reason, outcomes}
@@ -703,6 +726,50 @@ defmodule Imp.Optimizer.BootstrapFinetune do
         }
     end
   end
+
+  defp bounded_finetune(%__MODULE__{} = optimizer, lm, examples, opts) do
+    task =
+      Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fn ->
+        result = Trainer.finetune(optimizer.trainer, lm, examples, opts)
+        {result, drain_callback_messages()}
+      end)
+
+    case Task.yield(task, optimizer.launch_timeout) do
+      {:ok, {result, messages}} ->
+        relay_callback_messages(messages)
+        result
+
+      {:exit, reason} ->
+        {:error, {:bootstrap_finetune_launch_task_exit, reason}}
+
+      nil ->
+        Task.shutdown(task, :brutal_kill)
+        {:error, {:bootstrap_finetune_launch_timeout, optimizer.launch_timeout}}
+    end
+  rescue
+    error -> {:error, {:bootstrap_finetune_launch_task_failed, Exception.message(error)}}
+  end
+
+  defp drain_callback_messages(messages \\ []) do
+    receive do
+      message -> drain_callback_messages([message | messages])
+    after
+      0 -> Enum.reverse(messages)
+    end
+  end
+
+  defp relay_callback_messages(messages), do: Enum.each(messages, &send(self(), &1))
+
+  defp notify_lifecycle(%__MODULE__{lifecycle_observer: {pid, reference}}, event)
+       when is_pid(pid) and is_reference(reference) do
+    send(pid, {__MODULE__, reference, event})
+    :ok
+  end
+
+  defp notify_lifecycle(_optimizer, _event), do: :ok
+
+  defp cancellation_deadline(%__MODULE__{cancellation_timeout: timeout}),
+    do: monotonic_ms() + timeout
 
   defp training_started(program, %TrainingPlan{} = plan) do
     jobs = Enum.map(plan.entries, & &1.job)

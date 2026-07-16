@@ -29,6 +29,7 @@ defmodule Imp.Optimizer.BetterTogether do
           validation: list() | nil,
           teacher: teacher(),
           invocation_opts: keyword(),
+          training_launch_timeout: pos_integer(),
           training_timeout: non_neg_integer(),
           training_poll_interval: non_neg_integer(),
           training_cancellation_timeout: non_neg_integer()
@@ -57,6 +58,7 @@ defmodule Imp.Optimizer.BetterTogether do
       default: :infinity
     ],
     max_concurrency: [type: :pos_integer, default: 1],
+    training_launch_timeout: [type: :pos_integer, default: 300_000],
     training_timeout: [type: :non_neg_integer, default: 300_000],
     training_poll_interval: [type: :non_neg_integer, default: 1_000],
     training_cancellation_timeout: [type: :non_neg_integer, default: 5_000]
@@ -115,6 +117,7 @@ defmodule Imp.Optimizer.BetterTogether do
       shuffle?: opts[:shuffle_trainset_between_steps],
       optimizer_compile_args: opts[:optimizer_compile_args],
       teacher: opts[:teacher],
+      training_launch_timeout: opts[:training_launch_timeout],
       training_timeout: opts[:training_timeout],
       training_poll_interval: opts[:training_poll_interval],
       training_cancellation_timeout: opts[:training_cancellation_timeout]
@@ -155,6 +158,9 @@ defmodule Imp.Optimizer.BetterTogether do
           compilation_error_occurred: errors != [],
           stopped_early: errors != [],
           provider_training_semantics: :bounded_await_and_atomic_rebind,
+          training_launch_timeout: opts[:training_launch_timeout],
+          training_launch_timeout_semantics:
+            :bounds_local_compile_and_callbacks_but_cannot_disprove_late_provider_acceptance,
           training_timeout: opts[:training_timeout],
           training_poll_interval: opts[:training_poll_interval],
           training_cancellation_timeout: opts[:training_cancellation_timeout],
@@ -467,6 +473,7 @@ defmodule Imp.Optimizer.BetterTogether do
          validation: Keyword.get(invocation_opts, :validation),
          teacher: teacher,
          invocation_opts: invocation_opts,
+         training_launch_timeout: execution.training_launch_timeout,
          training_timeout: execution.training_timeout,
          training_poll_interval: execution.training_poll_interval,
          training_cancellation_timeout: execution.training_cancellation_timeout
@@ -511,7 +518,7 @@ defmodule Imp.Optimizer.BetterTogether do
       optimizer =
         if is_nil(request.teacher), do: optimizer, else: %{optimizer | teacher: request.teacher}
 
-      case BootstrapFinetune.compile(optimizer, request.program, request.trainset) do
+      case bounded_bootstrap_compile(request, optimizer) do
         %{program: compiled, plan: %TrainingPlan{} = plan, error: reason} ->
           bootstrap_start_error(compiled, plan, reason)
 
@@ -520,6 +527,9 @@ defmodule Imp.Optimizer.BetterTogether do
 
         %{program: compiled, plan: %TrainingPlan{} = plan} ->
           resolve_bootstrap_step(request, optimizer, compiled, plan)
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end
@@ -569,6 +579,109 @@ defmodule Imp.Optimizer.BetterTogether do
            ) do
       {:ok, compiled, %{optimizer: request.optimizer.__struct__, kind: :program}}
     end
+  end
+
+  defp bounded_bootstrap_compile(request, optimizer) do
+    reference = make_ref()
+
+    optimizer = %{
+      optimizer
+      | launch_timeout: min(optimizer.launch_timeout, request.training_launch_timeout),
+        cancellation_timeout:
+          min(optimizer.cancellation_timeout, request.training_cancellation_timeout),
+        lifecycle_observer: {self(), reference}
+    }
+
+    task =
+      Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fn ->
+        result = BootstrapFinetune.compile(optimizer, request.program, request.trainset)
+        {result, drain_compile_messages()}
+      end)
+
+    case Task.yield(task, request.training_launch_timeout) do
+      {:ok, {result, messages}} ->
+        relay_compile_messages(messages)
+        drain_bootstrap_lifecycle(reference)
+        result
+
+      {:exit, reason} ->
+        events = drain_bootstrap_lifecycle(reference)
+        bootstrap_launch_failure(request, events, {:training_launch_task_exit, reason})
+
+      nil ->
+        Task.shutdown(task, :brutal_kill)
+        events = drain_bootstrap_lifecycle(reference)
+
+        bootstrap_launch_failure(
+          request,
+          events,
+          {:training_step_launch_timeout, BootstrapFinetune, request.training_launch_timeout}
+        )
+    end
+  rescue
+    error ->
+      {:error, {:training_launch_task_failed, BootstrapFinetune, Exception.message(error)}}
+  end
+
+  defp drain_bootstrap_lifecycle(reference, events \\ []) do
+    receive do
+      {BootstrapFinetune, ^reference, event} ->
+        drain_bootstrap_lifecycle(reference, [event | events])
+    after
+      0 -> Enum.reverse(events)
+    end
+  end
+
+  defp drain_compile_messages(messages \\ []) do
+    receive do
+      message -> drain_compile_messages([message | messages])
+    after
+      0 -> Enum.reverse(messages)
+    end
+  end
+
+  defp relay_compile_messages(messages), do: Enum.each(messages, &send(self(), &1))
+
+  defp bootstrap_launch_failure(request, events, reason) do
+    case observed_training_plan(events) do
+      %TrainingPlan{} = plan ->
+        {cancelled, cancellations} =
+          BootstrapFinetune.__cancel_training_plan__(plan, :all_started,
+            deadline: cancellation_deadline(request)
+          )
+
+        {:error, bootstrap_launch_reason(reason, training_plan_summary(cancelled), cancellations)}
+
+      nil ->
+        {:error, bootstrap_launch_reason(reason, [], [])}
+    end
+  end
+
+  defp bootstrap_launch_reason(
+         {:training_step_launch_timeout, optimizer, timeout},
+         summaries,
+         cancellations
+       ) do
+    {:training_step_launch_timeout, optimizer, timeout, summaries, cancellations,
+     :provider_acceptance_after_callback_timeout_cannot_be_observed}
+  end
+
+  defp bootstrap_launch_reason(reason, summaries, cancellations) do
+    {:training_launch_failed, reason, summaries, cancellations,
+     :provider_acceptance_after_callback_timeout_cannot_be_observed}
+  end
+
+  defp observed_training_plan(events) do
+    Enum.reduce(events, nil, fn
+      {:plan, %TrainingPlan{} = plan}, _current ->
+        plan
+
+      {:started, index, %TrainingJob{} = job}, %TrainingPlan{} = plan ->
+        %{plan | entries: List.update_at(plan.entries, index, &%{&1 | job: job})}
+
+      _event, current ->
+        current
+    end)
   end
 
   defp invoke_generic_training_optimizer(%{optimizer: %module{} = optimizer} = request, opts) do
