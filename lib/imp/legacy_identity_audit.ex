@@ -76,7 +76,7 @@ defmodule Imp.LegacyIdentityAudit do
        %{
          findings: findings,
          violations: Enum.reject(findings, &allowlisted?/1),
-         tracked_paths: length(paths)
+         tracked_paths: length(entries)
        }}
     end
   end
@@ -154,6 +154,7 @@ defmodule Imp.LegacyIdentityAudit do
     Enum.reduce_while(paths, {:ok, []}, fn path, {:ok, entries} ->
       case File.read(Path.join(root, path)) do
         {:ok, content} -> {:cont, {:ok, [%{path: path, content: content} | entries]}}
+        {:error, :enoent} -> {:cont, {:ok, entries}}
         {:error, reason} -> {:halt, {:error, {:read_failed, path, reason}}}
       end
     end)

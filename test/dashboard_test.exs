@@ -8,7 +8,7 @@ defmodule DashboardTest do
                        __DIR__
                      )
 
-  test "dashboard aggregates lane artifacts and require-full refuses missing lanes" do
+  test "dashboard aggregates lane artifacts and require-ready refuses missing lanes" do
     root = tmp_dir("dashboard")
     trace_dir = Path.join(root, "trace")
     failure_campaign_dir = Path.join(root, "failure-campaign")
@@ -51,7 +51,7 @@ defmodule DashboardTest do
     write_json!(Path.join(trace_dir, "golden-trace-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "generated_at" => "2026-07-07T00:00:00Z",
-      "git_sha" => "abc",
+      "git_sha" => dashboard_git_sha(),
       "summary" => %{
         "total" => 6,
         "passing" => 6,
@@ -351,23 +351,27 @@ defmodule DashboardTest do
     [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
     dashboard = dashboard_path |> File.read!() |> Jason.decode!()
 
-    refute dashboard["full_parity"]
-    assert dashboard["performance_claim_supported"]
+    refute dashboard["profile_ready"]
+    assert dashboard["provider_free_overhead_regression_guard_passed"]
     assert dashboard["profile"]["id"] == "telos"
-    refute dashboard["release_gate"]["passing"]
+    refute dashboard["profile_gate"]["passing"]
 
-    assert dashboard["release_gate"]["blocking_lanes"] == [
+    assert dashboard["profile_gate"]["blocking_lanes"] == [
              "failure_recovery",
              "gepa_replication",
              "live_matched_model",
              "live_provider_smoke",
              "optimize_anything",
-             "rlm_benchmark",
-             "public_claims"
+             "rlm_benchmark"
            ]
 
-    assert Enum.count(dashboard["release_gate"]["checks"]) ==
-             length(dashboard["required_lanes"]) + 1
+    expected_claim_checks =
+      dashboard["claims"]["claims"]
+      |> Enum.filter(&(&1["gate_policy"] == "blocking"))
+      |> Enum.flat_map(& &1["requirements"])
+      |> length()
+
+    assert Enum.count(dashboard["profile_gate"]["checks"]) == expected_claim_checks
 
     assert dashboard["claims"]["status"] == "failing"
 
@@ -375,11 +379,11 @@ defmodule DashboardTest do
              length(dashboard["claims"]["claims"])
 
     assert dashboard["claims"]["summary"]["blocked"] == 6
-    assert dashboard["claims"]["summary"]["non_blocking"] == 0
+    assert dashboard["claims"]["summary"]["informational"] == 1
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
-      |> Enum.filter(&(&1["status"] == "proven"))
+      |> Enum.filter(&(&1["evidence_state"] == "proven"))
       |> Enum.map(& &1["id"])
       |> Enum.sort()
 
@@ -390,7 +394,7 @@ defmodule DashboardTest do
              "claim.dspy_semantics.golden_trace",
              "claim.failure_recovery.deterministic_t0",
              "claim.optimizer_lift.full",
-             "claim.performance.provider_free",
+             "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
              "claim.rag_tools_agents.full"
@@ -435,8 +439,8 @@ defmodule DashboardTest do
         &(&1["id"] == "claim.live_matched_model.full_parity")
       )
 
-    assert active_live_claim["status"] == "blocked"
-    assert active_live_claim["decision"] == "active_gap"
+    assert active_live_claim["evidence_state"] == "missing"
+    assert active_live_claim["claim_state"] == "target"
     assert active_live_claim["release"] == "telos"
 
     assert dashboard["lanes"]["golden_trace"]["status"] == "full"
@@ -529,7 +533,7 @@ defmodule DashboardTest do
            ] = live_blockers
 
     live_gate_check =
-      Enum.find(dashboard["release_gate"]["checks"], &(&1["lane"] == "live_matched_model"))
+      Enum.find(dashboard["profile_gate"]["checks"], &(&1["lane"] == "live_matched_model"))
 
     assert live_gate_check["blocking_requirements"] == live_blockers
 
@@ -617,12 +621,12 @@ defmodule DashboardTest do
             out_dir,
             "--max-age-hours",
             "100000",
-            "--require-full"
+            "--require-ready"
           ])
         end)
       end
 
-    assert error.message =~ "full parity release gate failed"
+    assert error.message =~ "profile readiness gate failed"
     assert error.message =~ "blocking requirements:"
     assert error.message =~ "current_low_cost"
     assert error.message =~ "8720 rows remaining"
@@ -687,6 +691,7 @@ defmodule DashboardTest do
       {"rejected", :rejected, "failing", false},
       {"tampered", :tampered, "failing", false},
       {"stale", :stale, "stale", false},
+      {"future", :future, "stale", false},
       {"valid", :valid, "full", true}
     ]
 
@@ -696,11 +701,25 @@ defmodule DashboardTest do
       Enum.each([local_mlx_dir, out_dir], &File.mkdir_p!/1)
 
       case artifact_kind do
-        :missing -> :ok
-        :rejected -> write_local_mlx_artifact!(local_mlx_dir, status: "rejected")
-        :tampered -> write_local_mlx_artifact!(local_mlx_dir, tampered: true)
-        :stale -> write_local_mlx_artifact!(local_mlx_dir, generated_at: ~U[2000-01-01 00:00:00Z])
-        :valid -> write_local_mlx_artifact!(local_mlx_dir)
+        :missing ->
+          :ok
+
+        :rejected ->
+          write_local_mlx_artifact!(local_mlx_dir, status: "rejected")
+
+        :tampered ->
+          write_local_mlx_artifact!(local_mlx_dir, tampered: true)
+
+        :stale ->
+          write_local_mlx_artifact!(local_mlx_dir, generated_at: ~U[2000-01-01 00:00:00Z])
+
+        :future ->
+          write_local_mlx_artifact!(local_mlx_dir,
+            generated_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+          )
+
+        :valid ->
+          write_local_mlx_artifact!(local_mlx_dir)
       end
 
       dashboard = run_local_mlx_dashboard!(local_mlx_dir, out_dir)
@@ -708,7 +727,7 @@ defmodule DashboardTest do
 
       assert lane["status"] == expected_status
       assert lane["full_evidence"] == full_evidence
-      assert lane["passing"] == artifact_kind in [:stale, :valid]
+      assert lane["passing"] == artifact_kind in [:stale, :future, :valid]
 
       if artifact_kind in [:rejected, :tampered] do
         assert [%{"kind" => "local_mlx_artifact_rejected"}] =
@@ -717,7 +736,7 @@ defmodule DashboardTest do
     end)
   end
 
-  test "local MLX lane selects the newest candidate without falling back" do
+  test "local MLX lane falls back from a newer rejected candidate" do
     root = tmp_dir("dashboard-local-mlx-newest")
     local_mlx_dir = Path.join(root, "artifacts")
     out_dir = Path.join(root, "out")
@@ -739,9 +758,9 @@ defmodule DashboardTest do
       |> run_local_mlx_dashboard!(out_dir)
       |> get_in(["lanes", "local_mlx_weight_training"])
 
-    assert lane["artifact"]["path"] == newest_path
-    assert lane["status"] == "failing"
-    refute lane["full_evidence"]
+    assert lane["artifact"]["path"] == old_path
+    assert lane["status"] == "full"
+    assert lane["full_evidence"]
   end
 
   test "instruction optimizer full evidence requires the dashboard code revision" do
@@ -888,7 +907,7 @@ defmodule DashboardTest do
       optimizer_claim =
         Enum.find(dashboard["claims"]["claims"], &(&1["id"] == "claim.optimizer_lift.full"))
 
-      assert optimizer_claim["status"] == "blocked"
+      assert optimizer_claim["evidence_state"] == "missing"
     end)
   end
 
@@ -972,7 +991,7 @@ defmodule DashboardTest do
     refute gepa_claim["proven"]
   end
 
-  test "require-full fails when the public claims inventory is unreadable" do
+  test "require-ready fails when the public claims inventory is unreadable" do
     root = tmp_dir("dashboard-missing-claims")
     out_dir = Path.join(root, "out")
     File.mkdir_p!(out_dir)
@@ -985,7 +1004,7 @@ defmodule DashboardTest do
             out_dir,
             "--claims-file",
             Path.join(root, "missing-claims.json"),
-            "--require-full"
+            "--require-ready"
           ])
         end)
       end
@@ -995,7 +1014,92 @@ defmodule DashboardTest do
     assert error.message =~ "missing_claims_file"
   end
 
-  test "require-full failure summarizes campaign aggregate blockers" do
+  test "alternate claims inventories are diagnostic and cannot authorize readiness" do
+    root = tmp_dir("dashboard-alternate-claims")
+    claims_path = Path.join(root, "claims.json")
+    out_dir = Path.join(root, "out")
+    File.mkdir_p!(out_dir)
+
+    write_json!(claims_path, %{
+      "schema_version" => 2,
+      "claims" => [
+        %{
+          "id" => "claim.diagnostic.only",
+          "claim_state" => "asserted",
+          "target_rung" => "C0",
+          "release" => "v0.1",
+          "scope" => "Diagnostic inventory used only by this test.",
+          "statement" => "A diagnostic claim cannot authorize release readiness.",
+          "category" => "diagnostic",
+          "surface" => ["dashboard"],
+          "claim_type" => "diagnostic",
+          "comparison" => "imp_native",
+          "gate_policy" => "informational",
+          "sources" => ["test/dashboard_test.exs"],
+          "requirements" => [
+            %{
+              "id" => "diagnostic.missing",
+              "kind" => "diagnostic",
+              "lane" => "product_package",
+              "evidence" => "full",
+              "threshold" => "diagnostic only"
+            }
+          ]
+        }
+      ]
+    })
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--claims-file",
+        claims_path,
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = dashboard_path |> File.read!() |> Jason.decode!()
+
+    refute dashboard["profile_ready"]
+    refute dashboard["claims"]["artifact"]["canonical"]
+    assert dashboard["profile_gate"]["blocking_lanes"] == ["claims_inventory"]
+
+    assert [%{"kind" => "noncanonical_claims_inventory"}] =
+             dashboard["claims"]["blocking_requirements"]
+  end
+
+  test "claims inventory rejects duplicate claim and requirement ids" do
+    root = tmp_dir("dashboard-duplicate-claims")
+    claims_path = Path.join(root, "claims.json")
+    out_dir = Path.join(root, "out")
+    File.mkdir_p!(out_dir)
+
+    canonical = "benchmarks/claims.json" |> File.read!() |> Jason.decode!()
+    [first | rest] = canonical["claims"]
+    write_json!(claims_path, put_in(canonical, ["claims"], [first, first | rest]))
+
+    error =
+      assert_raise Mix.Error, fn ->
+        capture_io(fn ->
+          Mix.Task.reenable("imp.benchmark.dashboard")
+
+          Mix.Tasks.Imp.Benchmark.Dashboard.run([
+            "--claims-file",
+            claims_path,
+            "--out",
+            out_dir,
+            "--require-ready"
+          ])
+        end)
+      end
+
+    assert error.message =~ "invalid_claims_file"
+  end
+
+  test "require-ready failure summarizes campaign aggregate blockers" do
     root = tmp_dir("dashboard-campaign-blockers")
     results_dir = Path.join(root, "results")
     out_dir = Path.join(root, "out")
@@ -1034,7 +1138,7 @@ defmodule DashboardTest do
             out_dir,
             "--max-age-hours",
             "100000",
-            "--require-full"
+            "--require-ready"
           ])
         end)
       end
@@ -1092,8 +1196,9 @@ defmodule DashboardTest do
   test "dashboard ignores stale prompt contracts on non-winning live candidates" do
     root = tmp_dir("dashboard-live-prompt-winners")
     live_matrix_dir = Path.join(root, "live-matrix")
+    results_dir = Path.join(root, "results")
     out_dir = Path.join(root, "out")
-    Enum.each([live_matrix_dir, out_dir], &File.mkdir_p!/1)
+    Enum.each([live_matrix_dir, results_dir, out_dir], &File.mkdir_p!/1)
 
     write_json!(Path.join(live_matrix_dir, "live-matched-model-matrix-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -1160,6 +1265,8 @@ defmodule DashboardTest do
       Mix.Tasks.Imp.Benchmark.Dashboard.run([
         "--live-matrix-dir",
         live_matrix_dir,
+        "--results-dir",
+        results_dir,
         "--out",
         out_dir,
         "--max-age-hours",
@@ -1277,7 +1384,14 @@ defmodule DashboardTest do
 
     write_gate_evidence!(gate_dir, "product_package", "package.check",
       generated_at: old,
-      git_sha: current_sha
+      git_sha: current_sha,
+      name: "gate-evidence-product_package-current.json"
+    )
+
+    write_gate_evidence!(gate_dir, "product_package", "package.check",
+      generated_at: DateTime.utc_now(),
+      git_sha: "recent-wrong-sha",
+      name: "gate-evidence-product_package-wrong.json"
     )
 
     write_gate_evidence!(gate_dir, "live_provider_smoke", "live.check",
@@ -1319,6 +1433,8 @@ defmodule DashboardTest do
     deterministic_gate = dashboard["lanes"]["product_package"]
     assert deterministic_gate["status"] == "full"
     assert deterministic_gate["fresh"]
+    assert deterministic_gate["artifact"]["git_sha"] == current_sha
+    assert deterministic_gate["admission"]["source_compatible"]
 
     live_gate = dashboard["lanes"]["live_provider_smoke"]
     assert live_gate["status"] == "stale"
@@ -1333,7 +1449,36 @@ defmodule DashboardTest do
     overhead_lane = dashboard["lanes"]["provider_free_overhead"]
     assert overhead_lane["status"] == "stale"
     refute overhead_lane["full_evidence"]
-    refute dashboard["performance_claim_supported"]
+    refute dashboard["provider_free_overhead_regression_guard_passed"]
+  end
+
+  test "wrong-revision gate evidence is not selected as a lane artifact" do
+    root = tmp_dir("dashboard-wrong-revision-only")
+    gate_dir = Path.join(root, "gate")
+    out_dir = Path.join(root, "out")
+    Enum.each([gate_dir, out_dir], &File.mkdir_p!/1)
+
+    write_gate_evidence!(gate_dir, "product_package", "package.check", git_sha: "wrong-revision")
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--gate-dir",
+        gate_dir,
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+
+    lane =
+      dashboard_path |> File.read!() |> Jason.decode!() |> get_in(["lanes", "product_package"])
+
+    assert lane["status"] == "missing"
+    assert lane["artifact"] == nil
+    refute lane["admission"]["admitted"]
   end
 
   test "failure recovery skips invalid tmp candidates and falls back to results" do
@@ -1605,7 +1750,7 @@ defmodule DashboardTest do
     }
 
     clock = fn -> Keyword.get(opts, :generated_at, ~U[2026-07-07 00:02:00Z]) end
-    source_sha = Keyword.get(opts, :git_sha, "abc")
+    source_sha = Keyword.get(opts, :git_sha, dashboard_git_sha())
 
     context =
       Imp.BenchmarkTruth.RunContext.new!(
@@ -1882,11 +2027,13 @@ defmodule DashboardTest do
   end
 
   defp write_gate_evidence!(dir, gate, mix_task, opts \\ []) do
-    write_json!(Path.join(dir, "gate-evidence-#{gate}-20260707T000000Z.json"), %{
+    name = Keyword.get(opts, :name, "gate-evidence-#{gate}-20260707T000000Z.json")
+
+    write_json!(Path.join(dir, name), %{
       "schema_version" => 1,
       "runner" => "imp-gate-evidence",
       "generated_at" => Keyword.get(opts, :generated_at, "2026-07-07T00:00:00Z"),
-      "git_sha" => Keyword.get(opts, :git_sha, "abc"),
+      "git_sha" => Keyword.get(opts, :git_sha, dashboard_git_sha()),
       "gate" => gate,
       "command" => %{"executable" => "mix", "args" => [mix_task], "env" => []},
       "summary" => %{

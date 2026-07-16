@@ -2,7 +2,6 @@ defmodule Imp.ResearchPortfolio do
   @moduledoc false
 
   @evidence_tiers ~w(exact_replication reference_differential adapted_public_protocol ecological_field_benchmark imp_native_extension)
-  @statuses ~w(ready conditional blocked complete)
 
   def load!(path \\ "benchmarks/research_portfolio.json", opts \\ []) do
     portfolio = path |> File.read!() |> Jason.decode!()
@@ -21,7 +20,7 @@ defmodule Imp.ResearchPortfolio do
   end
 
   def validate!(
-        %{"schema_version" => 1, "lanes" => lanes} = portfolio,
+        %{"schema_version" => 2, "lanes" => lanes} = portfolio,
         %{"claims" => claims},
         root
       )
@@ -36,7 +35,7 @@ defmodule Imp.ResearchPortfolio do
 
     active_claim_ids =
       claims
-      |> Enum.filter(&(&1["decision"] == "active_gap"))
+      |> Enum.filter(&(&1["claim_state"] == "target"))
       |> Enum.map(&Map.fetch!(&1, "id"))
       |> Enum.sort()
 
@@ -50,12 +49,12 @@ defmodule Imp.ResearchPortfolio do
   end
 
   def validate!(_portfolio, _claims, _root),
-    do: raise(ArgumentError, "expected schema_version 1 with non-empty lanes and claims")
+    do: raise(ArgumentError, "expected schema_version 2 with non-empty lanes and claims")
 
   def render(%{"lanes" => lanes}) do
     header = [
-      "| Research lane | Status | Capacity under test | Evidence portfolio | Falsification rule |",
-      "| --- | --- | --- | --- | --- |"
+      "| Research lane | Capacity under test | Evidence portfolio | Falsification rule |",
+      "| --- | --- | --- | --- |"
     ]
 
     rows =
@@ -67,7 +66,6 @@ defmodule Imp.ResearchPortfolio do
 
         values = [
           lane["name"],
-          lane["status"],
           lane["capacity"],
           views,
           lane["decision_rules"]["fail"]
@@ -94,7 +92,10 @@ defmodule Imp.ResearchPortfolio do
     id = require_nonempty!(lane["id"], "lane id")
     require_nonempty!(lane["name"], "lane #{id} name")
     require_nonempty!(lane["capacity"], "lane #{id} capacity")
-    require_member!(lane["status"], @statuses, "lane #{id} status")
+
+    if Map.has_key?(lane, "status"),
+      do:
+        raise(ArgumentError, "lane #{id} must not cache mutable status; use tk and the dashboard")
 
     unless is_list(lane["claim_ids"]) and Enum.all?(lane["claim_ids"], &is_binary/1),
       do: raise(ArgumentError, "lane #{id} claim_ids must be a list")

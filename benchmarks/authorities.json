@@ -69,7 +69,7 @@
       "kind": "product",
       "surface_tokens": ["package", "public_api", "docs", "README", "livebooks"],
       "upstream_surface_ids": ["product.learning_path", "product.release"],
-      "coverage_matrix_concepts": ["Public facade", "Production gate", "Evidence dashboard and full release gate", "Live inference gate", "Local integration gate", "Documentation and Livebooks"],
+      "coverage_matrix_concepts": ["Public facade", "Production gate", "Evidence dashboard and profile readiness gate", "Live inference gate", "Local integration gate", "Documentation and Livebooks"],
       "parity_lanes": ["Lane 6: Evidence Dashboard and Release Gate"],
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.2.1", "git_ref": "refs/tags/3.2.1", "commit": "29448ae12756abdd14bd8796c819247ebb83673c", "source_paths": ["docs/docs", "pyproject.toml", "README.md"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json", "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a", "file_count": 296}},
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},

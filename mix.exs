@@ -67,9 +67,9 @@ defmodule Imp.MixProject do
           "benchmark.truth.check": :test,
           "benchmark.live.check": :test,
           "benchmark.dashboard": :test,
-          "benchmark.dashboard.full": :test,
+          "benchmark.dashboard.ready": :test,
           "benchmark.dashboard.telos": :test,
-          "benchmark.dashboard.telos.full": :test,
+          "benchmark.dashboard.telos.ready": :test,
           "benchmark.live_matrix": :test,
           "imp.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
@@ -294,7 +294,6 @@ defmodule Imp.MixProject do
         "benchmark.trace.check",
         "benchmark.operations_stress.check",
         "benchmark.failure_campaign.check",
-        "benchmark.overhead.check",
         "benchmark.search.check",
         "benchmark.optimizer_lift.check",
         "benchmark.instruction_optimizer.contract.check",
@@ -378,14 +377,14 @@ defmodule Imp.MixProject do
       "benchmark.dashboard": [
         "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
-      "benchmark.dashboard.full": [
-        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+      "benchmark.dashboard.ready": [
+        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
       ],
       "benchmark.dashboard.telos": [
         "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard"
       ],
-      "benchmark.dashboard.telos.full": [
-        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-full"
+      "benchmark.dashboard.telos.ready": [
+        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/results --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/results --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
       ],
       "benchmark.live.check": [
         "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

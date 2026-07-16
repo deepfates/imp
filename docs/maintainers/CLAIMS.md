@@ -1,27 +1,47 @@
-# Public Claim Inventory
+# Claims And Proof Obligations
 
-`benchmarks/claims.json` is the machine-readable inventory of public Imp
-release claims. The benchmark dashboard evaluates that file alongside the
-evidence lanes and adds a `public_claims` release-gate check.
+`benchmarks/claims.json` is the sole machine-readable inventory of public Imp
+claims and research targets. It declares intended scope and proof obligations;
+it never stores current status. The benchmark dashboard evaluates those
+obligations against admitted artifacts and adds a `public_claims` profile-gate
+check.
 
-This inventory governs full parity, comparative effectiveness, and benchmark
-claims. It is additive to the scoped v0.1 product contract in
-`docs/V0_1_RELEASE_LEDGER.md`; deferred research rows may keep
-`benchmark.dashboard.telos.full` red without invalidating a product-only v0.1
+This inventory governs product, conformance, comparative effectiveness, and
+benchmark claims. It is additive to the scoped product procedure in
+`docs/maintainers/RELEASE.md`; deferred research rows may keep
+`benchmark.dashboard.telos.ready` red without invalidating a product-only v0.1
 candidate, provided those claims are not presented as current capabilities.
 
 The rule is simple: v0.1 release-blocking claims must trace to fresh passing
-evidence before `mix benchmark.dashboard.full` passes. Broader telos claims
-must trace to fresh passing evidence before `mix benchmark.dashboard.telos.full`
+evidence before `mix benchmark.dashboard.ready` passes. Broader telos claims
+must trace to fresh passing evidence before `mix benchmark.dashboard.telos.ready`
 passes. Claims that are true only for a narrower path must say so in the claim
 statement and in the linked docs.
 
 The inventory has two policy scopes. `v0.1` rows are scoped product claims for
 the named APIs, workflows, and evidence cases in those rows. `telos` rows are
-future research targets for comparative effectiveness, parity, or replication;
-they remain release-blocking gaps and must not be read as current product
-capabilities. A `full` requirement means full evidence for that row's precise
-scope, not full parity for an entire subsystem or the whole upstream project.
+research targets for comparative effectiveness, conformance, or replication;
+they remain blocking within the `telos` profile and must not be read as current
+product capabilities. A `full` requirement means complete evidence for that
+row's precise scope, not blanket parity for a subsystem or upstream project.
+
+## Evidence Rungs
+
+Every claim stops at an explicit rung:
+
+| Rung | Meaning |
+| --- | --- |
+| C0 | The API exists and is callable. |
+| C1 | Behavior conforms to a pinned authority for the declared scope. |
+| C2 | The capability executes through its real operational boundary. |
+| C3 | Held-out evidence supports effectiveness on the declared portfolio. |
+| C4 | An exact paper protocol is reproduced from public authority. |
+| C5 | Powered paired evidence supports comparative advantage. |
+
+Higher rungs do not erase lower contracts. A C3 result cannot repair C1
+semantic divergence, and an operational C2 sample cannot authorize an
+effectiveness claim. Exact authority that is genuinely unavailable blocks only
+the C4 claim; a separately named adapted protocol may still earn C3.
 
 ## Shape
 
@@ -35,13 +55,13 @@ Each claim has:
 - `claim_type`: feature completeness, conformance, live-provider proof,
   functional effectiveness, or performance.
 - `comparison`: `dspy`, `imp_native`, or a narrower comparison target.
-- `decision`: `proven_target` or `active_gap` for the named release scope.
-- `release`: the release whose policy owns the decision, such as `v0.1` or
-  `post-v0.1`.
+- `claim_state`: `asserted`, `target`, or `retired`. This is intent, not proof.
+- `target_rung`: the exact C0-C5 evidence rung required by the claim.
+- `release`: the profile that owns the claim, such as `v0.1` or `telos`.
 - `scope`: the precise boundary of the claim.
 - `limitations`: explicit exclusions or evidence still required.
-- `release_blocking`: whether this claim blocks the full dashboard for its
-  release profile.
+- `gate_policy`: `blocking` or `informational`. Informational claims remain
+  visible but cannot block readiness.
 - `sources`: docs, tests, fixtures, or papers that explain the claim.
 - `requirements`: evidence rows the dashboard can evaluate.
 
@@ -72,9 +92,9 @@ mix gate.livebook.evidence
 mix gate.protocol.evidence
 mix gate.live_provider.evidence
 mix benchmark.dashboard
-mix benchmark.dashboard.full
+mix benchmark.dashboard.ready
 mix benchmark.dashboard.telos
-mix benchmark.dashboard.telos.full
+mix benchmark.dashboard.telos.ready
 ```
 
 The `gate.*.evidence` aliases run real source-checkout gates and write
@@ -129,15 +149,16 @@ timeout, and idempotency; and integration retrieval plus tool-agent recovery.
 The campaign does not create or cancel a live provider training job, so its
 failure-recovery policy makes no live provider-training claim.
 
-When a profile-specific full dashboard fails, the terminal error names both the
+When a profile gate fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
 work queue for that profile: either produce the missing evidence, narrow or
 remove the claim, or mark a genuinely impossible external dependency as
 unavailable in the relevant evidence artifact.
 
 Do not add a marketing or README claim without adding or updating a row in
-`benchmarks/claims.json`. Do not mark a claim non-blocking merely because the
-evidence is inconvenient. Unfinished telos work remains an `active_gap` and
-release-blocking until its evidence passes. A claim may become non-blocking
-only after an explicit product decision changes the telos, not as a way to make
-the current dashboard green.
+`benchmarks/claims.json`. Do not duplicate current state in this file,
+`benchmarks/reproductions.json`, or Markdown; regenerate the dashboard instead.
+Do not mark a claim non-blocking merely because its evidence is inconvenient.
+Unfinished telos work remains a `target` and blocking within that profile
+until its proof obligation passes or an explicit product decision changes the
+claim.

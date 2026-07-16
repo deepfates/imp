@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Imp.EvidenceAuthorities do
     if argv != [] or invalid != [], do: Mix.raise("invalid arguments")
 
     ledger_path = Keyword.get(opts, :ledger, "benchmarks/authorities.json")
-    doc_path = Keyword.get(opts, :doc, "docs/EVIDENCE_AUTHORITIES.md")
+    doc_path = Keyword.get(opts, :doc, "docs/maintainers/AUTHORITIES.md")
     ledger = Imp.EvidenceAuthorities.load!(ledger_path)
     current = File.read!(doc_path)
 

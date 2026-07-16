@@ -19,8 +19,23 @@ mix quality.check
 
 Provider-backed and research-scale tests are separate because they require
 credentials, external services, canonical datasets, or significant spend. See
-`docs/PRODUCTION_OPERATIONS.md` and `docs/UPSTREAM_FIDELITY_AUDIT.md` before
-changing a provider, optimizer, benchmark, or fidelity claim.
+`docs/maintainers/RELEASE.md` and `docs/maintainers/EVIDENCE.md` before changing
+a provider, optimizer, benchmark, or fidelity claim.
+
+## Maintainer Authority
+
+The repository authority order is deliberately narrow:
+
+1. `benchmarks/claims.json` declares claim scope and proof obligations.
+2. `benchmarks/authorities.json` pins reference behavior.
+3. `benchmarks/reproductions.json` declares protocols and admitted artifacts.
+4. `mix benchmark.dashboard` computes evidence and profile readiness.
+5. `tk` owns unfinished work, dependencies, and priorities.
+
+Markdown explains contracts and methods; it does not maintain a parallel status
+or roadmap. Start with `docs/maintainers/CLAIMS.md`,
+`docs/maintainers/AUTHORITIES.md`, `docs/maintainers/REPRODUCTIONS.md`, and
+`docs/maintainers/RESEARCH_PROTOCOLS.md`.
 
 ## Design Standard
 

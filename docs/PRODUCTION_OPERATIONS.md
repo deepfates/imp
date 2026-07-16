@@ -1,59 +1,14 @@
 # Production Operations
 
-This document is the authoritative source-checkout release gate contract for
-Imp.
+This document covers consumer runtime operations and source-checkout validation
+for Imp maintainers. Mix gate aliases mentioned here are available only in a
+source checkout; they are not installed with the Hex package. The canonical
+release procedure remains in repository-only maintainer documentation.
 
 It is the final chapter of the same manual path used by the README, API guide,
 and Livebooks: after an Imp program has a signature, examples, metrics,
-optimization, and any needed tools, this page explains how maintainers prove the
-repository and how applications run live providers without hiding credentials or
-transport behavior.
-
-## Required Gates
-
-Run from a clean source checkout tree before shipping ordinary product changes:
-
-```sh
-scripts/setup_reference_test_env.sh
-mix production.check
-mix integration.check
-mix protocol.check
-mix package.check
-mix quality.check
-```
-
-The reference setup requires Python 3.12 and Deno 2.8.3. It installs the
-pinned DSPy and GEPA Python sources used by deterministic source-checkout
-contracts; these runtimes are maintainer dependencies and are not part of the
-Imp package or an Imp production release.
-
-When changing public examples, notebooks, or learning-material control flow in
-the source checkout, also run the slower executable Livebook proof:
-
-```sh
-mix livebook.execute.check
-```
-
-With live provider credentials in the source checkout, run the opt-in provider
-smoke gate:
-
-```sh
-set -a
-. ./.env
-set +a
-LIVE_PROVIDER=1 mix live.check
-```
-
-Maintainer evidence for benchmarks and parity is separate from the production
-gate. In a source checkout:
-
-```sh
-mix evidence.check
-```
-
-Use benchmark evidence when changing prompts, adapters, metrics, optimizers, or
-claims about Imp-vs-DSPy parity. Do not make paid live campaigns part of the
-default product workflow.
+optimization, and any needed tools, this page explains how applications run
+live providers without hiding credentials or transport behavior.
 
 ## Runtime Posture
 
@@ -340,20 +295,6 @@ set -a
 set +a
 LIVE_PROVIDER=1 mix live.check
 ```
-
-## Release Checklist
-
-Before tagging:
-
-1. `git status --short` is clean.
-2. `mix production.check` passes.
-3. `mix integration.check` passes.
-4. `mix protocol.check` passes.
-5. `mix quality.check` passes.
-6. `LIVE_PROVIDER=1 mix live.check` passes for the exact candidate commit.
-7. Any production claim about paid training, external retrievers, or external
-   MCP servers is backed by dedicated external-service tests.
-8. Docs and Livebooks match the current public API.
 
 ## Debugging Gates
 

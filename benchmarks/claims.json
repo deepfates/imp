@@ -1,10 +1,28 @@
 {
-  "schema_version": 1,
-  "purpose": "Machine-readable Imp public claim inventory. The benchmark dashboard evaluates these rows against evidence lanes and refuses claim-ready/full-parity status while release-blocking claims are missing fresh evidence.",
+  "schema_version": 2,
+  "purpose": "Canonical inventory of asserted Imp claims and telos targets. This file declares scope and proof obligations; current evidence state is computed by the dashboard and is never stored here.",
+  "claim_state_vocabulary": {
+    "asserted": "A claim intended for the named product profile; it is publishable only when its computed evidence state is proven.",
+    "target": "A declared telos target that is not a current product capability.",
+    "retired": "A deliberately withdrawn claim retained only for audit history."
+  },
+  "gate_policy_vocabulary": {
+    "blocking": "Missing proof blocks readiness of the claim's profile.",
+    "informational": "The claim remains visible but does not contribute to profile readiness."
+  },
+  "evidence_rung_vocabulary": {
+    "C0": "The API exists and is callable.",
+    "C1": "Behavior conforms to a pinned authority for the declared scope.",
+    "C2": "The capability executes operationally through its real boundary.",
+    "C3": "Held-out evidence supports effectiveness for the declared task portfolio.",
+    "C4": "An exact paper protocol is reproduced from public authoritative materials.",
+    "C5": "Powered paired evidence supports comparative advantage or superiority."
+  },
   "claims": [
     {
       "id": "claim.product.public_api_installable",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C2",
       "release": "v0.1",
       "scope": "Clean package consumption and the documented v0.1 public API paths covered by package contract tests.",
       "statement": "Imp passes the clean-room package contract for the documented v0.1 public API paths exercised outside the source checkout.",
@@ -12,8 +30,8 @@
       "surface": ["package", "public_api", "docs"],
       "claim_type": "feature_completeness",
       "comparison": "imp_native",
-      "release_blocking": true,
-      "sources": ["README.md", "docs/RELEASE_CRITERIA.md", "test/package_contract_test.exs"],
+      "gate_policy": "blocking",
+      "sources": ["README.md", "docs/maintainers/RELEASE.md", "test/package_contract_test.exs"],
       "requirements": [
         {
           "id": "package.clean_room",
@@ -26,7 +44,8 @@
     },
     {
       "id": "claim.docs.livebooks_real_provider",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C2",
       "release": "v0.1",
       "scope": "Executable shipped documentation plus a current provider smoke.",
       "statement": "Imp docs and Livebooks are executable product evidence, including real-provider proof cells for provider-relevant features.",
@@ -34,7 +53,7 @@
       "surface": ["README", "docs", "livebooks", "ReqLLM"],
       "claim_type": "live_provider_proof",
       "comparison": "imp_native",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/README.md", "livebooks/*.livemd", "test/livebook_contract_test.exs"],
       "requirements": [
         {
@@ -55,7 +74,8 @@
     },
     {
       "id": "claim.dspy_semantics.golden_trace",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C1",
       "release": "v0.1",
       "scope": "The pinned normalized golden-trace cases and named Imp semantic checks; excludes byte-identical Python prompt templates and unlisted upstream behavior.",
       "statement": "Imp passes the pinned golden-trace cases for signatures, Predict, ChainOfThought, typed adapters, and ReAct tool traces, plus named semantic checks for streaming, save/load redaction, and cache behavior.",
@@ -63,7 +83,7 @@
       "surface": ["signature", "predict", "chain_of_thought", "adapters", "react", "streaming", "save_load", "cache"],
       "claim_type": "conformance",
       "comparison": "dspy",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
       "requirements": [
         {
@@ -77,7 +97,8 @@
     },
     {
       "id": "claim.live_matched_model.full_parity",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C3",
       "release": "telos",
       "scope": "Telos research comparison on the named live benchmark tasks under current_low_cost, frontier_sanity, and historical_research policy; excludes the v0.1 provider runtime contract and blanket all-task parity.",
       "limitations": ["Requires fresh complete matched-model campaigns."],
@@ -86,8 +107,8 @@
       "surface": ["gsm8k", "hotpotqa", "predict", "chain_of_thought", "rag"],
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
-      "release_blocking": true,
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "docs/RELEASE_CRITERIA.md"],
+      "gate_policy": "blocking",
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "live_matched_model.full",
@@ -100,7 +121,8 @@
     },
     {
       "id": "claim.optimizer_lift.full",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C3",
       "release": "telos",
       "scope": "Telos research comparison for the advanced optimizer families named in this row; excludes the v0.1 deterministic optimizer contract.",
       "limitations": ["v0.1 guarantees deterministic optimizer contracts, not DSPy-equivalent lift."],
@@ -109,7 +131,7 @@
       "surface": ["LabeledFewShot", "BootstrapFewShot", "RandomSearch", "KNNFewShot", "BootstrapRS", "COPRO", "MIPROv2", "SIMBA", "GEPA", "InstructionSearch", "InferRules", "SignatureOptimizer", "BetterTogether", "Ensemble", "BootstrapFinetune", "GRPO", "OptimizeAnything"],
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
       "requirements": [
         {
@@ -123,7 +145,8 @@
     },
     {
       "id": "claim.gepa_replication.full",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C3",
       "release": "telos",
       "scope": "Telos research replication across the six named GEPA paper families; excludes a claim for unlisted datasets or optimizer families.",
       "limitations": ["Papillon and HoVer full-scope artifacts are incomplete."],
@@ -132,7 +155,7 @@
       "surface": ["GEPA", "MIPROv2", "SIMBA", "AIMEBench", "HotpotQABench", "hoverBench", "IFBench", "LiveBenchMathBench", "Papillon"],
       "claim_type": "research_replication",
       "comparison": "dspy_gepa",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
       "requirements": [
         {
@@ -146,7 +169,8 @@
     },
     {
       "id": "claim.optimize_anything.non_prompt_effectiveness",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C3",
       "release": "v0.1",
       "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
       "limitations": ["Scoped to Imp-native effectiveness; does not claim paper-scale or matched-internals parity with upstream Optimize Anything."],
@@ -155,7 +179,7 @@
       "surface": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic"],
       "claim_type": "functional_effectiveness",
       "comparison": "imp_baseline_and_authored_comparator",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
       "requirements": [
         {
@@ -169,7 +193,8 @@
     },
     {
       "id": "claim.rag_tools_agents.full",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C2",
       "release": "telos",
       "scope": "Telos research comparison for the named advanced RAG, tool, and agent workflows; excludes the scoped v0.1 local contracts and selected live paths.",
       "limitations": ["v0.1 claims local contracts and selected live paths, not full upstream parity."],
@@ -178,7 +203,7 @@
       "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
       "claim_type": "feature_completeness",
       "comparison": "dspy_and_imp_native",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
       "requirements": [
         {
@@ -192,7 +217,8 @@
     },
     {
       "id": "claim.rlm.provider_free_benchmark",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C4",
       "release": "telos",
       "scope": "Telos research comparison for paper-scale RLM long-context effectiveness across the five named paper families; excludes the v0.1 RLM runtime and contract claim.",
       "limitations": [
@@ -204,7 +230,7 @@
       "surface": ["rlm", "long_context", "recursive_control", "dspy_rlm"],
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
       "requirements": [
         {
@@ -217,31 +243,33 @@
       ]
     },
     {
-      "id": "claim.performance.provider_free",
-      "decision": "active_gap",
-      "release": "telos",
-      "scope": "Telos research comparison for the named provider-free local paths; excludes end-to-end/provider latency and blanket speed claims.",
-      "limitations": ["No v0.1 claim that Imp is faster than DSPy."],
-      "statement": "The telos research target is a provider-free local overhead comparison between Imp and DSPy for the named core paths before making any performance claim.",
-      "category": "performance",
+      "id": "claim.runtime.provider_free_overhead_guard",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "Informational regression guard for named provider-free local paths; excludes end-to-end latency, parity, and speed claims.",
+      "limitations": ["The configured ceiling is a regression alarm and provides no evidence that Imp matches or outperforms DSPy."],
+      "statement": "Imp records a provider-free local-overhead regression guard for named core paths without presenting the configured ceiling as a performance claim.",
+      "category": "runtime",
       "surface": ["signature_parse", "adapter_format_parse", "schema_validation", "evaluation", "metrics", "optimizer_scheduling", "redaction", "cache", "concurrency"],
       "claim_type": "performance",
       "comparison": "dspy",
-      "release_blocking": true,
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/RELEASE_CRITERIA.md"],
+      "gate_policy": "informational",
+      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "provider_free_overhead.full",
           "kind": "performance",
           "lane": "provider_free_overhead",
           "evidence": "full",
-          "threshold": "all provider-free overhead cases pass within configured ratio"
+          "threshold": "all named provider-free paths remain below their configured regression ceilings"
         }
       ]
     },
     {
       "id": "claim.local_mlx_weight_training.effectiveness",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C3",
       "release": "v0.1",
       "scope": "Pinned local MLX LoRA training, official fused deployment, and portable-program rebinding on the canonical Banking77 holdout.",
       "limitations": ["Does not establish paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."],
@@ -250,7 +278,7 @@
       "surface": ["BootstrapFinetune", "training_protocol", "local_weight_training", "save_load"],
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": ["docs/ADVANCED.md", "docs/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
@@ -264,7 +292,8 @@
     },
     {
       "id": "claim.protocols.production_boundaries",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C2",
       "release": "v0.1",
       "scope": "Provider-compatible local protocol boundaries; excludes paid training completion.",
       "statement": "Imp production protocol boundaries for provider training, retrievers, and MCP are exercised through source-checkout protocol gates before being claimed as production surface.",
@@ -272,8 +301,8 @@
       "surface": ["training_protocol", "retriever_protocol", "mcp_protocol"],
       "claim_type": "feature_completeness",
       "comparison": "imp_native",
-      "release_blocking": true,
-      "sources": ["docs/PRODUCTION_OPERATIONS.md", "docs/RELEASE_CRITERIA.md", "test/protocol_training", "test/protocol_retriever", "test/protocol_mcp"],
+      "gate_policy": "blocking",
+      "sources": ["docs/PRODUCTION_OPERATIONS.md", "docs/maintainers/RELEASE.md", "test/protocol_training", "test/protocol_retriever", "test/protocol_mcp"],
       "requirements": [
         {
           "id": "protocols.local",
@@ -286,7 +315,8 @@
     },
     {
       "id": "claim.failure_recovery.deterministic_t0",
-      "decision": "proven_target",
+      "claim_state": "asserted",
+      "target_rung": "C2",
       "release": "v0.1",
       "scope": "Provider-free repeated failure and recovery behavior with verified runtime leak accounting.",
       "statement": "Imp deterministic cancellation, timeout, bounded concurrency, partial-stream failure, retry/idempotency, and optimizer resume recovery paths pass the canonical T0 campaign without runtime leaks.",
@@ -299,7 +329,7 @@
       ],
       "claim_type": "failure_recovery",
       "comparison": "imp_native",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": [
         "lib/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"
@@ -316,7 +346,8 @@
     },
     {
       "id": "claim.failure_recovery.live",
-      "decision": "active_gap",
+      "claim_state": "target",
+      "target_rung": "C2",
       "release": "telos",
       "scope": "Telos live recovery evidence for exactly two rows: provider retry/timeout/idempotency and integration retrieval plus tool-agent recovery.",
       "limitations": [
@@ -334,7 +365,7 @@
       ],
       "claim_type": "live_provider_proof",
       "comparison": "imp_native",
-      "release_blocking": true,
+      "gate_policy": "blocking",
       "sources": [
         "lib/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"

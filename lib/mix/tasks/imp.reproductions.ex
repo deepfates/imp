@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Imp.Reproductions do
 
     registry_path = Keyword.get(opts, :registry, "benchmarks/reproductions.json")
     authority_path = Keyword.get(opts, :authority, "benchmarks/authorities.json")
-    doc_path = Keyword.get(opts, :doc, "docs/REPRODUCTION_STATUS.md")
+    doc_path = Keyword.get(opts, :doc, "docs/maintainers/REPRODUCTIONS.md")
 
     registry = Imp.ReproductionRegistry.load!(registry_path, authority_path: authority_path)
     current = File.read!(doc_path)

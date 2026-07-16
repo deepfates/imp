@@ -34,6 +34,7 @@ defmodule Imp.BenchmarkTruth.ReleaseProfile do
   def lane_requirements(claims, profile) do
     claims
     |> select_claims(profile)
+    |> Enum.filter(&(&1["gate_policy"] == "blocking"))
     |> Enum.flat_map(fn claim ->
       Enum.map(claim["requirements"] || [], fn requirement ->
         %{

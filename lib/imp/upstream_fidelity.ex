@@ -774,7 +774,7 @@ defmodule Imp.UpstreamFidelity do
           "CHANGELOG.md",
           "LICENSE",
           "SECURITY.md",
-          "docs/RELEASE_CRITERIA.md"
+          "docs/maintainers/RELEASE.md"
         ]
       }
     }

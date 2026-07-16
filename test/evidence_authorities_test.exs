@@ -5,7 +5,7 @@ defmodule Imp.EvidenceAuthoritiesTest do
 
   test "checked-in authority documentation is generated from the validated ledger" do
     ledger = EvidenceAuthorities.load!()
-    current = File.read!("docs/EVIDENCE_AUTHORITIES.md")
+    current = File.read!("docs/maintainers/AUTHORITIES.md")
 
     assert current ==
              EvidenceAuthorities.replace_summary!(

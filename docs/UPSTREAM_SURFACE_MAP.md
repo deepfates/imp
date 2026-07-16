@@ -681,7 +681,7 @@ Executable evidence:
 - docs: `CHANGELOG.md`
 - docs: `LICENSE`
 - docs: `SECURITY.md`
-- docs: `docs/RELEASE_CRITERIA.md`
+- docs: `docs/maintainers/RELEASE.md`
 
 
 Missing evidence or behavior:

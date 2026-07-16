@@ -5,14 +5,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       mix imp.benchmark.dashboard
 
   By default the task writes a dashboard even when lanes are missing. Use
-  `--require-full` for the release gate that refuses full parity claims unless
-  every required lane is present and passing at full-evidence scale.
+  `--require-ready` for the profile gate that refuses readiness unless every
+  release-blocking claim in the selected profile has its required evidence.
 
   Public claims are evaluated from `benchmarks/claims.json` by default. Pass
-  `--claims-file path/to/claims.json` to evaluate a different inventory.
+  `--claims-file path/to/claims.json` to inspect a different inventory. An
+  alternate inventory is diagnostic only and cannot authorize profile readiness.
 
   Select `--profile v0.1`, `--profile telos`, or `--profile research` to choose
-  the release claim scope. The default is the conservative `telos` profile.
+  the claim scope. The default is the product-scoped `v0.1` profile.
   """
 
   use Mix.Task
@@ -22,6 +23,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
   @default_results_dir "benchmarks/results"
+  @default_claims_file "benchmarks/claims.json"
   @failure_case_ids ~w(
     task_cancellation_releases_admission
     task_timeout_is_explicit_and_terminal
@@ -95,7 +97,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           out: :string,
           max_age_hours: :integer,
           profile: :string,
-          require_full: :boolean
+          require_ready: :boolean
         ]
       )
 
@@ -118,10 +120,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
     Mix.shell().info("parity dashboard: #{out_path}")
     Mix.shell().info("release profile: #{dashboard["profile"]["id"]}")
-    Mix.shell().info("full parity: #{dashboard["full_parity"]}")
-    Mix.shell().info("performance claim supported: #{dashboard["performance_claim_supported"]}")
+    Mix.shell().info("profile ready: #{dashboard["profile_ready"]}")
 
-    if Keyword.get(opts, :require_full, false) and not dashboard["full_parity"] do
+    Mix.shell().info(
+      "provider-free overhead guard: #{dashboard["provider_free_overhead_regression_guard_passed"]}"
+    )
+
+    if Keyword.get(opts, :require_ready, false) and not dashboard["profile_ready"] do
       Mix.raise(release_gate_failure_message(dashboard, out_path))
     end
   end
@@ -129,7 +134,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp dashboard(opts) do
     max_age_hours = Keyword.get(opts, :max_age_hours, 24)
     profile = opts |> Keyword.fetch!(:profile) |> ReleaseProfile.fetch!()
-    claims_path = Keyword.get(opts, :claims_file, "benchmarks/claims.json")
+    claims_path = Keyword.get(opts, :claims_file, @default_claims_file)
     code_revision = git_sha()
 
     instruction_optimizer_contract =
@@ -153,7 +158,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
           "package.check",
-          :source_checkout
+          :source_revision
         ),
       "livebook_execute" =>
         gate_lane(
@@ -161,7 +166,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
           "livebook.execute.check",
-          :source_checkout
+          :source_revision
         ),
       "live_provider_smoke" =>
         gate_lane(
@@ -169,7 +174,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
           "live.check",
-          :strict
+          :source_and_age
         ),
       "protocol_gates" =>
         gate_lane(
@@ -177,7 +182,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           Keyword.get(opts, :gate_dir, "tmp/gate-evidence"),
           max_age_hours,
           "protocol.check",
-          :source_checkout
+          :source_revision
         ),
       "failure_recovery" =>
         failure_recovery_lane(
@@ -224,31 +229,39 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         overhead_lane(Keyword.get(opts, :overhead_dir, "tmp/overhead"), max_age_hours)
     }
 
-    required = profile_lane_requirements(claims_path, profile)
+    required = profile_lane_requirements(claims_path, profile, Map.keys(lanes))
     claims = claims_gate(claims_path, lanes, profile)
-    gate_checks = release_gate_checks(required, lanes, claims)
-    full_parity = Enum.all?(gate_checks, &(&1["passing"] == true))
+    gate_checks = claim_gate_checks(claims)
+    profile_ready = claims["passing"] == true
     performance_supported = get_in(lanes, ["provider_free_overhead", "full_evidence"]) == true
 
     %{
-      "schema_version" => 1,
+      "schema_version" => 2,
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => code_revision,
       "max_age_hours" => max_age_hours,
       "profile" => profile,
       "required_lanes" => Enum.map(required, & &1["lane"]),
       "required_lane_requirements" => required,
-      "full_parity" => full_parity,
-      "performance_claim_supported" => performance_supported,
-      "release_gate" => %{
-        "passing" => full_parity,
+      "profile_ready" => profile_ready,
+      "provider_free_overhead_regression_guard_passed" => performance_supported,
+      "profile_gate" => %{
+        "passing" => profile_ready,
         "checks" => gate_checks,
         "blocking_lanes" =>
           gate_checks
           |> Enum.reject(& &1["passing"])
-          |> Enum.map(& &1["lane"]),
+          |> Enum.map(& &1["lane"])
+          |> Enum.uniq()
+          |> Enum.sort(),
+        "blocking_claim_ids" =>
+          gate_checks
+          |> Enum.reject(& &1["passing"])
+          |> Enum.map(& &1["claim_id"])
+          |> Enum.uniq()
+          |> Enum.sort(),
         "note" =>
-          "Full parity requires every required lane to be fresh, passing, and backed by full-evidence artifacts."
+          "Profile readiness requires every release-blocking claim to have fresh evidence at its declared tier."
       },
       "claims" => claims,
       "summary" => %{
@@ -257,7 +270,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         "total_lanes" => map_size(lanes),
         "public_claims" => claims["summary"],
         "note" =>
-          "Full parity is true only when all required lanes pass with full-evidence artifacts. Passing smoke or deterministic slices are preserved but cannot authorize full parity claims."
+          "Profile readiness is true only when every release-blocking claim has its declared evidence. Passing smoke or deterministic slices remain visible but authorize only their stated scope."
       },
       "lanes" => lanes
     }
@@ -265,77 +278,110 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp results_dir(opts), do: Keyword.get(opts, :results_dir, @default_results_dir)
 
-  defp profile_lane_requirements(path, profile) do
-    case read_claims(path) do
+  defp profile_lane_requirements(path, profile, known_lanes) do
+    case read_claims(path, known_lanes) do
       {:ok, claims} -> ReleaseProfile.lane_requirements(claims, profile)
       {:error, _reason} -> []
     end
   end
 
-  defp release_gate_checks(required, lanes, claims) do
-    lane_checks =
-      Enum.map(required, fn requirement ->
-        lane_id = requirement["lane"]
-        lane = Map.fetch!(lanes, lane_id)
-        evidence = requirement["evidence"]
+  defp claim_gate_checks(%{"claims" => [], "passing" => false} = claims) do
+    [
+      %{
+        "lane" => "claims_inventory",
+        "claim_id" => "claims_inventory",
+        "requirement_id" => "claims_inventory.valid",
+        "status" => claims["status"],
+        "passing" => false,
+        "fresh" => false,
+        "full_evidence" => false,
+        "required_evidence" => "valid_inventory",
+        "limitation" => claims["limitation"],
+        "blocking_requirements" => claims["blocking_requirements"] || []
+      }
+    ]
+  end
 
-        passing =
-          lane["passing"] == true and lane["fresh"] == true and
-            (evidence == "passing" or lane["full_evidence"] == true)
+  defp claim_gate_checks(%{"claims" => claims} = claims_gate) do
+    inventory_checks =
+      if get_in(claims_gate, ["artifact", "canonical"]) == false do
+        [
+          %{
+            "lane" => "claims_inventory",
+            "claim_id" => "claims_inventory",
+            "requirement_id" => "claims_inventory.canonical",
+            "status" => "noncanonical",
+            "passing" => false,
+            "fresh" => false,
+            "full_evidence" => false,
+            "required_evidence" => "canonical_inventory",
+            "limitation" => claims_gate["limitation"],
+            "blocking_requirements" => claims_gate["blocking_requirements"] || []
+          }
+        ]
+      else
+        []
+      end
 
-        %{
-          "lane" => lane_id,
-          "status" => lane["status"],
-          "passing" => passing,
-          "fresh" => lane["fresh"],
-          "full_evidence" => lane["full_evidence"],
-          "required_evidence" => evidence,
-          "claim_ids" => requirement["claim_ids"],
-          "requirement_ids" => requirement["requirement_ids"],
-          "limitation" => lane["limitation"],
-          "blocking_requirements" => lane["blocking_requirements"] || []
-        }
+    claim_checks =
+      claims
+      |> Enum.filter(&(&1["gate_policy"] == "blocking"))
+      |> Enum.flat_map(fn claim ->
+        Enum.map(claim["requirements"] || [], fn requirement ->
+          %{
+            "lane" => requirement["lane"],
+            "claim_id" => claim["id"],
+            "requirement_id" => requirement["id"],
+            "status" => requirement["lane_status"],
+            "passing" => requirement["satisfied"] == true,
+            "fresh" => requirement["lane_fresh"] == true,
+            "full_evidence" => requirement["lane_full_evidence"] == true,
+            "required_evidence" => requirement["evidence"],
+            "limitation" => requirement["lane_limitation"],
+            "blocking_requirements" => requirement["blocking_requirements"] || []
+          }
+        end)
       end)
 
-    lane_checks ++
-      [
-        %{
-          "lane" => "public_claims",
-          "status" => claims["status"],
-          "passing" => claims["passing"] == true,
-          "fresh" => true,
-          "full_evidence" => claims["passing"] == true,
-          "limitation" => claims["limitation"],
-          "blocking_requirements" => claims["blocking_requirements"] || []
-        }
-      ]
+    inventory_checks ++ claim_checks
   end
+
+  defp claim_gate_checks(_claims), do: []
 
   defp release_gate_failure_message(dashboard, out_path) do
     blocking =
       dashboard
-      |> get_in(["release_gate", "checks"])
+      |> get_in(["profile_gate", "checks"])
       |> List.wrap()
       |> Enum.reject(& &1["passing"])
       |> Enum.flat_map(&blocking_lines/1)
 
     """
-    full parity release gate failed; inspect #{out_path}
+    profile readiness gate failed; inspect #{out_path}
     blocking requirements:
     #{Enum.map_join(blocking, "\n", &"- #{&1}")}
     """
     |> String.trim()
   end
 
-  defp blocking_lines(%{"lane" => lane, "blocking_requirements" => requirements})
+  defp blocking_lines(%{"claim_id" => claim_id, "requirement_id" => requirement_id} = check) do
+    check
+    |> blocking_detail_lines()
+    |> Enum.map(&"claim #{claim_id} requirement #{requirement_id}: #{&1}")
+  end
+
+  defp blocking_lines(check), do: blocking_detail_lines(check)
+
+  defp blocking_detail_lines(%{"lane" => lane, "blocking_requirements" => requirements})
        when is_list(requirements) and requirements != [] do
     Enum.map(requirements, &format_blocking_requirement(lane, &1))
   end
 
-  defp blocking_lines(%{"lane" => lane, "limitation" => limitation}) when is_binary(limitation),
-    do: ["#{lane}: #{limitation}"]
+  defp blocking_detail_lines(%{"lane" => lane, "limitation" => limitation})
+       when is_binary(limitation),
+       do: ["#{lane}: #{limitation}"]
 
-  defp blocking_lines(%{"lane" => lane, "status" => status}),
+  defp blocking_detail_lines(%{"lane" => lane, "status" => status}),
     do: ["#{lane}: status #{inspect(status)} is not full passing evidence"]
 
   defp format_blocking_requirement(parent_lane, %{"kind" => "live_lane_full_evidence"} = req) do
@@ -458,7 +504,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp parity_suffix(_parity), do: ""
 
   defp golden_trace_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "golden-trace-parity-*.json")),
+    with {:ok, path} <-
+           latest_admitted(
+             Path.join(dir, "golden-trace-parity-*.json"),
+             :source_revision,
+             max_age_hours
+           ),
          {:ok, artifact} <- read_artifact(path) do
       passing =
         get_in(artifact, ["summary", "all_cases_passing"]) == true and
@@ -468,7 +519,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         passing: passing,
         full_evidence: passing,
         scale: "full",
-        freshness: :source_checkout,
+        freshness: :source_revision,
         summary: %{
           "cases" => get_in(artifact, ["summary", "total"]),
           "passing_cases" => get_in(artifact, ["summary", "passing"]),
@@ -485,7 +536,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp gate_lane(id, dir, max_age_hours, expected_mix_task, freshness) do
-    with {:ok, path} <- latest(Path.join(dir, "gate-evidence-#{id}-*.json")),
+    with {:ok, path} <-
+           latest_admitted(
+             Path.join(dir, "gate-evidence-#{id}-*.json"),
+             freshness,
+             max_age_hours
+           ),
          {:ok, artifact} <- read_artifact(path) do
       passing =
         artifact["gate"] == id and
@@ -564,9 +620,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         passing: deterministic,
         full_evidence: deterministic and live,
         scale: if(live, do: "full", else: "t0"),
-        freshness: :source_checkout,
-        full_freshness: if(live, do: :strict, else: :source_checkout),
-        status_freshness: if(live, do: :strict, else: :source_checkout),
+        freshness: :source_revision,
+        full_freshness: if(live, do: :source_and_age, else: :source_revision),
+        status_freshness: if(live, do: :source_and_age, else: :source_revision),
         summary: %{
           "evidence_tier" => artifact["evidence_tier"],
           "authority" => authority,
@@ -637,7 +693,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
             {path, artifact} =
               Enum.max_by(valid, fn {path, artifact} ->
                 live = failure_recovery_authority(artifact)["live_complete"] == true
-                freshness = if(live, do: :strict, else: :source_checkout)
+                freshness = if(live, do: :source_and_age, else: :source_revision)
                 admitted = fresh?(artifact, path, max_age_hours, freshness)
                 {admitted, live, mtime_unix!(path)}
               end)
@@ -648,9 +704,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp local_mlx_weight_training_lane(dir, max_age_hours) do
-    with {:ok, path} <- latest(Path.join(dir, "local-mlx-*.json")),
-         {:ok, artifact} <- read_verified_local_mlx_artifact(path),
-         {:ok, validated} <- validate_local_mlx_artifact(path, artifact) do
+    with {:ok, path, validated} <-
+           latest_valid_local_mlx_artifact(Path.join(dir, "local-mlx-*.json")) do
       artifact_lane("local_mlx_weight_training", path, validated, max_age_hours,
         passing: true,
         full_evidence: true,
@@ -679,6 +734,37 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           path,
           "artifact was rejected by LocalMLXCampaign validation: #{inspect(reasons)}"
         )
+    end
+  end
+
+  defp latest_valid_local_mlx_artifact(glob) do
+    paths = glob |> Path.wildcard() |> Enum.sort_by(&mtime_unix!/1, :desc)
+
+    {valid, rejected} =
+      Enum.reduce(paths, {[], []}, fn path, {valid, rejected} ->
+        with {:ok, artifact} <- read_verified_local_mlx_artifact(path),
+             {:ok, validated} <- validate_local_mlx_artifact(path, artifact) do
+          {[{path, validated} | valid], rejected}
+        else
+          {:error, reason} -> {valid, [{path, reason} | rejected]}
+        end
+      end)
+
+    case valid do
+      [] ->
+        case List.first(rejected) do
+          {_path, {:unverifiable, path, reason}} -> {:error, {:unverifiable, path, reason}}
+          {_path, {:rejected, path, reasons}} -> {:error, {:rejected, path, reasons}}
+          nil -> {:error, :missing}
+        end
+
+      valid ->
+        {path, artifact} =
+          Enum.max_by(valid, fn {path, artifact} ->
+            {artifact_timestamp(artifact), mtime_unix!(path)}
+          end)
+
+        {:ok, path, artifact}
     end
   end
 
@@ -1427,27 +1513,34 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp claims_gate(path, lanes, profile) do
-    case read_claims(path) do
+    case read_claims(path, Map.keys(lanes)) do
       {:ok, claims} ->
         selected_claims = ReleaseProfile.select_claims(claims, profile)
         evaluated = Enum.map(selected_claims, &evaluate_claim(&1, lanes))
+        canonical_inventory = canonical_claims_file?(path)
 
         blocking =
-          Enum.filter(evaluated, &(&1["release_blocking"] == true and &1["status"] != "proven"))
+          Enum.filter(
+            evaluated,
+            &(&1["gate_policy"] == "blocking" and &1["evidence_state"] != "proven")
+          )
 
-        %{
-          "status" => if(blocking == [], do: "full", else: "failing"),
-          "passing" => blocking == [],
-          "artifact" => %{"path" => path, "sha256" => file_sha256(path)},
-          "profile" => profile,
-          "summary" => %{
-            "total" => length(evaluated),
-            "proven" => Enum.count(evaluated, &(&1["status"] == "proven")),
-            "blocked" => length(blocking),
-            "non_blocking" => Enum.count(evaluated, &(&1["release_blocking"] != true))
-          },
-          "claims" => evaluated,
-          "blocking_requirements" =>
+        inventory_blockers =
+          if canonical_inventory do
+            []
+          else
+            [
+              %{
+                "kind" => "noncanonical_claims_inventory",
+                "claim_id" => "claims_inventory",
+                "statement" => "profile readiness uses the canonical public claims inventory",
+                "missing_requirements" => ["claims_inventory.canonical"]
+              }
+            ]
+          end
+
+        blockers =
+          inventory_blockers ++
             Enum.map(blocking, fn claim ->
               %{
                 "kind" => "public_claim_blocked",
@@ -1459,12 +1552,38 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
                   |> Enum.reject(&(&1["satisfied"] == true))
                   |> Enum.map(& &1["id"])
               }
-            end),
+            end)
+
+        passing = canonical_inventory and blocking == []
+
+        %{
+          "status" => if(passing, do: "full", else: "failing"),
+          "passing" => passing,
+          "artifact" => %{
+            "path" => path,
+            "sha256" => file_sha256(path),
+            "canonical" => canonical_inventory
+          },
+          "profile" => profile,
+          "summary" => %{
+            "total" => length(evaluated),
+            "proven" => Enum.count(evaluated, &(&1["evidence_state"] == "proven")),
+            "blocked" => length(blocking),
+            "informational" => Enum.count(evaluated, &(&1["gate_policy"] == "informational"))
+          },
+          "claims" => evaluated,
+          "blocking_requirements" => blockers,
           "limitation" =>
-            if(blocking == [],
-              do: nil,
-              else: "One or more release-blocking public claims lack fresh passing evidence."
-            )
+            cond do
+              not canonical_inventory ->
+                "Alternate claims inventories are diagnostic and cannot authorize profile readiness."
+
+              blocking != [] ->
+                "One or more release-blocking public claims lack fresh passing evidence."
+
+              true ->
+                nil
+            end
         }
 
       {:error, reason} ->
@@ -1472,7 +1591,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           "status" => "missing",
           "passing" => false,
           "artifact" => nil,
-          "summary" => %{"total" => 0, "proven" => 0, "blocked" => 1, "non_blocking" => 0},
+          "summary" => %{"total" => 0, "proven" => 0, "blocked" => 1, "informational" => 0},
           "claims" => [],
           "blocking_requirements" => [
             %{
@@ -1487,17 +1606,63 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     end
   end
 
-  defp read_claims(path) do
-    with true <- File.exists?(path),
+  defp read_claims(path, known_lanes) do
+    with :ok <- if(File.exists?(path), do: :ok, else: {:error, :missing_claims_file}),
          {:ok, artifact} <- read_artifact(path),
-         claims when is_list(claims) <- artifact["claims"] do
+         2 <- artifact["schema_version"],
+         claims when is_list(claims) <- artifact["claims"],
+         true <- claims != [],
+         true <- Enum.all?(claims, &valid_claim?(&1, known_lanes)),
+         true <- unique_claim_ids?(claims),
+         true <- unique_requirement_ids?(claims) do
       {:ok, claims}
     else
-      false -> {:error, :missing_claims_file}
+      {:error, :missing_claims_file} -> {:error, :missing_claims_file}
       nil -> {:error, :missing_claims_array}
       _other -> {:error, :invalid_claims_file}
     end
   end
+
+  defp valid_claim?(claim, known_lanes) when is_map(claim) do
+    is_binary(claim["id"]) and claim["claim_state"] in ~w(asserted target retired) and
+      claim["target_rung"] in ~w(C0 C1 C2 C3 C4 C5) and
+      claim["gate_policy"] in ~w(blocking informational) and is_binary(claim["release"]) and
+      claim["release"] in known_claim_releases() and is_binary(claim["statement"]) and
+      is_binary(claim["scope"]) and is_binary(claim["category"]) and
+      is_binary(claim["claim_type"]) and is_binary(claim["comparison"]) and
+      nonempty_string_list?(claim["surface"]) and nonempty_string_list?(claim["sources"]) and
+      is_list(claim["requirements"]) and claim["requirements"] != [] and
+      Enum.all?(claim["requirements"], fn requirement ->
+        is_binary(requirement["id"]) and is_binary(requirement["lane"]) and
+          requirement["evidence"] in ~w(passing full) and is_binary(requirement["kind"]) and
+          is_binary(requirement["threshold"]) and
+          (is_nil(known_lanes) or requirement["lane"] in known_lanes)
+      end)
+  end
+
+  defp valid_claim?(_claim, _known_lanes), do: false
+
+  defp unique_claim_ids?(claims) do
+    ids = Enum.map(claims, & &1["id"])
+    ids == Enum.uniq(ids)
+  end
+
+  defp unique_requirement_ids?(claims) do
+    ids = claims |> Enum.flat_map(& &1["requirements"]) |> Enum.map(& &1["id"])
+    ids == Enum.uniq(ids)
+  end
+
+  defp nonempty_string_list?(values),
+    do: is_list(values) and values != [] and Enum.all?(values, &(is_binary(&1) and &1 != ""))
+
+  defp known_claim_releases do
+    ReleaseProfile.names()
+    |> Enum.flat_map(&ReleaseProfile.fetch!(&1)["claim_releases"])
+    |> Enum.uniq()
+  end
+
+  defp canonical_claims_file?(path),
+    do: Path.expand(path) == Path.expand(@default_claims_file)
 
   defp evaluate_claim(claim, lanes) do
     requirements =
@@ -1506,7 +1671,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       |> Enum.map(&evaluate_claim_requirement(&1, lanes))
 
     satisfied? = requirements != [] and Enum.all?(requirements, &(&1["satisfied"] == true))
-    release_blocking = Map.get(claim, "release_blocking", true)
+    _gate_policy = Map.fetch!(claim, "gate_policy")
 
     claim
     |> Map.take([
@@ -1517,19 +1682,19 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       "claim_type",
       "comparison",
       "sources",
-      "decision",
+      "claim_state",
+      "target_rung",
       "release",
       "scope",
       "limitations",
-      "release_blocking"
+      "gate_policy"
     ])
-    |> Map.put("release_blocking", release_blocking)
     |> Map.put(
-      "status",
+      "evidence_state",
       cond do
         satisfied? -> "proven"
-        release_blocking -> "blocked"
-        true -> "not_release_blocking"
+        Enum.any?(requirements, &(&1["satisfied"] == true)) -> "partial"
+        true -> "missing"
       end
     )
     |> Map.put("requirements", requirements)
@@ -1551,6 +1716,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     |> Map.put("evidence", evidence)
     |> Map.put("satisfied", satisfied?)
     |> Map.put("lane_status", lane && lane["status"])
+    |> Map.put("lane_fresh", lane && lane["fresh"])
+    |> Map.put("lane_full_evidence", lane && lane["full_evidence"])
+    |> Map.put("lane_limitation", lane && lane["limitation"])
     |> Map.put("artifact", lane && lane["artifact"])
     |> Map.put("blocking_requirements", (lane && lane["blocking_requirements"]) || [])
   end
@@ -1664,7 +1832,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp artifact_lane(id, path, artifact, max_age_hours, opts) do
-    freshness = Keyword.get(opts, :freshness, :strict)
+    freshness = Keyword.get(opts, :freshness, :age)
     full_freshness = Keyword.get(opts, :full_freshness, freshness)
     status_freshness = Keyword.get(opts, :status_freshness, freshness)
     fresh = fresh?(artifact, path, max_age_hours, freshness)
@@ -1673,12 +1841,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     passing = Keyword.fetch!(opts, :passing)
     full_evidence = Keyword.fetch!(opts, :full_evidence) and full_fresh
     scale = Keyword.fetch!(opts, :scale)
+    admission = admission_details(artifact, path, max_age_hours, freshness)
 
     %{
       "id" => id,
       "status" => status(passing, full_evidence, scale, status_fresh),
       "passing" => passing,
       "fresh" => fresh,
+      "admission" => admission,
       "full_evidence" => full_evidence,
       "scale" => scale,
       "artifact" => %{
@@ -1699,6 +1869,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       "status" => "missing",
       "passing" => false,
       "fresh" => false,
+      "admission" => %{
+        "policy" => "missing",
+        "admitted" => false,
+        "recency_valid" => false,
+        "source_compatible" => false,
+        "rejection_reasons" => ["artifact_missing"]
+      },
       "full_evidence" => false,
       "scale" => "missing",
       "artifact" => nil,
@@ -1912,18 +2089,51 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp status(true, _full_evidence, scale, true) when scale in ["smoke", "sample"], do: scale
   defp status(true, _full_evidence, _scale, true), do: "passing"
 
+  defp latest_admitted(glob, policy, _max_age_hours) do
+    candidates =
+      glob
+      |> Path.wildcard()
+      |> Enum.flat_map(fn path ->
+        case read_artifact(path) do
+          {:ok, artifact} -> [{path, artifact}]
+          {:error, _reason} -> []
+        end
+      end)
+
+    eligible =
+      Enum.filter(candidates, fn {path, artifact} ->
+        policy_candidate?(artifact, path, policy)
+      end)
+
+    choose_latest_candidate(eligible)
+  end
+
   defp latest(glob) when is_binary(glob), do: latest([glob])
 
   defp latest(globs) do
-    paths =
+    candidates =
       globs
       |> Enum.flat_map(&Path.wildcard/1)
       |> Enum.uniq()
+      |> Enum.flat_map(fn path ->
+        case read_artifact(path) do
+          {:ok, artifact} -> [{path, artifact}]
+          {:error, _reason} -> []
+        end
+      end)
 
-    case paths do
-      [] -> {:error, :missing}
-      paths -> {:ok, Enum.max_by(paths, &mtime_unix!/1)}
-    end
+    choose_latest_candidate(candidates)
+  end
+
+  defp choose_latest_candidate([]), do: {:error, :missing}
+
+  defp choose_latest_candidate(candidates) do
+    {path, _artifact} =
+      Enum.max_by(candidates, fn {path, artifact} ->
+        {artifact_timestamp(artifact), mtime_unix!(path)}
+      end)
+
+    {:ok, path}
   end
 
   defp read_artifact(path) do
@@ -1934,21 +2144,64 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp fresh?(artifact, path, max_age_hours, freshness)
 
-  defp fresh?(artifact, path, max_age_hours, :source_checkout) do
-    current_git_sha_bound?(artifact) or fresh_by_age?(artifact, path, max_age_hours)
-  end
+  defp fresh?(artifact, _path, _max_age_hours, :source_revision),
+    do: current_git_sha_bound?(artifact)
 
-  defp fresh?(artifact, path, max_age_hours, :strict),
+  defp fresh?(artifact, path, max_age_hours, :age),
     do: fresh_by_age?(artifact, path, max_age_hours)
 
-  defp fresh_by_age?(artifact, path, max_age_hours) do
+  defp fresh?(artifact, path, max_age_hours, :source_and_age),
+    do: current_git_sha_bound?(artifact) and fresh_by_age?(artifact, path, max_age_hours)
+
+  defp policy_candidate?(artifact, _path, :source_revision),
+    do: current_git_sha_bound?(artifact)
+
+  defp policy_candidate?(artifact, _path, :age), do: valid_artifact_time?(artifact)
+
+  defp policy_candidate?(artifact, _path, :source_and_age),
+    do: current_git_sha_bound?(artifact) and valid_artifact_time?(artifact)
+
+  defp admission_details(artifact, path, max_age_hours, policy) do
+    recency_valid = fresh_by_age?(artifact, path, max_age_hours)
+    source_compatible = current_git_sha_bound?(artifact)
+    admitted = fresh?(artifact, path, max_age_hours, policy)
+
+    rejection_reasons =
+      []
+      |> maybe_reject(policy in [:age, :source_and_age] and not recency_valid, "recency_invalid")
+      |> maybe_reject(
+        policy in [:source_revision, :source_and_age] and not source_compatible,
+        "source_revision_mismatch"
+      )
+
+    %{
+      "policy" => Atom.to_string(policy),
+      "admitted" => admitted,
+      "recency_valid" => recency_valid,
+      "source_compatible" => source_compatible,
+      "max_age_hours" => max_age_hours,
+      "rejection_reasons" => rejection_reasons
+    }
+  end
+
+  defp maybe_reject(reasons, true, reason), do: reasons ++ [reason]
+  defp maybe_reject(reasons, false, _reason), do: reasons
+
+  defp fresh_by_age?(artifact, _path, max_age_hours) do
     case artifact_generated_at(artifact) do
       {:ok, datetime} ->
-        DateTime.diff(DateTime.utc_now(), datetime, :second) <= max_age_hours * 60 * 60
+        age_seconds = DateTime.diff(DateTime.utc_now(), datetime, :second)
+        age_seconds >= -300 and age_seconds <= max_age_hours * 60 * 60
 
       :error ->
-        age_seconds = System.system_time(:second) - mtime_unix!(path)
-        age_seconds <= max_age_hours * 60 * 60
+        false
+    end
+  end
+
+  defp valid_artifact_time?(artifact) do
+    case artifact_generated_at(artifact) do
+      {:ok, datetime} -> DateTime.diff(DateTime.utc_now(), datetime, :second) >= -300
+      :error -> false
     end
   end
 
@@ -1963,6 +2216,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     case artifact["generated_at"] && DateTime.from_iso8601(artifact["generated_at"]) do
       {:ok, datetime, _offset} -> {:ok, datetime}
       _other -> :error
+    end
+  end
+
+  defp artifact_timestamp(artifact) do
+    case artifact_generated_at(artifact) do
+      {:ok, datetime} -> DateTime.to_unix(datetime, :microsecond)
+      :error -> 0
     end
   end
 

@@ -2,7 +2,6 @@ defmodule Imp.ReproductionRegistry do
   @moduledoc false
 
   @tiers ~w(none t0 t1 t2 t3)
-  @states ~w(red yellow green)
   @classifications ~w(replication adaptation native_extension)
   @protocol_modes ~w(provider_free live)
 
@@ -22,7 +21,7 @@ defmodule Imp.ReproductionRegistry do
   end
 
   def validate!(
-        %{"schema_version" => 1, "protocols" => protocols, "features" => features} = registry,
+        %{"schema_version" => 2, "protocols" => protocols, "features" => features} = registry,
         %{"families" => families},
         root
       )
@@ -34,29 +33,29 @@ defmodule Imp.ReproductionRegistry do
     validate_surface_token_coverage!(features, authority_by_id)
     Enum.each(protocols, &validate_protocol!(&1, root))
     Enum.each(features, &validate_feature!(&1, authority_by_id, protocols, root))
+    validate_unadmitted_protocols!(protocols, features)
     registry
   end
 
   def validate!(_registry, _authorities, _root),
-    do: raise(ArgumentError, "expected schema_version 1 with protocols and features")
+    do: raise(ArgumentError, "expected schema_version 2 with protocols and features")
 
   def render(%{"features" => features}) do
     header = [
-      "| Feature | Class | Tier | State | Protocols | Blocking constraints |",
-      "| --- | --- | --- | --- | --- | --- |"
+      "| Feature | Class | Protocols | Admitted tier | Admitted artifact |",
+      "| --- | --- | --- | --- | --- |"
     ]
 
     rows =
       Enum.map(features, fn feature ->
-        evidence = feature["evidence"]
+        evidence = feature["admitted_evidence"]
 
         values = [
           feature["name"],
           feature["classification"],
-          String.upcase(evidence["tier"]),
-          evidence["claim_state"],
           Enum.join(feature["protocol_ids"], "<br>"),
-          constraint_summary(feature["constraints"])
+          String.upcase(evidence["tier"]),
+          evidence["artifact"] || "none"
         ]
 
         "| " <> Enum.map_join(values, " | ", &escape_cell/1) <> " |"
@@ -127,18 +126,13 @@ defmodule Imp.ReproductionRegistry do
       nil -> :ok
       path -> require_file!(path, root, "protocol #{id} manifest")
     end
-
-    validate_artifact_validator!(protocol["artifact_validator"], id)
   end
 
   defp validate_protocol!(_, _root),
     do: raise(ArgumentError, "protocol entries must be named objects")
 
-  defp validate_artifact_validator!(%{"mode" => "task", "task" => task}, id),
-    do: require_task!(task, "protocol #{id} artifact validator")
-
   defp validate_artifact_validator!(
-         %{"mode" => "module", "module" => module_name, "function" => function, "arity" => arity},
+         %{"mode" => "module", "module" => module_name, "function" => function, "arity" => 2},
          id
        ) do
     module =
@@ -161,14 +155,30 @@ defmodule Imp.ReproductionRegistry do
                   __STACKTRACE__
       end
 
-    unless is_integer(arity) and arity >= 0 and Code.ensure_loaded?(module) and
-             function_exported?(module, function_atom, arity) do
+    unless Code.ensure_loaded?(module) and function_exported?(module, function_atom, 2) do
       raise ArgumentError, "protocol #{id} artifact validator is not exported"
     end
+
+    {module, function_atom}
   end
 
   defp validate_artifact_validator!(_, id),
-    do: raise(ArgumentError, "protocol #{id} must declare an executable artifact validator")
+    do: raise(ArgumentError, "protocol #{id} must declare a pure module artifact validator")
+
+  defp validate_unadmitted_protocols!(protocols, features) do
+    admitted_protocol_ids =
+      for %{"admitted_evidence" => %{"artifact" => artifact, "protocol_id" => protocol_id}}
+          when is_binary(artifact) and is_binary(protocol_id) <- features,
+          into: MapSet.new(),
+          do: protocol_id
+
+    Enum.each(protocols, fn {id, protocol} ->
+      if id not in admitted_protocol_ids and protocol["artifact_validator"] not in [nil] do
+        raise ArgumentError,
+              "protocol #{id} must not declare an artifact validator without admitted artifacts"
+      end
+    end)
+  end
 
   defp validate_feature!(feature, authority_by_id, protocols, root) do
     id = feature["id"]
@@ -212,38 +222,19 @@ defmodule Imp.ReproductionRegistry do
         do: raise(ArgumentError, "feature #{id} names unknown protocol #{protocol_id}")
     end)
 
-    validate_constraints!(feature["constraints"], id)
-    validate_evidence!(feature["evidence"], feature, protocols, root)
-  end
-
-  defp validate_constraints!(constraints, id) do
-    unless is_list(constraints) and
-             Enum.all?(constraints, fn constraint ->
-               is_map(constraint) and constraint["status"] in ~w(open resolved) and
-                 is_binary(constraint["kind"]) and constraint["kind"] != "" and
-                 is_binary(constraint["detail"]) and constraint["detail"] != ""
-             end) do
-      raise ArgumentError, "feature #{id} has invalid constraints"
+    if Map.has_key?(feature, "constraints") or
+         get_in(feature, ["admitted_evidence", "claim_state"]) != nil do
+      raise ArgumentError,
+            "feature #{id} must not cache mutable constraints or claim state; use tk and the dashboard"
     end
+
+    validate_evidence!(feature["admitted_evidence"], feature, protocols, root)
   end
 
   defp validate_evidence!(evidence, feature, protocols, root) when is_map(evidence) do
     id = feature["id"]
     tier = evidence["tier"]
-    state = evidence["claim_state"]
     require_member!(tier, @tiers, "feature #{id} evidence tier")
-    require_member!(state, @states, "feature #{id} claim state")
-
-    expected_state =
-      if(tier == "none", do: "red", else: if(tier == "t3", do: "green", else: "yellow"))
-
-    unless state == expected_state,
-      do: raise(ArgumentError, "feature #{id} claim state overstates tier #{tier}")
-
-    open_constraints = Enum.filter(feature["constraints"], &(&1["status"] == "open"))
-
-    if state == "green" and open_constraints != [],
-      do: raise(ArgumentError, "feature #{id} cannot be green with open constraints")
 
     case {tier, evidence["artifact"], evidence["protocol_id"]} do
       {"none", nil, nil} ->
@@ -266,10 +257,10 @@ defmodule Imp.ReproductionRegistry do
         unless is_binary(expected_sha256) and Regex.match?(~r/^[0-9a-f]{64}$/, expected_sha256),
           do: raise(ArgumentError, "feature #{id} admitted artifact must have a SHA-256 digest")
 
+        artifact_body = File.read!(Path.join(root, artifact))
+
         actual_sha256 =
-          root
-          |> Path.join(artifact)
-          |> File.read!()
+          artifact_body
           |> then(&:crypto.hash(:sha256, &1))
           |> Base.encode16(case: :lower)
 
@@ -287,6 +278,10 @@ defmodule Imp.ReproductionRegistry do
         if tier_rank(tier) > tier_rank(protocol["max_tier"]),
           do: raise(ArgumentError, "feature #{id} evidence exceeds protocol tier")
 
+        artifact_body
+        |> Jason.decode!()
+        |> validate_artifact!(protocol["artifact_validator"], protocol_id, id)
+
       _ ->
         raise ArgumentError,
               "feature #{id} admitted evidence must name both artifact and protocol"
@@ -295,6 +290,22 @@ defmodule Imp.ReproductionRegistry do
 
   defp validate_evidence!(_, feature, _protocols, _root),
     do: raise(ArgumentError, "feature #{feature["id"]} has invalid evidence")
+
+  defp validate_artifact!(artifact, validator, protocol_id, feature_id) do
+    {module, function} = validate_artifact_validator!(validator, protocol_id)
+
+    try do
+      case apply(module, function, [protocol_id, artifact]) do
+        :ok -> :ok
+        {:ok, _} -> :ok
+        other -> raise ArgumentError, "unexpected validator result #{inspect(other)}"
+      end
+    rescue
+      error ->
+        raise ArgumentError,
+              "feature #{feature_id} admitted artifact failed protocol #{protocol_id} validation: #{Exception.message(error)}"
+    end
+  end
 
   defp require_task!(task, context) do
     require_nonempty!(task, "#{context} task")
@@ -326,15 +337,4 @@ defmodule Imp.ReproductionRegistry do
 
   defp tier_rank(tier), do: Enum.find_index(@tiers, &(&1 == tier))
   defp escape_cell(value), do: value |> to_string() |> String.replace("|", "\\|")
-
-  defp constraint_summary([]), do: "none"
-
-  defp constraint_summary(constraints) do
-    constraints
-    |> Enum.filter(&(&1["status"] == "open"))
-    |> case do
-      [] -> "none"
-      open -> Enum.map_join(open, "<br>", & &1["kind"])
-    end
-  end
 end

@@ -46,9 +46,9 @@ Every guide and notebook follows the same product story:
   reflection aggregation, measured batch control, budget and timeout policy,
   and evidence boundaries.
 
-The source checkout also contains maintainer-only authority, coverage, parity,
-and release ledgers. They are intentionally excluded from the consumer package
-because their commands operate on repository evidence infrastructure.
+The source checkout also contains maintainer-only authority and evidence
+infrastructure. It is excluded from the consumer package because its commands
+operate on repository protocols and admitted artifacts.
 
 ## Learn By Running Code
 
@@ -86,14 +86,3 @@ credentials are loaded.
 
 Package consumers do not need the source-checkout Mix aliases; those gates are
 for Imp maintainers validating this repository before release.
-
-## Maintainer Evidence
-
-The repository also keeps release-evidence notes for maintainers and reviewers.
-They audit Imp-vs-DSPy parity and performance claims, but they are intentionally
-separate from the packaged user manual. In the source checkout, the benchmark
-catalog and release-evidence notes are the maintainer starting point for
-outside-view validation work.
-
-- [Identity Compatibility](IDENTITY_COMPATIBILITY.md): the narrow read-time
-  boundary for checksummed DSEx-era evidence after the Imp cutover.

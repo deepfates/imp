@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "purpose": "Executable, non-authorizing index of research-derived Imp surfaces, reproduction protocols, evidence, and red constraints.",
+  "schema_version": 2,
+  "purpose": "Executable index of Imp research-derived surfaces, runnable protocols, validators, and immutable admitted artifacts. Current claim state and unfinished work are intentionally excluded.",
   "tier_vocabulary": {
     "none": "No immutable admitted artifact.",
     "t0": "Provider-free deterministic behavior or protocol wiring.",
@@ -9,73 +9,1326 @@
     "t3": "Paper-scale, multi-seed reproduction under the declared protocol."
   },
   "protocols": {
-    "package_gate": {"mode":"provider_free","max_tier":"t0","task":"imp.gate_evidence","args":["--gate","product_package","--mix-task","package.check"],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.gate_evidence"}},
-    "core_trace": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.trace","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.trace"}},
-    "live_matrix": {"mode":"live","max_tier":"t2","task":"imp.benchmark.live_matrix","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.live_matrix"}},
-    "multimodal_live": {"mode":"live","max_tier":"t2","task":"imp.benchmark.multimodal_quality","args":[],"manifest":"benchmarks/data/multimodal/openai-responses-manifest.json","artifact_validator":{"mode":"task","task":"imp.benchmark.multimodal_quality"}},
-    "rag_agent": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.rag_tool_agent","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.rag_tool_agent"}},
-    "rlm_contract": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.rlm_contract","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.rlm_contract"}},
-    "rlm_paper": {"mode":"live","max_tier":"t3","task":"imp.benchmark.rlm_campaign","args":["--manifest","benchmarks/config/rlm-paper-protocol-v3.json"],"manifest":"benchmarks/config/rlm-paper-protocol-v3.json","artifact_validator":{"mode":"task","task":"imp.benchmark.rlm_campaign"}},
-    "confidence_calibration": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.confidence_calibration","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.confidence_calibration"}},
-    "auto_evaluation_contract": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.auto_evaluation_contract","args":["--manifest","benchmarks/config/auto-evaluation-differential-v1.json"],"manifest":"benchmarks/config/auto-evaluation-differential-v1.json","artifact_validator":{"mode":"task","task":"imp.benchmark.auto_evaluation_contract"}},
-    "optimizer_lift": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.optimizer_lift","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.optimizer_lift"}},
-    "instruction_contract": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.instruction_optimizer_contract","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.instruction_optimizer_contract"}},
-    "instruction_live": {"mode":"live","max_tier":"t2","task":"imp.benchmark.instruction_optimizer_experiment","args":["--manifest","benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json"],"manifest":"benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json","artifact_validator":{"mode":"task","task":"imp.benchmark.instruction_optimizer_experiment"}},
-    "gepa_contract": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.gepa_contract","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.gepa_contract"}},
-    "gepa_live": {"mode":"live","max_tier":"t3","task":"imp.benchmark.gepa_campaign","args":["--manifest","benchmarks/config/gepa-paper-campaign-v2.json"],"manifest":"benchmarks/config/gepa-paper-campaign-v2.json","artifact_validator":{"mode":"task","task":"imp.benchmark.gepa_replication"}},
-    "local_mlx": {"mode":"live","max_tier":"t2","task":"imp.benchmark.local_mlx","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.local_mlx"}},
-    "provider_training": {"mode":"live","max_tier":"t2","task":"imp.benchmark.provider_training","args":[],"manifest":"benchmarks/data/provider-training-banking77-v1.json","artifact_validator":{"mode":"task","task":"imp.benchmark.provider_training"}},
-    "fast_slow": {"mode":"provider_free","max_tier":"t0","task":"imp.benchmark.fast_slow","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.fast_slow"}},
-    "optimize_anything": {"mode":"live","max_tier":"t2","task":"imp.benchmark.optimize_anything","args":["--live"],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.optimize_anything"}},
-    "operations": {"mode":"provider_free","max_tier":"t0","task":"imp.benchmark.operations_stress","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.operations_stress"}},
-    "parity": {"mode":"live","max_tier":"t2","task":"imp.benchmark.parity","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.parity"}},
-    "benchmark_run": {"mode":"live","max_tier":"t2","task":"imp.benchmark.run","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.integrity"}},
-    "gepa_dataset": {"mode":"provider_free","max_tier":"t1","task":"imp.benchmark.gepa_dataset","args":[],"manifest":null,"artifact_validator":{"mode":"task","task":"imp.benchmark.gepa_dataset"}}
+    "package_gate": {
+      "mode": "provider_free",
+      "max_tier": "t0",
+      "task": "imp.gate_evidence",
+      "args": [
+        "--gate",
+        "product_package",
+        "--mix-task",
+        "package.check"
+      ],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "core_trace": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.trace",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "live_matrix": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.live_matrix",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "multimodal_live": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.multimodal_quality",
+      "args": [],
+      "manifest": "benchmarks/data/multimodal/openai-responses-manifest.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "rag_agent": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.rag_tool_agent",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "rlm_contract": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.rlm_contract",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "rlm_paper": {
+      "mode": "live",
+      "max_tier": "t3",
+      "task": "imp.benchmark.rlm_campaign",
+      "args": [
+        "--manifest",
+        "benchmarks/config/rlm-paper-protocol-v3.json"
+      ],
+      "manifest": "benchmarks/config/rlm-paper-protocol-v3.json",
+      "artifact_validator": null
+    },
+    "confidence_calibration": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.confidence_calibration",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "auto_evaluation_contract": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.auto_evaluation_contract",
+      "args": [
+        "--manifest",
+        "benchmarks/config/auto-evaluation-differential-v1.json"
+      ],
+      "manifest": "benchmarks/config/auto-evaluation-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "optimizer_lift": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.optimizer_lift",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "instruction_contract": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.instruction_optimizer_contract",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "instruction_live": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.instruction_optimizer_experiment",
+      "args": [
+        "--manifest",
+        "benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json"
+      ],
+      "manifest": "benchmarks/config/instruction-optimizer-aime-economical-preflight-haiku45-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "gepa_contract": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.gepa_contract",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "gepa_live": {
+      "mode": "live",
+      "max_tier": "t3",
+      "task": "imp.benchmark.gepa_campaign",
+      "args": [
+        "--manifest",
+        "benchmarks/config/gepa-paper-campaign-v2.json"
+      ],
+      "manifest": "benchmarks/config/gepa-paper-campaign-v2.json",
+      "artifact_validator": null
+    },
+    "local_mlx": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.local_mlx",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "provider_training": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.provider_training",
+      "args": [],
+      "manifest": "benchmarks/data/provider-training-banking77-v1.json",
+      "artifact_validator": null
+    },
+    "fast_slow": {
+      "mode": "provider_free",
+      "max_tier": "t0",
+      "task": "imp.benchmark.fast_slow",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "optimize_anything": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.optimize_anything",
+      "args": [
+        "--live"
+      ],
+      "manifest": null,
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "operations": {
+      "mode": "provider_free",
+      "max_tier": "t0",
+      "task": "imp.benchmark.operations_stress",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "parity": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.parity",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "benchmark_run": {
+      "mode": "live",
+      "max_tier": "t2",
+      "task": "imp.benchmark.run",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    },
+    "gepa_dataset": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.gepa_dataset",
+      "args": [],
+      "manifest": null,
+      "artifact_validator": null
+    }
   },
   "features": [
-    {"id":"product_release","name":"Package, public API, docs, and livebooks","authority_family":"family.product_release_docs","surface_tokens":["package","public_api","docs","README","livebooks"],"public_surfaces":["mix.exs:package","README.md","docs","livebooks"],"implementation_paths":["mix.exs","README.md"],"classification":"native_extension","protocol_ids":["package_gate"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"publication","status":"open","detail":"Private repository, pending product name, and no release artifact."}]},
-    {"id":"dspy_programming_model","name":"Signature, Predict, and ChainOfThought","authority_family":"family.dspy_core_programming","surface_tokens":["signature","predict","chain_of_thought"],"public_surfaces":["Imp.Signature","Imp.Predict","Imp.ChainOfThought"],"implementation_paths":["lib/imp/signature.ex","lib/imp/predict/predict.ex","lib/imp/predict/chain_of_thought.ex"],"classification":"adaptation","protocol_ids":["core_trace"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"manifest","status":"open","detail":"Golden-trace task has no immutable reproduction manifest or admitted artifact."}]},
-    {"id":"model_provider_runtime","name":"Model/provider normalized runtime","authority_family":"family.model_provider_runtime","surface_tokens":["ReqLLM"],"public_surfaces":["Imp.LM","Imp.Clients.ReqLLM"],"implementation_paths":["lib/imp/lm.ex","lib/imp/clients/req_llm.ex"],"classification":"native_extension","protocol_ids":["live_matrix"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"live_matrix","status":"open","detail":"No current full matched-model matrix is admitted."}]},
-    {"id":"structured_multimodal_adapters","name":"Structured adapters and multimodal values","authority_family":"family.adapters_multimodal","surface_tokens":["adapters","adapter_format_parse","schema_validation"],"public_surfaces":["Imp.Adapter","Imp.Adapters.Types","Imp.Schema"],"implementation_paths":["lib/imp/adapter.ex","lib/imp/adapters/types.ex","lib/imp/schema.ex"],"classification":"adaptation","protocol_ids":["multimodal_live"],"evidence":{"tier":"t2","artifact":"benchmarks/results/multimodal-quality-live-20260713T224355Z.json","artifact_sha256":"02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e","protocol_id":"multimodal_live","claim_state":"yellow"},"constraints":[{"kind":"scope","status":"open","detail":"Admitted evidence covers the pinned six-row image/PDF campaign, not broad multimodal quality or audio."}]},
-    {"id":"react","name":"ReAct","authority_family":"family.tools_agents_react","surface_tokens":["react","tools","agents"],"public_surfaces":["Imp.Predict.ReAct"],"implementation_paths":["lib/imp/predict/react.ex"],"classification":"adaptation","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"live_behavior","status":"open","detail":"Provider-facing matched behavior is not admitted."}]},
-    {"id":"react_v2","name":"ReActV2","authority_family":"family.tools_agents_react","surface_tokens":[],"public_surfaces":["Imp.Predict.ReActV2"],"implementation_paths":["lib/imp/predict/react_v2.ex"],"classification":"adaptation","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"unique_campaign","status":"open","detail":"No feature-specific reproduction manifest or artifact."}]},
-    {"id":"mcp","name":"MCP protocol boundary","authority_family":"family.tools_agents_react","surface_tokens":["mcp","mcp_protocol"],"public_surfaces":["Imp.MCP"],"implementation_paths":["lib/imp/mcp.ex"],"classification":"native_extension","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"protocol_evidence","status":"open","detail":"Protocol tests are not an admitted research reproduction."}]},
-    {"id":"code_act","name":"CodeAct","authority_family":"family.tools_agents_react","surface_tokens":["code_act"],"public_surfaces":["Imp.Predict.CodeAct"],"implementation_paths":["lib/imp/predict/code_act.ex"],"classification":"adaptation","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"runtime_difference","status":"open","detail":"BEAM sandbox semantics differ from the Python authority and lack a matched campaign."}]},
-    {"id":"program_of_thought","name":"ProgramOfThought","authority_family":"family.tools_agents_react","surface_tokens":["program_of_thought"],"public_surfaces":["Imp.Predict.ProgramOfThought"],"implementation_paths":["lib/imp/predict/program_of_thought.ex"],"classification":"adaptation","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"matched_reproduction","status":"open","detail":"Behavioral tests exist but no matched reproduction is admitted."}]},
-    {"id":"rlm","name":"Recursive Language Models","authority_family":"family.rlm","surface_tokens":["rlm","long_context","recursive_control","dspy_rlm"],"public_surfaces":["Imp.Predict.RLM"],"implementation_paths":["lib/imp/predict/rlm.ex","lib/imp/predict/rlm/runtime.ex"],"classification":"adaptation","protocol_ids":["rlm_contract","rlm_paper"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"dataset_pins","status":"open","detail":"T3 manifest retains acquisition placeholders and cannot authorize paper-scale reproduction."},{"kind":"historical_models","status":"open","detail":"Paper-era model availability and exact endpoints remain constrained."}]},
-    {"id":"assertions_evaluation","name":"Assertions and evaluation","authority_family":"family.composition_evaluation","surface_tokens":["evaluation","metrics"],"public_surfaces":["Imp.Assertion","Imp.Evaluate","Imp.Metrics"],"implementation_paths":["lib/imp/assertion.ex","lib/imp/evaluate.ex","lib/imp/metrics.ex"],"classification":"adaptation","protocol_ids":["confidence_calibration"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"effectiveness_campaign","status":"open","detail":"No assertions/refinement effectiveness manifest or admitted artifact."}]},
-    {"id":"semantic_f1","name":"SemanticF1 auto-evaluation","authority_family":"family.composition_evaluation","surface_tokens":[],"public_surfaces":["Imp.Evaluate.SemanticF1"],"implementation_paths":["lib/imp/evaluate/auto_evaluation.ex","lib/imp/benchmark_truth/auto_evaluation_contract.ex"],"classification":"replication","protocol_ids":["auto_evaluation_contract"],"evidence":{"tier":"t1","artifact":"benchmarks/results/auto-evaluation-differential-v1.json","artifact_sha256":"9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0","protocol_id":"auto_evaluation_contract","claim_state":"yellow"},"constraints":[{"kind":"natural_data","status":"open","detail":"No matched natural-data judge-quality campaign."}]},
-    {"id":"complete_and_grounded","name":"CompleteAndGrounded auto-evaluation","authority_family":"family.composition_evaluation","surface_tokens":[],"public_surfaces":["Imp.Evaluate.CompleteAndGrounded"],"implementation_paths":["lib/imp/evaluate/auto_evaluation.ex","lib/imp/benchmark_truth/auto_evaluation_contract.ex"],"classification":"replication","protocol_ids":["auto_evaluation_contract"],"evidence":{"tier":"t1","artifact":"benchmarks/results/auto-evaluation-differential-v1.json","artifact_sha256":"9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0","protocol_id":"auto_evaluation_contract","claim_state":"yellow"},"constraints":[{"kind":"natural_data","status":"open","detail":"No matched completeness/groundedness quality campaign."}]},
-    {"id":"refinement","name":"Best-of-N and refinement","authority_family":"family.composition_evaluation","surface_tokens":[],"public_surfaces":["Imp.Predict.BestOfN","Imp.Predict.Refine"],"implementation_paths":["lib/imp/predict/best_of_n.ex","lib/imp/predict/refine.ex"],"classification":"adaptation","protocol_ids":["confidence_calibration"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"manifest","status":"open","detail":"Behavioral tests are not a reproduction manifest."}]},
-    {"id":"labeled_few_shot","name":"LabeledFewShot","authority_family":"family.optimizer_few_shot_search","surface_tokens":["LabeledFewShot"],"public_surfaces":["Imp.Optimizer.LabeledFewShot"],"implementation_paths":["lib/imp/optimizer/labeled_few_shot.ex"],"classification":"replication","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"real_manifest","status":"open","detail":"Only synthetic provider-free lift coverage exists."}]},
-    {"id":"bootstrap_few_shot","name":"BootstrapFewShot","authority_family":"family.optimizer_few_shot_search","surface_tokens":["BootstrapFewShot"],"public_surfaces":["Imp.Optimizer.BootstrapFewShot"],"implementation_paths":["lib/imp/optimizer/bootstrap_few_shot.ex"],"classification":"replication","protocol_ids":["optimizer_lift","instruction_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"campaign_quality","status":"open","detail":"Prior preflight had parse failures and is not admissible."}]},
-    {"id":"bootstrap_random_search","name":"BootstrapRS and RandomSearch","authority_family":"family.optimizer_few_shot_search","surface_tokens":["BootstrapRS","RandomSearch"],"public_surfaces":["Imp.Optimizer.BootstrapRS","Imp.Optimizer.RandomSearch"],"implementation_paths":["lib/imp/optimizer/bootstrap_rs.ex","lib/imp/optimizer/random_search.ex"],"classification":"replication","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"real_manifest","status":"open","detail":"No matched non-synthetic campaign manifest."}]},
-    {"id":"knn_few_shot","name":"KNNFewShot","authority_family":"family.optimizer_few_shot_search","surface_tokens":["KNNFewShot"],"public_surfaces":["Imp.Optimizer.KNNFewShot"],"implementation_paths":["lib/imp/optimizer/knn_few_shot.ex"],"classification":"replication","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"real_manifest","status":"open","detail":"No matched effectiveness campaign."}]},
-    {"id":"copro","name":"COPRO","authority_family":"family.optimizer_instruction_search","surface_tokens":["COPRO"],"public_surfaces":["Imp.Optimizer.COPRO"],"implementation_paths":["lib/imp/optimizer/copro.ex"],"classification":"replication","protocol_ids":["optimizer_lift","instruction_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"matched_live","status":"open","detail":"No clean matched live artifact."}]},
-    {"id":"instruction_search","name":"InstructionSearch","authority_family":"family.optimizer_instruction_search","surface_tokens":["InstructionSearch"],"public_surfaces":["Imp.Optimizer.InstructionSearch"],"implementation_paths":["lib/imp/optimizer/instruction_search.ex"],"classification":"native_extension","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"upstream_equivalent","status":"open","detail":"No stable sidecar equivalent; must not be claimed as upstream reproduction."}]},
-    {"id":"infer_rules","name":"InferRules","authority_family":"family.optimizer_instruction_search","surface_tokens":["InferRules"],"public_surfaces":["Imp.Optimizer.InferRules"],"implementation_paths":["lib/imp/optimizer/infer_rules.ex"],"classification":"adaptation","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"dedicated_contract","status":"open","detail":"No dedicated upstream differential or campaign."}]},
-    {"id":"signature_optimizer","name":"SignatureOptimizer","authority_family":"family.optimizer_instruction_search","surface_tokens":["SignatureOptimizer"],"public_surfaces":["Imp.Optimizer.SignatureOptimizer"],"implementation_paths":["lib/imp/optimizer/signature_optimizer.ex"],"classification":"native_extension","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"upstream_equivalent","status":"open","detail":"No stable matched upstream campaign."}]},
-    {"id":"optimizer_miprov2","name":"MIPROv2","authority_family":"family.optimizer_miprov2","surface_tokens":["MIPROv2"],"public_surfaces":["Imp.Optimizer.MIPROv2"],"implementation_paths":["lib/imp/optimizer/mipro_v2.ex"],"classification":"replication","protocol_ids":["instruction_contract","instruction_live"],"evidence":{"tier":"t2","artifact":"benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json","artifact_sha256":"e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76","protocol_id":"instruction_live","claim_state":"yellow"},"constraints":[{"kind":"sampled_effectiveness","status":"open","detail":"One-seed 6/3/3 AIME preflight found equal 2/3 frozen-test scores for baseline and both optimizers in each runtime; it does not establish lift."},{"kind":"t3_effectiveness","status":"open","detail":"No clean seven-program multi-seed effectiveness campaign."},{"kind":"rng_sequences","status":"open","detail":"Exact cross-runtime sampler sequences remain unmatched."}]},
-    {"id":"optimizer_simba","name":"SIMBA","authority_family":"family.optimizer_simba","surface_tokens":["SIMBA"],"public_surfaces":["Imp.Optimizer.SIMBA"],"implementation_paths":["lib/imp/optimizer/simba.ex"],"classification":"replication","protocol_ids":["instruction_contract","instruction_live"],"evidence":{"tier":"t2","artifact":"benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json","artifact_sha256":"e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76","protocol_id":"instruction_live","claim_state":"yellow"},"constraints":[{"kind":"sampled_effectiveness","status":"open","detail":"One-seed 6/3/3 AIME preflight found equal 2/3 frozen-test scores for baseline and both optimizers in each runtime; it does not establish lift."},{"kind":"primary_paper","status":"open","detail":"No primary SIMBA paper is claimed."},{"kind":"t3_effectiveness","status":"open","detail":"No clean multi-seed effectiveness campaign."}]},
-    {"id":"optimizer_gepa","name":"GEPA","authority_family":"family.optimizer_gepa","surface_tokens":["GEPA"],"public_surfaces":["Imp.Optimizer.GEPA"],"implementation_paths":["lib/imp/optimizer/gepa.ex","lib/imp/benchmark_truth/gepa_campaign_manifest.ex"],"classification":"replication","protocol_ids":["gepa_contract","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"campaign_completion","status":"open","detail":"Full multi-seed paper-family run is incomplete."}]},
-    {"id":"avatar","name":"Avatar actor","authority_family":"family.optimizer_weights","surface_tokens":["Avatar"],"public_surfaces":["Imp.Optimizer.Avatar","Imp.Predict.Avatar"],"implementation_paths":["lib/imp/optimizer/avatar.ex","lib/imp/predict/avatar.ex"],"classification":"adaptation","protocol_ids":["provider_training"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"effectiveness_campaign","status":"open","detail":"No matched effectiveness campaign."}]},
-    {"id":"avatar_optimizer","name":"AvatarOptimizer","authority_family":"family.optimizer_weights","surface_tokens":["AvatarOptimizer"],"public_surfaces":["Imp.Optimizer.AvatarOptimizer"],"implementation_paths":["lib/imp/optimizer/avatar.ex"],"classification":"replication","protocol_ids":["provider_training"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"upstream_tests","status":"open","detail":"No dedicated upstream tests or campaign."}]},
-    {"id":"bootstrap_finetune","name":"BootstrapFinetune and training protocol","authority_family":"family.optimizer_weights","surface_tokens":["BootstrapFinetune","training_protocol","local_weight_training"],"public_surfaces":["Imp.Optimizer.BootstrapFinetune","Imp.Clients.Training"],"implementation_paths":["lib/imp/optimizer/bootstrap_finetune.ex","lib/imp/clients/training.ex"],"classification":"adaptation","protocol_ids":["local_mlx","provider_training"],"evidence":{"tier":"t2","artifact":"benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json","artifact_sha256":"c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16","protocol_id":"local_mlx","claim_state":"yellow"},"constraints":[{"kind":"paid_provider","status":"open","detail":"Official provider fine-tune endpoint returned HTTP 500 and created no job."},{"kind":"matched_dspy","status":"open","detail":"Local MLX evidence does not establish DSPy-matched training parity."}]},
-    {"id":"grpo","name":"GRPO","authority_family":"family.optimizer_weights","surface_tokens":["GRPO"],"public_surfaces":["Imp.Optimizer.GRPO"],"implementation_paths":["lib/imp/optimizer/grpo.ex"],"classification":"adaptation","protocol_ids":["provider_training"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"reinforcement_campaign","status":"open","detail":"No real reinforcement-learning campaign artifact."}]},
-    {"id":"better_together","name":"BetterTogether","authority_family":"family.optimizer_weights","surface_tokens":["BetterTogether"],"public_surfaces":["Imp.Optimizer.BetterTogether"],"implementation_paths":["lib/imp/optimizer/better_together.ex"],"classification":"adaptation","protocol_ids":["provider_training"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"weight_lifecycle","status":"open","detail":"No completed matched weight lifecycle or effectiveness campaign."}]},
-    {"id":"ensemble","name":"Ensemble","authority_family":"family.optimizer_weights","surface_tokens":["Ensemble"],"public_surfaces":["Imp.Optimizer.Ensemble"],"implementation_paths":["lib/imp/optimizer/ensemble.ex"],"classification":"replication","protocol_ids":["optimizer_lift"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"manifest","status":"open","detail":"No dedicated reproduction manifest."}]},
-    {"id":"fast_slow","name":"Fast-Slow training and CISPO","authority_family":"family.optimizer_fast_slow","surface_tokens":["FastSlow","FastSlowTraining","CISPO"],"public_surfaces":["Imp.Training.FastSlow"],"implementation_paths":["lib/imp/training/fast_slow/runner.ex"],"classification":"adaptation","protocol_ids":["fast_slow"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"first_party_source","status":"open","detail":"First-party implementation source is unpublished; source parity is unavailable."},{"kind":"provider_effectiveness","status":"open","detail":"Deterministic protocol wiring is not provider effectiveness."}]},
-    {"id":"optimize_anything","name":"Optimize Anything","authority_family":"family.optimizer_anything","surface_tokens":["OptimizeAnything","code_artifact","agent_config","scheduling_heuristic"],"public_surfaces":["Imp.Optimize.Anything"],"implementation_paths":["lib/imp/optimize/anything.ex","lib/imp/optimize/anything/runner.ex"],"classification":"adaptation","protocol_ids":["optimize_anything"],"evidence":{"tier":"t2","artifact":"benchmarks/results/optimize-anything-replication-20260713T092840Z.json","artifact_sha256":"080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653","protocol_id":"optimize_anything","claim_state":"yellow"},"constraints":[{"kind":"paper_scale","status":"open","detail":"Scoped three-class Imp-native effectiveness is not a paper-scale upstream comparison."}]},
-    {"id":"retrieval_rag","name":"Retrieval, RAG, embeddings, and datasets","authority_family":"family.retrieval_rag_data","surface_tokens":["rag","retriever_protocol"],"public_surfaces":["Imp.Retrieve","Imp.Predict.RAG","Imp.Embeddings","Imp.Datasets"],"implementation_paths":["lib/imp/retrieve.ex","lib/imp/predict/rag.ex","lib/imp/embeddings.ex","lib/imp/datasets.ex"],"classification":"adaptation","protocol_ids":["rag_agent"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"external_engine","status":"open","detail":"External retrieval engines are protocol dependencies; embedded ColBERT is intentionally omitted."}]},
-    {"id":"runtime_performance","name":"Async, streaming, cache, telemetry, and overhead","authority_family":"family.runtime_performance","surface_tokens":["streaming","async","cache","concurrency","signature_parse","optimizer_scheduling","redaction"],"public_surfaces":["Imp.Streaming","Imp.Cache","Imp.Telemetry","Imp.Redaction"],"implementation_paths":["lib/imp/streaming.ex","lib/imp/cache.ex","lib/imp/telemetry.ex","lib/imp/redaction.ex"],"classification":"native_extension","protocol_ids":["operations"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"claim_scope","status":"open","detail":"Only named provider-free paths may support performance claims."}]},
-    {"id":"state_operations","name":"Persistence and protocol boundaries","authority_family":"family.state_operations","surface_tokens":["save_load"],"public_surfaces":["Imp.Saving"],"implementation_paths":["lib/imp/saving.ex"],"classification":"native_extension","protocol_ids":["operations"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"service_equivalence","status":"open","detail":"Imp protocol gates do not establish upstream service equivalence."}]},
-    {"id":"benchmark_gsm8k","name":"GSM8K","authority_family":"family.benchmark_gsm8k","surface_tokens":["gsm8k"],"public_surfaces":["Imp.Benchmarks.GSM8K"],"implementation_paths":["lib/imp/benchmarks.ex"],"classification":"replication","protocol_ids":["parity"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"admitted_campaign","status":"open","detail":"Pinned dataset exists but no current full matched campaign is admitted."}]},
-    {"id":"benchmark_hotpotqa","name":"HotPotQA and HotpotQABench","authority_family":"family.benchmark_hotpotqa","surface_tokens":["hotpotqa","HotpotQABench"],"public_surfaces":["Imp.Benchmarks.HotPotQA"],"implementation_paths":["lib/imp/benchmarks.ex","lib/imp/benchmark_truth/hotpot_multi_hop.ex"],"classification":"replication","protocol_ids":["parity","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"campaign_completion","status":"open","detail":"General parity and GEPA replication remain distinct incomplete protocols."}]},
-    {"id":"benchmark_color_classification","name":"Color and structured classification fixtures","authority_family":"family.benchmark_color_classification","surface_tokens":[],"public_surfaces":["Imp.Benchmarks.ColorClassification"],"implementation_paths":["lib/imp/benchmarks.ex"],"classification":"native_extension","protocol_ids":["benchmark_run"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"scientific_authority","status":"open","detail":"Imp-owned smoke fixture is not an upstream scientific benchmark."}]},
-    {"id":"benchmark_aime","name":"AIMEBench","authority_family":"family.benchmark_aime","surface_tokens":["AIMEBench"],"public_surfaces":["Imp.BenchmarkTruth.GepaMetrics.AIME"],"implementation_paths":["lib/imp/benchmark_truth/gepa_metrics.ex"],"classification":"replication","protocol_ids":["gepa_dataset","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"live_optimization","status":"open","detail":"Pinned split exists; live optimization evidence is incomplete."}]},
-    {"id":"benchmark_hover","name":"HoVer and hoverBench","authority_family":"family.benchmark_hover","surface_tokens":["hoverBench"],"public_surfaces":["Imp.BenchmarkTruth.HoverBM25","Imp.BenchmarkTruth.HoverMultiHop"],"implementation_paths":["lib/imp/benchmark_truth/hover_bm25.ex","lib/imp/benchmark_truth/hover_multi_hop.ex"],"classification":"adaptation","protocol_ids":["gepa_dataset","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"full_campaign","status":"open","detail":"Source-exact retrieval differential exists; full optimization campaign remains incomplete."}]},
-    {"id":"benchmark_ifbench","name":"IFBench","authority_family":"family.benchmark_ifbench","surface_tokens":["IFBench"],"public_surfaces":["Imp.BenchmarkTruth.IFBenchFeedback"],"implementation_paths":["lib/imp/benchmark_truth/ifbench_feedback.ex"],"classification":"replication","protocol_ids":["gepa_dataset","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"full_campaign","status":"open","detail":"Verifier differential exists; paper-family campaign remains incomplete."}]},
-    {"id":"benchmark_livebench_math","name":"LiveBenchMathBench","authority_family":"family.benchmark_livebench_math","surface_tokens":["LiveBenchMathBench"],"public_surfaces":["Imp.BenchmarkTruth.GepaMetrics.LiveBenchMath"],"implementation_paths":["lib/imp/benchmark_truth/gepa_metrics.ex"],"classification":"replication","protocol_ids":["gepa_dataset","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"research_environment","status":"open","detail":"AMPS_Hard requires validation in the pinned research Python environment."}]},
-    {"id":"benchmark_papillon","name":"Papillon privacy delegation","authority_family":"family.benchmark_papillon","surface_tokens":["Papillon"],"public_surfaces":["Imp.BenchmarkTruth.Papillon"],"implementation_paths":["lib/imp/benchmark_truth/papillon.ex"],"classification":"adaptation","protocol_ids":["gepa_dataset","gepa_live"],"evidence":{"tier":"none","artifact":null,"protocol_id":null,"claim_state":"red"},"constraints":[{"kind":"judge_provenance","status":"open","detail":"Full-scope campaign and judge-model provenance are incomplete."}]}
+    {
+      "id": "product_release",
+      "name": "Package, public API, docs, and livebooks",
+      "authority_family": "family.product_release_docs",
+      "surface_tokens": [
+        "package",
+        "public_api",
+        "docs",
+        "README",
+        "livebooks"
+      ],
+      "public_surfaces": [
+        "mix.exs:package",
+        "README.md",
+        "docs",
+        "livebooks"
+      ],
+      "implementation_paths": [
+        "mix.exs",
+        "README.md"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "package_gate"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "dspy_programming_model",
+      "name": "Signature, Predict, and ChainOfThought",
+      "authority_family": "family.dspy_core_programming",
+      "surface_tokens": [
+        "signature",
+        "predict",
+        "chain_of_thought"
+      ],
+      "public_surfaces": [
+        "Imp.Signature",
+        "Imp.Predict",
+        "Imp.ChainOfThought"
+      ],
+      "implementation_paths": [
+        "lib/imp/signature.ex",
+        "lib/imp/predict/predict.ex",
+        "lib/imp/predict/chain_of_thought.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "core_trace"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "model_provider_runtime",
+      "name": "Model/provider normalized runtime",
+      "authority_family": "family.model_provider_runtime",
+      "surface_tokens": [
+        "ReqLLM"
+      ],
+      "public_surfaces": [
+        "Imp.LM",
+        "Imp.Clients.ReqLLM"
+      ],
+      "implementation_paths": [
+        "lib/imp/lm.ex",
+        "lib/imp/clients/req_llm.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "live_matrix"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "structured_multimodal_adapters",
+      "name": "Structured adapters and multimodal values",
+      "authority_family": "family.adapters_multimodal",
+      "surface_tokens": [
+        "adapters",
+        "adapter_format_parse",
+        "schema_validation"
+      ],
+      "public_surfaces": [
+        "Imp.Adapter",
+        "Imp.Adapters.Types",
+        "Imp.Schema"
+      ],
+      "implementation_paths": [
+        "lib/imp/adapter.ex",
+        "lib/imp/adapters/types.ex",
+        "lib/imp/schema.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "multimodal_live"
+      ],
+      "admitted_evidence": {
+        "tier": "t2",
+        "artifact": "benchmarks/results/multimodal-quality-live-20260713T224355Z.json",
+        "artifact_sha256": "02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e",
+        "protocol_id": "multimodal_live"
+      }
+    },
+    {
+      "id": "react",
+      "name": "ReAct",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [
+        "react",
+        "tools",
+        "agents"
+      ],
+      "public_surfaces": [
+        "Imp.Predict.ReAct"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/react.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "react_v2",
+      "name": "ReActV2",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [],
+      "public_surfaces": [
+        "Imp.Predict.ReActV2"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/react_v2.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "mcp",
+      "name": "MCP protocol boundary",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [
+        "mcp",
+        "mcp_protocol"
+      ],
+      "public_surfaces": [
+        "Imp.MCP"
+      ],
+      "implementation_paths": [
+        "lib/imp/mcp.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "code_act",
+      "name": "CodeAct",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [
+        "code_act"
+      ],
+      "public_surfaces": [
+        "Imp.Predict.CodeAct"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/code_act.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "program_of_thought",
+      "name": "ProgramOfThought",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [
+        "program_of_thought"
+      ],
+      "public_surfaces": [
+        "Imp.Predict.ProgramOfThought"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/program_of_thought.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "rlm",
+      "name": "Recursive Language Models",
+      "authority_family": "family.rlm",
+      "surface_tokens": [
+        "rlm",
+        "long_context",
+        "recursive_control",
+        "dspy_rlm"
+      ],
+      "public_surfaces": [
+        "Imp.Predict.RLM"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/rlm.ex",
+        "lib/imp/predict/rlm/runtime.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rlm_contract",
+        "rlm_paper"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "assertions_evaluation",
+      "name": "Assertions and evaluation",
+      "authority_family": "family.composition_evaluation",
+      "surface_tokens": [
+        "evaluation",
+        "metrics"
+      ],
+      "public_surfaces": [
+        "Imp.Assertion",
+        "Imp.Evaluate",
+        "Imp.Metrics"
+      ],
+      "implementation_paths": [
+        "lib/imp/assertion.ex",
+        "lib/imp/evaluate.ex",
+        "lib/imp/metrics.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "confidence_calibration"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "semantic_f1",
+      "name": "SemanticF1 auto-evaluation",
+      "authority_family": "family.composition_evaluation",
+      "surface_tokens": [],
+      "public_surfaces": [
+        "Imp.Evaluate.SemanticF1"
+      ],
+      "implementation_paths": [
+        "lib/imp/evaluate/auto_evaluation.ex",
+        "lib/imp/benchmark_truth/auto_evaluation_contract.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "auto_evaluation_contract"
+      ],
+      "admitted_evidence": {
+        "tier": "t1",
+        "artifact": "benchmarks/results/auto-evaluation-differential-v1.json",
+        "artifact_sha256": "9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0",
+        "protocol_id": "auto_evaluation_contract"
+      }
+    },
+    {
+      "id": "complete_and_grounded",
+      "name": "CompleteAndGrounded auto-evaluation",
+      "authority_family": "family.composition_evaluation",
+      "surface_tokens": [],
+      "public_surfaces": [
+        "Imp.Evaluate.CompleteAndGrounded"
+      ],
+      "implementation_paths": [
+        "lib/imp/evaluate/auto_evaluation.ex",
+        "lib/imp/benchmark_truth/auto_evaluation_contract.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "auto_evaluation_contract"
+      ],
+      "admitted_evidence": {
+        "tier": "t1",
+        "artifact": "benchmarks/results/auto-evaluation-differential-v1.json",
+        "artifact_sha256": "9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0",
+        "protocol_id": "auto_evaluation_contract"
+      }
+    },
+    {
+      "id": "refinement",
+      "name": "Best-of-N and refinement",
+      "authority_family": "family.composition_evaluation",
+      "surface_tokens": [],
+      "public_surfaces": [
+        "Imp.Predict.BestOfN",
+        "Imp.Predict.Refine"
+      ],
+      "implementation_paths": [
+        "lib/imp/predict/best_of_n.ex",
+        "lib/imp/predict/refine.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "confidence_calibration"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "labeled_few_shot",
+      "name": "LabeledFewShot",
+      "authority_family": "family.optimizer_few_shot_search",
+      "surface_tokens": [
+        "LabeledFewShot"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.LabeledFewShot"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/labeled_few_shot.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "bootstrap_few_shot",
+      "name": "BootstrapFewShot",
+      "authority_family": "family.optimizer_few_shot_search",
+      "surface_tokens": [
+        "BootstrapFewShot"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.BootstrapFewShot"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/bootstrap_few_shot.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift",
+        "instruction_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "bootstrap_random_search",
+      "name": "BootstrapRS and RandomSearch",
+      "authority_family": "family.optimizer_few_shot_search",
+      "surface_tokens": [
+        "BootstrapRS",
+        "RandomSearch"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.BootstrapRS",
+        "Imp.Optimizer.RandomSearch"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/bootstrap_rs.ex",
+        "lib/imp/optimizer/random_search.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "knn_few_shot",
+      "name": "KNNFewShot",
+      "authority_family": "family.optimizer_few_shot_search",
+      "surface_tokens": [
+        "KNNFewShot"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.KNNFewShot"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/knn_few_shot.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "copro",
+      "name": "COPRO",
+      "authority_family": "family.optimizer_instruction_search",
+      "surface_tokens": [
+        "COPRO"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.COPRO"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/copro.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift",
+        "instruction_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "instruction_search",
+      "name": "InstructionSearch",
+      "authority_family": "family.optimizer_instruction_search",
+      "surface_tokens": [
+        "InstructionSearch"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.InstructionSearch"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/instruction_search.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "infer_rules",
+      "name": "InferRules",
+      "authority_family": "family.optimizer_instruction_search",
+      "surface_tokens": [
+        "InferRules"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.InferRules"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/infer_rules.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "signature_optimizer",
+      "name": "SignatureOptimizer",
+      "authority_family": "family.optimizer_instruction_search",
+      "surface_tokens": [
+        "SignatureOptimizer"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.SignatureOptimizer"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/signature_optimizer.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "optimizer_miprov2",
+      "name": "MIPROv2",
+      "authority_family": "family.optimizer_miprov2",
+      "surface_tokens": [
+        "MIPROv2"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.MIPROv2"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/mipro_v2.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "instruction_contract",
+        "instruction_live"
+      ],
+      "admitted_evidence": {
+        "tier": "t2",
+        "artifact": "benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json",
+        "artifact_sha256": "e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76",
+        "protocol_id": "instruction_live"
+      }
+    },
+    {
+      "id": "optimizer_simba",
+      "name": "SIMBA",
+      "authority_family": "family.optimizer_simba",
+      "surface_tokens": [
+        "SIMBA"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.SIMBA"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/simba.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "instruction_contract",
+        "instruction_live"
+      ],
+      "admitted_evidence": {
+        "tier": "t2",
+        "artifact": "benchmarks/results/instruction-optimizer-live/instruction-optimizer-preflight-haiku45-bb65994-20260715.json",
+        "artifact_sha256": "e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76",
+        "protocol_id": "instruction_live"
+      }
+    },
+    {
+      "id": "optimizer_gepa",
+      "name": "GEPA",
+      "authority_family": "family.optimizer_gepa",
+      "surface_tokens": [
+        "GEPA"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.GEPA"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/gepa.ex",
+        "lib/imp/benchmark_truth/gepa_campaign_manifest.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "gepa_contract",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "avatar",
+      "name": "Avatar actor",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "Avatar"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.Avatar",
+        "Imp.Predict.Avatar"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/avatar.ex",
+        "lib/imp/predict/avatar.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "provider_training"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "avatar_optimizer",
+      "name": "AvatarOptimizer",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "AvatarOptimizer"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.AvatarOptimizer"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/avatar.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "provider_training"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "bootstrap_finetune",
+      "name": "BootstrapFinetune and training protocol",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "BootstrapFinetune",
+        "training_protocol",
+        "local_weight_training"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.BootstrapFinetune",
+        "Imp.Clients.Training"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/bootstrap_finetune.ex",
+        "lib/imp/clients/training.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "local_mlx",
+        "provider_training"
+      ],
+      "admitted_evidence": {
+        "tier": "t2",
+        "artifact": "benchmarks/results/local-mlx/local-mlx-922a85e-20260714.json",
+        "artifact_sha256": "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16",
+        "protocol_id": "local_mlx"
+      }
+    },
+    {
+      "id": "grpo",
+      "name": "GRPO",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "GRPO"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.GRPO"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/grpo.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "provider_training"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "better_together",
+      "name": "BetterTogether",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "BetterTogether"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.BetterTogether"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/better_together.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "provider_training"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "ensemble",
+      "name": "Ensemble",
+      "authority_family": "family.optimizer_weights",
+      "surface_tokens": [
+        "Ensemble"
+      ],
+      "public_surfaces": [
+        "Imp.Optimizer.Ensemble"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimizer/ensemble.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "fast_slow",
+      "name": "Fast-Slow training and CISPO",
+      "authority_family": "family.optimizer_fast_slow",
+      "surface_tokens": [
+        "FastSlow",
+        "FastSlowTraining",
+        "CISPO"
+      ],
+      "public_surfaces": [
+        "Imp.Training.FastSlow"
+      ],
+      "implementation_paths": [
+        "lib/imp/training/fast_slow/runner.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "fast_slow"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "optimize_anything",
+      "name": "Optimize Anything",
+      "authority_family": "family.optimizer_anything",
+      "surface_tokens": [
+        "OptimizeAnything",
+        "code_artifact",
+        "agent_config",
+        "scheduling_heuristic"
+      ],
+      "public_surfaces": [
+        "Imp.Optimize.Anything"
+      ],
+      "implementation_paths": [
+        "lib/imp/optimize/anything.ex",
+        "lib/imp/optimize/anything/runner.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "optimize_anything"
+      ],
+      "admitted_evidence": {
+        "tier": "t2",
+        "artifact": "benchmarks/results/optimize-anything-replication-20260713T092840Z.json",
+        "artifact_sha256": "080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653",
+        "protocol_id": "optimize_anything"
+      }
+    },
+    {
+      "id": "retrieval_rag",
+      "name": "Retrieval, RAG, embeddings, and datasets",
+      "authority_family": "family.retrieval_rag_data",
+      "surface_tokens": [
+        "rag",
+        "retriever_protocol"
+      ],
+      "public_surfaces": [
+        "Imp.Retrieve",
+        "Imp.Predict.RAG",
+        "Imp.Embeddings",
+        "Imp.Datasets"
+      ],
+      "implementation_paths": [
+        "lib/imp/retrieve.ex",
+        "lib/imp/predict/rag.ex",
+        "lib/imp/embeddings.ex",
+        "lib/imp/datasets.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "rag_agent"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "runtime_performance",
+      "name": "Async, streaming, cache, telemetry, and overhead",
+      "authority_family": "family.runtime_performance",
+      "surface_tokens": [
+        "streaming",
+        "async",
+        "cache",
+        "concurrency",
+        "signature_parse",
+        "optimizer_scheduling",
+        "redaction"
+      ],
+      "public_surfaces": [
+        "Imp.Streaming",
+        "Imp.Cache",
+        "Imp.Telemetry",
+        "Imp.Redaction"
+      ],
+      "implementation_paths": [
+        "lib/imp/streaming.ex",
+        "lib/imp/cache.ex",
+        "lib/imp/telemetry.ex",
+        "lib/imp/redaction.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "operations"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "state_operations",
+      "name": "Persistence and protocol boundaries",
+      "authority_family": "family.state_operations",
+      "surface_tokens": [
+        "save_load"
+      ],
+      "public_surfaces": [
+        "Imp.Saving"
+      ],
+      "implementation_paths": [
+        "lib/imp/saving.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "operations"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_gsm8k",
+      "name": "GSM8K",
+      "authority_family": "family.benchmark_gsm8k",
+      "surface_tokens": [
+        "gsm8k"
+      ],
+      "public_surfaces": [
+        "Imp.Benchmarks.GSM8K"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmarks.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "parity"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_hotpotqa",
+      "name": "HotPotQA and HotpotQABench",
+      "authority_family": "family.benchmark_hotpotqa",
+      "surface_tokens": [
+        "hotpotqa",
+        "HotpotQABench"
+      ],
+      "public_surfaces": [
+        "Imp.Benchmarks.HotPotQA"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmarks.ex",
+        "lib/imp/benchmark_truth/hotpot_multi_hop.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "parity",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_color_classification",
+      "name": "Color and structured classification fixtures",
+      "authority_family": "family.benchmark_color_classification",
+      "surface_tokens": [],
+      "public_surfaces": [
+        "Imp.Benchmarks.ColorClassification"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmarks.ex"
+      ],
+      "classification": "native_extension",
+      "protocol_ids": [
+        "benchmark_run"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_aime",
+      "name": "AIMEBench",
+      "authority_family": "family.benchmark_aime",
+      "surface_tokens": [
+        "AIMEBench"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.GepaMetrics.AIME"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmark_truth/gepa_metrics.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "gepa_dataset",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_hover",
+      "name": "HoVer and hoverBench",
+      "authority_family": "family.benchmark_hover",
+      "surface_tokens": [
+        "hoverBench"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.HoverBM25",
+        "Imp.BenchmarkTruth.HoverMultiHop"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmark_truth/hover_bm25.ex",
+        "lib/imp/benchmark_truth/hover_multi_hop.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "gepa_dataset",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_ifbench",
+      "name": "IFBench",
+      "authority_family": "family.benchmark_ifbench",
+      "surface_tokens": [
+        "IFBench"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.IFBenchFeedback"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmark_truth/ifbench_feedback.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "gepa_dataset",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_livebench_math",
+      "name": "LiveBenchMathBench",
+      "authority_family": "family.benchmark_livebench_math",
+      "surface_tokens": [
+        "LiveBenchMathBench"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.GepaMetrics.LiveBenchMath"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmark_truth/gepa_metrics.ex"
+      ],
+      "classification": "replication",
+      "protocol_ids": [
+        "gepa_dataset",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
+      "id": "benchmark_papillon",
+      "name": "Papillon privacy delegation",
+      "authority_family": "family.benchmark_papillon",
+      "surface_tokens": [
+        "Papillon"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.Papillon"
+      ],
+      "implementation_paths": [
+        "lib/imp/benchmark_truth/papillon.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "gepa_dataset",
+        "gepa_live"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    }
   ]
 }

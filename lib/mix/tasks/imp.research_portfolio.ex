@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Imp.ResearchPortfolio do
 
     portfolio_path = Keyword.get(opts, :portfolio, "benchmarks/research_portfolio.json")
     claims_path = Keyword.get(opts, :claims, "benchmarks/claims.json")
-    doc_path = Keyword.get(opts, :doc, "docs/RESEARCH_PORTFOLIO.md")
+    doc_path = Keyword.get(opts, :doc, "docs/maintainers/RESEARCH_PROTOCOLS.md")
 
     portfolio = Imp.ResearchPortfolio.load!(portfolio_path, claims_path: claims_path)
     current = File.read!(doc_path)

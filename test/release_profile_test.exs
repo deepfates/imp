@@ -21,6 +21,7 @@ defmodule Imp.ReleaseProfileTest do
       %{
         "id" => "v01",
         "release" => "v0.1",
+        "gate_policy" => "blocking",
         "requirements" => [
           %{"id" => "failure.t0", "lane" => "failure_recovery", "evidence" => "passing"}
         ]
@@ -28,6 +29,7 @@ defmodule Imp.ReleaseProfileTest do
       %{
         "id" => "telos",
         "release" => "telos",
+        "gate_policy" => "blocking",
         "requirements" => [
           %{"id" => "failure.live", "lane" => "failure_recovery", "evidence" => "full"}
         ]
@@ -43,5 +45,20 @@ defmodule Imp.ReleaseProfileTest do
     assert requirement["evidence"] == "full"
     assert requirement["claim_ids"] == ["v01", "telos"]
     assert requirement["requirement_ids"] == ["failure.t0", "failure.live"]
+  end
+
+  test "non-blocking claims remain visible but do not create profile requirements" do
+    claims = [
+      %{
+        "id" => "informational",
+        "release" => "v0.1",
+        "gate_policy" => "informational",
+        "requirements" => [
+          %{"id" => "research.sample", "lane" => "research", "evidence" => "passing"}
+        ]
+      }
+    ]
+
+    assert ReleaseProfile.lane_requirements(claims, ReleaseProfile.fetch!("v0.1")) == []
   end
 end

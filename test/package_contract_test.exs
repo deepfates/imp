@@ -43,7 +43,8 @@ defmodule PackageContractTest do
     "docs/BENCHMARK_TRUTH.md",
     "docs/COVERAGE_MATRIX.md",
     "docs/PARITY_VALIDATION_PROGRAM.md",
-    "docs/RELEASE_CRITERIA.md",
+    "docs/maintainers/RELEASE.md",
+    "docs/maintainers/EVIDENCE.md",
     "lib/imp/legacy_identity_audit.ex",
     "lib/imp/benchmarks.ex"
   ]

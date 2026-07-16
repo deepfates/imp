@@ -8,7 +8,7 @@ different question than the release dashboard:
   DSPy literature, docs, and examples.
 
 The machine-readable public claim inventory lives in `benchmarks/claims.json`;
-see `docs/BENCHMARK_CLAIMS.md` for the dashboard claim-gate operating loop.
+see `docs/maintainers/CLAIMS.md` for the dashboard claim-gate operating loop.
 
 The commands in this document are source-checkout evidence commands for Imp
 maintainers. They are not part of the Hex package API or a normal application

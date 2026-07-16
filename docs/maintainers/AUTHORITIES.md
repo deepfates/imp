@@ -1,4 +1,4 @@
-# Evidence Authorities
+# Authority Index
 
 `benchmarks/authorities.json` is the machine-readable upstream authority
 inventory for Imp's claimed algorithm and benchmark families. It is an audit

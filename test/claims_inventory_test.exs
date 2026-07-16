@@ -2,17 +2,40 @@ defmodule ClaimsInventoryTest do
   use ExUnit.Case, async: true
 
   @claims_path "benchmarks/claims.json"
-  @decisions ["proven_target", "active_gap"]
+  @claim_states ["asserted", "target", "retired"]
+  @gate_policies ["blocking", "informational"]
+  @known_lanes ~w(
+    failure_recovery
+    gepa_replication
+    golden_trace
+    live_matched_model
+    live_provider_smoke
+    livebook_execute
+    local_mlx_weight_training
+    optimize_anything
+    optimizer_lift
+    product_package
+    protocol_gates
+    provider_free_overhead
+    rag_tool_agent
+    rlm_benchmark
+  )
 
-  test "claim ids and release decisions are explicit and internally consistent" do
+  test "claim ids, states, and gate policies are explicit and internally consistent" do
     claims = read_claims!()
     ids = Enum.map(claims, &Map.fetch!(&1, "id"))
 
     assert length(ids) == length(Enum.uniq(ids))
 
     Enum.each(claims, fn claim ->
-      assert claim["decision"] in @decisions,
-             "#{claim["id"]} has invalid decision #{inspect(claim["decision"])}"
+      assert claim["claim_state"] in @claim_states,
+             "#{claim["id"]} has invalid claim state #{inspect(claim["claim_state"])}"
+
+      assert claim["gate_policy"] in @gate_policies,
+             "#{claim["id"]} has invalid gate policy #{inspect(claim["gate_policy"])}"
+
+      assert claim["target_rung"] in ~w(C0 C1 C2 C3 C4 C5),
+             "#{claim["id"]} has invalid target rung #{inspect(claim["target_rung"])}"
 
       assert is_binary(claim["release"]) and claim["release"] != "",
              "#{claim["id"]} must name its release scope"
@@ -22,21 +45,35 @@ defmodule ClaimsInventoryTest do
     end)
   end
 
-  test "proven targets and active telos gaps both remain release blocking" do
+  test "product assertions and telos targets have explicit profile policy" do
     Enum.each(read_claims!(), fn claim ->
-      case claim["decision"] do
-        "proven_target" ->
+      case claim["claim_state"] do
+        "asserted" ->
           assert claim["release"] == "v0.1"
-          assert claim["release_blocking"] == true
+          assert claim["gate_policy"] in ~w(blocking informational)
 
-        "active_gap" ->
+        "target" ->
           assert claim["release"] == "telos"
-          assert claim["release_blocking"] == true
+          assert claim["gate_policy"] == "blocking"
 
           assert is_list(claim["limitations"]) and claim["limitations"] != [],
-                 "#{claim["id"]} active gap must state its limitations"
+                 "#{claim["id"]} target must state its limitations"
+
+        "retired" ->
+          :ok
       end
     end)
+  end
+
+  test "the provider-free overhead ceiling is informational, not a performance claim" do
+    claim =
+      Enum.find(read_claims!(), &(&1["id"] == "claim.runtime.provider_free_overhead_guard"))
+
+    assert claim["gate_policy"] == "informational"
+    assert claim["target_rung"] == "C2"
+
+    assert claim["statement"] =~
+             "without presenting the configured ceiling as a performance claim"
   end
 
   test "every claim has an evidence requirement and auditable source" do
@@ -54,13 +91,25 @@ defmodule ClaimsInventoryTest do
     end)
   end
 
+  test "requirement ids are unique and every requirement names a known lane" do
+    requirements = Enum.flat_map(read_claims!(), & &1["requirements"])
+    ids = Enum.map(requirements, & &1["id"])
+
+    assert length(ids) == length(Enum.uniq(ids))
+
+    Enum.each(requirements, fn requirement ->
+      assert requirement["lane"] in @known_lanes,
+             "#{requirement["id"]} names unknown lane #{inspect(requirement["lane"])}"
+    end)
+  end
+
   test "live failure recovery remains an explicit full-evidence telos gap" do
     claim =
       Enum.find(read_claims!(), &(&1["id"] == "claim.failure_recovery.live"))
 
-    assert claim["decision"] == "active_gap"
+    assert claim["claim_state"] == "target"
     assert claim["release"] == "telos"
-    assert claim["release_blocking"]
+    assert claim["gate_policy"] == "blocking"
 
     assert [
              %{
@@ -93,7 +142,7 @@ defmodule ClaimsInventoryTest do
     claim =
       Enum.find(read_claims!(), &(&1["id"] == "claim.local_mlx_weight_training.effectiveness"))
 
-    assert claim["decision"] == "proven_target"
+    assert claim["claim_state"] == "asserted"
     assert claim["comparison"] == "imp_local_baseline"
     assert claim["limitations"] != []
 
@@ -105,9 +154,8 @@ defmodule ClaimsInventoryTest do
   end
 
   defp read_claims! do
-    @claims_path
-    |> File.read!()
-    |> Jason.decode!()
-    |> Map.fetch!("claims")
+    inventory = @claims_path |> File.read!() |> Jason.decode!()
+    assert inventory["schema_version"] == 2
+    Map.fetch!(inventory, "claims")
   end
 end

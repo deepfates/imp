@@ -61,18 +61,18 @@ defmodule DocumentationContractTest do
   end
 
   test "release criteria are expressed as current product evidence, not historical tickets" do
-    body = File.read!("docs/RELEASE_CRITERIA.md")
+    body = File.read!("docs/maintainers/RELEASE.md")
 
     refute_closed_ticket_refs(body)
     refute body =~ "The production release scope is tracked under ticket"
     refute body =~ "tk ready -T imp"
 
-    assert body =~ ~r/Historical planning tickets are not release\s+criteria/
-    assert body =~ "tk ready | rg '^de-'"
+    assert body =~ "All unfinished work and dependencies live in `tk`"
+    assert body =~ ~r/Markdown must not carry a\s+parallel roadmap/
     assert body =~ "mix production.check"
-    assert body =~ "mix benchmark.dashboard.full"
+    assert body =~ "mix benchmark.dashboard.ready"
     assert body =~ "mix livebook.execute.check"
-    assert body =~ "docs/BENCHMARK_CATALOG.md"
+    assert body =~ "benchmarks/claims.json"
   end
 
   test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
@@ -86,8 +86,9 @@ defmodule DocumentationContractTest do
   test "adapter fidelity audit names upstream semantics and Imp evidence" do
     body = File.read!("docs/ADAPTER_FIDELITY.md")
     readme = File.read!("docs/README.md")
+    contributing = File.read!("CONTRIBUTING.md")
 
-    assert readme =~ "release-evidence notes"
+    assert contributing =~ "authority order is deliberately narrow"
     refute readme =~ "ADAPTER_FIDELITY.md"
     assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
     assert body =~ "JSON fallback"

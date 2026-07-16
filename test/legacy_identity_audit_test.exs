@@ -31,4 +31,20 @@ defmodule LegacyIdentityAuditTest do
 
     assert [%{policy: :live_package}] = Enum.reject(findings, &Audit.allowlisted?/1)
   end
+
+  test "audit ignores tracked files deleted from the working tree" do
+    root =
+      Path.join(System.tmp_dir!(), "imp-identity-audit-#{System.unique_integer([:positive])}")
+
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    File.mkdir_p!(root)
+    File.write!(Path.join(root, "kept.txt"), "Imp\n")
+    File.write!(Path.join(root, "removed.txt"), "DS" <> "Ex\n")
+    {_, 0} = System.cmd("git", ["init", "--quiet"], cd: root)
+    {_, 0} = System.cmd("git", ["add", "kept.txt", "removed.txt"], cd: root)
+    File.rm!(Path.join(root, "removed.txt"))
+
+    assert {:ok, %{violations: [], tracked_paths: 1}} = Audit.audit(root)
+  end
 end
