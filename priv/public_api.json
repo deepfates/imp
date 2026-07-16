@@ -3431,7 +3431,10 @@
       "source": "lib/imp/optimizer/bootstrap_finetune.ex",
       "struct_fields": [
         "adapter",
+        "cancellation_timeout",
         "exclude_demos",
+        "launch_timeout",
+        "lifecycle_observer",
         "max_concurrency",
         "max_demos",
         "metric",
