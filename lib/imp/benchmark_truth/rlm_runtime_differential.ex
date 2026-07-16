@@ -72,6 +72,10 @@ defmodule Imp.BenchmarkTruth.RLMRuntimeDifferential do
     compare(manifest, manifest_path, official, imp_rows)
   end
 
+  def validate_artifact!("rlm_runtime_differential", artifact) when is_map(artifact) do
+    validate_artifact!(artifact, %{"manifest" => @default_manifest})
+  end
+
   def validate_artifact!(artifact, protocol) when is_map(artifact) and is_map(protocol) do
     manifest_path = protocol["manifest"] || @default_manifest
     manifest = read_json!(manifest_path)
@@ -105,7 +109,7 @@ defmodule Imp.BenchmarkTruth.RLMRuntimeDifferential do
 
     artifact
   rescue
-    error in [KeyError, ArgumentError, File.Error, Jason.DecodeError] ->
+    error ->
       reraise ArgumentError,
               [
                 message:

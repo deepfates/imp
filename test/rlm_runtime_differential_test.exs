@@ -13,6 +13,12 @@ defmodule Imp.BenchmarkTruth.RLMRuntimeDifferentialReadinessTest do
 
     assert message =~ "manifest is missing"
   end
+
+  test "registry validator entry point uses protocol-id-first calling convention" do
+    assert_raise ArgumentError, ~r/invalid standalone RLM differential artifact/, fn ->
+      RLMRuntimeDifferential.validate_artifact!("rlm_runtime_differential", %{})
+    end
+  end
 end
 
 defmodule Imp.BenchmarkTruth.RLMRuntimeDifferentialTest do
