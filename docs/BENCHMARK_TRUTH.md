@@ -232,14 +232,14 @@ git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c
 IMP_DSPY_VENV=tmp/dspy-parity-venv scripts/setup_dspy_parity_env.sh
 ```
 
-Then run the focused fixture with:
+Then capture the clean, source-bound C1 receipt with:
 
 ```sh
-PYTHONPATH=tmp/dspy-3.2.1 \
-  tmp/dspy-parity-venv/bin/python scripts/dspy_copro_isolation_differential.py
+mix imp.benchmark.copro_isolation --require-clean --out tmp/copro-isolation
 ```
 
-That fixture starts COPRO in a fresh worker process after installing mutable parent
+The canonical validator is receipt-only and provider-free by default; fresh Python
+replay is an explicit additional operation. The fixture starts COPRO in a fresh worker process after installing mutable parent
 LM state. It verifies the canonical authority ledger, clean release commit/tag,
 all 296 source-manifest files, distribution version, COPRO source, and upstream
 test before binding fixture/script hashes. Proposal fan-out and order come from
@@ -307,8 +307,14 @@ mix imp.benchmark.optimize_anything \
   --live \
   --provider openai \
   --model gpt-5.4-2026-03-05 \
+  --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
   --seeds 17,23,31 \
   --max-proposals 5 \
+  --max-cost-usd 0.50 \
+  --max-requests 20 \
+  --max-input-tokens 100000 \
+  --max-output-tokens 20000 \
+  --max-output-tokens-per-request 1000 \
   --out benchmarks/runs/optimize-anything
 ```
 
@@ -321,11 +327,57 @@ Optimize Anything parity result.
 
 Full evidence requires at least three distinct seeds, positive mean held-out
 lift, a strict majority of improving seeds for every family, positive live
-provider token and cost accounting, and durable per-run checkpoints. All seed
+provider token and cost accounting, and per-run checkpoints. All seed
 outcomes remain in the artifact, including ties and regressions. `--smoke`
 proves campaign wiring and artifact validation only and never authorizes the
 effectiveness claim. The dashboard consumes full artifacts through its
 `optimize_anything` lane.
+
+Live execution has no implicit spend allowance. It requires positive finite
+ceilings for requests, input tokens, output tokens, per-request output tokens,
+and dollars. Before each request, the campaign atomically reserves a
+conservative input estimate plus the full per-request output allowance at the
+declared prices; a reservation that could cross any ceiling rejects the call
+before provider code runs. The evidence lane disables ReqLLM response caching
+and transport retries, so one reservation owns one provider attempt. Provider
+telemetry settles observed usage exactly once in the campaign ledger. Missing,
+zero, non-finite, or non-one-to-one cost telemetry fails closed. If unexpected
+provider accounting nevertheless reports usage above a declared bound on the
+final call, that completed call remains in the checkpoint but the campaign
+emits no full evidence.
+
+Each ledger transition sync-writes a temporary file and renames it over the
+latest checkpoint. The final checksummed envelope is embedded in the run
+artifact; admission recomputes its digest and exact equality with the seed-row
+aggregate without reading the local path. The path is informational and may be
+nonportable. This is neither an append-only transition log nor a restart,
+power-loss, or directory-fsync guarantee. Existing run ids are refused, and a
+terminated run must be reviewed before starting a new run id with a newly
+declared ceiling. The telemetry handlers accept only events emitted by the
+campaign owner process, preventing unrelated concurrent ReqLLM calls from
+contaminating cost evidence.
+
+The pinned standard profile uses the official OpenAI API prices of $2.50 per
+million input tokens and $15.00 per million output tokens from
+<https://developers.openai.com/api/docs/pricing>. The documented $0.50 ceiling
+is deliberately above the roughly $0.217 observed by the prior nine-run
+campaign while remaining the configured pre-dispatch bound under the declared
+prices, not a spending target. An unexpected provider accounting overrun is
+retained in the checkpoint and invalidates evidence as described above. The
+separately tracked $15 maximum belongs to the broader matched-upstream research
+portfolio; it is not a spend allowance for this narrow three-class rerun and
+does not add an asserted product claim. The
+optional `openai-gpt-5.4-mini-standard-2026-03-17` profile uses $0.75/$4.50;
+it is a cost-appropriate engineering option but has no retained effectiveness
+claim until the unchanged three-class, three-seed policy passes. Other models
+must supply explicit positive `--input-price-per-million`,
+`--output-price-per-million`, and `--pricing-source-url` values instead of a
+profile. Pricing-source URLs must be ordinary credential-free HTTP(S)
+documentation URLs. Userinfo, credential or secret markers in recursively
+decoded hosts, paths, queries, or fragments, excessive encoding, and
+secret-shaped values are rejected rather than redacted because the URL is part
+of source identity. Known profiles bind the exact provider, model, rates, and
+authority URL at the CLI, campaign, and pure admission layers.
 
 This campaign establishes Imp-native non-prompt optimization effectiveness at
 the declared scale. It does not establish full paper reproduction or equality
@@ -587,10 +639,11 @@ mix imp.benchmark.rag_tool_agent \
   --out benchmarks/runs/rag-tool-agent
 ```
 
-The operational artifact does not measure HotPotQA answer/supporting-fact quality, BFCL
-tool name or argument accuracy, or an identical Imp/DSPy failure schedule.
-Those remain a separate open comparative-effectiveness portfolio and neither
-the provider-free operational pass nor selected live rows can close it.
+The operational artifact does not measure HotPotQA answer/supporting-fact
+quality or BFCL tool name/argument accuracy. The separate matched failure
+differential below closes the missing provider-free schedule contract, but it
+does not close comparative effectiveness because its actions are queued rather
+than model-selected.
 
 The separate provider-free HotPotQA retrieval differential uses the pinned
 first ten `fullwiki` validation rows and materializes one shared corpus of 100
@@ -610,8 +663,75 @@ The bounded current result matches 10/10 rows and both aggregate summaries:
 0.35 supporting-fact recall and 0.30 answer-availability EM/F1. The answer
 scorer emits the gold answer only when it is present in retrieved context, so
 this is retrieval/answer-availability evidence rather than language-model
-generation quality. It does not close the broader HotPotQA effectiveness,
-BFCL, or matched-failure portfolio.
+generation quality. It does not close the broader HotPotQA effectiveness or
+BFCL portfolio; the separate failure differential below is operational rather
+than effectiveness evidence.
+
+The BFCL-shaped provider-free lane is intentionally C1/T1 fixture-scorer
+conformance, not an official BFCL sample, DSPy differential, or operational
+benchmark. Its twelve positive rows and nine adversarial mutations are
+original CC0 Imp-authored cases. The mutation corpus covers wrong, missing,
+extra, and reordered calls; scalar types; array order; malformed JSON; invalid
+terminals; and wrong valid terminals. The provenance block explicitly records
+that no upstream BFCL prompts, answers, schemas, or dataset rows were copied.
+Elixir and an independent Python stdlib implementation normalize JSON
+string/map arguments, recursively canonicalize object keys while preserving
+arrays and scalar types, and score exact tool names, call order, arguments,
+terminal states, and fail-closed invalid input:
+
+```sh
+mix imp.benchmark.bfcl_adapted \
+  --require-clean \
+  --out benchmarks/runs/bfcl-adapted
+```
+
+The artifact must match 12/12 positives and 9/9 preregistered mutations with
+1.0 scorer and mutation-detection agreement. It binds BFCL repository revision
+`6ea57973c7a6097fd7c5915698c54c17c5b1b6c8` as protocol provenance only and
+enumerates every adaptation from the official scorer. Neither official BFCL
+nor DSPy scorer code executes. This establishes scorer-fixture agreement only;
+it does not measure a model choosing calls and must not be reported as
+operational evidence, DSPy parity, official BFCL accuracy, or tool-use
+effectiveness.
+
+Canonical admission is pure: it verifies the run envelope and pinned source
+bindings, reconstructs the expected fixture scores, and requires both stored
+implementations to equal those scores without executing Python. Maintainers may
+request an explicit Python replay during a local audit, but replay is never part
+of registry admission.
+
+The provider-free RAG/tool failure differential preregisters six scenarios and
+executes the identical queued action sequence through actual
+`Imp.Predict.ReAct` in DSPy-3.2.1 mode and actual pinned DSPy 3.2.1 `ReAct`:
+
+```sh
+mix imp.benchmark.rag_tool_failure_differential \
+  --require-clean \
+  --python tmp/dspy-parity-venv/bin/python \
+  --out benchmarks/runs/rag-tool-failure-differential
+```
+
+It compares every normalized action observation and terminal state exactly.
+The schedule covers a transient failure followed by retry, a retriever-tool
+timeout exception, duplicate idempotency-key replay, a tool removed from the
+runtime registry, a permanent tool failure, `finish`/`submit` normalization,
+and iteration-budget exhaustion. Before importing DSPy, the Python sidecar
+requires a clean git checkout at tag `3.2.1` and commit `29448ae…`, verifies all
+296 canonical manifest files, then confirms that ReAct and Tool resolve from
+that checkout. It binds the installed distribution version separately from
+DSPy's historical `3.2.0` module version, so a fake package or matching version
+string cannot pass. The Elixir launcher removes credential-bearing environment
+variables before process start; Python scrubs again before import, disables
+dotenv, and checks a dummy canary is absent during every queued LM call.
+
+This is C2 operational evidence. The deterministic LM supplies every action,
+the retry and idempotency state machines belong to fixture tools, and the
+timeout is an injected exception rather than a wall-clock cancellation test.
+Therefore the artifact is not evidence for model recovery quality, retrieval
+quality, native retry/idempotency features, latency, transport timeouts, or
+research effectiveness parity. Its validator recomputes rows, summaries,
+limitations, source hashes, and exact scenario order instead of trusting pass
+booleans.
 
 ```sh
 mix imp.benchmark.rag_tool_agent \
@@ -1099,6 +1219,16 @@ was unavailable. New live evidence should also report
 sufficient for a complete concurrent cost claim.
 
 ## Evidence Standard
+
+### Test-only operations diagnostic
+
+`mix benchmark.operations_stress.check` is deliberately outside the evidence
+and claim system. It runs ten useful single-process deterministic assertions,
+but its timestamped JSON does not bind a git tree, RunContext, environment, or
+tamper checksum. The artifact declares `test_only_diagnostic` and
+`claim_eligible: false`; it must not be admitted or cited at any C0-C5 level.
+The same behaviors remain mechanically covered by ExUnit. Operational evidence
+must come from a source-bound lane such as failure recovery or overhead.
 
 A credible Imp benchmark report must include:
 

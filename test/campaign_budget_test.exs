@@ -128,6 +128,50 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     assert CampaignBudget.snapshot(budget)["exhausted"] == "input_tokens"
   end
 
+  test "rejects credential-bearing pricing URLs before any checkpoint callback" do
+    previous = Process.flag(:trap_exit, true)
+    owner = self()
+
+    try do
+      assert {:error, {%ArgumentError{message: message}, _stacktrace}} =
+               CampaignBudget.start_link(
+                 limits: %{requests: 3, input_tokens: 10, output_tokens: 10, usd: 1.0},
+                 pricing: %{
+                   "input_per_million" => 1.0,
+                   "output_per_million" => 1.0,
+                   "source_url" => "https://user:password@pricing.example/rates?api_key=CANARY"
+                 },
+                 default_max_output_tokens: 1,
+                 on_change: fn _snapshot -> send(owner, :checkpoint_written) end
+               )
+
+      assert message =~ "ordinary credential-free HTTP(S) documentation URL"
+      refute_receive :checkpoint_written
+    after
+      Process.flag(:trap_exit, previous)
+    end
+  end
+
+  test "rejects credential markers in recursively decoded URL paths, queries, and fragments" do
+    unsafe_urls = [
+      "https://pricing.example/api_key/CANARY_OA",
+      "https://pricing.example/sk-proj-abcdefghijklmnopqrstuvwxyz1234567890/rates",
+      "https://pricing.example/rates?api%255fkey=CANARY_OA",
+      "https://pricing.example/rates?api_key%3DCANARY_OA",
+      "https://pricing.example/rates#token%253Dsecret"
+    ]
+
+    for url <- unsafe_urls do
+      assert_raise ArgumentError, ~r/ordinary credential-free/, fn ->
+        CampaignBudget.validate_pricing_source_url!(url)
+      end
+    end
+
+    assert CampaignBudget.validate_pricing_source_url!(
+             "https://developers.openai.com/api/docs/pricing"
+           ) == "https://developers.openai.com/api/docs/pricing"
+  end
+
   test "reconciles an unresolved reservation once when its checkpoint is resumed" do
     {:ok, first} =
       CampaignBudget.start_link(

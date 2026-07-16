@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "fixture_id": "dspy-copro-isolation-v3",
+  "source": {
+    "authority_family": "family.optimizer_instruction_search",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "copro_source": {
+      "path": "dspy/teleprompt/copro_optimizer.py",
+      "sha256": "43470ce80ebf29bc34b3bbb7c7d92c09fa5953d9c773ef32e261505a071b78f1"
+    },
+    "upstream_test": {
+      "path": "tests/teleprompt/test_copro_optimizer.py",
+      "sha256": "a9561ce73c056f60ed3ad9fd51c59da27d7acb6d271a16868f94d339eff0db47"
+    }
+  },
+  "copro": {
+    "breadth": 4,
+    "depth": 1,
+    "proposal_order": [
+      {"instruction": "Candidate A", "prefix": "A:"},
+      {"instruction": "Candidate A", "prefix": "A:"},
+      {"instruction": "Candidate B", "prefix": "B:"}
+    ],
+    "evaluation_order": ["candidate_a", "candidate_a", "candidate_b", "base"],
+    "scores": {"candidate_a": 0.25, "candidate_b": 0.75, "base": 0.0},
+    "candidate_program_order": ["candidate_b", "candidate_a", "base"],
+    "candidate_program_count": 3,
+    "total_calls": 4,
+    "results_latest": {
+      "depth": [0],
+      "max": [75.0],
+      "average": [31.25],
+      "min": [0.0],
+      "std": [27.24311839712921]
+    },
+    "results_best": {
+      "depth": [0],
+      "max": [75.0],
+      "average": [33.33333333333333],
+      "min": [0.0],
+      "std": [31.180478223116177]
+    }
+  },
+  "proposals": [
+    {"key": "candidate_a", "instruction": "Candidate A", "prefix": "A:"},
+    {"key": "candidate_a", "instruction": "Candidate A", "prefix": "A:"},
+    {"key": "candidate_b", "instruction": "Candidate B", "prefix": "B:"}
+  ],
+  "scope": {
+    "claims": [
+      "COPRO starts with a process-isolated DSPy global LM",
+      "COPRO fans out the requested proposal count in deterministic order",
+      "COPRO evaluates proposals in proposal order before score sorting",
+      "COPRO directly removes an equal-score duplicate candidate",
+      "COPRO exposes pinned results_latest and results_best statistics"
+    ],
+    "source_supported": [
+      "The pinned COPRO source's greater-than-or-equal score guard retains the first record for an identical instruction/prefix duplicate"
+    ],
+    "not_claimed": ["exact Python RNG parity", "provider behavior or effectiveness", "full optimizer parity"]
+  }
+}

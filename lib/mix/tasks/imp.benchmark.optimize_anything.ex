@@ -5,7 +5,12 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
       mix imp.benchmark.optimize_anything --input path/to/rows.json --out benchmarks/runs/optimize-anything
       mix imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything
       mix imp.benchmark.optimize_anything --live --provider openai \
-        --model gpt-5.4-2026-03-05 --seeds 17,23,31 --out benchmarks/runs/optimize-anything
+        --model gpt-5.4-2026-03-05 --seeds 17,23,31 \
+        --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
+        --max-cost-usd 0.50 --max-requests 20 \
+        --max-input-tokens 100000 --max-output-tokens 20000 \
+        --max-output-tokens-per-request 1000 \
+        --out benchmarks/runs/optimize-anything
 
   Input mode requires complete live evidence for every artifact class. Smoke
   mode emits deterministic local rows that validate the evidence pipeline but
@@ -16,10 +21,10 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
 
   alias Imp.BenchmarkTruth.ArtifactFile
   alias Imp.BenchmarkTruth.OptimizeAnything.{Artifact, Campaign}
+  alias Imp.BenchmarkTruth.OptimizeAnything.PricingPolicy
 
   @shortdoc "Validate Optimize Anything replication evidence"
   @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimize-anything")
-
   @impl true
   def run(args) do
     Mix.Task.run("app.start")
@@ -69,7 +74,16 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
           provider: :string,
           model: :string,
           seeds: :string,
-          max_proposals: :integer
+          max_proposals: :integer,
+          pricing_profile: :string,
+          input_price_per_million: :float,
+          output_price_per_million: :float,
+          pricing_source_url: :string,
+          max_cost_usd: :float,
+          max_requests: :integer,
+          max_input_tokens: :integer,
+          max_output_tokens: :integer,
+          max_output_tokens_per_request: :integer
         ]
       )
 
@@ -89,18 +103,108 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
     provider = Keyword.get(opts, :provider) || Mix.raise("--provider is required for --live")
     model = Keyword.get(opts, :model) || Mix.raise("--model is required for --live")
     seeds = opts |> Keyword.get(:seeds, "0,1,2") |> parse_seeds!()
+    pricing = pricing_config!(opts, provider, model)
+    limits = live_limits!(opts)
+
+    max_output_tokens_per_request =
+      required_positive_integer!(opts, :max_output_tokens_per_request)
 
     %{out_path: path} =
       Campaign.run(
-        lm: Imp.req_llm("#{provider}:#{model}"),
+        lm:
+          Imp.req_llm("#{provider}:#{model}",
+            cache: false,
+            max_retries: 0,
+            max_tokens: max_output_tokens_per_request
+          ),
         provider: provider,
         model: model,
         seeds: seeds,
         max_proposals: Keyword.get(opts, :max_proposals, 3),
+        limits: limits,
+        pricing: pricing.pricing,
+        pricing_profile: pricing.profile,
+        pricing_source_url: pricing.source_url,
+        max_output_tokens_per_request: max_output_tokens_per_request,
         out_dir: Keyword.get(opts, :out, @default_out_dir)
       )
 
     Mix.shell().info("Optimize Anything live campaign artifact: #{path}")
+  end
+
+  defp pricing_config!(opts, provider, model) do
+    profile = Keyword.get(opts, :pricing_profile)
+
+    custom_fields = [
+      Keyword.get(opts, :input_price_per_million),
+      Keyword.get(opts, :output_price_per_million),
+      Keyword.get(opts, :pricing_source_url)
+    ]
+
+    case {profile, Enum.any?(custom_fields, &(not is_nil(&1)))} do
+      {profile, false} when is_binary(profile) ->
+        pricing_policy!(fn -> PricingPolicy.profile!(provider, model, profile) end)
+
+      {nil, true} ->
+        input = required_positive_number!(opts, :input_price_per_million)
+        output = required_positive_number!(opts, :output_price_per_million)
+
+        source_url =
+          Keyword.get(opts, :pricing_source_url) ||
+            Mix.raise("--pricing-source-url is required with custom pricing")
+
+        pricing_policy!(fn ->
+          PricingPolicy.custom!(
+            provider,
+            model,
+            %{"input_per_million" => input, "output_per_million" => output},
+            source_url
+          )
+        end)
+
+      {nil, false} ->
+        Mix.raise(
+          "--pricing-profile or all of --input-price-per-million, " <>
+            "--output-price-per-million, and --pricing-source-url are required for --live"
+        )
+
+      {_unknown, true} ->
+        Mix.raise("--pricing-profile cannot be combined with custom pricing inputs")
+
+      {unknown, false} ->
+        Mix.raise("unknown --pricing-profile #{inspect(unknown)}")
+    end
+  end
+
+  defp live_limits!(opts) do
+    %{
+      requests: required_positive_integer!(opts, :max_requests),
+      input_tokens: required_positive_integer!(opts, :max_input_tokens),
+      output_tokens: required_positive_integer!(opts, :max_output_tokens),
+      usd: required_positive_number!(opts, :max_cost_usd)
+    }
+  end
+
+  defp required_positive_integer!(opts, key) do
+    case Keyword.get(opts, key) do
+      value when is_integer(value) and value > 0 -> value
+      _ -> Mix.raise("--#{option_name(key)} is required and must be a positive integer")
+    end
+  end
+
+  defp required_positive_number!(opts, key) do
+    case Keyword.get(opts, key) do
+      value when is_number(value) and value > 0 -> value
+      _ -> Mix.raise("--#{option_name(key)} is required and must be positive")
+    end
+  end
+
+  defp option_name(key), do: key |> Atom.to_string() |> String.replace("_", "-")
+
+  defp pricing_policy!(fun) do
+    fun.()
+  rescue
+    error in ArgumentError -> Mix.raise(Exception.message(error))
   end
 
   defp parse_seeds!(value) do

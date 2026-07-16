@@ -19,6 +19,54 @@ defmodule Imp.ReproductionRegistryTest do
     Mix.Tasks.Imp.Reproductions.run(["--check"])
   end
 
+  test "BFCL scorer agreement is registered as benchmark infrastructure, not ReAct behavior" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+    protocol = get_in(registry, ["protocols", "bfcl_shaped_scorer"])
+    feature = Enum.find(registry["features"], &(&1["id"] == "bfcl_scorer_infrastructure"))
+    react = Enum.find(registry["features"], &(&1["id"] == "react"))
+
+    assert protocol["mode"] == "provider_free"
+    assert protocol["max_tier"] == "t1"
+    assert protocol["task"] == "imp.benchmark.bfcl_adapted"
+    assert protocol["args"] == ["--require-clean"]
+    assert protocol["manifest"] == "benchmarks/config/bfcl-adapted-differential-v1.json"
+    assert protocol["artifact_validator"]["function"] == "validate!"
+
+    assert feature["public_surfaces"] == ["mix imp.benchmark.bfcl_adapted"]
+    assert feature["protocol_ids"] == ["bfcl_shaped_scorer"]
+
+    assert feature["admitted_evidence"] == %{
+             "tier" => "none",
+             "artifact" => nil,
+             "protocol_id" => nil
+           }
+
+    refute "bfcl_shaped_scorer" in react["protocol_ids"]
+  end
+
+  test "COPRO isolation has a pure provider-free T1 admission protocol" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+    protocol = get_in(registry, ["protocols", "copro_isolation"])
+    copro = Enum.find(registry["features"], &(&1["id"] == "copro"))
+
+    assert protocol == %{
+             "mode" => "provider_free",
+             "max_tier" => "t1",
+             "task" => "imp.benchmark.copro_isolation",
+             "args" => ["--require-clean"],
+             "manifest" => "benchmarks/config/copro-isolation-differential-v1.json",
+             "artifact_validator" => %{
+               "mode" => "module",
+               "module" => "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+               "function" => "validate!",
+               "arity" => 2
+             }
+           }
+
+    assert "copro_isolation" in copro["protocol_ids"]
+    assert copro["admitted_evidence"]["tier"] == "none"
+  end
+
   test "rejects duplicate ownership and omitted authority families" do
     registry = read_json!(@registry)
     authorities = read_json!(@authorities)

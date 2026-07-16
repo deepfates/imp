@@ -29,10 +29,68 @@ git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c
 IMP_DSPY_VENV=tmp/dspy-parity-venv scripts/setup_dspy_parity_env.sh
 PYTHONPATH=tmp/dspy-3.2.1 tmp/dspy-parity-venv/bin/python scripts/dspy_copro_isolation_differential.py"""
 
+_CREDENTIAL_ENV_SUFFIXES = (
+    "_API_KEY",
+    "_ACCESS_TOKEN",
+    "_AUTH_TOKEN",
+    "_SECRET",
+    "_TOKEN",
+    "_PASSWORD",
+    "_CREDENTIALS",
+)
+_CREDENTIAL_ENV_EXACT = {
+    "ACCESS_TOKEN",
+    "API_KEY",
+    "AUTHORIZATION",
+    "AUTH_TOKEN",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AZURE_CLIENT_SECRET",
+    "CREDENTIALS",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "PASSWORD",
+    "SECRET",
+    "TOKEN",
+}
+
+
+def credential_environment_names(environment: Dict[str, str]) -> List[str]:
+    return sorted(
+        name
+        for name in environment
+        if name.upper() in _CREDENTIAL_ENV_EXACT
+        or name.upper().endswith(_CREDENTIAL_ENV_SUFFIXES)
+    )
+
+
+def provider_free_environment(environment: Dict[str, str]) -> Dict[str, str]:
+    scrubbed = environment.copy()
+    for name in credential_environment_names(scrubbed):
+        scrubbed.pop(name, None)
+    return scrubbed
+
+
+# This is a provider-free source differential. Remove ambient provider and
+# cloud credentials before importing the pinned reference runtime so neither
+# import hooks nor the fixture can accidentally acquire live authority.
+_SANITIZED_ENVIRONMENT = provider_free_environment(dict(os.environ))
+os.environ.clear()
+os.environ.update(_SANITIZED_ENVIRONMENT)
+os.environ["PYTHON_DOTENV_DISABLED"] = "1"
+del _SANITIZED_ENVIRONMENT
+
 try:
     import dspy
 except ModuleNotFoundError as error:
     raise SystemExit(f"DSPy 3.2.1 fixture environment is missing. Exact setup:\n{SETUP_INSTRUCTIONS}") from error
+
+# Some dependency stacks load a repository .env during import despite this
+# provider-free harness. Scrub again before configuring or executing DSPy.
+_SANITIZED_ENVIRONMENT = provider_free_environment(dict(os.environ))
+os.environ.clear()
+os.environ.update(_SANITIZED_ENVIRONMENT)
+del _SANITIZED_ENVIRONMENT
 
 
 PROPOSAL_PATTERN = re.compile(
@@ -60,6 +118,9 @@ class FixtureLM(dspy.BaseLM):
         self.transport_calls: List[Dict[str, Any]] = []
 
     def forward(self, prompt=None, messages=None, **kwargs):  # noqa: ANN001
+        assert credential_environment_names(dict(os.environ)) == [], (
+            "provider-free COPRO fixture reacquired credential-bearing environment variables"
+        )
         content = "\n".join(
             [str(prompt or "")]
             + [str(message.get("content", "")) for message in (messages or [])]
@@ -105,7 +166,12 @@ def run_isolated(fixture: Dict[str, Any], config_path: Path) -> Dict[str, Any]:
     """Install mutable state, then start COPRO in a fresh Python process."""
     dspy.configure(lm=PoisonLM(), adapter=dspy.ChatAdapter())
     command = [sys.executable, str(Path(__file__).resolve()), "--worker", "--config", str(config_path)]
-    completed = subprocess.run(command, capture_output=True, text=True, env=os.environ.copy())
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        env=provider_free_environment(dict(os.environ)),
+    )
     if completed.returncode != 0:
         raise RuntimeError(
             "isolated DSPy COPRO worker failed:\n"
@@ -199,6 +265,9 @@ def run_worker(fixture: Dict[str, Any], config_path: Path) -> Dict[str, Any]:
         "runner": "python-dspy-copro-isolation-differential",
         "source": fixture["source"],
         "runtime_identity": runtime_identity,
+        "credential_environment": {
+            "provider_credential_names_present": credential_environment_names(dict(os.environ)),
+        },
         "fixture_identity": {
             "script_sha256": sha256(Path(__file__).resolve()),
             "config_sha256": sha256(config_path),

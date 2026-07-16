@@ -1,0 +1,34 @@
+{
+  "schema_version": 2,
+  "protocol_id": "bfcl_shaped_scorer_conformance_v2",
+  "fixture": {
+    "path": "test/fixtures/benchmarks/bfcl-adapted-v1.json",
+    "sha256": "0e0cafb74a488053c8daad2e9227cc673887af27ead49e8aa14e1359a0e04eb4",
+    "positive_rows": 12,
+    "mutation_rows": 9,
+    "license": "CC0-1.0",
+    "materialization": "checked_in"
+  },
+  "upstream_protocol": {
+    "repository": "https://github.com/ShishirPatil/gorilla",
+    "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+    "authority_manifest": "benchmarks/authority_sources/bfcl-protocol-6ea5797.json",
+    "usage": "protocol_provenance_only"
+  },
+  "reference": {
+    "runtime": "independent_cpython_stdlib_implementation",
+    "script": "scripts/bfcl_adapted_reference_scorer.py"
+  },
+  "evidence_level": "C1_T1_fixture_scorer_agreement",
+  "adaptations_and_deviations": [
+    "All cases and mutations are original CC0 Imp-authored fixtures; no official BFCL prompts, answers, schemas, or dataset rows are copied.",
+    "The official BFCL scorer is not executed or reproduced; its immutable revision is protocol provenance only.",
+    "Imp requires exact case-sensitive call names, exact call order for every category, exact recursively normalized JSON arguments, and an Imp-specific terminal enum.",
+    "Official BFCL has category-specific AST, type, relevance, multi-turn, and agentic checks; this fixture does not claim equivalent semantics.",
+    "The independent Python side is a stdlib reimplementation of this preregistered Imp-authored scorer contract and does not import DSPy or BFCL code."
+  ],
+  "limitations": [
+    "C1/T1 evidence proves cross-language agreement on a checked-in fixture and mutation corpus only.",
+    "Scripted candidates do not measure language-model function selection, official BFCL accuracy, operational agent behavior, or DSPy parity."
+  ]
+}

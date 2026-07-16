@@ -44,6 +44,10 @@ class DSPyCOPROIsolationDifferentialTest(unittest.TestCase):
         environment["PYTHONPATH"] = os.pathsep.join(
             [str(DSPY_TARGET)] + ([environment["PYTHONPATH"]] if environment.get("PYTHONPATH") else [])
         )
+        environment["OPENAI_API_KEY"] = "dummy-copro-canary-never-use"
+        environment["AWS_SESSION_TOKEN"] = "dummy-copro-cloud-canary-never-use"
+        environment["API_KEY"] = "dummy-copro-generic-canary-never-use"
+        environment["TOKEN"] = "dummy-copro-generic-token-never-use"
         completed = subprocess.run(
             [str(PYTHON), str(SCRIPT), "--config", str(CONFIG)],
             cwd=ROOT,
@@ -66,6 +70,9 @@ class DSPyCOPROIsolationDifferentialTest(unittest.TestCase):
         )
         self.assertTrue(artifact["runtime_identity"]["git_clean"])
         self.assertEqual(artifact["runtime_identity"]["authority_manifest_verified_files"], 296)
+        self.assertEqual(
+            artifact["credential_environment"]["provider_credential_names_present"], []
+        )
         self.assertTrue(artifact["isolation"]["isolated_process"])
         self.assertFalse(artifact["isolation"]["poison_marker_seen"])
         self.assertEqual(artifact["observations"]["proposal_n"], [3])

@@ -178,6 +178,14 @@ defmodule Imp.FailureCampaignTest do
     refute contains_key?(artifact, "payload")
   end
 
+  test "mix task rejects removed external-provider options" do
+    for option <- ["--api-key-env", "--model", "--agent-model", "--base-url"] do
+      assert_raise Mix.Error, ~r/invalid options/, fn ->
+        Mix.Tasks.Imp.Benchmark.FailureCampaign.run([option, "dummy"])
+      end
+    end
+  end
+
   defp case_by_id(artifact, id), do: Enum.find(artifact["cases"], &(&1["id"] == id))
 
   defp assert_optimizer_evidence(artifact, lane, optimizer, checkpoint_type) do

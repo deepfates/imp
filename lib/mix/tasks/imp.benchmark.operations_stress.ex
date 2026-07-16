@@ -1,13 +1,16 @@
 defmodule Mix.Tasks.Imp.Benchmark.OperationsStress do
   @moduledoc """
-  Run the provider-free structured I/O and operations stress benchmark.
+  Run the test-only structured I/O and operations stress diagnostic.
+
+  This single-process check is not source-bound evidence and is ineligible for
+  C0-C5 claim admission.
 
       mix imp.benchmark.operations_stress --out tmp/operations-stress
   """
 
   use Mix.Task
 
-  @shortdoc "Run Imp structured I/O and operations stress checks"
+  @shortdoc "Run test-only structured I/O and operations diagnostics"
 
   @impl true
   def run(args) do
@@ -34,7 +37,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OperationsStress do
     out_path = Path.join(out_dir, "operations-stress-#{timestamp_slug()}.json")
     File.write!(out_path, Jason.encode!(artifact, pretty: true) <> "\n")
 
-    Mix.shell().info("operations stress report: #{out_path}")
+    Mix.shell().info("test-only operations stress diagnostic: #{out_path}")
 
     Mix.shell().info(
       "checks passing: #{artifact["summary"]["passing"]}/#{artifact["summary"]["total"]}"

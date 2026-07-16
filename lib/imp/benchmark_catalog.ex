@@ -70,7 +70,11 @@ defmodule Imp.BenchmarkCatalog do
       metric: "retrieval recall plus answer exact/F1",
       tiers: ["smoke", "research"],
       status: "provider_free_implemented",
-      commands: ["mix benchmark.rag_tool_agent.check", "mix protocol.retriever.check"],
+      commands: [
+        "mix benchmark.rag_tool_agent.check",
+        "mix imp.benchmark.rag_tool_failure_differential",
+        "mix protocol.retriever.check"
+      ],
       next_step:
         "Scale to matched Imp/DSPy generation over larger retrieval corpora when making research-tier quality claims."
     },
@@ -85,9 +89,11 @@ defmodule Imp.BenchmarkCatalog do
       commands: [
         "mix benchmark.trace.check",
         "mix benchmark.rag_tool_agent.check",
+        "mix imp.benchmark.rag_tool_failure_differential",
         "mix integration.check"
       ],
-      next_step: "Add sampled measurable tool-use tasks beyond fixture replay."
+      next_step:
+        "Add model-selected recovery and sampled measurable tool-use tasks beyond queued fixtures."
     },
     %{
       id: "rlm_recursive_control",
@@ -140,13 +146,13 @@ defmodule Imp.BenchmarkCatalog do
       tiers: ["smoke", "research"],
       status: "provider_free_and_live_implemented",
       commands: [
-        "mix benchmark.operations_stress.check",
+        "mix test test/operations_stress_test.exs test/stream_listener_incremental_test.exs",
         "mix benchmark.trace.check",
         "mix test test/schema_constraints_test.exs test/req_llm_client_test.exs",
         "LIVE_PROVIDER=1 mix live.check"
       ],
       next_step:
-        "Extend adversarial structured-output stress to matched live-provider drift checks when release policy requires it."
+        "Keep the operations stress runner test-only; add source-bound matched live-provider drift evidence only when release policy requires that claim."
     },
     %{
       id: "operations_persistence_observability",
@@ -158,9 +164,9 @@ defmodule Imp.BenchmarkCatalog do
       metric:
         "round-trip fidelity, secret absence, event completeness, cache correctness, and failure isolation",
       tiers: ["smoke", "research"],
-      status: "provider_free_implemented",
+      status: "test_coverage_plus_source_bound_recovery_evidence",
       commands: [
-        "mix benchmark.operations_stress.check",
+        "mix test test/operations_stress_test.exs test/adversarial_security_stress_test.exs",
         "mix benchmark.failure_campaign.check",
         "mix production.check",
         "mix integration.check",
@@ -180,11 +186,10 @@ defmodule Imp.BenchmarkCatalog do
       tiers: ["smoke"],
       status: "deterministic_implemented",
       commands: [
-        "mix test test/multimodal_adapter_test.exs",
-        "mix benchmark.operations_stress.check"
+        "mix test test/multimodal_adapter_test.exs"
       ],
       next_step:
-        "Keep artifact evidence as primitive encoding/decoding proof; add a provider-backed multimodal benchmark only if public docs claim live multimodal reasoning."
+        "Keep primitive encoding/decoding as deterministic test coverage; add source-bound provider evidence only if public docs claim live multimodal reasoning."
     },
     %{
       id: "optimizer_lift",

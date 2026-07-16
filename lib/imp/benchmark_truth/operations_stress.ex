@@ -50,6 +50,13 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
 
     %{
       "schema_version" => 1,
+      "evidence_classification" => "test_only_diagnostic",
+      "claim_eligible" => false,
+      "limitations" => [
+        "single-process deterministic checks, not a soak or load test",
+        "no source-bound run context, environment identity, or tamper envelope",
+        "must not be admitted or cited as C0-C5 claim evidence"
+      ],
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "summary" => summary(checks),
       "checks" => checks

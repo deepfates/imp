@@ -332,16 +332,16 @@
           "evidence_tier": "reference_differential"
         },
         {
-          "name": "BFCL tool-use subset",
-          "construct": "function selection, argument construction, and multi-step tool execution",
-          "protocol": "Pinned public rows mapped to equivalent typed tools; score calls before execution and final answers after execution.",
+          "name": "BFCL-shaped scorer conformance fixture",
+          "construct": "exact scorer behavior for names, ordered calls, normalized arguments, terminals, and invalid input",
+          "protocol": "Twelve original CC0 positive rows plus nine preregistered mutations scored independently in Elixir and Python; pinned official BFCL revision is provenance only and no upstream rows or scorer code are used.",
           "evidence_tier": "adapted_public_protocol"
         },
         {
           "name": "Failure-injected agent workflow",
-          "construct": "bounded recovery from tool timeout, malformed arguments, and transient retrieval errors",
-          "protocol": "Identical deterministic fault schedule with trace-level terminal-state assertions.",
-          "evidence_tier": "ecological_field_benchmark"
+          "construct": "bounded operational observations for tool timeout, transient retrieval errors, replay, unknown tools, and terminal states",
+          "protocol": "Six identical queued-action scenarios execute through actual Imp and source-authenticated DSPy 3.2.1 ReAct with exact trace-terminal assertions. Fixture tools own retry/idempotency and timeout is injected, so this is not model-selected recovery effectiveness.",
+          "evidence_tier": "reference_differential"
         }
       ],
       "matched_controls": [
@@ -599,7 +599,9 @@
       "cost_ceiling_usd": 5.0,
       "preflight": {
         "command": "mix imp.benchmark.operations_stress --out /tmp/imp-operations-preflight",
-        "manifest": null
+        "manifest": null,
+        "evidence_classification": "test_only_diagnostic",
+        "claim_eligible": false
       }
     }
   ]

@@ -383,8 +383,9 @@ Executable evidence:
 
 - test: `test/optimizer_behavioral_corpus_test.exs`
 - test: `test/copro_isolation_differential_test.exs`
+- test: `test/copro_isolation_artifact_test.exs`
 - test: `test/python_dspy_copro_isolation_differential_test.py`
-- fixture: `test/fixtures/dspy_copro_isolation_differential.json`
+- protocol: `benchmarks/config/copro-isolation-differential-v1.json`
 - docs: `docs/API_GUIDE.md`
 
 

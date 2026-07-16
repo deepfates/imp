@@ -27,10 +27,6 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
           live: :boolean,
           live_iterations: :integer,
           live_timeout_ms: :integer,
-          api_key_env: :string,
-          model: :string,
-          agent_model: :string,
-          base_url: :string,
           require_clean: :boolean
         ]
       )

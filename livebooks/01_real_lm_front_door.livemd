@@ -2,7 +2,8 @@
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:imp, path: repo}])
+Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 
 ## Program, Don't Prompt
@@ -14,13 +15,13 @@ evaluation, optimization, and persistence.
 Manual path: real provider shape first, deterministic development next,
 evaluation and optimization after that, then tools and operations.
 
-It expects `OPENAI_API_KEY` and `OPENAI_MODEL` in the environment. Without
-those variables the live cells return `{:skip, reason}` so the notebook remains
-safe to execute in local gates.
+It requires the explicit `LIVE_PROVIDER=1` opt-in plus `OPENAI_API_KEY` and
+`OPENAI_MODEL` in the environment. Without all three, the live cells return
+`{:skip, reason}` so the notebook remains safe to execute in local gates.
 
 ```elixir
 live_lm = fn opts ->
-  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
      Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
@@ -33,7 +34,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live cells."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live cells."}
   end
 end
 ```

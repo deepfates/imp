@@ -6,6 +6,10 @@ defmodule OperationsStressTest do
   test "operations stress artifact covers structured I/O and runtime operations" do
     artifact = Imp.BenchmarkTruth.OperationsStress.run(max_concurrency: 4)
 
+    assert artifact["evidence_classification"] == "test_only_diagnostic"
+    refute artifact["claim_eligible"]
+    refute Map.has_key?(artifact, "run_context")
+    assert Enum.any?(artifact["limitations"], &String.contains?(&1, "must not be admitted"))
     assert artifact["summary"]["complete"]
     assert artifact["summary"]["passing"] == 10
 
@@ -46,8 +50,59 @@ defmodule OperationsStressTest do
     [path] = Path.wildcard(Path.join(out_dir, "operations-stress-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
 
+    assert artifact["evidence_classification"] == "test_only_diagnostic"
+    refute artifact["claim_eligible"]
     assert artifact["summary"]["complete"]
     assert artifact["summary"]["passing"] == artifact["summary"]["total"]
+  end
+
+  test "operations stress stays outside evidence admission and public claims" do
+    aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
+
+    refute "benchmark.operations_stress.check" in Keyword.fetch!(aliases, :"evidence.check")
+
+    protocol =
+      "benchmarks/reproductions.json"
+      |> File.read!()
+      |> Jason.decode!()
+      |> get_in(["protocols", "operations"])
+
+    assert protocol["evidence_classification"] == "test_only_diagnostic"
+    assert protocol["artifact_validator"] == nil
+
+    assert_raise ArgumentError, ~r/protocol operations has no pure artifact validator/, fn ->
+      Imp.BenchmarkTruth.EvidenceAdmission.admit!(
+        artifact_path: Path.join(System.tmp_dir!(), "nonexistent-operations-artifact.json"),
+        protocol_id: "operations",
+        tier: "t0",
+        feature_ids: ["runtime_performance"]
+      )
+    end
+
+    operations_preflight =
+      "benchmarks/research_portfolio.json"
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.fetch!("lanes")
+      |> Enum.find(&(&1["id"] == "beam_operations"))
+      |> Map.fetch!("preflight")
+
+    assert operations_preflight["evidence_classification"] == "test_only_diagnostic"
+    refute operations_preflight["claim_eligible"]
+
+    catalog_commands =
+      Imp.BenchmarkCatalog.families()
+      |> Enum.flat_map(& &1.commands)
+
+    refute "mix benchmark.operations_stress.check" in catalog_commands
+    refute File.read!("benchmarks/claims.json") =~ "operations_stress"
+
+    benchmark_truth = File.read!("docs/BENCHMARK_TRUTH.md")
+    production_operations = File.read!("docs/PRODUCTION_OPERATIONS.md")
+
+    assert benchmark_truth =~ "deliberately outside the evidence"
+    assert benchmark_truth =~ "must not be admitted or cited at any C0-C5 level"
+    assert production_operations =~ "intentionally excluded from `mix\nevidence.check`"
   end
 
   defp tmp_dir(name) do

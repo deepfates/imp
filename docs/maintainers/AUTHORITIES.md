@@ -72,7 +72,7 @@ open.
 | DSPy programming model | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | present |
 | Model, provider, settings, and normalized runtime | runtime | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | not_applicable | partial |
 | Structured adapters and multimodal value types | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | partial |
-| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | protocol_defined | present |
+| Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | pinned | present |
 | Recursive Language Models | algorithm | 3.3.0b1 @ b2829b7ae3b6 | pinned | present | partial | partial |
 | Refinement, evaluation, and metrics | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | present |
 | Few-shot, KNN, and random search optimizers | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |

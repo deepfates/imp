@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "protocol_id": "bfcl_shaped_scorer_conformance_v2",
+  "provenance": {
+    "upstream_protocol": "Berkeley Function Calling Leaderboard",
+    "upstream_repository": "https://github.com/ShishirPatil/gorilla",
+    "upstream_revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+    "upstream_usage": "protocol_provenance_only_no_code_or_rows_executed",
+    "adaptation": "Original Imp-authored positive and adversarial rows for an exact BFCL-shaped scorer contract.",
+    "row_license": "CC0-1.0",
+    "copyright_safety": "No upstream BFCL prompts, answers, schemas, or dataset rows are reproduced."
+  },
+  "normalization": {
+    "tool_name": "exact case-sensitive string equality in call order",
+    "arguments": "decode JSON strings, recursively stringify and lexicographically sort object keys, preserve array order and JSON scalar types",
+    "terminal_state": "exact enum equality: submitted, max_iters, tool_error, or unknown_tool",
+    "invalid_input": "malformed JSON and invalid terminals produce fail-closed error codes"
+  },
+  "cases": [
+    {"id":"simple_weather","category":"simple","expected":{"calls":[{"name":"get_weather","arguments":{"city":"Paris","unit":"celsius"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"get_weather","arguments":"{\"unit\":\"celsius\",\"city\":\"Paris\"}"}],"terminal_state":"submitted"}},
+    {"id":"simple_convert","category":"simple","expected":{"calls":[{"name":"convert_currency","arguments":{"amount":12.5,"from":"USD","to":"EUR"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"convert_currency","arguments":{"to":"EUR","amount":12.5,"from":"USD"}}],"terminal_state":"submitted"}},
+    {"id":"boolean_toggle","category":"simple","expected":{"calls":[{"name":"set_feature","arguments":{"enabled":true,"feature":"search"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"set_feature","arguments":{"feature":"search","enabled":true}}],"terminal_state":"submitted"}},
+    {"id":"array_lookup","category":"multiple","expected":{"calls":[{"name":"lookup_many","arguments":{"keys":["a","b","c"]}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"lookup_many","arguments":"{\"keys\":[\"a\",\"b\",\"c\"]}"}],"terminal_state":"submitted"}},
+    {"id":"nested_event","category":"nested","expected":{"calls":[{"name":"create_event","arguments":{"attendees":["a@example.test","b@example.test"],"metadata":{"priority":2,"remote":false},"title":"Review"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"create_event","arguments":{"title":"Review","metadata":{"remote":false,"priority":2},"attendees":["a@example.test","b@example.test"]}}],"terminal_state":"submitted"}},
+    {"id":"parallel_quotes","category":"parallel","expected":{"calls":[{"name":"stock_quote","arguments":{"symbol":"IMP"}},{"name":"stock_quote","arguments":{"symbol":"BEAM"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"stock_quote","arguments":{"symbol":"IMP"}},{"name":"stock_quote","arguments":"{\"symbol\":\"BEAM\"}"}],"terminal_state":"submitted"}},
+    {"id":"multiple_route_search","category":"multiple","expected":{"calls":[{"name":"route","arguments":{"avoid":["tolls"],"destination":"Oakland","origin":"Berkeley"}},{"name":"search","arguments":{"limit":3,"query":"coffee"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"route","arguments":{"origin":"Berkeley","destination":"Oakland","avoid":["tolls"]}},{"name":"search","arguments":{"query":"coffee","limit":3}}],"terminal_state":"submitted"}},
+    {"id":"null_optional","category":"simple","expected":{"calls":[{"name":"find_contact","arguments":{"email":null,"name":"Ada"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"find_contact","arguments":"{\"name\":\"Ada\",\"email\":null}"}],"terminal_state":"submitted"}},
+    {"id":"bounded_max_iters","category":"terminal","expected":{"calls":[{"name":"search","arguments":{"limit":1,"query":"missing"}}],"terminal_state":"max_iters"},"candidate":{"calls":[{"name":"search","arguments":{"query":"missing","limit":1}}],"terminal_state":"max_iters"}},
+    {"id":"tool_error_terminal","category":"terminal","expected":{"calls":[{"name":"failing_tool","arguments":{"code":503}}],"terminal_state":"tool_error"},"candidate":{"calls":[{"name":"failing_tool","arguments":"{\"code\":503}"}],"terminal_state":"tool_error"}},
+    {"id":"unknown_tool_terminal","category":"terminal","expected":{"calls":[{"name":"not_in_catalog","arguments":{}}],"terminal_state":"unknown_tool"},"candidate":{"calls":[{"name":"not_in_catalog","arguments":"{}"}],"terminal_state":"unknown_tool"}},
+    {"id":"empty_submit","category":"terminal","expected":{"calls":[],"terminal_state":"submitted"},"candidate":{"calls":[],"terminal_state":"submitted"}}
+  ],
+  "mutations": [
+    {"id":"mutation_wrong_name","category":"wrong_call_name","expected":{"calls":[{"name":"get_weather","arguments":{"city":"Paris"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"Get_Weather","arguments":{"city":"Paris"}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":false,"arguments_exact":true,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_missing_call","category":"missing_call","expected":{"calls":[{"name":"first","arguments":{}},{"name":"second","arguments":{}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"first","arguments":{}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":false,"arguments_exact":false,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_extra_call","category":"extra_call","expected":{"calls":[{"name":"first","arguments":{}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"first","arguments":{}},{"name":"second","arguments":{}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":false,"arguments_exact":false,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_reordered_calls","category":"reordered_calls","expected":{"calls":[{"name":"first","arguments":{"n":1}},{"name":"second","arguments":{"n":2}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"second","arguments":{"n":2}},{"name":"first","arguments":{"n":1}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":false,"arguments_exact":false,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_scalar_type","category":"scalar_type","expected":{"calls":[{"name":"convert","arguments":{"amount":12.5}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"convert","arguments":{"amount":"12.5"}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":true,"arguments_exact":false,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_array_order","category":"array_order","expected":{"calls":[{"name":"lookup","arguments":{"keys":["a","b"]}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"lookup","arguments":{"keys":["b","a"]}}],"terminal_state":"submitted"},"expected_score":{"valid_input":true,"tool_name_exact":true,"arguments_exact":false,"terminal_state_exact":true,"passing":false,"error_code":null}},
+    {"id":"mutation_malformed_json","category":"malformed_json","expected":{"calls":[{"name":"lookup","arguments":{"key":"a"}}],"terminal_state":"submitted"},"candidate":{"calls":[{"name":"lookup","arguments":"{not-json"}],"terminal_state":"submitted"},"expected_score":{"valid_input":false,"tool_name_exact":false,"arguments_exact":false,"terminal_state_exact":false,"passing":false,"error_code":"malformed_argument_json"}},
+    {"id":"mutation_invalid_terminal","category":"invalid_terminal","expected":{"calls":[],"terminal_state":"submitted"},"candidate":{"calls":[],"terminal_state":"done"},"expected_score":{"valid_input":false,"tool_name_exact":false,"arguments_exact":false,"terminal_state_exact":false,"passing":false,"error_code":"invalid_trace"}},
+    {"id":"mutation_wrong_terminal","category":"wrong_terminal","expected":{"calls":[],"terminal_state":"submitted"},"candidate":{"calls":[],"terminal_state":"max_iters"},"expected_score":{"valid_input":true,"tool_name_exact":true,"arguments_exact":true,"terminal_state_exact":false,"passing":false,"error_code":null}}
+  ]
+}

@@ -2,7 +2,8 @@
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:imp, path: repo}])
+Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 
 ## Build Train And Dev Sets
@@ -142,18 +143,18 @@ result =
     ]
   )
 
-result
+IO.inspect(result, label: "Optimize Anything result")
 ```
 
 ## Live Evaluation Proof
 
-This cell spends a few provider calls when credentials are present. It proves
-that the same `evaluate -> optimize -> report` path works with a real LM, while
-keeping the dataset intentionally tiny.
+This cell spends a few provider calls only when `LIVE_PROVIDER=1` and provider
+credentials are present. It proves that the same `evaluate -> optimize ->
+report` path works with a real LM, while keeping the dataset intentionally tiny.
 
 ```elixir
 live_lm = fn opts ->
-  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
      Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
@@ -166,7 +167,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live proof cell."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live proof cell."}
   end
 end
 ```
@@ -256,7 +257,7 @@ result =
     ]
   )
 
-result
+IO.inspect(result, label: "GEPA-style reflection result")
 ```
 
 Next: open `livebooks/04_tools_agents_mcp_rlm.livemd` when the program needs

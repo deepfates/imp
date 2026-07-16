@@ -141,12 +141,20 @@ Source-checkout maintainer aliases:
 - GEPA paper-family artifact validation through
   `mix benchmark.gepa_replication.check`
 - RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
-- operations stress checks through `mix benchmark.operations_stress.check`
+- matched provider-free RAG/tool failure traces through
+  `mix benchmark.rag_tool_failure.check`
 - repeated deterministic timeout, cancellation, backpressure, partial-stream,
   checkpoint, tamper, and leak checks through
   `mix benchmark.failure_campaign.check`
 - RLM recursive-controller benchmark checks through `mix benchmark.rlm.check`
 - pinned executable upstream conformance through `mix upstream_fidelity.check`
+
+`mix benchmark.operations_stress.check` remains available as a test-only,
+single-process diagnostic. It is intentionally excluded from `mix
+evidence.check`: its timestamped JSON has no source-bound RunContext,
+environment identity, or tamper envelope and must not be cited as C0-C5 claim
+evidence. The underlying behaviors are enforced by ExUnit; source-bound
+operational claims use the failure-recovery and overhead lanes.
 
 The failure campaign writes normalized per-iteration outcomes and flake rates.
 The default alias is T0 provider-free evidence. The compatibility `--live`
@@ -216,6 +224,11 @@ Security-sensitive defaults:
 - saved provider clients load without serialized credentials
 - saved training-job checkpoints contain lifecycle state and checksums but no
   transport or API key; both must be reinjected explicitly on load
+- dispatch journals serialize callers using the same path within one BEAM node,
+  bind provider/model/endpoint/method semantics and job idempotency identity,
+  and refuse credential-bearing job locators; their atomic rename and checksum
+  cover ordinary process interruption, not adversarial writers, power loss, or
+  filesystem failure
 - custom provider endpoint configuration must be explicit and must not silently
   bind ambient provider credentials
 - provider clients use real transport by default; tests use injectable

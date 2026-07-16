@@ -2,7 +2,8 @@
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:imp, path: repo}])
+Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 
 ## Tools
@@ -112,12 +113,12 @@ Imp.to_map(pred)
 
 ## Live ReAct Proof
 
-This cell proves the provider tool-call path with a real LM when credentials
-are present.
+This cell proves the provider tool-call path with a real LM only when
+`LIVE_PROVIDER=1` and provider credentials are present.
 
 ```elixir
 live_lm = fn opts ->
-  if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
     {:ok,
      Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
        Keyword.merge(
@@ -130,7 +131,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL to run the live proof cells."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live proof cells."}
   end
 end
 ```

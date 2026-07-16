@@ -18,7 +18,10 @@ defmodule BenchmarkCatalogTest do
     assert by_id["rlm_recursive_control"].status == "deterministic_implemented"
     assert by_id["program_composition_orchestration"].status == "provider_free_implemented"
     assert by_id["adapter_streaming_structured_io"].status == "provider_free_and_live_implemented"
-    assert by_id["operations_persistence_observability"].status == "provider_free_implemented"
+
+    assert by_id["operations_persistence_observability"].status ==
+             "test_coverage_plus_source_bound_recovery_evidence"
+
     assert by_id["multimodal_primitives"].status == "deterministic_implemented"
     assert by_id["optimizer_lift"].status == "provider_free_implemented"
     assert by_id["gepa_paper_replication"].status == "artifact_contract_implemented"
@@ -43,9 +46,11 @@ defmodule BenchmarkCatalogTest do
     assert by_id["rlm_recursive_control"].metric =~ "budget"
     assert by_id["program_composition_orchestration"].next_step =~ "matched Imp/DSPy"
 
-    assert "mix benchmark.operations_stress.check" in by_id["adapter_streaming_structured_io"].commands
+    assert "mix test test/operations_stress_test.exs test/stream_listener_incremental_test.exs" in by_id[
+             "adapter_streaming_structured_io"
+           ].commands
 
-    assert "mix benchmark.operations_stress.check" in by_id[
+    assert "mix test test/operations_stress_test.exs test/adversarial_security_stress_test.exs" in by_id[
              "operations_persistence_observability"
            ].commands
 
@@ -55,7 +60,7 @@ defmodule BenchmarkCatalogTest do
 
     assert by_id["adapter_streaming_structured_io"].metric =~ "incremental field"
     assert by_id["operations_persistence_observability"].metric =~ "secret absence"
-    assert "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands
+    refute "mix benchmark.operations_stress.check" in by_id["multimodal_primitives"].commands
     assert by_id["multimodal_primitives"].task_shape =~ "content parts"
 
     assert "mix benchmark.instruction_optimizer.contract.check" in by_id["optimizer_lift"].commands

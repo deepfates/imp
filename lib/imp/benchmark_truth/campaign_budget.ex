@@ -17,19 +17,43 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
   def record_usage(server, usage), do: GenServer.call(server, {:usage, usage})
   def snapshot(server), do: GenServer.call(server, :snapshot)
 
-  def attach_req_llm(server) do
+  @doc false
+  def validate_pricing_source_url!(url),
+    do: Imp.BenchmarkTruth.OptimizeAnything.PricingPolicy.validate_source_url!(url)
+
+  @doc false
+  def evidence_digest(value) do
+    encoded = :erlang.term_to_binary(value, [:deterministic])
+    "sha256:" <> (:crypto.hash(:sha256, encoded) |> Base.encode16(case: :lower))
+  end
+
+  def attach_req_llm(server, opts \\ []) do
+    owner = Keyword.get(opts, :owner)
+
+    unless is_nil(owner) or is_pid(owner) do
+      raise ArgumentError, "campaign budget telemetry :owner must be a pid or nil"
+    end
+
     id = {__MODULE__, server, make_ref()}
+    handler_config = if(is_nil(owner), do: {server, id}, else: {server, id, owner})
 
     :ok =
       :telemetry.attach(
         id,
         [:req_llm, :token_usage],
         &__MODULE__.handle_req_llm_usage_event/4,
-        {server, id}
+        handler_config
       )
 
     id
   end
+
+  def handle_req_llm_usage_event(_event, _measurements, _metadata, {_server, _id, owner})
+      when is_pid(owner) and owner != self(),
+      do: :ok
+
+  def handle_req_llm_usage_event(event, measurements, metadata, {server, id, _owner}),
+    do: handle_req_llm_usage_event(event, measurements, metadata, {server, id})
 
   @doc false
   def handle_req_llm_usage_event(_event, measurements, _metadata, {server, id})
@@ -280,8 +304,14 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
            "output_per_million" => output
          } = pricing
        )
-       when is_number(input) and input >= 0 and is_number(output) and output >= 0,
-       do: pricing
+       when is_number(input) and input >= 0 and is_number(output) and output >= 0 do
+    case Map.get(pricing, "source_url", Map.get(pricing, :source_url)) do
+      nil -> :ok
+      source_url -> validate_pricing_source_url!(source_url)
+    end
+
+    pricing
+  end
 
   defp validate_pricing!(other),
     do:
@@ -384,22 +414,112 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
 
   @behaviour Imp.LM
 
-  defstruct [:inner, :budget]
+  defstruct [:inner, :budget, :max_output_tokens]
 
   @impl true
   def generate(_messages, _opts), do: {:error, :budgeted_lm_instance_required}
 
   def generate(%__MODULE__{} = lm, messages, opts) do
-    case Imp.BenchmarkTruth.CampaignBudget.reserve(lm.budget, messages, opts) do
-      {:ok, reservation} ->
-        try do
-          Imp.LM.generate(lm.inner, messages, opts)
-        after
-          Imp.BenchmarkTruth.CampaignBudget.release(lm.budget, reservation)
-        end
+    with {:ok, bounded_opts} <- bound_output_tokens(lm.max_output_tokens, opts),
+         {:ok, reservation} <-
+           Imp.BenchmarkTruth.CampaignBudget.reserve(lm.budget, messages, bounded_opts) do
+      try do
+        Imp.LM.generate(sanitize_inner(lm.inner), messages, bounded_opts)
+      after
+        Imp.BenchmarkTruth.CampaignBudget.release(lm.budget, reservation)
+      end
+    else
+      {:error, {:max_output_tokens_exceeded, _requested, _limit}} = error ->
+        error
+
+      {:error, {:invalid_max_output_tokens, _value}} = error ->
+        error
 
       {:error, dimension} ->
         {:error, {:campaign_budget_exhausted, dimension}}
     end
+  end
+
+  defp bound_output_tokens(nil, opts), do: {:ok, opts}
+
+  defp bound_output_tokens(limit, opts) when is_integer(limit) and limit > 0 do
+    requested =
+      [:max_tokens, :max_completion_tokens]
+      |> Enum.flat_map(fn key ->
+        case Keyword.fetch(opts, key) do
+          {:ok, value} -> [{key, value}]
+          :error -> []
+        end
+      end)
+
+    case Enum.find(requested, fn {_key, value} ->
+           not (is_integer(value) and value >= 0)
+         end) do
+      {key, value} ->
+        {:error, {:invalid_max_output_tokens, {key, value}}}
+
+      nil ->
+        case Enum.find(requested, fn {_key, value} -> value > limit end) do
+          {_key, value} ->
+            {:error, {:max_output_tokens_exceeded, value, limit}}
+
+          nil ->
+            effective =
+              Keyword.get(opts, :max_completion_tokens, Keyword.get(opts, :max_tokens, limit))
+
+            bounded_opts =
+              opts
+              |> scrub_nested_transport_controls()
+              |> Keyword.delete(:max_completion_tokens)
+              |> Keyword.put(:max_tokens, effective)
+              |> Keyword.put(:max_retries, 0)
+              |> Keyword.put(:cache, false)
+
+            {:ok, bounded_opts}
+        end
+    end
+  end
+
+  defp bound_output_tokens(limit, _opts),
+    do: {:error, {:invalid_max_output_tokens, limit}}
+
+  defp sanitize_inner(%Imp.Clients.ReqLLM{} = inner) do
+    %{inner | opts: scrub_transport_controls(inner.opts)}
+  end
+
+  defp sanitize_inner(%{module: _module, opts: opts} = inner) when is_list(opts) do
+    %{inner | opts: scrub_transport_controls(opts)}
+  end
+
+  defp sanitize_inner(inner), do: inner
+
+  defp scrub_transport_controls(opts) do
+    opts
+    |> scrub_nested_transport_controls()
+    |> Keyword.drop([:max_tokens, :max_completion_tokens, :max_retries, :cache])
+  end
+
+  defp scrub_nested_transport_controls(opts) do
+    Enum.reduce([:provider_options, :request_options], opts, fn key, acc ->
+      Keyword.update(acc, key, [], fn
+        nested when is_list(nested) ->
+          Keyword.drop(nested, [:max_tokens, :max_completion_tokens, :max_retries, :cache])
+
+        nested when is_map(nested) ->
+          Map.drop(nested, [
+            :max_tokens,
+            :max_completion_tokens,
+            :max_retries,
+            :cache,
+            "max_tokens",
+            "max_completion_tokens",
+            "max_retries",
+            "cache"
+          ])
+
+        _other ->
+          []
+      end)
+    end)
   end
 end

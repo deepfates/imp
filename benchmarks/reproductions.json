@@ -59,6 +59,49 @@
       "manifest": null,
       "artifact_validator": null
     },
+    "bfcl_shaped_scorer": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.bfcl_adapted",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/bfcl-adapted-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "copro_isolation": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.copro_isolation",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/copro-isolation-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "rag_failure_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.rag_tool_failure_differential",
+      "args": [],
+      "manifest": "benchmarks/config/rag-tool-failure-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
     "rlm_contract": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -216,6 +259,7 @@
     "operations": {
       "mode": "provider_free",
       "max_tier": "t0",
+      "evidence_classification": "test_only_diagnostic",
       "task": "imp.benchmark.operations_stress",
       "args": [],
       "manifest": null,
@@ -363,6 +407,32 @@
       }
     },
     {
+      "id": "bfcl_scorer_infrastructure",
+      "name": "BFCL-shaped scorer benchmark infrastructure",
+      "authority_family": "family.tools_agents_react",
+      "surface_tokens": [
+        "tools"
+      ],
+      "public_surfaces": [
+        "mix imp.benchmark.bfcl_adapted"
+      ],
+      "implementation_paths": [
+        "lib/mix/tasks/imp.benchmark.bfcl_adapted.ex",
+        "scripts/bfcl_adapted_reference_scorer.py",
+        "benchmarks/config/bfcl-adapted-differential-v1.json",
+        "test/fixtures/benchmarks/bfcl-adapted-v1.json"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "bfcl_shaped_scorer"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
       "id": "react",
       "name": "ReAct",
       "authority_family": "family.tools_agents_react",
@@ -379,7 +449,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "rag_agent"
+        "rag_agent",
+        "rag_failure_differential"
       ],
       "admitted_evidence": {
         "tier": "none",
@@ -719,6 +790,7 @@
       "classification": "replication",
       "protocol_ids": [
         "optimizer_lift",
+        "copro_isolation",
         "instruction_live"
       ],
       "admitted_evidence": {

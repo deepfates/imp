@@ -152,10 +152,17 @@ or live provider-training claim.
 
 RAG, tool, and agent evidence is split by capacity. The asserted C2 claim is
 limited to source-bound provider-free operational contracts, with exact DSPy
-rows only where a direct comparison is declared. HotPotQA retrieval and
-supporting-fact quality, a pinned BFCL tool-use subset, and an identical
-cross-runtime failure schedule remain an open C4 comparative-effectiveness
-target. Historical selected live paths do not satisfy that target.
+rows only where a direct comparison is declared. Bounded HotPotQA retrieval is
+a separate differential. The CC0 BFCL-shaped scorer check is only C1/T1
+fixture agreement: independent Elixir and Python implementations score twelve
+original positives and nine mutations. It executes neither official BFCL nor
+DSPy scorer code and establishes no model generation/tool-selection quality,
+official BFCL performance, or operational behavior. A separate C2 differential
+executes an identical queued-action failure schedule through actual Imp and
+source-authenticated DSPy 3.2.1 ReAct, but fixture-owned retry/idempotency and
+an injected timeout exception do not establish model recovery effectiveness or
+wall-clock timeout parity.
+Historical selected live paths do not satisfy the C4 target.
 
 When a profile gate fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the

@@ -25,7 +25,6 @@ defmodule GateContractTest do
              "research.portfolio.check",
              "benchmark.truth.check",
              "benchmark.trace.check",
-             "benchmark.operations_stress.check",
              "benchmark.failure_campaign.check",
              "benchmark.search.check",
              "benchmark.optimizer_lift.check",
@@ -34,6 +33,9 @@ defmodule GateContractTest do
              "benchmark.fast_slow.check",
              "benchmark.optimize_anything.check",
              "benchmark.rag_tool_agent.check",
+             "benchmark.bfcl_scorer.check",
+             "benchmark.copro_isolation.check",
+             "benchmark.rag_tool_failure.check",
              "benchmark.rlm.check",
              "benchmark.rlm.contract.check",
              "upstream_fidelity.check"
@@ -103,6 +105,14 @@ defmodule GateContractTest do
 
     assert Keyword.fetch!(aliases, :"benchmark.rag_tool_agent.check") == [
              "imp.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.bfcl_scorer.check") == [
+             "imp.benchmark.bfcl_adapted --no-require-clean --out tmp/bfcl-shaped-scorer"
+           ]
+
+    assert Keyword.fetch!(aliases, :"benchmark.rag_tool_failure.check") == [
+             "imp.benchmark.rag_tool_failure_differential --no-require-clean --out tmp/rag-tool-failure-differential"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.rlm.check") == [

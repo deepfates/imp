@@ -221,21 +221,21 @@
       "target_rung": "C4",
       "release": "telos",
       "scope": "Comparative effectiveness for retrieval-grounded HotPotQA, pinned BFCL tool use, and an identical matched failure-injected agent schedule.",
-      "limitations": ["A pinned ten-row provider-free HotPotQA shared-corpus differential now measures supporting-fact recall and extractive answer availability, but it is not model-generation quality or full-dataset effectiveness; a pinned BFCL subset and identical cross-runtime fault schedule remain missing."],
+      "limitations": ["A pinned ten-row provider-free HotPotQA differential passes. The BFCL-shaped lane is only C1/T1 cross-language agreement on twelve original positive fixtures and nine original mutations; it does not execute an official BFCL or DSPy scorer and does not measure language-model generation/tool-selection effectiveness or official leaderboard performance. The six-scenario C2 failure differential holds queued actions constant and compares exact runtime observations, but its fixture-owned retry/idempotency logic and injected timeout exception do not establish model recovery effectiveness or wall-clock timeout parity."],
       "statement": "The open telos target requires non-inferior retrieval quality, tool-call accuracy, task completion, and terminal recovery under preregistered matched controls; operational smoke rows and selected live paths cannot satisfy it.",
       "category": "tools_agents_rag",
       "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "benchmarks/config/bfcl-adapted-differential-v1.json", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/hotpot_retrieval_artifact_test.exs", "test/bfcl_adapted_artifact_test.exs", "test/rag_tool_failure_differential_test.exs"],
       "requirements": [
         {
           "id": "rag_tool_agent.comparative_effectiveness",
           "kind": "comparative_effectiveness",
           "lane": "rag_tool_agent",
           "evidence": "full",
-          "threshold": "a source-bound research artifact completes pinned HotPotQA retrieval/supporting-fact scoring, pinned BFCL tool name/argument scoring, and an identical matched cross-runtime failure schedule"
+          "threshold": "a source-bound research artifact completes pinned HotPotQA retrieval/supporting-fact scoring, pinned BFCL model-produced tool name/argument scoring, and an identical model-selected matched cross-runtime failure schedule"
         }
       ]
     },

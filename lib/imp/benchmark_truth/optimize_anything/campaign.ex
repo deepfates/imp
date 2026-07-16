@@ -1,12 +1,13 @@
 defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   @moduledoc false
 
-  alias Imp.BenchmarkTruth.{ArtifactFile, RunContext}
+  alias Imp.BenchmarkTruth.{ArtifactFile, BudgetedLM, CampaignBudget, RunContext}
 
   alias Imp.BenchmarkTruth.OptimizeAnything.{
     AgentConfig,
     Artifact,
     CodeArtifact,
+    PricingPolicy,
     SchedulingHeuristic
   }
 
@@ -36,6 +37,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
     max_proposals = Keyword.get(opts, :max_proposals, 3)
     run_id = Keyword.get(opts, :run_id, run_id())
     gepa_commit = current_gepa_commit!()
+    budget_config = validate_budget_config!(opts)
 
     unless is_integer(max_proposals) and max_proposals > 0 do
       raise ArgumentError, ":max_proposals must be a positive integer"
@@ -47,7 +49,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       "provider" => provider,
       "model" => model,
       "seeds" => seeds,
-      "max_proposals" => max_proposals
+      "max_proposals" => max_proposals,
+      "budget" => budget_config.source
     }
 
     run_context =
@@ -57,10 +60,45 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       )
 
     git_sha = run_context.code_revision
+    run_root = campaign_run_root!(checkpoint_root, run_id)
+    budget_checkpoint = Path.join(run_root, "campaign-budget.json")
+
+    if File.exists?(run_root) or File.exists?(budget_checkpoint) do
+      raise ArgumentError,
+            "Optimize Anything run id #{inspect(run_id)} already has checkpoint state; use a new run id"
+    end
+
     File.mkdir_p!(out_dir)
 
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: budget_config.limits,
+        pricing: budget_config.pricing,
+        default_max_output_tokens: budget_config.max_output_tokens_per_request,
+        on_change: &persist_budget_checkpoint(budget_checkpoint, &1)
+      )
+
+    telemetry_owner = self()
+    budget_handler = CampaignBudget.attach_req_llm(budget, owner: telemetry_owner)
+    audit_handler = {__MODULE__, :usage_audit, make_ref()}
+    {:ok, usage_audit} = Agent.start_link(fn -> empty_usage_audit() end)
+
+    :ok =
+      :telemetry.attach(
+        audit_handler,
+        [:req_llm, :token_usage],
+        &__MODULE__.handle_usage/4,
+        {usage_audit, telemetry_owner}
+      )
+
     context = %{
-      lm: lm,
+      lm: %BudgetedLM{
+        inner: lm,
+        budget: budget,
+        max_output_tokens: budget_config.max_output_tokens_per_request
+      },
+      budget: budget,
+      usage_audit: usage_audit,
       provider: provider,
       model: model,
       seeds: seeds,
@@ -68,42 +106,89 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       checkpoint_root: checkpoint_root,
       run_id: run_id,
       git_sha: git_sha,
-      gepa_commit: gepa_commit
+      gepa_commit: gepa_commit,
+      budget_checkpoint: budget_checkpoint,
+      budget_config: budget_config
     }
 
-    rows =
-      Enum.map(@evaluators, fn evaluator ->
-        run_evaluator(evaluator, context)
-      end)
+    try do
+      rows =
+        Enum.map(@evaluators, fn evaluator ->
+          run_evaluator(evaluator, context)
+        end)
 
-    artifact =
-      Artifact.build(rows,
-        mode: :full,
-        git_sha: git_sha,
-        source: source
-      )
+      budget_snapshot = CampaignBudget.snapshot(budget)
+      validate_final_budget!(budget_snapshot, Agent.get(usage_audit, & &1))
+      persist_budget_checkpoint(budget_checkpoint, budget_snapshot)
+      budget_checkpoint_evidence = read_budget_checkpoint!(budget_checkpoint, budget_snapshot)
 
-    path = Path.join(out_dir, "optimize-anything-replication-#{timestamp_slug()}.json")
-    %{artifact: artifact, path: path} = ArtifactFile.write_run_json!(path, artifact, run_context)
+      rows =
+        Enum.map(rows, fn row ->
+          row
+          |> Map.put("campaign_budget", budget_snapshot)
+          |> put_in(["provenance", "budget_checkpoint"], budget_checkpoint)
+          |> put_in(["reproducibility", "budget"], budget_snapshot)
+        end)
 
-    unless Artifact.full_artifact?(artifact) do
-      raise "Optimize Anything live campaign did not produce full effectiveness evidence; inspect #{path}"
+      artifact =
+        Artifact.build(rows,
+          mode: :full,
+          git_sha: git_sha,
+          source: source
+        )
+        |> Map.put("budget_checkpoint", budget_checkpoint_evidence)
+
+      path = Path.join(out_dir, "optimize-anything-replication-#{timestamp_slug()}.json")
+
+      %{artifact: artifact, path: path} =
+        ArtifactFile.write_run_json!(path, artifact, run_context)
+
+      unless Artifact.full_artifact?(artifact) do
+        raise "Optimize Anything live campaign did not produce full effectiveness evidence; inspect #{path}"
+      end
+
+      %{artifact: artifact, out_path: path}
+    after
+      if Process.alive?(budget) do
+        persist_budget_checkpoint(budget_checkpoint, CampaignBudget.snapshot(budget))
+      end
+
+      :telemetry.detach(audit_handler)
+      :telemetry.detach(budget_handler)
+      Agent.stop(usage_audit)
+      GenServer.stop(budget)
     end
-
-    %{artifact: artifact, out_path: path}
   end
 
   def run(opts),
     do: raise(ArgumentError, "campaign options must be a keyword list, got: #{inspect(opts)}")
 
   @doc false
+  def handle_usage(_event, _measurements, _metadata, {_agent, owner})
+      when owner != self(),
+      do: :ok
+
+  def handle_usage(event, measurements, metadata, {agent, _owner}),
+    do: handle_usage(event, measurements, metadata, agent)
+
   def handle_usage(_event, measurements, _metadata, agent) do
-    Agent.update(agent, &sum_usage(&1, usage_from_measurements(measurements)))
+    Agent.update(agent, fn audit ->
+      usage = usage_from_measurements(measurements)
+
+      %{
+        audit
+        | events: audit.events + 1,
+          invalid_cost_events:
+            audit.invalid_cost_events + if(positive_finite?(usage.cost_usd), do: 0, else: 1)
+      }
+    end)
   end
 
   defp run_evaluator(evaluator, context) do
     %{
       lm: lm,
+      budget: budget,
+      usage_audit: usage_audit,
       provider: provider,
       model: model,
       seeds: seeds,
@@ -111,7 +196,9 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       checkpoint_root: checkpoint_root,
       run_id: run_id,
       git_sha: git_sha,
-      gepa_commit: gepa_commit
+      gepa_commit: gepa_commit,
+      budget_checkpoint: budget_checkpoint,
+      budget_config: budget_config
     } = context
 
     baseline_score = score(evaluator, evaluator.baseline(), evaluator.valset())
@@ -122,12 +209,15 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
         run_seed(
           evaluator,
           lm,
+          budget,
+          usage_audit,
           seed,
           max_proposals,
           checkpoint_root,
           run_id,
           baseline_score,
-          git_sha
+          git_sha,
+          budget_checkpoint
         )
       end)
 
@@ -180,7 +270,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       "evaluator_metadata" => evaluator.metadata(),
       "reproducibility" => %{
         "command" =>
-          "mix imp.benchmark.optimize_anything --live --provider #{provider} --model #{model} --seeds #{Enum.join(seeds, ",")}",
+          reproducibility_command(provider, model, seeds, max_proposals, budget_config),
         "evaluator_version" => evaluator.id(),
         "dataset_source" => "embedded Imp benchmark truth corpus with executable evaluators",
         "environment" => "Elixir #{System.version()} / OTP #{System.otp_release()}",
@@ -203,12 +293,15 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   defp run_seed(
          evaluator,
          lm,
+         budget,
+         usage_audit,
          seed,
          max_proposals,
          checkpoint_root,
          run_id,
          baseline_score,
-         git_sha
+         git_sha,
+         budget_checkpoint
        ) do
     run_dir =
       Path.join([
@@ -238,22 +331,31 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
         ]
       )
 
-    {elapsed_us, result, usage} =
-      measure_usage(fn ->
-        :timer.tc(fn ->
-          OptimizeAnything.run(
-            evaluator.baseline(),
-            &evaluator.evaluate/2,
-            config: config,
-            dataset: evaluator.trainset(),
-            valset: evaluator.valset(),
-            objective:
-              evaluator.metadata()["objective"] || evaluator.metadata()[:objective] ||
-                "Maximize held-out evaluator score while preserving the candidate contract.",
-            background: Jason.encode!(evaluator.metadata(), pretty: true)
-          )
-        end)
+    before_budget = CampaignBudget.snapshot(budget)
+    before_events = Agent.get(usage_audit, & &1.events)
+
+    {elapsed_us, result} =
+      :timer.tc(fn ->
+        OptimizeAnything.run(
+          evaluator.baseline(),
+          &evaluator.evaluate/2,
+          config: config,
+          dataset: evaluator.trainset(),
+          valset: evaluator.valset(),
+          objective:
+            evaluator.metadata()["objective"] || evaluator.metadata()[:objective] ||
+              "Maximize held-out evaluator score while preserving the candidate contract.",
+          background: Jason.encode!(evaluator.metadata(), pretty: true)
+        )
       end)
+
+    after_budget = CampaignBudget.snapshot(budget)
+    after_audit = Agent.get(usage_audit, & &1)
+    usage = budget_usage_delta(before_budget, after_budget)
+    request_count = after_budget["requests"] - before_budget["requests"]
+    event_count = after_audit.events - before_events
+
+    validate_seed_usage!(usage, request_count, event_count, after_audit)
 
     artifact = Result.best_candidate(result)
     optimized_score = score(evaluator, artifact, evaluator.valset())
@@ -268,8 +370,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       metric_calls: result.total_metric_calls,
       wall_time_ms: max(div(elapsed_us, 1_000), 1),
       usage: usage,
+      request_count: request_count,
       run_id: "#{run_id}/#{evaluator.artifact_class()}/#{seed}",
-      checkpoint: checkpoint
+      checkpoint: checkpoint,
+      budget_checkpoint: budget_checkpoint
     }
   end
 
@@ -291,22 +395,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       "git_sha" => git_sha,
       "result" => Result.to_map(result)
     })
-  end
-
-  defp measure_usage(fun) do
-    handler_id = {__MODULE__, :usage, make_ref()}
-    {:ok, agent} = Agent.start_link(fn -> empty_usage() end)
-
-    :ok =
-      :telemetry.attach(handler_id, [:req_llm, :token_usage], &__MODULE__.handle_usage/4, agent)
-
-    try do
-      {elapsed_us, result} = fun.()
-      {elapsed_us, result, Agent.get(agent, & &1)}
-    after
-      :telemetry.detach(handler_id)
-      Agent.stop(agent)
-    end
   end
 
   defp usage_from_measurements(measurements) do
@@ -348,10 +436,215 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       "input_tokens" => run.usage.input_tokens,
       "output_tokens" => run.usage.output_tokens,
       "cost_usd" => run.usage.cost_usd,
+      "request_count" => run.request_count,
       "run_id" => run.run_id,
-      "checkpoint" => run.checkpoint
+      "checkpoint" => run.checkpoint,
+      "budget_checkpoint" => run.budget_checkpoint
     }
   end
+
+  defp validate_budget_config!(opts) do
+    limits = Keyword.fetch!(opts, :limits)
+    pricing = Keyword.fetch!(opts, :pricing)
+    pricing_source_url = Keyword.fetch!(opts, :pricing_source_url)
+    pricing_profile = Keyword.get(opts, :pricing_profile, "custom")
+    max_output_tokens_per_request = Keyword.fetch!(opts, :max_output_tokens_per_request)
+
+    required_limits = [:requests, :input_tokens, :output_tokens, :usd]
+
+    unless Enum.all?(required_limits, fn key ->
+             value = Map.get(limits, key, Map.get(limits, Atom.to_string(key)))
+             is_number(value) and value > 0 and (key == :usd or is_integer(value))
+           end) do
+      raise ArgumentError,
+            ":limits must set positive finite requests, input_tokens, output_tokens, and usd ceilings"
+    end
+
+    PricingPolicy.resolve!(
+      Keyword.fetch!(opts, :provider),
+      Keyword.fetch!(opts, :model),
+      pricing_profile,
+      pricing,
+      pricing_source_url
+    )
+
+    unless is_integer(max_output_tokens_per_request) and max_output_tokens_per_request > 0 and
+             max_output_tokens_per_request <=
+               Map.get(limits, :output_tokens, Map.get(limits, "output_tokens")) do
+      raise ArgumentError,
+            ":max_output_tokens_per_request must be positive and no greater than the output-token ceiling"
+    end
+
+    %{
+      limits: limits,
+      pricing: Map.put(pricing, "source_url", pricing_source_url),
+      pricing_profile: pricing_profile,
+      max_output_tokens_per_request: max_output_tokens_per_request,
+      source: %{
+        "limits" => stringify_keys(limits),
+        "pricing" => Map.put(pricing, "source_url", pricing_source_url),
+        "pricing_profile" => pricing_profile,
+        "max_output_tokens_per_request" => max_output_tokens_per_request,
+        "request_policy" => %{"cache" => false, "max_retries" => 0}
+      }
+    }
+  end
+
+  defp persist_budget_checkpoint(path, snapshot) do
+    payload = %{
+      "schema_version" => 1,
+      "kind" => "optimize_anything_campaign_budget",
+      "budget" => snapshot
+    }
+
+    envelope = %{
+      "payload_sha256" => CampaignBudget.evidence_digest(payload),
+      "payload" => payload
+    }
+
+    File.mkdir_p!(Path.dirname(path))
+    temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
+
+    try do
+      File.write!(temporary, Jason.encode!(envelope, pretty: true) <> "\n", [:sync, :exclusive])
+      File.rename!(temporary, path)
+    after
+      File.rm(temporary)
+    end
+
+    path
+  end
+
+  defp read_budget_checkpoint!(path, expected_snapshot) do
+    envelope = path |> File.read!() |> Jason.decode!()
+    payload = envelope["payload"]
+
+    unless envelope["payload_sha256"] == CampaignBudget.evidence_digest(payload) and
+             payload == %{
+               "schema_version" => 1,
+               "kind" => "optimize_anything_campaign_budget",
+               "budget" => expected_snapshot
+             } do
+      raise "Optimize Anything budget checkpoint failed its final integrity check"
+    end
+
+    envelope
+  end
+
+  defp campaign_run_root!(checkpoint_root, run_id) do
+    unless is_binary(run_id) and Regex.match?(~r/\A[A-Za-z0-9][A-Za-z0-9._-]*\z/, run_id) do
+      raise ArgumentError, ":run_id must be a safe nonempty path fragment"
+    end
+
+    root = Path.expand(checkpoint_root)
+    run_root = Path.expand(run_id, root)
+
+    unless String.starts_with?(run_root, root <> "/") do
+      raise ArgumentError, ":run_id escapes the checkpoint root"
+    end
+
+    run_root
+  end
+
+  defp budget_usage_delta(before, after_snapshot) do
+    before_usage = before["usage"]
+    after_usage = after_snapshot["usage"]
+
+    %{
+      cost_usd: after_usage["usd"] - before_usage["usd"],
+      input_tokens: after_usage["input_tokens"] - before_usage["input_tokens"],
+      output_tokens: after_usage["output_tokens"] - before_usage["output_tokens"]
+    }
+  end
+
+  defp validate_seed_usage!(usage, request_count, event_count, audit) do
+    cond do
+      request_count <= 0 ->
+        raise "Optimize Anything live seed made no provider requests"
+
+      event_count != request_count ->
+        raise "Optimize Anything live seed requires exactly one usage event per provider request"
+
+      audit.invalid_cost_events > 0 ->
+        raise "Optimize Anything live usage event has missing, zero, or non-finite cost"
+
+      not positive_finite?(usage.cost_usd) ->
+        raise "Optimize Anything live seed has missing, zero, or non-finite cost"
+
+      usage.input_tokens <= 0 or usage.output_tokens <= 0 ->
+        raise "Optimize Anything live seed has missing or zero token accounting"
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_final_budget!(snapshot, audit) do
+    cond do
+      snapshot["active_reservations"] != 0 ->
+        raise "Optimize Anything campaign ended with active budget reservations"
+
+      snapshot["exhausted"] != nil ->
+        raise "Optimize Anything campaign exceeded its declared #{snapshot["exhausted"]} ceiling"
+
+      not usage_within_limits?(snapshot) ->
+        raise "Optimize Anything campaign observed usage exceeds its declared ceilings"
+
+      snapshot["requests"] != audit.events ->
+        raise "Optimize Anything campaign request and usage-event counts differ"
+
+      audit.invalid_cost_events > 0 or not positive_finite?(snapshot["usage"]["usd"]) ->
+        raise "Optimize Anything campaign has incomplete provider cost accounting"
+
+      true ->
+        :ok
+    end
+  end
+
+  defp usage_within_limits?(snapshot) do
+    limits = snapshot["limits"]
+    usage = snapshot["usage"]
+
+    snapshot["requests"] <= limits["requests"] and
+      usage["input_tokens"] <= limits["input_tokens"] and
+      usage["output_tokens"] <= limits["output_tokens"] and usage["usd"] <= limits["usd"]
+  end
+
+  defp reproducibility_command(provider, model, seeds, max_proposals, budget_config) do
+    limits = budget_config.limits
+    pricing_args = reproducibility_pricing_args(budget_config)
+
+    "mix imp.benchmark.optimize_anything --live --provider #{provider} --model #{model}" <>
+      " --seeds #{Enum.join(seeds, ",")} --max-proposals #{max_proposals}" <>
+      pricing_args <>
+      " --max-cost-usd #{limit_value(limits, :usd)}" <>
+      " --max-requests #{limit_value(limits, :requests)}" <>
+      " --max-input-tokens #{limit_value(limits, :input_tokens)}" <>
+      " --max-output-tokens #{limit_value(limits, :output_tokens)}" <>
+      " --max-output-tokens-per-request #{budget_config.max_output_tokens_per_request}"
+  end
+
+  defp reproducibility_pricing_args(%{pricing_profile: "custom", pricing: pricing}) do
+    " --input-price-per-million #{pricing["input_per_million"]}" <>
+      " --output-price-per-million #{pricing["output_per_million"]}" <>
+      " --pricing-source-url #{shell_arg(pricing["source_url"])}"
+  end
+
+  defp reproducibility_pricing_args(%{pricing_profile: profile}),
+    do: " --pricing-profile #{shell_arg(profile)}"
+
+  defp shell_arg(value), do: "'" <> String.replace(value, "'", "'\\''") <> "'"
+
+  defp limit_value(limits, key), do: Map.get(limits, key, Map.get(limits, Atom.to_string(key)))
+
+  defp stringify_keys(map), do: Map.new(map, fn {key, value} -> {to_string(key), value} end)
+
+  defp positive_finite?(value) when is_number(value),
+    do: value > 0 and match?({:ok, _encoded}, Jason.encode(value))
+
+  defp positive_finite?(_value), do: false
+
+  defp empty_usage_audit, do: %{events: 0, invalid_cost_events: 0}
 
   defp validate_seeds!(seeds) when is_list(seeds) and length(seeds) >= 3 do
     if Enum.all?(seeds, &is_integer/1) and Enum.uniq(seeds) == seeds,

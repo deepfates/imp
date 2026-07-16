@@ -396,6 +396,7 @@ Initial executable command:
 
 ```sh
 mix benchmark.rag_tool_agent.check
+mix benchmark.rag_tool_failure.check
 mix imp.benchmark.rag_tool_agent \
   --live \
   --model anthropic:claude-haiku-4-5-20251001 \
@@ -420,6 +421,15 @@ artifact under `benchmarks/results/` passed all 15 rows for its bound revision,
 but it does not authorize the current revision. A fresh run belongs under
 `benchmarks/runs/rag-tool-agent/` and still does not imply research-scale
 retrieval or tool-use quality.
+
+The separate `mix imp.benchmark.rag_tool_failure_differential` lane runs one
+six-scenario queued-action schedule through actual Imp ReAct and
+source-authenticated DSPy 3.2.1 ReAct. Exact normalized traces cover a
+transient retry, injected retriever timeout, fixture idempotency replay,
+unknown/failing tools, finish/submit, and max-iteration terminals. This closes
+the provider-free matched-schedule mechanics gap at C2 only. Because the LM
+does not select actions and fixture tools own retry/idempotency behavior, it is
+not recovery effectiveness, wall-clock timeout parity, or native policy parity.
 
 The RLM command produces T0 deterministic contract replay over hand-authored
 fixture rows. It is useful for checking harness wiring and inspecting traces,

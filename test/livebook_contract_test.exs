@@ -26,7 +26,8 @@ defmodule LivebookContractTest do
     for path <- livebooks do
       body = File.read!(path)
 
-      assert body =~ "Mix.install([{:imp, path: repo}])"
+      assert body =~
+               "Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, \"mix.lock\"))"
 
       for term <- @stale_terms do
         refute String.contains?(String.downcase(body), String.downcase(term))
@@ -93,6 +94,20 @@ defmodule LivebookContractTest do
 
       assert body =~ "OPENAI_API_KEY"
       assert body =~ "OPENAI_MODEL"
+      assert body =~ "System.get_env(\"LIVE_PROVIDER\") == \"1\""
+      assert body =~ "live_provider_enabled? && System.get_env(\"OPENAI_API_KEY\")"
+
+      ~r/```elixir\n(.*?)```/s
+      |> Regex.scan(body, capture: :all_but_first)
+      |> List.flatten()
+      |> Enum.filter(fn block ->
+        String.contains?(block, "Imp.req_llm") and
+          String.contains?(block, "System.fetch_env!(\"OPENAI_API_KEY\")")
+      end)
+      |> Enum.each(fn provider_block ->
+        assert provider_block =~
+                 "live_provider_enabled? && System.get_env(\"OPENAI_API_KEY\")"
+      end)
 
       for snippet <- snippets do
         assert body =~ snippet

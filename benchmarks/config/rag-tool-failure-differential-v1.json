@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "protocol_id": "rag-tool-failure-differential-v1",
+  "reference": {
+    "repository": "stanfordnlp/dspy",
+    "version": "3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "authority": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+    "source_materialization": "clean git checkout at exact 3.2.1 tag and commit",
+    "authority_manifest_files": 296,
+    "exercised_sources": [
+      "dspy/predict/react.py",
+      "dspy/adapters/types/tool.py"
+    ]
+  },
+  "execution": {
+    "provider_free": true,
+    "lm": "deterministic queued actions",
+    "imp_program": "Imp.Predict.ReAct mode dspy_3_2_1",
+    "reference_program": "dspy.ReAct",
+    "comparison": "exact normalized action observations and terminal state"
+  },
+  "credential_isolation": {
+    "child_environment": "credential-bearing variables removed before process start",
+    "python_import": "DSPy imported only after a second environment scrub",
+    "dotenv": "disabled",
+    "canary": "dummy API-key canary must be observed before scrub and absent during every queued LM call"
+  },
+  "scenarios": [
+    {
+      "id": "transient_retry_then_success",
+      "max_iters": 3,
+      "answer": "Paris",
+      "actions": [
+        {"tool": "unstable_lookup", "arguments": {"request_id": "retry-1"}},
+        {"tool": "unstable_lookup", "arguments": {"request_id": "retry-1"}},
+        {"tool": "finish", "arguments": {}}
+      ],
+      "expected_trace": [
+        {"tool": "unstable_lookup", "arguments": {"request_id": "retry-1"}, "outcome": "transient_error"},
+        {"tool": "unstable_lookup", "arguments": {"request_id": "retry-1"}, "outcome": "success", "value": "Paris"},
+        {"tool": "finish", "arguments": {}, "outcome": "terminal"}
+      ],
+      "expected_terminal": {"reason": "finish", "state": "recovered", "answer": "Paris"}
+    },
+    {
+      "id": "retriever_timeout_observed",
+      "max_iters": 2,
+      "answer": "timeout-observed",
+      "actions": [
+        {"tool": "timed_retriever", "arguments": {"query": "capital-france"}},
+        {"tool": "finish", "arguments": {}}
+      ],
+      "expected_trace": [
+        {"tool": "timed_retriever", "arguments": {"query": "capital-france"}, "outcome": "timeout_error"},
+        {"tool": "finish", "arguments": {}, "outcome": "terminal"}
+      ],
+      "expected_terminal": {"reason": "finish", "state": "timeout_observed", "answer": "timeout-observed"}
+    },
+    {
+      "id": "idempotent_replay",
+      "max_iters": 3,
+      "answer": "Paris",
+      "actions": [
+        {"tool": "idempotent_lookup", "arguments": {"idempotency_key": "idem-1"}},
+        {"tool": "idempotent_lookup", "arguments": {"idempotency_key": "idem-1"}},
+        {"tool": "finish", "arguments": {}}
+      ],
+      "expected_trace": [
+        {"tool": "idempotent_lookup", "arguments": {"idempotency_key": "idem-1"}, "outcome": "fresh", "value": "Paris"},
+        {"tool": "idempotent_lookup", "arguments": {"idempotency_key": "idem-1"}, "outcome": "replay", "value": "Paris"},
+        {"tool": "finish", "arguments": {}, "outcome": "terminal"}
+      ],
+      "expected_terminal": {"reason": "finish", "state": "success", "answer": "Paris"}
+    },
+    {
+      "id": "unknown_tool_then_finish",
+      "max_iters": 2,
+      "answer": "unknown-observed",
+      "actions": [
+        {"tool": "ghost_lookup", "arguments": {"query": "capital-france"}},
+        {"tool": "finish", "arguments": {}}
+      ],
+      "expected_trace": [
+        {"tool": "ghost_lookup", "arguments": {"query": "capital-france"}, "outcome": "unknown_tool_error"},
+        {"tool": "finish", "arguments": {}, "outcome": "terminal"}
+      ],
+      "expected_terminal": {"reason": "finish", "state": "unknown_observed", "answer": "unknown-observed"}
+    },
+    {
+      "id": "failing_tool_then_finish",
+      "max_iters": 2,
+      "answer": "failure-observed",
+      "actions": [
+        {"tool": "broken_lookup", "arguments": {"query": "capital-france"}},
+        {"tool": "finish", "arguments": {}}
+      ],
+      "expected_trace": [
+        {"tool": "broken_lookup", "arguments": {"query": "capital-france"}, "outcome": "permanent_error"},
+        {"tool": "finish", "arguments": {}, "outcome": "terminal"}
+      ],
+      "expected_terminal": {"reason": "finish", "state": "failure_observed", "answer": "failure-observed"}
+    },
+    {
+      "id": "iteration_budget_terminal",
+      "max_iters": 1,
+      "answer": "budget-exhausted",
+      "actions": [
+        {"tool": "stable_lookup", "arguments": {"query": "capital-france"}}
+      ],
+      "expected_trace": [
+        {"tool": "stable_lookup", "arguments": {"query": "capital-france"}, "outcome": "success", "value": "Paris"}
+      ],
+      "expected_terminal": {"reason": "max_iters", "state": "budget_exhausted", "answer": "budget-exhausted"}
+    }
+  ],
+  "limitations": [
+    "This is C2 provider-free operational differential evidence, not model, retrieval-quality, or tool-selection effectiveness evidence.",
+    "The queued LM preregisters actions; it does not test whether a model chooses recovery actions.",
+    "The retry and idempotency state machines belong to the shared fixture tools, not to DSPy or Imp.",
+    "The timeout row injects a tool-level TimeoutError/deadline exception; it does not compare wall-clock cancellation or transport timeout implementations.",
+    "Only DSPy ReAct and Tool source files authenticated at the pinned revision are attributed to DSPy."
+  ]
+}

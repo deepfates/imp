@@ -91,13 +91,31 @@ configuration, and scheduling artifacts:
 ```sh
 mix benchmark.optimize_anything.check
 mix imp.benchmark.optimize_anything --live --provider openai \
-  --model gpt-5.4-2026-03-05 --seeds 17,23,31 --max-proposals 5 \
+  --model gpt-5.4-2026-03-05 \
+  --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
+  --seeds 17,23,31 --max-proposals 5 \
+  --max-cost-usd 0.50 --max-requests 20 \
+  --max-input-tokens 100000 --max-output-tokens 20000 \
+  --max-output-tokens-per-request 1000 \
   --out benchmarks/runs/optimize-anything
 ```
 
 The smoke command validates wiring only. The source-checkout benchmark guide
 defines the multi-seed, held-out evaluation, cost, and checkpoint requirements
-that authorize the scoped live effectiveness claim.
+that authorize the scoped live effectiveness claim. The live command requires
+all spend and token ceilings explicitly, reserves worst-case request cost
+before transport, disables cache hits and transport retries, and records a
+checksummed budget checkpoint; missing or zero provider cost telemetry aborts
+the campaign. A provider-reported final-call overrun is retained in the
+checkpoint but cannot produce full evidence. The pinned price profile is bound
+to the exact provider/model snapshot and the official OpenAI pricing source.
+The final checkpoint envelope is embedded and validated without relying on its
+informational local path. Persistence is a sync-write plus rename of the latest
+snapshot, not an append-only log, resumable spend state, directory-fsync, or
+power-loss guarantee. Existing run ids are refused; after a process restart,
+review the checkpoint and launch a new run id with a fresh limit. The separate
+$15 matched-upstream research maximum is not the $0.50 ceiling for this narrow
+rerun and does not authorize an additional asserted product claim.
 
 Current implementation fidelity is pinned to GEPA v0.1.4. The exact v0.1.1
 checkout remains a historical structural differential, and new campaign

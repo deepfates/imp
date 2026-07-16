@@ -25,7 +25,13 @@ defmodule Imp.Optimizer.COPROIsolationDifferentialTest do
           "test/fixtures/dspy_copro_isolation_differential.json"
         ],
         cd: File.cwd!(),
-        env: [{"PYTHONPATH", target}],
+        env: [
+          {"PYTHONPATH", target},
+          {"OPENAI_API_KEY", "dummy-copro-canary-never-use"},
+          {"AWS_SESSION_TOKEN", "dummy-copro-cloud-canary-never-use"},
+          {"API_KEY", "dummy-copro-generic-canary-never-use"},
+          {"TOKEN", "dummy-copro-generic-token-never-use"}
+        ],
         stderr_to_stdout: true
       )
 
@@ -45,6 +51,7 @@ defmodule Imp.Optimizer.COPROIsolationDifferentialTest do
 
     assert artifact["runtime_identity"]["git_clean"]
     assert artifact["runtime_identity"]["authority_manifest_verified_files"] == 296
+    assert artifact["credential_environment"]["provider_credential_names_present"] == []
     assert artifact["isolation"]["isolated_process"]
     refute artifact["isolation"]["poison_marker_seen"]
     assert artifact["observations"]["proposal_n"] == [3]

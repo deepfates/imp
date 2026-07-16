@@ -803,6 +803,11 @@ defmodule Imp.Clients.Trainer do
               keyword()
             ) ::
               {:ok, Imp.Clients.TrainingJob.t()} | {:error, term()}
+
+  @callback reconcile_finetune(String.t()) ::
+              {:ok, Imp.Clients.TrainingJob.t()} | {:error, term()}
+  @callback reconcile_finetune(term(), String.t()) ::
+              {:ok, Imp.Clients.TrainingJob.t()} | {:error, term()}
   @callback finetune(
               term(),
               term(),
@@ -842,6 +847,8 @@ defmodule Imp.Clients.Trainer do
 
   @optional_callbacks finetune: 3,
                       finetune: 4,
+                      reconcile_finetune: 1,
+                      reconcile_finetune: 2,
                       supported_methods: 0,
                       supported_methods: 1,
                       start_reinforcement: 2,
@@ -863,8 +870,36 @@ defmodule Imp.Clients.Trainer do
     opts = validate_opts!(opts)
     examples = validate_examples!(examples)
 
+    case Keyword.pop(opts, :dispatch_journal_path) do
+      {nil, provider_opts} ->
+        finetune_direct(provider, lm, examples, provider_opts)
+
+      {path, provider_opts} when is_binary(path) and path != "" ->
+        Imp.Clients.TrainingDispatch.run(provider, lm, examples, provider_opts, path)
+
+      {path, _provider_opts} ->
+        {:error, {:invalid_training_dispatch_journal_path, path}}
+    end
+  end
+
+  @doc false
+  def finetune_direct(provider, lm, examples, opts) do
     with :ok <- supports_method(provider, Keyword.get(opts, :method, :sft)) do
       do_finetune(provider, lm, examples, opts)
+    end
+  end
+
+  @doc "Reconciles a durable finetuning dispatch identifier to its provider job."
+  def reconcile_finetune(provider, dispatch_id) when is_binary(dispatch_id) do
+    case dispatch_training(provider, :reconcile_finetune, [dispatch_id]) do
+      {:ok, %Imp.Clients.TrainingJob{} = job} ->
+        {:ok, Imp.Clients.TrainingJob.validate_terminal(job)}
+
+      {:ok, other} ->
+        {:error, {:invalid_training_reconciliation_result, other}}
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -987,6 +1022,25 @@ defmodule Imp.Clients.Trainer do
   end
 
   defp do_finetune(provider, _lm, _examples, _opts), do: {:error, {:not_a_trainer, provider}}
+
+  defp dispatch_training(module, callback, args) when is_atom(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, callback, length(args)) do
+      call_trainer(fn -> apply(module, callback, args) end, module)
+    else
+      {:error, {:training_callback_not_supported, callback}}
+    end
+  end
+
+  defp dispatch_training(%module{} = trainer, callback, args) do
+    if Code.ensure_loaded?(module) and function_exported?(module, callback, length(args) + 1) do
+      call_trainer(fn -> apply(module, callback, [trainer | args]) end, module)
+    else
+      {:error, {:training_callback_not_supported, callback}}
+    end
+  end
+
+  defp dispatch_training(_provider, callback, _args),
+    do: {:error, {:training_callback_not_supported, callback}}
 
   defp dispatch(module, callback, args) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, callback, length(args)) do

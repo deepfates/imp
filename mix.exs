@@ -84,6 +84,9 @@ defmodule Imp.MixProject do
           "benchmark.overhead.check": :test,
           "benchmark.search.check": :test,
           "benchmark.rag_tool_agent.check": :test,
+          "benchmark.bfcl_scorer.check": :test,
+          "benchmark.copro_isolation.check": :test,
+          "benchmark.rag_tool_failure.check": :test,
           "benchmark.rlm.check": :test,
           "benchmark.rlm.contract.check": :test,
           "reproduction.check": :test,
@@ -315,7 +318,6 @@ defmodule Imp.MixProject do
         "research.portfolio.check",
         "benchmark.truth.check",
         "benchmark.trace.check",
-        "benchmark.operations_stress.check",
         "benchmark.failure_campaign.check",
         "benchmark.search.check",
         "benchmark.optimizer_lift.check",
@@ -324,6 +326,9 @@ defmodule Imp.MixProject do
         "benchmark.fast_slow.check",
         "benchmark.optimize_anything.check",
         "benchmark.rag_tool_agent.check",
+        "benchmark.bfcl_scorer.check",
+        "benchmark.copro_isolation.check",
+        "benchmark.rag_tool_failure.check",
         "benchmark.rlm.check",
         "benchmark.rlm.contract.check",
         "upstream_fidelity.check"
@@ -381,6 +386,15 @@ defmodule Imp.MixProject do
       ],
       "benchmark.rag_tool_agent.check": [
         "imp.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
+      ],
+      "benchmark.bfcl_scorer.check": [
+        "imp.benchmark.bfcl_adapted --no-require-clean --out tmp/bfcl-shaped-scorer"
+      ],
+      "benchmark.copro_isolation.check": [
+        "imp.benchmark.copro_isolation --require-clean --out tmp/copro-isolation"
+      ],
+      "benchmark.rag_tool_failure.check": [
+        "imp.benchmark.rag_tool_failure_differential --no-require-clean --out tmp/rag-tool-failure-differential"
       ],
       "benchmark.rlm.check": [
         "imp.benchmark.rlm --data test/fixtures/benchmarks/hotpotqa-small.jsonl --out tmp/rlm-benchmark"

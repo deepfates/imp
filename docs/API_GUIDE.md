@@ -766,6 +766,34 @@ configured. `Imp.Clients.MLXLMTrainer` is an optional, explicit local SFT
 backend, not a fallback. A training optimizer that declares optional validation
 accepts it as `validation:` in the fourth-argument keyword options.
 
+Direct provider submissions can close the accepted-submit/lost-handle crash
+window by passing `dispatch_journal_path:` to `Imp.Clients.Trainer.finetune/4`.
+Imp writes a credential-free prepared intent before dispatch, uses a stable
+derived idempotency identity, and atomically commits the returned
+`Imp.Clients.TrainingJob` before returning it. A trainer may implement
+`reconcile_finetune/2` (or module callback `reconcile_finetune/1`) to recover an
+accepted job after an ambiguous caller crash. If reconciliation is unavailable,
+an ambiguous dispatch fails closed instead of risking a duplicate provider job.
+Reuse a journal only with the same trainer identity, model, examples, and
+semantic options; mismatches are rejected.
+
+Calls sharing one journal path are serialized inside the current BEAM node, so
+concurrent callers cannot independently submit the same prepared intent. A
+submitted or reconciled job must carry the exact derived idempotency identity;
+a different identity is rejected and never committed. Committed custom-provider
+jobs are reconciled again to rebuild process-local runtime state. If that
+provider cannot reconcile, resume fails explicitly instead of returning a
+handle whose callbacks or transport were lost.
+
+Journal payloads exclude credentials, callbacks, PIDs, and transports. Endpoint,
+provider, model, method, examples, and other semantic configuration remain
+identity-bound. A credential-bearing job ID, provider/model artifact locator, or
+status/cancel URL makes safe resumability impossible and therefore fails closed
+before the job handle is persisted. The same-directory sync-write-and-rename
+protocol plus checksum covers cooperative callers and ordinary BEAM process
+crashes. It does not claim protection from adversarial local writers, host power
+loss, filesystem failure, or concurrent writers outside this API.
+
 Optimizer-specific `compile` functions remain public for advanced workflows
 that need their native return values or split/options layout. The MIPROv2 and
 SIMBA checkpoint examples above use that direct surface. Constructor optimizers

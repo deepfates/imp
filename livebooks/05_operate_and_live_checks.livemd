@@ -2,7 +2,8 @@
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:imp, path: repo}])
+Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 
 ## Local Quality Gates
@@ -76,11 +77,11 @@ runtime.traces
 
 ## Optional Live Provider
 
-This cell expects `OPENAI_API_KEY` and `OPENAI_MODEL` to be present in your
-environment. Do not paste secrets into the notebook.
+This cell requires `LIVE_PROVIDER=1`, `OPENAI_API_KEY`, and `OPENAI_MODEL` in
+your environment. Do not paste secrets into the notebook.
 
 ```elixir
-if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   model = System.fetch_env!("OPENAI_MODEL")
 
   lm =
@@ -93,7 +94,7 @@ if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   program = Imp.predict("question -> answer", lm: lm)
   Imp.call(program, %{question: "Reply with exactly: pong"})
 else
-  {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live provider cell."}
+  {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL before running the live provider cell."}
 end
 ```
 
@@ -114,7 +115,7 @@ This cell validates the same live provider path and asserts the expected output
 when credentials are present.
 
 ```elixir
-if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
+if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
   model = System.fetch_env!("OPENAI_MODEL")
 
   lm =
@@ -134,7 +135,7 @@ if System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
 
   Imp.to_map(prediction)
 else
-  {:skip, "Set OPENAI_API_KEY and OPENAI_MODEL before running the live operations proof."}
+  {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL before running the live operations proof."}
 end
 ```
 

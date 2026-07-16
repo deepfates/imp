@@ -1343,6 +1343,14 @@
           "optional": true
         },
         {
+          "name": "reconcile_finetune/1",
+          "optional": true
+        },
+        {
+          "name": "reconcile_finetune/2",
+          "optional": true
+        },
+        {
           "name": "reconcile_reinforcement/1",
           "optional": true
         },
@@ -1395,6 +1403,7 @@
       "functions": [
         "final_model_artifact/2",
         "finetune/4",
+        "reconcile_finetune/2",
         "reconcile_reinforcement/2",
         "reinforcement_status/2",
         "reinforcement_step/4",
@@ -1412,6 +1421,8 @@
           "final_model_artifact/2": [],
           "finetune/3": [],
           "finetune/4": [],
+          "reconcile_finetune/1": [],
+          "reconcile_finetune/2": [],
           "reconcile_reinforcement/1": [],
           "reconcile_reinforcement/2": [],
           "reinforcement_status/1": [],
@@ -1431,6 +1442,9 @@
           ],
           "finetune/4": [
             "finetune(provider, lm, examples, opts \\\\ [])"
+          ],
+          "reconcile_finetune/2": [
+            "reconcile_finetune(provider, dispatch_id)"
           ],
           "reconcile_reinforcement/2": [
             "reconcile_reinforcement(provider, dispatch_id)"

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "authority": "Berkeley Function Calling Leaderboard protocol and scorer",
+  "repository": "https://github.com/ShishirPatil/gorilla",
+  "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "commit_date": "2026-03-23T19:40:47+08:00",
+  "license": "Apache-2.0",
+  "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "source_files": [
+    {
+      "path": "berkeley-function-call-leaderboard/README.md",
+      "sha256": "c6c95683cce9653788c8b3f3f5002d2f5c27b95a1288544fe82c2a2faf5e12d0"
+    },
+    {
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/eval_checker/ast_eval/ast_checker.py",
+      "sha256": "2aae7a68461a8f76c0be3894c8901b66b56967a1989d3ab066051e3fb97f1538"
+    },
+    {
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/eval_checker/eval_runner.py",
+      "sha256": "b1033684908819ccb312d4d0e2c563359d69247412f00206013b2292b0e3ce81"
+    }
+  ],
+  "materialization": {
+    "method": "git clone --depth 1 followed by git rev-parse HEAD and local SHA-256",
+    "verified_remote": "https://github.com/ShishirPatil/gorilla.git"
+  },
+  "usage": "Protocol provenance only. Imp does not execute, vendor, or claim agreement with the official BFCL scorer in this lane."
+}

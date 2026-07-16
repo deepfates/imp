@@ -11,7 +11,8 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | Signature, Predict, and ChainOfThought | adaptation | core_trace | NONE | none |
 | Model/provider normalized runtime | native_extension | live_matrix | NONE | none |
 | Structured adapters and multimodal values | adaptation | multimodal_live | T2 | benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json |
-| ReAct | adaptation | rag_agent | NONE | none |
+| BFCL-shaped scorer benchmark infrastructure | adaptation | bfcl_shaped_scorer | NONE | none |
+| ReAct | adaptation | rag_agent<br>rag_failure_differential | NONE | none |
 | ReActV2 | adaptation | rag_agent | NONE | none |
 | MCP protocol boundary | native_extension | rag_agent | NONE | none |
 | CodeAct | adaptation | rag_agent | NONE | none |
@@ -25,7 +26,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BootstrapFewShot | replication | optimizer_lift<br>instruction_live | NONE | none |
 | BootstrapRS and RandomSearch | replication | optimizer_lift | NONE | none |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>instruction_live | NONE | none |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | NONE | none |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |
