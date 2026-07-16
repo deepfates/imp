@@ -458,6 +458,22 @@ defmodule Imp.Clients.ReqLLM do
     )
   end
 
+  defp normalize_tool_call(%{id: id, name: name, args: arguments}) do
+    ReqLLM.ToolCall.new(
+      id || tool_call_id(name),
+      to_string(name),
+      Jason.encode!(arguments || %{})
+    )
+  end
+
+  defp normalize_tool_call(%{"id" => id, "name" => name, "args" => arguments}) do
+    ReqLLM.ToolCall.new(
+      id || tool_call_id(name),
+      to_string(name),
+      Jason.encode!(arguments || %{})
+    )
+  end
+
   defp normalize_tool_call(other), do: other
 
   defp tool_call_id([%{id: id} | _]), do: id

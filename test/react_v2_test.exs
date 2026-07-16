@@ -5,18 +5,21 @@ defmodule ReActV2Test do
     def generate_text(model, messages, opts) do
       state = Keyword.fetch!(opts, :state)
       test_pid = Keyword.fetch!(opts, :test_pid)
-      send(test_pid, {:native_tool_request, opts})
+      send(test_pid, {:native_tool_request, messages, opts})
 
       response =
         Agent.get_and_update(state, fn
           :initial ->
             {%ReqLLM.Response{
-               id: "resp_empty",
+               id: "resp_incomplete_submit",
                model: to_string(model),
                context: ReqLLM.Context.new(messages),
-               message: ReqLLM.Context.assistant(""),
-               object: %{tool_calls: []},
-               finish_reason: :stop
+               message:
+                 ReqLLM.Context.assistant("",
+                   tool_calls: [ReqLLM.ToolCall.new("toolu_incomplete", "submit", "{}")]
+                 ),
+               object: nil,
+               finish_reason: :tool_calls
              }, :forced}
 
           :forced ->
@@ -136,10 +139,14 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == "Paris"
     assert Imp.get(prediction, :termination_reason) == :forced_submit
 
-    assert_received {:native_tool_request, initial_opts}
+    assert_received {:native_tool_request, _initial_messages, initial_opts}
     assert initial_opts[:tool_choice] == "auto"
-    assert_received {:native_tool_request, forced_opts}
+    assert_received {:native_tool_request, forced_messages, forced_opts}
     assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
+
+    assert Enum.map(forced_messages, & &1.role) == [:system, :user, :assistant, :tool, :user]
+    assert [%ReqLLM.ToolCall{id: "toolu_incomplete"}] = Enum.at(forced_messages, 2).tool_calls
+    assert Enum.at(forced_messages, 3).tool_call_id == "toolu_incomplete"
   end
 
   test "normalizes atom- and string-keyed tool-call collection wrappers" do
