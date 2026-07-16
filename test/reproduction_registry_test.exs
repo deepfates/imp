@@ -81,12 +81,14 @@ defmodule Imp.ReproductionRegistryTest do
 
     expected = [
       {"bootstrap_few_shot", "bootstrap_few_shot_differential",
-       "imp.benchmark.bootstrap_few_shot_differential"},
+       "imp.benchmark.bootstrap_few_shot_differential",
+       "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9"},
       {"bootstrap_random_search", "random_search_differential",
-       "imp.benchmark.random_search_differential"}
+       "imp.benchmark.random_search_differential",
+       "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318"}
     ]
 
-    Enum.each(expected, fn {feature_id, protocol_id, task} ->
+    Enum.each(expected, fn {feature_id, protocol_id, task, sha256} ->
       feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
       protocol = get_in(registry, ["protocols", protocol_id])
       assert protocol["mode"] == "provider_free"
@@ -97,9 +99,10 @@ defmodule Imp.ReproductionRegistryTest do
       assert protocol_id in feature["protocol_ids"]
 
       assert feature["admitted_evidence"] == %{
-               "tier" => "none",
-               "artifact" => nil,
-               "protocol_id" => nil
+               "tier" => "t1",
+               "artifact" => "benchmarks/evidence/admitted/#{protocol_id}/#{sha256}.json",
+               "artifact_sha256" => sha256,
+               "protocol_id" => protocol_id
              }
     end)
   end

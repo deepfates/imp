@@ -765,9 +765,10 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9.json",
+        "artifact_sha256": "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9",
+        "protocol_id": "bootstrap_few_shot_differential"
       }
     },
     {
@@ -792,9 +793,10 @@
         "optimizer_lift"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/random_search_differential/2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318.json",
+        "artifact_sha256": "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318",
+        "protocol_id": "random_search_differential"
       }
     },
     {
