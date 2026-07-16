@@ -3,13 +3,7 @@ defmodule LiveProviderTest do
 
   @tag :live
   test "ReqLLM-backed live provider completes an Imp prediction" do
-    api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL")
-
-    assert is_binary(api_key) and byte_size(api_key) > 0
-    assert is_binary(model) and byte_size(model) > 0
-
-    lm = Imp.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 20)
+    lm = Imp.Test.LiveProvider.lm(max_completion_tokens: 20)
     program = Imp.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
@@ -28,13 +22,7 @@ defmodule LiveProviderTest do
 
   @tag :live
   test "ReqLLM-backed live provider completes structured JSON prediction" do
-    api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL")
-
-    assert is_binary(api_key) and byte_size(api_key) > 0
-    assert is_binary(model) and byte_size(model) > 0
-
-    lm = Imp.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 80)
+    lm = Imp.Test.LiveProvider.lm(max_completion_tokens: 80)
 
     program =
       Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
@@ -50,13 +38,7 @@ defmodule LiveProviderTest do
 
   @tag :live
   test "ReqLLM-backed live provider accepts native JSON schema response format" do
-    api_key = System.get_env("OPENAI_API_KEY")
-    model = System.get_env("OPENAI_MODEL")
-
-    assert is_binary(api_key) and byte_size(api_key) > 0
-    assert is_binary(model) and byte_size(model) > 0
-
-    lm = Imp.req_llm("openai:#{model}", temperature: 0, max_completion_tokens: 80)
+    lm = Imp.Test.LiveProvider.lm(max_completion_tokens: 80)
 
     program =
       Imp.predict("question -> answer, score: int",

@@ -4,16 +4,7 @@ defmodule LiveProviderE2ETest do
   @moduletag :live
 
   defp live_lm(opts \\ []) do
-    api_key = System.get_env("OPENAI_API_KEY")
-    {model, opts} = Keyword.pop(opts, :model, System.get_env("OPENAI_MODEL"))
-
-    assert is_binary(api_key) and byte_size(api_key) > 0
-    assert is_binary(model) and byte_size(model) > 0
-
-    Imp.req_llm(
-      "openai:#{model}",
-      Keyword.merge([api_key: api_key, temperature: 0, max_completion_tokens: 120], opts)
-    )
+    Imp.Test.LiveProvider.lm(Keyword.merge([max_completion_tokens: 120], opts))
   end
 
   test "live provider completes chain-of-thought with required reasoning field" do
