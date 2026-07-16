@@ -305,6 +305,7 @@ Run the live non-prompt effectiveness campaign with a pinned provider model:
 ```sh
 mix imp.benchmark.optimize_anything \
   --live \
+  --env-file .env \
   --provider openai \
   --model gpt-5.4-2026-03-05 \
   --pricing-profile openai-gpt-5.4-standard-2026-03-05 \

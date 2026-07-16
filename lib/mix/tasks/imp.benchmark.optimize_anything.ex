@@ -6,6 +6,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
       mix imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything
       mix imp.benchmark.optimize_anything --live --provider openai \
         --model gpt-5.4-2026-03-05 --seeds 17,23,31 \
+        --env-file .env \
         --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
         --max-cost-usd 0.50 --max-requests 20 \
         --max-input-tokens 100000 --max-output-tokens 20000 \
@@ -83,7 +84,8 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
           max_requests: :integer,
           max_input_tokens: :integer,
           max_output_tokens: :integer,
-          max_output_tokens_per_request: :integer
+          max_output_tokens_per_request: :integer,
+          env_file: :keep
         ]
       )
 
@@ -100,6 +102,8 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
   end
 
   defp run_live(opts) do
+    env_files = Keyword.get_values(opts, :env_file)
+    Imp.BenchmarkEnv.load_files!(if(env_files == [], do: [".env"], else: env_files))
     provider = Keyword.get(opts, :provider) || Mix.raise("--provider is required for --live")
     model = Keyword.get(opts, :model) || Mix.raise("--model is required for --live")
     seeds = opts |> Keyword.get(:seeds, "0,1,2") |> parse_seeds!()
