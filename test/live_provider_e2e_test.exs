@@ -194,12 +194,7 @@ defmodule LiveProviderE2ETest do
 
     agent =
       Imp.react(signature, [lookup],
-        lm:
-          live_lm(
-            model: "gpt-5.4-mini-2026-03-17",
-            max_completion_tokens: 400,
-            reasoning_effort: "low"
-          ),
+        lm: live_lm(max_completion_tokens: 400),
         tool_policy: [:lookup_capital, :submit],
         max_iters: 4
       )

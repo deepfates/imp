@@ -326,8 +326,7 @@ defmodule Imp.Predict.ReActV2 do
   defp provider_tool_config(tools, signature) do
     [
       tools: Enum.map(Map.values(tools), &tool_description(&1, signature)),
-      tool_choice: "auto",
-      provider_options: [openai_parallel_tool_calls: true]
+      tool_choice: "auto"
     ]
   end
 
