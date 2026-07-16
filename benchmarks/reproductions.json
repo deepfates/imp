@@ -794,9 +794,10 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/copro_isolation/b470039ed3ac73379c551883bd80f0202bf9e8e2875321e056ea1a19d1667da9.json",
+        "artifact_sha256": "b470039ed3ac73379c551883bd80f0202bf9e8e2875321e056ea1a19d1667da9",
+        "protocol_id": "copro_isolation"
       }
     },
     {

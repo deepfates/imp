@@ -26,7 +26,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BootstrapFewShot | replication | optimizer_lift<br>instruction_live | NONE | none |
 | BootstrapRS and RandomSearch | replication | optimizer_lift | NONE | none |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | NONE | none |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/b470039ed3ac73379c551883bd80f0202bf9e8e2875321e056ea1a19d1667da9.json |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |

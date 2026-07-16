@@ -64,7 +64,13 @@ defmodule Imp.ReproductionRegistryTest do
            }
 
     assert "copro_isolation" in copro["protocol_ids"]
-    assert copro["admitted_evidence"]["tier"] == "none"
+    evidence = copro["admitted_evidence"]
+    assert evidence["tier"] == "t1"
+    assert evidence["protocol_id"] == "copro_isolation"
+    assert evidence["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
+
+    assert evidence["artifact"] ==
+             "benchmarks/evidence/admitted/copro_isolation/#{evidence["artifact_sha256"]}.json"
   end
 
   test "rejects duplicate ownership and omitted authority families" do
