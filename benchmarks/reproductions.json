@@ -89,6 +89,36 @@
         "arity": 2
       }
     },
+    "bootstrap_few_shot_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.bootstrap_few_shot_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/classical-optimizer-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "random_search_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.random_search_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/classical-optimizer-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
     "rag_failure_differential": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -730,6 +760,7 @@
       ],
       "classification": "replication",
       "protocol_ids": [
+        "bootstrap_few_shot_differential",
         "optimizer_lift",
         "instruction_live"
       ],
@@ -757,6 +788,7 @@
       ],
       "classification": "replication",
       "protocol_ids": [
+        "random_search_differential",
         "optimizer_lift"
       ],
       "admitted_evidence": {

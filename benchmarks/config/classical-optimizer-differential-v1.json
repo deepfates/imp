@@ -1,0 +1,101 @@
+{
+  "fixture_id": "dspy-classical-optimizer-c1-v1",
+  "source": {
+    "authority_family": "family.optimizer_few_shot_search",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "bootstrap_source": {
+      "path": "dspy/teleprompt/bootstrap.py",
+      "sha256": "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255"
+    },
+    "random_search_source": {
+      "path": "dspy/teleprompt/random_search.py",
+      "sha256": "76c92034e192451eefa91d7942ff0c7a82eb976baf4aee5c76e2e377d5378791"
+    },
+    "bootstrap_upstream_test": {
+      "path": "tests/teleprompt/test_bootstrap.py",
+      "sha256": "54092d2c983a810ae33932ef507d22a7496f5b69510a0e6f31d1ef54527b4cc2"
+    },
+    "random_search_upstream_test": {
+      "path": "tests/teleprompt/test_random_search.py",
+      "sha256": "3301e2f1544e5271cf8a31990c6ff61bd138dc85401a4b1bc3722083ff98f058"
+    }
+  },
+  "bootstrap_few_shot": {
+    "max_bootstrapped_demos": 2,
+    "max_labeled_demos": 0,
+    "max_rounds": 1,
+    "trainset": [
+      {"question": "q0", "answer": "generated"},
+      {"question": "q1", "answer": "gold-q1"},
+      {"question": "q2", "answer": "generated"},
+      {"question": "q3", "answer": "generated"}
+    ],
+    "expected": {
+      "teacher_questions": ["q0", "q1", "q2"],
+      "accepted_questions": ["q0", "q2"],
+      "augmented_answers": ["generated", "generated"],
+      "attempt_count": 3,
+      "compiled_demo_count": 2
+    }
+  },
+  "random_search": {
+    "num_candidate_programs": 3,
+    "max_bootstrapped_demos": 1,
+    "max_labeled_demos": 2,
+    "max_rounds": 1,
+    "restrict": [-3, -2, -1, 0, 1, 2],
+    "trainset": [
+      {"question": "r0", "answer": "constant"},
+      {"question": "r1", "answer": "constant"},
+      {"question": "r2", "answer": "constant"}
+    ],
+    "valset": [
+      {"question": "v0", "answer": "constant"},
+      {"question": "v1", "answer": "constant"}
+    ],
+    "expected": {
+      "candidate_seeds": [-3, -2, -1, 0, 1, 2],
+      "candidate_kinds": ["zero_shot", "labels_only", "unshuffled_bootstrap", "shuffled_bootstrap", "shuffled_bootstrap", "shuffled_bootstrap"],
+      "ranked_seeds": [-3, -2, -1, 0, 1, 2],
+      "demo_counts": [0, 2, 2, 2, 2, 2],
+      "scores": [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
+      "subscores": [[1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0]]
+    }
+  },
+  "scopes": {
+    "bootstrap_few_shot": {
+      "claims": [
+        "Imp and pinned DSPy 3.2.1 traverse the same unshuffled bootstrap examples until the accepted-demo cap",
+        "Imp and pinned DSPy 3.2.1 apply the same exact-match acceptance decisions in the fixture",
+        "Imp and pinned DSPy 3.2.1 assemble the same ordered augmented generated-output demonstrations"
+      ],
+      "not_claimed": [
+        "exact Python RNG parity",
+        "repeated-predictor-call sampling parity",
+        "provider behavior or effectiveness",
+        "full optimizer parity"
+      ]
+    },
+    "random_search": {
+      "claims": [
+        "Imp and pinned DSPy 3.2.1 enumerate the same restricted candidate seed schedule and baseline kinds",
+        "Imp and pinned DSPy 3.2.1 preserve evaluation order across equal-score stable ranking",
+        "Imp and pinned DSPy 3.2.1 produce the same percentage scores, subscores, and demo counts in the fixture"
+      ],
+      "not_claimed": [
+        "exact Python RNG parity",
+        "shuffled training-row order parity",
+        "provider behavior or effectiveness",
+        "full optimizer parity"
+      ]
+    }
+  }
+}

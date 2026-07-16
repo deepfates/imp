@@ -55,6 +55,12 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     :ok
   end
 
+  def validate!(protocol, artifact)
+      when protocol in ["bootstrap_few_shot_differential", "random_search_differential"] do
+    Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential.validate_artifact!(protocol, artifact)
+    :ok
+  end
+
   def validate!("optimize_anything", artifact) do
     validation = OptimizeAnythingArtifact.validate_rows(artifact["rows"], mode: :full)
 

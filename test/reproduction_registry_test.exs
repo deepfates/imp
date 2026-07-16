@@ -76,6 +76,34 @@ defmodule Imp.ReproductionRegistryTest do
              "benchmarks/evidence/admitted/copro_isolation/#{evidence["artifact_sha256"]}.json"
   end
 
+  test "classical optimizer families have separate provider-free T1 protocols" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+
+    expected = [
+      {"bootstrap_few_shot", "bootstrap_few_shot_differential",
+       "imp.benchmark.bootstrap_few_shot_differential"},
+      {"bootstrap_random_search", "random_search_differential",
+       "imp.benchmark.random_search_differential"}
+    ]
+
+    Enum.each(expected, fn {feature_id, protocol_id, task} ->
+      feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
+      protocol = get_in(registry, ["protocols", protocol_id])
+      assert protocol["mode"] == "provider_free"
+      assert protocol["max_tier"] == "t1"
+      assert protocol["task"] == task
+      assert protocol["args"] == ["--require-clean"]
+      assert protocol["manifest"] == "benchmarks/config/classical-optimizer-differential-v1.json"
+      assert protocol_id in feature["protocol_ids"]
+
+      assert feature["admitted_evidence"] == %{
+               "tier" => "none",
+               "artifact" => nil,
+               "protocol_id" => nil
+             }
+    end)
+  end
+
   test "rejects duplicate ownership and omitted authority families" do
     registry = read_json!(@registry)
     authorities = read_json!(@authorities)
