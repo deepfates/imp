@@ -6,7 +6,7 @@ defmodule Imp.Test.LiveProvider do
 
     Imp.req_llm(
       "#{provider}:#{model}",
-      Keyword.merge([api_key: api_key, temperature: 0], opts)
+      Keyword.merge([api_key: api_key, temperature: 0, cache: false, max_retries: 0], opts)
     )
   end
 
