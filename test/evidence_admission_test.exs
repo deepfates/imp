@@ -76,6 +76,44 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmissionTest do
            end)
   end
 
+  test "a valid source-bound refresh can replace an invalid prior artifact" do
+    registry_path = temporary_registry!()
+
+    registry =
+      registry_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.update!("features", fn features ->
+        Enum.map(features, fn feature ->
+          if feature["id"] in ["semantic_f1", "complete_and_grounded"] do
+            put_in(feature["admitted_evidence"], %{
+              "tier" => "t1",
+              "artifact" =>
+                "benchmarks/evidence/admitted/auto_evaluation_contract/#{String.duplicate("0", 64)}.json",
+              "artifact_sha256" => String.duplicate("0", 64),
+              "protocol_id" => "auto_evaluation_contract"
+            })
+          else
+            feature
+          end
+        end)
+      end)
+
+    File.write!(registry_path, Jason.encode!(registry, pretty: true) <> "\n")
+
+    result =
+      EvidenceAdmission.admit!(
+        artifact_path: @artifact,
+        protocol_id: "auto_evaluation_contract",
+        tier: "t1",
+        feature_ids: ["semantic_f1", "complete_and_grounded"],
+        registry_path: registry_path
+      )
+
+    assert result.artifact == @artifact
+    assert result.features == ["semantic_f1", "complete_and_grounded"]
+  end
+
   test "admission rejects an undeclared feature/protocol pair before writing" do
     registry_path = temporary_registry!()
 

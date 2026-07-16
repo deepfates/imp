@@ -21,9 +21,17 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
     registry = Jason.decode!(registry_bytes)
     ordered_registry = Jason.decode!(registry_bytes, objects: :ordered_objects)
     authorities = Imp.EvidenceAuthorities.load!(authority_path)
-    ReproductionRegistry.validate!(registry, authorities, root)
 
     protocol = validate_admission!(registry, protocol_id, tier, feature_ids)
+
+    # A source-bound artifact can become invalid precisely because its canonical
+    # authority or implementation binding advanced. Validate every unaffected
+    # feature while temporarily clearing only the records being atomically
+    # replaced; otherwise a valid refresh is impossible to admit.
+    registry
+    |> clear_target_admissions(feature_ids)
+    |> ReproductionRegistry.validate!(authorities, root)
+
     artifact_bytes = File.read!(artifact_path)
     artifact = Jason.decode!(artifact_bytes)
     ReproductionRegistry.validate_protocol_artifact!(registry, protocol_id, artifact)
@@ -130,6 +138,26 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
       do: raise(ArgumentError, "ordered registry is missing requested features")
 
     put_in(ordered_registry["features"], updated)
+  end
+
+  defp clear_target_admissions(%{"features" => features} = registry, feature_ids) do
+    selected = MapSet.new(feature_ids)
+
+    cleared =
+      Enum.map(features, fn feature ->
+        if MapSet.member?(selected, feature["id"]) do
+          Map.put(feature, "admitted_evidence", %{
+            "tier" => "none",
+            "artifact" => nil,
+            "artifact_sha256" => nil,
+            "protocol_id" => nil
+          })
+        else
+          feature
+        end
+      end)
+
+    Map.put(registry, "features", cleared)
   end
 
   defp admission_record(tier, artifact, sha256, protocol_id) do
