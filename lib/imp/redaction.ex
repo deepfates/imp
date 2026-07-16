@@ -188,7 +188,12 @@ defmodule Imp.Redaction do
       else: [key, redact(nested, keys)]
   end
 
-  def redact(value, keys) when is_list(value), do: Enum.map(value, &redact(&1, keys))
+  def redact([], _keys), do: []
+
+  # Provider failures and low-level protocol metadata can contain improper lists.
+  # Walking cons cells directly preserves their shape and keeps the observability
+  # boundary fail-safe instead of crashing inside Enumerable.
+  def redact([head | tail], keys), do: [redact(head, keys) | redact(tail, keys)]
 
   def redact({key, nested}, keys) when is_atom(key) or is_binary(key) do
     if redacted_entry?(key, nested, keys),
@@ -306,18 +311,7 @@ defmodule Imp.Redaction do
     if credential_entry?(key, nested), do: :drop, else: drop_noncredential_pair([key, nested])
   end
 
-  defp drop_credential_value(list) when is_list(list) do
-    sanitized =
-      Enum.reduce(list, [], fn nested, acc ->
-        case drop_credential_value(nested) do
-          {:keep, value} -> [value | acc]
-          :drop -> acc
-        end
-      end)
-      |> Enum.reverse()
-
-    {:keep, sanitized}
-  end
+  defp drop_credential_value(list) when is_list(list), do: drop_list_values(list, [])
 
   defp drop_credential_value({key, nested}) when is_atom(key) or is_binary(key) do
     if credential_entry?(key, nested) do
@@ -353,6 +347,28 @@ defmodule Imp.Redaction do
       {:keep, value} -> {:keep, [key, value]}
       :drop -> :drop
     end
+  end
+
+  defp drop_list_values([], acc), do: {:keep, Enum.reverse(acc)}
+
+  defp drop_list_values([head | tail], acc) do
+    acc =
+      case drop_credential_value(head) do
+        {:keep, value} -> [value | acc]
+        :drop -> acc
+      end
+
+    drop_list_values(tail, acc)
+  end
+
+  defp drop_list_values(tail, acc) do
+    sanitized_tail =
+      case drop_credential_value(tail) do
+        {:keep, value} -> value
+        :drop -> []
+      end
+
+    {:keep, Enum.reduce(acc, sanitized_tail, fn value, rest -> [value | rest] end)}
   end
 
   defp keep_tagged_entry(acc, encoded_key, nested) do

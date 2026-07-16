@@ -117,6 +117,16 @@ defmodule Imp.RedactionTest do
              {:error, {:provider, "[REDACTED]"}}
   end
 
+  test "redaction and credential dropping preserve improper provider lists" do
+    provider_reason = [:provider_error, %{api_key: "CANARY_IMPROPER_SECRET"} | "messages"]
+
+    assert Imp.Redaction.redact(provider_reason) ==
+             [:provider_error, %{api_key: "[REDACTED]"} | "messages"]
+
+    assert Imp.Redaction.drop_credentials(provider_reason) ==
+             [:provider_error, %{} | "messages"]
+  end
+
   test "malformed typed credential keys fail closed across map boundaries" do
     typed_key = %{"__imp_type__" => "atom", "value" => "api_key", "extra" => "ignored"}
     atom_typed_key = %{__imp_type__: :atom, value: "authorization", extra: true}
