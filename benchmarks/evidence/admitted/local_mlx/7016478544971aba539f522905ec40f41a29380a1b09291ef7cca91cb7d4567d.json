@@ -1,0 +1,2358 @@
+{
+  "acceptance": {
+    "admissible": true,
+    "complete_held_out": true,
+    "fused_improves_accuracy": true,
+    "fused_improves_macro_f1": true,
+    "metrics_recomputed": true,
+    "official_fusion_completed": true,
+    "row_identity_preserved": true,
+    "save_load_equivalent": true
+  },
+  "adapter_inference": {
+    "accuracy": 0.95,
+    "correct": 38,
+    "failures": 0,
+    "latency_ms": 7257.376,
+    "macro_f1": 0.9484126984126984,
+    "reason": "Adapter inference is recorded as a lane check; official fusion provenance remains the supported weight bridge.",
+    "rows": [
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-800",
+        "latency_ms": 486.563,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-801",
+        "latency_ms": 167.716,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-802",
+        "latency_ms": 165.862,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-803",
+        "latency_ms": 175.2,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-804",
+        "latency_ms": 185.275,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-805",
+        "latency_ms": 196.609,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-806",
+        "latency_ms": 176.062,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-807",
+        "latency_ms": 170.097,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-808",
+        "latency_ms": 181.145,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-809",
+        "latency_ms": 166.0,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1080",
+        "latency_ms": 173.116,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1081",
+        "latency_ms": 180.199,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1082",
+        "latency_ms": 166.952,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1083",
+        "latency_ms": 194.059,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1084",
+        "latency_ms": 175.783,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1085",
+        "latency_ms": 172.466,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1086",
+        "latency_ms": 184.777,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1087",
+        "latency_ms": 180.991,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1088",
+        "latency_ms": 170.163,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1089",
+        "latency_ms": 171.146,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1600",
+        "latency_ms": 170.055,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1601",
+        "latency_ms": 163.52,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1602",
+        "latency_ms": 164.356,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1603",
+        "latency_ms": 167.143,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1604",
+        "latency_ms": 168.037,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1605",
+        "latency_ms": 168.961,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1606",
+        "latency_ms": 164.939,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1607",
+        "latency_ms": 169.112,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1608",
+        "latency_ms": 177.236,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1609",
+        "latency_ms": 169.528,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2080",
+        "latency_ms": 165.912,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2081",
+        "latency_ms": 175.533,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2082",
+        "latency_ms": 176.39,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2083",
+        "latency_ms": 173.219,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2084",
+        "latency_ms": 178.167,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2085",
+        "latency_ms": 176.251,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2086",
+        "latency_ms": 167.142,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2087",
+        "latency_ms": 183.91,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2088",
+        "latency_ms": 167.581,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2089",
+        "latency_ms": 168.603,
+        "status": "ok",
+        "usage": null
+      }
+    ],
+    "server": {
+      "adapter_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter",
+      "advertised_model_ids": [
+        "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+      ],
+      "advertised_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "base_url": "http://127.0.0.1:18821/v1",
+      "cleanup": "synchronous_process_group_absence_verified",
+      "command": {
+        "argv": [
+          "--from",
+          "mlx-lm==0.31.3",
+          "mlx_lm.server",
+          "--model",
+          "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "18821",
+          "--max-tokens",
+          "64",
+          "--adapter-path",
+          "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter"
+        ],
+        "executable": "/Users/deepfates/.local/bin/uvx"
+      },
+      "explicit_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "model_id": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "ready_ms": 973,
+      "resolved_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+    },
+    "status": "observed_not_admitted",
+    "total": 40,
+    "usage": {}
+  },
+  "artifact_type": "imp_mlx_weight_training_campaign",
+  "baseline": {
+    "accuracy": 0.15,
+    "correct": 6,
+    "failures": 5,
+    "latency_ms": 7954.48,
+    "macro_f1": 0.07692307692307693,
+    "rows": [
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-800",
+        "latency_ms": 287.644,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-801",
+        "latency_ms": 180.544,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-802",
+        "latency_ms": 184.639,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-803",
+        "latency_ms": 180.563,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-804",
+        "latency_ms": 349.697,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-805",
+        "latency_ms": 187.167,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-806",
+        "latency_ms": 292.542,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-807",
+        "latency_ms": 152.638,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-808",
+        "latency_ms": 189.57,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-809",
+        "latency_ms": 177.414,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1080",
+        "latency_ms": 174.605,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1081",
+        "latency_ms": 176.253,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1082",
+        "latency_ms": 178.649,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1083",
+        "latency_ms": 149.772,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1084",
+        "latency_ms": 176.7,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1085",
+        "latency_ms": 177.526,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1086",
+        "latency_ms": 182.869,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1087",
+        "latency_ms": 179.162,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1088",
+        "latency_ms": 177.754,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1089",
+        "latency_ms": 147.011,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1600",
+        "latency_ms": 188.076,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "correct": false,
+        "error": "%{reason: {:error, %{message: \"Validation failed. Retry with corrected output:\\n- route: must be one of [\\\"R17\\\", \\\"R42\\\", \\\"R68\\\", \\\"R93\\\"]\", reason: %{route: \"[R17]\"}, __exception__: true}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `utterance` (str):\\nYour output fields are:\\n1. `route` (str):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\n[[ ## utterance ## ]]\\n{utterance}\\n\\n[[ ## route ## ]]\\n{route}\\n\\n[[ ## completed ## ]]\\nIn adhering to this structure, your objective is: \\n        Route the customer query to exactly one opaque routing code. The valid codes are R17, R42, R68, and R93. Return no explanation.\"}, %{role: :user, content: \"[[ ## utterance ## ]]\\nWhy is my payment pending?\\n\\nRespond with the corresponding output fields, starting with the field `[[ ## route ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.\"}], raw: \"[R17]\"}}",
+        "expected": "R68",
+        "id": "banking77-test-1601",
+        "latency_ms": 282.682,
+        "status": "error"
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1602",
+        "latency_ms": 179.664,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1603",
+        "latency_ms": 183.969,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "correct": false,
+        "error": "%{reason: {:error, %{message: \"Validation failed. Retry with corrected output:\\n- route: must be one of [\\\"R17\\\", \\\"R42\\\", \\\"R68\\\", \\\"R93\\\"]\", reason: %{route: \"[R17]\"}, __exception__: true}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `utterance` (str):\\nYour output fields are:\\n1. `route` (str):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\n[[ ## utterance ## ]]\\n{utterance}\\n\\n[[ ## route ## ]]\\n{route}\\n\\n[[ ## completed ## ]]\\nIn adhering to this structure, your objective is: \\n        Route the customer query to exactly one opaque routing code. The valid codes are R17, R42, R68, and R93. Return no explanation.\"}, %{role: :user, content: \"[[ ## utterance ## ]]\\nWhy is my card payment showing as pending?\\n\\nRespond with the corresponding output fields, starting with the field `[[ ## route ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.\"}], raw: \"[R17]\"}}",
+        "expected": "R68",
+        "id": "banking77-test-1604",
+        "latency_ms": 248.46,
+        "status": "error"
+      },
+      {
+        "correct": false,
+        "error": "%{reason: {:error, %{message: \"Validation failed. Retry with corrected output:\\n- route: must be one of [\\\"R17\\\", \\\"R42\\\", \\\"R68\\\", \\\"R93\\\"]\", reason: %{route: \"[R17]\"}, __exception__: true}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `utterance` (str):\\nYour output fields are:\\n1. `route` (str):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\n[[ ## utterance ## ]]\\n{utterance}\\n\\n[[ ## route ## ]]\\n{route}\\n\\n[[ ## completed ## ]]\\nIn adhering to this structure, your objective is: \\n        Route the customer query to exactly one opaque routing code. The valid codes are R17, R42, R68, and R93. Return no explanation.\"}, %{role: :user, content: \"[[ ## utterance ## ]]\\nWhy has my payment not gone through?\\n\\nRespond with the corresponding output fields, starting with the field `[[ ## route ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.\"}], raw: \"[R17]\"}}",
+        "expected": "R68",
+        "id": "banking77-test-1605",
+        "latency_ms": 250.701,
+        "status": "error"
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1606",
+        "latency_ms": 153.231,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1607",
+        "latency_ms": 182.035,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1608",
+        "latency_ms": 147.785,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R68",
+        "id": "banking77-test-1609",
+        "latency_ms": 152.258,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2080",
+        "latency_ms": 191.445,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2081",
+        "latency_ms": 181.386,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2082",
+        "latency_ms": 278.95,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2083",
+        "latency_ms": 179.18,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "correct": false,
+        "error": "%{reason: {:error, %{message: \"Validation failed. Retry with corrected output:\\n- route: must be one of [\\\"R17\\\", \\\"R42\\\", \\\"R68\\\", \\\"R93\\\"]\", reason: %{route: \"[R17]\"}, __exception__: true}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `utterance` (str):\\nYour output fields are:\\n1. `route` (str):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\n[[ ## utterance ## ]]\\n{utterance}\\n\\n[[ ## route ## ]]\\n{route}\\n\\n[[ ## completed ## ]]\\nIn adhering to this structure, your objective is: \\n        Route the customer query to exactly one opaque routing code. The valid codes are R17, R42, R68, and R93. Return no explanation.\"}, %{role: :user, content: \"[[ ## utterance ## ]]\\nWhy was my payment cancelled?\\n\\nRespond with the corresponding output fields, starting with the field `[[ ## route ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.\"}], raw: \"[R17]\"}}",
+        "expected": "R93",
+        "id": "banking77-test-2084",
+        "latency_ms": 245.69,
+        "status": "error"
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2085",
+        "latency_ms": 184.752,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2086",
+        "latency_ms": 181.653,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2087",
+        "latency_ms": 197.522,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2088",
+        "latency_ms": 186.014,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "correct": false,
+        "error": "%{reason: {:error, %{message: \"Validation failed. Retry with corrected output:\\n- route: must be one of [\\\"R17\\\", \\\"R42\\\", \\\"R68\\\", \\\"R93\\\"]\", reason: %{route: \"[R17]\"}, __exception__: true}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `utterance` (str):\\nYour output fields are:\\n1. `route` (str):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\n[[ ## utterance ## ]]\\n{utterance}\\n\\n[[ ## route ## ]]\\n{route}\\n\\n[[ ## completed ## ]]\\nIn adhering to this structure, your objective is: \\n        Route the customer query to exactly one opaque routing code. The valid codes are R17, R42, R68, and R93. Return no explanation.\"}, %{role: :user, content: \"[[ ## utterance ## ]]\\nWhy has my card payment been cancelled?\\n\\nRespond with the corresponding output fields, starting with the field `[[ ## route ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.\"}], raw: \"[R17]\"}}",
+        "expected": "R93",
+        "id": "banking77-test-2089",
+        "latency_ms": 254.912,
+        "status": "error"
+      }
+    ],
+    "server": {
+      "adapter_path": null,
+      "advertised_model_ids": [
+        "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+      ],
+      "advertised_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "base_url": "http://127.0.0.1:18821/v1",
+      "cleanup": "synchronous_process_group_absence_verified",
+      "command": {
+        "argv": [
+          "--from",
+          "mlx-lm==0.31.3",
+          "mlx_lm.server",
+          "--model",
+          "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "18821",
+          "--max-tokens",
+          "64"
+        ],
+        "executable": "/Users/deepfates/.local/bin/uvx"
+      },
+      "explicit_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "model_id": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "ready_ms": 8026,
+      "resolved_model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+    },
+    "total": 40,
+    "usage": {}
+  },
+  "dataset": {
+    "file_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+    "held_out_digest": "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1",
+    "held_out_rows": 40,
+    "path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/benchmarks/data/provider-training-banking77-v1.json",
+    "payload_sha256": "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f",
+    "selection": {
+      "held_out_per_label": 10,
+      "selected_source_labels": [
+        "card_payment_fee_charged",
+        "card_payment_not_recognised",
+        "pending_card_payment",
+        "reverted_card_payment?"
+      ],
+      "strategy": "first rows in canonical source order per selected label",
+      "train_held_out_overlap": [],
+      "train_per_label": 20
+    },
+    "source": {
+      "dataset": "PolyAI/banking77",
+      "license": "cc-by-4.0",
+      "paper": "https://arxiv.org/abs/2003.04807v2",
+      "revision": "90d4e2ee5521c04fc1488f065b8b083658768c57"
+    },
+    "train_digest": "sha256:0fa1c7321f2773485139a544054c619620f048ebd8dd52552e3a2ca57878b1ba",
+    "train_rows": 80
+  },
+  "effect": {
+    "accuracy_delta": 0.7,
+    "macro_f1_delta": 0.7661059528706586
+  },
+  "evaluation_contract": {
+    "adapter": "Imp.Adapter.Chat",
+    "cache": false,
+    "held_out_ids": [
+      "banking77-test-800",
+      "banking77-test-801",
+      "banking77-test-802",
+      "banking77-test-803",
+      "banking77-test-804",
+      "banking77-test-805",
+      "banking77-test-806",
+      "banking77-test-807",
+      "banking77-test-808",
+      "banking77-test-809",
+      "banking77-test-1080",
+      "banking77-test-1081",
+      "banking77-test-1082",
+      "banking77-test-1083",
+      "banking77-test-1084",
+      "banking77-test-1085",
+      "banking77-test-1086",
+      "banking77-test-1087",
+      "banking77-test-1088",
+      "banking77-test-1089",
+      "banking77-test-1600",
+      "banking77-test-1601",
+      "banking77-test-1602",
+      "banking77-test-1603",
+      "banking77-test-1604",
+      "banking77-test-1605",
+      "banking77-test-1606",
+      "banking77-test-1607",
+      "banking77-test-1608",
+      "banking77-test-1609",
+      "banking77-test-2080",
+      "banking77-test-2081",
+      "banking77-test-2082",
+      "banking77-test-2083",
+      "banking77-test-2084",
+      "banking77-test-2085",
+      "banking77-test-2086",
+      "banking77-test-2087",
+      "banking77-test-2088",
+      "banking77-test-2089"
+    ],
+    "max_tokens": 32,
+    "server_max_tokens": 64,
+    "sha256": "8d5ecfbe6b926ca5edf20d9d6a037579ba9ad23767f6a8aeee84e76613939cee",
+    "temperature": 0,
+    "timeout_ms": 120000
+  },
+  "evidence_level": "local_weight_effectiveness",
+  "fused": {
+    "accuracy": 0.85,
+    "correct": 34,
+    "failures": 0,
+    "latency_ms": 6190.129,
+    "macro_f1": 0.8430290297937356,
+    "rows": [
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-800",
+        "latency_ms": 216.034,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-801",
+        "latency_ms": 149.445,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-802",
+        "latency_ms": 149.464,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-803",
+        "latency_ms": 145.129,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-804",
+        "latency_ms": 149.443,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-805",
+        "latency_ms": 149.786,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-806",
+        "latency_ms": 149.958,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-807",
+        "latency_ms": 150.398,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-808",
+        "latency_ms": 163.819,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-809",
+        "latency_ms": 154.038,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1080",
+        "latency_ms": 156.188,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1081",
+        "latency_ms": 154.853,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1082",
+        "latency_ms": 162.83,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1083",
+        "latency_ms": 157.377,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1084",
+        "latency_ms": 151.299,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1085",
+        "latency_ms": 149.869,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1086",
+        "latency_ms": 148.916,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1087",
+        "latency_ms": 148.365,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1088",
+        "latency_ms": 147.676,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1089",
+        "latency_ms": 150.138,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1600",
+        "latency_ms": 152.076,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1601",
+        "latency_ms": 147.873,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1602",
+        "latency_ms": 151.905,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1603",
+        "latency_ms": 162.78,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1604",
+        "latency_ms": 171.387,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1605",
+        "latency_ms": 156.242,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1606",
+        "latency_ms": 151.624,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1607",
+        "latency_ms": 146.768,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1608",
+        "latency_ms": 146.387,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1609",
+        "latency_ms": 145.561,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2080",
+        "latency_ms": 149.946,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2081",
+        "latency_ms": 150.948,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2082",
+        "latency_ms": 150.174,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2083",
+        "latency_ms": 153.48,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2084",
+        "latency_ms": 149.533,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2085",
+        "latency_ms": 149.331,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2086",
+        "latency_ms": 149.388,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2087",
+        "latency_ms": 162.168,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2088",
+        "latency_ms": 153.413,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2089",
+        "latency_ms": 182.495,
+        "status": "ok",
+        "usage": null
+      }
+    ],
+    "server": {
+      "adapter_path": null,
+      "advertised_model_ids": [
+        "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused"
+      ],
+      "advertised_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "base_url": "http://127.0.0.1:18821/v1",
+      "cleanup": "synchronous_process_group_absence_verified",
+      "command": {
+        "argv": [
+          "--from",
+          "mlx-lm==0.31.3",
+          "mlx_lm.server",
+          "--model",
+          "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "18821",
+          "--max-tokens",
+          "64"
+        ],
+        "executable": "/Users/deepfates/.local/bin/uvx"
+      },
+      "explicit_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "model_id": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "ready_ms": 1005,
+      "resolved_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused"
+    },
+    "total": 40,
+    "usage": {}
+  },
+  "fusion": {
+    "command": {
+      "argv": [
+        "--from",
+        "mlx-lm==0.31.3",
+        "mlx_lm.fuse",
+        "--model",
+        "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+        "--adapter-path",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter",
+        "--save-path",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused"
+      ],
+      "executable": "/Users/deepfates/.local/bin/uvx"
+    },
+    "result": {
+      "duration_ms": 1434,
+      "exit_status": 0,
+      "output": "Loading pretrained model\n"
+    },
+    "tree": {
+      "files": [
+        {
+          "bytes": 81,
+          "path": "README.md",
+          "sha256": "748c964f9b7e5f2c3770ce013bbc0153be7c54311d9692c343b6188eefe77ac6"
+        },
+        {
+          "bytes": 2509,
+          "path": "chat_template.jinja",
+          "sha256": "d5495a1e5db0611132a97e46a65dbb64a642a499421228b9c8b93229097fa9a4"
+        },
+        {
+          "bytes": 863,
+          "path": "config.json",
+          "sha256": "3542f21e28bfe8422fe98249af39a5b7770fa41ca7d60cda1b72906c2c53b998"
+        },
+        {
+          "bytes": 278064766,
+          "path": "model.safetensors",
+          "sha256": "0b932ef66854b3e31b9a8841df5d49ea1765ee1b7cf1b619856b760e13ce4118"
+        },
+        {
+          "bytes": 44248,
+          "path": "model.safetensors.index.json",
+          "sha256": "bb1adb8f7a341e90908581e5a32299597bedd42000ed6c866bd1269878df8c40"
+        },
+        {
+          "bytes": 11421892,
+          "path": "tokenizer.json",
+          "sha256": "3fd169731d2cbde95e10bf356d66d5997fd885dd8dbb6fb4684da3f23b2585d8"
+        },
+        {
+          "bytes": 729,
+          "path": "tokenizer_config.json",
+          "sha256": "ee8f6d44bf2353e6d3686c3adaf70e1ccfe9e6ed6822d0ab2f28cafdd7754792"
+        }
+      ],
+      "schema_version": 1,
+      "sha256": "c724d1b5707163401ca34395f12dd19795df5a31d3723b31cb6fbd1ede572e0b"
+    }
+  },
+  "generated_at": "2026-07-16T22:31:11Z",
+  "git_sha": "6477c3c991600b58ea2798e8682315fe746db0a1",
+  "limitations": [
+    "This establishes local weight-training effectiveness, not BetterTogether parity.",
+    "Strict parser failures remain incorrect and block a production-ready trained-model claim."
+  ],
+  "model": {
+    "repository": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+    "revision": "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+    "tree": {
+      "files": [
+        {
+          "bytes": 605,
+          "link_target": "../../blobs/482ced4679301bf287ebb310bdd1790eb4514232",
+          "path": "added_tokens.json",
+          "sha256": "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b"
+        },
+        {
+          "bytes": 783,
+          "link_target": "../../blobs/e3c0e76e4e54c951f36d49e3042347b58382136e",
+          "path": "config.json",
+          "sha256": "b045e57ea90b8f1b35f89f954b176a5c1faa02bd0af2c89bcec191239d66cef4"
+        },
+        {
+          "bytes": 1671853,
+          "link_target": "../../blobs/31349551d90c7606f325fe0f11bbb8bd5fa0d7c7",
+          "path": "merges.txt",
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "bytes": 278064920,
+          "link_target": "../../blobs/ddffab9cbc7bf6dde941c6724841eeca8981fcfa81ca20ff8efff1396326d153",
+          "path": "model.safetensors",
+          "sha256": "ddffab9cbc7bf6dde941c6724841eeca8981fcfa81ca20ff8efff1396326d153"
+        },
+        {
+          "bytes": 44209,
+          "link_target": "../../blobs/8831428421e282132532f717fcaba43f8c7f5445",
+          "path": "model.safetensors.index.json",
+          "sha256": "54001cb4c11197119c206dde28e7be08e5872aab6c6d271aed339ec77e84f870"
+        },
+        {
+          "bytes": 613,
+          "link_target": "../../blobs/ac23c0aaa2434523c494330aeb79c58395378103",
+          "path": "special_tokens_map.json",
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "bytes": 7031673,
+          "link_target": "../../blobs/d24314ef7f0afd1b678c2e24c767e19f24f86b0e",
+          "path": "tokenizer.json",
+          "sha256": "a8506e7111b80c6d8635951a02eab0f4e1a8e4e5772da83846579e97b16f61bf"
+        },
+        {
+          "bytes": 7308,
+          "link_target": "../../blobs/482ccbc1096b0e9400e86e33f189681c2aebdab9",
+          "path": "tokenizer_config.json",
+          "sha256": "f7c61e32b7a17d19bf8e7037dcb74079a833e53ea9801f24008cac68458f03b7"
+        },
+        {
+          "bytes": 2776833,
+          "link_target": "../../blobs/4783fe10ac3adce15ac8f358ef5462739852c569",
+          "path": "vocab.json",
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ],
+      "schema_version": 1,
+      "sha256": "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947"
+    }
+  },
+  "program_sha256": "3e3cc79db8fa3b21a34acbda6b4eaefbe7020fde461d0bffb4f2c24d7a31348e",
+  "reloaded": {
+    "accuracy": 0.85,
+    "correct": 34,
+    "failures": 0,
+    "latency_ms": 6063.482,
+    "macro_f1": 0.8430290297937356,
+    "rows": [
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-800",
+        "latency_ms": 159.931,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-801",
+        "latency_ms": 153.484,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-802",
+        "latency_ms": 150.29,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-803",
+        "latency_ms": 149.817,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-804",
+        "latency_ms": 149.572,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-805",
+        "latency_ms": 150.072,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-806",
+        "latency_ms": 150.923,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-807",
+        "latency_ms": 149.701,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": false,
+        "expected": "R17",
+        "id": "banking77-test-808",
+        "latency_ms": 160.547,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": true,
+        "expected": "R17",
+        "id": "banking77-test-809",
+        "latency_ms": 156.148,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1080",
+        "latency_ms": 161.243,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1081",
+        "latency_ms": 154.829,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1082",
+        "latency_ms": 156.45,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1083",
+        "latency_ms": 154.043,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1084",
+        "latency_ms": 152.081,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1085",
+        "latency_ms": 153.478,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R17",
+        "correct": false,
+        "expected": "R42",
+        "id": "banking77-test-1086",
+        "latency_ms": 150.515,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1087",
+        "latency_ms": 148.925,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1088",
+        "latency_ms": 146.334,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R42",
+        "correct": true,
+        "expected": "R42",
+        "id": "banking77-test-1089",
+        "latency_ms": 154.445,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1600",
+        "latency_ms": 150.489,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1601",
+        "latency_ms": 149.156,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1602",
+        "latency_ms": 150.216,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1603",
+        "latency_ms": 148.129,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1604",
+        "latency_ms": 147.011,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1605",
+        "latency_ms": 152.378,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1606",
+        "latency_ms": 151.999,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1607",
+        "latency_ms": 149.862,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1608",
+        "latency_ms": 149.369,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": true,
+        "expected": "R68",
+        "id": "banking77-test-1609",
+        "latency_ms": 146.83,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R68",
+        "correct": false,
+        "expected": "R93",
+        "id": "banking77-test-2080",
+        "latency_ms": 152.104,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2081",
+        "latency_ms": 151.608,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2082",
+        "latency_ms": 150.406,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2083",
+        "latency_ms": 149.395,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2084",
+        "latency_ms": 150.05,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2085",
+        "latency_ms": 146.644,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2086",
+        "latency_ms": 153.714,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2087",
+        "latency_ms": 157.827,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2088",
+        "latency_ms": 146.58,
+        "status": "ok",
+        "usage": null
+      },
+      {
+        "actual": "R93",
+        "correct": true,
+        "expected": "R93",
+        "id": "banking77-test-2089",
+        "latency_ms": 145.349,
+        "status": "ok",
+        "usage": null
+      }
+    ],
+    "server": {
+      "adapter_path": null,
+      "advertised_model_ids": [
+        "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused"
+      ],
+      "advertised_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "base_url": "http://127.0.0.1:18821/v1",
+      "cleanup": "synchronous_process_group_absence_verified",
+      "command": {
+        "argv": [
+          "--from",
+          "mlx-lm==0.31.3",
+          "mlx_lm.server",
+          "--model",
+          "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "18821",
+          "--max-tokens",
+          "64"
+        ],
+        "executable": "/Users/deepfates/.local/bin/uvx"
+      },
+      "explicit_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "model_id": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused",
+      "ready_ms": 1005,
+      "resolved_model_path": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/fused"
+    },
+    "total": 40,
+    "usage": {}
+  },
+  "run_context": {
+    "code": {
+      "identity": "deepfates/imp@6477c3c991600b58ea2798e8682315fe746db0a1",
+      "revision": "6477c3c991600b58ea2798e8682315fe746db0a1",
+      "source": "imp"
+    },
+    "completed_at": "2026-07-16T22:31:11Z",
+    "envelope_sha256": "sha256:b2d7731e870b7339eb34030d6721d0bcd6b4f886a09c4b1131d279f96bd82d6c",
+    "environment": {
+      "dependencies": {
+        "mix_exs_sha256": "sha256:f5f72de5aaa03bb3b7f42a5752cb70c0715558417fcaa9dee3995a0243edca39",
+        "mix_lock_sha256": "sha256:2464cb9e6f904cce12536bfa6e86ea4f85639e4bf534f9ecaa75972b751c742d",
+        "resolved": [
+          {
+            "app": "abnf_parsec",
+            "checksum": "c4e88d5d089f1698297c0daced12be1fb404e6e577ecf261313ebba5477941f9",
+            "outer_checksum": "e0ed6290c7cc7e5020c006d1003520390c9bdd20f7c3f776bd49bfe3c5cd362a",
+            "package": "abnf_parsec",
+            "source": "hex",
+            "version": "2.1.0"
+          },
+          {
+            "app": "bandit",
+            "checksum": "6c5214daa2469644ac4ab0113b98abc24f75e348378e6a974c6343b3e5da22ef",
+            "outer_checksum": "45dac82dc86f45cf4a196dee9cc5a8b791d9c9469d996055f055e6ee36c66e20",
+            "package": "bandit",
+            "source": "hex",
+            "version": "1.12.0"
+          },
+          {
+            "app": "bunt",
+            "checksum": "081c2c665f086849e6d57900292b3a161727ab40431219529f13c4ddcf3e7a44",
+            "outer_checksum": "dc5f86aa08a5f6fa6b8096f0735c4e76d54ae5c9fa2c143e5a1fc7c1cd9bb6b5",
+            "package": "bunt",
+            "source": "hex",
+            "version": "1.0.0"
+          },
+          {
+            "app": "credo",
+            "checksum": "cc52129665fc7c15143d47838fda0f9cd6dac9ceced7bf4da6f85fcbfe64b12a",
+            "outer_checksum": "2d8bc95d5a7bb99dd2613621d4f08c6a3575c3fd4b62e6a2b48a100352a557b8",
+            "package": "credo",
+            "source": "hex",
+            "version": "1.7.19"
+          },
+          {
+            "app": "dotenvy",
+            "checksum": "00e318f3c51de9fafc4b48598447e386f19204dc18ca69886905bb8f8b08b667",
+            "outer_checksum": "c8269471b5701e9e56dc86509c1199ded2b33dce088c3471afcfef7839766d8e",
+            "package": "dotenvy",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "earmark_parser",
+            "checksum": "cba8369ab2a1342e419bc2760eec731b17be828941dcf494045d44766227e1d5",
+            "outer_checksum": "d3ec045bf122965db20c0bdb420e19ee1415843135327124918473feb4b328e8",
+            "package": "earmark_parser",
+            "source": "hex",
+            "version": "1.4.45"
+          },
+          {
+            "app": "elixir_make",
+            "checksum": "16577e2583a79bb79237bbff349619ef5d80afffc07eac6e4faf0d00e2ddaf7d",
+            "outer_checksum": "dc1f09fb7fa68866b886abd5f0f3c83553b1a19a52359a899e92af1bb3b31982",
+            "package": "elixir_make",
+            "source": "hex",
+            "version": "0.10.0"
+          },
+          {
+            "app": "ex_aws_auth",
+            "checksum": "2f4faf59dd62933c52faf5c026f22b6b9b7d143cf30ee462204a646e3304761f",
+            "outer_checksum": "42ea14c586689652f51906c797378a07822b65b32febd22067b4e93ff9dc7d4f",
+            "package": "ex_aws_auth",
+            "source": "hex",
+            "version": "1.4.1"
+          },
+          {
+            "app": "ex_doc",
+            "checksum": "4a972ffe64bc07dc605af487e98fc19b72a4185f55ca031b94c0552d6071c1d9",
+            "outer_checksum": "2756e357742fecd9749b489b85d67c9ce99c465f2e75728d9e6dc8d704b973de",
+            "package": "ex_doc",
+            "source": "hex",
+            "version": "0.40.3"
+          },
+          {
+            "app": "file_system",
+            "checksum": "31864f4685b0148f25bd3fbef2b1228457c0c89024ad67f7a81a3ffbc0bbad3a",
+            "outer_checksum": "7a15ff97dfe526aeefb090a7a9d3d03aa907e100e262a0f8f7746b78f8f87a5d",
+            "package": "file_system",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "finch",
+            "checksum": "e3f9287ac25a8832f848b144c2b57346aac65b205e2e0629a52adfe6507fd837",
+            "outer_checksum": "80e58d3f936f57e3fdf404f83a3642897ae6d9fb642934e46da4d8fe761b99d5",
+            "package": "finch",
+            "source": "hex",
+            "version": "0.23.0"
+          },
+          {
+            "app": "goth",
+            "checksum": "ee37f96e3519bdecd603f20e7f10c758287088b6d77c0147cd5ee68cf224aade",
+            "outer_checksum": "0fc2dce5bd710651ed179053d0300ce3a5d36afbdde11e500d57f05f398d5ed5",
+            "package": "goth",
+            "source": "hex",
+            "version": "1.4.5"
+          },
+          {
+            "app": "hpax",
+            "checksum": "777de5d433b0fbdc7c418159c8055910faa8047ffdb3d6b31098d2a46cd7685c",
+            "outer_checksum": "afc7cb142ebcc2d01ce7816190b98ce5dd49e799111b24249f3443d730f377ca",
+            "package": "hpax",
+            "source": "hex",
+            "version": "1.0.4"
+          },
+          {
+            "app": "idna",
+            "checksum": "1067a13043538129602d2f2ce6899d8713125c7d19734aa557ce2e3ea55bd4f1",
+            "outer_checksum": "6ae959a025bf36df61a8cab8508d9654891b5426a84c44d82deaffd6ddf8c71f",
+            "package": "idna",
+            "source": "hex",
+            "version": "7.1.0"
+          },
+          {
+            "app": "jason",
+            "checksum": "2e3a008590b0b8d7388c20293e9dcc9cf3e5d642fd2a114e4cbbb52e595d940a",
+            "outer_checksum": "b0c823996102bcd0239b3c2444eb00409b72f6a140c1950bc8b457d836b30684",
+            "package": "jason",
+            "source": "hex",
+            "version": "1.4.5"
+          },
+          {
+            "app": "jaxon",
+            "checksum": "00951a79d354260e28d7e36f956c3de94818124768a4b22e0fc55559d1b3bfe7",
+            "outer_checksum": "74532853b1126609615ea98f0ceb5009e70465ca98027afbbd8ed314d887e82d",
+            "package": "jaxon",
+            "source": "hex",
+            "version": "2.0.8"
+          },
+          {
+            "app": "jose",
+            "checksum": "06e62b467b61d3726cbc19e9b5489f7549c37993de846dfb3ee8259f9ed208b3",
+            "outer_checksum": "31e92b653e9210b696765cdd885437457de1add2a9011d92f8cf63e4641bab7b",
+            "package": "jose",
+            "source": "hex",
+            "version": "1.11.12"
+          },
+          {
+            "app": "jsv",
+            "checksum": "fb84c2a1bb5884e2b91ae66c5ed84a4db1da2bcfc1df5175c8b33c8791d39353",
+            "outer_checksum": "5963f414f9fb37c541dcebfb2df96d07ae4a40d12f52d7ac5e057969e5e7d83a",
+            "package": "jsv",
+            "source": "hex",
+            "version": "0.21.2"
+          },
+          {
+            "app": "llm_db",
+            "checksum": "2cd32be2907e72df3d72e57ad99b3963011ceb9418b46a95c4315ce1b0ba5429",
+            "outer_checksum": "9ffff8ccf4e3c268a72cbd19e0539cab618ebd3c4bc621a43c48dd2ee8af412f",
+            "package": "llm_db",
+            "source": "hex",
+            "version": "2026.7.0"
+          },
+          {
+            "app": "makeup",
+            "checksum": "882d46dc0905e9ff7abf2aab61a7e6b3dcc555533977d8a23b06019e6c89ac94",
+            "outer_checksum": "9a1a24e5b343b8ae16abea0822c10a6f75da27af7fa802ada5251f7579bfccfa",
+            "package": "makeup",
+            "source": "hex",
+            "version": "1.2.2"
+          },
+          {
+            "app": "makeup_elixir",
+            "checksum": "e928a4f984e795e41e3abd27bfc09f51db16ab8ba1aebdba2b3a575437efafc2",
+            "outer_checksum": "7284900d412a3e5cfd97fdaed4f5ed389b8f2b4cb49efc0eb3bd10e2febf9507",
+            "package": "makeup_elixir",
+            "source": "hex",
+            "version": "1.0.1"
+          },
+          {
+            "app": "makeup_erlang",
+            "checksum": "835f7e60792e08824cda445639555d7bf1bbbddb1b60b306e33cb6f6db24dc74",
+            "outer_checksum": "1cd6780fb1dd1a03979abaed0fe82712b0625118fd5257d3ebbf73f960c73c3c",
+            "package": "makeup_erlang",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "mime",
+            "checksum": "b8d739037be7cd402aee1ba0306edfdef982687ee7e9859bee6198c1e7e2f128",
+            "outer_checksum": "6171188e399ee16023ffc5b76ce445eb6d9672e2e241d2df6050f3c771e80ccd",
+            "package": "mime",
+            "source": "hex",
+            "version": "2.0.7"
+          },
+          {
+            "app": "mint",
+            "checksum": "3337184d69179695c7a9f1714d92c11e629d36c8c037a21cf490131d3d150554",
+            "outer_checksum": "5f7c9342480c069dbbc4eeac3490303c9e01870ff01a7f1d29b6107054fc1e74",
+            "package": "mint",
+            "source": "hex",
+            "version": "1.9.3"
+          },
+          {
+            "app": "mox",
+            "checksum": "a2cd96b4b80a3883e3100a221e8adc1b98e4c3a332a8fc434c39526babafd5b3",
+            "outer_checksum": "c7b92b3cc69ee24a7eeeaf944cd7be22013c52fcb580c1f33f50845ec821089a",
+            "package": "mox",
+            "source": "hex",
+            "version": "1.2.0"
+          },
+          {
+            "app": "nimble_options",
+            "checksum": "e3a492d54d85fc3fd7c5baf411d9d2852922f66e69476317787a7b2bb000a61b",
+            "outer_checksum": "821b2470ca9442c4b6984882fe9bb0389371b8ddec4d45a9504f00a66f650b44",
+            "package": "nimble_options",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "nimble_ownership",
+            "checksum": "fa8a6f2d8c592ad4d79b2ca617473c6aefd5869abfa02563a77682038bf916cf",
+            "outer_checksum": "098af64e1f6f8609c6672127cfe9e9590a5d3fcdd82bc17a377b8692fd81a879",
+            "package": "nimble_ownership",
+            "source": "hex",
+            "version": "1.0.2"
+          },
+          {
+            "app": "nimble_parsec",
+            "checksum": "8efba0122db06df95bfaa78f791344a89352ba04baedd3849593bfce4d0dc1c6",
+            "outer_checksum": "4b21398942dda052b403bbe1da991ccd03a053668d147d53fb8c4e0efe09c973",
+            "package": "nimble_parsec",
+            "source": "hex",
+            "version": "1.4.2"
+          },
+          {
+            "app": "nimble_pool",
+            "checksum": "bf9c29fbdcba3564a8b800d1eeb5a3c58f36e1e11d7b7fb2e084a643f645f06b",
+            "outer_checksum": "af2e4e6b34197db81f7aad230c1118eac993acc0dae6bc83bac0126d4ae0813a",
+            "package": "nimble_pool",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "plug",
+            "checksum": "56c480c633ec2ce10140e236e15233bf576e1d323887d7c96711bd02ab5160db",
+            "outer_checksum": "be266aee1b8536ef6409d58cf39a3121319f0ec47cfa1b24024485aa0e76ad76",
+            "package": "plug",
+            "source": "hex",
+            "version": "1.20.3"
+          },
+          {
+            "app": "plug_crypto",
+            "checksum": "19bda8184399cb24afa10be734f84a16ea0a2bc65054e23a62bb10f06bc89491",
+            "outer_checksum": "6470bce6ffe41c8bd497612ffde1a7e4af67f36a15eea5f921af71cf3e11247c",
+            "package": "plug_crypto",
+            "source": "hex",
+            "version": "2.1.1"
+          },
+          {
+            "app": "req",
+            "checksum": "b9b2024f35bcf60a92cc8cad2eaaf9d4e7aace463ff74be1afe5986830184413",
+            "outer_checksum": "cc9cd30a2ddd04989929b887178e1610c940456d962c6c3a52df6146d2eef9bf",
+            "package": "req",
+            "source": "hex",
+            "version": "0.6.2"
+          },
+          {
+            "app": "req_llm",
+            "checksum": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "outer_checksum": "169d77a77bac5cee7655a7a9158ebea1c2a7857670f4104b29516a25a2d24f1e",
+            "package": "req_llm",
+            "source": "hex",
+            "version": "1.17.1"
+          },
+          {
+            "app": "server_sent_events",
+            "checksum": "54606238b9182ba673a10ce90bd95f81a0939c1baa91cdf86b66acc04edd1832",
+            "outer_checksum": "8e164db8e295a2d869a8faafbf4a1eeaa749b62fe93f66271adff6394d93ce15",
+            "package": "server_sent_events",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "splode",
+            "checksum": "9843c54f84f71b7833fec3f0be06c3cfb5be6b35960ee195ea4fad84b1c25030",
+            "outer_checksum": "8f2309b6ec2ecbb01435656429ed1d9ed04ba28797a3280c3b0d1217018ecfbd",
+            "package": "splode",
+            "source": "hex",
+            "version": "0.3.1"
+          },
+          {
+            "app": "stream_data",
+            "checksum": "026f929db613aabea6208012ae9b8970d3fd5f88b3bdf26831bc536f98c42036",
+            "outer_checksum": "2b0ee3a340dcce1c8cf6302a763ee757d1e01c54d6e16d9069062509d68b1dc9",
+            "package": "stream_data",
+            "source": "hex",
+            "version": "1.4.0"
+          },
+          {
+            "app": "telemetry",
+            "checksum": "a0cb522801dffb1c49fe6e30561badffc7b6d0e180db1300df759faa22062855",
+            "outer_checksum": "928f6495066506077862c0d1646609eed891a4326bee3126ba54b60af61febb1",
+            "package": "telemetry",
+            "source": "hex",
+            "version": "1.4.2"
+          },
+          {
+            "app": "texture",
+            "checksum": "aa9097e0709652044ba500de817d60ce8a48dc0b4ffd92232fd33459a20282f6",
+            "outer_checksum": "f250de468cfe35f404faf232429f40114f83f73430e0f7086a9cc251865642e2",
+            "package": "texture",
+            "source": "hex",
+            "version": "1.2.0"
+          },
+          {
+            "app": "thousand_island",
+            "checksum": "f50a213cac97262b6d5ebb85745aa2c00fec1413191e6e66834788d45425cecb",
+            "outer_checksum": "708923d40523e43cf99041ab37a0d4b0ec426ac6438fa3716ab23d919eaeb412",
+            "package": "thousand_island",
+            "source": "hex",
+            "version": "1.5.0"
+          },
+          {
+            "app": "toml",
+            "checksum": "fbcd773caa937d0c7a02c301a1feea25612720ac3fa1ccb8bfd9d30d822911de",
+            "outer_checksum": "0690246a2478c1defd100b0c9b89b4ea280a22be9a7b313a8a058a2408a2fa70",
+            "package": "toml",
+            "source": "hex",
+            "version": "0.7.0"
+          },
+          {
+            "app": "websock",
+            "checksum": "2f69a6ebe810328555b6fe5c831a851f485e303a7c8ce6c5f675abeb20ebdadc",
+            "outer_checksum": "6105453d7fac22c712ad66fab1d45abdf049868f253cf719b625151460b8b453",
+            "package": "websock",
+            "source": "hex",
+            "version": "0.5.3"
+          },
+          {
+            "app": "websockex",
+            "checksum": "9de28d37bbe34f371eb46e29b79c94c94fff79f93c960d842fbf447253558eb4",
+            "outer_checksum": "8ef39576ed56bc3804c9cd8626f8b5d6b5721848d2726c0ccd4f05385a3c9f14",
+            "package": "websockex",
+            "source": "hex",
+            "version": "0.5.1"
+          },
+          {
+            "app": "zoi",
+            "checksum": "fc23f53d5ba6c8639fb30d9a70a80ae8fed774c180c2544bfd16f53bedf95dff",
+            "outer_checksum": "d69c2e6468752367941d0264e21cf229c1ba8757b2973eea17c12b3cb7d2d4c4",
+            "package": "zoi",
+            "source": "hex",
+            "version": "0.18.5"
+          }
+        ]
+      },
+      "fingerprint": "sha256:e7ed1740e0ffe4d59428bc9915b74ff8de6d03a1b2260dd74e479034ffe8fd6a",
+      "kind": "beam",
+      "runtime": {
+        "architecture": "aarch64-apple-darwin25.3.0",
+        "elixir": "1.19.5",
+        "erts": "16.3",
+        "mix_env": "test",
+        "os": {
+          "family": "unix",
+          "name": "darwin"
+        },
+        "otp_release": "28"
+      }
+    },
+    "inputs": {
+      "dataset_file_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+      "dataset_payload_sha256": "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f",
+      "mlx_lm_version": "0.31.3",
+      "model": "mlx-community/Qwen2.5-0.5B-Instruct-4bit@a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "model_tree_sha256": "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947",
+      "protocol_id": "local_mlx"
+    },
+    "payload_sha256": "sha256:b39b21207eff904715f0d58a9a89bba80933965a3f3c0a6779d63794e42b0553",
+    "schema_version": 2,
+    "source_commits": {
+      "imp": "deepfates/imp@6477c3c991600b58ea2798e8682315fe746db0a1"
+    },
+    "started_at": "2026-07-16T22:29:47Z",
+    "workspace": {
+      "reproducible": true,
+      "state": "clean"
+    }
+  },
+  "runner": "elixir",
+  "runtime": {
+    "architecture": "aarch64-apple-darwin25.3.0",
+    "elixir": "1.19.5",
+    "launcher": {
+      "argv_prefix": [
+        "--from",
+        "mlx-lm==0.31.3"
+      ],
+      "path": "/Users/deepfates/.local/bin/uvx",
+      "sha256": "65ae83a7cb29252466a1ac693c8afaf6807711e5e8c8b65db9e252015a8bcfab"
+    },
+    "mlx_lm_version": "0.31.3",
+    "os": "{:unix, :darwin}",
+    "otp": "28"
+  },
+  "schema_version": 1,
+  "status": "complete",
+  "training": {
+    "fresh": true,
+    "job": {
+      "cancel_body": "job_id",
+      "cancel_method": "post",
+      "cancel_url": null,
+      "id": "mlx-3c1ef1d898944dc9bda1",
+      "idempotency_key": "imp-mlx:3c1ef1d8:98944dc9:bda14043:e6313663:7b499361:7deb9c9f:a3033d32:4873efef",
+      "max_attempts": 3,
+      "metadata": {
+        "artifact_sha256": {
+          "adapter_config.json": "62edd88d:a43e55e7:102367cd:8b467375:82fe7539:531f8515:c5779489:9076ad44",
+          "adapters.safetensors": "f9e097a1:118ebc8f:f440b021:870efda4:1ccc64f8:47236e2b:6aecdaa6:b028ef63"
+        },
+        "dataset_sha256": "7d12c549:6bf19b0a:3967cf55:6038b6d5:e2079548:7cf43a44:f95f764e:ccc50335",
+        "manifest": "../manifest.json",
+        "mlx_lm_version": "0.31.3",
+        "model_revision": "a5339a41:31f135d0:fdc6a5c8:b5bbed27:53bbe0f3"
+      },
+      "model": "mlx-community/Qwen2.5-0.5B-Instruct-4bit@a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "provider": "mlx_lm",
+      "result_model": "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter",
+      "retry_backoff_ms": 100,
+      "schema_version": 1,
+      "status": "succeeded",
+      "status_body": "job_id",
+      "status_method": "post",
+      "status_url": null,
+      "training_data": [
+        72,
+        8
+      ],
+      "type": "imp_training_job"
+    },
+    "job_checkpoint_sha256": "7dbd6a32ce5c7ab931e2f01378f6410b765c63b0efd31037a284d3231a3721f1",
+    "manifest": {
+      "argv": [
+        "--model",
+        "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+        "--train",
+        "--data",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/data",
+        "--adapter-path",
+        "/Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter",
+        "--fine-tune-type",
+        "lora",
+        "--iters",
+        "216",
+        "--batch-size",
+        "1",
+        "--grad-accumulation-steps",
+        "4",
+        "--learning-rate",
+        "0.0001",
+        "--num-layers",
+        "8",
+        "--max-seq-length",
+        "512",
+        "--save-every",
+        "100",
+        "--seed",
+        "0",
+        "--mask-prompt"
+      ],
+      "artifact_type": "imp_mlx_lm_sft_run",
+      "artifacts": {
+        "adapter_config.json": {
+          "bytes": 1380,
+          "sha256": "62edd88da43e55e7102367cd8b46737582fe7539531f8515c57794899076ad44"
+        },
+        "adapters.safetensors": {
+          "bytes": 5877295,
+          "sha256": "f9e097a1118ebc8ff440b021870efda41ccc64f847236e2b6aecdaa6b028ef63"
+        }
+      },
+      "command": {
+        "duration_ms": 44313,
+        "exit_status": 0,
+        "output": "Loading pretrained model\nLoading datasets\nTraining\nTrainable parameters: 0.297% (1.466M/494.033M)\nStarting training..., iters: 216\n\rCalculating loss...:   0%|          | 0/8 [00:00<?, ?it/s]\rCalculating loss...:  12%|█▎        | 1/8 [00:00<00:00,  7.97it/s]\rCalculating loss...:  25%|██▌       | 2/8 [00:00<00:00,  8.60it/s]\rCalculating loss...:  38%|███▊      | 3/8 [00:00<00:00,  8.65it/s]\rCalculating loss...:  50%|█████     | 4/8 [00:00<00:00,  9.09it/s]\rCalculating loss...:  75%|███████▌  | 6/8 [00:00<00:00,  9.53it/s]\rCalculating loss...:  88%|████████▊ | 7/8 [00:00<00:00,  9.57it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  9.68it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  9.34it/s]\nIter 1: Val loss 3.471, Val took 0.866s\nIter 10: Train loss 1.571, Learning Rate 1.000e-04, It/sec 5.421, Tokens/sec 59.632, Trained Tokens 110, Peak mem 0.887 GB\nIter 20: Train loss 0.200, Learning Rate 1.000e-04, It/sec 5.401, Tokens/sec 59.408, Trained Tokens 220, Peak mem 0.887 GB\nIter 30: Train loss 0.134, Learning Rate 1.000e-04, It/sec 5.462, Tokens/sec 60.083, Trained Tokens 330, Peak mem 0.887 GB\nIter 40: Train loss 0.136, Learning Rate 1.000e-04, It/sec 5.611, Tokens/sec 61.723, Trained Tokens 440, Peak mem 0.887 GB\nIter 50: Train loss 0.245, Learning Rate 1.000e-04, It/sec 5.561, Tokens/sec 61.171, Trained Tokens 550, Peak mem 0.887 GB\nIter 60: Train loss 0.134, Learning Rate 1.000e-04, It/sec 5.607, Tokens/sec 61.681, Trained Tokens 660, Peak mem 0.887 GB\nIter 70: Train loss 0.183, Learning Rate 1.000e-04, It/sec 5.655, Tokens/sec 62.206, Trained Tokens 770, Peak mem 0.887 GB\nIter 80: Train loss 0.155, Learning Rate 1.000e-04, It/sec 5.542, Tokens/sec 60.958, Trained Tokens 880, Peak mem 0.887 GB\nIter 90: Train loss 0.118, Learning Rate 1.000e-04, It/sec 5.769, Tokens/sec 63.462, Trained Tokens 990, Peak mem 0.887 GB\nIter 100: Train loss 0.148, Learning Rate 1.000e-04, It/sec 5.582, Tokens/sec 61.403, Trained Tokens 1100, Peak mem 0.887 GB\nIter 100: Saved adapter weights to /Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter/adapters.safetensors and /Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter/0000100_adapters.safetensors.\nIter 110: Train loss 0.115, Learning Rate 1.000e-04, It/sec 5.731, Tokens/sec 63.038, Trained Tokens 1210, Peak mem 0.887 GB\nIter 120: Train loss 0.121, Learning Rate 1.000e-04, It/sec 5.272, Tokens/sec 57.988, Trained Tokens 1320, Peak mem 0.903 GB\nIter 130: Train loss 0.037, Learning Rate 1.000e-04, It/sec 5.735, Tokens/sec 63.080, Trained Tokens 1430, Peak mem 0.903 GB\nIter 140: Train loss 0.070, Learning Rate 1.000e-04, It/sec 5.261, Tokens/sec 57.875, Trained Tokens 1540, Peak mem 0.903 GB\nIter 150: Train loss 0.093, Learning Rate 1.000e-04, It/sec 5.428, Tokens/sec 59.708, Trained Tokens 1650, Peak mem 0.903 GB\nIter 160: Train loss 0.084, Learning Rate 1.000e-04, It/sec 5.436, Tokens/sec 59.801, Trained Tokens 1760, Peak mem 0.903 GB\nIter 170: Train loss 0.009, Learning Rate 1.000e-04, It/sec 5.490, Tokens/sec 60.385, Trained Tokens 1870, Peak mem 0.903 GB\nIter 180: Train loss 0.014, Learning Rate 1.000e-04, It/sec 5.368, Tokens/sec 59.047, Trained Tokens 1980, Peak mem 0.903 GB\nIter 190: Train loss 0.025, Learning Rate 1.000e-04, It/sec 5.424, Tokens/sec 59.668, Trained Tokens 2090, Peak mem 0.903 GB\n\rCalculating loss...:   0%|          | 0/8 [00:00<?, ?it/s]\rCalculating loss...:  12%|█▎        | 1/8 [00:00<00:00,  9.15it/s]\rCalculating loss...:  25%|██▌       | 2/8 [00:00<00:00,  8.65it/s]\rCalculating loss...:  38%|███▊      | 3/8 [00:00<00:00,  9.11it/s]\rCalculating loss...:  50%|█████     | 4/8 [00:00<00:00,  9.18it/s]\rCalculating loss...:  62%|██████▎   | 5/8 [00:00<00:00,  9.30it/s]\rCalculating loss...:  75%|███████▌  | 6/8 [00:00<00:00,  9.49it/s]\rCalculating loss...:  88%|████████▊ | 7/8 [00:00<00:00,  9.45it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  8.92it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  9.11it/s]\nIter 200: Val loss 0.015, Val took 0.885s\nIter 200: Train loss 0.014, Learning Rate 1.000e-04, It/sec 5.419, Tokens/sec 59.610, Trained Tokens 2200, Peak mem 0.903 GB\nIter 200: Saved adapter weights to /Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter/adapters.safetensors and /Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter/0000200_adapters.safetensors.\nIter 210: Train loss 0.055, Learning Rate 1.000e-04, It/sec 5.526, Tokens/sec 60.785, Trained Tokens 2310, Peak mem 0.903 GB\n\rCalculating loss...:   0%|          | 0/8 [00:00<?, ?it/s]\rCalculating loss...:  12%|█▎        | 1/8 [00:00<00:00,  9.69it/s]\rCalculating loss...:  25%|██▌       | 2/8 [00:00<00:00,  8.92it/s]\rCalculating loss...:  38%|███▊      | 3/8 [00:00<00:00,  9.15it/s]\rCalculating loss...:  50%|█████     | 4/8 [00:00<00:00,  9.21it/s]\rCalculating loss...:  62%|██████▎   | 5/8 [00:00<00:00,  9.43it/s]\rCalculating loss...:  75%|███████▌  | 6/8 [00:00<00:00,  8.94it/s]\rCalculating loss...:  88%|████████▊ | 7/8 [00:00<00:00,  9.02it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  9.19it/s]\rCalculating loss...: 100%|██████████| 8/8 [00:00<00:00,  9.16it/s]\nIter 216: Val loss 0.004, Val took 0.877s\nIter 216: Train loss 0.080, Learning Rate 1.000e-04, It/sec 9.186, Tokens/sec 60.628, Trained Tokens 2376, Peak mem 0.903 GB\nSaved final weights to /Users/deepfates/Hacking/github/deepfates/dspy_elixir/tmp/mlx-campaign-20260716T222947Z/training/3c1ef1d8-98944dc9-bda14043-e6313663-7b499361-7deb9c9f-a3033d32-4873efef/adapter/adapters.safetensors.\n"
+      },
+      "dataset": {
+        "dataset_sha256": "7d12c5496bf19b0a3967cf556038b6d5e20795487cf43a44f95f764eccc50335",
+        "train_count": 72,
+        "train_sha256": "b4e9c02168f5ed7b130c853c9d95660ef22e555ef9870eea029a0bca64f38430",
+        "valid_count": 8,
+        "valid_sha256": "c108e3c735bccf838b6bb13e63e70fae68f78572f270528eeb0af45391ab5073"
+      },
+      "run_id": "3c1ef1d898944dc9bda14043e63136637b4993617deb9c9fa3033d324873efef",
+      "schema_version": 1,
+      "spec": {
+        "adapter": "Elixir.Imp.Adapter.Chat",
+        "dataset_sha256": "7d12c5496bf19b0a3967cf556038b6d5e20795487cf43a44f95f764eccc50335",
+        "mlx_lm_version": "0.31.3",
+        "model": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        "model_path": "/Users/deepfates/.cache/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+        "model_revision": "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+        "training": {
+          "batch_size": 1,
+          "grad_accumulation_steps": 4,
+          "iters": 216,
+          "learning_rate": 0.0001,
+          "mask_prompt": true,
+          "max_seq_length": 512,
+          "num_layers": 8,
+          "save_every": 100,
+          "seed": 0,
+          "stratify_by": [
+            "route"
+          ],
+          "validation_fraction": 0.1
+        }
+      },
+      "status": "succeeded"
+    },
+    "manifest_sha256": "973474a10989e09c1d14fe093b3312bc49d6155e8ca3e8c8be4b219cd29d0df8"
+  }
+}

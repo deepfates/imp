@@ -411,7 +411,10 @@
       "name": "BFCL-shaped scorer benchmark infrastructure",
       "authority_family": "family.tools_agents_react",
       "surface_tokens": [
-        "tools"
+        "tools",
+        "bfcl",
+        "scorer",
+        "tool_selection"
       ],
       "public_surfaces": [
         "mix imp.benchmark.bfcl_adapted"
@@ -439,7 +442,8 @@
       "surface_tokens": [
         "react",
         "tools",
-        "agents"
+        "agents",
+        "failure_recovery"
       ],
       "public_surfaces": [
         "Imp.Predict.ReAct"
@@ -613,7 +617,9 @@
       "id": "semantic_f1",
       "name": "SemanticF1 auto-evaluation",
       "authority_family": "family.composition_evaluation",
-      "surface_tokens": [],
+      "surface_tokens": [
+        "SemanticF1"
+      ],
       "public_surfaces": [
         "Imp.Evaluate.SemanticF1"
       ],
@@ -636,7 +642,9 @@
       "id": "complete_and_grounded",
       "name": "CompleteAndGrounded auto-evaluation",
       "authority_family": "family.composition_evaluation",
-      "surface_tokens": [],
+      "surface_tokens": [
+        "CompleteAndGrounded"
+      ],
       "public_surfaces": [
         "Imp.Evaluate.CompleteAndGrounded"
       ],
@@ -659,7 +667,12 @@
       "id": "refinement",
       "name": "Best-of-N and refinement",
       "authority_family": "family.composition_evaluation",
-      "surface_tokens": [],
+      "surface_tokens": [
+        "Refine",
+        "BestOfN",
+        "feedback",
+        "judge_quality"
+      ],
       "public_surfaces": [
         "Imp.Predict.BestOfN",
         "Imp.Predict.Refine"
@@ -952,11 +965,9 @@
         "Avatar"
       ],
       "public_surfaces": [
-        "Imp.Optimizer.Avatar",
         "Imp.Predict.Avatar"
       ],
       "implementation_paths": [
-        "lib/imp/optimizer/avatar.ex",
         "lib/imp/predict/avatar.ex"
       ],
       "classification": "adaptation",
@@ -971,18 +982,18 @@
     },
     {
       "id": "avatar_optimizer",
-      "name": "AvatarOptimizer",
+      "name": "Avatar optimizer",
       "authority_family": "family.optimizer_weights",
       "surface_tokens": [
         "AvatarOptimizer"
       ],
       "public_surfaces": [
-        "Imp.Optimizer.AvatarOptimizer"
+        "Imp.Optimizer.Avatar"
       ],
       "implementation_paths": [
         "lib/imp/optimizer/avatar.ex"
       ],
-      "classification": "replication",
+      "classification": "adaptation",
       "protocol_ids": [
         "provider_training"
       ],
@@ -999,6 +1010,7 @@
       "surface_tokens": [
         "BootstrapFinetune",
         "training_protocol",
+        "provider_training",
         "local_weight_training"
       ],
       "public_surfaces": [
@@ -1016,8 +1028,8 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json",
-        "artifact_sha256": "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16",
+        "artifact": "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json",
+        "artifact_sha256": "7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d",
         "protocol_id": "local_mlx"
       }
     },
@@ -1026,7 +1038,8 @@
       "name": "GRPO",
       "authority_family": "family.optimizer_weights",
       "surface_tokens": [
-        "GRPO"
+        "GRPO",
+        "mmGRPO"
       ],
       "public_surfaces": [
         "Imp.Optimizer.GRPO"
@@ -1080,7 +1093,7 @@
       "implementation_paths": [
         "lib/imp/optimizer/ensemble.ex"
       ],
-      "classification": "replication",
+      "classification": "adaptation",
       "protocol_ids": [
         "optimizer_lift"
       ],
@@ -1123,7 +1136,9 @@
         "OptimizeAnything",
         "code_artifact",
         "agent_config",
-        "scheduling_heuristic"
+        "scheduling_heuristic",
+        "upstream_comparison",
+        "artifact_portfolio"
       ],
       "public_surfaces": [
         "Imp.Optimize.Anything"
@@ -1149,6 +1164,7 @@
       "authority_family": "family.retrieval_rag_data",
       "surface_tokens": [
         "rag",
+        "retrieval",
         "retriever_protocol"
       ],
       "public_surfaces": [

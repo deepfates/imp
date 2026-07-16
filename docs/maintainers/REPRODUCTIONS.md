@@ -34,11 +34,11 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | SIMBA | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | GEPA | replication | gepa_contract<br>gepa_live | NONE | none |
 | Avatar actor | adaptation | provider_training | NONE | none |
-| AvatarOptimizer | replication | provider_training | NONE | none |
-| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training | T2 | benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json |
+| Avatar optimizer | adaptation | provider_training | NONE | none |
+| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
 | GRPO | adaptation | provider_training | NONE | none |
 | BetterTogether | adaptation | provider_training | NONE | none |
-| Ensemble | replication | optimizer_lift | NONE | none |
+| Ensemble | adaptation | optimizer_lift | NONE | none |
 | Fast-Slow training and CISPO | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |
