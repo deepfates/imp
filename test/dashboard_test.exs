@@ -387,7 +387,16 @@ defmodule DashboardTest do
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
-             "claim.rag_tools_agents.provider_free_operational"
+             "claim.rag.provider_free_contract",
+             "claim.react.provider_free_tool_contract",
+             "claim.react_v2.provider_free_recovery_contract",
+             "claim.mcp.in_process_import_contract",
+             "claim.agents.policy_denial_contract",
+             "claim.code_act.provider_free_execution_contract",
+             "claim.program_of_thought.safe_eval_contract",
+             "claim.streaming.incremental_field_contract",
+             "claim.async.ordered_stream_contract",
+             "claim.persistence.credential_redaction_contract"
            ] -- proven_claim_ids == []
 
     assert dashboard["lanes"]["product_package"]["status"] == "full"

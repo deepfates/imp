@@ -36,9 +36,12 @@ defmodule Imp.ReproductionRegistryTest do
     assert feature["protocol_ids"] == ["bfcl_shaped_scorer"]
 
     assert feature["admitted_evidence"] == %{
-             "tier" => "none",
-             "artifact" => nil,
-             "protocol_id" => nil
+             "tier" => "t1",
+             "artifact" =>
+               "benchmarks/evidence/admitted/bfcl_shaped_scorer/91b95e1d7308dafdfd62c20dbb133179c4722fe5e023ced013341f3c2c0849ea.json",
+             "artifact_sha256" =>
+               "91b95e1d7308dafdfd62c20dbb133179c4722fe5e023ced013341f3c2c0849ea",
+             "protocol_id" => "bfcl_shaped_scorer"
            }
 
     refute "bfcl_shaped_scorer" in react["protocol_ids"]

@@ -140,19 +140,30 @@ defmodule ClaimsInventoryTest do
     assert claim["statement"] =~ "exact paper authority"
   end
 
-  test "RAG, BFCL, and failure claims stay separated by authority and rung" do
-    operational =
-      Enum.find(
-        read_claims!(),
-        &(&1["id"] == "claim.rag_tools_agents.provider_free_operational")
-      )
-
-    assert operational["claim_state"] == "asserted"
-    assert operational["target_rung"] == "C2"
-    assert [%{"evidence" => "passing"}] = operational["requirements"]
-    assert hd(operational["limitations"]) =~ "does not establish HotPotQA"
-
+  test "RAG, tool, agent, BFCL, and failure claims stay separated by capacity and rung" do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
+
+    capacity_claims = ~w(
+      rag.provider_free_contract
+      react.provider_free_tool_contract
+      react_v2.provider_free_recovery_contract
+      mcp.in_process_import_contract
+      agents.policy_denial_contract
+      code_act.provider_free_execution_contract
+      program_of_thought.safe_eval_contract
+      streaming.incremental_field_contract
+      async.ordered_stream_contract
+      persistence.credential_redaction_contract
+    )
+
+    for id <- capacity_claims do
+      claim = claims["claim.#{id}"]
+      assert claim["claim_state"] == "asserted"
+      assert claim["target_rung"] == "C1"
+      assert [%{"evidence" => "passing", "lane" => "rag_tool_agent"}] = claim["requirements"]
+    end
+
+    refute Map.has_key?(claims, "claim.rag_tools_agents.provider_free_operational")
 
     assert claims["claim.rag.hotpot_retrieval.differential"]["target_rung"] == "C1"
     assert claims["claim.rag.hotpot_retrieval.effectiveness"]["target_rung"] == "C3"

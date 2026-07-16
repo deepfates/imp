@@ -2,6 +2,8 @@ defmodule OptimizeAnythingCodeArtifactTest do
   use ExUnit.Case, async: true
 
   alias Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact
+  alias Imp.Optimize.Anything, as: OptimizeAnything
+  alias Imp.Optimize.Anything.Config
 
   test "common benchmark contract is complete and JSON-safe" do
     assert is_binary(CodeArtifact.id())
@@ -17,6 +19,7 @@ defmodule OptimizeAnythingCodeArtifactTest do
     baseline_score = aggregate_score(CodeArtifact.baseline(), CodeArtifact.trainset())
     comparator_score = aggregate_score(CodeArtifact.comparator(), CodeArtifact.trainset())
 
+    assert String.starts_with?(CodeArtifact.baseline(), "if(")
     assert baseline_score > 0.1
     assert baseline_score < 0.8
     assert_in_delta comparator_score, 1.0, 1.0e-12
@@ -71,6 +74,84 @@ defmodule OptimizeAnythingCodeArtifactTest do
 
     assert score == 0.0
     assert message =~ "arithmetic"
+  end
+
+  test "feedback exposes training inputs and diagnoses ambiguous nested if syntax" do
+    example = Enum.find(CodeArtifact.trainset(), &(&1["id"] == "train-server-hint"))
+
+    ambiguous =
+      "if retryable == false, do: -1, else: if retry_after_ms > 0, do: if retry_after_ms > 8000, do: 8000, else: retry_after_ms, else: attempt * 500"
+
+    assert {score,
+            %{
+              "inputs" => %{
+                "attempt" => 2,
+                "jitter_slot" => 1,
+                "retry_after_ms" => 1_200,
+                "retryable" => true,
+                "urgent" => false
+              },
+              "failure" => %{
+                "code" => "missing_else_clause",
+                "message" => message,
+                "phase" => "interpretation"
+              }
+            }} = CodeArtifact.evaluate(ambiguous, example)
+
+    assert score == 0.0
+    assert message =~ "parenthesize every nested conditional"
+  end
+
+  test "candidate contract teaches an unambiguous nested conditional form" do
+    contract = CodeArtifact.metadata()["candidate_contract"]
+
+    assert contract["canonical_nested_if_syntax"] =~ "if(first_condition"
+
+    candidate =
+      "if(retryable == false, do: -1, else: if(urgent == true, do: 0, else: if(retry_after_ms > 0, do: if(retry_after_ms > 8000, do: 8000, else: retry_after_ms), else: attempt * 500 + jitter_slot)))"
+
+    assert {_score, %{"failure" => nil, "inputs" => inputs}} =
+             CodeArtifact.evaluate(candidate, hd(CodeArtifact.trainset()))
+
+    assert is_map(inputs)
+  end
+
+  test "provider-free reflection receives grammar and public training inputs" do
+    test_pid = self()
+
+    lm = fn messages, _opts ->
+      send(test_pid, {:reflection_prompt, messages})
+      {:ok, "```elixir\n#{CodeArtifact.comparator()}\n```"}
+    end
+
+    result =
+      OptimizeAnything.run(
+        CodeArtifact.baseline(),
+        &CodeArtifact.evaluate/2,
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1, seed: 17],
+            reflection: [
+              reflection_lm: lm,
+              reflection_minibatch_size: length(CodeArtifact.trainset())
+            ]
+          ),
+        dataset: CodeArtifact.trainset(),
+        valset: CodeArtifact.valset(),
+        objective: CodeArtifact.metadata()["objective"],
+        background: Jason.encode!(CodeArtifact.metadata())
+      )
+
+    assert_receive {:reflection_prompt, messages}
+    assert [%{content: prompt}] = messages
+
+    assert prompt =~ "canonical_nested_if_syntax"
+    assert prompt =~ "Parenthesize every nested conditional"
+    assert prompt =~ ~S|"inputs"|
+    assert prompt =~ ~S|"jitter_slot"|
+
+    assert OptimizeAnything.Result.best_candidate(result) ==
+             String.trim(CodeArtifact.comparator())
   end
 
   test "evaluation is deterministic and reports structured subscores" do

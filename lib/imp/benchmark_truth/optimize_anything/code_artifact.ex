@@ -7,7 +7,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
   @max_ast_nodes 180
   @maximum_delay_ms 8_000
 
-  @baseline "if retryable == false, do: -1, else: attempt * 500"
+  @baseline "if(retryable == false, do: -1, else: attempt * 500)"
 
   @comparator """
   if(retryable == false,
@@ -94,6 +94,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
         ],
         "allowed_syntax" =>
           "literals, the available variables, nested if/do/else, unary minus, and binary arithmetic, comparison, and boolean operators",
+        "canonical_nested_if_syntax" =>
+          "Parenthesize every nested conditional: if(first_condition, do: first_value, else: if(second_condition, do: second_value, else: fallback_value)). Do not use an unparenthesized `else: if ..., do: ..., else: ...` chain because its keyword clauses are ambiguous.",
         "forbidden_syntax" =>
           "assignments, cond, case, guards, tuples, maps, modules, remote calls, and all function calls",
         "output" => "one integer from -1 through 8000",
@@ -219,11 +221,19 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
     )
   end
 
+  defp execution_diagnostic({:missing_clause, "else"}) do
+    diagnostic(
+      "missing_else_clause",
+      "every if expression requires an else clause; parenthesize every nested conditional as if(condition, do: value, else: if(other_condition, do: other_value, else: fallback_value))",
+      "interpretation"
+    )
+  end
+
   defp execution_diagnostic(reason) do
     diagnostic("evaluation_error", inspect(reason), "interpretation")
   end
 
-  defp score_success(actual, %{"expected" => expected, "id" => example_id}) do
+  defp score_success(actual, %{"expected" => expected, "id" => example_id} = example) do
     type_score = if is_integer(actual), do: 0.1, else: 0.0
     bounded_score = if valid_delay?(actual), do: 0.05, else: 0.0
     exact_score = if actual === expected, do: 0.65, else: 0.0
@@ -244,6 +254,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
        "diagnostics" => success_diagnostics(actual, expected),
        "example_id" => example_id,
        "expected" => expected,
+       "inputs" => Map.get(example, "inputs"),
        "failure" => nil,
        "status" => if(actual === expected, do: "passed", else: "incorrect"),
        "subscores" => subscores
@@ -263,6 +274,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
        "diagnostics" => [failure],
        "example_id" => Map.get(example, "id"),
        "expected" => Map.get(example, "expected"),
+       "inputs" => Map.get(example, "inputs"),
        "failure" => failure,
        "status" => "failed",
        "subscores" => %{
