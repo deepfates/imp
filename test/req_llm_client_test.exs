@@ -83,6 +83,22 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule ProviderMetadataStub do
+    def generate_text(model, messages, _opts) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_provider_metadata",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant("ok"),
+         provider_meta: %{
+           schema: %{token: :string, api_key: :string, authorization: %{type: :string}},
+           token: "CANARY_PROVIDER_META_TOKEN"
+         }
+       }}
+    end
+  end
+
   defmodule NestedObjectStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -375,6 +391,25 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(opts, :temperature) == 0.0
     refute Keyword.has_key?(opts, :native_json_schema)
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
+  end
+
+  test "provider metadata preserves semantic schema descriptors while redacting credentials" do
+    lm = Imp.req_llm("openai:gpt-test", req_module: ProviderMetadataStub)
+
+    assert {:ok,
+            %{
+              __imp_lm_metadata__: %{
+                req_llm: %{provider_meta: provider_meta}
+              }
+            }} = Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
+
+    assert provider_meta.schema == %{
+             token: :string,
+             api_key: :string,
+             authorization: %{type: :string}
+           }
+
+    assert provider_meta.token == "[REDACTED]"
   end
 
   test "ReqLLM receives recursive native JSON schema constraints" do

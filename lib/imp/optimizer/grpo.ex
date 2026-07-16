@@ -367,7 +367,8 @@ defmodule Imp.Optimizer.GRPO do
            {:ok, batches, state} <- assign_batches(groups, session, state),
            step_intent <- step_intent(identity, step, batches),
            :ok <- checkpoint_step_intent(optimizer, state, identity, step, step_intent),
-           {:ok, stepped} <- submit_step(optimizer, session, batches, step_intent) do
+           {:ok, stepped} <-
+             submit_step(optimizer, session, Map.fetch!(step_intent, :batches), step_intent) do
         program = rebind_current_model(state.program, stepped.current_model)
         state = %{state | session: stepped, program: program}
 
@@ -396,24 +397,17 @@ defmodule Imp.Optimizer.GRPO do
       {:ok, stepped} ->
         {:ok, stepped}
 
+      {:error, {:reinforcement_step_not_accepted, reason}} ->
+        {:error, reason}
+
       {:error, reason} ->
-        if uncertain_step_callback_failure?(reason) do
-          {:step_outcome_unknown, {:grpo_step_outcome_unknown, step_id, reason}}
-        else
-          {:error, reason}
-        end
+        # Once a mutating provider callback has been invoked, an ordinary error
+        # cannot prove that the remote side rejected the request. Providers may
+        # opt into the explicit not-accepted result above; every other failure is
+        # reconciled from the durable intent before Imp decides whether to replay.
+        {:step_outcome_unknown, {:grpo_step_outcome_unknown, step_id, reason}}
     end
   end
-
-  defp uncertain_step_callback_failure?(
-         {:reinforcement_callback_timeout, :reinforcement_step, _}
-       ),
-       do: true
-
-  defp uncertain_step_callback_failure?({:reinforcement_callback_exit, :reinforcement_step, _}),
-    do: true
-
-  defp uncertain_step_callback_failure?(_reason), do: false
 
   defp checkpoint_step_intent(optimizer, state, identity, step, step_intent) do
     maybe_checkpoint(
@@ -424,6 +418,10 @@ defmodule Imp.Optimizer.GRPO do
   end
 
   defp step_intent(identity, step, batches) do
+    # The persisted replay payload and the first submitted payload must be the
+    # same credential-safe value. Sanitizing only while writing the checkpoint
+    # would change its digest and make exact recovery impossible after a crash.
+    batches = checkpoint_safe_batches(batches)
     batch_ids = Enum.map(batches, &fetch(&1, :batch_id))
 
     payload = %{
@@ -434,6 +432,13 @@ defmodule Imp.Optimizer.GRPO do
     }
 
     Map.merge(payload, %{id: "grpo-step:" <> digest(payload), batches: batches})
+  end
+
+  defp checkpoint_safe_batches(batches) do
+    batches
+    |> Imp.Optimizer.Report.encode_term()
+    |> Imp.Redaction.redact()
+    |> Imp.Optimizer.Report.decode_term()
   end
 
   defp resume_step_intent(optimizer, trainset, valset, state, intent, identity) do

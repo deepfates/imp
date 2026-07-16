@@ -912,6 +912,36 @@ defmodule BootstrapFinetuneTest do
            } = result
   end
 
+  test "direct multi-job launch uses one aggregate deadline" do
+    first_lm = lm("aggregate-first", %{first_answer: "one"})
+    second_lm = lm("aggregate-second", %{second_answer: "two"})
+    program = two_predictor_program(first_lm, second_lm)
+
+    trainer = fn training_lm, _examples, _opts ->
+      Process.sleep(30)
+      {:ok, TrainingJob.new(%{id: training_lm.model, status: :running})}
+    end
+
+    optimizer =
+      BootstrapFinetune.new(&always_pass/2,
+        trainer: trainer,
+        launch_timeout: 45,
+        cancellation_timeout: 20
+      )
+
+    started_at = System.monotonic_time(:millisecond)
+    result = BootstrapFinetune.compile(optimizer, program, [train_example()])
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert %{
+             error:
+               {:bootstrap_finetune_training_start_failed, _key,
+                {:bootstrap_finetune_launch_timeout, 45}, _cancellations}
+           } = result
+
+    assert elapsed < 100
+  end
+
   test "direct terminal cleanup bounds a provider cancellation that never returns" do
     failed_lm = lm("failed-cleanup", %{first_answer: "one"})
     running_lm = lm("hung-cleanup", %{second_answer: "two"})

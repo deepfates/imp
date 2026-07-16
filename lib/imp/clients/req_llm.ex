@@ -752,23 +752,26 @@ defmodule Imp.Clients.ReqLLM do
 
   defp sanitize_usage_value(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
-      if Imp.Redaction.credential_key?(key),
+      if Imp.Redaction.credential_entry?(key, nested),
         do: {key, "[REDACTED]"},
         else: {key, sanitize_usage_value(nested)}
     end)
   end
 
-  defp sanitize_usage_value([key, nested]) when is_atom(key) or is_binary(key) do
-    if Imp.Redaction.credential_key?(key),
+  defp sanitize_usage_value([key, nested])
+       when is_atom(key) or is_binary(key) or is_map(key) do
+    if Imp.Redaction.credential_entry?(key, nested),
       do: [key, "[REDACTED]"],
       else: [key, sanitize_usage_value(nested)]
   end
 
-  defp sanitize_usage_value(value) when is_list(value),
-    do: Enum.map(value, &sanitize_usage_value/1)
+  defp sanitize_usage_value([]), do: []
+
+  defp sanitize_usage_value([head | tail]),
+    do: [sanitize_usage_value(head) | sanitize_usage_value(tail)]
 
   defp sanitize_usage_value({key, nested}) when is_atom(key) or is_binary(key) do
-    if Imp.Redaction.credential_key?(key),
+    if Imp.Redaction.credential_entry?(key, nested),
       do: {key, "[REDACTED]"},
       else: {key, sanitize_usage_value(nested)}
   end

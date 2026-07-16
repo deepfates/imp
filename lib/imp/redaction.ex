@@ -72,6 +72,12 @@ defmodule Imp.Redaction do
     ["credential"],
     ["credentials"]
   ]
+  @schema_descriptor_keys MapSet.new(~w(
+    $defs $ref additionalProperties allOf anyOf definitions description exclusiveMaximum
+    exclusiveMinimum format items maxItems maxLength maxProperties maximum minItems minLength
+    minProperties minimum multipleOf not nullable oneOf pattern properties propertyNames
+    required title type uniqueItems
+  ))
 
   @doc """
   Returns the default key names treated as sensitive.
@@ -464,18 +470,59 @@ defmodule Imp.Redaction do
   defp semantic_schema_descriptor?(value) when is_map(value) do
     types = [Map.get(value, "__imp_type__"), Map.get(value, :__imp_type__)]
     values = [Map.get(value, "value"), Map.get(value, :value)]
+    schema_types = [Map.get(value, "type"), Map.get(value, :type)]
 
     allowed_keys = MapSet.new(["__imp_type__", :__imp_type__, "value", :value])
 
-    Enum.any?(types, &(&1 in ["atom", :atom])) and
-      Enum.any?(
-        values,
-        &(&1 in ~w(string integer float number boolean object map list array any))
-      ) and
-      Enum.all?(Map.keys(value), &MapSet.member?(allowed_keys, &1))
+    (Enum.any?(types, &(&1 in ["atom", :atom])) and
+       Enum.any?(
+         values,
+         &(&1 in ~w(string integer float number boolean object map list array any))
+       ) and
+       Enum.all?(Map.keys(value), &MapSet.member?(allowed_keys, &1))) or
+      (Enum.any?(
+         schema_types,
+         &(&1 in ([
+                    :string,
+                    :integer,
+                    :float,
+                    :number,
+                    :boolean,
+                    :object,
+                    :map,
+                    :list,
+                    :array,
+                    :any
+                  ] ++ ~w(string integer float number boolean object map list array any)))
+       ) and schema_descriptor_keys?(value)) or
+      tagged_schema_descriptor?(value)
   end
 
   defp semantic_schema_descriptor?(_value), do: false
+
+  defp tagged_schema_descriptor?(value) do
+    types = [Map.get(value, "__imp_type__"), Map.get(value, :__imp_type__)]
+
+    if Enum.any?(types, &(&1 in ["map", :map])) do
+      value
+      |> Imp.Optimizer.Report.decode_term()
+      |> semantic_schema_descriptor?()
+    else
+      false
+    end
+  rescue
+    _error -> false
+  end
+
+  defp schema_descriptor_keys?(value) do
+    Enum.all?(Map.keys(value), fn
+      key when is_atom(key) or is_binary(key) ->
+        MapSet.member?(@schema_descriptor_keys, to_string(key))
+
+      _key ->
+        false
+    end)
+  end
 
   defp secret_value?(value) do
     trimmed = String.trim(value)

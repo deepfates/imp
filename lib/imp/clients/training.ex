@@ -792,7 +792,13 @@ defmodule Imp.Clients.ReinforcementSession do
 end
 
 defmodule Imp.Clients.Trainer do
-  @moduledoc "Behaviour for provider-specific training backends."
+  @moduledoc """
+  Behaviour for provider-specific training backends.
+
+  A mutating `reinforcement_step` error has an unknown remote outcome by default.
+  A backend may return `{:error, {:reinforcement_step_not_accepted, reason}}` only
+  when it can guarantee that the provider did not accept or apply the step.
+  """
 
   @callback supported_methods() :: [atom()]
   @callback supported_methods(term()) :: [atom()]

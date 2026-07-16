@@ -174,6 +174,31 @@ defmodule Imp.ObservabilityInspectionTest do
     refute first =~ @secret
   end
 
+  test "rendering remains fail-safe for typed map keys" do
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key"}
+
+    inspection =
+      Imp.Observability.Inspection.new(
+        :trace,
+        :ok,
+        %{},
+        [
+          {:telemetry,
+           %{
+             typed_key => @secret,
+             provider_error: [:provider_error, %{api_key: @secret} | "tail"]
+           }}
+        ],
+        limit: 10,
+        max_bytes: 10_000,
+        redact: true
+      )
+
+    rendered = Imp.Observability.render_inspection(inspection)
+    assert rendered =~ "[REDACTED]"
+    refute rendered =~ @secret
+  end
+
   test "redaction can only be disabled explicitly" do
     inspection =
       Imp.Observability.inspect_artifact({:provider, [%{prompt: @secret, outputs: ["ok"]}]},

@@ -57,6 +57,9 @@ defmodule GRPOLifecycleTest do
       ids = Enum.map(groups, & &1.batch_id)
 
       case trainer.runtime_mode do
+        :provider_error ->
+          :ok
+
         :pending_step_then_hang ->
           Process.sleep(1_000)
 
@@ -73,7 +76,10 @@ defmodule GRPOLifecycleTest do
           if mode == :accepted_step_then_hang, do: Process.sleep(1_000)
       end
 
-      {:ok, session}
+      case trainer.runtime_mode do
+        :provider_error -> {:error, :provider_transport_closed}
+        _other -> {:ok, session}
+      end
     end
 
     @impl true
@@ -234,6 +240,42 @@ defmodule GRPOLifecycleTest do
     assert second_batches == first_batches
   end
 
+  test "a provider error after dispatch remains unknown until durable reconciliation", context do
+    first = optimizer(trainer(context, :provider_error), context.path, num_train_steps: 1)
+
+    assert {:error, {:grpo_step_outcome_unknown, step_id, :provider_transport_closed}} =
+             Imp.Optimizer.GRPO.compile(first, program(), trainset())
+
+    assert_received {:grpo_step, first_opts}
+    assert first_opts[:step_id] == step_id
+    assert File.regular?(context.path)
+
+    resumed = %{first | trainer: trainer(context, :ok)}
+    assert {:ok, _compiled} = Imp.Optimizer.GRPO.compile(resumed, program(), trainset())
+    assert_received {:grpo_step, second_opts}
+    assert second_opts[:step_id] == step_id
+    assert second_opts[:idempotency_key] == step_id
+  end
+
+  test "credential-shaped replay data is sanitized before first submission and remains exact",
+       context do
+    canary = "sk-test-secret-1234567890"
+    dataset = trainset(canary)
+    first = optimizer(trainer(context, :pending_step_then_hang), context.path, num_train_steps: 1)
+
+    assert {:error, {:grpo_step_outcome_unknown, _step_id, _timeout}} =
+             Imp.Optimizer.GRPO.compile(first, program(), dataset)
+
+    assert_received {:grpo_step_batches, first_batches}
+    refute inspect(first_batches) =~ canary
+    assert inspect(first_batches) =~ "[REDACTED]"
+
+    resumed = %{first | trainer: trainer(context, :ok)}
+    assert {:ok, _compiled} = Imp.Optimizer.GRPO.compile(resumed, program(), dataset)
+    assert_received {:grpo_step_batches, second_batches}
+    assert second_batches == first_batches
+  end
+
   test "a partially visible reinforcement effect is not guessed or replayed", context do
     first =
       optimizer(trainer(context, :partial_step_then_hang), context.path,
@@ -319,4 +361,7 @@ defmodule GRPOLifecycleTest do
 
   defp trainset,
     do: [Imp.example(question: "q", answer: "ok") |> Imp.with_inputs(:question)]
+
+  defp trainset(question),
+    do: [Imp.example(question: question, answer: "ok") |> Imp.with_inputs(:question)]
 end

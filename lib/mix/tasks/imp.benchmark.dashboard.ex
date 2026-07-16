@@ -206,6 +206,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "instruction_optimizer_contract" => instruction_optimizer_contract,
       "optimizer_lift" => optimizer_lift,
+      "copro_isolation" => copro_isolation_lane(max_age_hours),
       "gepa_replication" =>
         gepa_replication_lane(
           Keyword.get(opts, :gepa_dir, "tmp/gepa-replication"),
@@ -742,6 +743,46 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           "artifact was rejected by LocalMLXCampaign validation: #{inspect(reasons)}"
         )
     end
+  end
+
+  defp copro_isolation_lane(max_age_hours) do
+    registry = Imp.ReproductionRegistry.load!()
+    feature = Enum.find(registry["features"], &(&1["id"] == "copro"))
+    evidence = feature && feature["admitted_evidence"]
+
+    unless is_map(evidence) and evidence["tier"] == "t1" and
+             evidence["protocol_id"] == "copro_isolation" and
+             is_binary(evidence["artifact"]) do
+      raise ArgumentError, "canonical COPRO T1 isolation evidence is not selected"
+    end
+
+    path = evidence["artifact"]
+    artifact = ArtifactFile.read_run_json!(path)
+    Imp.ReproductionRegistry.validate_protocol_artifact!(registry, "copro_isolation", artifact)
+
+    artifact_lane("copro_isolation", path, artifact, max_age_hours,
+      passing: true,
+      full_evidence: true,
+      scale: "full",
+      freshness: :age,
+      summary: %{
+        "feature" => "copro",
+        "tier" => evidence["tier"],
+        "protocol_id" => evidence["protocol_id"],
+        "artifact_sha256" => evidence["artifact_sha256"],
+        "deterministic_observations_verified" =>
+          get_in(artifact, ["summary", "deterministic_observations_verified"]),
+        "limitations" => get_in(artifact, ["scope", "not_claimed"])
+      },
+      limitation:
+        "The canonical artifact proves only its five DSPy 3.2.1 observations; it excludes exact RNG parity, provider behavior, effectiveness, and full optimizer parity."
+    )
+  rescue
+    error ->
+      missing_lane(
+        "copro_isolation",
+        "canonical selected COPRO isolation evidence is invalid: #{Exception.message(error)}"
+      )
   end
 
   defp latest_valid_local_mlx_artifact(glob) do

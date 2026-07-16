@@ -164,8 +164,8 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/dcad73d7acf199134f3a8b22ea74fb8cd156eb48b30f8127a350a215af8b5d27.json", "test/copro_isolation_artifact_test.exs"],
-      "requirements": [{"id": "optimizer.copro.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "passing", "threshold": "the canonical COPRO isolation artifact verifies all five declared observations and retained exclusions"}]
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json", "test/copro_isolation_artifact_test.exs"],
+      "requirements": [{"id": "optimizer.copro.semantic", "kind": "optimizer_conformance", "lane": "copro_isolation", "evidence": "passing", "threshold": "the canonical COPRO isolation artifact verifies all five declared observations and retained exclusions"}]
     },
     {
       "id": "claim.optimizer.bootstrap_few_shot.effectiveness",

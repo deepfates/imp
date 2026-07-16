@@ -36,7 +36,7 @@ defmodule GRPOContractTest do
       send(session.backend_state.owner, {:step, groups})
 
       if session.backend_state.mode == :step_error,
-        do: {:error, :step_failed},
+        do: {:error, {:reinforcement_step_not_accepted, :step_failed}},
         else: {:ok, session}
     end
 

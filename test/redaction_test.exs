@@ -175,6 +175,18 @@ defmodule Imp.RedactionTest do
            }
 
     assert Imp.Redaction.drop_credentials(%{token: "CANARY_ACTUAL_TOKEN"}) == %{}
+
+    object_descriptor = %{
+      type: :string,
+      description: "provider credential field",
+      minLength: 1
+    }
+
+    assert Imp.Redaction.redact(%{api_key: object_descriptor}) == %{api_key: object_descriptor}
+
+    assert Imp.Redaction.drop_credentials(%{api_key: object_descriptor}) == %{
+             api_key: object_descriptor
+           }
   end
 
   test "canonical credential classification covers provider variants without swallowing semantics" do

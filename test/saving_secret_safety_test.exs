@@ -62,7 +62,14 @@ defmodule Imp.SavingSecretSafetyTest do
 
     tool =
       Imp.tool(:lookup, "Use credential #{secret}", runner,
-        schema: %{query: :string, token: :string, note: "Bearer abcdefghijklmnop"}
+        schema: %{
+          query: :string,
+          token: :string,
+          api_key: :string,
+          auth_token: %{type: :string},
+          actual_token: %{token: secret, api_key: secret},
+          note: "Bearer abcdefghijklmnop"
+        }
       )
 
     program = Imp.react("question -> answer", [tool], max_iters: 0)
@@ -82,6 +89,14 @@ defmodule Imp.SavingSecretSafetyTest do
     assert loaded.tools.lookup.description == "[REDACTED]"
     assert loaded.tools.lookup.schema.note == "[REDACTED]"
     assert loaded.tools.lookup.schema.token == :string
+    assert loaded.tools.lookup.schema.api_key == :string
+    assert loaded.tools.lookup.schema.auth_token == %{type: :string}
+
+    assert loaded.tools.lookup.schema.actual_token == %{
+             token: "[REDACTED]",
+             api_key: "[REDACTED]"
+           }
+
     assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
   end
 

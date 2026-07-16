@@ -737,7 +737,19 @@ defmodule Imp.Optimizer.Trajectory do
       else: encoded
   end
 
-  defp encode_term(value) when is_list(value), do: Enum.map(value, &encode_term/1)
+  defp encode_term([]), do: []
+
+  defp encode_term([head | tail] = value) do
+    if proper_list?(value) do
+      Enum.map(value, &encode_term/1)
+    else
+      %{
+        "__trajectory_type__" => "improper_list",
+        "head" => encode_term(head),
+        "tail" => encode_term(tail)
+      }
+    end
+  end
 
   defp encode_term(value) when is_tuple(value),
     do: %{"__trajectory_type__" => "tuple", "value" => value |> Tuple.to_list() |> encode_term()}
@@ -752,6 +764,10 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp encode_term(value),
     do: decode_error!("trajectory contains a non-JSON-safe value: #{inspect(value)}")
+
+  defp proper_list?([]), do: true
+  defp proper_list?([_head | tail]), do: proper_list?(tail)
+  defp proper_list?(_tail), do: false
 
   defp encode_map(value) do
     Enum.reduce(value, %{}, fn
@@ -806,6 +822,13 @@ defmodule Imp.Optimizer.Trajectory do
        when is_list(value) do
     require_typed_keys!(tagged, ~w(__trajectory_type__ value))
     value |> decode_term() |> List.to_tuple()
+  end
+
+  defp decode_term(
+         %{"__trajectory_type__" => "improper_list", "head" => head, "tail" => tail} = tagged
+       ) do
+    require_typed_keys!(tagged, ~w(__trajectory_type__ head tail))
+    [decode_term(head) | decode_term(tail)]
   end
 
   defp decode_term(%{"__trajectory_type__" => "atom", "value" => value} = tagged)
@@ -883,7 +906,12 @@ defmodule Imp.Optimizer.Trajectory do
       else: [key, redact_value(nested, keys)]
   end
 
-  defp redact_value(value, keys) when is_list(value), do: Enum.map(value, &redact_value(&1, keys))
+  defp redact_value([], _keys), do: []
+
+  # Low-level provider failures may contain improper lists. Walk cons cells
+  # directly so trajectory persistence remains fail-safe at that boundary.
+  defp redact_value([head | tail], keys),
+    do: [redact_value(head, keys) | redact_value(tail, keys)]
 
   defp redact_value({key, nested}, keys) when is_atom(key) or is_binary(key) do
     if redacted_entry?(key, nested, keys) and not accounting_value?(key, nested),
@@ -896,10 +924,12 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp redact_value(value, keys), do: Imp.Redaction.redact(value, keys)
 
-  defp accounting_value?(key, value),
+  defp accounting_value?(key, value) when is_atom(key) or is_binary(key),
     do:
       to_string(key) in ["input_tokens", "output_tokens", "total_tokens"] and
         is_integer(value) and value >= 0
+
+  defp accounting_value?(_key, _value), do: false
 
   defp redacted_key?(key, keys) do
     case Imp.Redaction.redact({key, :visible}, keys) do

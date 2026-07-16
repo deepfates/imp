@@ -243,6 +243,36 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     assert redacted.example.token == "[REDACTED]"
   end
 
+  test "serialization fails safe for mixed tagged credential keys and improper provider lists" do
+    typed_key = %{"__imp_type__" => "atom", "value" => "api_key"}
+
+    tagged = %{
+      "__imp_type__" => :map,
+      :entries => [[typed_key, "CANARY_TRAJECTORY_TAGGED_SECRET"]]
+    }
+
+    trajectory =
+      Trajectory.project(:evaluation, %{
+        index: 0,
+        score: 0.0,
+        trace: [],
+        metadata: %{
+          tagged: tagged,
+          provider_error: [:provider_error, %{api_key: "CANARY_IMPROPER_SECRET"} | "messages"]
+        }
+      })
+
+    wire = Trajectory.dump(trajectory)
+    rendered = inspect(wire)
+
+    refute rendered =~ "CANARY_TRAJECTORY_TAGGED_SECRET"
+    refute rendered =~ "CANARY_IMPROPER_SECRET"
+    assert rendered =~ "[REDACTED]"
+    assert rendered =~ "provider_error"
+    assert {:ok, _json} = Jason.encode(wire)
+    assert {:ok, _restored} = Trajectory.load(wire)
+  end
+
   test "typed payload tags reject extra keys" do
     wire =
       Trajectory.project(:evaluation, %{index: 0, score: 0.0, trace: []})

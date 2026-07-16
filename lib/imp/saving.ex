@@ -908,7 +908,6 @@ defmodule Imp.Saving do
   defp redact_dump(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
       cond do
-        to_string(key) == "schema" -> {key, Imp.Redaction.redact(nested, [])}
         Imp.Redaction.credential_entry?(key, nested) -> {key, "[REDACTED]"}
         true -> {key, redact_dump(nested)}
       end
@@ -981,7 +980,7 @@ defmodule Imp.Saving do
     |> Enum.map(fn tool ->
       tool
       |> Map.update!("description", &Imp.Redaction.redact(&1, []))
-      |> Map.update!("schema", &Imp.Redaction.redact(&1, []))
+      |> Map.update!("schema", &Imp.Redaction.redact/1)
     end)
   end
 

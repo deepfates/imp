@@ -682,13 +682,16 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     do: %{program: program, plan: plan, error: :trainer_required}
 
   defp start_training(%__MODULE__{} = optimizer, program, plan) do
+    launch_deadline = monotonic_ms() + optimizer.launch_timeout
+
     plan.entries
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, started} ->
       examples = training_examples(optimizer.trainer, entry)
 
       with {:ok, opts} <- trainer_opts(optimizer, entry),
-           {:ok, job} <- bounded_finetune(optimizer, entry.lm, examples, opts) do
+           {:ok, job} <-
+             bounded_finetune(optimizer, entry.lm, examples, opts, launch_deadline) do
         started = started ++ [%{entry | job: job}]
         notify_lifecycle(optimizer, {:started, index, job})
         {:cont, {:ok, started}}
@@ -727,14 +730,24 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     end
   end
 
-  defp bounded_finetune(%__MODULE__{} = optimizer, lm, examples, opts) do
+  defp bounded_finetune(%__MODULE__{} = optimizer, lm, examples, opts, deadline) do
+    remaining = max(deadline - monotonic_ms(), 0)
+
+    if remaining == 0 do
+      {:error, {:bootstrap_finetune_launch_timeout, optimizer.launch_timeout}}
+    else
+      do_bounded_finetune(optimizer, lm, examples, opts, remaining)
+    end
+  end
+
+  defp do_bounded_finetune(%__MODULE__{} = optimizer, lm, examples, opts, timeout) do
     task =
       Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fn ->
         result = Trainer.finetune(optimizer.trainer, lm, examples, opts)
         {result, drain_callback_messages()}
       end)
 
-    case Task.yield(task, optimizer.launch_timeout) do
+    case Task.yield(task, timeout) do
       {:ok, {result, messages}} ->
         relay_callback_messages(messages)
         result

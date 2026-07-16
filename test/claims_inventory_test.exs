@@ -5,6 +5,7 @@ defmodule ClaimsInventoryTest do
   @claim_states ["asserted", "target", "retired"]
   @gate_policies ["blocking", "informational"]
   @known_lanes ~w(
+    copro_isolation
     failure_recovery
     gepa_replication
     golden_trace
@@ -182,7 +183,8 @@ defmodule ClaimsInventoryTest do
     copro = claims["claim.optimizer.copro.semantic_conformance"]
     assert copro["claim_state"] == "asserted"
     assert copro["target_rung"] == "C1"
-    assert copro["sources"] |> Enum.any?(&String.contains?(&1, "dcad73d7"))
+    assert copro["sources"] |> Enum.any?(&String.contains?(&1, "cead13aa"))
+    assert get_in(copro, ["requirements", Access.at(0), "lane"]) == "copro_isolation"
     assert hd(copro["limitations"]) =~ "excludes exact Python RNG parity"
 
     refute Map.has_key?(claims, "claim.optimizer_lift.full")

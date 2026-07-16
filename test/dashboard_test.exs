@@ -393,6 +393,22 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["product_package"]["status"] == "full"
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
     assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
+    assert dashboard["lanes"]["copro_isolation"]["status"] == "full"
+    assert dashboard["lanes"]["copro_isolation"]["passing"]
+
+    assert get_in(dashboard, ["lanes", "copro_isolation", "artifact", "path"]) ==
+             "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json"
+
+    assert get_in(dashboard, ["lanes", "copro_isolation", "artifact", "sha256"]) ==
+             "cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d"
+
+    assert get_in(dashboard, [
+             "lanes",
+             "copro_isolation",
+             "summary",
+             "deterministic_observations_verified"
+           ]) == 5
+
     assert dashboard["lanes"]["live_provider_smoke"]["status"] == "missing"
     assert dashboard["lanes"]["failure_recovery"]["status"] == "passing"
     assert dashboard["lanes"]["failure_recovery"]["passing"]
