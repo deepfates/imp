@@ -440,6 +440,11 @@ Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
+The implementation authority for `Imp.Optimizer.GRPO` is DSPy 3.2.1's pinned
+`dspy/teleprompt/grpo.py` mmGRPO contract at commit `29448ae…`. The DeepSeekMath
+GRPO paper is retained as algorithmic background only; it is not used to claim
+that Imp reproduces the paper trainer or results.
+
 Imp modules: `Imp.Predict.Avatar`, `Imp.Optimizer.Avatar`, `Imp.Optimizer.BootstrapFinetune`, `Imp.Optimizer.GRPO`, `Imp.Optimizer.BetterTogether`, `Imp.Optimizer.Ensemble`
 Elixir-native rationale: BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.
 

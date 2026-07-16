@@ -65,7 +65,7 @@ defmodule ClaimsInventoryTest do
     end)
   end
 
-  test "the provider-free overhead ceiling is informational, not a performance claim" do
+  test "the provider-free overhead budgets are informational, not a speed claim" do
     claim =
       Enum.find(read_claims!(), &(&1["id"] == "claim.runtime.provider_free_overhead_guard"))
 
@@ -73,7 +73,7 @@ defmodule ClaimsInventoryTest do
     assert claim["target_rung"] == "C2"
 
     assert claim["statement"] =~
-             "without presenting the configured ceiling as a performance claim"
+             "without presenting any budget or ratio as a speed claim"
   end
 
   test "every claim has an evidence requirement and auditable source" do
@@ -125,7 +125,8 @@ defmodule ClaimsInventoryTest do
            ] = claim["requirements"]
 
     refute "training_protocol" in claim["surface"]
-    assert claim["statement"] =~ "does not claim live provider training"
+    assert claim["statement"] =~ "does not claim"
+    assert claim["statement"] =~ "live provider training"
   end
 
   test "RLM research claim names unavailable exact authorities" do
@@ -136,6 +137,30 @@ defmodule ClaimsInventoryTest do
     assert Enum.any?(claim["limitations"], &String.contains?(&1, "S-NIAH"))
     assert Enum.any?(claim["limitations"], &String.contains?(&1, "ACQUIRE_AND_PIN_SHA256"))
     assert claim["statement"] =~ "exact paper authority"
+  end
+
+  test "RAG operational contracts stay separate from comparative effectiveness" do
+    operational =
+      Enum.find(
+        read_claims!(),
+        &(&1["id"] == "claim.rag_tools_agents.provider_free_operational")
+      )
+
+    assert operational["claim_state"] == "asserted"
+    assert operational["target_rung"] == "C2"
+    assert [%{"evidence" => "passing"}] = operational["requirements"]
+    assert hd(operational["limitations"]) =~ "does not establish HotPotQA"
+
+    comparative =
+      Enum.find(
+        read_claims!(),
+        &(&1["id"] == "claim.rag_tools_agents.comparative_effectiveness")
+      )
+
+    assert comparative["claim_state"] == "target"
+    assert comparative["target_rung"] == "C4"
+    assert comparative["statement"] =~ "operational smoke rows"
+    assert hd(comparative["requirements"])["threshold"] =~ "pinned BFCL"
   end
 
   test "local MLX effectiveness claim remains narrow and independently gated" do

@@ -19,6 +19,7 @@ defmodule AvatarPersistenceTest do
         ],
         lm: Imp.req_llm("openai:gpt-avatar", api_key: "sk-avatar-secret-123456"),
         max_iters: 4,
+        tool_timeout_ms: 1_234,
         tool_policy: policy,
         metadata: %{
           api_key: "sk-metadata-secret-123456",
@@ -33,6 +34,7 @@ defmodule AvatarPersistenceTest do
     assert state["type"] == "avatar"
     assert state["tools"] |> hd() |> Map.fetch!("runner") == "lookup_runner"
     assert state["tool_policy"] == %{"registry_callback" => "avatar_policy"}
+    assert state["tool_timeout_ms"] == 1_234
     assert state["metadata"]["__imp_type__"] == "map"
 
     assert state["metadata"]
@@ -46,7 +48,7 @@ defmodule AvatarPersistenceTest do
 
     restored = encoded |> Jason.decode!(keys: :strings) |> Imp.load(registry: registry)
 
-    assert %Imp.Predict.Avatar{max_iters: 4} = restored
+    assert %Imp.Predict.Avatar{max_iters: 4, tool_timeout_ms: 1_234} = restored
     assert restored.actor.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
     assert restored.finisher.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
     assert restored.tool_policy == policy
@@ -85,6 +87,10 @@ defmodule AvatarPersistenceTest do
     assert_raise ArgumentError, ~r/Avatar max_iters must be a non-negative integer/, fn ->
       state |> Map.put("max_iters", -1) |> Imp.load()
     end
+
+    assert_raise ArgumentError, ~r/Avatar tool_timeout_ms must be a non-negative integer/, fn ->
+      state |> Map.put("tool_timeout_ms", -1) |> Imp.load()
+    end
   end
 
   test "early Avatar payloads without metadata load with an empty map" do
@@ -95,5 +101,15 @@ defmodule AvatarPersistenceTest do
       |> Imp.load()
 
     assert restored.metadata == %{}
+  end
+
+  test "early Avatar payloads without a tool timeout load with the bounded default" do
+    restored =
+      Imp.avatar("question -> answer", [])
+      |> Imp.dump()
+      |> Map.delete("tool_timeout_ms")
+      |> Imp.load()
+
+    assert restored.tool_timeout_ms == 30_000
   end
 end

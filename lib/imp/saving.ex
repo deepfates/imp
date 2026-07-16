@@ -153,6 +153,7 @@ defmodule Imp.Saving do
       "finisher" => dump_avatar_predict(avatar.finisher, "Avatar finisher"),
       "tools" => dump_avatar_tools(avatar.tools),
       "max_iters" => avatar.max_iters,
+      "tool_timeout_ms" => avatar.tool_timeout_ms,
       "tool_policy" => dump_tool_policy(avatar.tool_policy, "Avatar tool policy"),
       "metadata" => dump_portable_value!(avatar.metadata, "Avatar metadata")
     }
@@ -295,7 +296,8 @@ defmodule Imp.Saving do
       "programs" => Enum.map(program.programs, &dump/1),
       "reduce_fn" => dump_optional_callback(program.ensemble.reduce_fn, "Ensemble reducer"),
       "size" => program.ensemble.size,
-      "deterministic" => program.ensemble.deterministic
+      "deterministic" => program.ensemble.deterministic,
+      "seed" => program.ensemble.seed
     }
   end
 
@@ -423,6 +425,12 @@ defmodule Imp.Saving do
     finisher = require_predict!(load(state["finisher"]), "Avatar finisher")
     tools = load_tools!(state["tools"], "Avatar")
     max_iters = require_non_negative_integer!(state["max_iters"], "Avatar max_iters")
+
+    tool_timeout_ms =
+      state
+      |> Map.get("tool_timeout_ms", 30_000)
+      |> require_non_negative_integer!("Avatar tool_timeout_ms")
+
     tool_policy = load_tool_policy!(state["tool_policy"], "Avatar tool policy")
 
     metadata =
@@ -439,6 +447,7 @@ defmodule Imp.Saving do
       finisher: finisher,
       tools: tools,
       max_iters: max_iters,
+      tool_timeout_ms: tool_timeout_ms,
       tool_policy: tool_policy,
       metadata: metadata
     }
@@ -675,7 +684,8 @@ defmodule Imp.Saving do
       Imp.Optimizer.Ensemble.new(
         reduce_fn: load_optional_callback(state["reduce_fn"], 1, "Ensemble reducer"),
         size: state["size"],
-        deterministic: state["deterministic"]
+        deterministic: state["deterministic"],
+        seed: Map.get(state, "seed", 0)
       )
 
     Imp.Optimizer.Ensemble.compile(ensemble, programs)

@@ -192,26 +192,50 @@
       ]
     },
     {
-      "id": "claim.rag_tools_agents.full",
-      "claim_state": "target",
+      "id": "claim.rag_tools_agents.provider_free_operational",
+      "claim_state": "asserted",
       "target_rung": "C2",
-      "release": "telos",
-      "scope": "Telos research comparison for the named advanced RAG, tool, and agent workflows; excludes the scoped v0.1 local contracts and selected live paths.",
-      "limitations": ["v0.1 claims local contracts and selected live paths, not full upstream parity."],
-      "statement": "The telos research target is comparative evidence for the named RAG, tool, ReAct, agent, CodeAct, ProgramOfThought, streaming, async, and save/load workflows, without treating selected product paths as full upstream parity.",
+      "release": "v0.1",
+      "scope": "Bounded provider-free operational contracts for deterministic RAG, ReAct, ReActV2 recovery, MCP import, agent policy, CodeAct, ProgramOfThought, streaming, async execution, and credential-free persistence.",
+      "limitations": ["This claim does not establish HotPotQA quality, BFCL tool-use effectiveness, matched cross-runtime failure recovery, live provider behavior, or full DSPy parity."],
+      "statement": "Imp executes the named bounded provider-free RAG, tool, agent, recovery, execution, streaming, async, and persistence contracts with exact fail-closed DSPy rows where direct comparison is claimed.",
       "category": "tools_agents_rag",
-      "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
-      "claim_type": "feature_completeness",
-      "comparison": "dspy_and_imp_native",
+      "surface": ["rag", "tools", "react", "react_v2", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
+      "claim_type": "operational_contract",
+      "comparison": "dspy_where_direct_and_imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [
         {
-          "id": "rag_tool_agent.full",
-          "kind": "parity",
+          "id": "rag_tool_agent.provider_free_operational",
+          "kind": "operational_contract",
+          "lane": "rag_tool_agent",
+          "evidence": "passing",
+          "threshold": "source-bound provider-free artifact reports bounded_provider_free_operational_contracts_complete with exact required DSPy rows"
+        }
+      ]
+    },
+    {
+      "id": "claim.rag_tools_agents.comparative_effectiveness",
+      "claim_state": "target",
+      "target_rung": "C4",
+      "release": "telos",
+      "scope": "Comparative effectiveness for retrieval-grounded HotPotQA, pinned BFCL tool use, and an identical matched failure-injected agent schedule.",
+      "limitations": ["A pinned ten-row provider-free HotPotQA shared-corpus differential now measures supporting-fact recall and extractive answer availability, but it is not model-generation quality or full-dataset effectiveness; a pinned BFCL subset and identical cross-runtime fault schedule remain missing."],
+      "statement": "The open telos target requires non-inferior retrieval quality, tool-call accuracy, task completion, and terminal recovery under preregistered matched controls; operational smoke rows and selected live paths cannot satisfy it.",
+      "category": "tools_agents_rag",
+      "surface": ["rag", "tools", "react", "agents", "mcp", "code_act", "program_of_thought", "streaming", "async", "save_load"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dspy_and_imp_native",
+      "gate_policy": "blocking",
+      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
+      "requirements": [
+        {
+          "id": "rag_tool_agent.comparative_effectiveness",
+          "kind": "comparative_effectiveness",
           "lane": "rag_tool_agent",
           "evidence": "full",
-          "threshold": "rag-tool-agent artifact reports full_rag_tool_agent_parity"
+          "threshold": "a source-bound research artifact completes pinned HotPotQA retrieval/supporting-fact scoring, pinned BFCL tool name/argument scoring, and an identical matched cross-runtime failure schedule"
         }
       ]
     },
@@ -248,8 +272,8 @@
       "target_rung": "C2",
       "release": "v0.1",
       "scope": "Informational regression guard for named provider-free local paths; excludes end-to-end latency, parity, and speed claims.",
-      "limitations": ["The configured ceiling is a regression alarm and provides no evidence that Imp matches or outperforms DSPy."],
-      "statement": "Imp records a provider-free local-overhead regression guard for named core paths without presenting the configured ceiling as a performance claim.",
+      "limitations": ["Named absolute and reference-relative budgets are regression alarms and provide no evidence that Imp matches or outperforms DSPy; ratios are measurements only."],
+      "statement": "Imp records provider-free local-overhead regression guards with named per-operation budgets, rationale, and environment identity without presenting any budget or ratio as a speed claim.",
       "category": "runtime",
       "surface": ["signature_parse", "adapter_format_parse", "schema_validation", "evaluation", "metrics", "optimizer_scheduling", "redaction", "cache", "concurrency"],
       "claim_type": "performance",
@@ -262,7 +286,7 @@
           "kind": "performance",
           "lane": "provider_free_overhead",
           "evidence": "full",
-          "threshold": "all named provider-free paths remain below their configured regression ceilings"
+          "threshold": "all paired provider-free paths remain below their named absolute and reference-relative budgets in a clean current-source artifact"
         }
       ]
     },
@@ -349,13 +373,13 @@
       "claim_state": "target",
       "target_rung": "C2",
       "release": "telos",
-      "scope": "Telos live recovery evidence for exactly two rows: provider retry/timeout/idempotency and integration retrieval plus tool-agent recovery.",
+      "scope": "Telos local operational recovery evidence for exactly two rows: provider-shaped timeout/retry/idempotency and integration retrieval plus exact tool-agent failure/retry/submit recovery.",
       "limitations": [
-        "The current deterministic campaign is T0 evidence and cannot establish live provider, training, retrieval, tool, or agent recovery.",
+        "The operational rows use local injected transports, a static LM, and dummy canaries; they do not establish external-provider behavior.",
         "No live provider training job was created or cancelled; training recovery remains deterministic-only.",
-        "The live authority is limited to one injected provider 429 followed by provider success, one closed retriever transport followed by retrieval success, and one provider-backed tool-agent run."
+        "The authority is limited to one bounded injected timeout followed by idempotent success, one closed retriever transport followed by retrieval success, and one exact tool failure/retry/submit trajectory."
       ],
-      "statement": "The telos research target is completed live evidence for the provider_retry_timeout_idempotency_live and retrieval_and_tool_agent_recovery_live rows; it does not claim live provider training, public MCP service recovery, or exhaustive network failure coverage.",
+      "statement": "The telos research target is completed local operational evidence for the provider_retry_timeout_idempotency_live and retrieval_and_tool_agent_recovery_live compatibility rows; it does not claim external providers, live provider training, public MCP service recovery, or exhaustive network failure coverage.",
       "category": "operations",
       "surface": [
         "ReqLLM",

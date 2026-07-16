@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import subprocess
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,10 @@ LIVE_RAG_INSTRUCTION = "Answer using the supplied context. Return only the exact
 LIVE_TOOL_INSTRUCTION = """First call lookup_capital with country "france". After its result is in history,
 finish with answer exactly equal to that result. Never answer from memory and
 never call lookup_capital more than once."""
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_PATH = ROOT / "test/fixtures/benchmarks/rag-tool-agent-provider-free.json"
+AUTHORITY_PATH = ROOT / "benchmarks/authority_sources/dspy-3.2.1-29448ae.json"
+DSPY_AUTHORITY = json.loads(FIXTURE_PATH.read_text())["dspy_authority"]
 
 
 class QASignature(dspy.Signature):
@@ -134,6 +139,12 @@ def main() -> int:
         "git_sha": git_sha(),
         "python": platform.python_version(),
         "dspy_version": getattr(dspy, "__version__", "unknown"),
+        "source": {
+            **DSPY_AUTHORITY,
+            "script_sha256": file_sha256(Path(__file__)),
+            "authority_sha256": file_sha256(AUTHORITY_PATH),
+            "fixture_sha256": file_sha256(FIXTURE_PATH),
+        },
         "rows": rows,
     }
 
@@ -413,6 +424,10 @@ def overlap(query: str, text: str) -> int:
 
 def timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def file_sha256(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def git_sha() -> Optional[str]:

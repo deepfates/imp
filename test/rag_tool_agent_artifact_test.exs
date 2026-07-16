@@ -14,6 +14,20 @@ defmodule RagToolAgentArtifactTest do
     [path] = Path.wildcard(Path.join(out_dir, "rag-tool-agent-parity-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
 
+    assert Mix.Tasks.Imp.Benchmark.RagToolAgent.validate_artifact!(artifact, require_clean: false) ==
+             artifact
+
+    if get_in(artifact, ["run_context", "workspace", "state"]) == "dirty" do
+      assert_raise ArgumentError, ~r/requires a clean source checkout/, fn ->
+        Mix.Tasks.Imp.Benchmark.RagToolAgent.validate_artifact!(artifact)
+      end
+    end
+
+    assert get_in(artifact, ["run_context", "source_commits", "dspy"]) ==
+             "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c"
+
+    assert get_in(artifact, ["run_context", "inputs", "task_sha256"]) =~ ~r/^sha256:/
+
     assert artifact["summary"]["all_passing"]
     assert artifact["summary"]["provider_free_contract_complete"]
     refute artifact["summary"]["live_matched_behavior_complete"]
@@ -23,11 +37,39 @@ defmodule RagToolAgentArtifactTest do
     rows = Map.new(artifact["rows"], &{&1["id"], &1})
 
     assert rows["rag_memory_retrieval"]["passing"]
+
+    assert get_in(rows, ["rag_memory_retrieval", "imp", "trace", "program"]) ==
+             "Imp.Predict.RAG"
+
     assert rows["rag_multi_hop_retrieval"]["passing"]
     assert get_in(rows, ["rag_multi_hop_retrieval", "imp", "trace", "hops"]) |> length() == 2
     assert rows["react_lookup_tool"]["passing"]
     assert rows["code_act_tool_program"]["passing"]
     assert get_in(rows, ["code_act_tool_program", "imp", "trace"]) |> length() == 2
+    assert rows["react_v2_recovers_from_tool_and_submit_errors"]["passing"]
+
+    assert rows["react_v2_recovers_from_tool_and_submit_errors"]["imp"]["termination_reason"] ==
+             "submit"
+  end
+
+  test "provider-free comparator rejects missing, duplicate, and wrong-source DSPy rows" do
+    for {label, report} <- [
+          {:missing, dspy_report([])},
+          {:duplicate, dspy_report(provider_free_dspy_rows() ++ provider_free_dspy_rows())},
+          {:wrong_source,
+           dspy_report(provider_free_dspy_rows())
+           |> put_in(["source", "commit"], String.duplicate("0", 40))}
+        ] do
+      out_dir = tmp_dir("rag-tool-agent-#{label}")
+
+      assert_raise Mix.Error, ~r/(rows must be exactly|stale or wrong source)/, fn ->
+        capture_io(fn ->
+          Mix.Tasks.Imp.Benchmark.RagToolAgent.run_with_runners(["--out", out_dir], %{
+            dspy: fn nil -> report end
+          })
+        end)
+      end
+    end
   end
 
   test "live mode admits only complete matched model behavior evidence" do
@@ -55,7 +97,7 @@ defmodule RagToolAgentArtifactTest do
     assert artifact["summary"]["provider_free_contract_complete"]
     assert artifact["summary"]["live_matched_behavior_complete"]
     assert artifact["summary"]["full_rag_tool_agent_parity"]
-    assert artifact["summary"]["total"] == 15
+    assert artifact["summary"]["total"] == 16
     assert artifact["summary"]["direct_comparisons"] == 4
   end
 
@@ -164,6 +206,26 @@ defmodule RagToolAgentArtifactTest do
         ]
       }
     ]
+  end
+
+  defp dspy_report(rows) do
+    %{
+      "runner" => "stub-dspy-provider-free",
+      "rows" => rows,
+      "source" => %{
+        "repository" => "stanfordnlp/dspy",
+        "version" => "3.2.1",
+        "commit" => "29448ae12756abdd14bd8796c819247ebb83673c",
+        "script_sha256" => sha256("scripts/dspy_rag_tool_agent.py"),
+        "authority_sha256" => sha256("benchmarks/authority_sources/dspy-3.2.1-29448ae.json"),
+        "fixture_sha256" => sha256("test/fixtures/benchmarks/rag-tool-agent-provider-free.json")
+      }
+    }
+  end
+
+  defp sha256(path) do
+    "sha256:" <>
+      (path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower))
   end
 
   defp live_rows(config, runtime_model) do

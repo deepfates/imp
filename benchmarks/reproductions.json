@@ -391,7 +391,9 @@
       "id": "react_v2",
       "name": "ReActV2",
       "authority_family": "family.tools_agents_react",
-      "surface_tokens": [],
+      "surface_tokens": [
+        "react_v2"
+      ],
       "public_surfaces": [
         "Imp.Predict.ReActV2"
       ],

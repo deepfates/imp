@@ -6,16 +6,23 @@ defmodule Imp.Optimizer.Ensemble.Program do
 
   @impl true
   def call(%__MODULE__{} = program, inputs) do
-    programs =
+    {programs, selection} =
       cond do
         program.ensemble.deterministic ->
-          Enum.take(program.programs, program.ensemble.size || length(program.programs))
+          selected =
+            Enum.take(program.programs, program.ensemble.size || length(program.programs))
+
+          {selected, %{mode: :ordered, seed: program.ensemble.seed}}
 
         program.ensemble.size ->
-          program.programs |> Enum.shuffle() |> Enum.take(program.ensemble.size)
+          rng = selection_rng(program.ensemble.seed, inputs)
+          {shuffled, _rng} = Imp.Optimizer.Sampling.shuffle(program.programs, rng)
+
+          {Enum.take(shuffled, program.ensemble.size),
+           %{mode: :seeded, seed: program.ensemble.seed}}
 
         true ->
-          program.programs
+          {program.programs, %{mode: :all, seed: program.ensemble.seed}}
       end
 
     outputs = Enum.map(programs, &safe_call(&1, inputs))
@@ -29,8 +36,19 @@ defmodule Imp.Optimizer.Ensemble.Program do
 
       reduce(program.ensemble.reduce_fn, predictions, outputs)
     else
-      {:ok, Imp.Prediction.new(%{outputs: outputs})}
+      {:ok, Imp.Prediction.new(%{outputs: outputs}, metadata: %{ensemble_selection: selection})}
     end
+  end
+
+  defp selection_rng(seed, inputs) do
+    derived_seed =
+      {seed, inputs}
+      |> :erlang.term_to_binary([:deterministic])
+      |> then(&:crypto.hash(:sha256, &1))
+      |> binary_part(0, 8)
+      |> :binary.decode_unsigned()
+
+    Imp.Optimizer.Sampling.new(derived_seed)
   end
 
   defp safe_call(program, inputs) do
@@ -86,10 +104,12 @@ defmodule Imp.Optimizer.Ensemble do
   `{:error, reason}` entry to the ensemble outputs instead of crashing the whole
   ensemble. When a `:reduce_fn` is supplied, it receives only successful
   predictions; reducer exceptions or invalid reducer returns become structured
-  `{:error, reason}` results.
+  `{:error, reason}` results. When `:size` selects a random subset, `:seed`
+  drives a pure per-input RNG stream, so the same saved ensemble and inputs
+  replay the same selection without depending on process-global random state.
   """
 
-  defstruct reduce_fn: nil, size: nil, deterministic: false
+  defstruct reduce_fn: nil, size: nil, deterministic: false, seed: 0
 
   @option_schema [
     reduce_fn: [
@@ -97,7 +117,8 @@ defmodule Imp.Optimizer.Ensemble do
       default: nil
     ],
     size: [type: {:or, [:non_neg_integer, nil]}, default: nil],
-    deterministic: [type: :boolean, default: false]
+    deterministic: [type: :boolean, default: false],
+    seed: [type: :integer, default: 0]
   ]
 
   def new(opts \\ []) do
@@ -106,7 +127,8 @@ defmodule Imp.Optimizer.Ensemble do
     %__MODULE__{
       reduce_fn: opts[:reduce_fn],
       size: opts[:size],
-      deterministic: opts[:deterministic]
+      deterministic: opts[:deterministic],
+      seed: opts[:seed]
     }
   end
 

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "dspy_authority": {
+    "repository": "stanfordnlp/dspy",
+    "version": "3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c"
+  },
+  "required_dspy_rows": [
+    "rag_memory_retrieval",
+    "react_lookup_tool"
+  ]
+}

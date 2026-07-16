@@ -815,6 +815,10 @@ defmodule Imp.Clients.Trainer do
               {:ok, Imp.Clients.ReinforcementSession.t()} | {:error, term()}
   @callback start_reinforcement(term(), term(), keyword()) ::
               {:ok, Imp.Clients.ReinforcementSession.t()} | {:error, term()}
+  @callback reconcile_reinforcement(String.t()) ::
+              {:ok, Imp.Clients.ReinforcementSession.t() | map()} | {:error, term()}
+  @callback reconcile_reinforcement(term(), String.t()) ::
+              {:ok, Imp.Clients.ReinforcementSession.t() | map()} | {:error, term()}
   @callback reinforcement_status(Imp.Clients.ReinforcementSession.t()) ::
               {:ok, Imp.Clients.ReinforcementSession.t() | map()} | {:error, term()}
   @callback reinforcement_status(term(), Imp.Clients.ReinforcementSession.t()) ::
@@ -842,6 +846,8 @@ defmodule Imp.Clients.Trainer do
                       supported_methods: 1,
                       start_reinforcement: 2,
                       start_reinforcement: 3,
+                      reconcile_reinforcement: 1,
+                      reconcile_reinforcement: 2,
                       reinforcement_status: 1,
                       reinforcement_status: 2,
                       reinforcement_step: 3,
@@ -886,6 +892,14 @@ defmodule Imp.Clients.Trainer do
   def reinforcement_status(provider, %Imp.Clients.ReinforcementSession{} = session) do
     with {:ok, status} <- dispatch(provider, :reinforcement_status, [session]) do
       normalize_session_update(session, status)
+    end
+  end
+
+  @doc "Reconciles a durable reinforcement dispatch identifier to its provider session."
+  def reconcile_reinforcement(provider, dispatch_id) when is_binary(dispatch_id) do
+    with {:ok, session} <- dispatch(provider, :reconcile_reinforcement, [dispatch_id]),
+         {:ok, session} <- normalize_session(session) do
+      {:ok, session}
     end
   end
 

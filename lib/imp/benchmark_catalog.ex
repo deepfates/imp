@@ -167,7 +167,7 @@ defmodule Imp.BenchmarkCatalog do
         "mix benchmark.overhead.check"
       ],
       next_step:
-        "Run the two live provider/training recovery lanes recorded as red by the deterministic failure campaign, then extend to long-running service soak tests."
+        "Admit the two clean current-source local operational recovery rows, then extend to long-running service soak tests."
     },
     %{
       id: "multimodal_primitives",

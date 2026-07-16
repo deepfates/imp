@@ -219,10 +219,11 @@ fallbacks for library ergonomics, but the supervised path is the production
 posture.
 
 Long-running or fan-out work should have an OTP owner. Imp routes its built-in
-async helpers through supervised task owners when the application is running
-and falls back to plain task helpers only for script-style library use before
-supervised startup. That keeps cancellation, crash reporting, telemetry
-context, and shutdown behavior visible to the host system in production.
+async helpers through supervised task owners. If the `:imp` application is not
+running yet, the internal task dispatcher starts it before submitting work; it does not
+fall back to unsupervised plain tasks. That keeps cancellation, crash reporting,
+telemetry context, and shutdown behavior visible to the host system in
+production and in script-style use.
 
 The built-in cancellation helper terminates a supervised task with a bounded
 wait.

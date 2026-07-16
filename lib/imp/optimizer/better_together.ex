@@ -297,6 +297,19 @@ defmodule Imp.Optimizer.BetterTogether do
           errors
         )
 
+      {:error, reason, diagnostics} ->
+        failed = %{
+          index: index,
+          key: key,
+          strategy: strategy_label(strategy),
+          status: :error,
+          error: reason,
+          diagnostics: diagnostics
+        }
+
+        {candidates ++ [failed],
+         errors ++ [%{index: index, key: key, error: reason, diagnostics: diagnostics}], rng}
+
       {:error, reason} ->
         failed = %{
           index: index,
@@ -511,6 +524,39 @@ defmodule Imp.Optimizer.BetterTogether do
     end
   end
 
+  defp execute_step(request, %{kind: :training} = capabilities) do
+    invocation_opts = maybe_put_teacher(request.invocation_opts, request.teacher)
+
+    with :ok <- validate_generic_datasets(capabilities.datasets, invocation_opts),
+         {:ok, compiled} <- invoke_generic_training_optimizer(request, invocation_opts) do
+      case compiled do
+        %Imp.Optimizer.TrainingResult{status: :completed} = result ->
+          case validate_generic_training_result(result) do
+            :ok ->
+              {:ok, result.program,
+               %{
+                 optimizer: request.optimizer.__struct__,
+                 kind: :training,
+                 training_status: result.status,
+                 awaited: false
+               }}
+
+            {:error, reason} ->
+              reject_invalid_training_result(request, result, reason)
+          end
+
+        %Imp.Optimizer.TrainingResult{status: :job_created} = result ->
+          case validate_generic_training_result(result) do
+            :ok -> resolve_generic_training_step(request, result)
+            {:error, reason} -> reject_invalid_training_result(request, result, reason)
+          end
+
+        %Imp.Optimizer.TrainingResult{} = result ->
+          reject_noncanonical_training_result(request, result)
+      end
+    end
+  end
+
   defp execute_step(request, capabilities) do
     invocation_opts = maybe_put_teacher(request.invocation_opts, request.teacher)
 
@@ -521,24 +567,107 @@ defmodule Imp.Optimizer.BetterTogether do
              invocation_opts,
              capabilities
            ) do
-      case {capabilities.kind, compiled} do
-        {:program, compiled} ->
-          {:ok, compiled, %{optimizer: request.optimizer.__struct__, kind: :program}}
-
-        {:training, %Imp.Optimizer.TrainingResult{status: :completed} = result} ->
-          {:ok, result.program,
-           %{
-             optimizer: request.optimizer.__struct__,
-             kind: :training,
-             training_status: result.status,
-             awaited: false
-           }}
-
-        {:training, %Imp.Optimizer.TrainingResult{status: :job_created} = result} ->
-          resolve_generic_training_step(request, result)
-      end
+      {:ok, compiled, %{optimizer: request.optimizer.__struct__, kind: :program}}
     end
   end
+
+  defp invoke_generic_training_optimizer(%{optimizer: %module{} = optimizer} = request, opts) do
+    case module.run(optimizer, request.program, opts) do
+      {:ok, %Imp.Optimizer.TrainingResult{} = result} -> {:ok, result}
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_optimizer_result, :training_result, other}}
+    end
+  rescue
+    error -> {:error, {:optimizer_failed, module, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:optimizer_failed, module, {kind, reason}}}
+  end
+
+  defp validate_generic_training_result(%Imp.Optimizer.TrainingResult{} = result) do
+    cond do
+      not executable_program?(result.program) ->
+        {:error, {:invalid_optimizer_program, result.program}}
+
+      not is_map(result.metadata) ->
+        {:error, {:invalid_training_metadata, result.metadata}}
+
+      result.status == :job_created and is_nil(result.job) ->
+        {:error, :training_job_required}
+
+      result.status == :completed and match?(%TrainingJob{}, result.job) and
+          TrainingJob.active_status?(result.job.status) ->
+        {:error, {:completed_training_job_active, training_job_summary(result.job)}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp executable_program?(%module{}),
+    do: Code.ensure_loaded?(module) and function_exported?(module, :call, 2)
+
+  defp executable_program?(_program), do: false
+
+  defp validate_generic_datasets(requirements, opts) do
+    Enum.reduce_while(requirements, :ok, fn {name, requirement}, :ok ->
+      present? = Keyword.has_key?(opts, name)
+      value = Keyword.get(opts, name)
+
+      result =
+        case requirement do
+          :required when not present? -> {:error, {:missing_dataset, name}}
+          :required -> validate_generic_dataset_value(name, value)
+          :optional when not present? -> :ok
+          :optional -> validate_generic_dataset_value(name, value)
+          :unsupported when present? -> {:error, {:unsupported_dataset, name}}
+          :unsupported -> :ok
+        end
+
+      case result do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp validate_generic_dataset_value(name, nil), do: {:error, {:invalid_dataset, name, nil}}
+
+  defp validate_generic_dataset_value(name, value) do
+    if Enumerable.impl_for(value), do: :ok, else: {:error, {:invalid_dataset, name, value}}
+  end
+
+  defp reject_invalid_training_result(request, result, reason) do
+    reason = {:invalid_training_result, request.optimizer.__struct__, reason}
+
+    case result.job do
+      %TrainingJob{status: status} = job ->
+        if TrainingJob.active_status?(status),
+          do: generic_training_cleanup(request, job, reason),
+          else: {:error, reason}
+
+      _other ->
+        {:error, reason}
+    end
+  end
+
+  defp reject_noncanonical_training_result(request, result) do
+    reason =
+      {:invalid_training_result_status, request.optimizer.__struct__, result.status,
+       malformed_training_job_summary(result.job)}
+
+    case result.job do
+      %TrainingJob{status: status} = job ->
+        if TrainingJob.active_status?(status),
+          do: generic_training_cleanup(request, job, reason),
+          else: {:error, reason}
+
+      _other ->
+        {:error, reason}
+    end
+  end
+
+  defp malformed_training_job_summary(%TrainingJob{} = job), do: training_job_summary(job)
+  defp malformed_training_job_summary(job), do: %{job: Report.json_safe(job)}
 
   defp resolve_generic_training_step(
          request,
@@ -972,7 +1101,29 @@ defmodule Imp.Optimizer.BetterTogether do
         deadline: cancellation_deadline(request)
       )
 
-    {:error, failure.reason}
+    diagnostics =
+      bootstrap_diagnostics(failure.program, %{
+        status: failure.status,
+        reason: failure.reason,
+        metadata: failure.metadata
+      })
+
+    {:error, failure.reason, diagnostics}
+  end
+
+  defp bootstrap_diagnostics(program, failure) do
+    report =
+      case Report.fetch(program) do
+        %Report{} = report -> Report.dump(report)
+        _missing -> nil
+      end
+
+    %{
+      "optimizer" => "bootstrap_finetune",
+      "failure" => Report.json_safe(failure),
+      "report" => report
+    }
+    |> Imp.Redaction.redact()
   end
 
   defp cancellation_deadline(request),
@@ -1014,10 +1165,12 @@ defmodule Imp.Optimizer.BetterTogether do
   end
 
   defp bootstrap_start_error(compiled, plan, reason) do
+    diagnostics = bootstrap_diagnostics(compiled, %{status: :start_failed, reason: reason})
+
     if Enum.any?(plan.entries, &match?(%TrainingJob{}, &1.job)) do
-      {:error, {:training_plan_start_failed, reason, training_plan_summary(plan), compiled}}
+      {:error, {:training_plan_start_failed, reason, training_plan_summary(plan)}, diagnostics}
     else
-      {:error, {:training_not_started, reason, compiled}}
+      {:error, {:training_not_started, reason}, diagnostics}
     end
   end
 

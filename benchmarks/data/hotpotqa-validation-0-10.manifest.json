@@ -1,0 +1,19 @@
+{
+  "config": "fullwiki",
+  "data_path": "benchmarks/data/hotpotqa-validation-0-10.jsonl",
+  "dataset": "hotpotqa/hotpot_qa",
+  "fetched_at": "2026-07-06T22:14:44Z",
+  "input_keys": [
+    "question",
+    "context"
+  ],
+  "license": "CC-BY-SA-4.0",
+  "license_notice": "benchmarks/data/HOTPOTQA_ATTRIBUTION.md",
+  "length": 10,
+  "offset": 0,
+  "rows": 10,
+  "sha256": "636fa4c398c9f6a633533ef8b4b3734377ba08786f40bd7b6a9427ecc13b62f3",
+  "source_url": "https://datasets-server.huggingface.co/rows?offset=0&length=10&split=validation&config=fullwiki&dataset=hotpotqa%2Fhotpot_qa",
+  "split": "validation",
+  "task": "hotpotqa"
+}

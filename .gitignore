@@ -13,6 +13,11 @@
 # Replaceable build and test material.
 /tmp/
 /benchmarks/data/
+!/benchmarks/data/
+/benchmarks/data/*
+!/benchmarks/data/hotpotqa-validation-0-10.jsonl
+!/benchmarks/data/hotpotqa-validation-0-10.manifest.json
+!/benchmarks/data/HOTPOTQA_ATTRIBUTION.md
 
 # Disposable executions and resumable campaign state. Immutable accepted
 # evidence lives outside these roots under benchmarks/evidence/admitted.

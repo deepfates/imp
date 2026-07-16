@@ -234,7 +234,7 @@ defmodule Mix.Tasks.Imp.PublicApi do
       "signatures" => signatures(docs),
       "callbacks" => callbacks(docs, module, category_policy),
       "types" => types(docs, module, category_policy),
-      "struct_fields" => struct_fields(module, policy)
+      "struct_fields" => struct_fields(module)
     }
   end
 
@@ -302,29 +302,21 @@ defmodule Mix.Tasks.Imp.PublicApi do
 
   defp callbacks(_entries, _module, %{"callbacks" => false}), do: []
 
-  defp callbacks(entries, module, %{"callbacks" => true}) do
-    optional_callbacks =
-      if function_exported?(module, :behaviour_info, 1) do
-        module.behaviour_info(:optional_callbacks) |> MapSet.new()
-      else
-        MapSet.new()
-      end
+  defp callbacks(_entries, module, %{"callbacks" => true}) do
+    if function_exported?(module, :behaviour_info, 1) do
+      optional_callbacks = module.behaviour_info(:optional_callbacks) |> MapSet.new()
 
-    entries
-    |> Enum.flat_map(fn
-      {{kind, name, arity}, _anno, _signatures, _doc, _metadata}
-      when kind in [:callback, :macrocallback] ->
-        [
-          %{
-            "name" => "#{name}/#{arity}",
-            "optional" => MapSet.member?(optional_callbacks, {name, arity})
-          }
-        ]
-
-      _entry ->
-        []
-    end)
-    |> Enum.sort_by(& &1["name"])
+      module.behaviour_info(:callbacks)
+      |> Enum.map(fn {name, arity} ->
+        %{
+          "name" => "#{name}/#{arity}",
+          "optional" => MapSet.member?(optional_callbacks, {name, arity})
+        }
+      end)
+      |> Enum.sort_by(& &1["name"])
+    else
+      []
+    end
   end
 
   defp types(_entries, _module, %{"types" => false}), do: []
@@ -359,29 +351,15 @@ defmodule Mix.Tasks.Imp.PublicApi do
     end
   end
 
-  defp struct_fields(module, policy) do
-    fields = Map.get(policy["struct_fields"], inspect(module), [])
-
-    if fields == [] do
-      []
+  defp struct_fields(module) do
+    if function_exported?(module, :__struct__, 0) do
+      module.__struct__()
+      |> Map.keys()
+      |> Enum.reject(&(&1 == :__struct__))
+      |> Enum.map(&Atom.to_string/1)
+      |> Enum.sort()
     else
-      actual_fields =
-        module.__struct__()
-        |> Map.keys()
-        |> Enum.reject(&(&1 == :__struct__))
-        |> Enum.map(&Atom.to_string/1)
-        |> MapSet.new()
-
-      fields
-      |> Enum.each(fn field ->
-        unless MapSet.member?(actual_fields, field) do
-          Mix.raise(
-            "public API policy names missing struct field #{inspect(field)} on #{inspect(module)}"
-          )
-        end
-      end)
-
-      Enum.sort(fields)
+      []
     end
   end
 
@@ -454,18 +432,6 @@ defmodule Mix.Tasks.Imp.PublicApi do
         Mix.raise(
           "public API policy category #{inspect(category)} must declare callbacks and types"
         )
-      end
-    end)
-
-    Enum.each(Map.get(policy, "struct_fields", %{}), fn {module_name, fields} ->
-      unless MapSet.member?(module_names, module_name) and is_list(fields) do
-        Mix.raise("public API policy names missing packaged documented struct #{module_name}")
-      end
-
-      module = Module.concat(String.split(module_name, "."))
-
-      unless function_exported?(module, :__struct__, 0) do
-        Mix.raise("public API policy names non-struct module #{module_name}")
       end
     end)
 

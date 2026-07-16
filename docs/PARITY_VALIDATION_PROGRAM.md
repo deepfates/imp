@@ -472,18 +472,21 @@ Initial executable command:
 mix benchmark.overhead.check
 ```
 
-The current provider-free lane emits an Imp/DSPy overhead artifact for signature
+The provider-free lane emits an Imp/DSPy overhead artifact for signature
 parsing, adapter format/parse, schema validation, evaluation loop throughput,
 metric normalization, optimizer trial scheduling, trace redaction/serialization,
 cache hit/miss overhead, and concurrent orchestration.
-The production gate uses a conservative ratio threshold and the artifact must
-be consulted before making any path-specific speed claim.
+Each named operation has an absolute Imp-median guard and a reference-relative
+guard with explicit rationale. Cache, schema, and optimizer operations use
+matched logical work and configuration. Runtime/environment identity is bound
+into the verified artifact. Ratios are diagnostic measurements, not speed or
+parity claims.
 
 Pass condition:
 
 - Imp performance claims name the benchmark they come from
-- provider-free overhead is lower than DSPy for the claimed paths, or the claim
-  is not made
+- every named operation remains within its declared regression budgets
+- no speed claim is inferred from a budget or ratio
 - regressions have tracked remediation before release
 
 ## Lane 6: Evidence Dashboard and Release Gate

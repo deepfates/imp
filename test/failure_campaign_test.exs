@@ -51,7 +51,12 @@ defmodule Imp.FailureCampaignTest do
     assert Enum.all?(artifact["cases"], &(&1["flake_rate"] == 0.0))
     assert Enum.all?(artifact["cases"], &(&1["iterations"] == @required_iterations))
     assert Enum.all?(artifact["remaining"], &(&1["required"] == true))
-    assert Enum.all?(artifact["remaining"], &(&1["status"] =~ "requires_live_"))
+
+    assert Enum.all?(
+             artifact["remaining"],
+             &(&1["status"] == "requires_local_operational_evidence")
+           )
+
     refute contains_key?(artifact, "payload")
 
     timeout = case_by_id(artifact, "task_timeout_is_explicit_and_terminal")
@@ -102,6 +107,51 @@ defmodule Imp.FailureCampaignTest do
     end
   end
 
+  test "local operational rows prove timeout and exact tool-agent recovery without providers" do
+    artifact =
+      Imp.BenchmarkTruth.FailureCampaign.run(
+        iterations: 2,
+        max_concurrency: 2,
+        live: true,
+        live_iterations: 2,
+        live_timeout_ms: 1_000
+      )
+
+    assert artifact["summary"]["live_complete"]
+    assert get_in(artifact, ["configuration", "runtime_warmup", "external_network"]) == false
+    assert get_in(artifact, ["configuration", "runtime_warmup", "billable_generation"]) == false
+    assert artifact["telemetry"]["balanced_spans"]
+    assert artifact["secret_scan"]["passing"]
+
+    [provider, agent] = artifact["live_cases"]
+
+    assert Enum.all?(provider["outcomes"], fn outcome ->
+             evidence = outcome["evidence"]
+
+             evidence["provider"] == "local_injected_transport" and
+               evidence["injected_timeout"] and evidence["timeout_reason"] == "timeout" and
+               evidence["attempts"] == 2 and evidence["idempotency_header_stable"] and
+               evidence["elapsed_ms"] <= evidence["deadline_ms"] and
+               evidence["canary_included"] == false
+           end)
+
+    expected_history = [
+      %{"tool" => "lookup", "result" => "transient_local_failure"},
+      %{"tool" => "lookup", "result" => "pong"},
+      %{"tool" => "submit", "result" => "completed"}
+    ]
+
+    assert Enum.all?(agent["outcomes"], fn outcome ->
+             evidence = outcome["evidence"]
+
+             evidence["provider"] == "local_static_lm" and evidence["tool_attempts"] == 2 and
+               evidence["tool_failures"] == 1 and evidence["tool_successes"] == 1 and
+               evidence["submit_calls"] == 1 and evidence["history"] == expected_history and
+               evidence["elapsed_ms"] <= evidence["deadline_ms"] and
+               evidence["canary_included"] == false
+           end)
+  end
+
   test "mix task writes the deterministic artifact" do
     out = Path.join(System.tmp_dir!(), "imp-failure-#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf!(out) end)
@@ -112,6 +162,7 @@ defmodule Imp.FailureCampaignTest do
         Integer.to_string(@required_iterations),
         "--max-concurrency",
         "2",
+        "--no-require-clean",
         "--out",
         out
       ])

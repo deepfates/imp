@@ -149,9 +149,10 @@ Source-checkout maintainer aliases:
 - pinned executable upstream conformance through `mix upstream_fidelity.check`
 
 The failure campaign writes normalized per-iteration outcomes and flake rates.
-It is T0 provider-free evidence: its artifact deliberately keeps provider
-retry/idempotency and cross-surface live recovery lanes red until those probes
-have actually run.
+The default alias is T0 provider-free evidence. The compatibility `--live`
+flag adds two local operational rows: bounded provider-shaped timeout and
+idempotent retry, plus retriever recovery and an exact tool
+failure/retry/submit trajectory. Neither mode contacts an external provider.
 
 The live provider tests prove a real provider can execute:
 

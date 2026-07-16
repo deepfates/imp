@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "protocol_id": "hotpotqa_shared_retrieval_v1",
+  "dataset": {
+    "path": "benchmarks/data/hotpotqa-validation-0-10.jsonl",
+    "manifest": "benchmarks/data/hotpotqa-validation-0-10.manifest.json",
+    "split": "validation",
+    "offset": 0,
+    "rows": 10,
+    "license": "CC-BY-SA-4.0",
+    "license_notice": "benchmarks/data/HOTPOTQA_ATTRIBUTION.md",
+    "sha256": "636fa4c398c9f6a633533ef8b4b3734377ba08786f40bd7b6a9427ecc13b62f3"
+  },
+  "retrieval": {
+    "corpus": "all uniquely titled passages materialized from the pinned ten-row subset",
+    "document_id": "sha256(normalized title) first 16 lowercase hex characters",
+    "ranking": "distinct lowercase ASCII alphanumeric query/document token overlap; stable corpus order breaks ties",
+    "top_k": 5,
+    "context": "retrieved document text joined in ranked order with two newlines"
+  },
+  "scorers": {
+    "supporting_fact_recall": "unique gold supporting titles present among retrieved document titles / unique gold supporting titles",
+    "answer_oracle": "gold answer iff normalized gold answer is a substring of normalized retrieved context; empty string otherwise",
+    "answer_em": "Imp.Metrics.em-compatible lowercase punctuation/article normalized exact match",
+    "answer_f1": "Imp.Metrics.f1-compatible lowercase punctuation/article normalized token F1"
+  },
+  "dspy_authority": {
+    "repository": "stanfordnlp/dspy",
+    "version": "3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "manifest": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json"
+  },
+  "limitations": [
+    "This provider-free differential measures deterministic retrieval and answer availability, not language-model generation quality.",
+    "Ten pinned validation rows are bounded comparative evidence, not full HotPotQA effectiveness or paper-scale parity."
+  ]
+}

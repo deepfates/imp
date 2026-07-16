@@ -1,20 +1,16 @@
 {
   "schema_version": 1,
-  "campaign": "dsex-failure-campaign",
+  "campaign": "imp-local-failure-recovery",
   "deterministic_iterations": 10,
   "live_iterations": 2,
   "max_concurrency": 2,
   "iteration_timeout_ms": 15000,
-  "live_timeout_ms": 30000,
-  "provider": "openai",
-  "provider_model": "gpt-4.1-mini",
-  "agent_model": "gpt-5.4",
-  "api_key_env": "OPENAI_API_KEY",
-  "base_url_env": "OPENAI_BASE_URL",
-  "live_networks": [
-    "api.openai.com",
-    "httpbin.org"
-  ],
+  "live_timeout_ms": 1000,
+  "provider": "local_injected_transport",
+  "provider_model": "local-fixture",
+  "agent_model": "local-static-lm",
+  "external_network": false,
+  "live_networks": [],
   "authority": {
     "require_clean_git": true,
     "minimum_live_iterations": 2,

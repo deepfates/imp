@@ -2,16 +2,16 @@
   "app": "imp",
   "categories": [
     {
-      "callbacks": false,
+      "callbacks": true,
       "name": "advanced",
       "support": "supported",
       "types": true
     },
     {
-      "callbacks": false,
+      "callbacks": true,
       "name": "facade",
       "support": "facade",
-      "types": false
+      "types": true
     },
     {
       "callbacks": false,
@@ -26,7 +26,7 @@
       "types": true
     },
     {
-      "callbacks": false,
+      "callbacks": true,
       "name": "stable",
       "support": "stable",
       "types": true
@@ -708,7 +708,11 @@
       "module": "Imp.AdapterParseError",
       "signatures": {},
       "source": "lib/imp/exceptions.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "__exception__",
+        "message",
+        "reason"
+      ],
       "types": []
     },
     {
@@ -768,7 +772,11 @@
         }
       },
       "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "arguments",
+        "id",
+        "name"
+      ],
       "types": []
     },
     {
@@ -792,7 +800,9 @@
         }
       },
       "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "tool_call_results"
+      ],
       "types": []
     },
     {
@@ -820,7 +830,9 @@
         }
       },
       "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "tool_calls"
+      ],
       "types": []
     },
     {
@@ -844,7 +856,11 @@
         }
       },
       "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "id",
+        "name",
+        "result"
+      ],
       "types": []
     },
     {
@@ -888,7 +904,15 @@
         }
       },
       "source": "lib/imp/agent.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "children",
+        "handler",
+        "input_schema",
+        "name",
+        "output_schema",
+        "tool_policy",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -1043,7 +1067,25 @@
         }
       },
       "source": "lib/imp/clients/training.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "api_key",
+        "cancel_body",
+        "cancel_method",
+        "cancel_url",
+        "headers",
+        "max_attempts",
+        "payload_builder",
+        "provider",
+        "response_mapper",
+        "retry_backoff_ms",
+        "status_body",
+        "status_method",
+        "status_url",
+        "submission_preparer",
+        "submit_url",
+        "supported_methods",
+        "transport"
+      ],
       "types": []
     },
     {
@@ -1071,7 +1113,31 @@
         }
       },
       "source": "lib/imp/clients/mlx_lm_trainer.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter",
+        "batch_size",
+        "executable",
+        "executable_args",
+        "grad_accumulation_steps",
+        "iters",
+        "kill_grace_ms",
+        "learning_rate",
+        "mask_prompt",
+        "max_output_bytes",
+        "max_seq_length",
+        "model",
+        "model_path",
+        "model_revision",
+        "num_layers",
+        "root",
+        "runner",
+        "save_every",
+        "seed",
+        "signature",
+        "stratify_by",
+        "timeout",
+        "validation_fraction"
+      ],
       "types": [
         {
           "kind": "type",
@@ -1131,7 +1197,18 @@
         }
       },
       "source": "lib/imp/clients/training.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "backend_state",
+        "current_model",
+        "fulfilled_batch_ids",
+        "id",
+        "metadata",
+        "model",
+        "pending_batch_ids",
+        "provider",
+        "result_model",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -1179,7 +1256,11 @@
         }
       },
       "source": "lib/imp/clients/req_llm.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "model",
+        "opts",
+        "req_module"
+      ],
       "types": [
         {
           "kind": "type",
@@ -1262,6 +1343,14 @@
           "optional": true
         },
         {
+          "name": "reconcile_reinforcement/1",
+          "optional": true
+        },
+        {
+          "name": "reconcile_reinforcement/2",
+          "optional": true
+        },
+        {
           "name": "reinforcement_status/1",
           "optional": true
         },
@@ -1306,6 +1395,7 @@
       "functions": [
         "final_model_artifact/2",
         "finetune/4",
+        "reconcile_reinforcement/2",
         "reinforcement_status/2",
         "reinforcement_step/4",
         "start_reinforcement/3",
@@ -1322,6 +1412,8 @@
           "final_model_artifact/2": [],
           "finetune/3": [],
           "finetune/4": [],
+          "reconcile_reinforcement/1": [],
+          "reconcile_reinforcement/2": [],
           "reinforcement_status/1": [],
           "reinforcement_status/2": [],
           "reinforcement_step/3": [],
@@ -1339,6 +1431,9 @@
           ],
           "finetune/4": [
             "finetune(provider, lm, examples, opts \\\\ [])"
+          ],
+          "reconcile_reinforcement/2": [
+            "reconcile_reinforcement(provider, dispatch_id)"
           ],
           "reinforcement_status/2": [
             "reinforcement_status(provider, session)"
@@ -1432,7 +1527,26 @@
         }
       },
       "source": "lib/imp/clients/training.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "api_key",
+        "cancel_body",
+        "cancel_method",
+        "cancel_url",
+        "id",
+        "idempotency_key",
+        "max_attempts",
+        "metadata",
+        "model",
+        "provider",
+        "result_model",
+        "retry_backoff_ms",
+        "status",
+        "status_body",
+        "status_method",
+        "status_url",
+        "training_data",
+        "transport"
+      ],
       "types": [
         {
           "kind": "type",
@@ -1525,8 +1639,17 @@
       ]
     },
     {
-      "callbacks": [],
-      "category": "stable",
+      "callbacks": [
+        {
+          "name": "describe/1",
+          "optional": false
+        },
+        {
+          "name": "score/3",
+          "optional": false
+        }
+      ],
+      "category": "spi",
       "functions": [
         "score/3"
       ],
@@ -1565,7 +1688,10 @@
         }
       },
       "source": "lib/imp/confidence/scoring.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "low_confidence_threshold",
+        "min_score_on_correct"
+      ],
       "types": []
     },
     {
@@ -1585,7 +1711,10 @@
         }
       },
       "source": "lib/imp/confidence/scoring.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "midpoint",
+        "steepness"
+      ],
       "types": []
     },
     {
@@ -1605,7 +1734,9 @@
         }
       },
       "source": "lib/imp/confidence/scoring.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "threshold"
+      ],
       "types": []
     },
     {
@@ -1617,7 +1748,11 @@
       "module": "Imp.ContextWindowExceededError",
       "signatures": {},
       "source": "lib/imp/exceptions.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "__exception__",
+        "message",
+        "reason"
+      ],
       "types": []
     },
     {
@@ -1641,7 +1776,11 @@
       "module": "Imp.Core.Assistant",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "metadata",
+        "tool_calls"
+      ],
       "types": []
     },
     {
@@ -1653,7 +1792,10 @@
       "module": "Imp.Core.Developer",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "metadata"
+      ],
       "types": []
     },
     {
@@ -1665,7 +1807,14 @@
       "module": "Imp.Core.LMConfig",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "extra",
+        "max_tokens",
+        "model",
+        "response_format",
+        "temperature",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -1677,7 +1826,11 @@
       "module": "Imp.Core.LMRequest",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "config",
+        "messages",
+        "metadata"
+      ],
       "types": []
     },
     {
@@ -1689,7 +1842,12 @@
       "module": "Imp.Core.LMResponse",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cost",
+        "outputs",
+        "raw",
+        "usage"
+      ],
       "types": []
     },
     {
@@ -1717,7 +1875,10 @@
       "module": "Imp.Core.System",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "metadata"
+      ],
       "types": []
     },
     {
@@ -1729,7 +1890,11 @@
       "module": "Imp.Core.ToolCall",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "arguments",
+        "id",
+        "name"
+      ],
       "types": []
     },
     {
@@ -1741,7 +1906,12 @@
       "module": "Imp.Core.ToolResult",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "id",
+        "is_error",
+        "name",
+        "result"
+      ],
       "types": []
     },
     {
@@ -1753,7 +1923,10 @@
       "module": "Imp.Core.User",
       "signatures": {},
       "source": "lib/imp/core.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "metadata"
+      ],
       "types": []
     },
     {
@@ -1857,7 +2030,12 @@
         }
       },
       "source": "lib/imp/datasets.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "dev",
+        "metadata",
+        "test",
+        "train"
+      ],
       "types": []
     },
     {
@@ -1925,8 +2103,13 @@
       "types": []
     },
     {
-      "callbacks": [],
-      "category": "stable",
+      "callbacks": [
+        {
+          "name": "embed/2",
+          "optional": false
+        }
+      ],
+      "category": "spi",
       "functions": [
         "embed/3",
         "validate_texts!/2"
@@ -1972,7 +2155,11 @@
       "module": "Imp.Error",
       "signatures": {},
       "source": "lib/imp/exceptions.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "__exception__",
+        "message",
+        "reason"
+      ],
       "types": []
     },
     {
@@ -2020,7 +2207,16 @@
         }
       },
       "source": "lib/imp/evaluate.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "deadline",
+        "devset",
+        "display_progress",
+        "failure_score",
+        "max_concurrency",
+        "max_errors",
+        "metric",
+        "timeout"
+      ],
       "types": []
     },
     {
@@ -2040,7 +2236,12 @@
         }
       },
       "source": "lib/imp/evaluate/auto_evaluation.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "completeness",
+        "groundedness",
+        "predict",
+        "threshold"
+      ],
       "types": []
     },
     {
@@ -2076,7 +2277,11 @@
         }
       },
       "source": "lib/imp/evaluate/auto_evaluation.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "decompositional",
+        "predict",
+        "threshold"
+      ],
       "types": []
     },
     {
@@ -2208,7 +2413,11 @@
         }
       },
       "source": "lib/imp/external_command.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "os_pid",
+        "owner",
+        "ref"
+      ],
       "types": [
         {
           "kind": "type",
@@ -2217,8 +2426,21 @@
       ]
     },
     {
-      "callbacks": [],
-      "category": "stable",
+      "callbacks": [
+        {
+          "name": "post/4",
+          "optional": false
+        },
+        {
+          "name": "request/5",
+          "optional": true
+        },
+        {
+          "name": "stream/4",
+          "optional": true
+        }
+      ],
+      "category": "spi",
       "functions": [
         "post/5",
         "request/6",
@@ -2303,7 +2525,9 @@
         }
       },
       "source": "lib/imp/history.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "messages"
+      ],
       "types": [
         {
           "kind": "type",
@@ -2320,8 +2544,17 @@
       ]
     },
     {
-      "callbacks": [],
-      "category": "stable",
+      "callbacks": [
+        {
+          "name": "generate/2",
+          "optional": false
+        },
+        {
+          "name": "stream/3",
+          "optional": true
+        }
+      ],
+      "category": "spi",
       "functions": [
         "generate/3",
         "validate_lm/1"
@@ -2413,7 +2646,12 @@
       "module": "Imp.LMError",
       "signatures": {},
       "source": "lib/imp/exceptions.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "__exception__",
+        "message",
+        "reason",
+        "retryable"
+      ],
       "types": []
     },
     {
@@ -2490,7 +2728,9 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "tools"
+      ],
       "types": []
     },
     {
@@ -2514,7 +2754,18 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "headers",
+        "idempotency_key",
+        "max_attempts",
+        "max_retry_after",
+        "protocol_version",
+        "retry_delay",
+        "timeout",
+        "transport",
+        "transport_opts",
+        "url"
+      ],
       "types": []
     },
     {
@@ -2542,7 +2793,12 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "args",
+        "command",
+        "protocol_version",
+        "timeout"
+      ],
       "types": []
     },
     {
@@ -2570,7 +2826,19 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "headers",
+        "idempotency_key",
+        "max_attempts",
+        "max_retry_after",
+        "protocol_version",
+        "retry_delay",
+        "session_id",
+        "timeout",
+        "transport",
+        "transport_opts",
+        "url"
+      ],
       "types": []
     },
     {
@@ -2658,7 +2926,12 @@
       "module": "Imp.Metrics.Result",
       "signatures": {},
       "source": "lib/imp/metrics.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "feedback",
+        "metadata",
+        "passed?",
+        "score"
+      ],
       "types": []
     },
     {
@@ -2758,7 +3031,10 @@
       "module": "Imp.Observability.ProgressSubscription",
       "signatures": {},
       "source": "lib/imp/observability.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "id",
+        "owner"
+      ],
       "types": []
     },
     {
@@ -2774,7 +3050,14 @@
         }
       },
       "source": "lib/imp/observability/status.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "completed",
+        "message",
+        "metadata",
+        "phase",
+        "state",
+        "total"
+      ],
       "types": [
         {
           "kind": "type",
@@ -2791,7 +3074,10 @@
       "module": "Imp.Observability.Trace",
       "signatures": {},
       "source": "lib/imp/observability.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "events",
+        "result"
+      ],
       "types": []
     },
     {
@@ -2815,8 +3101,17 @@
       "types": []
     },
     {
-      "callbacks": [],
-      "category": "advanced",
+      "callbacks": [
+        {
+          "name": "__optimizer__/0",
+          "optional": false
+        },
+        {
+          "name": "run/3",
+          "optional": false
+        }
+      ],
+      "category": "spi",
       "functions": [
         "capabilities/1",
         "run/3",
@@ -2958,7 +3253,17 @@
         }
       },
       "source": "lib/imp/optimizer/avatar.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "comparator",
+        "lower_bound",
+        "max_iters",
+        "max_negative_inputs",
+        "max_positive_inputs",
+        "metric",
+        "optimize_for",
+        "rewriter",
+        "upper_bound"
+      ],
       "types": []
     },
     {
@@ -2998,7 +3303,10 @@
         }
       },
       "source": "lib/imp/optimizer/better_together.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "metric",
+        "optimizers"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3047,7 +3355,15 @@
         }
       },
       "source": "lib/imp/optimizer/bootstrap_few_shot.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_bootstrapped_demos",
+        "max_errors",
+        "max_labeled_demos",
+        "max_rounds",
+        "metric",
+        "metric_threshold",
+        "teacher_settings"
+      ],
       "types": []
     },
     {
@@ -3099,7 +3415,17 @@
         }
       },
       "source": "lib/imp/optimizer/bootstrap_finetune.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter",
+        "exclude_demos",
+        "max_concurrency",
+        "max_demos",
+        "metric",
+        "multitask",
+        "teacher",
+        "train_kwargs",
+        "trainer"
+      ],
       "types": []
     },
     {
@@ -3155,7 +3481,16 @@
         }
       },
       "source": "lib/imp/optimizer/copro.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "breadth",
+        "depth",
+        "extra_instructions",
+        "init_temperature",
+        "metric",
+        "proposal_max_concurrency",
+        "proposer_lm",
+        "track_stats"
+      ],
       "types": []
     },
     {
@@ -3183,7 +3518,12 @@
         }
       },
       "source": "lib/imp/optimizer/ensemble.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "deterministic",
+        "reduce_fn",
+        "seed",
+        "size"
+      ],
       "types": []
     },
     {
@@ -3219,7 +3559,37 @@
         }
       },
       "source": "lib/imp/optimizer/gepa.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "acceptance_policy",
+        "callbacks",
+        "combee",
+        "component_feedback",
+        "evaluation_policy",
+        "feedback_fn",
+        "frontier_type",
+        "generations",
+        "max_concurrency",
+        "max_full_evaluations",
+        "max_merge_invocations",
+        "max_metric_calls",
+        "max_reflection_calls",
+        "max_reflection_cost",
+        "merge_acceptance_policy",
+        "merge_val_overlap_floor",
+        "metric",
+        "minibatch_size",
+        "proposal_concurrency",
+        "proposal_timeout",
+        "raise_on_exception",
+        "reflection_lm",
+        "reflection_strategy",
+        "sampling_strategy",
+        "seed",
+        "selection_strategy",
+        "stopper",
+        "timeout",
+        "use_merge"
+      ],
       "types": []
     },
     {
@@ -3247,7 +3617,27 @@
         }
       },
       "source": "lib/imp/optimizer/grpo.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "callback_timeout_ms",
+        "checkpoint_path",
+        "failure_score",
+        "format_failure_score",
+        "max_status_polls",
+        "num_dspy_examples_per_grpo_step",
+        "num_rollouts_per_grpo_step",
+        "num_steps_for_val",
+        "num_train_steps",
+        "report_train_scores",
+        "reward_fn",
+        "seed",
+        "status_poll_interval_ms",
+        "train_kwargs",
+        "trainer",
+        "use_train_as_val",
+        "validation_fn",
+        "variably_invoked_predictor_fill_strategy",
+        "variably_invoked_predictor_grouping_mode"
+      ],
       "types": []
     },
     {
@@ -3271,7 +3661,9 @@
         }
       },
       "source": "lib/imp/optimizer/infer_rules.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "signature_optimizer"
+      ],
       "types": []
     },
     {
@@ -3351,7 +3743,10 @@
         }
       },
       "source": "lib/imp/optimizer/knn_few_shot.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "bootstrap",
+        "knn"
+      ],
       "types": []
     },
     {
@@ -3375,7 +3770,9 @@
         }
       },
       "source": "lib/imp/optimizer/labeled_few_shot.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "k"
+      ],
       "types": []
     },
     {
@@ -3407,7 +3804,18 @@
         }
       },
       "source": "lib/imp/optimizer/mipro_v2.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "config",
+        "max_concurrency",
+        "max_errors",
+        "metric",
+        "metric_threshold",
+        "prompt_lm",
+        "startup_trials",
+        "task_lm",
+        "teacher",
+        "timeout"
+      ],
       "types": []
     },
     {
@@ -3448,7 +3856,12 @@
         }
       },
       "source": "lib/imp/optimizer/parameter.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "digest",
+        "id",
+        "kind",
+        "value"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3501,7 +3914,18 @@
         }
       },
       "source": "lib/imp/optimizer/playbook.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "authority_source_ids",
+        "budget",
+        "checkpoint_fn",
+        "evaluator",
+        "max_growth_bytes",
+        "max_growth_ratio",
+        "min_lift",
+        "parameter",
+        "proposer",
+        "reservations"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3554,7 +3978,21 @@
         }
       },
       "source": "lib/imp/optimizer/random_search.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "candidates",
+        "demos_per_candidate",
+        "max_bootstrapped_demos",
+        "max_errors",
+        "max_labeled_demos",
+        "max_rounds",
+        "metric",
+        "metric_threshold",
+        "num_candidate_programs",
+        "num_threads",
+        "seed",
+        "stop_at_score",
+        "teacher_settings"
+      ],
       "types": []
     },
     {
@@ -3602,7 +4040,14 @@
         }
       },
       "source": "lib/imp/optimizer/report.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "best_score",
+        "candidate_count",
+        "candidates",
+        "errors",
+        "metadata",
+        "optimizer"
+      ],
       "types": []
     },
     {
@@ -3634,7 +4079,21 @@
         }
       },
       "source": "lib/imp/optimizer/simba.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "bsize",
+        "candidate_temperature",
+        "demo_input_field_maxlen",
+        "max_concurrency",
+        "max_demos",
+        "max_steps",
+        "metric",
+        "num_candidates",
+        "prompt_lm",
+        "sampling_temperature",
+        "seed",
+        "teacher_lm",
+        "timeout"
+      ],
       "types": []
     },
     {
@@ -3722,7 +4181,10 @@
         }
       },
       "source": "lib/imp/optimizer/signature_optimizer.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "candidates",
+        "metric"
+      ],
       "types": []
     },
     {
@@ -3738,7 +4200,13 @@
         }
       },
       "source": "lib/imp/optimizer.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "job",
+        "metadata",
+        "program",
+        "reason",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3760,7 +4228,12 @@
         }
       },
       "source": "lib/imp/optimizer.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "job",
+        "metadata",
+        "program",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3821,7 +4294,26 @@
         }
       },
       "source": "lib/imp/optimizer/trajectory.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cache",
+        "error",
+        "events",
+        "example",
+        "feedback",
+        "index",
+        "metadata",
+        "metric_metadata",
+        "named_parameters",
+        "prediction",
+        "program_id",
+        "rollout_id",
+        "runtime",
+        "schema_version",
+        "score",
+        "timing",
+        "trace",
+        "usage"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3898,7 +4390,15 @@
         }
       },
       "source": "lib/imp/playbook.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "entries",
+        "hash",
+        "id",
+        "parent_hash",
+        "policy",
+        "revision",
+        "tombstones"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3931,7 +4431,11 @@
         }
       },
       "source": "lib/imp/playbook/delta.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "expected_revision",
+        "operations",
+        "parent_hash"
+      ],
       "types": [
         {
           "kind": "type",
@@ -3968,7 +4472,18 @@
         }
       },
       "source": "lib/imp/playbook/entry.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "harmful",
+        "hash",
+        "helpful",
+        "id",
+        "parent_hash",
+        "provenance",
+        "revision",
+        "section",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4000,7 +4515,15 @@
         }
       },
       "source": "lib/imp/playbook/operation/add.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "harmful",
+        "helpful",
+        "id",
+        "provenance",
+        "section",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4028,7 +4551,15 @@
         }
       },
       "source": "lib/imp/playbook/operation/merge.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "expected_revisions",
+        "id",
+        "ids",
+        "provenance",
+        "section",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4056,7 +4587,10 @@
         }
       },
       "source": "lib/imp/playbook/operation/remove.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "expected_revision",
+        "id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4084,7 +4618,14 @@
         }
       },
       "source": "lib/imp/playbook/operation/revise.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "content",
+        "expected_revision",
+        "id",
+        "provenance",
+        "section",
+        "status"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4112,7 +4653,12 @@
         }
       },
       "source": "lib/imp/playbook/operation/update_counters.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "expected_revision",
+        "harmful",
+        "helpful",
+        "id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4140,7 +4686,18 @@
         }
       },
       "source": "lib/imp/playbook/policy.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_counter",
+        "max_entries",
+        "max_entry_bytes",
+        "max_operations",
+        "max_playbook_bytes",
+        "max_provenance_items",
+        "max_section_bytes",
+        "max_source_id_bytes",
+        "max_tombstones",
+        "reject_secrets"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4168,7 +4725,10 @@
         }
       },
       "source": "lib/imp/playbook/provenance.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "digests",
+        "source_ids"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4190,7 +4750,12 @@
         }
       },
       "source": "lib/imp/playbook/tombstone.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "at_revision",
+        "entry",
+        "operation",
+        "replacement_id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4222,7 +4787,10 @@
         }
       },
       "source": "lib/imp/playbook/with_context.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "playbook",
+        "program"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4279,7 +4847,12 @@
         }
       },
       "source": "lib/imp/predict/assertions.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "assertions",
+        "max_attempts",
+        "program",
+        "strict"
+      ],
       "types": []
     },
     {
@@ -4311,7 +4884,16 @@
         }
       },
       "source": "lib/imp/predict/avatar.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "actor",
+        "finisher",
+        "max_iters",
+        "metadata",
+        "signature",
+        "tool_policy",
+        "tool_timeout_ms",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -4339,7 +4921,13 @@
         }
       },
       "source": "lib/imp/predict/best_of_n.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "feedback_fn",
+        "metric",
+        "n",
+        "program",
+        "threshold"
+      ],
       "types": []
     },
     {
@@ -4359,7 +4947,9 @@
         }
       },
       "source": "lib/imp/predict/chain_of_thought.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "predict"
+      ],
       "types": []
     },
     {
@@ -4382,7 +4972,12 @@
         }
       },
       "source": "lib/imp/predict/code_act.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_iters",
+        "program_of_thought",
+        "tool_policy",
+        "tools"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4411,7 +5006,10 @@
         }
       },
       "source": "lib/imp/predict/knn.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "field",
+        "retriever"
+      ],
       "types": []
     },
     {
@@ -4439,7 +5037,11 @@
         }
       },
       "source": "lib/imp/predict/multi_chain_comparison.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "last_key",
+        "m",
+        "predict"
+      ],
       "types": []
     },
     {
@@ -4499,7 +5101,17 @@
         }
       },
       "source": "lib/imp/predict/predict.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter",
+        "config",
+        "demos",
+        "dynamic_adapter?",
+        "dynamic_lm?",
+        "lm",
+        "metadata",
+        "signature",
+        "traces"
+      ],
       "types": []
     },
     {
@@ -4526,7 +5138,12 @@
         }
       },
       "source": "lib/imp/predict/program_of_thought.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_iters",
+        "output_field",
+        "predict",
+        "signature"
+      ],
       "types": [
         {
           "kind": "type",
@@ -4555,7 +5172,14 @@
         }
       },
       "source": "lib/imp/predict/rag.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "context_field",
+        "hops",
+        "k",
+        "program",
+        "query_field",
+        "retriever"
+      ],
       "types": []
     },
     {
@@ -4587,7 +5211,33 @@
         }
       },
       "source": "lib/imp/predict/rlm.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter",
+        "compaction",
+        "compaction_context_tokens",
+        "compaction_threshold_pct",
+        "dynamic_adapter?",
+        "dynamic_lm?",
+        "dynamic_sub_lm?",
+        "lm",
+        "max_concurrent_subcalls",
+        "max_interpreter_effects",
+        "max_interpreter_steps",
+        "max_interpreter_value_bytes",
+        "max_iterations",
+        "max_llm_calls",
+        "max_observation_chars",
+        "max_preview_chars",
+        "max_recursion_depth",
+        "max_time_ms",
+        "model_override",
+        "persistent",
+        "session",
+        "signature",
+        "sub_lm",
+        "tool_policy",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -4607,7 +5257,14 @@
         }
       },
       "source": "lib/imp/predict/react.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_iters",
+        "mode",
+        "react",
+        "signature",
+        "tool_policy",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -4627,7 +5284,13 @@
         }
       },
       "source": "lib/imp/predict/react_v2.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "max_iters",
+        "react",
+        "signature",
+        "tool_policy",
+        "tools"
+      ],
       "types": []
     },
     {
@@ -4655,7 +5318,14 @@
         }
       },
       "source": "lib/imp/predict/refine.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "fail_count",
+        "feedback_fn",
+        "max_attempts",
+        "metric",
+        "program",
+        "threshold"
+      ],
       "types": []
     },
     {
@@ -4910,7 +5580,10 @@
         }
       },
       "source": "lib/imp/retrieve.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "docs",
+        "k"
+      ],
       "types": []
     },
     {
@@ -4962,7 +5635,21 @@
         }
       },
       "source": "lib/imp/retrievers/http.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "attempt_timeout",
+        "body_builder",
+        "headers",
+        "max_attempts",
+        "max_retry_delay_ms",
+        "method",
+        "response_mapper",
+        "retry_backoff_ms",
+        "retry_statuses",
+        "sleep_fun",
+        "total_timeout",
+        "transport",
+        "url"
+      ],
       "types": []
     },
     {
@@ -4986,7 +5673,11 @@
         }
       },
       "source": "lib/imp/retrievers/knn.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "examples",
+        "field",
+        "k"
+      ],
       "types": []
     },
     {
@@ -5086,7 +5777,9 @@
         }
       },
       "source": "lib/imp/saving/registry.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "callbacks"
+      ],
       "types": []
     },
     {
@@ -5341,7 +6034,12 @@
       "module": "Imp.Streaming.Messages.StatusMessage",
       "signatures": {},
       "source": "lib/imp/streaming/messages.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "level",
+        "message",
+        "metadata",
+        "status"
+      ],
       "types": []
     },
     {
@@ -5361,7 +6059,9 @@
         }
       },
       "source": "lib/imp/streaming/messages.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "messages"
+      ],
       "types": []
     },
     {
@@ -5409,7 +6109,17 @@
         }
       },
       "source": "lib/imp/streaming/messages.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter",
+        "allow_reuse",
+        "events",
+        "framing",
+        "on_chunk",
+        "on_event",
+        "on_status",
+        "predict_name",
+        "signature_field_name"
+      ],
       "types": []
     },
     {
@@ -5421,7 +6131,11 @@
       "module": "Imp.Streaming.Messages.StreamResponse",
       "signatures": {},
       "source": "lib/imp/streaming/messages.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "chunk",
+        "done",
+        "metadata"
+      ],
       "types": []
     },
     {
@@ -5573,7 +6287,17 @@
         }
       },
       "source": "lib/imp/tracking/mlflow.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "artifact_uri",
+        "experiment_id",
+        "finish_adopted_run",
+        "headers",
+        "owned_run",
+        "run_id",
+        "tracking_uri",
+        "transport",
+        "transport_opts"
+      ],
       "types": [
         {
           "kind": "type",
@@ -5731,7 +6455,27 @@
         }
       },
       "source": "lib/imp/tracking/wandb/client.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "authorization",
+        "base_url",
+        "entity",
+        "finished?",
+        "group",
+        "history_offset",
+        "id",
+        "job_type",
+        "last_step",
+        "name",
+        "notes",
+        "project",
+        "request_opts",
+        "resume",
+        "status_mode",
+        "storage_id",
+        "summary",
+        "tags",
+        "transport"
+      ],
       "types": [
         {
           "kind": "type",
@@ -5799,7 +6543,17 @@
         }
       },
       "source": "lib/imp/training/fast_slow/rollout.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cycle",
+        "epsilon",
+        "id",
+        "mean_reward",
+        "members",
+        "problem_id",
+        "prompt_count",
+        "size",
+        "std_reward"
+      ],
       "types": [
         {
           "kind": "type",
@@ -5914,7 +6668,10 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "limits",
+        "used"
+      ],
       "types": [
         {
           "kind": "type",
@@ -5946,7 +6703,19 @@
         }
       },
       "source": "lib/imp/training/fast_slow/reuse_cache.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "behavior_logprobs",
+        "cycle",
+        "id",
+        "input_digest",
+        "output",
+        "problem_id",
+        "prompt_digest",
+        "response_mask",
+        "response_token_ids",
+        "reward",
+        "theta_id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6032,7 +6801,21 @@
         }
       },
       "source": "lib/imp/training/fast_slow/config.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "adapter_version",
+        "dataset_digests",
+        "g",
+        "k",
+        "max_cycles",
+        "models",
+        "optimizer_config",
+        "program_topology",
+        "provider_config",
+        "reuse_rollouts",
+        "sampling_config",
+        "t",
+        "verifier_version"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6068,7 +6851,11 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cursor",
+        "epoch",
+        "rng"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6096,7 +6883,14 @@
         }
       },
       "source": "lib/imp/training/fast_slow/event.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "at",
+        "cycle",
+        "data",
+        "kind",
+        "operation_id",
+        "sequence"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6133,7 +6927,14 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "checksum",
+        "consumed_steps",
+        "cycle",
+        "dataset_cursor",
+        "digest",
+        "minibatches"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6174,7 +6975,16 @@
         }
       },
       "source": "lib/imp/training/fast_slow/event.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "attempts",
+        "cycle",
+        "id",
+        "kind",
+        "payload",
+        "payload_digest",
+        "reconciliation",
+        "result"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6210,7 +7020,17 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "anchor_digest",
+        "candidate_ids",
+        "candidates",
+        "digest",
+        "instance_frontier",
+        "instance_scores",
+        "lookahead_digest",
+        "parent_digest",
+        "revision"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6247,7 +7067,11 @@
         }
       },
       "source": "lib/imp/training/fast_slow/reuse_cache.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cycle",
+        "entries",
+        "theta_id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6304,7 +7128,35 @@
         }
       },
       "source": "lib/imp/training/fast_slow/rollout.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "behavior_logprobs",
+        "behavior_policy_id",
+        "claim_id",
+        "cycle",
+        "dataset_indices",
+        "failure",
+        "generated_at_step",
+        "group_id",
+        "group_size",
+        "id",
+        "identity_digest",
+        "input_digest",
+        "member_index",
+        "metrics",
+        "output",
+        "output_digest",
+        "problem_id",
+        "prompt_digest",
+        "prompt_index",
+        "prompt_revision",
+        "response_mask",
+        "response_token_ids",
+        "sampling_config_digest",
+        "score",
+        "source",
+        "status",
+        "theta_id"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6383,7 +7235,12 @@
         }
       },
       "source": "lib/imp/training/fast_slow/runner.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "backend",
+        "cycle",
+        "minibatches",
+        "resulting_dataset"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6487,7 +7344,29 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "budgets",
+        "config_fingerprint",
+        "current_theta_id",
+        "cycle",
+        "dataset",
+        "events",
+        "g",
+        "k",
+        "lookahead",
+        "max_cycles",
+        "pending_operations",
+        "prompt_population",
+        "reuse_cache",
+        "reuse_rollouts",
+        "rollout_ledger",
+        "sampling_config_digest",
+        "slow_step",
+        "stage",
+        "t",
+        "terminal",
+        "theta_lineage"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6515,7 +7394,11 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cycle",
+        "details",
+        "reason"
+      ],
       "types": [
         {
           "kind": "type",
@@ -6547,7 +7430,13 @@
         }
       },
       "source": "lib/imp/training/fast_slow/state.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "cycle",
+        "digest",
+        "id",
+        "parent_id",
+        "payload"
+      ],
       "types": [
         {
           "kind": "type",

@@ -38,7 +38,51 @@ defmodule PublicAPIManifestTest do
     assert "fields" in modules["Imp.Example"]["struct_fields"]
     assert %{"kind" => "type", "name" => "t/0"} in modules["Imp.Example"]["types"]
     assert %{"name" => "call/2", "optional" => false} in modules["Imp.Module"]["callbacks"]
+    assert modules["Imp.Optimizer"]["category"] == "spi"
+
+    assert %{"name" => "run/3", "optional" => false} in modules["Imp.Optimizer"][
+             "callbacks"
+           ]
+
+    assert %{"name" => "generate/2", "optional" => false} in modules["Imp.LM"]["callbacks"]
+    assert %{"name" => "request/5", "optional" => true} in modules["Imp.HTTP"]["callbacks"]
     assert modules["Imp.Example"]["callbacks"] == []
+  end
+
+  test "manifest records every field of every supported public struct" do
+    Mix.Tasks.Imp.PublicApi.manifest()["modules"]
+    |> Enum.filter(&(&1["kind"] == "struct"))
+    |> Enum.each(fn entry ->
+      module = module_from_string(entry["module"])
+
+      expected =
+        module.__struct__()
+        |> Map.keys()
+        |> Enum.reject(&(&1 == :__struct__))
+        |> Enum.map(&Atom.to_string/1)
+        |> Enum.sort()
+
+      assert entry["struct_fields"] == expected,
+             "incomplete public struct contract for #{entry["module"]}"
+    end)
+  end
+
+  test "manifest records every callback of every supported public behaviour" do
+    Mix.Tasks.Imp.PublicApi.manifest()["modules"]
+    |> Enum.filter(&(&1["kind"] == "behaviour"))
+    |> Enum.each(fn entry ->
+      module = module_from_string(entry["module"])
+
+      expected =
+        module.behaviour_info(:callbacks)
+        |> Enum.map(fn {name, arity} -> "#{name}/#{arity}" end)
+        |> Enum.sort()
+
+      actual = entry["callbacks"] |> Enum.map(& &1["name"]) |> Enum.sort()
+
+      assert actual == expected,
+             "incomplete public behaviour contract for #{entry["module"]}"
+    end)
   end
 
   test "manifest omits hidden and generated runtime exports and records internal exclusions" do

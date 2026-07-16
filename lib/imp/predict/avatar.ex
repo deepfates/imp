@@ -5,7 +5,9 @@ defmodule Imp.Predict.Avatar do
   Avatar asks a typed actor predictor for one action per turn. Tool results,
   including policy denials and execution errors, become structured observations
   for the next turn. A reserved `Finish` action or iteration exhaustion invokes
-  a separate typed finalizer for the task signature.
+  a separate typed finalizer for the task signature. Each tool callback runs in
+  an isolated unlinked task under `:tool_timeout_ms`; a timeout kills that task,
+  records a terminal action observation, and proceeds directly to finalization.
   """
 
   @behaviour Imp.Module
@@ -18,6 +20,7 @@ defmodule Imp.Predict.Avatar do
     :finisher,
     tools: %{},
     max_iters: 3,
+    tool_timeout_ms: 30_000,
     tool_policy: :allow,
     metadata: %{}
   ]
@@ -32,6 +35,7 @@ defmodule Imp.Predict.Avatar do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     max_iters: [type: :non_neg_integer, default: 3],
+    tool_timeout_ms: [type: :non_neg_integer, default: 30_000],
     tool_policy: [type: {:custom, Imp.ToolPolicy, :validate, []}, default: :allow]
   ]
 
@@ -45,7 +49,7 @@ defmodule Imp.Predict.Avatar do
       raise ArgumentError, "Finish is reserved by Imp.Predict.Avatar"
     end
 
-    predict_opts = Keyword.drop(opts, [:max_iters, :tool_policy])
+    predict_opts = Keyword.drop(opts, [:max_iters, :tool_timeout_ms, :tool_policy])
 
     %__MODULE__{
       signature: signature,
@@ -53,6 +57,7 @@ defmodule Imp.Predict.Avatar do
       finisher: Imp.Predict.Predict.new(finisher_signature(signature), predict_opts),
       tools: tools,
       max_iters: opts[:max_iters],
+      tool_timeout_ms: opts[:tool_timeout_ms],
       tool_policy: opts[:tool_policy],
       metadata: opts[:metadata]
     }
@@ -102,8 +107,13 @@ defmodule Imp.Predict.Avatar do
       if finish_action?(action) do
         finish(avatar, inputs, history, :finish)
       else
-        observation = execute_action(avatar, action)
-        run(avatar, inputs, history ++ [observation], turn + 1)
+        case execute_action(avatar, action) do
+          {:continue, observation} ->
+            run(avatar, inputs, history ++ [observation], turn + 1)
+
+          {:halt, observation, reason} ->
+            finish(avatar, inputs, history ++ [observation], reason)
+        end
       end
     end
   end
@@ -124,26 +134,61 @@ defmodule Imp.Predict.Avatar do
   defp execute_action(avatar, %Action{} = action) do
     canonical_name = Imp.Tool.resolve_name(avatar.tools, action.tool_name)
 
-    {output, error?} =
+    {output, error?, terminal_reason} =
       cond do
         is_nil(canonical_name) ->
-          {{:error, {:unknown_tool, action.tool_name}}, true}
+          {{:error, {:unknown_tool, action.tool_name}}, true, nil}
 
         true ->
           arguments = Imp.Tool.normalize_arguments(action.tool_input_query)
 
           case safe_authorize(avatar.tool_policy, canonical_name, arguments) do
-            :ok -> safe_tool_call(Map.fetch!(avatar.tools, canonical_name), arguments)
-            {:error, reason} -> {{:error, reason}, true}
+            :ok ->
+              bounded_tool_call(
+                Map.fetch!(avatar.tools, canonical_name),
+                arguments,
+                avatar.tool_timeout_ms
+              )
+
+            {:error, reason} ->
+              {{:error, reason}, true, nil}
           end
       end
 
-    %ActionOutput{
+    observation = %ActionOutput{
       tool_name: canonical_name || action.tool_name,
       tool_input_query: Imp.Redaction.redact(action.tool_input_query),
       tool_output: Imp.Redaction.redact(output),
-      error?: error?
+      error?: error?,
+      terminal_reason: terminal_reason
     }
+
+    if terminal_reason,
+      do: {:halt, observation, terminal_reason},
+      else: {:continue, observation}
+  end
+
+  defp bounded_tool_call(tool, arguments, timeout) do
+    task =
+      Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fn ->
+        safe_tool_call(tool, arguments)
+      end)
+
+    case Task.yield(task, timeout) do
+      {:ok, {output, error?}} ->
+        {output, error?, nil}
+
+      {:exit, reason} ->
+        {{:error, {:tool_task_exit, tool.name, reason}}, true, nil}
+
+      nil ->
+        _ = Task.shutdown(task, :brutal_kill)
+        {{:error, {:tool_timeout, tool.name, timeout}}, true, :tool_timeout}
+    end
+  rescue
+    error -> {{:error, {:tool_task_error, tool.name, Exception.message(error)}}, true, nil}
+  catch
+    kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil}
   end
 
   defp safe_tool_call(tool, arguments) do

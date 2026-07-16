@@ -16,33 +16,36 @@ telemetry-handler deltas. It also records balanced telemetry span counts and a
 credential scan. Any failed iteration, nonzero added resource count, unbalanced
 span, retained handler, or credential hit keeps deterministic authority red.
 
-## Selected live authority
+## Selected local operational authority
 
-The live campaign is intentionally narrower than “every external integration”:
+The operational campaign is intentionally local, bounded, and provider-free:
 
-* The provider row injects one HTTP 429, then completes the same idempotent
-  operation against OpenAI. It requires exactly two attempts, a stable
-  idempotency key, a bounded timeout, positive token usage, and a real 2xx
-  response.
-* The integration row injects one closed transport into the HTTP retriever,
-  then completes against `httpbin.org`. It separately requires a real
-  OpenAI-backed ReAct run to invoke `lookup` once and `submit` once.
+* The provider-shaped row starts an operation through Imp's retry boundary,
+  forces the first attempt to exceed its attempt timeout, and completes the
+  second attempt. It requires exactly two attempts, one observed timeout, a
+  stable dummy idempotency key, a terminal 2xx, and an elapsed time within the
+  declared deadline.
+* The integration row injects one closed retriever transport, then recovers.
+  A static-LM ReAct workflow calls `lookup`; the tool returns one recoverable
+  error, succeeds on the exact retry, and then calls `submit` exactly once. The
+  complete normalized history is part of the verified evidence.
 
 The dashboard verifies the run envelope, recomputes every deterministic and
-live row from outcomes, and ignores reported summary booleans. At least two live
+operational row from outcomes, and ignores reported summary booleans. At least two
 iterations, zero flakes, zero resource leaks, balanced telemetry, and a clean
-secret scan are required for full evidence.
+dummy-canary scan are required for full evidence. The canonical task requires a
+clean current-source checkout by default, and the dashboard rejects dirty or
+non-reproducible RunContext envelopes even when their Git revision matches.
 
-This campaign does **not** claim a paid training job lifecycle, a public MCP
-service probe, or exhaustive provider/network failure coverage. Agent token
-usage is not currently exposed by the final ReAct prediction, so its exact cost
-is reported as unavailable rather than estimated. These are explicit
-limitations, not implicit passes.
+This campaign makes no provider, paid-training, public MCP, external-network,
+or comparative-performance claim. These are explicit limitations, not implicit
+passes.
 
 ## Reproduction
 
-Use the pinned settings in
-`benchmarks/config/failure-recovery-live.json` from a clean commit:
+Use the pinned settings in `benchmarks/config/failure-recovery-live.json` from
+a clean commit. Despite the retained compatibility flag name, `--live` enables
+only the local operational rows and performs no external network calls:
 
 ```bash
 mix imp.benchmark.failure_campaign \
@@ -50,13 +53,12 @@ mix imp.benchmark.failure_campaign \
   --max-concurrency 2 \
   --live \
   --live-iterations 2 \
-  --live-timeout-ms 30000 \
-  --model gpt-4.1-mini \
-  --agent-model gpt-5.4 \
+  --live-timeout-ms 1000 \
   --require-clean \
   --out benchmarks/runs/failure-recovery
 ```
 
 Then point the dashboard at the result directory. The artifact’s signed payload
-hash, exact Git revision, workspace state, provider/model names, attempt counts,
-time bounds, usage, and resource deltas are the authority inputs.
+hash, exact Git revision, clean workspace state, attempt counts, time bounds,
+exact tool history, canary digest, telemetry, and resource deltas are the
+authority inputs.

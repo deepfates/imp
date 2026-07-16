@@ -5,13 +5,16 @@ defmodule Imp.Optimizer.GRPO do
 
   Groups align calls by `{predictor, relative invocation}` across rollouts and
   propagate the program-level reward to each aligned completion. A trainer owns
-  only the reinforcement session lifecycle and model artifact. This boundary
-  does not persist a resumable optimizer state or implement independent jobs for
-  multiple student LMs.
+  only the reinforcement session lifecycle and model artifact. Optional durable
+  session checkpoints reconcile accepted dispatches after caller crashes and
+  resume completed optimizer steps. Provider callbacks execute under explicit
+  deadlines in isolated unlinked tasks, so callback implementations must not
+  rely on the caller's process dictionary or mailbox. Independent jobs for
+  multiple student LMs are not implemented.
   """
 
   alias Imp.Clients.{ReinforcementSession, Trainer}
-  alias Imp.Optimizer.TrajectoryRunner
+  alias Imp.Optimizer.{GRPO.Checkpoint, Sampling, TrajectoryRunner}
 
   defstruct [
     :reward_fn,
@@ -30,6 +33,8 @@ defmodule Imp.Optimizer.GRPO do
     variably_invoked_predictor_fill_strategy: nil,
     status_poll_interval_ms: 1_000,
     max_status_polls: 300,
+    callback_timeout_ms: 30_000,
+    checkpoint_path: nil,
     train_kwargs: []
   ]
 
@@ -55,6 +60,11 @@ defmodule Imp.Optimizer.GRPO do
     ],
     status_poll_interval_ms: [type: :non_neg_integer, default: 1_000],
     max_status_polls: [type: :pos_integer, default: 300],
+    callback_timeout_ms: [
+      type: {:custom, __MODULE__, :validate_callback_timeout, []},
+      default: 30_000
+    ],
+    checkpoint_path: [type: {:or, [:string, nil]}, default: nil],
     train_kwargs: [type: :keyword_list, default: []]
   ]
 
@@ -80,6 +90,15 @@ defmodule Imp.Optimizer.GRPO do
 
     struct!(__MODULE__, Keyword.put(opts, :reward_fn, reward_fn))
   end
+
+  @doc false
+  def validate_callback_timeout(:infinity), do: {:ok, :infinity}
+
+  def validate_callback_timeout(timeout) when is_integer(timeout) and timeout > 0,
+    do: {:ok, timeout}
+
+  def validate_callback_timeout(_timeout),
+    do: {:error, "expected :infinity or a positive integer"}
 
   @impl true
   def __optimizer__,
@@ -122,17 +141,19 @@ defmodule Imp.Optimizer.GRPO do
     with :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
          :ok <- Trainer.supports_method(optimizer.trainer, :grpo),
          lm <- program_lm(program),
-         {:ok, session} <-
-           Trainer.start_reinforcement(
-             optimizer.trainer,
-             lm,
-             Keyword.put(
-               optimizer.train_kwargs,
-               :num_generations,
-               optimizer.num_rollouts_per_grpo_step
-             )
-           ) do
-      run_started_session(optimizer, program, trainset, valset, session)
+         identity <- checkpoint_identity(optimizer, lm, trainset, valset),
+         {:ok, session, resume_data, resumed?, dispatch_id} <-
+           acquire_session(optimizer, lm, identity) do
+      run_started_session(
+        optimizer,
+        program,
+        trainset,
+        valset,
+        session,
+        Map.put(identity, :dispatch_id, dispatch_id),
+        resume_data,
+        resumed?
+      )
     end
   end
 
@@ -149,60 +170,172 @@ defmodule Imp.Optimizer.GRPO do
       else: compile_opts
   end
 
-  defp run_started_session(optimizer, program, trainset, valset, session) do
-    trainset = repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
+  defp acquire_session(%{checkpoint_path: path} = optimizer, lm, identity)
+       when is_binary(path) do
+    if File.regular?(path) do
+      checkpoint = Checkpoint.load!(path)
+      verify_checkpoint_identity!(checkpoint.data, identity)
+      dispatch_id = Map.fetch!(checkpoint.data, :dispatch_id)
 
-    initial_state = %{
-      session: session,
-      program: program,
-      rng: seed_state(optimizer.seed),
-      shuffled_ids: [],
-      frequencies: %{},
-      frequency_order: [],
-      epoch: -1,
-      group_queue: []
-    }
+      case bounded_callback(optimizer, :reconcile_reinforcement, fn ->
+             Trainer.reconcile_reinforcement(optimizer.trainer, dispatch_id)
+           end) do
+        {:ok, %ReinforcementSession{} = session} ->
+          resume_data =
+            if checkpoint.phase == :dispatch_intent,
+              do: nil,
+              else: Map.put(checkpoint.data, :checkpoint_phase, checkpoint.phase)
 
-    result =
-      try do
-        with :ok <- maybe_validate(optimizer, program, trainset, valset, -1),
-             {:ok, state} <- run_steps(optimizer, trainset, valset, initial_state) do
-          {:ok, state}
-        end
-      rescue
-        error -> {:error, {:grpo_execution_failed, Exception.message(error)}}
-      catch
-        kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}}
+          {:ok, session, resume_data, true, dispatch_id}
+
+        {:error, :reinforcement_session_not_found} when checkpoint.phase == :dispatch_intent ->
+          start_session(optimizer, lm, identity, dispatch_id)
+
+        {:error, reason} ->
+          {:error, {:grpo_session_reconciliation_failed, dispatch_id, reason}}
       end
+    else
+      dispatch_id = new_dispatch_id(identity)
+      Checkpoint.save!(path, :dispatch_intent, %{dispatch_id: dispatch_id, identity: identity})
+      start_session(optimizer, lm, identity, dispatch_id)
+    end
+  rescue
+    error -> {:error, {:grpo_checkpoint_failed, Exception.message(error)}}
+  end
 
-    case result do
-      {:ok, state} ->
-        with {:ok, terminated} <-
-               Trainer.terminate_reinforcement(optimizer.trainer, state.session),
-             {:ok, artifact} <-
-               Trainer.final_model_artifact(optimizer.trainer, terminated),
-             {:ok, rebound} <- rebind_program(state.program, artifact, terminated) do
-          {:ok, rebound}
-        end
+  defp acquire_session(optimizer, lm, identity) do
+    dispatch_id = new_dispatch_id(identity)
+    start_session(optimizer, lm, identity, dispatch_id)
+  end
 
-      {:error, reason, state} ->
-        _ = Trainer.terminate_reinforcement(optimizer.trainer, state.session)
-        {:error, reason}
+  defp start_session(optimizer, lm, identity, dispatch_id) do
+    opts =
+      optimizer.train_kwargs
+      |> Keyword.put(:num_generations, optimizer.num_rollouts_per_grpo_step)
+      |> maybe_put_dispatch_id(optimizer.checkpoint_path, dispatch_id)
+
+    case bounded_callback(optimizer, :start_reinforcement, fn ->
+           Trainer.start_reinforcement(optimizer.trainer, lm, opts)
+         end) do
+      {:ok, %ReinforcementSession{} = session} ->
+        maybe_checkpoint(optimizer, :running, %{
+          dispatch_id: dispatch_id,
+          identity: identity,
+          next_step: 0,
+          session: session_summary(session)
+        })
+
+        {:ok, session, nil, false, dispatch_id}
 
       {:error, reason} ->
-        _ = Trainer.terminate_reinforcement(optimizer.trainer, initial_state.session)
         {:error, reason}
     end
   end
 
-  defp run_steps(%{num_train_steps: 0}, _trainset, _valset, state),
-    do: {:ok, state}
+  defp maybe_put_dispatch_id(opts, path, dispatch_id) when is_binary(path),
+    do: Keyword.put_new(opts, :dispatch_id, dispatch_id)
 
-  defp run_steps(optimizer, trainset, valset, state) do
-    Enum.reduce_while(0..(optimizer.num_train_steps - 1), {:ok, state}, fn step, {:ok, state} ->
+  defp maybe_put_dispatch_id(opts, _path, _dispatch_id), do: opts
+
+  defp run_started_session(
+         optimizer,
+         program,
+         trainset,
+         valset,
+         session,
+         identity,
+         resume_data,
+         resumed?
+       ) do
+    trainset = repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
+
+    {initial_state, next_step} =
+      restore_or_initialize_state(program, session, optimizer.seed, resume_data)
+
+    result =
+      if resume_data && resume_data[:checkpoint_phase] in [:terminating, :termination_failed] do
+        {:ok, initial_state}
+      else
+        try do
+          with :ok <-
+                 maybe_initial_validation(
+                   optimizer,
+                   initial_state.program,
+                   trainset,
+                   valset,
+                   next_step
+                 ),
+               {:ok, state} <-
+                 run_steps(
+                   optimizer,
+                   trainset,
+                   valset,
+                   initial_state,
+                   next_step,
+                   identity
+                 ) do
+            {:ok, state}
+          end
+        rescue
+          error -> {:error, {:grpo_execution_failed, Exception.message(error)}}
+        catch
+          kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}}
+        end
+      end
+
+    case result do
+      {:ok, state} ->
+        maybe_checkpoint(
+          optimizer,
+          :terminating,
+          checkpoint_data(state, identity, optimizer.num_train_steps)
+        )
+
+        case terminate_session(optimizer, state.session) do
+          {:ok, terminated} ->
+            with {:ok, artifact} <-
+                   bounded_callback(optimizer, :final_model_artifact, fn ->
+                     Trainer.final_model_artifact(optimizer.trainer, terminated)
+                   end),
+                 {:ok, rebound} <-
+                   rebind_program(state.program, artifact, terminated, resumed?) do
+              Checkpoint.remove(optimizer.checkpoint_path)
+              {:ok, rebound}
+            end
+
+          {:error, reason} ->
+            maybe_checkpoint(
+              optimizer,
+              :termination_failed,
+              checkpoint_data(state, identity, optimizer.num_train_steps)
+              |> Map.put(:termination_error, reason)
+            )
+
+            {:error, {:grpo_termination_failed, reason}}
+        end
+
+      {:error, reason, state} ->
+        terminate_after_failure(optimizer, state, identity, reason)
+
+      {:error, reason} ->
+        terminate_after_failure(optimizer, initial_state, identity, reason)
+    end
+  end
+
+  defp run_steps(%{num_train_steps: count}, _trainset, _valset, state, next_step, _identity)
+       when next_step >= count,
+       do: {:ok, state}
+
+  defp run_steps(optimizer, trainset, valset, state, next_step, identity) do
+    Enum.reduce_while(next_step..(optimizer.num_train_steps - 1), {:ok, state}, fn step,
+                                                                                   {:ok, state} ->
       case run_step(optimizer, trainset, valset, step, state) do
-        {:ok, state} -> {:cont, {:ok, state}}
-        {:error, reason, state} -> {:halt, {:error, reason, state}}
+        {:ok, state} ->
+          maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
+          {:cont, {:ok, state}}
+
+        {:error, reason, state} ->
+          {:halt, {:error, reason, state}}
       end
     end)
   end
@@ -214,7 +347,10 @@ defmodule Imp.Optimizer.GRPO do
 
       with {:ok, groups, state} <- build_groups(optimizer, state.program, selected, step, state),
            {:ok, batches, state} <- assign_batches(groups, session, state),
-           {:ok, stepped} <- Trainer.reinforcement_step(optimizer.trainer, session, batches) do
+           {:ok, stepped} <-
+             bounded_callback(optimizer, :reinforcement_step, fn ->
+               Trainer.reinforcement_step(optimizer.trainer, session, batches)
+             end) do
         program = rebind_current_model(state.program, stepped.current_model)
         state = %{state | session: stepped, program: program}
 
@@ -234,7 +370,10 @@ defmodule Imp.Optimizer.GRPO do
     do: {:error, :reinforcement_pending_batch_timeout}
 
   defp await_pending(optimizer, session, polls_left) do
-    with {:ok, refreshed} <- Trainer.reinforcement_status(optimizer.trainer, session) do
+    with {:ok, refreshed} <-
+           bounded_callback(optimizer, :reinforcement_status, fn ->
+             Trainer.reinforcement_status(optimizer.trainer, session)
+           end) do
       available =
         Enum.reject(refreshed.pending_batch_ids, &(&1 in refreshed.fulfilled_batch_ids))
 
@@ -245,6 +384,169 @@ defmodule Imp.Optimizer.GRPO do
         {:ok, %{refreshed | pending_batch_ids: available}}
       end
     end
+  end
+
+  defp restore_or_initialize_state(program, session, seed, nil) do
+    {%{
+       session: session,
+       program: rebind_current_model(program, session.current_model),
+       rng: seed_state(seed),
+       shuffled_ids: [],
+       frequencies: %{},
+       frequency_order: [],
+       epoch: -1,
+       group_queue: []
+     }, 0}
+  end
+
+  defp restore_or_initialize_state(program, session, seed, data)
+       when not is_map_key(data, :rng) do
+    restore_or_initialize_state(program, session, seed, nil)
+  end
+
+  defp restore_or_initialize_state(program, session, _seed, data) do
+    {%{
+       session: session,
+       program: rebind_current_model(program, session.current_model),
+       rng: data |> Map.fetch!(:rng) |> Sampling.load!(),
+       shuffled_ids: Map.fetch!(data, :shuffled_ids),
+       frequencies: Map.fetch!(data, :frequencies),
+       frequency_order: Map.fetch!(data, :frequency_order),
+       epoch: Map.fetch!(data, :epoch),
+       group_queue: Map.fetch!(data, :group_queue)
+     }, Map.fetch!(data, :next_step)}
+  end
+
+  defp maybe_initial_validation(_optimizer, _program, _trainset, _valset, next_step)
+       when next_step > 0,
+       do: :ok
+
+  defp maybe_initial_validation(optimizer, program, trainset, valset, 0),
+    do: maybe_validate(optimizer, program, trainset, valset, -1)
+
+  defp checkpoint_data(state, identity, next_step) do
+    %{
+      dispatch_id: Map.fetch!(identity, :dispatch_id),
+      identity: Map.delete(identity, :dispatch_id),
+      next_step: next_step,
+      session: session_summary(state.session),
+      rng: Sampling.dump(state.rng),
+      shuffled_ids: state.shuffled_ids,
+      frequencies: state.frequencies,
+      frequency_order: state.frequency_order,
+      epoch: state.epoch,
+      group_queue: state.group_queue
+    }
+  end
+
+  defp session_summary(session) do
+    %{
+      id: session.id,
+      provider: session.provider,
+      status: session.status,
+      pending_batch_ids: session.pending_batch_ids,
+      fulfilled_batch_ids: session.fulfilled_batch_ids,
+      current_model: session.current_model,
+      result_model: session.result_model,
+      metadata: session.metadata
+    }
+  end
+
+  defp terminate_after_failure(optimizer, state, identity, execution_reason) do
+    case terminate_session(optimizer, state.session) do
+      {:ok, _terminated} ->
+        Checkpoint.remove(optimizer.checkpoint_path)
+        {:error, execution_reason}
+
+      {:error, termination_reason} ->
+        maybe_checkpoint(
+          optimizer,
+          :termination_failed,
+          checkpoint_data(state, identity, 0)
+          |> Map.put(:execution_error, execution_reason)
+          |> Map.put(:termination_error, termination_reason)
+        )
+
+        {:error, {:grpo_execution_and_termination_failed, execution_reason, termination_reason}}
+    end
+  end
+
+  defp terminate_session(optimizer, session) do
+    bounded_callback(optimizer, :terminate_reinforcement, fn ->
+      Trainer.terminate_reinforcement(optimizer.trainer, session)
+    end)
+  end
+
+  defp bounded_callback(%{callback_timeout_ms: :infinity}, callback, fun) do
+    normalize_callback_result(callback, fun.())
+  rescue
+    error -> {:error, {:reinforcement_callback_failed, callback, Exception.message(error)}}
+  catch
+    kind, reason -> {:error, {:reinforcement_callback_exit, callback, {kind, reason}}}
+  end
+
+  defp bounded_callback(optimizer, callback, fun) do
+    task = Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fun)
+
+    case Task.yield(task, optimizer.callback_timeout_ms) do
+      {:ok, result} ->
+        normalize_callback_result(callback, result)
+
+      {:exit, reason} ->
+        {:error, {:reinforcement_callback_exit, callback, reason}}
+
+      nil ->
+        _ = Task.shutdown(task, :brutal_kill)
+        {:error, {:reinforcement_callback_timeout, callback, optimizer.callback_timeout_ms}}
+    end
+  rescue
+    error -> {:error, {:reinforcement_callback_failed, callback, Exception.message(error)}}
+  end
+
+  defp normalize_callback_result(_callback, {:ok, _value} = result), do: result
+  defp normalize_callback_result(_callback, {:error, _reason} = error), do: error
+
+  defp normalize_callback_result(callback, other),
+    do: {:error, {:invalid_reinforcement_callback_result, callback, other}}
+
+  defp maybe_checkpoint(%{checkpoint_path: path}, phase, data) when is_binary(path),
+    do: Checkpoint.save!(path, phase, data)
+
+  defp maybe_checkpoint(_optimizer, _phase, _data), do: :ok
+
+  defp checkpoint_identity(optimizer, lm, trainset, valset) do
+    identity = %{
+      model: if(is_map(lm), do: Map.get(lm, :model, Map.get(lm, "model")), else: inspect(lm)),
+      seed: optimizer.seed,
+      num_train_steps: optimizer.num_train_steps,
+      examples_per_step: optimizer.num_dspy_examples_per_grpo_step,
+      rollouts_per_step: optimizer.num_rollouts_per_grpo_step,
+      trainset: Enum.map(trainset, &Imp.Example.to_map/1),
+      valset: if(is_list(valset), do: Enum.map(valset, &Imp.Example.to_map/1), else: nil)
+    }
+
+    Map.put(identity, :digest, digest(identity))
+  end
+
+  defp verify_checkpoint_identity!(data, identity) do
+    saved = Map.fetch!(data, :identity)
+
+    unless Map.fetch!(saved, :digest) == Map.fetch!(identity, :digest) do
+      raise ArgumentError, "GRPO session checkpoint identity mismatch"
+    end
+  end
+
+  defp new_dispatch_id(identity) do
+    "grpo:" <>
+      Map.fetch!(identity, :digest) <>
+      ":" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
+  end
+
+  defp digest(value) do
+    value
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 
   defp select_examples(optimizer, trainset, step, state) do
@@ -562,7 +864,7 @@ defmodule Imp.Optimizer.GRPO do
     end
   end
 
-  defp rebind_program(program, artifact, session) do
+  defp rebind_program(program, artifact, session, resumed?) do
     rebound =
       Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
         Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
@@ -573,7 +875,8 @@ defmodule Imp.Optimizer.GRPO do
         provider: session.provider,
         session_id: session.id,
         result_model: artifact,
-        method: :grpo
+        method: :grpo,
+        resumed: resumed?
       })
 
     {:ok, rebound}

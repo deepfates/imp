@@ -18,7 +18,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   use Mix.Task
 
-  alias Imp.BenchmarkTruth.{ArtifactFile, LocalMLXCampaign, ReleaseProfile}
+  alias Imp.BenchmarkTruth.{ArtifactFile, LocalMLXCampaign, OverheadPolicy, ReleaseProfile}
 
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
@@ -64,6 +64,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     react_unknown_tool_error_trace
     mcp_import_agent_trace
     agent_tool_policy_denial
+    react_v2_recovers_from_tool_and_submit_errors
     code_act_tool_program
     program_of_thought_safe_eval
     program_of_thought_rejects_unsafe_remote_call
@@ -826,8 +827,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       artifact["schema_version"] == 3 and artifact["runner"] == "imp-failure-campaign" and
         artifact["evidence_tier"] == "t0_deterministic_failure_recovery"
 
+    workspace_clean =
+      get_in(artifact, ["run_context", "schema_version"]) == 2 and
+        get_in(artifact, ["run_context", "workspace", "state"]) == "clean" and
+        get_in(artifact, ["run_context", "workspace", "reproducible"]) == true
+
     deterministic_complete =
-      envelope_current and valid_case_ids == expected_case_ids and runtime_complete and
+      envelope_current and workspace_clean and valid_case_ids == expected_case_ids and
+        runtime_complete and
         valid_failure_telemetry?(artifact["telemetry"]) and
         valid_failure_secret_scan?(artifact["secret_scan"]) and
         length(deterministic_cases) == length(expected_case_ids) and
@@ -844,6 +851,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     %{
       "run_envelope_verified" => true,
       "current_schema" => envelope_current,
+      "workspace_clean" => workspace_clean,
       "deterministic_complete" => deterministic_complete,
       "runtime_complete" => runtime_complete,
       "expected_deterministic_cases" => expected_case_ids,
@@ -974,11 +982,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       case id do
         "provider_retry_timeout_idempotency_live" ->
           MapSet.new(
-            ~w(real_provider_terminal_success bounded_retry_after_injected_429 stable_idempotency_key positive_provider_usage)
+            ~w(local_provider_terminal_success bounded_injected_timeout stable_idempotency_key dummy_canary_absent)
           )
 
         "retrieval_and_tool_agent_recovery_live" ->
-          MapSet.new(~w(live_retrieval_recovered provider_backed_tool_agent_completed))
+          MapSet.new(~w(live_retrieval_recovered recoverable_tool_failure_retry_submit))
 
         _ ->
           MapSet.new()
@@ -1003,20 +1011,32 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp valid_failure_live_evidence?("provider_retry_timeout_idempotency_live", evidence) do
-    evidence["provider"] == "openai" and is_binary(evidence["model"]) and
+    evidence["provider"] == "local_injected_transport" and evidence["model"] == "local-fixture" and
       evidence["attempts"] == 2 and evidence["max_attempts"] == 2 and
-      evidence["injected_status"] == 429 and evidence["terminal_status"] in 200..299 and
+      evidence["injected_timeout"] == true and evidence["timeout_reason"] == "timeout" and
+      positive_integer?(evidence["attempt_timeout_ms"]) and
+      positive_integer?(evidence["deadline_ms"]) and
+      non_negative_integer?(evidence["elapsed_ms"]) and
+      evidence["elapsed_ms"] >= evidence["attempt_timeout_ms"] and
+      evidence["elapsed_ms"] <= evidence["deadline_ms"] and evidence["terminal_status"] == 200 and
       evidence["idempotency_header_stable"] == true and
-      positive_integer?(get_in(evidence, ["usage", "input_tokens"])) and
-      positive_integer?(get_in(evidence, ["usage", "output_tokens"])) and
-      is_map(evidence["cost"])
+      evidence["canary_included"] == false and is_binary(evidence["canary_sha256"])
   end
 
   defp valid_failure_live_evidence?("retrieval_and_tool_agent_recovery_live", evidence) do
-    evidence["provider"] == "openai" and is_binary(evidence["model"]) and
+    evidence["provider"] == "local_static_lm" and evidence["model"] == "local-fixture" and
       evidence["retrieval_attempts"] == 2 and evidence["retrieval_injected_error"] == "closed" and
-      evidence["retrieval_terminal_network"] == "httpbin.org" and evidence["tool_calls"] == 1 and
-      evidence["submit_calls"] == 1
+      evidence["retrieval_terminal_network"] == "local_injected_transport" and
+      evidence["tool_attempts"] == 2 and evidence["tool_failures"] == 1 and
+      evidence["tool_successes"] == 1 and evidence["submit_calls"] == 1 and
+      non_negative_integer?(evidence["elapsed_ms"]) and positive_integer?(evidence["deadline_ms"]) and
+      evidence["elapsed_ms"] <= evidence["deadline_ms"] and
+      evidence["canary_included"] == false and is_binary(evidence["canary_sha256"]) and
+      evidence["history"] == [
+        %{"tool" => "lookup", "result" => "transient_local_failure"},
+        %{"tool" => "lookup", "result" => "pong"},
+        %{"tool" => "submit", "result" => "completed"}
+      ]
   end
 
   defp valid_failure_live_evidence?(_id, _evidence), do: false
@@ -1065,25 +1085,53 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp overhead_lane(dir, max_age_hours) do
     with {:ok, path} <-
            latest(Path.join(dir, "overhead-parity-*.json"), &valid_overhead_candidate?/1),
-         {:ok, artifact} <- read_artifact(path) do
-      passing = get_in(artifact, ["summary", "all_passing"]) == true
+         {:ok, artifact} <- read_verified_overhead_artifact(path) do
+      workspace_clean =
+        get_in(artifact, ["run_context", "schema_version"]) == 2 and
+          get_in(artifact, ["run_context", "workspace", "state"]) == "clean" and
+          get_in(artifact, ["run_context", "workspace", "reproducible"]) == true
 
-      artifact_lane("provider_free_overhead", path, artifact, max_age_hours,
+      policy_complete = OverheadPolicy.artifact_valid?(artifact)
+      passing = policy_complete and workspace_clean
+
+      "provider_free_overhead"
+      |> artifact_lane(path, artifact, max_age_hours,
         passing: passing,
         full_evidence: passing,
         scale: "full",
+        freshness: :source_revision,
         summary: %{
           "cases" => get_in(artifact, ["summary", "total"]),
           "passing_cases" => get_in(artifact, ["summary", "passing"]),
-          "max_ratio" => artifact["max_ratio"],
+          "policy" => get_in(artifact, ["policy", "id"]),
+          "workspace_clean" => workspace_clean,
+          "ratios_are_measurements_not_speed_claims" =>
+            get_in(artifact, ["policy", "ratios_are_measurements_not_speed_claims"]),
           "worst_ratio" => worst_ratio(artifact["cases"] || [])
         },
         limitation:
-          "Performance claims must name the covered path and artifact; the dashboard does not authorize blanket speed claims."
+          "Named budgets are regression guards. Ratios remain measurements; the dashboard authorizes no speed or superiority claim."
       )
+      |> maybe_reject_dirty_workspace(workspace_clean)
     else
       _ -> missing_lane("provider_free_overhead", "no overhead-parity artifact found in #{dir}")
     end
+  end
+
+  defp read_verified_overhead_artifact(path) do
+    {:ok, ArtifactFile.read_run_json!(path)}
+  rescue
+    _error -> {:error, :unverifiable}
+  end
+
+  defp maybe_reject_dirty_workspace(lane, true), do: lane
+
+  defp maybe_reject_dirty_workspace(lane, false) do
+    lane
+    |> put_in(["candidate_eligibility", "eligible"], false)
+    |> update_in(["candidate_eligibility", "rejection_reasons"], fn reasons ->
+      Enum.uniq((reasons || []) ++ ["workspace_not_clean"])
+    end)
   end
 
   defp instruction_optimizer_contract_lane(dir, max_age_hours, code_revision) do
@@ -1430,13 +1478,21 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     live_ids = MapSet.new(@rag_tool_agent_live_ids)
     summary = if is_map(artifact["summary"]), do: artifact["summary"], else: %{}
 
+    source_bound =
+      try do
+        Mix.Tasks.Imp.Benchmark.RagToolAgent.validate_artifact!(artifact)
+        true
+      rescue
+        _error -> false
+      end
+
     rows_reconciled =
       length(rows) == MapSet.size(row_ids) and summary["total"] == length(rows) and
         summary["passing"] == Enum.count(rows, &(&1["passing"] == true)) and
         Enum.all?(rows, &(&1["passing"] == true)) and summary["all_passing"] == true
 
     provider_free_complete =
-      rows_reconciled and MapSet.subset?(provider_free_ids, row_ids) and
+      source_bound and rows_reconciled and MapSet.subset?(provider_free_ids, row_ids) and
         Enum.all?(@rag_tool_agent_provider_free_ids, &(rows_by_id[&1]["passing"] == true))
 
     live_complete =
@@ -1447,10 +1503,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       provider_free_complete and live_complete and
         summary["provider_free_contract_complete"] == true and
         summary["live_matched_behavior_complete"] == true and
-        summary["full_rag_tool_agent_parity"] == true
+        summary["full_rag_tool_agent_parity"] == true and
+        summary["comparative_effectiveness_complete"] == true
 
     %{
       "rows_reconciled" => rows_reconciled,
+      "source_bound" => source_bound,
       "provider_free_complete" => provider_free_complete,
       "live_complete" => live_complete,
       "full" => full
@@ -2183,11 +2241,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp valid_gate_candidate?(_artifact, _id, _expected_mix_task), do: false
 
-  defp valid_overhead_candidate?(%{"summary" => summary, "cases" => cases})
-       when is_map(summary) and is_list(cases),
-       do: is_boolean(summary["all_passing"])
-
-  defp valid_overhead_candidate?(_artifact), do: false
+  defp valid_overhead_candidate?(artifact), do: OverheadPolicy.artifact_valid?(artifact)
 
   defp valid_instruction_optimizer_candidate?(%{"summary" => summary, "dspy" => dspy})
        when is_map(summary) and is_map(dspy) do
@@ -2348,7 +2402,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   defp worst_ratio(cases) do
     cases
-    |> Enum.map(& &1["median_ratio_imp_over_dspy"])
+    |> Enum.map(fn row ->
+      row["median_ratio_imp_over_dspy"] ||
+        get_in(row, ["measurements", "median_ratio_imp_over_dspy"])
+    end)
     |> Enum.reject(&is_nil/1)
     |> case do
       [] -> nil

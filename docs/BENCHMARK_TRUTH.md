@@ -141,6 +141,11 @@ template differences stay reviewable instead of hidden.
 mix benchmark.overhead.check
 ```
 
+The canonical alias requires a clean checkout. During development,
+`mix imp.benchmark.overhead --no-require-clean ...` may produce a diagnostic
+artifact, but the dashboard keeps its claim red and marks the candidate
+ineligible until the integrated source is committed and rerun cleanly.
+
 This lane compares Imp and Python DSPy without provider latency. It runs local
 runtime benchmarks for:
 
@@ -155,12 +160,18 @@ runtime benchmarks for:
 - cache hits and misses
 - concurrent orchestration
 
-The artifact reports per-case median, mean, p95, min, max, and
-`median_ratio_imp_over_dspy`. The production gate currently enforces a
-conservative maximum ratio of `50.0` so regressions are visible without
-pretending every local path is faster. Speed claims must name the exact case and
-artifact they come from; slower paths such as cache miss overhead are evidence
-for focused optimization work, not for marketing claims.
+The artifact reports per-case median, mean, p95, min, max, and a measured
+`median_ratio_imp_over_dspy`. Every operation has its own absolute Imp-median
+budget, reference-relative median budget, operation contract, and rationale.
+The cache hit, cache miss, schema-validation, and BootstrapFewShot cases execute
+the same logical operation and matched configuration in both runtimes. The
+artifact records BEAM, Python, OS, architecture, dependency, and clean-source
+identity in a verified run envelope.
+
+These budgets are regression alarms, not parity, superiority, or speed claims.
+Ratios are measurements only. No path-specific speed claim is authorized by a
+passing ceiling; such a claim would require a separately declared and powered
+comparison.
 
 ## Run Shared Inference-Time Search Evidence
 
@@ -197,7 +208,9 @@ optimum scores. The current artifact directly compares Imp and DSPy
 `SIMBA` and `GEPA` lift when the installed DSPy sidecar exposes them. It records
 documented Imp-only or intentional-deviation evidence for Elixir-native
 `InstructionSearch` and provider-side trainer workflows such as finetuning and
-GRPO. The artifact records the installed Python `dspy` package version and
+mmGRPO. Imp's GRPO implementation authority is pinned DSPy 3.2.1 source;
+DeepSeekMath is background rather than an implementation-parity authority. The
+artifact records the installed Python `dspy` package version and
 detected optimizer capabilities so the lane stays honest as the upstream runtime
 changes. The same artifact includes natural Imp user-story lanes for
 classification, QA, retrieval/KNN few-shot, and instruction following, with
@@ -559,6 +572,46 @@ through agents, tool policy denial traces, ReAct error traces, CodeAct,
 ProgramOfThought success and sandbox rejection, streaming incremental fields,
 BEAM async execution, and save/load redaction. Provider behavior over real
 models can be measured directly in the same artifact:
+
+The provider-free artifact is a bounded C2 operational-contract proof. It
+requires exactly the two declared DSPy comparison rows, rejects missing or
+duplicate rows, exercises the actual `Imp.rag` wrapper, and includes a
+ReActV2 trajectory that recovers from failing, unknown, and malformed tool
+calls before bounded submission. A source-bound candidate must be run from a
+clean checkout and binds the Imp revision, pinned DSPy 3.2.1 authority, task
+and sidecar hashes, and the provider-free fixture:
+
+```sh
+mix imp.benchmark.rag_tool_agent \
+  --require-clean \
+  --out benchmarks/runs/rag-tool-agent
+```
+
+The operational artifact does not measure HotPotQA answer/supporting-fact quality, BFCL
+tool name or argument accuracy, or an identical Imp/DSPy failure schedule.
+Those remain a separate open comparative-effectiveness portfolio and neither
+the provider-free operational pass nor selected live rows can close it.
+
+The separate provider-free HotPotQA retrieval differential uses the pinned
+first ten `fullwiki` validation rows and materializes one shared corpus of 100
+uniquely titled passages. It binds the dataset, split manifest, scorer/config,
+Imp task, Python sidecar, and DSPy 3.2.1 authority by SHA-256. Both runtimes use
+the same stable token-overlap ranking, document IDs, top five, and context
+ordering, then report supporting-title recall plus extractive answer-availability
+EM/F1:
+
+```sh
+mix imp.benchmark.hotpot_retrieval \
+  --require-clean \
+  --out benchmarks/runs/hotpot-retrieval
+```
+
+The bounded current result matches 10/10 rows and both aggregate summaries:
+0.35 supporting-fact recall and 0.30 answer-availability EM/F1. The answer
+scorer emits the gold answer only when it is present in retrieved context, so
+this is retrieval/answer-availability evidence rather than language-model
+generation quality. It does not close the broader HotPotQA effectiveness,
+BFCL, or matched-failure portfolio.
 
 ```sh
 mix imp.benchmark.rag_tool_agent \

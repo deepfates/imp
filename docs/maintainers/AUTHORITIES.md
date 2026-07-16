@@ -83,7 +83,7 @@ open.
 | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | partial |
 | Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
 | Optimize Anything arbitrary artifact optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
-| Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | partial | present |
+| Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | present |
 | Async, streaming, cache, observability, and provider-free overhead | runtime | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |
 | Persistence, deployment, and protocol boundaries | operations | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |
 | GSM8K math | benchmark | dataset-head @ 3101c7d50724 | pinned | not_applicable | pinned | partial |

@@ -87,14 +87,14 @@ defmodule ProviderTrainingLifecycleTest do
   defmodule GRPOTrainingFixture do
     @behaviour Imp.Clients.Trainer
 
-    defstruct []
+    defstruct [:owner]
 
     @impl true
     def supported_methods(%__MODULE__{}), do: [:grpo]
 
     @impl true
-    def start_reinforcement(%__MODULE__{}, trainer_lm, opts) do
-      send(self(), {:grpo_started, trainer_lm, opts})
+    def start_reinforcement(%__MODULE__{owner: owner}, trainer_lm, opts) do
+      send(owner, {:grpo_started, trainer_lm, opts})
 
       {:ok,
        Imp.Clients.ReinforcementSession.new(%{
@@ -109,14 +109,14 @@ defmodule ProviderTrainingLifecycleTest do
     def reinforcement_status(%__MODULE__{}, session), do: {:ok, session}
 
     @impl true
-    def reinforcement_step(%__MODULE__{}, session, groups, _opts) do
-      send(self(), {:grpo_step, groups})
+    def reinforcement_step(%__MODULE__{owner: owner}, session, groups, _opts) do
+      send(owner, {:grpo_step, groups})
       {:ok, session}
     end
 
     @impl true
-    def terminate_reinforcement(%__MODULE__{}, session) do
-      send(self(), :grpo_terminated)
+    def terminate_reinforcement(%__MODULE__{owner: owner}, session) do
+      send(owner, :grpo_terminated)
       {:ok, %{session | status: :succeeded}}
     end
 
@@ -1256,7 +1256,7 @@ defmodule ProviderTrainingLifecycleTest do
     program = Imp.code_act("question -> answer", [], lm: lm)
     trainset = [Imp.example(question: "life?", answer: "42") |> Imp.with_inputs(:question)]
 
-    trainer = %GRPOTrainingFixture{}
+    trainer = %GRPOTrainingFixture{owner: self()}
 
     assert {:ok, compiled} =
              Imp.Optimizer.GRPO.new(fn _example -> 0.75 end,
@@ -1273,7 +1273,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "an explicit GRPO-only trainer rejects SFT before trainer dispatch" do
-    trainer = %GRPOTrainingFixture{}
+    trainer = %GRPOTrainingFixture{owner: self()}
 
     assert {:error, {:unsupported_training_method, :sft}} =
              Imp.Clients.Trainer.finetune(
@@ -1287,7 +1287,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "trainer accepts token-aligned Fast-Slow trajectories without discarding provenance" do
-    trainer = %GRPOTrainingFixture{}
+    trainer = %GRPOTrainingFixture{owner: self()}
 
     session =
       Imp.Clients.ReinforcementSession.new(%{

@@ -189,7 +189,7 @@ defmodule BetterTogetherTest do
 
   defmodule GenericTrainingOptimizer do
     @behaviour Imp.Optimizer
-    defstruct [:job]
+    defstruct [:job, status: :job_created]
 
     @impl true
     def __optimizer__,
@@ -200,13 +200,13 @@ defmodule BetterTogetherTest do
       }
 
     @impl true
-    def run(%__MODULE__{job: job}, program, _opts),
+    def run(%__MODULE__{job: job, status: status}, program, _opts),
       do:
         {:ok,
          %Imp.Optimizer.TrainingResult{
            program: program,
            job: job,
-           status: :job_created,
+           status: status,
            metadata: %{optimizer: :generic_test}
          }}
   end
@@ -857,6 +857,138 @@ defmodule BetterTogetherTest do
     refute_received {:unexpected_unknown_lifecycle_request, _}
   end
 
+  test "boundedly cleans an active job attached to a noncanonical training result" do
+    owner = self()
+
+    cancel_transport = fn url, _headers, _body, _opts ->
+      send(owner, {:malformed_result_cancel_requested, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "malformed-active",
+        provider: :test,
+        status: :running,
+        transport: cancel_transport,
+        cancel_url: "https://training.example/jobs/malformed-active/cancel",
+        cancel_body: :empty,
+        max_attempts: 1
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        g: %GenericTrainingOptimizer{job: job, status: :provider_specific}
+      })
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_cancellation_timeout: 100,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:malformed_result_cancel_requested,
+                     "https://training.example/jobs/malformed-active/cancel"}
+
+    assert [
+             %{
+               error:
+                 {:training_terminal_error,
+                  {:invalid_training_result_status, GenericTrainingOptimizer, :provider_specific,
+                   %{job_id: "malformed-active", status: :running, metadata: %{}}}, [cleanup]}
+             }
+           ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert cleanup == %{
+             job_id: "malformed-active",
+             prior_status: :running,
+             status: :cancelled,
+             result: :ok
+           }
+  end
+
+  test "does not accept completed while its attached provider job is still active" do
+    owner = self()
+
+    transport = fn url, _headers, _body, _opts ->
+      send(owner, {:inconsistent_completed_cancel_requested, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    job =
+      Imp.Clients.TrainingJob.new(%{
+        id: "inconsistent-completed",
+        provider: :test,
+        status: :running,
+        transport: transport,
+        cancel_url: "https://training.example/jobs/inconsistent-completed/cancel",
+        cancel_body: :empty,
+        max_attempts: 1
+      })
+
+    compiled =
+      BetterTogether.new(metric(), %{
+        g: %GenericTrainingOptimizer{job: job, status: :completed}
+      })
+      |> BetterTogether.compile(program(), examples(), nil,
+        strategy: :g,
+        valset_ratio: 0,
+        training_cancellation_timeout: 100,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:inconsistent_completed_cancel_requested,
+                     "https://training.example/jobs/inconsistent-completed/cancel"}
+
+    assert [%{error: {:training_terminal_error, {:invalid_training_result, _, _}, [cleanup]}}] =
+             Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert cleanup.status == :cancelled
+    assert cleanup.result == :ok
+  end
+
+  test "noncanonical training results do not destructively clean terminal or unknown jobs" do
+    owner = self()
+
+    transport = fn url, _headers, _body, _opts ->
+      send(owner, {:unexpected_malformed_result_request, url})
+      {:ok, %{status: 200, headers: [], body: Jason.encode!(%{status: "cancelled"})}}
+    end
+
+    Enum.each([:failed, {:unknown, "provider-paused"}], fn status ->
+      job =
+        Imp.Clients.TrainingJob.new(%{
+          id: "malformed-nondestructive",
+          provider: :test,
+          status: status,
+          transport: transport,
+          cancel_url: "https://training.example/jobs/malformed-nondestructive/cancel",
+          cancel_body: :empty
+        })
+
+      compiled =
+        BetterTogether.new(metric(), %{
+          g: %GenericTrainingOptimizer{job: job, status: "job_created"}
+        })
+        |> BetterTogether.compile(program(), examples(), nil,
+          strategy: :g,
+          valset_ratio: 0,
+          training_cancellation_timeout: 25,
+          shuffle_trainset_between_steps: false
+        )
+
+      assert [
+               %{
+                 error:
+                   {:invalid_training_result_status, GenericTrainingOptimizer, "job_created",
+                    %{job_id: "malformed-nondestructive", status: ^status, metadata: %{}}}
+               }
+             ] = Imp.Optimizer.Report.fetch(compiled).errors
+    end)
+
+    refute_received {:unexpected_malformed_result_request, _}
+  end
+
   test "explicitly rejects a function-valued generic optimizer" do
     owner = self()
 
@@ -1066,7 +1198,21 @@ defmodule BetterTogetherTest do
     assert report.metadata.compilation_error_occurred
     assert report.metadata.selected_strategy == ""
 
-    assert [%{error: {:training_not_started, :trainer_required, _compiled}}] = report.errors
+    assert [
+             %{
+               error: {:training_not_started, :trainer_required},
+               diagnostics: %{
+                 "optimizer" => "bootstrap_finetune",
+                 "failure" => failure,
+                 "report" => bootstrap_report
+               }
+             }
+           ] = report.errors
+
+    assert failure["__imp_type__"] == "map"
+    assert bootstrap_report["candidate_count"] == length(examples())
+    assert length(bootstrap_report["candidates"]) == length(examples())
+    assert bootstrap_report["metadata"]["__imp_type__"] == "map"
 
     assert report.metadata.provider_training_semantics ==
              :bounded_await_and_atomic_rebind
@@ -1332,7 +1478,7 @@ defmodule BetterTogetherTest do
            id: "provider-cancelled",
            provider: :test,
            status: :cancelled,
-           metadata: %{reason: :provider_cancelled}
+           metadata: %{reason: :provider_cancelled, api_key: "diagnostic-secret-canary"}
          })}
 
       %{model: "running-base"}, _examples, _opts ->
@@ -1361,11 +1507,18 @@ defmodule BetterTogetherTest do
 
     assert [
              %{
+               diagnostics: diagnostics,
                error:
                  {:training_plan_failed, [%{job_id: "provider-cancelled", status: :cancelled}],
                   _jobs, [%{job_id: "running-peer", status: :cancelled, result: :ok}]}
              }
            ] = Imp.Optimizer.Report.fetch(compiled).errors
+
+    assert diagnostics["optimizer"] == "bootstrap_finetune"
+    assert diagnostics["report"]["candidate_count"] == length(examples())
+    assert diagnostics["report"]["errors"] != []
+    assert diagnostics["report"]["metadata"]["__imp_type__"] == "map"
+    refute diagnostics |> Jason.encode!() |> String.contains?("diagnostic-secret-canary")
   end
 
   test "the await deadline bounds a blocking provider refresh" do

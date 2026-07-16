@@ -4,6 +4,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
 
       mix imp.benchmark.overhead
 
+  Evidence capture requires a clean checkout by default. `--no-require-clean`
+  is available only for diagnostics; the dashboard rejects that dirty envelope.
+
   This benchmark deliberately excludes provider latency. It measures local
   library overhead for formatting, parsing, validation, evaluation, optimizer
   scheduling, redaction/serialization, cache, and concurrency paths.
@@ -14,6 +17,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
   @shortdoc "Run provider-free Imp-vs-DSPy overhead benchmarks"
 
   @default_out_dir Imp.BenchmarkTruth.Paths.runs("overhead")
+  @dspy_script "scripts/dspy_overhead_benchmark.py"
+  alias Imp.BenchmarkTruth.{ArtifactFile, OverheadPolicy, RunContext}
 
   @impl true
   def run(args) do
@@ -27,7 +32,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
           batch_size: :integer,
           out: :string,
           python: :string,
-          max_ratio: :float
+          require_clean: :boolean
         ]
       )
 
@@ -37,27 +42,43 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
     warmup = Keyword.get(opts, :warmup, 20)
     batch_size = Keyword.get(opts, :batch_size, 10)
     out_dir = Keyword.get(opts, :out, @default_out_dir)
-    max_ratio = Keyword.get(opts, :max_ratio, 5.0)
+    validate_positive!(:iterations, iterations)
+    validate_non_negative!(:warmup, warmup)
+    validate_positive!(:batch_size, batch_size)
     File.mkdir_p!(out_dir)
 
-    imp = imp_report(iterations, warmup, batch_size)
-    dspy = dspy_report(python(opts), out_dir, iterations, warmup, batch_size)
-    report = comparison_report(imp, dspy, max_ratio)
-    out_path = Path.join(out_dir, "overhead-parity-#{timestamp_slug()}.json")
-    File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
+    context =
+      RunContext.capture_git!(
+        require_clean: Keyword.get(opts, :require_clean, true),
+        inputs: %{
+          "protocol_id" => "provider_free_overhead_regression_guard_v2",
+          "iterations" => iterations,
+          "warmup" => warmup,
+          "batch_size" => batch_size,
+          "policy" => OverheadPolicy.budgets()
+        }
+      )
 
-    Mix.shell().info("overhead parity report: #{out_path}")
+    imp = imp_report(iterations, warmup, batch_size, context.environment)
+    dspy = dspy_report(python(opts), out_dir, iterations, warmup, batch_size)
+    report = comparison_report(imp, dspy)
+    out_path = Path.join(out_dir, "overhead-parity-#{timestamp_slug()}.json")
+
+    %{artifact: report, path: out_path} =
+      ArtifactFile.write_run_json!(out_path, report, context)
+
+    Mix.shell().info("overhead regression report: #{out_path}")
 
     Mix.shell().info(
       "overhead cases passing threshold: #{report["summary"]["passing"]}/#{report["summary"]["total"]}"
     )
 
     unless report["summary"]["all_passing"] do
-      Mix.raise("overhead parity failed; inspect #{out_path}")
+      Mix.raise("overhead regression guard failed; inspect #{out_path}")
     end
   end
 
-  defp imp_report(iterations, warmup, batch_size) do
+  defp imp_report(iterations, warmup, batch_size, environment) do
     cases = benchmark_cases()
 
     %{
@@ -68,6 +89,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
       "elixir" => System.version(),
       "otp" => System.otp_release(),
       "schedulers" => System.schedulers_online(),
+      "environment" => environment,
       "iterations" => iterations,
       "warmup" => warmup,
       "batch_size" => batch_size,
@@ -83,6 +105,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
     response = "[[ ## answer ## ]]\nParis"
     examples = Enum.map(1..8, &example/1)
     metric = Imp.Metrics.exact_match(:answer)
+    schema_signature = Imp.signature("text -> label: string, score: number")
+    schema_value = %{label: "ok", score: 1.0}
+    cache_hit_key = {:overhead_hit, :paired_lookup}
+    Imp.Cache.put(cache_hit_key, response)
 
     program =
       Imp.predict(signature,
@@ -100,7 +126,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
        end},
       {"adapter_parse", fn -> Imp.Adapter.Chat.parse(signature, response, []) end},
       {"schema_validate",
-       fn -> Imp.Schema.validate_fields(signature.outputs, %{answer: "Paris"}) end},
+       fn -> Imp.Schema.validate_fields(schema_signature.outputs, schema_value) end},
       {"evaluation_loop",
        fn -> examples |> Imp.Evaluate.new(metric) |> Imp.Evaluate.run(program) end},
       {"metric_normalization",
@@ -110,7 +136,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
        end},
       {"optimizer_trial_scheduling",
        fn ->
-         Imp.Optimizer.BootstrapFewShot.new(metric, max_bootstrapped_demos: 1)
+         Imp.Optimizer.BootstrapFewShot.new(metric,
+           max_bootstrapped_demos: 1,
+           max_labeled_demos: 1
+         )
          |> Imp.Optimizer.BootstrapFewShot.compile(program, Enum.take(examples, 2))
        end},
       {"trace_redaction_serialization",
@@ -123,11 +152,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
          |> Imp.Redaction.redact()
          |> Jason.encode!()
        end},
-      {"cache_hit",
-       fn ->
-         Imp.Cache.put(:overhead_hit, response)
-         Imp.Cache.get(:overhead_hit)
-       end},
+      {"cache_hit", fn -> Imp.Cache.get(cache_hit_key) end},
       {"cache_miss",
        fn ->
          key = {:overhead_miss, System.unique_integer([:positive])}
@@ -191,10 +216,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
   end
 
   defp dspy_report(python, out_dir, iterations, warmup, batch_size) do
+    verify_reference_script!()
     out_path = Path.join(out_dir, "dspy-overhead-#{timestamp_slug()}.json")
 
     args = [
-      "scripts/dspy_overhead_benchmark.py",
+      @dspy_script,
       "--iterations",
       to_string(iterations),
       "--warmup",
@@ -207,38 +233,43 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
 
     case System.cmd(python, args, stderr_to_stdout: true) do
       {_output, 0} ->
-        out_path |> File.read!() |> Jason.decode!()
+        report = out_path |> File.read!() |> Jason.decode!()
+        validate_reference_report!(report, iterations, warmup, batch_size)
+        report
 
       {output, status} ->
         Mix.raise("DSPy overhead benchmark failed with status #{status}:\n#{output}")
     end
   end
 
-  defp comparison_report(imp, dspy, max_ratio) do
-    imp_cases = Map.new(imp["cases"], &{&1["id"], &1})
-    dspy_cases = Map.new(dspy["cases"], &{&1["id"], &1})
+  defp comparison_report(imp, dspy) do
+    imp_cases = case_index!(imp["cases"], "Imp")
+    dspy_cases = case_index!(dspy["cases"], "DSPy")
 
     cases =
       imp_cases
       |> Map.keys()
       |> Enum.sort()
       |> Enum.map(fn id ->
-        compare_case(id, imp_cases[id], dspy_cases[id], max_ratio)
+        OverheadPolicy.evaluate!(id, imp_cases[id], Map.fetch!(dspy_cases, id))
       end)
 
     passing = Enum.count(cases, & &1["passing"])
 
     %{
-      "schema_version" => 1,
-      "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-      "git_sha" => git_sha(),
-      "max_ratio" => max_ratio,
+      "schema_version" => 2,
+      "runner" => "imp-dspy-overhead-regression-guard",
+      "policy" => %{
+        "id" => "named_per_operation_v1",
+        "ratios_are_measurements_not_speed_claims" => true,
+        "budgets" => OverheadPolicy.budgets()
+      },
       "summary" => %{
         "total" => length(cases),
         "passing" => passing,
         "all_passing" => passing == length(cases),
         "note" =>
-          "Provider-free overhead ratios compare local library work only; they do not measure model quality or provider latency."
+          "Named absolute and reference-relative budgets are regression guards. Ratios are measurements, not parity, superiority, or speed claims."
       },
       "imp" =>
         Map.take(imp, [
@@ -246,25 +277,22 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
           "elixir",
           "otp",
           "schedulers",
+          "environment",
           "iterations",
           "warmup",
           "batch_size"
         ]),
       "dspy" =>
-        Map.take(dspy, ["runner", "python", "dspy_version", "iterations", "warmup", "batch_size"]),
+        Map.take(dspy, [
+          "runner",
+          "python",
+          "dspy_version",
+          "environment",
+          "iterations",
+          "warmup",
+          "batch_size"
+        ]),
       "cases" => cases
-    }
-  end
-
-  defp compare_case(id, imp, dspy, max_ratio) do
-    ratio = Float.round(imp["median_us"] / max(dspy["median_us"], 0.001), 4)
-
-    %{
-      "id" => id,
-      "passing" => ratio <= max_ratio,
-      "median_ratio_imp_over_dspy" => ratio,
-      "imp" => imp,
-      "dspy" => dspy
     }
   end
 
@@ -284,6 +312,64 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
       _other -> nil
     end
   end
+
+  defp case_index!(cases, runtime) when is_list(cases) do
+    ids = Enum.map(cases, & &1["id"])
+    expected = OverheadPolicy.expected_case_ids()
+
+    unless length(ids) == length(Enum.uniq(ids)) and Enum.sort(ids) == expected do
+      Mix.raise(
+        "#{runtime} overhead case IDs must match exactly once: expected #{inspect(expected)}, got #{inspect(ids)}"
+      )
+    end
+
+    Map.new(cases, &{&1["id"], &1})
+  end
+
+  defp case_index!(_cases, runtime), do: Mix.raise("#{runtime} overhead cases must be a list")
+
+  defp verify_reference_script! do
+    actual =
+      @dspy_script
+      |> File.read!()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    unless actual == OverheadPolicy.script_sha256() do
+      Mix.raise(
+        "DSPy overhead script SHA-256 mismatch: expected #{OverheadPolicy.script_sha256()}, got #{actual}"
+      )
+    end
+  end
+
+  defp validate_reference_report!(report, iterations, warmup, batch_size) do
+    environment = report["environment"] || %{}
+
+    valid? =
+      report["runner"] == "python-dspy-overhead" and
+        report["dspy_version"] == OverheadPolicy.dspy_version() and
+        environment["script_sha256"] == OverheadPolicy.script_sha256() and
+        is_binary(environment["system"]) and is_binary(environment["machine"]) and
+        is_binary(environment["python_implementation"]) and
+        is_binary(environment["python_executable"]) and report["iterations"] == iterations and
+        report["warmup"] == warmup and report["batch_size"] == batch_size
+
+    unless valid? do
+      Mix.raise(
+        "DSPy overhead reference identity mismatch; expected DSPy #{OverheadPolicy.dspy_version()} and pinned script #{OverheadPolicy.script_sha256()}"
+      )
+    end
+  end
+
+  defp validate_positive!(_name, value) when is_integer(value) and value > 0, do: :ok
+
+  defp validate_positive!(name, value),
+    do: Mix.raise("#{name} must be a positive integer, got: #{inspect(value)}")
+
+  defp validate_non_negative!(_name, value) when is_integer(value) and value >= 0, do: :ok
+
+  defp validate_non_negative!(name, value),
+    do: Mix.raise("#{name} must be a non-negative integer, got: #{inspect(value)}")
 
   defp timestamp_slug do
     DateTime.utc_now()

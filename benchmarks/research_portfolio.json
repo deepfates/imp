@@ -309,7 +309,7 @@
       "id": "retrieval_tools_agents",
       "name": "Retrieval, tools, and agents",
       "claim_ids": [
-        "claim.rag_tools_agents.full"
+        "claim.rag_tools_agents.comparative_effectiveness"
       ],
       "capacity": "Imp programs retrieve the right evidence and execute typed tools through multi-step trajectories with quality and failure semantics comparable to DSPy.",
       "references": [

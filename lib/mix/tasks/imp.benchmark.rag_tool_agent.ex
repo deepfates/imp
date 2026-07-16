@@ -22,6 +22,11 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   @shortdoc "Run RAG/tool/agent parity and production-semantics checks"
 
   @default_out_dir Imp.BenchmarkTruth.Paths.runs("rag-tool-agent")
+  @fixture_path "test/fixtures/benchmarks/rag-tool-agent-provider-free.json"
+  @script_path "scripts/dspy_rag_tool_agent.py"
+  @task_path "lib/mix/tasks/imp.benchmark.rag_tool_agent.ex"
+  @authority_path "benchmarks/authority_sources/dspy-3.2.1-29448ae.json"
+  @provider_free_dspy_row_ids ["rag_memory_retrieval", "react_lookup_tool"]
   @live_row_ids ["live_rag_memory_retrieval", "live_mcp_lookup_tool"]
   @live_settings %{
     "temperature" => 0.0,
@@ -51,6 +56,28 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   end
 
   @doc false
+  def validate_artifact!(artifact, opts \\ []) when is_map(artifact) and is_list(opts) do
+    artifact = Imp.BenchmarkTruth.RunContext.verify!(artifact)
+
+    if Keyword.get(opts, :require_clean, true) and
+         get_in(artifact, ["run_context", "workspace", "state"]) != "clean" do
+      raise ArgumentError, "RAG/tool/agent evidence requires a clean source checkout"
+    end
+
+    unless get_in(artifact, ["run_context", "inputs"]) == source_bindings() do
+      raise ArgumentError, "RAG/tool/agent artifact source bindings are stale"
+    end
+
+    validate_dspy_source!(artifact["dspy"] || %{})
+
+    unless get_in(artifact, ["summary", "provider_free_contract_complete"]) == true do
+      raise ArgumentError, "RAG/tool/agent artifact lacks complete provider-free contracts"
+    end
+
+    artifact
+  end
+
+  @doc false
   def run_with_runners(args, runners) when is_list(args) and is_map(runners) do
     {opts, _argv, invalid} =
       OptionParser.parse(args,
@@ -64,7 +91,8 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
           env_file: :string,
           temperature: :float,
           max_tokens: :integer,
-          reasoning_effort: :string
+          reasoning_effort: :string,
+          require_clean: :boolean
         ]
       )
 
@@ -77,12 +105,23 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
     live = Keyword.get(opts, :live, false)
     live_config = if live, do: live_config!(opts), else: nil
 
+    run_context =
+      Imp.BenchmarkTruth.RunContext.capture_git!(
+        require_clean: Keyword.get(opts, :require_clean, false),
+        source_commits: %{
+          "dspy" => "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c"
+        },
+        inputs: source_bindings()
+      )
+
     imp = imp_report()
     imp = maybe_add_live_rows(imp, live_config, runners[:imp])
     dspy = dspy_report(python(opts), out_dir, live_config, runners[:dspy])
     report = comparison_report(imp, dspy)
     out_path = Path.join(out_dir, "rag-tool-agent-parity-#{timestamp_slug()}.json")
-    File.write!(out_path, Jason.encode!(report, pretty: true) <> "\n")
+
+    %{artifact: report, path: out_path} =
+      Imp.BenchmarkTruth.ArtifactFile.write_run_json!(out_path, report, run_context)
 
     Mix.shell().info("RAG/tool/agent parity report: #{out_path}")
 
@@ -210,6 +249,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       react_unknown_tool_error_row(),
       mcp_import_agent_row(),
       agent_policy_denial_row(),
+      react_v2_recovery_row(),
       code_act_row(),
       program_of_thought_row(),
       program_of_thought_sandbox_error_row(),
@@ -236,16 +276,17 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
         %{id: "beam", text: "BEAM runs lightweight Elixir processes."}
       ])
 
-    {:ok, [doc]} = Imp.Retrieve.retrieve(retriever, "What is France's capital?", k: 1)
-
-    lm = fn _messages, _opts ->
-      {:ok, %{answer: if(String.contains?(doc.text, "Paris"), do: "Paris", else: "unknown")}}
+    lm = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      {:ok, %{answer: if(String.contains?(prompt, "Paris"), do: "Paris", else: "unknown")}}
     end
 
-    program = Imp.predict("question, context -> answer", lm: lm)
+    program =
+      Imp.predict("question, context -> answer", lm: lm)
+      |> Imp.rag(retriever, k: 1)
 
-    {:ok, prediction} =
-      Imp.call(program, %{question: "What is France's capital?", context: doc.text})
+    {:ok, prediction} = Imp.call(program, %{question: "What is France's capital?"})
+    [retrieved_doc] = prediction.metadata.retrieval.docs
 
     answer = Imp.Prediction.get(prediction, :answer)
 
@@ -253,10 +294,16 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       "id" => "rag_memory_retrieval",
       "category" => "rag",
       "comparison_status" => "direct",
-      "passing" => answer == "Paris" and doc.text == "France capital: Paris.",
+      "passing" =>
+        answer == "Paris" and retrieved_doc.text == "France capital: Paris." and
+          prediction.metadata.retrieval.count == 1,
       "answer" => answer,
-      "retrieved" => [normalize(doc)],
-      "trace" => %{"retriever" => "Imp.Retrieve.Memory", "documents" => 1}
+      "retrieved" => [normalize(retrieved_doc)],
+      "trace" => %{
+        "program" => "Imp.Predict.RAG",
+        "retriever" => "Imp.Retrieve.Memory",
+        "documents" => prediction.metadata.retrieval.count
+      }
     }
   end
 
@@ -500,6 +547,81 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       "trace" => normalize(runtime.traces),
       "deviation" =>
         "Imp Agent tool policies are an Elixir production-runtime surface, not a direct DSPy primitive."
+    }
+  end
+
+  defp react_v2_recovery_row do
+    broken = Imp.tool(:broken, "always fails", fn _args -> raise "scripted failure" end)
+
+    {:ok, queue} =
+      Agent.start_link(fn ->
+        [
+          %{
+            tool_calls: [
+              %{id: "broken-1", name: "broken", arguments: %{}},
+              %{id: "unknown-1", name: "unknown", arguments: %{}}
+            ]
+          },
+          %{tool_calls: [%{id: "malformed-1", name: "submit", arguments: %{}}]},
+          %{tool_calls: [%{id: "submit-1", name: "submit", arguments: %{answer: "recovered"}}]}
+        ]
+      end)
+
+    lm = fn _messages, _opts ->
+      Agent.get_and_update(queue, fn [response | rest] -> {{:ok, response}, rest} end)
+    end
+
+    {:ok, prediction} =
+      Imp.react_v2("question -> answer", [broken], lm: lm, max_iters: 3)
+      |> Imp.call(%{question: "recover"})
+
+    Agent.stop(queue)
+
+    events = prediction |> Imp.get(:history) |> Map.fetch!(:messages)
+
+    trace =
+      Enum.map(events, fn event ->
+        %{
+          "call_ids" => Enum.map(event.tool_calls.tool_calls, & &1.id),
+          "results" =>
+            Enum.map(event.tool_call_results, fn result ->
+              %{"error" => result.error, "result" => normalize(result.result)}
+            end)
+        }
+      end)
+
+    expected = [
+      %{
+        "call_ids" => ["broken-1", "unknown-1"],
+        "results" => [
+          %{"error" => true, "result" => ["error", ["tool_error", "broken", "scripted failure"]]},
+          %{"error" => true, "result" => ["error", ["unknown_tool", "unknown"]]}
+        ]
+      },
+      %{
+        "call_ids" => ["malformed-1"],
+        "results" => [
+          %{"error" => true, "result" => ["error", ["missing_output_fields", ["answer"]]]}
+        ]
+      },
+      %{
+        "call_ids" => ["submit-1"],
+        "results" => [%{"error" => false, "result" => %{"answer" => "recovered"}}]
+      }
+    ]
+
+    %{
+      "id" => "react_v2_recovers_from_tool_and_submit_errors",
+      "category" => "agent_recovery",
+      "comparison_status" => "imp_only",
+      "passing" =>
+        Imp.get(prediction, :answer) == "recovered" and
+          Imp.get(prediction, :termination_reason) == :submit and trace == expected,
+      "answer" => Imp.get(prediction, :answer),
+      "trace" => trace,
+      "termination_reason" => to_string(Imp.get(prediction, :termination_reason)),
+      "deviation" =>
+        "BEAM-native ReActV2 recovery records failing, unknown, and malformed calls as observations before bounded successful submission."
     }
   end
 
@@ -959,16 +1081,47 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
   defp maybe_keyword(opts, _key, nil), do: opts
   defp maybe_keyword(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp validate_dspy_report!(report, nil) when is_map(report), do: :ok
+  defp validate_dspy_report!(%{"rows" => rows} = report, nil) when is_list(rows) do
+    validate_exact_rows!(rows, @provider_free_dspy_row_ids, "DSPy provider-free")
+    validate_dspy_source!(report)
+  end
 
   defp validate_dspy_report!(%{"rows" => rows}, _config) do
-    rows
-    |> Enum.filter(&(&1["id"] in @live_row_ids))
-    |> validate_live_rows!("DSPy")
+    validate_exact_rows!(
+      rows,
+      @provider_free_dspy_row_ids ++ @live_row_ids,
+      "DSPy live"
+    )
   end
 
   defp validate_dspy_report!(report, _config),
     do: Mix.raise("DSPy runner returned invalid report: #{inspect(report)}")
+
+  defp validate_exact_rows!(rows, expected_ids, runner) do
+    ids = Enum.map(rows, & &1["id"])
+
+    unless Enum.sort(ids) == Enum.sort(expected_ids) and length(ids) == length(Enum.uniq(ids)) do
+      Mix.raise(
+        "#{runner} rows must be exactly #{inspect(expected_ids)} with no duplicates, got: #{inspect(ids)}"
+      )
+    end
+
+    :ok
+  end
+
+  defp validate_dspy_source!(report) do
+    expected = provider_free_fixture()["dspy_authority"]
+    source = report["source"] || %{}
+
+    unless source["repository"] == expected["repository"] and
+             source["version"] == expected["version"] and
+             source["commit"] == expected["commit"] and
+             source["script_sha256"] == file_sha256!(@script_path) and
+             source["authority_sha256"] == file_sha256!(@authority_path) and
+             source["fixture_sha256"] == file_sha256!(@fixture_path) do
+      Mix.raise("DSPy provider-free report has stale or wrong source bindings")
+    end
+  end
 
   defp comparison_report(imp, dspy) do
     dspy_rows = Map.new(dspy["rows"], &{&1["id"], &1})
@@ -1000,12 +1153,14 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
         "direct_comparisons" => Enum.count(rows, &(&1["comparison_status"] == "direct")),
         "imp_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
         "provider_free_contract_complete" => provider_free_complete,
+        "bounded_provider_free_operational_contracts_complete" => provider_free_complete,
         "live_matched_behavior_complete" => live_complete,
         "full_rag_tool_agent_parity" => full,
+        "comparative_effectiveness_complete" => false,
         "note" => summary_note(live_complete)
       },
       "imp" => Map.take(imp, ["runner", "elixir", "otp", "git_sha"]),
-      "dspy" => Map.take(dspy, ["runner", "python", "dspy_version", "git_sha"]),
+      "dspy" => Map.take(dspy, ["runner", "python", "dspy_version", "git_sha", "source"]),
       "rows" => rows
     }
   end
@@ -1136,6 +1291,27 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
       {sha, 0} -> String.trim(sha)
       _other -> nil
     end
+  end
+
+  @doc false
+  def source_bindings do
+    %{
+      "protocol_id" => "rag_tool_agent_provider_free_v2",
+      "task_sha256" => file_sha256!(@task_path),
+      "script_sha256" => file_sha256!(@script_path),
+      "authority_path" => @authority_path,
+      "authority_sha256" => file_sha256!(@authority_path),
+      "fixture_path" => @fixture_path,
+      "fixture_sha256" => file_sha256!(@fixture_path),
+      "required_dspy_rows" => @provider_free_dspy_row_ids
+    }
+  end
+
+  defp provider_free_fixture, do: @fixture_path |> File.read!() |> Jason.decode!()
+
+  defp file_sha256!(path) do
+    "sha256:" <>
+      (path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower))
   end
 
   defp timestamp_slug do

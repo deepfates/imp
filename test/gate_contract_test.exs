@@ -74,11 +74,11 @@ defmodule GateContractTest do
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.failure_campaign.check") == [
-             "imp.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
+             "imp.benchmark.failure_campaign --iterations 10 --require-clean --out tmp/failure-campaign"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.overhead.check") == [
-             "imp.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+             "imp.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --require-clean --out tmp/overhead"
            ]
 
     assert Keyword.fetch!(aliases, :"benchmark.search.check") == [

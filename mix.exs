@@ -353,10 +353,10 @@ defmodule Imp.MixProject do
         "imp.benchmark.operations_stress --out tmp/operations-stress"
       ],
       "benchmark.failure_campaign.check": [
-        "imp.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign"
+        "imp.benchmark.failure_campaign --iterations 10 --require-clean --out tmp/failure-campaign"
       ],
       "benchmark.overhead.check": [
-        "imp.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --out tmp/overhead --max-ratio 50.0"
+        "imp.benchmark.overhead --iterations 30 --warmup 5 --batch-size 10 --require-clean --out tmp/overhead"
       ],
       "benchmark.search.check": [
         "imp.benchmark.search --iterations 10 --max-concurrency 2 --work-ms 10 --out tmp/search-benchmark"

@@ -172,6 +172,24 @@ defmodule AuthorityInventoryTest do
     assert pins["req_llm"]["commit"] == "33840077c2f1332eb6dff2d268dff02393014da4"
   end
 
+  test "mmGRPO implementation authority is DSPy source and DeepSeekMath is background only" do
+    family =
+      read_json!(@authority_path)["families"]
+      |> Enum.find(&(&1["id"] == "family.optimizer_weights"))
+
+    authorities = family["additional_primary_authorities"]
+
+    assert %{
+             "revision" => "29448ae12756abdd14bd8796c819247ebb83673c",
+             "surface" => "DSPy mmGRPO implementation contract",
+             "title" => "DSPy 3.2.1 mmGRPO"
+           } = Enum.find(authorities, &(&1["title"] == "DSPy 3.2.1 mmGRPO"))
+
+    deepseek = Enum.find(authorities, &String.starts_with?(&1["title"], "DeepSeekMath"))
+    assert deepseek["surface"] =~ "background only"
+    assert deepseek["surface"] =~ "not the Imp implementation authority"
+  end
+
   test "every claim inventory surface token is explicitly owned by a family" do
     ledger = read_json!(@authority_path)
     claims = read_json!(@claims_path)["claims"]

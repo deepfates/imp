@@ -9,6 +9,7 @@ import json
 import platform
 import statistics
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -17,6 +18,7 @@ from types import SimpleNamespace
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 import dspy
+from pydantic import BaseModel
 
 
 class QASignature(dspy.Signature):
@@ -38,6 +40,11 @@ class StaticLM(dspy.BaseLM):
             model=self.model,
             _hidden_params={},
         )
+
+
+class SchemaFixture(BaseModel):
+    label: str
+    score: float
 
 
 def main() -> int:
@@ -63,6 +70,15 @@ def main() -> int:
         "git_sha": git_sha(),
         "python": platform.python_version(),
         "dspy_version": getattr(dspy, "__version__", "unknown"),
+        "environment": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python_implementation": platform.python_implementation(),
+            "python_executable": str(Path(sys.executable).resolve()),
+            "script_sha256": file_sha256(__file__),
+        },
         "iterations": args.iterations,
         "warmup": args.warmup,
         "batch_size": args.batch_size,
@@ -83,8 +99,9 @@ def build_cases() -> Dict[str, Callable[[], Any]]:
     signature = QASignature
     adapter = dspy.ChatAdapter()
     response = "[[ ## answer ## ]]\nParis"
+    schema_value = {"label": "ok", "score": 1.0}
     examples = [dspy.Example(question=f"q{i}", answer="Paris").with_inputs("question") for i in range(8)]
-    metric = lambda example, pred, trace=None: str(pred.answer).strip() == example.answer
+    metric = dspy.evaluate.answer_exact_match
 
     def signature_parse() -> Any:
         return dspy.Signature("question -> answer")
@@ -96,7 +113,7 @@ def build_cases() -> Dict[str, Callable[[], Any]]:
         return adapter.parse(signature, response)
 
     def schema_validate() -> Any:
-        return adapter.parse(signature, response)
+        return SchemaFixture.model_validate(schema_value)
 
     def evaluation_loop() -> Any:
         evaluator = dspy.Evaluate(devset=examples, metric=metric, display_progress=False, max_errors=100)
@@ -107,7 +124,11 @@ def build_cases() -> Dict[str, Callable[[], Any]]:
         return [metric(example, pred) for example in examples]
 
     def optimizer_trial_scheduling() -> Any:
-        teleprompter = dspy.BootstrapFewShot(metric=metric, max_bootstrapped_demos=1, max_labeled_demos=1)
+        teleprompter = dspy.BootstrapFewShot(
+            metric=metric,
+            max_bootstrapped_demos=1,
+            max_labeled_demos=1,
+        )
         return teleprompter.compile(dspy.Predict(signature), trainset=examples[:2])
 
     def trace_redaction_serialization() -> Any:

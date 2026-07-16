@@ -2,9 +2,9 @@
   "schema_version": 1,
   "rule_resolution": "most_specific_match",
   "categories": {
-    "facade": {"callbacks": false, "types": false, "support": "facade"},
-    "stable": {"callbacks": false, "types": true, "support": "stable"},
-    "advanced": {"callbacks": false, "types": true, "support": "supported"},
+    "facade": {"callbacks": true, "types": true, "support": "facade"},
+    "stable": {"callbacks": true, "types": true, "support": "stable"},
+    "advanced": {"callbacks": true, "types": true, "support": "supported"},
     "spi": {"callbacks": true, "types": true, "support": "implementer"},
     "internal": {"callbacks": false, "types": false, "support": "excluded"}
   },
@@ -15,7 +15,12 @@
       "modules": [
         "Imp.Adapter",
         "Imp.Clients.Trainer",
+        "Imp.Confidence.Scoring",
+        "Imp.Embeddings",
+        "Imp.HTTP",
+        "Imp.LM",
         "Imp.Module",
+        "Imp.Optimizer",
         "Imp.Retrieve",
         "Imp.Tracking.Backend",
         "Imp.Tracking.Transport",
@@ -50,7 +55,6 @@
       "modules": [
         "Imp.AdapterParseError",
         "Imp.ContextWindowExceededError",
-        "Imp.HTTP",
         "Imp.LMError",
         "Imp.Retrieve.Memory"
       ],
@@ -100,7 +104,6 @@
         "Imp.Datasets.HotPotQA",
         "Imp.Datasets.MATH",
         "Imp.Optimize.Anything",
-        "Imp.Optimizer",
         "Imp.Optimizer.Artifact",
         "Imp.Optimizer.Avatar",
         "Imp.Optimizer.BetterTogether",
@@ -184,16 +187,5 @@
       ]
     }
   ],
-  "struct_fields": {
-    "Imp.Assertion": ["message", "name", "predicate"],
-    "Imp.Core.Message": ["content", "metadata", "role"],
-    "Imp.Evaluate.Result": ["errors", "rows", "score"],
-    "Imp.Example": ["demos", "fields", "input_keys"],
-    "Imp.Prediction": ["completions", "fields", "metadata", "score"],
-    "Imp.Signature": ["inputs", "instructions", "metadata", "outputs"],
-    "Imp.Signature.Field": ["desc", "kind", "metadata", "name", "prefix", "type"],
-    "Imp.Tool": ["description", "name", "run", "schema"],
-    "Imp.Tracking.Session": ["backends", "owner"]
-  },
   "export_exclusions": {}
 }

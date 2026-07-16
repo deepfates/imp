@@ -223,7 +223,7 @@
       "id": "family.tools_agents_react",
       "name": "Tools, MCP, ReAct, CodeAct, and ProgramOfThought",
       "kind": "algorithm",
-      "surface_tokens": ["react", "tools", "agents", "mcp", "code_act", "program_of_thought", "mcp_protocol"],
+      "surface_tokens": ["react", "react_v2", "tools", "agents", "mcp", "code_act", "program_of_thought", "mcp_protocol"],
       "upstream_surface_ids": ["tools.typed_calls", "agents.react_family"],
       "coverage_matrix_concepts": ["ReAct/provider tool loop", "Program of Thought", "CodeAct", "Tools with schema validation", "Tool-call primitives and provider-native function calls", "Agents, child agents, policies, traces", "MCP in-process import", "MCP HTTP, stdio, Streamable HTTP transports", "RAG/tool/agent parity lane", "Python-side code execution for PoT/CodeAct"],
       "parity_lanes": ["Lane 4: RAG, Tools, Agents, and Production Semantics"],
@@ -354,12 +354,13 @@
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},
       "additional_primary_authorities": [
         {"surface": "BetterTogether and BootstrapFinetune composition", "locator": "https://arxiv.org/abs/2407.10930v2", "revision": "v2", "title": "Fine-Tuning and Prompt Optimization: Two Great Steps that Work Better Together"},
-        {"surface": "GRPO algorithm", "locator": "https://arxiv.org/abs/2402.03300v3", "revision": "v3", "title": "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models"}
+        {"surface": "DSPy mmGRPO implementation contract", "locator": "https://github.com/stanfordnlp/dspy/blob/29448ae12756abdd14bd8796c819247ebb83673c/dspy/teleprompt/grpo.py", "revision": "29448ae12756abdd14bd8796c819247ebb83673c", "title": "DSPy 3.2.1 mmGRPO"},
+        {"surface": "GRPO algorithm background only; not the Imp implementation authority", "locator": "https://arxiv.org/abs/2402.03300v3", "revision": "v3", "title": "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models"}
       ],
       "upstream_tests": {"status": "partial", "references": ["tests/teleprompt/test_bootstrap_finetune.py#sha256=2e96b40f24ec9633139e6a6ed19f0ffc4add95fb82d88779a1b54b705927f4f3", "tests/teleprompt/test_grpo.py#sha256=29a8d0e827e90ff199c207fa1cd97f7fe4f0a54b25a41a68b9b26b718ab43d32", "tests/teleprompt/test_bettertogether.py#sha256=b6869bb8edfbcebe5efcf3e3c075fe4ef1c47ea97059e4b8cd80ca17dd06e9a8", "tests/teleprompt/test_ensemble.py#sha256=280a644c4469d22d32720f2f925cb45c65e6e5305d7e84c10c5dcab69ad78fbb", "No dedicated Avatar/AvatarOptimizer test was found in the pinned tree."]},
       "dataset_protocol": {"status": "partial", "references": ["provider-compatible local training protocol", "benchmarks/data/provider-training-banking77-v1.json"], "immutable_digests": ["sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f"]},
       "local_differential": {"status": "partial", "artifacts": ["benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json"]},
-      "notes": "There is no single primary authority for this composite DSPy family. BetterTogether/BootstrapFinetune composition and GRPO are pinned separately; Avatar and Ensemble are source-defined. The pinned local MLX campaign proves scoped weight-training effectiveness and fused-program rebinding, but not paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."
+      "notes": "There is no single primary authority for this composite DSPy family. BetterTogether/BootstrapFinetune composition and DSPy 3.2.1 mmGRPO are pinned separately; DeepSeekMath is algorithmic background only, not the Imp GRPO implementation authority; Avatar and Ensemble are source-defined. The pinned local MLX campaign proves scoped weight-training effectiveness and fused-program rebinding, but not paid-provider, BetterTogether, mmGRPO, or DSPy-matched training parity."
     },
     {
       "id": "family.optimizer_fast_slow",
@@ -402,9 +403,9 @@
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.2.1", "git_ref": "refs/tags/3.2.1", "commit": "29448ae12756abdd14bd8796c819247ebb83673c", "source_paths": ["dspy/retrievers", "dspy/datasets"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json", "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a", "file_count": 296}},
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},
       "upstream_tests": {"status": "present", "references": ["tests/retrievers/test_embeddings.py#sha256=d816116542cecec27f1c1483edfaf22729a2724f97a5ea17c121d3dbe7794b59", "tests/datasets/test_dataset.py#sha256=15c4bb41c0df7039518b407738d2be2f85f579cddd9e262ff65d32c7feb8157e"]},
-      "dataset_protocol": {"status": "partial", "references": ["test/fixtures/benchmarks/hotpotqa-small.jsonl"], "immutable_digests": []},
-      "local_differential": {"status": "present", "artifacts": ["benchmarks/results/rag-tool-agent-parity-*.json"]},
-      "notes": "External retrieval engines are protocol dependencies; embedded ColBERT is intentionally omitted."
+      "dataset_protocol": {"status": "pinned", "references": ["benchmarks/config/hotpotqa-shared-retrieval-v1.json", "benchmarks/data/hotpotqa-validation-0-10.jsonl", "benchmarks/data/hotpotqa-validation-0-10.manifest.json", "benchmarks/data/HOTPOTQA_ATTRIBUTION.md"], "immutable_digests": ["sha256:81d400e2d795605b7e01af0025806c363ac0df3bb8225785fef51e905120e22b", "sha256:636fa4c398c9f6a633533ef8b4b3734377ba08786f40bd7b6a9427ecc13b62f3", "sha256:5bf0304f018c572cc0079214550465f400aa6771fef28672ce3b477dabaf2947", "sha256:d7f7dddde04129b774dcb3300726b75ab565c16a4a9df03177e53ca53cae76a3"]},
+      "local_differential": {"status": "present", "artifacts": ["mix imp.benchmark.hotpot_retrieval", "benchmarks/results/rag-tool-agent-parity-*.json"]},
+      "notes": "The pinned ten-row HotPotQA differential compares shared-corpus document IDs, top-k context, supporting-fact recall, and extractive answer availability without a provider. It is bounded C2 evidence, not model-generation quality or full HotPotQA effectiveness. External retrieval engines remain protocol dependencies; embedded ColBERT is intentionally omitted."
     },
     {
       "id": "family.runtime_performance",
@@ -412,7 +413,7 @@
       "kind": "runtime",
       "surface_tokens": ["streaming", "async", "cache", "concurrency", "signature_parse", "optimizer_scheduling", "redaction"],
       "upstream_surface_ids": ["runtime.async_stream_cache", "runtime.observability"],
-      "coverage_matrix_concepts": ["Streaming", "Async/concurrency", "Cache", "Telemetry and observability", "Provider-free overhead parity lane"],
+      "coverage_matrix_concepts": ["Streaming", "Async/concurrency", "Cache", "Telemetry and observability", "Provider-free overhead regression lane"],
       "parity_lanes": ["Lane 5: Provider-Free Performance"],
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.2.1", "git_ref": "refs/tags/3.2.1", "commit": "29448ae12756abdd14bd8796c819247ebb83673c", "source_paths": ["dspy/utils", "dspy/streaming", "dspy/clients/cache.py", "dspy/utils/inspect_history.py", "dspy/utils/callback.py"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json", "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a", "file_count": 296}},
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},

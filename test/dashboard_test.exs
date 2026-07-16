@@ -62,14 +62,7 @@ defmodule DashboardTest do
       }
     })
 
-    write_json!(Path.join(overhead_dir, "overhead-parity-20260707T000000Z.json"), %{
-      "schema_version" => 1,
-      "generated_at" => "2026-07-07T00:00:00Z",
-      "git_sha" => "abc",
-      "max_ratio" => 50.0,
-      "summary" => %{"total" => 1, "passing" => 1, "all_passing" => true},
-      "cases" => [%{"id" => "adapter_parse", "median_ratio_imp_over_dspy" => 0.5}]
-    })
+    write_overhead_artifact!(overhead_dir)
 
     write_json!(Path.join(optimizer_dir, "optimizer-lift-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -125,22 +118,10 @@ defmodule DashboardTest do
       "rows" => gepa_rows()
     })
 
-    write_json!(Path.join(rag_tool_agent_dir, "rag-tool-agent-parity-20260707T000000Z.json"), %{
-      "schema_version" => 1,
-      "generated_at" => "2026-07-07T00:00:00Z",
-      "git_sha" => "abc",
-      "summary" => %{
-        "total" => 15,
-        "passing" => 15,
-        "all_passing" => true,
-        "direct_comparisons" => 4,
-        "imp_only_or_deviation" => 11,
-        "provider_free_contract_complete" => true,
-        "live_matched_behavior_complete" => true,
-        "full_rag_tool_agent_parity" => true
-      },
-      "rows" => rag_tool_agent_rows()
-    })
+    write_json!(
+      Path.join(rag_tool_agent_dir, "rag-tool-agent-parity-20260707T000000Z.json"),
+      source_bound_rag_tool_agent_artifact()
+    )
 
     write_json!(Path.join(rlm_dir, "rlm-benchmark-parity-20260707T000000Z.json"), %{
       "schema_version" => 1,
@@ -368,6 +349,7 @@ defmodule DashboardTest do
              "live_matched_model",
              "live_provider_smoke",
              "optimize_anything",
+             "rag_tool_agent",
              "rlm_benchmark"
            ]
 
@@ -384,7 +366,7 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["total"] ==
              length(dashboard["claims"]["claims"])
 
-    assert dashboard["claims"]["summary"]["blocked"] == 6
+    assert dashboard["claims"]["summary"]["blocked"] == 7
     assert dashboard["claims"]["summary"]["informational"] == 1
 
     proven_claim_ids =
@@ -403,7 +385,7 @@ defmodule DashboardTest do
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
-             "claim.rag_tools_agents.full"
+             "claim.rag_tools_agents.provider_free_operational"
            ] -- proven_claim_ids == []
 
     assert dashboard["lanes"]["product_package"]["status"] == "full"
@@ -431,6 +413,8 @@ defmodule DashboardTest do
              {"claim.gepa_replication.full", ["gepa_replication.full"]},
              {"claim.optimize_anything.non_prompt_effectiveness",
               ["optimize_anything.non_prompt.full"]},
+             {"claim.rag_tools_agents.comparative_effectiveness",
+              ["rag_tool_agent.comparative_effectiveness"]},
              {"claim.rlm.provider_free_benchmark", ["rlm_benchmark.full"]},
              {"claim.failure_recovery.live",
               [
@@ -595,7 +579,7 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_families"] == []
     assert dashboard["lanes"]["gepa_replication"]["summary"]["missing_fields"] != []
 
-    assert dashboard["lanes"]["rag_tool_agent"]["status"] == "full"
+    assert dashboard["lanes"]["rag_tool_agent"]["status"] == "sample"
 
     error =
       assert_raise Mix.Error, fn ->
@@ -1322,7 +1306,8 @@ defmodule DashboardTest do
              "local_mlx_weight_training",
              "optimize_anything",
              "product_package",
-             "protocol_gates"
+             "protocol_gates",
+             "rag_tool_agent"
            ]
 
     refute Enum.any?(dashboard["claims"]["claims"], &(&1["release"] == "telos"))
@@ -1377,6 +1362,21 @@ defmodule DashboardTest do
            ]
   end
 
+  test "failure recovery authority rejects a current-revision dirty workspace envelope" do
+    root = tmp_dir("dashboard-failure-dirty-workspace")
+    failure_dir = Path.join(root, "failure")
+    out_dir = Path.join(root, "out")
+    Enum.each([failure_dir, out_dir], &File.mkdir_p!/1)
+
+    write_failure_campaign!(failure_dir, workspace_state: "dirty")
+    dashboard = run_failure_dashboard!(root, "dirty-out", failure_dir)
+    lane = dashboard["lanes"]["failure_recovery"]
+
+    refute lane["passing"]
+    refute lane["summary"]["authority"]["deterministic_complete"]
+    refute lane["summary"]["authority"]["workspace_clean"]
+  end
+
   test "current-git-bound deterministic evidence bypasses age but live evidence stays strict" do
     root = tmp_dir("dashboard-freshness-policy")
     gate_dir = Path.join(root, "gate")
@@ -1407,14 +1407,7 @@ defmodule DashboardTest do
 
     write_failure_campaign!(failure_dir, generated_at: old, git_sha: current_sha)
 
-    write_json!(Path.join(overhead_dir, "overhead-parity-old.json"), %{
-      "schema_version" => 1,
-      "generated_at" => DateTime.to_iso8601(old),
-      "git_sha" => current_sha,
-      "max_ratio" => 50.0,
-      "summary" => %{"total" => 1, "passing" => 1, "all_passing" => true},
-      "cases" => [%{"id" => "adapter_parse", "median_ratio_imp_over_dspy" => 0.5}]
-    })
+    write_overhead_artifact!(overhead_dir, generated_at: old, git_sha: current_sha)
 
     capture_io(fn ->
       Mix.Task.reenable("imp.benchmark.dashboard")
@@ -1453,9 +1446,41 @@ defmodule DashboardTest do
     assert failure_lane["fresh"]
 
     overhead_lane = dashboard["lanes"]["provider_free_overhead"]
-    assert overhead_lane["status"] == "stale"
-    refute overhead_lane["full_evidence"]
-    refute dashboard["provider_free_overhead_regression_guard_passed"]
+    assert overhead_lane["status"] == "full"
+    assert overhead_lane["full_evidence"]
+    assert dashboard["provider_free_overhead_regression_guard_passed"]
+  end
+
+  test "overhead authority requires a clean current-source run envelope" do
+    root = tmp_dir("dashboard-overhead-workspace")
+    overhead_dir = Path.join(root, "overhead")
+    out_dir = Path.join(root, "out")
+    Enum.each([overhead_dir, out_dir], &File.mkdir_p!/1)
+    write_overhead_artifact!(overhead_dir, workspace_state: "dirty")
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--overhead-dir",
+        overhead_dir,
+        "--out",
+        out_dir
+      ])
+    end)
+
+    [dashboard_path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+
+    lane =
+      dashboard_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> get_in(["lanes", "provider_free_overhead"])
+
+    refute lane["passing"]
+    refute lane["full_evidence"]
+    refute lane["candidate_eligibility"]["eligible"]
+    assert "workspace_not_clean" in lane["candidate_eligibility"]["rejection_reasons"]
   end
 
   test "wrong-revision gate evidence is not selected as a lane artifact" do
@@ -1622,6 +1647,69 @@ defmodule DashboardTest do
   end
 
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
+
+  defp write_overhead_artifact!(dir, opts \\ []) do
+    budgets = Imp.BenchmarkTruth.OverheadPolicy.budgets()
+
+    cases =
+      Enum.map(budgets, fn {id, _budget} ->
+        Imp.BenchmarkTruth.OverheadPolicy.evaluate!(
+          id,
+          %{"median_us" => 1.0},
+          %{"median_us" => 2.0}
+        )
+      end)
+
+    clock = fn -> Keyword.get(opts, :generated_at, DateTime.utc_now()) end
+    source_sha = Keyword.get(opts, :git_sha, dashboard_git_sha())
+
+    context =
+      Imp.BenchmarkTruth.RunContext.new!(
+        source_commits: %{"imp" => "deepfates/imp@#{source_sha}"},
+        workspace_state: Keyword.get(opts, :workspace_state, "clean"),
+        inputs: %{
+          "protocol_id" => "provider_free_overhead_regression_guard_v2",
+          "policy" => budgets
+        },
+        clock: clock
+      )
+
+    artifact = %{
+      "schema_version" => 2,
+      "runner" => "imp-dspy-overhead-regression-guard",
+      "policy" => %{
+        "id" => "named_per_operation_v1",
+        "ratios_are_measurements_not_speed_claims" => true,
+        "budgets" => budgets
+      },
+      "summary" => %{
+        "total" => length(cases),
+        "passing" => length(cases),
+        "all_passing" => true
+      },
+      "imp" => %{"environment" => context.environment},
+      "dspy" => %{
+        "runner" => "python-dspy-overhead",
+        "dspy_version" => Imp.BenchmarkTruth.OverheadPolicy.dspy_version(),
+        "environment" => %{
+          "system" => "test-system",
+          "release" => "test-release",
+          "machine" => "test-machine",
+          "python_implementation" => "CPython",
+          "python_executable" => "/test/python",
+          "script_sha256" => Imp.BenchmarkTruth.OverheadPolicy.script_sha256()
+        }
+      },
+      "cases" => cases
+    }
+
+    path = Path.join(dir, "overhead-parity-test.json")
+
+    %{path: written_path} =
+      Imp.BenchmarkTruth.ArtifactFile.write_run_json!(path, artifact, context)
+
+    written_path
+  end
 
   defp run_failure_dashboard!(root, out_name, failure_dir) do
     out_dir = Path.join(root, out_name)
@@ -1803,7 +1891,7 @@ defmodule DashboardTest do
     context =
       Imp.BenchmarkTruth.RunContext.new!(
         source_commits: %{"imp" => "deepfates/imp@#{source_sha}"},
-        workspace_state: "synthetic",
+        workspace_state: Keyword.get(opts, :workspace_state, "clean"),
         clock: clock
       )
 
@@ -1856,38 +1944,53 @@ defmodule DashboardTest do
 
   defp failure_live_evidence("provider_retry_timeout_idempotency_live"),
     do: %{
-      "provider" => "openai",
-      "model" => "gpt-test",
+      "provider" => "local_injected_transport",
+      "model" => "local-fixture",
       "attempts" => 2,
       "max_attempts" => 2,
-      "injected_status" => 429,
+      "injected_timeout" => true,
+      "timeout_reason" => "timeout",
       "terminal_status" => 200,
       "idempotency_header_stable" => true,
-      "usage" => %{"input_tokens" => 1, "output_tokens" => 1},
-      "cost" => %{}
+      "attempt_timeout_ms" => 25,
+      "deadline_ms" => 200,
+      "elapsed_ms" => 25,
+      "canary_sha256" => "sha256:dummy",
+      "canary_included" => false
     }
 
   defp failure_live_evidence("retrieval_and_tool_agent_recovery_live"),
     do: %{
-      "provider" => "openai",
-      "model" => "gpt-test",
+      "provider" => "local_static_lm",
+      "model" => "local-fixture",
       "retrieval_attempts" => 2,
       "retrieval_injected_error" => "closed",
-      "retrieval_terminal_network" => "httpbin.org",
-      "tool_calls" => 1,
-      "submit_calls" => 1
+      "retrieval_terminal_network" => "local_injected_transport",
+      "tool_attempts" => 2,
+      "tool_failures" => 1,
+      "tool_successes" => 1,
+      "submit_calls" => 1,
+      "deadline_ms" => 1_000,
+      "elapsed_ms" => 10,
+      "canary_sha256" => "sha256:dummy",
+      "canary_included" => false,
+      "history" => [
+        %{"tool" => "lookup", "result" => "transient_local_failure"},
+        %{"tool" => "lookup", "result" => "pong"},
+        %{"tool" => "submit", "result" => "completed"}
+      ]
     }
 
   defp failure_live_checks("provider_retry_timeout_idempotency_live") do
     Enum.map(
-      ~w(repeated_zero_flakes runtime_leak_free real_provider_terminal_success bounded_retry_after_injected_429 stable_idempotency_key positive_provider_usage),
+      ~w(repeated_zero_flakes runtime_leak_free local_provider_terminal_success bounded_injected_timeout stable_idempotency_key dummy_canary_absent),
       &%{"id" => &1, "passing" => true}
     )
   end
 
   defp failure_live_checks("retrieval_and_tool_agent_recovery_live") do
     Enum.map(
-      ~w(repeated_zero_flakes runtime_leak_free live_retrieval_recovered provider_backed_tool_agent_completed),
+      ~w(repeated_zero_flakes runtime_leak_free live_retrieval_recovered recoverable_tool_failure_retry_submit),
       &%{"id" => &1, "passing" => true}
     )
   end
@@ -1940,6 +2043,58 @@ defmodule DashboardTest do
     path
   end
 
+  defp source_bound_rag_tool_agent_artifact do
+    {revision, 0} = System.cmd("git", ["rev-parse", "HEAD"])
+    revision = String.trim(revision)
+
+    source = %{
+      "repository" => "stanfordnlp/dspy",
+      "version" => "3.2.1",
+      "commit" => "29448ae12756abdd14bd8796c819247ebb83673c",
+      "script_sha256" => sha256_file("scripts/dspy_rag_tool_agent.py"),
+      "authority_sha256" => sha256_file("benchmarks/authority_sources/dspy-3.2.1-29448ae.json"),
+      "fixture_sha256" =>
+        sha256_file("test/fixtures/benchmarks/rag-tool-agent-provider-free.json")
+    }
+
+    rows = rag_tool_agent_rows()
+
+    artifact = %{
+      "schema_version" => 1,
+      "summary" => %{
+        "total" => length(rows),
+        "passing" => length(rows),
+        "all_passing" => true,
+        "direct_comparisons" => 4,
+        "imp_only_or_deviation" => 12,
+        "provider_free_contract_complete" => true,
+        "bounded_provider_free_operational_contracts_complete" => true,
+        "live_matched_behavior_complete" => true,
+        "full_rag_tool_agent_parity" => true,
+        "comparative_effectiveness_complete" => false
+      },
+      "dspy" => %{"source" => source},
+      "rows" => rows
+    }
+
+    context =
+      Imp.BenchmarkTruth.RunContext.new!(
+        source_commits: %{
+          "imp" => "deepfates/imp@#{revision}",
+          "dspy" => "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c"
+        },
+        workspace_state: "clean",
+        inputs: Mix.Tasks.Imp.Benchmark.RagToolAgent.source_bindings()
+      )
+
+    Imp.BenchmarkTruth.RunContext.finish(context, artifact)
+  end
+
+  defp sha256_file(path) do
+    "sha256:" <>
+      (path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower))
+  end
+
   defp rag_tool_agent_rows do
     provider_free_ids = ~w(
       rag_memory_retrieval
@@ -1949,6 +2104,7 @@ defmodule DashboardTest do
       react_unknown_tool_error_trace
       mcp_import_agent_trace
       agent_tool_policy_denial
+      react_v2_recovers_from_tool_and_submit_errors
       code_act_tool_program
       program_of_thought_safe_eval
       program_of_thought_rejects_unsafe_remote_call

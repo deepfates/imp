@@ -3,7 +3,10 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
   Run the repeated failure and recovery campaign.
 
       mix imp.benchmark.failure_campaign --iterations 10 --out tmp/failure-campaign
-      mix imp.benchmark.failure_campaign --live --live-iterations 2 --model gpt-4.1-mini
+      mix imp.benchmark.failure_campaign --live --live-iterations 2 --require-clean
+
+  The `--live` rows use only local injected transports and a static LM. They
+  never contact an external provider or service.
   """
 
   use Mix.Task
@@ -38,7 +41,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
 
     run_context =
       Imp.BenchmarkTruth.RunContext.capture_git!(
-        require_clean: Keyword.get(opts, :require_clean, false),
+        require_clean: Keyword.get(opts, :require_clean, true),
         inputs: %{
           "protocol_id" => "failure_campaign",
           "iterations" => Keyword.get(opts, :iterations, 10),
@@ -47,14 +50,10 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
           "live" => live?,
           "live_iterations" => Keyword.get(opts, :live_iterations, 2),
           "live_timeout_ms" => Keyword.get(opts, :live_timeout_ms, 30_000),
-          "model" => Keyword.get(opts, :model, "gpt-4.1-mini"),
-          "agent_model" =>
-            Keyword.get(opts, :agent_model, Keyword.get(opts, :model, "gpt-4.1-mini"))
+          "authority" => "local_injected_transport",
+          "external_network" => false
         }
       )
-
-    api_key_env = Keyword.get(opts, :api_key_env, "OPENAI_API_KEY")
-    api_key = if live?, do: System.get_env(api_key_env) || Mix.raise("#{api_key_env} is required")
 
     artifact =
       Imp.BenchmarkTruth.FailureCampaign.run(
@@ -64,16 +63,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
         live: live?,
         live_iterations: Keyword.get(opts, :live_iterations, 2),
         live_timeout_ms: Keyword.get(opts, :live_timeout_ms, 30_000),
-        api_key: api_key,
-        secrets: if(api_key, do: [api_key], else: []),
-        model: Keyword.get(opts, :model, "gpt-4.1-mini"),
-        agent_model: Keyword.get(opts, :agent_model, Keyword.get(opts, :model, "gpt-4.1-mini")),
-        base_url:
-          Keyword.get(
-            opts,
-            :base_url,
-            System.get_env("OPENAI_BASE_URL") || "https://api.openai.com/v1"
-          )
+        secrets: []
       )
 
     out_dir = Keyword.get(opts, :out, Imp.BenchmarkTruth.Paths.runs("failure-recovery"))

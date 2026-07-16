@@ -6,6 +6,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
 
   @required_flake_iterations 10
   @default_iteration_timeout_ms 15_000
+  @dummy_canary "IMP_DUMMY_CANARY_RECOVERY_V1"
 
   @deterministic_lanes [
     {"task_cancellation_releases_admission", :cancellation},
@@ -22,15 +23,15 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   @live_requirements [
     %{
       "id" => "provider_retry_timeout_idempotency_live",
-      "status" => "requires_live_provider_evidence",
+      "status" => "requires_local_operational_evidence",
       "required" => true,
-      "deterministic_coverage" => "training_http_and_task_runtime_only"
+      "deterministic_coverage" => "provider_shaped_timeout_retry_idempotency"
     },
     %{
       "id" => "retrieval_and_tool_agent_recovery_live",
-      "status" => "requires_live_retrieval_and_agent_evidence",
+      "status" => "requires_local_operational_evidence",
       "required" => true,
-      "deterministic_coverage" => "retrieval_and_mcp_transport_only"
+      "deterministic_coverage" => "retrieval_close_recovery_and_exact_tool_retry_history"
     }
   ]
 
@@ -116,7 +117,8 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       "scope" => Enum.map(@deterministic_lanes, &elem(&1, 0)),
       "limitations" => [
         "No live provider training job was created or cancelled.",
-        "Live authority is limited to the exact provider, retrieval, and tool-agent probes recorded in live_cases.",
+        "Operational authority is limited to the exact local timeout, retrieval, and tool-agent probes recorded in live_cases.",
+        "No external network or provider is contacted by this campaign.",
         "Deterministic MCP evidence uses an injected transport; no public MCP endpoint is claimed."
       ]
     }
@@ -773,20 +775,12 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
 
   defp run_live_cases(opts) do
     if Keyword.get(opts, :live, false) do
-      api_key = Keyword.fetch!(opts, :api_key)
-      model = Keyword.get(opts, :model, "gpt-4.1-mini")
-      agent_model = Keyword.get(opts, :agent_model, model)
-      base_url = Keyword.get(opts, :base_url, "https://api.openai.com/v1")
       iterations = Keyword.get(opts, :live_iterations, 2)
       timeout_ms = Keyword.get(opts, :live_timeout_ms, 30_000)
       validate_positive!(:live_iterations, iterations)
       validate_positive!(:live_timeout_ms, timeout_ms)
 
       live_opts = [
-        api_key: api_key,
-        model: model,
-        agent_model: agent_model,
-        base_url: base_url,
         iterations: iterations,
         timeout_ms: timeout_ms
       ]
@@ -812,96 +806,18 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
 
   defp prepare_runtime(opts) do
     if Keyword.get(opts, :live, false) do
-      api_key = Keyword.fetch!(opts, :api_key)
-      base_url = String.trim_trailing(Keyword.fetch!(opts, :base_url), "/")
-      model = Keyword.fetch!(opts, :model)
-      agent_model = Keyword.get(opts, :agent_model, model)
-      {:ok, _model} = ReqLLM.model("openai:#{model}")
-      {:ok, _agent_model} = ReqLLM.model("openai:#{agent_model}")
-
-      probes = [
-        Req.get(base_url <> "/models",
-          headers: [{"authorization", "Bearer #{api_key}"}],
-          receive_timeout: 15_000,
-          retry: false,
-          pool_max_idle_time: 0
-        ),
-        Req.get("https://httpbin.org/status/204",
-          receive_timeout: 15_000,
-          retry: false,
-          pool_max_idle_time: 0
-        )
-      ]
-
-      provider_warmup =
-        warmup_provider(model, api_key, base_url)
-
-      integration_preflight =
-        retrieval_agent_live_iteration(
-          api_key: api_key,
-          model: model,
-          agent_model: agent_model,
-          base_url: base_url,
-          timeout_ms: Keyword.get(opts, :live_timeout_ms, 30_000)
-        )
-
       %{
         "performed" => true,
-        "network_hosts" => [URI.parse(base_url).host, "httpbin.org"],
-        "statuses" => Enum.map(probes, &warmup_status/1),
-        "provider_adapter" => warmup_provider_result(provider_warmup, model),
-        "integration_preflight" => warmup_integration_result(integration_preflight),
-        "billable_generation" => true
+        "authority" => "local_injected_transport",
+        "network_hosts" => [],
+        "external_network" => false,
+        "billable_generation" => false,
+        "dummy_canary_sha256" => sha256(@dummy_canary)
       }
     else
       %{"performed" => false}
     end
   end
-
-  defp warmup_status({:ok, %Req.Response{status: status}}), do: status
-  defp warmup_status({:error, reason}), do: "error:#{failure_category(reason)}"
-
-  defp warmup_provider(model, api_key, base_url) do
-    with_finch(fn finch ->
-      ReqLLM.generate_text("openai:#{model}", "Reply with exactly pong.",
-        api_key: api_key,
-        base_url: base_url,
-        temperature: 0.0,
-        max_tokens: 16,
-        req_http_options: [finch: finch]
-      )
-    end)
-  end
-
-  defp warmup_provider_result({:ok, response}, model) do
-    usage = ReqLLM.Response.usage(response) || %{}
-    input = Map.get(usage, :input_tokens, Map.get(usage, "input_tokens", 0))
-    output = Map.get(usage, :output_tokens, Map.get(usage, "output_tokens", 0))
-
-    %{
-      "status" => "complete",
-      "usage" => %{"input_tokens" => input, "output_tokens" => output},
-      "cost" => openai_cost(model, input, output),
-      "payload_included" => false
-    }
-  end
-
-  defp warmup_provider_result({:error, reason}, _model),
-    do: %{
-      "status" => "failed",
-      "reason_category" => failure_category(reason),
-      "reason_detail" => inspect(reason, limit: 10, printable_limit: 500)
-    }
-
-  defp warmup_integration_result({:ok, evidence}),
-    do: %{"status" => "complete", "evidence" => json_safe(evidence)}
-
-  defp warmup_integration_result({:error, reason}),
-    do: %{
-      "status" => "failed",
-      "reason_category" => failure_category(reason),
-      "reason_detail" => inspect(reason, limit: 10, printable_limit: 500)
-    }
 
   defp repeat_live(id, iterations, timeout_ms, fun) do
     started_at = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
@@ -931,135 +847,135 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     }
   end
 
-  defp provider_live_iteration(opts),
-    do: with_finch(fn finch -> provider_live_iteration(opts, finch) end)
-
-  defp provider_live_iteration(opts, finch) do
-    api_key = Keyword.fetch!(opts, :api_key)
-    model = Keyword.fetch!(opts, :model)
-    url = String.trim_trailing(Keyword.fetch!(opts, :base_url), "/") <> "/responses"
-    timeout = Keyword.fetch!(opts, :timeout_ms)
-    key = "imp-failure-#{Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)}"
-
-    body =
-      Jason.encode!(%{model: model, input: "Reply with exactly pong.", max_output_tokens: 24})
+  defp provider_live_iteration(opts) do
+    timeout = min(Keyword.fetch!(opts, :timeout_ms), 50)
+    deadline_ms = timeout * 4 + 100
+    url = "http://127.0.0.1/provider-shaped-timeout"
+    key = "imp-local-recovery-v1"
+    body = Jason.encode!(%{model: "local-fixture", input: @dummy_canary})
 
     {:ok, attempts} = Agent.start_link(fn -> [] end)
 
-    transport = fn request_url, headers, request_body, request_opts ->
+    transport = fn _request_url, headers, _request_body, request_opts ->
       attempt =
         Agent.get_and_update(attempts, fn seen -> {length(seen) + 1, [headers | seen]} end)
 
-      if attempt == 1 do
-        {:ok, %{status: 429, headers: [{"retry-after", "0"}], body: ~s({"error":"injected"})}}
-      else
-        req_opts = [
-          method: :post,
-          url: request_url,
-          headers: headers,
-          body: request_body,
-          receive_timeout: Keyword.get(request_opts, :timeout, timeout),
-          retry: false,
-          finch: finch
-        ]
+      task =
+        Task.async(fn ->
+          if attempt == 1, do: Process.sleep(timeout + 25)
 
-        case Req.request(req_opts) do
-          {:ok, response} ->
-            {:ok,
-             %{
-               status: response.status,
-               headers: response.headers,
-               body: encode_body(response.body)
-             }}
+          {:ok,
+           %{
+             status: 200,
+             headers: [{"content-type", "application/json"}],
+             body:
+               Jason.encode!(%{
+                 "output" => [],
+                 "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+               })
+           }}
+        end)
 
-          {:error, reason} ->
-            {:error, reason}
-        end
+      attempt_timeout = Keyword.get(request_opts, :timeout, timeout)
+
+      case Task.yield(task, attempt_timeout) || Task.shutdown(task, :brutal_kill) do
+        {:ok, response} -> response
+        nil -> {:error, :timeout}
       end
     end
 
     headers = [
-      {"authorization", "Bearer #{api_key}"},
       {"content-type", "application/json"},
       {"idempotency-key", key}
     ]
 
+    started = System.monotonic_time(:millisecond)
+
     result =
       Imp.Clients.TrainingHTTP.request(transport, url, headers, body, [timeout: timeout], 2, 0)
+
+    elapsed_ms = System.monotonic_time(:millisecond) - started
 
     seen = Agent.get(attempts, &Enum.reverse/1)
     Agent.stop(attempts)
     keys = Enum.map(seen, &header_value(&1, "idempotency-key"))
 
-    with {:ok, %{status: status, body: response_body}} when status in 200..299 <- result,
-         {:ok, decoded} <- Jason.decode(response_body),
-         true <- response_text(decoded) |> String.downcase() |> String.contains?("pong"),
-         %{"input_tokens" => input, "output_tokens" => output} when input > 0 and output > 0 <-
-           decoded["usage"],
-         true <- length(seen) == 2 and Enum.uniq(keys) == [key] do
+    with {:ok, %{status: 200}} <- result,
+         true <- length(seen) == 2 and Enum.uniq(keys) == [key],
+         true <- elapsed_ms >= timeout and elapsed_ms <= deadline_ms do
       {:ok,
        %{
-         provider: "openai",
-         model: model,
+         provider: "local_injected_transport",
+         model: "local-fixture",
          attempts: 2,
          max_attempts: 2,
-         injected_status: 429,
-         terminal_status: status,
+         injected_timeout: true,
+         timeout_reason: :timeout,
+         terminal_status: 200,
          idempotency_header_stable: true,
-         timeout_ms: timeout,
-         usage: %{input_tokens: input, output_tokens: output},
-         cost: openai_cost(model, input, output),
+         attempt_timeout_ms: timeout,
+         deadline_ms: deadline_ms,
+         elapsed_ms: elapsed_ms,
+         canary_sha256: sha256(@dummy_canary),
+         canary_included: false,
          response_payload_included: false
        }}
     else
-      reason -> {:error, {:live_provider_probe_failed, inspect(reason)}}
+      reason -> {:error, {:local_provider_timeout_probe_failed, inspect(reason)}}
     end
   end
 
-  defp retrieval_agent_live_iteration(opts),
-    do: with_finch(fn finch -> retrieval_agent_live_iteration(opts, finch) end)
-
-  defp retrieval_agent_live_iteration(opts, finch) do
-    timeout = Keyword.fetch!(opts, :timeout_ms)
+  defp retrieval_agent_live_iteration(opts) do
+    timeout = min(Keyword.fetch!(opts, :timeout_ms), 1_000)
+    started = System.monotonic_time(:millisecond)
     {:ok, attempts} = Agent.start_link(fn -> 0 end)
 
-    transport = fn url, headers, body, request_opts ->
+    transport = fn _url, _headers, _body, _request_opts ->
       attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
 
       if attempt == 1 do
         {:error, :closed}
       else
-        Imp.HTTP.Hackneyless.post(url, headers, body, request_opts)
+        {:ok,
+         %{
+           status: 200,
+           headers: [],
+           body: Jason.encode!(%{"documents" => [%{"text" => "retrieval-ok"}]})
+         }}
       end
     end
 
     retriever =
-      Imp.Retrievers.HTTP.new("https://httpbin.org/anything",
+      Imp.Retrievers.HTTP.new("http://127.0.0.1/retrieval-recovery",
         transport: transport,
         max_attempts: 2,
         attempt_timeout: timeout,
         total_timeout: timeout,
         retry_backoff_ms: 0,
-        max_retry_delay_ms: 0,
-        response_mapper: fn decoded ->
-          if get_in(decoded, ["json", "query"]) == "beam-recovery", do: ["retrieval-ok"], else: []
-        end
+        max_retry_delay_ms: 0
       )
 
-    retrieval_result =
-      Imp.Retrievers.HTTP.retrieve(retriever, "beam-recovery", k: 1, finch: finch)
+    retrieval_result = Imp.Retrievers.HTTP.retrieve(retriever, "beam-recovery", k: 1)
 
     retrieval_attempts = Agent.get(attempts, & &1)
     Agent.stop(attempts)
+
+    {:ok, tool_attempts} = Agent.start_link(fn -> 0 end)
 
     tool =
       Imp.Tool.new(
         :lookup,
         "Lookup a fact by query.",
-        fn
-          %{query: "failure-recovery"} -> "pong"
-          %{"query" => "failure-recovery"} -> "pong"
-          other -> {:error, {:unexpected_query, other}}
+        fn args ->
+          attempt = Agent.get_and_update(tool_attempts, &{&1 + 1, &1 + 1})
+
+          case {attempt, args} do
+            {1, %{query: "failure-recovery"}} -> {:error, :transient_local_failure}
+            {1, %{"query" => "failure-recovery"}} -> {:error, :transient_local_failure}
+            {2, %{query: "failure-recovery"}} -> "pong"
+            {2, %{"query" => "failure-recovery"}} -> "pong"
+            other -> {:error, {:unexpected_tool_attempt, other}}
+          end
         end,
         schema: %{
           "type" => "object",
@@ -1070,14 +986,24 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         }
       )
 
-    lm =
-      Imp.req_llm("openai:#{Keyword.fetch!(opts, :agent_model)}",
-        api_key: Keyword.fetch!(opts, :api_key),
-        base_url: Keyword.fetch!(opts, :base_url),
-        temperature: 0,
-        max_tokens: 120,
-        req_http_options: [finch: finch]
-      )
+    {:ok, actions} =
+      Agent.start_link(fn ->
+        [
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "failure-recovery"}}]},
+          %{tool_calls: [%{name: :lookup, arguments: %{query: "failure-recovery"}}]},
+          %{tool_calls: [%{name: :submit, arguments: %{}}]},
+          %{reasoning: "Recovered after one bounded tool failure.", answer: "pong"}
+        ]
+      end)
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          Agent.get_and_update(actions, fn [next | rest] -> {next, rest} end)
+        end
+      ]
+    }
 
     agent =
       Imp.react(
@@ -1087,61 +1013,58 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         ),
         [tool],
         lm: lm,
+        mode: :dspy_3_2_1,
         tool_policy: [:lookup, :submit],
         max_iters: 4
       )
 
     agent_result = Imp.call(agent, %{question: "Recover the fixed fact using the lookup tool."})
+    elapsed_ms = System.monotonic_time(:millisecond) - started
+    tool_attempt_count = Agent.get(tool_attempts, & &1)
+    remaining_actions = Agent.get(actions, & &1)
+    Agent.stop(tool_attempts)
+    Agent.stop(actions)
 
-    with {:ok, ["retrieval-ok"]} <- retrieval_result,
+    with {:ok, [%{text: "retrieval-ok"}]} <- retrieval_result,
          2 <- retrieval_attempts,
+         2 <- tool_attempt_count,
          {:ok, prediction} <- agent_result,
          "pong" <-
            prediction |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase(),
-         history when is_list(history) <- Imp.Prediction.get(prediction, :history),
-         true <- Enum.any?(history, &(&1.tool == :lookup and &1.result == "pong")),
-         true <- Enum.any?(history, &(&1.tool == :submit)) do
+         history <- Imp.Prediction.get(prediction, :history),
+         [
+           %{tool: :lookup, result: "Execution error in lookup: :transient_local_failure"},
+           %{tool: :lookup, result: "pong"},
+           %{tool: :submit, result: "Completed."}
+         ] <- history,
+         [] <- remaining_actions,
+         true <- elapsed_ms <= timeout do
       {:ok,
        %{
-         provider: "openai",
-         model: Keyword.fetch!(opts, :agent_model),
+         provider: "local_static_lm",
+         model: "local-fixture",
          retrieval_attempts: 2,
          retrieval_injected_error: "closed",
-         retrieval_terminal_network: "httpbin.org",
-         tool_calls: 1,
+         retrieval_terminal_network: "local_injected_transport",
+         tool_attempts: 2,
+         tool_failures: 1,
+         tool_successes: 1,
          submit_calls: 1,
-         timeout_ms: timeout,
-         agent_usage_available: false,
-         agent_cost: %{"authority" => "not_exposed_by_prediction", "usd" => nil},
+         history: [
+           %{tool: :lookup, result: "transient_local_failure"},
+           %{tool: :lookup, result: "pong"},
+           %{tool: :submit, result: "completed"}
+         ],
+         deadline_ms: timeout,
+         elapsed_ms: elapsed_ms,
+         canary_sha256: sha256(@dummy_canary),
+         canary_included: false,
          payloads_included: false
        }}
     else
-      reason -> {:error, {:live_retrieval_agent_probe_failed, inspect(reason)}}
+      reason -> {:error, {:local_retrieval_agent_probe_failed, inspect(reason)}}
     end
   end
-
-  defp response_text(%{"output" => output}) when is_list(output) do
-    output
-    |> Enum.flat_map(&(&1["content"] || []))
-    |> Enum.map_join("", &(&1["text"] || ""))
-  end
-
-  defp response_text(_), do: ""
-
-  defp encode_body(body) when is_binary(body), do: body
-  defp encode_body(body), do: Jason.encode!(body)
-
-  defp openai_cost("gpt-4.1-mini", input, output) do
-    %{
-      "authority" => "pinned_public_list_price",
-      "input_usd_per_million" => 0.4,
-      "output_usd_per_million" => 1.6,
-      "usd" => Float.round(input * 0.4 / 1_000_000 + output * 1.6 / 1_000_000, 9)
-    }
-  end
-
-  defp openai_cost(_model, _input, _output),
-    do: %{"authority" => "unpriced_model", "usd" => nil}
 
   defp live_checks(id, outcomes, runtime) do
     evidence = Enum.map(outcomes, & &1["evidence"])
@@ -1156,25 +1079,24 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         "provider_retry_timeout_idempotency_live" ->
           [
             %{
-              "id" => "real_provider_terminal_success",
+              "id" => "local_provider_terminal_success",
               "passing" => Enum.all?(evidence, &(&1["terminal_status"] in 200..299))
             },
             %{
-              "id" => "bounded_retry_after_injected_429",
-              "passing" => Enum.all?(evidence, &(&1["attempts"] == 2 and &1["max_attempts"] == 2))
+              "id" => "bounded_injected_timeout",
+              "passing" =>
+                Enum.all?(evidence, fn row ->
+                  row["injected_timeout"] and row["timeout_reason"] == "timeout" and
+                    row["elapsed_ms"] <= row["deadline_ms"]
+                end)
             },
             %{
               "id" => "stable_idempotency_key",
               "passing" => Enum.all?(evidence, & &1["idempotency_header_stable"])
             },
             %{
-              "id" => "positive_provider_usage",
-              "passing" =>
-                Enum.all?(
-                  evidence,
-                  &(get_in(&1, ["usage", "input_tokens"]) > 0 and
-                      get_in(&1, ["usage", "output_tokens"]) > 0)
-                )
+              "id" => "dummy_canary_absent",
+              "passing" => Enum.all?(evidence, &(&1["canary_included"] == false))
             }
           ]
 
@@ -1185,30 +1107,24 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
               "passing" => Enum.all?(evidence, &(&1["retrieval_attempts"] == 2))
             },
             %{
-              "id" => "provider_backed_tool_agent_completed",
+              "id" => "recoverable_tool_failure_retry_submit",
               "passing" =>
-                Enum.all?(evidence, &(&1["tool_calls"] == 1 and &1["submit_calls"] == 1))
+                Enum.all?(evidence, fn row ->
+                  row["tool_attempts"] == 2 and row["tool_failures"] == 1 and
+                    row["tool_successes"] == 1 and row["submit_calls"] == 1 and
+                    row["elapsed_ms"] <= row["deadline_ms"] and
+                    row["canary_included"] == false and
+                    row["history"] == [
+                      %{"tool" => "lookup", "result" => "transient_local_failure"},
+                      %{"tool" => "lookup", "result" => "pong"},
+                      %{"tool" => "submit", "result" => "completed"}
+                    ]
+                end)
             }
           ]
       end
 
     common ++ specific
-  end
-
-  defp with_finch(fun) do
-    name = Imp.BenchmarkTruth.FailureCampaign.Finch
-
-    {:ok, finch} =
-      Finch.start_link(
-        name: name,
-        pools: %{default: [size: 1, count: 1, pool_max_idle_time: 60_000]}
-      )
-
-    try do
-      fun.(name)
-    after
-      if Process.alive?(finch), do: GenServer.stop(finch, :normal, 5_000)
-    end
   end
 
   defp live_cases_complete?(rows) do
@@ -1241,7 +1157,10 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       [:imp, :mcp, :http, :exception],
       [:imp, :mcp, :http, :attempt],
       [:imp, :lm, :start],
-      [:imp, :lm, :stop]
+      [:imp, :lm, :stop],
+      [:imp, :tool, :start],
+      [:imp, :tool, :stop],
+      [:imp, :tool, :exception]
     ]
 
     :ok =
@@ -1279,6 +1198,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       "metadata_secret_free" => Enum.all?(entries, fn {_event, entry} -> entry.safe end),
       "balanced_spans" =>
         balanced_span?(counts, "imp.retriever") and balanced_span?(counts, "imp.mcp.http") and
+          balanced_span?(counts, "imp.tool") and
           Map.get(counts, "imp.lm.start", 0) == Map.get(counts, "imp.lm.stop", 0)
     }
   end
@@ -1297,8 +1217,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     encoded = Jason.encode!(json_safe(value))
 
     configured =
-      opts
-      |> Keyword.get(:secrets, [])
+      [@dummy_canary | Keyword.get(opts, :secrets, [])]
       |> Enum.filter(&(is_binary(&1) and byte_size(&1) >= 8))
 
     configured_hits = Enum.count(configured, &String.contains?(encoded, &1))

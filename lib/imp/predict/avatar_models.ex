@@ -25,12 +25,13 @@ defmodule Imp.Predict.Avatar.ActionOutput do
   @moduledoc "A typed Avatar action and its observed result."
 
   @enforce_keys [:tool_name, :tool_input_query, :tool_output]
-  defstruct [:tool_name, :tool_input_query, :tool_output, error?: false]
+  defstruct [:tool_name, :tool_input_query, :tool_output, :terminal_reason, error?: false]
 
   @type t :: %__MODULE__{
           tool_name: atom() | String.t(),
           tool_input_query: term(),
           tool_output: term(),
+          terminal_reason: atom() | nil,
           error?: boolean()
         }
 end

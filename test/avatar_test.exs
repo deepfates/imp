@@ -145,6 +145,62 @@ defmodule AvatarTest do
            ] = Imp.get(prediction, :actions)
   end
 
+  test "a blocking tool is killed at its effect deadline and emits terminal trace evidence" do
+    parent = self()
+
+    lm =
+      actor_lm(fn prompt ->
+        if finalizer?(prompt) do
+          send(parent, :timeout_finalizer_called)
+          %{answer: "timed out safely"}
+        else
+          send(parent, :timeout_actor_called)
+          %{action: %{tool_name: "blocking", tool_input_query: %{query: "slow"}}}
+        end
+      end)
+
+    blocking =
+      Imp.tool(:blocking, "blocking local callback", fn _arguments ->
+        send(parent, {:blocking_tool_started, self()})
+        Process.sleep(250)
+        send(parent, :blocking_tool_late_side_effect)
+        "too late"
+      end)
+
+    avatar =
+      Imp.avatar("question -> answer", [blocking],
+        lm: lm,
+        max_iters: 5,
+        tool_timeout_ms: 25
+      )
+
+    started_at = System.monotonic_time(:millisecond)
+    assert {:ok, prediction} = Imp.call(avatar, %{question: "q"})
+    elapsed = System.monotonic_time(:millisecond) - started_at
+
+    assert elapsed < 200
+    assert_received :timeout_actor_called
+    assert_received :timeout_finalizer_called
+    assert_received {:blocking_tool_started, tool_pid}
+    refute Process.alive?(tool_pid)
+
+    assert Imp.get(prediction, :answer) == "timed out safely"
+    assert Imp.get(prediction, :termination_reason) == :tool_timeout
+
+    assert [
+             %ActionOutput{
+               tool_name: :blocking,
+               tool_input_query: %{query: "slow"},
+               tool_output: {:error, {:tool_timeout, :blocking, 25}},
+               error?: true,
+               terminal_reason: :tool_timeout
+             }
+           ] = Imp.get(prediction, :actions)
+
+    refute_receive :timeout_actor_called, 50
+    refute_receive :blocking_tool_late_side_effect, 300
+  end
+
   test "validates reserved fields and malformed actions" do
     assert_raise ArgumentError, ~r/reserved fields.*avatar_history/, fn ->
       Imp.avatar("avatar_history -> answer", [])

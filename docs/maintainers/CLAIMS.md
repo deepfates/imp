@@ -144,10 +144,18 @@ positive held-out accuracy and macro-F1 lift, and exact fused/save-load row
 equivalence. This proves the local training and deployment substrate only; it
 does not authorize paid-provider, BetterTogether, GRPO, or DSPy-matched parity.
 
-Failure-recovery live evidence is limited to two required rows: provider retry,
-timeout, and idempotency; and integration retrieval plus tool-agent recovery.
-The campaign does not create or cancel a live provider training job, so its
-failure-recovery policy makes no live provider-training claim.
+Failure-recovery operational evidence is limited to two required local rows:
+provider-shaped timeout/retry/idempotency and integration retrieval plus exact
+tool-agent failure/retry/submit recovery. The campaign uses injected local
+transports, a static LM, and dummy canaries only. It makes no external-provider
+or live provider-training claim.
+
+RAG, tool, and agent evidence is split by capacity. The asserted C2 claim is
+limited to source-bound provider-free operational contracts, with exact DSPy
+rows only where a direct comparison is declared. HotPotQA retrieval and
+supporting-fact quality, a pinned BFCL tool-use subset, and an identical
+cross-runtime failure schedule remain an open C4 comparative-effectiveness
+target. Historical selected live paths do not satisfy that target.
 
 When a profile gate fails, the terminal error names both the
 blocking lane requirements and the blocked public claims. That failure is the
