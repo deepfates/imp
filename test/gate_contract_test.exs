@@ -215,6 +215,12 @@ defmodule GateContractTest do
     refute Keyword.has_key?(aliases, String.to_atom("live" <> ".mcp.check"))
   end
 
+  test "gate evidence retains repeated environment overrides" do
+    source = File.read!("lib/mix/tasks/imp.gate_evidence.ex")
+    assert source =~ "env_file: :keep"
+    assert source =~ "env: :keep"
+  end
+
   test "generated docs expose the product API, not local validation machinery" do
     filter_modules =
       Mix.Project.config()

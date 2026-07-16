@@ -21,8 +21,8 @@ defmodule Mix.Tasks.Imp.GateEvidence do
           gate: :string,
           mix_task: :string,
           out: :string,
-          env_file: :string,
-          env: :string
+          env_file: :keep,
+          env: :keep
         ]
       )
 
