@@ -192,13 +192,22 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferentialAdmissionTest 
           candidate = handle.read()
       score = 2.0 if "|improved" in candidate else 1.0
       objective_calls = 2 if args.domain == "blackbox_problem_46" else 0
+      side_info = {"domain": args.domain, "score": score}
+      if args.domain == "swe_bench_flask_5014":
+          side_info["completion_receipt"] = {
+              "format": "junitxml-v1",
+              "expected_tests": 60,
+              "completed_tests": 60,
+              "passed_tests": 60,
+              "report_sha256": hashlib.sha256((candidate + "|replay").encode("utf-8")).hexdigest(),
+          }
       value = {
           "protocol_id": manifest["protocol_id"],
           "domain": args.domain,
           "candidate_sha256": hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
           "isolation": manifest["description"]["isolation"],
           "score": score,
-          "side_info": {"domain": args.domain, "score": score},
+          "side_info": side_info,
           "objective_calls": objective_calls,
           "wall_time_ms": 1,
       }
@@ -543,6 +552,21 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferentialAdmissionTest 
   defp evaluation_evidence(description, domain, candidate, sequence, score) do
     objective_calls = if domain == "blackbox_problem_46", do: 2, else: 0
 
+    side_info = %{"domain" => domain, "score" => score}
+
+    side_info =
+      if domain == "swe_bench_flask_5014" do
+        Map.put(side_info, "completion_receipt", %{
+          "format" => "junitxml-v1",
+          "expected_tests" => 60,
+          "completed_tests" => 60,
+          "passed_tests" => 60,
+          "report_sha256" => sha256(candidate <> "|recorded")
+        })
+      else
+        side_info
+      end
+
     %{
       "sequence" => sequence,
       "candidate" => candidate,
@@ -552,7 +576,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferentialAdmissionTest 
         "candidate_sha256" => sha256(candidate),
         "isolation" => description["isolation"],
         "score" => score,
-        "side_info" => %{"domain" => domain, "score" => score},
+        "side_info" => side_info,
         "objective_calls" => objective_calls,
         "wall_time_ms" => 1
       }

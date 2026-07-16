@@ -1151,7 +1151,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
 
   defp stable_evaluator_value(value) when is_map(value) do
     value
-    |> Map.drop(["wall_time_ms", "execution_time_seconds"])
+    |> Map.drop(["wall_time_ms", "execution_time_seconds", "report_sha256"])
     |> Map.new(fn {key, item} -> {key, stable_evaluator_value(item)} end)
   end
 
