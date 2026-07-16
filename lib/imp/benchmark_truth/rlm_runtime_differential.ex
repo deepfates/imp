@@ -74,6 +74,7 @@ defmodule Imp.BenchmarkTruth.RLMRuntimeDifferential do
 
   def validate_artifact!("rlm_runtime_differential", artifact) when is_map(artifact) do
     validate_artifact!(artifact, %{"manifest" => @default_manifest})
+    :ok
   end
 
   def validate_artifact!(artifact, protocol) when is_map(artifact) and is_map(protocol) do
