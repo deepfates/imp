@@ -3,6 +3,7 @@ defmodule Imp.Test.LiveProvider do
 
   def lm(opts \\ []) when is_list(opts) do
     %{provider: provider, model: model, api_key: api_key} = config!()
+    opts = normalize_token_limit(opts, provider)
 
     Imp.req_llm(
       "#{provider}:#{model}",
@@ -35,4 +36,13 @@ defmodule Imp.Test.LiveProvider do
 
   defp provider_environment!(provider),
     do: raise("unsupported IMP_LIVE_PROVIDER #{inspect(provider)}")
+
+  defp normalize_token_limit(opts, "openai"), do: opts
+
+  defp normalize_token_limit(opts, _provider) do
+    case Keyword.pop(opts, :max_completion_tokens) do
+      {nil, opts} -> opts
+      {limit, opts} -> Keyword.put(opts, :max_tokens, limit)
+    end
+  end
 end
