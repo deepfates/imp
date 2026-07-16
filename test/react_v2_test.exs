@@ -249,7 +249,8 @@ defmodule ReActV2Test do
           tool_calls:
             Imp.Adapters.Types.ToolCalls.new([
               %{id: "call-1", name: "lookup", arguments: %{query: "beam"}}
-            ]),
+            ])
+            |> Imp.Redaction.redact(),
           tool_call_results: [
             %{id: "call-1", name: "lookup", result: "BEAM", error: false}
           ]

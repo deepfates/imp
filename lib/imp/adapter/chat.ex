@@ -511,6 +511,15 @@ defmodule Imp.Adapter.Chat do
   defp normalize_history_tool_calls(%Imp.Adapters.Types.ToolCalls{tool_calls: calls}),
     do: Enum.map(calls, &Imp.Adapters.Types.ToolCall.format/1)
 
+  # Redaction intentionally converts structs to credential-safe maps before an
+  # event is stored in history. Preserve the collection envelope so replay still
+  # emits the assistant tool-use message required before provider tool results.
+  defp normalize_history_tool_calls(%{tool_calls: calls}),
+    do: normalize_history_tool_calls(calls)
+
+  defp normalize_history_tool_calls(%{"tool_calls" => calls}),
+    do: normalize_history_tool_calls(calls)
+
   defp normalize_history_tool_calls(calls) when is_list(calls) do
     calls
     |> Imp.Adapters.Types.ToolCalls.new()
