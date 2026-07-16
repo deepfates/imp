@@ -502,9 +502,10 @@
         "rlm_paper"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/rlm_runtime_differential/c3eea92ae7611f7fddca5d6ff3303564a0c2f226e82e32cc948aa9a6cda753a8.json",
+        "artifact_sha256": "c3eea92ae7611f7fddca5d6ff3303564a0c2f226e82e32cc948aa9a6cda753a8",
+        "protocol_id": "rlm_runtime_differential"
       }
     },
     {

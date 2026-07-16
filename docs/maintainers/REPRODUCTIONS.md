@@ -16,7 +16,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | MCP protocol boundary | native_extension | rag_agent | NONE | none |
 | CodeAct | adaptation | rag_agent | NONE | none |
 | ProgramOfThought | adaptation | rag_agent | NONE | none |
-| Recursive Language Models | adaptation | rlm_contract<br>rlm_runtime_differential<br>rlm_paper | NONE | none |
+| Recursive Language Models | adaptation | rlm_contract<br>rlm_runtime_differential<br>rlm_paper | T1 | benchmarks/evidence/admitted/rlm_runtime_differential/c3eea92ae7611f7fddca5d6ff3303564a0c2f226e82e32cc948aa9a6cda753a8.json |
 | Assertions and evaluation | adaptation | confidence_calibration | NONE | none |
 | SemanticF1 auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
 | CompleteAndGrounded auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
