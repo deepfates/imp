@@ -40,7 +40,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BetterTogether | adaptation | provider_training | NONE | none |
 | Ensemble | adaptation | optimizer_lift | NONE | none |
 | Fast-Slow training and CISPO | adaptation | fast_slow | NONE | none |
-| Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json |
+| Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |
 | Async, streaming, cache, telemetry, and overhead | native_extension | operations | NONE | none |
 | Persistence and protocol boundaries | native_extension | operations | NONE | none |

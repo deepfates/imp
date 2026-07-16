@@ -201,14 +201,15 @@ defmodule ClaimsInventoryTest do
     refute Map.has_key?(claims, "claim.optimizer_lift.full")
   end
 
-  test "OA failure and evaluation quality gaps remain explicit" do
+  test "OA bounded effectiveness and evaluation quality gaps remain explicit" do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
     oa = claims["claim.optimize_anything.non_prompt_effectiveness"]
 
     assert oa["claim_state"] == "asserted"
     assert oa["release"] == "v0.1"
-    assert Enum.any?(oa["limitations"], &String.contains?(&1, "produced no admissible artifact"))
-    assert oa["statement"] =~ "current evidence does not establish"
+    assert Enum.any?(oa["limitations"], &String.contains?(&1, "bounded to three"))
+    assert oa["statement"] =~ "improved all three"
+    assert Enum.any?(oa["sources"], &String.contains?(&1, "58ff84ac"))
 
     assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==
              "target"

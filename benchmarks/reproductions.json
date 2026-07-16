@@ -1188,8 +1188,8 @@
       ],
       "admitted_evidence": {
         "tier": "t2",
-        "artifact": "benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json",
-        "artifact_sha256": "080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653",
+        "artifact": "benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json",
+        "artifact_sha256": "58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631",
         "protocol_id": "optimize_anything"
       }
     },
