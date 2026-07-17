@@ -106,8 +106,12 @@ defmodule DocumentationContractTest do
   end
 
   test "internal process vocabulary stays off user surfaces" do
+    # CONFORMANCE.md is the receipts appendix, promoted from the conformance
+    # program; evidence vocabulary ("authority", "differential") is its
+    # subject matter, not a leak.
     user_surfaces =
-      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
+      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")] --
+        ["docs/CONFORMANCE.md"]
 
     # "differential" left off the ban list deliberately: "executable
     # differential tests" is the public conformance claim, not process vocab.
