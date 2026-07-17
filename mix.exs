@@ -168,8 +168,10 @@ defmodule Imp.MixProject do
       "docs/LEARNING_PATH.md",
       "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/GLOSSARY.md",
-      "docs/internal/IMP_PHILOSOPHY.md",
-      "docs/internal/PRIOR_ART.md",
+      "docs/PHILOSOPHY.md",
+      "docs/IMP_FOR_DSPY_USERS.md",
+      "docs/CONFORMANCE.md",
+      "docs/PRIOR_ART.md",
       "docs/internal/RESEARCH_LANDSCAPE.md",
       "docs/ARCHITECTURE.md",
       "docs/internal/IDENTITY_COMPATIBILITY.md",
@@ -215,6 +217,9 @@ defmodule Imp.MixProject do
     |> Map.fetch!("excluded_modules")
     |> MapSet.new(& &1["module"])
   end
+
+  # ExDoc passes nil for references that name no module (links between extras).
+  defp skip_filtered_doc_reference?(nil), do: false
 
   defp skip_filtered_doc_reference?(reference) do
     reference = String.trim_leading(reference, "Elixir.")

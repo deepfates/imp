@@ -1017,9 +1017,7 @@ defmodule PublicSurfaceTest do
 
     docs =
       ["README.md" | Path.wildcard("docs/**/*.md")]
-      |> Enum.reject(
-        &(&1 in ["docs/internal/PRIOR_ART.md", "docs/internal/RESEARCH_LANDSCAPE.md"])
-      )
+      |> Enum.reject(&(&1 in ["docs/PRIOR_ART.md", "docs/internal/RESEARCH_LANDSCAPE.md"]))
       |> Enum.map_join("\n", &File.read!/1)
 
     refute docs =~ borrowed_name
