@@ -23,7 +23,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     :metric_threshold,
     max_errors: :infinity,
     max_concurrency: 1,
-    timeout: 5_000,
+    timeout: :infinity,
     startup_trials: 10
   ]
 
@@ -56,7 +56,7 @@ defmodule Imp.Optimizer.MIPROv2 do
       metric_threshold: runtime_opts[:metric_threshold],
       max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
       max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
-      timeout: Keyword.get(runtime_opts, :timeout, 5_000),
+      timeout: Keyword.get(runtime_opts, :timeout, :infinity),
       startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
     }
     |> validate_runtime!()
