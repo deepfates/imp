@@ -32,6 +32,10 @@ defmodule Imp.BenchmarkTruth.AvatarActorDifferentialTest do
     assert length(artifact["scope"]["native_deviations"]) == 3
     assert "provider behavior or model tool selection" in artifact["scope"]["not_claimed"]
     assert "task effectiveness" in artifact["scope"]["not_claimed"]
+
+    assert [workaround] = artifact["scope"]["upstream_construction_workarounds"]
+    assert workaround =~ "monkey-patches dspy.TypedPredictor"
+    assert artifact["summary"]["upstream_construction_workarounds"] == [workaround]
   end
 
   test "rejects fabricated observations", %{report: report} do

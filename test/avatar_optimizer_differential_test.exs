@@ -32,6 +32,10 @@ defmodule Imp.BenchmarkTruth.AvatarOptimizerDifferentialTest do
     assert length(artifact["scope"]["native_deviations"]) == 3
     assert "exact Python RNG or sampling parity" in artifact["scope"]["not_claimed"]
     assert "rewrite quality or held-out lift" in artifact["scope"]["not_claimed"]
+
+    assert [workaround] = artifact["scope"]["upstream_construction_workarounds"]
+    assert workaround =~ "monkey-patches dspy.TypedPredictor and dspy.Predict"
+    assert artifact["summary"]["upstream_construction_workarounds"] == [workaround]
   end
 
   test "rejects fabricated observations", %{report: report} do

@@ -38,6 +38,9 @@
       "Imp and pinned DSPy 3.2.1 invoke one comparator and one feedback-based instruction rewrite for one optimizer iteration",
       "Imp and pinned DSPy 3.2.1 propagate comparator feedback into the rewritten actor instruction"
     ],
+    "upstream_construction_workarounds": [
+      "DSPy 3.2.1 AvatarOptimizer cannot construct as released: dspy/teleprompt/avatar_optimizer.py references top-level dspy.TypedPredictor and dspy.Predict factories whose 3.2.1 TypedPredictor export is absent from the package initializer. The sidecar monkey-patches dspy.TypedPredictor and dspy.Predict with inert constructor-shaped stand-ins before constructing AvatarOptimizer, then substitutes the deterministic fixture comparator and rewriter. All DSPy observations in this artifact were produced under that documented patch."
+    ],
     "native_deviations": [
       "Imp evaluates the rewritten candidate and retains it only when its measured score improves; DSPy 3.2.1 updates from the pre-rewrite score",
       "Imp returns an executable diagnostic baseline when a positive or negative trajectory class is absent",

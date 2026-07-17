@@ -88,6 +88,7 @@ defmodule Mix.Tasks.Imp.Benchmark.AvatarActorDifferential do
       "summary" => %{
         "authenticated_dspy_commit" => @dspy_commit,
         "matched_claim_count" => length(scope["claims"]),
+        "upstream_construction_workarounds" => scope["upstream_construction_workarounds"],
         "native_deviations" => scope["native_deviations"],
         "retained_exclusions" => scope["not_claimed"]
       }

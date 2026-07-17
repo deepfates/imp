@@ -40,6 +40,9 @@
       "Imp and pinned DSPy 3.2.1 expose the successful non-Finish action result in ordered history",
       "Imp and pinned DSPy 3.2.1 use the tool result when producing the declared final output"
     ],
+    "upstream_construction_workarounds": [
+      "DSPy 3.2.1 Avatar cannot construct as released: dspy/predict/avatar/avatar.py references a top-level dspy.TypedPredictor export that is absent from the 3.2.1 package initializer. The sidecar monkey-patches dspy.TypedPredictor with a constructor-shaped stand-in before constructing Avatar, then replaces the actor with the deterministic fixture. All DSPy observations in this artifact were produced under that documented patch."
+    ],
     "native_deviations": [
       "Imp enforces the configured actor iteration bound while DSPy 3.2.1 does not consistently use its constructor max_iters",
       "Imp uses a separate typed finisher instead of mutating and reusing the actor signature",
