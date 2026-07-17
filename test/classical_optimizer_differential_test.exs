@@ -1,6 +1,8 @@
 defmodule Imp.BenchmarkTruth.ClassicalOptimizerDifferentialTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   alias Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential, as: Differential
 
   @python "tmp/dspy-parity-venv/bin/python"

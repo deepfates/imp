@@ -201,7 +201,7 @@ P0 work on the current finish line:
 
 P1 work after those blockers:
 
-1. Maintain the pinned Ax `23.0.0` differential in `docs/AX_DIFFERENTIAL.md` as
+1. Maintain the pinned Ax `23.0.0` differential in `docs/internal/AX_DIFFERENTIAL.md` as
    an independent implementation check without promoting Ax to scientific
    authority.
 2. Add operational failure campaigns for cancellation, timeout, retries,

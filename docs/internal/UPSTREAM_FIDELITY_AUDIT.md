@@ -77,7 +77,7 @@ Regenerate the checked-in readable projection:
 ```sh
 mix imp.upstream_fidelity \
   --format markdown \
-  --out docs/UPSTREAM_SURFACE_MAP.md
+  --out docs/internal/UPSTREAM_SURFACE_MAP.md
 ```
 
 Run the release-blocking conformance gate:

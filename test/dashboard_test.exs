@@ -8,6 +8,7 @@ defmodule DashboardTest do
                        __DIR__
                      )
 
+  @tag :evidence_infrastructure
   test "dashboard aggregates lane artifacts and require-ready refuses missing lanes" do
     root = tmp_dir("dashboard")
     trace_dir = Path.join(root, "trace")

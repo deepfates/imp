@@ -7,10 +7,11 @@ signature, a callable program, examples, a metric, and optional program
 transformations. The model provider is a runtime dependency, so deterministic
 tests use `Imp.LM.Static` and a live provider does not change the task shape.
 
-Install the immutable release from Hex with `{:imp, "~> 0.1.0"}`. To pin the
-same release directly from Git, use
-`{:imp, github: "deepfates/imp", tag: "v0.1.0"}`. In a source checkout, use
-`{:imp, path: "."}` while developing against the local repository. Then follow
+Install the v0.1.0 release from GitHub with
+`{:imp, github: "deepfates/imp", tag: "v0.1.0"}` in your `mix.exs` deps.
+Imp is not on Hex yet; a Hex release is planned. In a
+source checkout, use `{:imp, path: "."}` while developing against the local
+repository. Then follow
 the [Learning Path](docs/LEARNING_PATH.md). It is
 the canonical, self-contained route from a signature and `Predict` through
 evaluation, measured optimization, tools/ReAct, retrieval, RLM, persistence,
@@ -33,8 +34,28 @@ Imp.get(prediction, :answer)
 ```
 
 For source development, clone the repository, run `mix deps.get`, and use
-`mix test`. In a source checkout, `mix production.check` is the quality gate and
+`mix test`. The default `mix test` run is green in a fresh clone with no extra
+setup. In a source checkout, `mix production.check` is the quality gate and
 `mix livebook.execute.check` executes the full notebook learning path.
+
+## Maintainer checks
+
+The benchmark-evidence and reproduction-registry tests are excluded from the
+default `mix test` run (tag `:evidence_infrastructure`). They validate the
+committed benchmark artifacts against full git history, the pinned DSPy Python
+environments (`scripts/setup_dspy_parity_env.sh` and friends), and in some
+lanes a `.env` with provider credentials — none of which a fresh clone has.
+To run them:
+
+```sh
+scripts/setup_dspy_parity_env.sh
+scripts/setup_dspy_current_target.sh
+scripts/setup_reference_test_env.sh
+EVIDENCE_INFRASTRUCTURE=1 mix test        # or: mix test --include evidence_infrastructure
+```
+
+They also need a full (non-shallow) clone, because the source-binding
+validators resolve ancestor commit SHAs.
 
 The learning-path snippets are executed by
 `test/learning_path_contract_test.exs`; the one live-provider snippet is

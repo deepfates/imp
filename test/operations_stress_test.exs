@@ -97,7 +97,7 @@ defmodule OperationsStressTest do
     refute "mix benchmark.operations_stress.check" in catalog_commands
     refute File.read!("benchmarks/claims.json") =~ "operations_stress"
 
-    benchmark_truth = File.read!("docs/BENCHMARK_TRUTH.md")
+    benchmark_truth = File.read!("docs/internal/BENCHMARK_TRUTH.md")
     production_operations = File.read!("docs/PRODUCTION_OPERATIONS.md")
 
     assert benchmark_truth =~ "deliberately outside the evidence"

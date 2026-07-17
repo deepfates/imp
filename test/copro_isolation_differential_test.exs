@@ -1,6 +1,8 @@
 defmodule Imp.Optimizer.COPROIsolationDifferentialTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   @setup """
   git clone https://github.com/stanfordnlp/dspy.git tmp/dspy-3.2.1
   git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c

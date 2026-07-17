@@ -9,7 +9,7 @@ defmodule DocumentationContractTest do
                                ])
 
   test "coverage matrix describes current evidence instead of closed planning tickets" do
-    body = File.read!("docs/COVERAGE_MATRIX.md")
+    body = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
     refute_closed_ticket_refs(body)
     refute body =~ "integration gate should"
@@ -76,7 +76,7 @@ defmodule DocumentationContractTest do
   end
 
   test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
-    body = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+    body = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
     refute_closed_ticket_refs(body)
     refute body =~ "Ticket:"
@@ -84,7 +84,7 @@ defmodule DocumentationContractTest do
   end
 
   test "adapter fidelity audit names upstream semantics and Imp evidence" do
-    body = File.read!("docs/ADAPTER_FIDELITY.md")
+    body = File.read!("docs/internal/ADAPTER_FIDELITY.md")
     readme = File.read!("docs/README.md")
     contributing = File.read!("CONTRIBUTING.md")
 
@@ -131,7 +131,7 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/IMP_PHILOSOPHY.md")
+    philosophy = File.read!("docs/internal/IMP_PHILOSOPHY.md")
 
     assert readme =~ "canonical, self-contained route"
     assert docs =~ "## Manual Spine"
@@ -240,7 +240,7 @@ defmodule DocumentationContractTest do
 
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
 
     assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
@@ -263,9 +263,9 @@ defmodule DocumentationContractTest do
 
   test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
-    coverage = File.read!("docs/COVERAGE_MATRIX.md")
-    parity = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
+    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
+    parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
     assert api =~ "## Optimize Arbitrary Artifacts"
     assert api =~ "is the sole Optimize Anything\nentry point"
@@ -281,7 +281,7 @@ defmodule DocumentationContractTest do
 
   test "instruction optimizer docs define durable run-level resume boundaries" do
     api = File.read!("docs/API_GUIDE.md")
-    fidelity = File.read!("docs/INSTRUCTION_OPTIMIZER_FIDELITY.md")
+    fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")
 
     assert api =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
     assert api =~ "Completed boundaries are not replayed"
@@ -294,7 +294,7 @@ defmodule DocumentationContractTest do
 
   test "embedding documentation names the deterministic baseline and provider shape contract" do
     api = File.read!("docs/API_GUIDE.md")
-    coverage = File.read!("docs/COVERAGE_MATRIX.md")
+    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
     assert api =~ "BagOfWords` is deterministic and local"
     assert api =~ "Production semantic embeddings"
