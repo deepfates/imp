@@ -29,7 +29,7 @@ Every guide and notebook follows the same product story:
 - [Imp for DSPy Users](IMP_FOR_DSPY_USERS.md): the concept mapping, what is
   deliberately different on the BEAM, and the honest conformance state.
 
-- [Philosophy](internal/IMP_PHILOSOPHY.md): the mental model: signatures, programs,
+- [Philosophy](PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
 - [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the

@@ -17,6 +17,33 @@ The practical sequence is stable across the project: signature, program, call,
 deterministic development, metric, optimizer, optional action boundaries, then
 operations.
 
+## The framework behind the design
+
+The two kinds of intelligence in the README have names in a conceptual
+framework called Gorm fluid and Grug tech. Grug tech means simple,
+deterministic, reliable, and maintainable systems, in the spirit of the
+[Grug Brained Developer](https://grugbrain.dev). Gorm fluid means the
+generative, adaptive, and often non-deterministic capabilities of large
+language models.
+
+The core idea is deliberate hybridization with containment. Generative AI
+should be injected in controlled doses inside solid structures, used as
+lubricant or glue between components, or grown in exploratory patterns and
+then distilled into reliable code. The framework warns against both pure
+rigidity and unchecked fluidity.
+
+Imp is a toolkit for exactly that practice. Signatures and types are the
+solid structure. The model is the fluid, injected at declared points. Metrics
+and held-out evaluation are how exploratory gains get distilled into
+something you can trust. Optimizers are the distillation step itself.
+
+The concepts originated in the grugbrain.dev philosophy, the Gaspode routine
+on [cyborgism.wiki](https://cyborgism.wiki/hypha/grug_tech_gorm_fluid), and
+writing on [generative.ink](https://generative.ink/artifacts/gpt-4_gorm_fluid/),
+and were refined into practical engineering advice in discussions from 2024
+to 2026, especially by the [@deepfates](https://x.com/deepfates) community
+on X.
+
 ## The Pieces
 
 - Signatures are data: `%Imp.Signature{}` declares inputs, outputs,
