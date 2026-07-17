@@ -8,7 +8,7 @@ defmodule LearningPathContractTest do
   # is a live-provider block and is executed end to end by the :live test
   # below (run via `mix live.check` with OPENAI_API_KEY set).
   @contract %{
-    "README.md" => %{blocks: 1, local: []},
+    "README.md" => %{blocks: 2, local: []},
     "docs/LEARNING_PATH.md" => %{
       blocks: 9,
       local: [
