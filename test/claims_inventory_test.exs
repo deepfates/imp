@@ -5,6 +5,7 @@ defmodule ClaimsInventoryTest do
   @claim_states ["asserted", "target", "retired"]
   @gate_policies ["blocking", "informational"]
   @known_lanes ~w(
+    auto_evaluation_contract
     bootstrap_few_shot_differential
     copro_isolation
     failure_recovery
@@ -280,11 +281,29 @@ defmodule ClaimsInventoryTest do
     assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==
              "target"
 
-    assert claims["claim.evaluation.auto_evaluation.semantic_conformance"]["target_rung"] ==
-             "C1"
+    auto_evaluation = claims["claim.evaluation.auto_evaluation.semantic_conformance"]
+    assert auto_evaluation["claim_state"] == "asserted"
+    assert auto_evaluation["target_rung"] == "C1"
+
+    assert get_in(auto_evaluation, ["requirements", Access.at(0), "lane"]) ==
+             "auto_evaluation_contract"
 
     assert claims["claim.evaluation.natural_judge.effectiveness"]["target_rung"] == "C3"
     assert claims["claim.evaluation.refine_advice.effectiveness"]["target_rung"] == "C3"
+
+    assert get_in(claims, [
+             "claim.evaluation.natural_judge.effectiveness",
+             "requirements",
+             Access.at(0),
+             "lane"
+           ]) == "live_matched_model"
+
+    assert get_in(claims, [
+             "claim.evaluation.refine_advice.effectiveness",
+             "requirements",
+             Access.at(0),
+             "lane"
+           ]) == "live_matched_model"
   end
 
   test "local MLX effectiveness claim remains narrow and independently gated" do

@@ -780,19 +780,19 @@
     },
     {
       "id": "claim.evaluation.auto_evaluation.semantic_conformance",
-      "claim_state": "target",
+      "claim_state": "asserted",
       "target_rung": "C1",
-      "release": "telos",
+      "release": "v0.1",
       "scope": "Pinned deterministic SemanticF1 and CompleteAndGrounded normalization and aggregation semantics against authenticated DSPy source.",
-      "limitations": ["The admitted T1 artifact does not establish natural judge calibration, task quality, or refinement effectiveness; a dedicated claim-dashboard lane remains to be wired before this claim can be promoted."],
-      "statement": "The open publication target is source-bound T1 auto-evaluation semantic conformance, kept separate from judge and refinement quality.",
+      "limitations": ["The admitted T1 artifact does not establish natural judge calibration, task quality, Refine advice quality, or Best-of-N lift."],
+      "statement": "Imp has source-bound C1 evidence for deterministic SemanticF1 and CompleteAndGrounded normalization, aggregation, threshold, and prompt-shape semantics against authenticated DSPy 3.2.1 source.",
       "category": "evaluation",
       "surface": ["SemanticF1", "CompleteAndGrounded", "evaluation"],
       "claim_type": "conformance",
       "comparison": "dspy",
-      "gate_policy": "blocking",
+      "gate_policy": "informational",
       "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json", "test/auto_evaluation_contract_test.exs"],
-      "requirements": [{"id": "evaluation.auto_evaluation.semantic_conformance", "kind": "evaluation_conformance", "lane": "live_matched_model", "evidence": "full", "threshold": "a dedicated source-bound claim lane validates the admitted T1 auto-evaluation artifact against current committed source"}]
+      "requirements": [{"id": "evaluation.auto_evaluation.semantic_conformance", "kind": "evaluation_conformance", "lane": "auto_evaluation_contract", "evidence": "full", "threshold": "the canonical admitted T1 artifact passes its current pure protocol validator"}]
     },
     {
       "id": "claim.evaluation.natural_judge.effectiveness",

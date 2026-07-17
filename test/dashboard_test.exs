@@ -369,7 +369,7 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    assert dashboard["claims"]["summary"]["informational"] == 4
+    assert dashboard["claims"]["summary"]["informational"] == 5
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -382,6 +382,7 @@ defmodule DashboardTest do
 
     assert [
              "claim.dspy_semantics.golden_trace",
+             "claim.evaluation.auto_evaluation.semantic_conformance",
              "claim.failure_recovery.deterministic_t0",
              "claim.optimizer.bootstrap_few_shot.semantic_conformance",
              "claim.optimizer.copro.semantic_conformance",
@@ -404,12 +405,45 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["product_package"]["status"] == "full"
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
     assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
+    assert dashboard["lanes"]["auto_evaluation_contract"]["status"] == "full"
+    assert dashboard["lanes"]["auto_evaluation_contract"]["passing"]
+    assert dashboard["lanes"]["auto_evaluation_contract"]["full_evidence"]
+
+    assert dashboard["lanes"]["auto_evaluation_contract"]["candidate_eligibility"][
+             "policy"
+           ] == "immutable_admission"
+
+    assert dashboard["lanes"]["auto_evaluation_contract"]["candidate_eligibility"][
+             "eligible"
+           ]
+
     assert dashboard["lanes"]["bootstrap_few_shot_differential"]["status"] == "full"
     assert dashboard["lanes"]["bootstrap_few_shot_differential"]["passing"]
     assert dashboard["lanes"]["random_search_differential"]["status"] == "full"
     assert dashboard["lanes"]["random_search_differential"]["passing"]
     assert dashboard["lanes"]["copro_isolation"]["status"] == "full"
     assert dashboard["lanes"]["copro_isolation"]["passing"]
+
+    assert get_in(dashboard, [
+             "lanes",
+             "auto_evaluation_contract",
+             "summary",
+             "passing_cases"
+           ]) == 6
+
+    assert get_in(dashboard, [
+             "lanes",
+             "auto_evaluation_contract",
+             "summary",
+             "contract_complete"
+           ])
+
+    refute get_in(dashboard, [
+             "lanes",
+             "auto_evaluation_contract",
+             "summary",
+             "natural_data_quality"
+           ])
 
     assert get_in(dashboard, [
              "lanes",
@@ -468,6 +502,16 @@ defmodule DashboardTest do
              ["agents.failure_recovery.effectiveness"]
 
     assert blockers["claim.rlm.provider_free_benchmark"] == ["rlm_benchmark.full"]
+
+    refute Map.has_key?(blockers, "claim.evaluation.auto_evaluation.semantic_conformance")
+
+    assert blockers["claim.evaluation.natural_judge.effectiveness"] == [
+             "evaluation.natural_judge.effectiveness"
+           ]
+
+    assert blockers["claim.evaluation.refine_advice.effectiveness"] == [
+             "evaluation.refine_advice.effectiveness"
+           ]
 
     active_live_claim =
       Enum.find(
@@ -1363,6 +1407,45 @@ defmodule DashboardTest do
 
     assert_raise Mix.Error, ~r/unknown release profile/, fn ->
       Mix.Tasks.Imp.Benchmark.Dashboard.run(["--profile", "unknown", "--out", out_dir])
+    end
+  end
+
+  test "immutable admitted C1 lanes are revalidated without expiring by age" do
+    root = tmp_dir("dashboard-immutable-admission")
+    out_dir = Path.join(root, "out")
+    File.mkdir_p!(out_dir)
+
+    capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.dashboard")
+
+      Mix.Tasks.Imp.Benchmark.Dashboard.run([
+        "--profile",
+        "telos",
+        "--out",
+        out_dir,
+        "--max-age-hours",
+        "0"
+      ])
+    end)
+
+    [path] = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    dashboard = path |> File.read!() |> Jason.decode!()
+
+    for lane_id <- ~w(
+          auto_evaluation_contract
+          bootstrap_few_shot_differential
+          random_search_differential
+          copro_isolation
+        ) do
+      lane = get_in(dashboard, ["lanes", lane_id])
+      assert lane["status"] == "full"
+      assert lane["passing"]
+      assert lane["fresh"]
+      assert lane["full_evidence"]
+      assert lane["candidate_eligibility"]["policy"] == "immutable_admission"
+      assert lane["candidate_eligibility"]["eligible"]
+      assert lane["candidate_eligibility"]["validator_revalidated"]
+      refute lane["candidate_eligibility"]["recency_valid"]
     end
   end
 
