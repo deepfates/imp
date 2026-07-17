@@ -74,9 +74,10 @@ compiled = Imp.optimize(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 nothing to compile. (This line feeds it the four measurement examples just to
 show the shape — in a real run, train on data you are not scoring against, as
 the tutorial does.) Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
-use the same `Imp.optimize` shape and the same metric to compare many
-candidate programs. They spend model calls, so they cost dollars and take
-minutes, and the tutorial states both for its runs. An optimization counts
+compare many candidate programs with the same metric. `RandomSearch` fits the
+`Imp.optimize/3` shape above; `MIPROv2` and `GEPA` also require a validation
+set as a fourth argument (`Imp.optimize/4`). They spend model calls, so they
+cost dollars and take minutes, and the tutorial states both for its runs. An optimization counts
 as an improvement when a held-out score shows it, and not before.
 
 ## 4. Test It Without A Provider
@@ -210,7 +211,7 @@ base =
     config: [json_retries: 1]
   )
 
-routed = Imp.rag(base, Imp.memory(conventions, k: 2), k: 2)
+routed = Imp.rag(base, Imp.memory(conventions, k: 2), k: 2, query_field: :ticket)
 
 {:ok, prediction} = Imp.call(routed, %{ticket: "Refund attempts fail with a gateway timeout error."})
 

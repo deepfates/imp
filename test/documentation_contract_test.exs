@@ -109,7 +109,9 @@ defmodule DocumentationContractTest do
     user_surfaces =
       ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
 
-    banned = ~r/\bC1\b|authorit|\badmitted\b|tranche|differential|fixture/i
+    # "differential" left off the ban list deliberately: "executable
+    # differential tests" is the public conformance claim, not process vocab.
+    banned = ~r/\bC1\b|authorit|\badmitted\b|tranche|fixture/i
 
     offenders =
       for path <- user_surfaces,
@@ -133,7 +135,7 @@ defmodule DocumentationContractTest do
     learning = File.read!("docs/LEARNING_PATH.md")
     docs = File.read!("docs/README.md")
 
-    assert readme =~ "Program your LMs on the BEAM"
+    assert readme =~ "two kinds of intelligence"
     assert readme =~ "Imp.req_llm"
     assert readme =~ "OPENAI_API_KEY"
     assert readme =~ "docs/LEARNING_PATH.md"
@@ -152,7 +154,7 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/internal/IMP_PHILOSOPHY.md")
+    philosophy = File.read!("docs/PHILOSOPHY.md")
 
     assert readme =~ "Learning Path"
     assert docs =~ "## Manual Spine"

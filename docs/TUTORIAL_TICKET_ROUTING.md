@@ -62,7 +62,7 @@ lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_K
 router =
   "ticket -> team: enum[atlas,harbor,beacon,quill]"
   |> Imp.signature("Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.")
-  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 ```
 
 The enum means the model's answer is always one of your four squads. When the
@@ -114,9 +114,10 @@ compiled = Imp.optimize(router, optimizer, trainset)
 
 This one runs in milliseconds and makes no model calls: it selects the first
 eight training examples (two per squad in the shipped set). Search optimizers
-such as `RandomSearch` and `MIPROv2` use the same `Imp.optimize/3` shape but
 spend real model calls comparing many candidate programs — budget dollars and
-minutes for those the way you would for any experiment.
+minutes for those the way you would for any experiment. `RandomSearch` takes
+the same `Imp.optimize/3` shape; `MIPROv2` also requires a validation set, so
+it uses `Imp.optimize/4` with your dev split as the fourth argument.
 
 ## Prove It On Held-Out Data
 

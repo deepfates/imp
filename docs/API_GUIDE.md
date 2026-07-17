@@ -325,10 +325,20 @@ one_word =
 ```
 
 `Imp.multi_chain_comparison/2` is useful when candidate completions are
-already available:
+already available. The comparison step adds a required `rationale` output to
+the signature, so the model (scripted here) must return that field too:
 
 ```elixir
-chooser = Imp.multi_chain_comparison("question -> answer", lm: lm, m: 2)
+mcc_lm = %{
+  module: Imp.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{rationale: "both candidates compute 2+2 directly", answer: "4"}
+    end
+  ]
+}
+
+chooser = Imp.multi_chain_comparison("question -> answer", lm: mcc_lm, m: 2)
 
 Imp.call(chooser, %{
   question: "2+2?",
