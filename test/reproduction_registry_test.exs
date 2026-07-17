@@ -140,6 +140,35 @@ defmodule Imp.ReproductionRegistryTest do
                "protocol_id" => nil
              }
     end
+
+    expected_protocols = [
+      {"avatar", "avatar_actor_differential", "imp.benchmark.avatar_actor_differential",
+       "benchmarks/config/avatar-actor-differential-v1.json"},
+      {"avatar_optimizer", "avatar_optimizer_differential",
+       "imp.benchmark.avatar_optimizer_differential",
+       "benchmarks/config/avatar-optimizer-differential-v1.json"},
+      {"bootstrap_finetune", "bootstrap_finetune_differential",
+       "imp.benchmark.bootstrap_finetune_differential",
+       "benchmarks/config/weight-composition-differential-v1.json"},
+      {"better_together", "better_together_differential",
+       "imp.benchmark.better_together_differential",
+       "benchmarks/config/weight-composition-differential-v1.json"},
+      {"ensemble", "ensemble_differential", "imp.benchmark.ensemble_differential",
+       "benchmarks/config/ensemble-differential-v1.json"},
+      {"grpo", "mmgrpo_differential", "imp.benchmark.mmgrpo_differential",
+       "benchmarks/config/mmgrpo-differential-v1.json"}
+    ]
+
+    Enum.each(expected_protocols, fn {feature_id, protocol_id, task, manifest} ->
+      protocol = get_in(registry, ["protocols", protocol_id])
+      assert protocol["mode"] == "provider_free"
+      assert protocol["max_tier"] == "t1"
+      assert protocol["task"] == task
+      assert protocol["args"] == ["--require-clean"]
+      assert protocol["manifest"] == manifest
+      assert protocol_id in features[feature_id]["protocol_ids"]
+      assert protocol["artifact_validator"]["function"] == "validate!"
+    end)
   end
 
   test "rejects duplicate ownership and omitted authority families" do

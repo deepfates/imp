@@ -33,12 +33,12 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | MIPROv2 | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | SIMBA | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | GEPA | replication | gepa_contract<br>gepa_live | NONE | none |
-| Avatar actor | adaptation | provider_training | NONE | none |
-| Avatar optimizer | adaptation | provider_training | NONE | none |
-| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
-| GRPO | adaptation | provider_training | NONE | none |
-| BetterTogether | adaptation | provider_training | NONE | none |
-| Ensemble | adaptation | optimizer_lift | NONE | none |
+| Avatar actor | adaptation | provider_training<br>avatar_actor_differential | NONE | none |
+| Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | NONE | none |
+| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training<br>bootstrap_finetune_differential | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
+| GRPO | adaptation | provider_training<br>mmgrpo_differential | NONE | none |
+| BetterTogether | adaptation | provider_training<br>better_together_differential | NONE | none |
+| Ensemble | adaptation | optimizer_lift<br>ensemble_differential | NONE | none |
 | Fast-Slow training and CISPO | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |

@@ -1,0 +1,56 @@
+{
+  "fixture_id": "dspy-avatar-actor-c1-v1",
+  "source": {
+    "authority_family": "family.optimizer_avatar_actor",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "source_files": [
+      {"path": "dspy/predict/avatar/__init__.py", "sha256": "be8d00352f3cb3ff6969c8af7eef5b08faad277ffccb844b8b16b93c7e06aaa6"},
+      {"path": "dspy/predict/avatar/avatar.py", "sha256": "9b41efb8837de2bfe85914e7b5dc0117ef56570cb5dcb816b032aa205016f0bf"},
+      {"path": "dspy/predict/avatar/models.py", "sha256": "127cd0fadab0bf14a0954812562948b424b5d08aa66225e3e0694e4f99cf0a8a"},
+      {"path": "dspy/predict/avatar/signatures.py", "sha256": "a4e76f3808bca9a85915de845574cc7300c2f55405add770cf078a2cb07147c2"}
+    ]
+  },
+  "fixture": {
+    "question": "Capital of France?",
+    "tool_name": "lookup",
+    "tool_query": "France",
+    "tool_output": "Paris",
+    "answer": "Paris"
+  },
+  "expected": {
+    "answer": "Paris",
+    "actor_call_count": 3,
+    "finish_selected": true,
+    "finalizer_received_tool_result": true,
+    "recorded_actions": [
+      {"tool_name": "lookup", "tool_input_query": "France", "tool_output": "Paris"}
+    ]
+  },
+  "scope": {
+    "claims": [
+      "Imp and pinned DSPy 3.2.1 execute one typed tool action before Finish",
+      "Imp and pinned DSPy 3.2.1 expose the successful non-Finish action result in ordered history",
+      "Imp and pinned DSPy 3.2.1 use the tool result when producing the declared final output"
+    ],
+    "native_deviations": [
+      "Imp enforces the configured actor iteration bound while DSPy 3.2.1 does not consistently use its constructor max_iters",
+      "Imp uses a separate typed finisher instead of mutating and reusing the actor signature",
+      "Imp records unknown, denied, crashed, and timed-out tools as recoverable observations"
+    ],
+    "not_claimed": [
+      "exact prompt or signature parity",
+      "provider behavior or model tool selection",
+      "tool failure behavior parity",
+      "task effectiveness",
+      "full Avatar parity"
+    ]
+  }
+}

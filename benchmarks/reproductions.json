@@ -119,6 +119,96 @@
         "arity": 2
       }
     },
+    "avatar_actor_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.avatar_actor_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/avatar-actor-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "avatar_optimizer_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.avatar_optimizer_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/avatar-optimizer-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "bootstrap_finetune_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.bootstrap_finetune_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/weight-composition-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "better_together_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.better_together_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/weight-composition-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "ensemble_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.ensemble_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/ensemble-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "mmgrpo_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.mmgrpo_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/mmgrpo-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
     "rag_failure_differential": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -1007,7 +1097,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "avatar_actor_differential"
       ],
       "admitted_evidence": {
         "tier": "none",
@@ -1030,7 +1121,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "avatar_optimizer_differential"
       ],
       "admitted_evidence": {
         "tier": "none",
@@ -1059,7 +1151,8 @@
       "classification": "adaptation",
       "protocol_ids": [
         "local_mlx",
-        "provider_training"
+        "provider_training",
+        "bootstrap_finetune_differential"
       ],
       "admitted_evidence": {
         "tier": "t2",
@@ -1084,7 +1177,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "mmgrpo_differential"
       ],
       "admitted_evidence": {
         "tier": "none",
@@ -1107,7 +1201,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "better_together_differential"
       ],
       "admitted_evidence": {
         "tier": "none",
@@ -1130,7 +1225,8 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "optimizer_lift"
+        "optimizer_lift",
+        "ensemble_differential"
       ],
       "admitted_evidence": {
         "tier": "none",

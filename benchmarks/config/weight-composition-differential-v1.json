@@ -1,0 +1,47 @@
+{
+  "fixture_id": "dspy-weight-composition-c1-v1",
+  "source": {
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "families": {
+      "bootstrap_finetune": {
+        "authority_family": "family.optimizer_bootstrap_finetune",
+        "source": {"path": "dspy/teleprompt/bootstrap_finetune.py", "sha256": "d3d3411e8f00d36fc7967290753af66bbe31b01038363e8685427cc58af5963f"},
+        "upstream_test": {"path": "tests/teleprompt/test_bootstrap_finetune.py", "sha256": "2e96b40f24ec9633139e6a6ed19f0ffc4add95fb82d88779a1b54b705927f4f3"}
+      },
+      "better_together": {
+        "authority_family": "family.optimizer_better_together",
+        "source": {"path": "dspy/teleprompt/bettertogether.py", "sha256": "e9ea96ed106d063e30c994dc0ebd4601fd099b9c3b91d43d92acb71e30f38334"},
+        "upstream_test": {"path": "tests/teleprompt/test_bettertogether.py", "sha256": "b6869bb8edfbcebe5efcf3e3c075fe4ef1c47ea97059e4b8cd80ca17dd06e9a8"}
+      }
+    }
+  },
+  "bootstrap_finetune": {
+    "expected_shared": {"multitask_job_count": 1, "per_predictor_job_count": 2, "trace_call_members": ["first", "second"]},
+    "expected_dspy_deviation": {"requested_predictor_0_rows": ["first", "second"], "requested_predictor_1_rows": ["first", "second"], "cause": "pred_ind loop-variable shadowing in DSPy 3.2.1"},
+    "expected_imp_native": {"requested_predictor_0_rows": ["first"], "requested_predictor_1_rows": ["second"], "launch_timeout_ms": 300000, "cancellation_timeout_ms": 5000}
+  },
+  "better_together": {
+    "strategy": "p -> w -> p",
+    "scores": [0.0, 1.0, 1.0, 0.0],
+    "expected_shared": {"steps": ["p", "w", "p"], "candidate_prefixes": ["", "p", "p -> w", "p -> w -> p"], "selected_with_validation": "p", "selected_without_validation": "p -> w -> p", "earlier_tie_wins": true},
+    "expected_imp_native": {"training_launch_timeout_ms": 300000, "training_timeout_ms": 300000, "training_poll_interval_ms": 1000, "training_cancellation_timeout_ms": 5000}
+  },
+  "scopes": {
+    "bootstrap_finetune": {
+      "claims": ["shared-LM multitask and per-predictor job topology agree", "accepted trace-call membership agrees", "Imp intentionally corrects DSPy 3.2.1 pred_ind shadowing"],
+      "not_claimed": ["exact cross-runtime trace-row order", "provider behavior or effectiveness", "training-result quality", "full optimizer parity"]
+    },
+    "better_together": {
+      "claims": ["strategy parsing and successful-prefix enumeration agree", "validation selection uses stable earlier-wins tie handling", "no-validation selection returns the latest successful prefix"],
+      "not_claimed": ["exact Python shuffle order", "provider behavior or effectiveness", "training-result quality", "full optimizer parity"]
+    }
+  }
+}

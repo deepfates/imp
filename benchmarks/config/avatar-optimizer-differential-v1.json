@@ -1,0 +1,54 @@
+{
+  "fixture_id": "dspy-avatar-optimizer-c1-v1",
+  "source": {
+    "authority_family": "family.optimizer_avatar_optimizer",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "source_files": [
+      {"path": "dspy/teleprompt/avatar_optimizer.py", "sha256": "628eefedcdcdbc296bab0256ec8e3ed932e91fd75f1f8d56081cee5a40abe5ae"}
+    ]
+  },
+  "fixture": {
+    "initial_instruction": "Use the lookup tool.",
+    "feedback": "Use the exact country name.",
+    "rewritten_instruction": "Use the exact country name, then finish.",
+    "positive_score": 1.0,
+    "negative_score": 0.0,
+    "lower_bound": 0.0,
+    "upper_bound": 1.0
+  },
+  "expected": {
+    "positive_count": 1,
+    "negative_count": 1,
+    "comparator_call_count": 1,
+    "rewriter_call_count": 1,
+    "feedback_propagated": true,
+    "final_instruction": "Use the exact country name, then finish."
+  },
+  "scope": {
+    "claims": [
+      "Imp and pinned DSPy 3.2.1 classify one upper-bound trajectory as positive and one lower-bound trajectory as negative",
+      "Imp and pinned DSPy 3.2.1 invoke one comparator and one feedback-based instruction rewrite for one optimizer iteration",
+      "Imp and pinned DSPy 3.2.1 propagate comparator feedback into the rewritten actor instruction"
+    ],
+    "native_deviations": [
+      "Imp evaluates the rewritten candidate and retains it only when its measured score improves; DSPy 3.2.1 updates from the pre-rewrite score",
+      "Imp returns an executable diagnostic baseline when a positive or negative trajectory class is absent",
+      "Imp takes bounded examples deterministically rather than using Python process-global random.sample"
+    ],
+    "not_claimed": [
+      "exact Python RNG or sampling parity",
+      "exact comparator prompt parity",
+      "provider behavior or effectiveness",
+      "rewrite quality or held-out lift",
+      "full AvatarOptimizer parity"
+    ]
+  }
+}

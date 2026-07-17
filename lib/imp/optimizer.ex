@@ -58,7 +58,8 @@ defmodule Imp.Optimizer do
   @spec capabilities(struct()) :: {:ok, capabilities()} | {:error, term()}
   def capabilities(%module{} = _optimizer) do
     try do
-      with true <- function_exported?(module, :__optimizer__, 0),
+      with true <- Code.ensure_loaded?(module),
+           true <- function_exported?(module, :__optimizer__, 0),
            true <- function_exported?(module, :run, 3),
            capabilities <- module.__optimizer__(),
            :ok <- validate_capabilities(capabilities) do
