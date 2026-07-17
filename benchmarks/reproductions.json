@@ -765,10 +765,9 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9.json",
-        "artifact_sha256": "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9",
-        "protocol_id": "bootstrap_few_shot_differential"
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
       }
     },
     {
@@ -793,10 +792,9 @@
         "optimizer_lift"
       ],
       "admitted_evidence": {
-        "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/random_search_differential/2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318.json",
-        "artifact_sha256": "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318",
-        "protocol_id": "random_search_differential"
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
       }
     },
     {
@@ -842,10 +840,9 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json",
-        "artifact_sha256": "cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d",
-        "protocol_id": "copro_isolation"
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
       }
     },
     {
@@ -995,7 +992,7 @@
     {
       "id": "avatar",
       "name": "Avatar actor",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_avatar_actor",
       "surface_tokens": [
         "Avatar"
       ],
@@ -1018,7 +1015,7 @@
     {
       "id": "avatar_optimizer",
       "name": "Avatar optimizer",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_avatar_optimizer",
       "surface_tokens": [
         "AvatarOptimizer"
       ],
@@ -1041,7 +1038,7 @@
     {
       "id": "bootstrap_finetune",
       "name": "BootstrapFinetune and training protocol",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_bootstrap_finetune",
       "surface_tokens": [
         "BootstrapFinetune",
         "training_protocol",
@@ -1071,7 +1068,7 @@
     {
       "id": "grpo",
       "name": "GRPO",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_mmgrpo",
       "surface_tokens": [
         "GRPO",
         "mmGRPO"
@@ -1095,7 +1092,7 @@
     {
       "id": "better_together",
       "name": "BetterTogether",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_better_together",
       "surface_tokens": [
         "BetterTogether"
       ],
@@ -1118,7 +1115,7 @@
     {
       "id": "ensemble",
       "name": "Ensemble",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_ensemble",
       "surface_tokens": [
         "Ensemble"
       ],

@@ -4,7 +4,7 @@ defmodule DashboardTest do
   import ExUnit.CaptureIO
 
   @local_mlx_fixture Path.expand(
-                       "../benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json",
+                       "../benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json",
                        __DIR__
                      )
 
@@ -344,6 +344,7 @@ defmodule DashboardTest do
     refute dashboard["profile_gate"]["passing"]
 
     assert dashboard["profile_gate"]["blocking_lanes"] == [
+             "copro_isolation",
              "failure_recovery",
              "gepa_replication",
              "live_matched_model",
@@ -369,7 +370,7 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    assert dashboard["claims"]["summary"]["informational"] == 2
+    assert dashboard["claims"]["summary"]["informational"] == 1
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -383,7 +384,6 @@ defmodule DashboardTest do
     assert [
              "claim.dspy_semantics.golden_trace",
              "claim.failure_recovery.deterministic_t0",
-             "claim.optimizer.copro.semantic_conformance",
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
@@ -402,21 +402,7 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["product_package"]["status"] == "full"
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
     assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
-    assert dashboard["lanes"]["copro_isolation"]["status"] == "full"
-    assert dashboard["lanes"]["copro_isolation"]["passing"]
-
-    assert get_in(dashboard, ["lanes", "copro_isolation", "artifact", "path"]) ==
-             "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json"
-
-    assert get_in(dashboard, ["lanes", "copro_isolation", "artifact", "sha256"]) ==
-             "cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d"
-
-    assert get_in(dashboard, [
-             "lanes",
-             "copro_isolation",
-             "summary",
-             "deterministic_observations_verified"
-           ]) == 5
+    assert dashboard["lanes"]["copro_isolation"]["status"] == "missing"
 
     assert dashboard["lanes"]["live_provider_smoke"]["status"] == "missing"
     assert dashboard["lanes"]["failure_recovery"]["status"] == "passing"

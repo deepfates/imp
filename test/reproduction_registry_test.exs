@@ -47,7 +47,7 @@ defmodule Imp.ReproductionRegistryTest do
     refute "bfcl_shaped_scorer" in react["protocol_ids"]
   end
 
-  test "COPRO isolation has a pure provider-free T1 admission protocol" do
+  test "COPRO isolation has a pure provider-free T1 protocol awaiting recapture" do
     registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
     protocol = get_in(registry, ["protocols", "copro_isolation"])
     copro = Enum.find(registry["features"], &(&1["id"] == "copro"))
@@ -67,13 +67,12 @@ defmodule Imp.ReproductionRegistryTest do
            }
 
     assert "copro_isolation" in copro["protocol_ids"]
-    evidence = copro["admitted_evidence"]
-    assert evidence["tier"] == "t1"
-    assert evidence["protocol_id"] == "copro_isolation"
-    assert evidence["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
 
-    assert evidence["artifact"] ==
-             "benchmarks/evidence/admitted/copro_isolation/#{evidence["artifact_sha256"]}.json"
+    assert copro["admitted_evidence"] == %{
+             "tier" => "none",
+             "artifact" => nil,
+             "protocol_id" => nil
+           }
   end
 
   test "classical optimizer families have separate provider-free T1 protocols" do
@@ -81,14 +80,12 @@ defmodule Imp.ReproductionRegistryTest do
 
     expected = [
       {"bootstrap_few_shot", "bootstrap_few_shot_differential",
-       "imp.benchmark.bootstrap_few_shot_differential",
-       "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9"},
+       "imp.benchmark.bootstrap_few_shot_differential"},
       {"bootstrap_random_search", "random_search_differential",
-       "imp.benchmark.random_search_differential",
-       "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318"}
+       "imp.benchmark.random_search_differential"}
     ]
 
-    Enum.each(expected, fn {feature_id, protocol_id, task, sha256} ->
+    Enum.each(expected, fn {feature_id, protocol_id, task} ->
       feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
       protocol = get_in(registry, ["protocols", protocol_id])
       assert protocol["mode"] == "provider_free"
@@ -99,12 +96,45 @@ defmodule Imp.ReproductionRegistryTest do
       assert protocol_id in feature["protocol_ids"]
 
       assert feature["admitted_evidence"] == %{
-               "tier" => "t1",
-               "artifact" => "benchmarks/evidence/admitted/#{protocol_id}/#{sha256}.json",
-               "artifact_sha256" => sha256,
-               "protocol_id" => protocol_id
+               "tier" => "none",
+               "artifact" => nil,
+               "protocol_id" => nil
              }
     end)
+  end
+
+  test "weight and composition reproductions own six independent authority families" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+    features = Map.new(registry["features"], &{&1["id"], &1})
+
+    assert %{
+             "avatar" => "family.optimizer_avatar_actor",
+             "avatar_optimizer" => "family.optimizer_avatar_optimizer",
+             "bootstrap_finetune" => "family.optimizer_bootstrap_finetune",
+             "grpo" => "family.optimizer_mmgrpo",
+             "better_together" => "family.optimizer_better_together",
+             "ensemble" => "family.optimizer_ensemble"
+           } ==
+             Map.new(
+               ~w(avatar avatar_optimizer bootstrap_finetune grpo better_together ensemble),
+               &{&1, features[&1]["authority_family"]}
+             )
+
+    bootstrap = features["bootstrap_finetune"]["admitted_evidence"]
+
+    assert bootstrap["artifact"] ==
+             "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
+
+    assert bootstrap["artifact_sha256"] ==
+             "7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d"
+
+    for id <- ~w(avatar avatar_optimizer grpo better_together ensemble) do
+      assert features[id]["admitted_evidence"] == %{
+               "tier" => "none",
+               "artifact" => nil,
+               "protocol_id" => nil
+             }
+    end
   end
 
   test "rejects duplicate ownership and omitted authority families" do

@@ -144,6 +144,18 @@ positive held-out accuracy and macro-F1 lift, and exact fused/save-load row
 equivalence. This proves the local training and deployment substrate only; it
 does not authorize paid-provider, BetterTogether, GRPO, or DSPy-matched parity.
 
+Weight and composition claims are divided into six authority families: Avatar
+actor, AvatarOptimizer, BootstrapFinetune, DSPy mmGRPO, BetterTogether, and
+Ensemble. Each has its own C0 API claim, C1 source-conformance target, and C3
+effectiveness target. Avatar actor task quality is separate from AvatarOptimizer
+rewrite lift. The clean Imp local-MLX artifact belongs only to
+BootstrapFinetune's local-effectiveness claim; the legacy DSex artifact is not
+Imp evidence. C1 work must preserve the declared native differences, including
+Avatar candidate evaluation, BootstrapFinetune's `pred_ind` correction,
+GRPO's durable dispatch lifecycle, BetterTogether's bounded generic optimizer
+contract, and Ensemble's deterministic replay. Exact Python RNG parity is not
+implied.
+
 Failure-recovery operational evidence is limited to two required local rows:
 provider-shaped timeout/retry/idempotency and integration retrieval plus exact
 tool-agent failure/retry/submit recovery. The campaign uses injected local

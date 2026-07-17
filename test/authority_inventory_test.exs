@@ -175,17 +175,17 @@ defmodule AuthorityInventoryTest do
   test "mmGRPO implementation authority is DSPy source and DeepSeekMath is background only" do
     family =
       read_json!(@authority_path)["families"]
-      |> Enum.find(&(&1["id"] == "family.optimizer_weights"))
+      |> Enum.find(&(&1["id"] == "family.optimizer_mmgrpo"))
 
-    authorities = family["additional_primary_authorities"]
-
-    assert %{
+    assert family["primary_authority"] == %{
+             "status" => "pinned",
+             "locator" =>
+               "https://github.com/stanfordnlp/dspy/blob/29448ae12756abdd14bd8796c819247ebb83673c/dspy/teleprompt/grpo.py",
              "revision" => "29448ae12756abdd14bd8796c819247ebb83673c",
-             "surface" => "DSPy mmGRPO implementation contract",
              "title" => "DSPy 3.2.1 mmGRPO"
-           } = Enum.find(authorities, &(&1["title"] == "DSPy 3.2.1 mmGRPO"))
+           }
 
-    deepseek = Enum.find(authorities, &String.starts_with?(&1["title"], "DeepSeekMath"))
+    deepseek = hd(family["background_authorities"])
     assert deepseek["surface"] =~ "background only"
     assert deepseek["surface"] =~ "not the Imp implementation authority"
   end
@@ -200,20 +200,55 @@ defmodule AuthorityInventoryTest do
     assert MapSet.difference(claimed_tokens, mapped_tokens) == MapSet.new()
   end
 
-  test "weight authority records partial local evidence without claiming family parity" do
-    family =
-      read_json!(@authority_path)["families"]
-      |> Enum.find(&(&1["id"] == "family.optimizer_weights"))
+  test "weight families have separate authorities and only Imp BootstrapFinetune owns local evidence" do
+    families = Map.new(read_json!(@authority_path)["families"], &{&1["id"], &1})
 
-    assert "local_weight_training" in family["surface_tokens"]
-    assert family["dataset_protocol"]["status"] == "partial"
-    assert family["local_differential"]["status"] == "partial"
+    expected = %{
+      "family.optimizer_avatar_actor" =>
+        {"dspy/predict/avatar/avatar.py",
+         "9b41efb8837de2bfe85914e7b5dc0117ef56570cb5dcb816b032aa205016f0bf"},
+      "family.optimizer_avatar_optimizer" =>
+        {"dspy/teleprompt/avatar_optimizer.py",
+         "628eefedcdcdbc296bab0256ec8e3ed932e91fd75f1f8d56081cee5a40abe5ae"},
+      "family.optimizer_bootstrap_finetune" =>
+        {"dspy/teleprompt/bootstrap_finetune.py",
+         "d3d3411e8f00d36fc7967290753af66bbe31b01038363e8685427cc58af5963f"},
+      "family.optimizer_mmgrpo" =>
+        {"dspy/teleprompt/grpo.py",
+         "da7f570df12bafc46ab9dc68b1e99cf2e233a30b7c08bd35e284b9c8738b96df"},
+      "family.optimizer_better_together" =>
+        {"dspy/teleprompt/bettertogether.py",
+         "e9ea96ed106d063e30c994dc0ebd4601fd099b9c3b91d43d92acb71e30f38334"},
+      "family.optimizer_ensemble" =>
+        {"dspy/teleprompt/ensemble.py",
+         "f206b5891d79b11590dc3ab41a9c22e249d3fa015f3c410d801f42759ef90793"}
+    }
 
-    assert family["local_differential"]["artifacts"] == [
-             "benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json"
+    Enum.each(expected, fn {id, {source, hash}} ->
+      family = Map.fetch!(families, id)
+
+      assert Enum.any?(family["upstream_repository"]["source_paths"], fn path ->
+               source == path or String.starts_with?(source, path <> "/")
+             end)
+
+      assert hash in family["upstream_source_hashes"]
+      assert family["primary_authority"]["status"] == "pinned"
+    end)
+
+    refute Map.has_key?(families, "family.optimizer_weights")
+
+    bootstrap = families["family.optimizer_bootstrap_finetune"]
+
+    assert bootstrap["local_differential"]["artifacts"] == [
+             "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
            ]
 
-    assert family["notes"] =~ "not paid-provider"
+    refute inspect(bootstrap) =~
+             "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16"
+
+    for {id, _} <- expected, id != "family.optimizer_bootstrap_finetune" do
+      assert families[id]["local_differential"] == %{"status" => "gap", "artifacts" => []}
+    end
   end
 
   test "every upstream map row, coverage concept, and parity lane is mapped" do

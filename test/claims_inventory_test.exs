@@ -185,6 +185,7 @@ defmodule ClaimsInventoryTest do
     for family <- ~w(bootstrap_few_shot random_search) do
       semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
       effectiveness = claims["claim.optimizer.#{family}.effectiveness"]
+      assert semantic["claim_state"] == "target"
       assert semantic["target_rung"] == "C1"
       assert semantic["claim_type"] == "conformance"
       assert effectiveness["target_rung"] == "C3"
@@ -192,13 +193,63 @@ defmodule ClaimsInventoryTest do
     end
 
     copro = claims["claim.optimizer.copro.semantic_conformance"]
-    assert copro["claim_state"] == "asserted"
+    assert copro["claim_state"] == "target"
     assert copro["target_rung"] == "C1"
-    assert copro["sources"] |> Enum.any?(&String.contains?(&1, "cead13aa"))
     assert get_in(copro, ["requirements", Access.at(0), "lane"]) == "copro_isolation"
-    assert hd(copro["limitations"]) =~ "excludes exact Python RNG parity"
+    assert hd(copro["limitations"]) =~ "exact Python RNG parity"
 
     refute Map.has_key?(claims, "claim.optimizer_lift.full")
+  end
+
+  test "weight families have independent C0, C1, and C3 obligations" do
+    claims = Map.new(read_claims!(), &{&1["id"], &1})
+
+    families = %{
+      "avatar_actor" => ["Avatar"],
+      "avatar_optimizer" => ["AvatarOptimizer"],
+      "bootstrap_finetune" => ["BootstrapFinetune"],
+      "mmgrpo" => ["GRPO", "mmGRPO"],
+      "better_together" => ["BetterTogether"],
+      "ensemble" => ["Ensemble"]
+    }
+
+    Enum.each(families, fn {family, surfaces} ->
+      api = claims["claim.optimizer.#{family}.api"]
+      semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
+
+      assert api["claim_state"] == "asserted"
+      assert api["target_rung"] == "C0"
+      assert api["claim_type"] == "feature_completeness"
+      assert get_in(api, ["requirements", Access.at(0), "lane"]) == "product_package"
+
+      assert semantic["claim_state"] == "target"
+      assert semantic["target_rung"] == "C1"
+      assert semantic["claim_type"] == "conformance"
+      assert get_in(semantic, ["requirements", Access.at(0), "lane"]) == "optimizer_lift"
+      assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(api["surface"]))
+      assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(semantic["surface"]))
+    end)
+
+    assert claims["claim.optimizer.avatar_actor.effectiveness"]["surface"] == ["Avatar"]
+
+    assert claims["claim.optimizer.avatar_optimizer.effectiveness"]["surface"] == [
+             "AvatarOptimizer"
+           ]
+
+    refute Map.has_key?(claims, "claim.optimizer.avatar.effectiveness")
+
+    c3_ids = ~w(
+      claim.optimizer.avatar_actor.effectiveness
+      claim.optimizer.avatar_optimizer.effectiveness
+      claim.optimizer.bootstrap_finetune.provider_effectiveness
+      claim.optimizer.mmgrpo.effectiveness
+      claim.optimizer.better_together.effectiveness
+      claim.optimizer.ensemble.effectiveness
+    )
+
+    for id <- c3_ids do
+      assert claims[id]["target_rung"] == "C3"
+    end
   end
 
   test "OA bounded effectiveness and evaluation quality gaps remain explicit" do

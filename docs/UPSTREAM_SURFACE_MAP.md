@@ -439,12 +439,18 @@ Missing evidence or behavior:
 
 Status: `elixir_native_equivalent`
 
-Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
+Upstream source: six independently pinned DSPy 3.2.1 families: `dspy/predict/avatar`, `dspy/teleprompt/avatar_optimizer.py`, `bootstrap_finetune.py`, `grpo.py`, `bettertogether.py`, and `ensemble.py`
 
 The implementation authority for `Imp.Optimizer.GRPO` is DSPy 3.2.1's pinned
 `dspy/teleprompt/grpo.py` mmGRPO contract at commit `29448ae…`. The DeepSeekMath
 GRPO paper is retained as algorithmic background only; it is not used to claim
 that Imp reproduces the paper trainer or results.
+
+The authority ledger keeps Avatar actor, AvatarOptimizer, BootstrapFinetune,
+mmGRPO, BetterTogether, and Ensemble separate. Source-defined families cite
+their exact DSPy file hashes; BootstrapFinetune and BetterTogether additionally
+cite the pinned BetterTogether paper. Their C0 API claims, C1 semantic targets,
+and C3 effectiveness targets must not satisfy one another.
 
 Imp modules: `Imp.Predict.Avatar`, `Imp.Optimizer.Avatar`, `Imp.Optimizer.BootstrapFinetune`, `Imp.Optimizer.GRPO`, `Imp.Optimizer.BetterTogether`, `Imp.Optimizer.Ensemble`
 Elixir-native rationale: BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.
@@ -470,14 +476,15 @@ Executable evidence:
 - docs: `docs/ADVANCED.md`
 - docs: `docs/COVERAGE_MATRIX.md`
 - docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
-- artifact: `benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json`
+- artifact: `benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json`
 
 Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
-- matched Avatar and AvatarOptimizer effectiveness
-- matched BetterTogether and GRPO effectiveness
+- source-bound C1 differentials for all six independent families
+- matched Avatar actor and AvatarOptimizer effectiveness as separate claims
+- matched Ensemble, BetterTogether, BootstrapFinetune-provider, and mmGRPO effectiveness
 
 ### `optimization.fast_slow`
 

@@ -23,10 +23,10 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | CompleteAndGrounded auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
 | Best-of-N and refinement | adaptation | confidence_calibration | NONE | none |
 | LabeledFewShot | replication | optimizer_lift | NONE | none |
-| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9.json |
-| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318.json |
+| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | NONE | none |
+| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | NONE | none |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | NONE | none |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |
