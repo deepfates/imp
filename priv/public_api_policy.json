@@ -31,8 +31,13 @@
       "category": "internal",
       "modules": [
         "Imp.Agent.Runtime",
+        "Imp.FieldSelector",
+        "Imp.FunctionContract",
         "Imp.Observability.Inspection",
-        "Imp.Tasks"
+        "Imp.Options",
+        "Imp.ProgramAccess",
+        "Imp.Tasks",
+        "Imp.ToolPolicy"
       ]
     },
     {
