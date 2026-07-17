@@ -7,9 +7,11 @@ signature, a callable program, examples, a metric, and optional program
 transformations. The model provider is a runtime dependency, so deterministic
 tests use `Imp.LM.Static` and a live provider does not change the task shape.
 
-Install from Git with `{:imp, github: "deepfates/imp", branch: "main"}`.
-In a source checkout, use `{:imp, path: "."}` while developing against the
-local repository. Then follow the [Learning Path](docs/LEARNING_PATH.md). It is
+Install the immutable release from Hex with `{:imp, "~> 0.1.0"}`. To pin the
+same release directly from Git, use
+`{:imp, github: "deepfates/imp", tag: "v0.1.0"}`. In a source checkout, use
+`{:imp, path: "."}` while developing against the local repository. Then follow
+the [Learning Path](docs/LEARNING_PATH.md). It is
 the canonical, self-contained route from a signature and `Predict` through
 evaluation, measured optimization, tools/ReAct, retrieval, RLM, persistence,
 observability, and OTP deployment.
