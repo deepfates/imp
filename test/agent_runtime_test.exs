@@ -461,5 +461,89 @@ defmodule AgentRuntimeTest do
            ] = events
   end
 
+  test "event sink exceptions are surfaced loudly without killing the run" do
+    parent = self()
+    handler_id = "agent-sink-exception-#{System.unique_integer([:positive])}"
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:imp, :agent, :event_sink, :exception],
+        fn event, measurements, metadata, _config ->
+          send(parent, {:sink_exception, event, measurements, metadata})
+        end,
+        nil
+      )
+
+    runtime = Runtime.new(event_sink: fn _event -> raise "sink exploded" end)
+    agent = Agent.new(:worker, fn %{x: x}, runtime -> {:ok, %{x: x + 1}, runtime} end)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, %{x: 2}, runtime} = Agent.run(agent, %{x: 1}, runtime)
+        assert [%{type: :agent, agent: :worker}] = runtime.traces
+      end)
+
+    assert log =~ "event sink"
+    assert log =~ "sink exploded"
+
+    assert_received {:sink_exception, [:imp, :agent, :event_sink, :exception], _measurements,
+                     metadata}
+
+    assert metadata.error =~ "sink exploded"
+  end
+
+  test "event sink throws and exits are surfaced loudly without killing the run" do
+    parent = self()
+    handler_id = "agent-sink-throw-#{System.unique_integer([:positive])}"
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:imp, :agent, :event_sink, :exception],
+        fn event, measurements, metadata, _config ->
+          send(parent, {:sink_exception, event, measurements, metadata})
+        end,
+        nil
+      )
+
+    runtime = Runtime.new(event_sink: fn _event -> throw(:sink_bailed) end)
+    agent = Agent.new(:worker, fn %{x: x}, runtime -> {:ok, %{x: x + 1}, runtime} end)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, %{x: 2}, _runtime} = Agent.run(agent, %{x: 1}, runtime)
+      end)
+
+    assert log =~ "event sink"
+    assert log =~ "sink_bailed"
+
+    assert_received {:sink_exception, [:imp, :agent, :event_sink, :exception], _measurements,
+                     metadata}
+
+    assert metadata.error =~ "sink_bailed"
+  end
+
+  test "missing context references become structured errors instead of raw tuples" do
+    agent = Agent.new(:reader, fn inputs, runtime -> {:ok, inputs, runtime} end)
+
+    assert {:error, {:missing_context, [:document]}, runtime} =
+             Agent.run(agent, %{doc: {:context_ref, :document}}, Runtime.new())
+
+    assert [
+             %{type: :agent_error, agent: :reader, error: {:missing_context, [:document]}}
+           ] = runtime.traces
+  end
+
+  test "moduledoc does not overclaim typed validation" do
+    {:docs_v1, _anno, _lang, _format, %{"en" => moduledoc}, _meta, _docs} =
+      Code.fetch_docs(Imp.Agent)
+
+    refute moduledoc =~ ~r/typed agent/i
+    assert moduledoc =~ "required-key presence"
+  end
+
   defp agent_ref, do: Process.get(:agent_ref)
 end
