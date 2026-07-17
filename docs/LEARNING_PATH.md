@@ -62,9 +62,9 @@ that returns a boolean, number, or structured score.
 
 An optimizer compiles your program into a better one, using training data and
 your metric. The [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) runs
-this workflow end to end on sixty labeled tickets and is the honest version of
-this section: a real baseline, a real held-out score (35% → 90% in our run,
-for about a cent), and an inspectable diff of what changed. The shape is:
+this workflow end to end on sixty labeled tickets, with a baseline, a
+held-out score (35% to 90% in our run, for about a cent), and a readable
+diff of what changed. The shape is:
 
 ```elixir
 compiled = Imp.optimize(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
@@ -74,10 +74,11 @@ compiled = Imp.optimize(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 nothing to compile. (This line feeds it the four measurement examples just to
 show the shape — in a real run, train on data you are not scoring against, as
 the tutorial does.) Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
-use the same `Imp.optimize` shape and the same metric to compare many
-candidate programs; they spend real model calls, so budget dollars and
-minutes for them the way you would for any experiment. Never call an
-optimization an improvement until a held-out score supports it.
+compare many candidate programs with the same metric. `RandomSearch` fits the
+`Imp.optimize/3` shape above; `MIPROv2` and `GEPA` also require a validation
+set as a fourth argument (`Imp.optimize/4`). They spend model calls, so they
+cost dollars and take minutes, and the tutorial states both for its runs. An optimization counts
+as an improvement when a held-out score shows it, and not before.
 
 ## 4. Test It Without A Provider
 
@@ -210,7 +211,7 @@ base =
     config: [json_retries: 1]
   )
 
-routed = Imp.rag(base, Imp.memory(conventions, k: 2), k: 2)
+routed = Imp.rag(base, Imp.memory(conventions, k: 2), k: 2, query_field: :ticket)
 
 {:ok, prediction} = Imp.call(routed, %{ticket: "Refund attempts fail with a gateway timeout error."})
 
@@ -222,7 +223,7 @@ For an external store, implement the `Imp.Retrieve` behaviour or pass a
 two-argument function returning `{:ok, docs}`. Evaluate retrieval and answer
 quality together, including cases where the relevant document is missing.
 
-## 7. Reach For Recursive Control When Context Outgrows The Prompt
+## 7. When The Input Outgrows The Prompt, Give The Model A Sandbox
 
 RLM gives a controller model a constrained, budgeted Elixir environment —
 safe evaluation, sub-model calls, bounded recursion, and a final `submit/1`

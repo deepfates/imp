@@ -26,12 +26,15 @@ Every guide and notebook follows the same product story:
 
 ## Learn The Model
 
-- [Philosophy](internal/IMP_PHILOSOPHY.md): the mental model: signatures, programs,
+- [Imp for DSPy Users](IMP_FOR_DSPY_USERS.md): the concept mapping, what is
+  deliberately different on the BEAM, and the honest conformance state.
+
+- [Philosophy](PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
 - [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
-- [Prior Art](internal/PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
+- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
 
 ## Build With Imp

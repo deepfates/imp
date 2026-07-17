@@ -1,67 +1,119 @@
 # Imp
 
-Program your LMs on the BEAM.
+There are two kinds of intelligence in a modern program. One is fluid. A
+language model can read a support ticket and understand that customers
+seeing each other's invoices is a security incident, not a billing question.
+The other is solid. Types, functions, and supervision trees do exactly what
+they say, every time. Most tools make you pick one and fake the other. Imp
+is for building programs out of both.
 
-Let's build a support-ticket router: it reads a ticket and assigns a team and
-an urgency. Add `{:imp, github: "deepfates/imp", tag: "v0.1.0"}` to your deps,
-put an OpenAI key in `OPENAI_API_KEY`, and declare the task:
+<!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
+<p align="center">
+  <img src="assets/imp-with-cards.jpg" width="380"
+       alt="An imp studies a hand of cards through a lens while a smaller imp springs from its tail.">
+</p>
+
+Here is what that means in practice. You declare a task the way you would
+declare a type, with named inputs, named outputs, and constraints, and Imp
+turns the declaration into a program. The program is a value, not a prompt.
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
 
 route =
   "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
-  |> Imp.signature("Assign the support ticket to one team: billing, infrastructure, security, or product.")
-  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
+  |> Imp.signature("Assign the support ticket to the team that owns it.")
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 
 {:ok, prediction} =
   Imp.call(route, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
 
 Imp.get(prediction, :team)
 #=> "security"
-
-Imp.get(prediction, :urgency)
-#=> "high"
 ```
 
-That output is real (`gpt-5.4-mini`). The ticket sounds like a billing problem;
-the model read it and routed it to security, and the enum types guarantee the
-answer is one of your teams — not free text you have to parse.
+Notice what the model did. The ticket is about invoices, but the model read
+the situation and routed it to security at high urgency. Notice what the
+types did too. The answer is always one of your four teams, because when the
+model returns anything else, Imp rejects the output against the declared
+enum and retries with the validation error. You never wrote a prompt.
 
-There is no prompt string in that program. The signature declares the task; Imp
-renders the messages, validates the model's output against the declared types,
-and retries with the validation error when the model drifts. The program is an
-ordinary Elixir value, so you can:
+Because the program is a value, the things you already do to programs now
+work on language-model behavior. You can test the router against a scripted
+model without spending a cent. You can score it on labeled data and get a
+number instead of an impression. You can hand it to an optimizer that
+rewrites the program until held-out data shows it got better. In the
+[tutorial](docs/TUTORIAL_TICKET_ROUTING.md), a router goes from 35% to 90%
+on tickets it has never seen, in about twenty seconds, for about a cent.
+You can also read exactly what the optimizer changed, because its work is
+data attached to the program.
 
-- **Evaluate it**: score it against labeled examples with a metric.
-- **Optimize it**: the [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
-  takes this same router from 35% to 90% on held-out tickets, for about a cent
-  and twenty seconds of model calls.
-- **Swap the model**: the provider is a runtime dependency, not part of the task.
-- **Ship it**: save and load programs without secrets, run them under OTP
-  supervision, observe them with telemetry.
+The loop of declaring, measuring, improving, and proving scales the whole
+way up:
 
-Start with the [Learning Path](docs/LEARNING_PATH.md) — first live call through
-evaluation, optimization, tools, and deployment — or open the full
-[manual](docs/README.md).
+- **Programs**: `Predict`, `ChainOfThought`, `ReAct` agents with typed tools
+  and policies, `CodeAct`, `ProgramOfThought`, refinement, best-of-N,
+  parallel fan-out, retrieval wrappers, and RLM, which gives a model
+  recursive control for inputs too large for one prompt, inside a budgeted
+  and supervised Elixir sandbox.
+- **Optimizers**: few-shot selection (`LabeledFewShot`, `BootstrapFewShot`,
+  random search), instruction evolution (`COPRO`, `SIMBA`, `MIPROv2`, and
+  `GEPA` with text feedback), ensembles and `BetterTogether`, and
+  weight-level training with `BootstrapFinetune`, `GRPO`, and local MLX
+  fine-tuning. They all use one `Imp.optimize` shape, and your metric on
+  held-out data gates every one of them.
+- **Beyond prompts**: Optimize-Anything points the same machinery at
+  arbitrary text artifacts such as code, configs, and heuristics. It works
+  anywhere you can score a candidate.
+
+You will use one or two of these; the rest are there when a task earns them.
+
+Then you run the program where it belongs. On the BEAM, a model call is one
+more slow, fallible, concurrent effect, and supervising effects like that is
+what the runtime was built for. Compiled programs persist as checksummed
+artifacts with no secrets inside, and credentials bind at runtime. Execution
+runs in bounded, supervised workers that return overloads instead of
+hanging. Every call, retry, and tool step emits telemetry you can ship to
+your metrics system. The [deployment example](examples/deployment) is a
+complete OTP application.
+
+Imp is a native BEAM realization of [DSPy](https://dspy.ai)'s research
+program of programming language models instead of prompting them. Imp tracks
+DSPy 3.2.1, and executable differential tests verify the optimizers against
+that pinned upstream source, so "faithful port" is a claim you can run
+yourself ([conformance report](docs/CONFORMANCE.md)). Where the BEAM offers
+more, such as supervision and cheap concurrency, Imp uses it. See
+[Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) for exactly what differs.
 
 ## Install
 
-Install the v0.1.0 release from GitHub with
-`{:imp, github: "deepfates/imp", tag: "v0.1.0"}` in your `mix.exs` deps.
-Imp is not on Hex yet; a Hex release is planned. In a
-source checkout, use `{:imp, path: "."}` while developing against the local
-repository.
+Add the release to your `mix.exs` deps:
 
-## Documentation
+```elixir
+{:imp, github: "deepfates/imp", tag: "v0.1.0"}
+```
 
-- [Learning Path](docs/LEARNING_PATH.md)
-- [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
-- [API Guide](docs/API_GUIDE.md)
-- [Production Operations](docs/PRODUCTION_OPERATIONS.md)
-- [Glossary](docs/GLOSSARY.md)
-- [Architecture](docs/ARCHITECTURE.md)
+Imp is not on Hex yet; a Hex release is planned. You will need an API key
+for a model provider (any [ReqLLM](https://hex.pm/packages/req_llm)
+provider works; the docs use OpenAI).
 
-Imp is inspired by DSPy's goal of declarative, measurable LM programs, with
-Elixir-native structs, behaviours, process-local configuration, supervision,
-and telemetry.
+## Learn
+
+- **[Learning Path](docs/LEARNING_PATH.md)**: one router grown step by step,
+  from the first live call through testing without a provider, metrics,
+  optimization, tools, retrieval, persistence, and deployment.
+- **[Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)**: the full
+  experiment, with the numbers and costs above.
+- **[Livebooks](livebooks/)**: the same path as runnable notebooks.
+- Reference: [API Guide](docs/API_GUIDE.md), [Glossary](docs/GLOSSARY.md),
+  [Architecture](docs/ARCHITECTURE.md), and
+  [Production Operations](docs/PRODUCTION_OPERATIONS.md).
+
+## Where this is going
+
+The near roadmap has three parts. First, a Hex release. Second, an
+interactive-fiction environment package, where an optimizer teaches an
+agent to survive a classic dungeon and every episode is recorded as a
+replayable, branchable log. Third, the longer bet that belongs to this
+runtime: optimization as a resident process, meaning programs that improve
+from their own recorded history, under supervision, while they run.

@@ -13,7 +13,7 @@ does not establish freshness, validity, scale, or a passing verdict.
 The inventory is derived from:
 
 - `benchmarks/claims.json`
-- `docs/internal/UPSTREAM_SURFACE_MAP.md`
+- `docs/CONFORMANCE.md`
 - `docs/internal/COVERAGE_MATRIX.md`
 - `docs/internal/PARITY_VALIDATION_PROGRAM.md`
 - `docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md`
