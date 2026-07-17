@@ -3,7 +3,7 @@
 Imp starts from a simple shift: treat language-model behavior as software, not
 as loose prompt text. You do not need to know another language or framework to
 use Imp. The system is taught from Elixir first: explicit data, behaviours,
-processes, immutable program structs, tests, and production gates.
+processes, immutable program structs, and tests.
 
 Imp is the project name for declarative self-improving programs in
 Elixir.
