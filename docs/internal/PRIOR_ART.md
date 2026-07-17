@@ -48,4 +48,4 @@ MIPROv2, GEPA, ReAct, or RLM, the local module documentation and tests define
 the Imp contract.
 
 The broader paper, repository, and production-system review is recorded in
-[Research Landscape](RESEARCH_LANDSCAPE.md).
+the repository's internal research notes.
