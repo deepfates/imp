@@ -20,6 +20,9 @@ Every guide and notebook follows the same product story:
 
 - [Learning Path](LEARNING_PATH.md): the canonical route from your first live
   model call to evaluation, optimization, tools, persistence, and deployment.
+- [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md): build a support-ticket
+  router, measure it on held-out data, and improve it with an optimizer —
+  real scores, real costs.
 
 ## Learn The Model
 
@@ -63,7 +66,10 @@ you exactly what to set when it is not.
    minutes with an OpenAI API key.
 2. Open [Livebook 01](../livebooks/01_real_lm_front_door.livemd) and extract
    structured data from an email with a real model.
-3. Swap your own task into the same shape: change the signature, keep the
+3. Build and improve a program end to end with the
+   [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) — held-out
+   before/after scores for about a cent.
+4. Swap your own task into the same shape: change the signature, keep the
    program, add a metric and a dev set from
    [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd).
 

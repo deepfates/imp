@@ -156,6 +156,7 @@ defmodule Imp.MixProject do
         "CHANGELOG.md",
         "LICENSE",
         "priv/public_api.json",
+        "priv/tutorial/support_tickets.json",
         "README.md",
         "mix.exs"
       ]
@@ -165,6 +166,7 @@ defmodule Imp.MixProject do
     [
       "docs/README.md",
       "docs/LEARNING_PATH.md",
+      "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/GLOSSARY.md",
       "docs/internal/IMP_PHILOSOPHY.md",
       "docs/internal/PRIOR_ART.md",
