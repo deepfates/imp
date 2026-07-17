@@ -30,7 +30,7 @@ Notice what the model did: the ticket talks about invoices, but it read the
 situation and routed to security at high urgency. And notice what the *types*
 did: the answer is always one of your four teams, because when the model
 drifts, Imp rejects the output against the declared enum and retries with the
-validation error. You never wrote a prompt, and you never parse free text.
+validation error. You never wrote a prompt.
 
 Because the program is a value, everything programs already enjoy now works
 on language-model behavior. You can test it against a scripted model without
@@ -59,21 +59,24 @@ That loop — declare, measure, improve, prove — scales the whole way up:
   at arbitrary text artifacts — code, configs, heuristics — anywhere you can
   score a candidate.
 
+You will use one or two of these; the rest are there when a task earns them.
+
 Then you run it where a program like this belongs. On the BEAM, a model call
-is just another slow, fallible, concurrent effect — the kind of thing OTP
-has supervised for forty years. Compiled programs persist as checksummed
+is just another slow, fallible, concurrent effect — the kind of thing this
+runtime was built to supervise. Compiled programs persist as checksummed
 artifacts with no secrets inside; credentials bind at runtime; execution
 runs in bounded, supervised workers that return overloads instead of
-hanging; telemetry is a built-in sense, not an integration. The
-[deployment example](examples/deployment) is a complete OTP application.
+hanging; every call, retry, and tool step emits telemetry you can ship to
+your metrics system. The [deployment example](examples/deployment) is a
+complete OTP application.
 
 Imp is a native BEAM realization of [DSPy](https://dspy.ai)'s research
-program — programming, not prompting — and it takes the lineage seriously:
-Imp tracks DSPy 3.2.1 and verifies its optimizers against the pinned
-upstream source with executable differential tests, so "faithful port" is a
-claim you can run, not a vibe. Where the runtimes differ, Imp is honest
-about it; where the BEAM offers more — supervision, cheap concurrency,
-hot upgrades — Imp uses it.
+program — programming, not prompting — and it takes the lineage seriously.
+Imp tracks DSPy 3.2.1, and the optimizers are verified against that pinned
+upstream source by executable differential tests: "faithful port" is a
+claim you can run ([conformance report](docs/CONFORMANCE.md)). Where the
+BEAM offers more — supervision, cheap concurrency — Imp uses it; see
+[Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) for exactly what differs.
 
 ## Install
 
@@ -101,7 +104,7 @@ provider works; the docs use OpenAI).
 
 ## Where this is going
 
-The near roadmap, honestly marked as intent rather than achievement: a Hex
+The near roadmap: a Hex
 release; an interactive-fiction environment package where an optimizer
 visibly teaches an agent to survive a classic dungeon, with every episode
 recorded as a replayable, branchable log; and — the longer bet native to

@@ -1,8 +1,8 @@
 # Imp for DSPy users
 
 You know DSPy. This page maps what you know onto Imp, names what is
-deliberately different on the BEAM, and is honest about what is tracked
-rather than done. Imp follows DSPy 3.2.1 — not loosely: the optimizers are
+deliberately different on the BEAM, and marks what is tracked rather than
+done. Imp follows DSPy 3.2.1 — not loosely: the optimizers are
 verified against the pinned upstream source with executable differential
 tests, and the conformance table below is generated from that program.
 
@@ -52,18 +52,22 @@ experimental WASM sandbox, with process isolation as the safety boundary.
 credentials; you rebind the live model at load time. This is the same
 save/load story as DSPy with the operational edges sharpened.
 
-## What is honestly not identical
+## What is not identical
 
 Imp's conformance program tracks 23 upstream surface groups against DSPy
-3.2.1. Current state: **14 conformant** (differentially verified), **6
-Elixir-native equivalents** (same capability, deliberately different
-mechanics — the model runtime, the ReAct family internals, RLM's sandbox,
-weight-optimizer plumbing, retrieval backends, fast/slow learning), **2
-tracking** DSPy's unreleased 3.3 changes, and **1 claim-scoped gap** in the
-instruction-optimizer family's exact-reproduction evidence. The full table
-with per-surface status lives in the repository's conformance report, and
-every "conformant" row is backed by the conformance program's executable checks — if this
-paragraph and the code ever disagree, the tests win.
+3.2.1:
+
+| Status | Count | Meaning |
+| --- | --- | --- |
+| Conformant | 14 | Differentially verified against the pinned upstream source |
+| Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
+| Tracking | 2 | Following DSPy's unreleased 3.3 changes |
+| Gap | 1 | The instruction-optimizer family's exact-reproduction evidence |
+
+The per-surface table is the [conformance report](CONFORMANCE.md), generated
+by executable checks (`scripts/` and the `mix imp.benchmark.*` differential
+tasks run real pinned DSPy in a sidecar and compare arm to arm). If this
+page and the code ever disagree, the tests win.
 
 Ecosystem breadth is the real gap: DSPy has years of retriever integrations,
 observability partners, and community. Imp's seams for that are behaviours
