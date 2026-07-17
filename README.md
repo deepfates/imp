@@ -17,7 +17,7 @@ lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_K
 route =
   "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
   |> Imp.signature("Assign the support ticket to the team that owns it.")
-  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 
 {:ok, prediction} =
   Imp.call(route, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
