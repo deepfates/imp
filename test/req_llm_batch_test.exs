@@ -206,6 +206,93 @@ defmodule ReqLLMBatchTest do
     assert temperature == 0.0
   end
 
+  # Regression for the silent message-mangling failure: run/3 JSON-round-trips
+  # every payload for checkpoint durability, which turns atom keys (:role,
+  # :content) into strings. The client used to match only atom-keyed messages,
+  # so every round-tripped message fell through to the inspect/1 catch-all and
+  # reached the provider as `user: "%{\"content\" => ...}"` while the batch
+  # reported success.
+  test "run/3 delivers the documented payload shape to the transport as real messages" do
+    checkpoint = checkpoint_path("api-guide-payload")
+
+    client =
+      ReqLLMClient.new("anthropic:test",
+        req_module: __MODULE__.MessageCapturingStub,
+        test_pid: self()
+      )
+
+    dispatcher = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
+
+    # Exact payload shape documented in docs/API_GUIDE.md for req_llm_dispatcher.
+    requests = [
+      %{
+        id: "question-001",
+        payload: %{messages: [%{role: :user, content: "Capital of France?"}]}
+      }
+    ]
+
+    assert {:ok, summary} = ReqLLMBatch.run(requests, dispatcher, checkpoint: checkpoint)
+    assert %{status: :succeeded} = find_request(summary, "question-001")
+
+    assert_receive {:req_llm_batch_messages, transport_messages}
+
+    assert [
+             %ReqLLM.Message{
+               role: :user,
+               content: [%ReqLLM.Message.ContentPart{type: :text, text: "Capital of France?"}]
+             }
+           ] = transport_messages
+  end
+
+  test "req_llm_dispatcher preserves roles for string-keyed round-tripped messages" do
+    client =
+      ReqLLMClient.new("anthropic:test",
+        req_module: __MODULE__.MessageCapturingStub,
+        test_pid: self()
+      )
+
+    dispatcher = ReqLLMBatch.req_llm_dispatcher(client)
+
+    # This is what a payload looks like after Jason round-trip: string keys,
+    # string roles.
+    payload = %{
+      "messages" => [
+        %{"role" => "system", "content" => "You answer tersely."},
+        %{"role" => "assistant", "content" => "Previously: Paris."},
+        %{"role" => "user", "content" => "Capital of Peru?"}
+      ]
+    }
+
+    assert {:ok, _output} =
+             dispatcher.(
+               %{id: "roles", payload: payload},
+               %{request_id: "roles", attempt: 1}
+             )
+
+    assert_receive {:req_llm_batch_messages, transport_messages}
+
+    assert [
+             %ReqLLM.Message{role: :system, content: [%{text: "You answer tersely."}]},
+             %ReqLLM.Message{role: :assistant, content: [%{text: "Previously: Paris."}]},
+             %ReqLLM.Message{role: :user, content: [%{text: "Capital of Peru?"}]}
+           ] = transport_messages
+  end
+
+  defmodule MessageCapturingStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_batch_messages, messages})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "captured-response",
+         model: model,
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(~s({"answer":"pong"})),
+         object: %{"answer" => "pong"}
+       }}
+    end
+  end
+
   defmodule ReqLLMStub do
     def generate_text(model, messages, opts) do
       send(
