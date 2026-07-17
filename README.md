@@ -2,70 +2,61 @@
 
 Program your LMs on the BEAM.
 
-Imp turns an LM task into an ordinary Elixir value: a typed input/output
-signature, a callable program, examples, a metric, and optional program
-transformations. The model provider is a runtime dependency, so deterministic
-tests use `Imp.LM.Static` and a live provider does not change the task shape.
+Let's build a support-ticket router: it reads a ticket and assigns a team and
+an urgency. Add `{:imp, github: "deepfates/imp", tag: "v0.1.0"}` to your deps,
+put an OpenAI key in `OPENAI_API_KEY`, and declare the task:
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+
+route =
+  "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
+  |> Imp.signature("Assign the support ticket to one team: billing, infrastructure, security, or product.")
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
+
+{:ok, prediction} =
+  Imp.call(route, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
+
+Imp.get(prediction, :team)
+#=> "security"
+
+Imp.get(prediction, :urgency)
+#=> "high"
+```
+
+That output is real (`gpt-5.4-mini`). The ticket sounds like a billing problem;
+the model read it and routed it to security, and the enum types guarantee the
+answer is one of your teams — not free text you have to parse.
+
+There is no prompt string in that program. The signature declares the task; Imp
+renders the messages, validates the model's output against the declared types,
+and retries with the validation error when the model drifts. The program is an
+ordinary Elixir value, so you can:
+
+- **Evaluate it**: score it against labeled examples with a metric.
+- **Optimize it**: the [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
+  takes this same router from 35% to 90% on held-out tickets, for about a cent
+  and twenty seconds of model calls.
+- **Swap the model**: the provider is a runtime dependency, not part of the task.
+- **Ship it**: save and load programs without secrets, run them under OTP
+  supervision, observe them with telemetry.
+
+Start with the [Learning Path](docs/LEARNING_PATH.md) — first live call through
+evaluation, optimization, tools, and deployment — or open the full
+[manual](docs/README.md).
+
+## Install
 
 Install the v0.1.0 release from GitHub with
 `{:imp, github: "deepfates/imp", tag: "v0.1.0"}` in your `mix.exs` deps.
 Imp is not on Hex yet; a Hex release is planned. In a
 source checkout, use `{:imp, path: "."}` while developing against the local
-repository. Then follow
-the [Learning Path](docs/LEARNING_PATH.md). It is
-the canonical, self-contained route from a signature and `Predict` through
-evaluation, measured optimization, tools/ReAct, retrieval, RLM, persistence,
-observability, and OTP deployment.
-
-```elixir
-# learning-path-contract: readme_predict
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program =
-  "question -> answer: short_span"
-  |> Imp.signature("Answer with the shortest correct span.")
-  |> Imp.predict(lm: lm)
-
-{:ok, prediction} = Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
-Imp.get(prediction, :answer)
-```
-
-For source development, clone the repository, run `mix deps.get`, and use
-`mix test`. The default `mix test` run is green in a fresh clone with no extra
-setup. In a source checkout, `mix production.check` is the quality gate and
-`mix livebook.execute.check` executes the full notebook learning path.
-
-## Maintainer checks
-
-The benchmark-evidence and reproduction-registry tests are excluded from the
-default `mix test` run (tag `:evidence_infrastructure`). They validate the
-committed benchmark artifacts against full git history, the pinned DSPy Python
-environments (`scripts/setup_dspy_parity_env.sh` and friends), and in some
-lanes a `.env` with provider credentials — none of which a fresh clone has.
-To run them:
-
-```sh
-scripts/setup_dspy_parity_env.sh
-scripts/setup_dspy_current_target.sh
-scripts/setup_reference_test_env.sh
-EVIDENCE_INFRASTRUCTURE=1 mix test        # or: mix test --include evidence_infrastructure
-```
-
-They also need a full (non-shallow) clone, because the source-binding
-validators resolve ancestor commit SHAs.
-
-The learning-path snippets are executed by
-`test/learning_path_contract_test.exs`; the one live-provider snippet is
-explicitly credential-gated. The supplied
-`examples/deployment` application shows supervised
-artifact loading and bounded concurrent calls.
+repository.
 
 ## Documentation
 
 - [Learning Path](docs/LEARNING_PATH.md)
+- [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
 - [API Guide](docs/API_GUIDE.md)
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md)
 - [Glossary](docs/GLOSSARY.md)
