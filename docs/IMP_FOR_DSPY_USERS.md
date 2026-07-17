@@ -59,10 +59,10 @@ Imp's conformance program tracks 23 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 14 | Differentially verified against the pinned upstream source |
+| Conformant | 13 | Differentially verified against the pinned upstream source |
 | Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
-| Gap | 1 | The instruction-optimizer family's exact-reproduction evidence |
+| Gap | 2 | Exact-reproduction evidence for the instruction-optimizer family and for GEPA (both non-blocking; local behavior is tested, upstream-matched outcomes are not claimed) |
 
 The per-surface table is the [conformance report](CONFORMANCE.md), generated
 by executable checks (`scripts/` and the `mix imp.benchmark.*` differential

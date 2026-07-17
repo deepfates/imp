@@ -2,11 +2,11 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
-Conformant: 14
+Conformant: 13
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 1
-Claim-specific non-blocking gaps: 1
+Gaps: 2
+Claim-specific non-blocking gaps: 2
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
