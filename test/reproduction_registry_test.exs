@@ -133,13 +133,38 @@ defmodule Imp.ReproductionRegistryTest do
     assert bootstrap["artifact_sha256"] ==
              "7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d"
 
-    for id <- ~w(avatar avatar_optimizer grpo better_together ensemble) do
-      assert features[id]["admitted_evidence"] == %{
-               "tier" => "none",
-               "artifact" => nil,
-               "protocol_id" => nil
-             }
-    end
+    assert [bootstrap_c1] = features["bootstrap_finetune"]["supporting_evidence"]
+    assert bootstrap_c1["tier"] == "t1"
+    assert bootstrap_c1["protocol_id"] == "bootstrap_finetune_differential"
+
+    assert bootstrap_c1["artifact_sha256"] ==
+             "fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902"
+
+    expected_admissions = %{
+      "avatar" =>
+        {"avatar_actor_differential",
+         "1ad7b61692c8ae3b8d0f027999b94bf8709283d29d513923ffbee5c6de10b665"},
+      "avatar_optimizer" =>
+        {"avatar_optimizer_differential",
+         "01f9a17648227940142fb98b801fbabe048dc0f9ffdae540f0f32372aa882f49"},
+      "grpo" =>
+        {"mmgrpo_differential",
+         "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7"},
+      "better_together" =>
+        {"better_together_differential",
+         "893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51"},
+      "ensemble" =>
+        {"ensemble_differential",
+         "eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a"}
+    }
+
+    Enum.each(expected_admissions, fn {id, {protocol_id, sha256}} ->
+      evidence = features[id]["admitted_evidence"]
+      assert evidence["tier"] == "t1"
+      assert evidence["protocol_id"] == protocol_id
+      assert evidence["artifact_sha256"] == sha256
+      assert evidence["artifact"] == ReproductionRegistry.admitted_path(protocol_id, sha256)
+    end)
 
     expected_protocols = [
       {"avatar", "avatar_actor_differential", "imp.benchmark.avatar_actor_differential",

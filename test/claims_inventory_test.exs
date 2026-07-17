@@ -6,8 +6,13 @@ defmodule ClaimsInventoryTest do
   @gate_policies ["blocking", "informational"]
   @known_lanes ~w(
     auto_evaluation_contract
+    avatar_actor_differential
+    avatar_optimizer_differential
+    better_together_differential
     bootstrap_few_shot_differential
+    bootstrap_finetune_differential
     copro_isolation
+    ensemble_differential
     failure_recovery
     gepa_replication
     golden_trace
@@ -22,6 +27,7 @@ defmodule ClaimsInventoryTest do
     provider_free_overhead
     rag_tool_agent
     random_search_differential
+    mmgrpo_differential
     rlm_benchmark
   )
 
@@ -221,15 +227,15 @@ defmodule ClaimsInventoryTest do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
 
     families = %{
-      "avatar_actor" => ["Avatar"],
-      "avatar_optimizer" => ["AvatarOptimizer"],
-      "bootstrap_finetune" => ["BootstrapFinetune"],
-      "mmgrpo" => ["GRPO", "mmGRPO"],
-      "better_together" => ["BetterTogether"],
-      "ensemble" => ["Ensemble"]
+      "avatar_actor" => {["Avatar"], "avatar_actor_differential"},
+      "avatar_optimizer" => {["AvatarOptimizer"], "avatar_optimizer_differential"},
+      "bootstrap_finetune" => {["BootstrapFinetune"], "bootstrap_finetune_differential"},
+      "mmgrpo" => {["GRPO", "mmGRPO"], "mmgrpo_differential"},
+      "better_together" => {["BetterTogether"], "better_together_differential"},
+      "ensemble" => {["Ensemble"], "ensemble_differential"}
     }
 
-    Enum.each(families, fn {family, surfaces} ->
+    Enum.each(families, fn {family, {surfaces, lane}} ->
       api = claims["claim.optimizer.#{family}.api"]
       semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
 
@@ -238,10 +244,11 @@ defmodule ClaimsInventoryTest do
       assert api["claim_type"] == "feature_completeness"
       assert get_in(api, ["requirements", Access.at(0), "lane"]) == "product_package"
 
-      assert semantic["claim_state"] == "target"
+      assert semantic["claim_state"] == "asserted"
       assert semantic["target_rung"] == "C1"
       assert semantic["claim_type"] == "conformance"
-      assert get_in(semantic, ["requirements", Access.at(0), "lane"]) == "optimizer_lift"
+      assert semantic["gate_policy"] == "informational"
+      assert get_in(semantic, ["requirements", Access.at(0), "lane"]) == lane
       assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(api["surface"]))
       assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(semantic["surface"]))
     end)

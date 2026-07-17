@@ -369,7 +369,7 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    assert dashboard["claims"]["summary"]["informational"] == 5
+    assert dashboard["claims"]["summary"]["informational"] == 11
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -385,7 +385,13 @@ defmodule DashboardTest do
              "claim.evaluation.auto_evaluation.semantic_conformance",
              "claim.failure_recovery.deterministic_t0",
              "claim.optimizer.bootstrap_few_shot.semantic_conformance",
+             "claim.optimizer.avatar_actor.semantic_conformance",
+             "claim.optimizer.avatar_optimizer.semantic_conformance",
+             "claim.optimizer.bootstrap_finetune.semantic_conformance",
+             "claim.optimizer.better_together.semantic_conformance",
              "claim.optimizer.copro.semantic_conformance",
+             "claim.optimizer.ensemble.semantic_conformance",
+             "claim.optimizer.mmgrpo.semantic_conformance",
              "claim.optimizer.random_search.semantic_conformance",
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
@@ -423,6 +429,18 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["random_search_differential"]["passing"]
     assert dashboard["lanes"]["copro_isolation"]["status"] == "full"
     assert dashboard["lanes"]["copro_isolation"]["passing"]
+
+    for lane_id <- ~w(
+          avatar_actor_differential
+          avatar_optimizer_differential
+          bootstrap_finetune_differential
+          better_together_differential
+          ensemble_differential
+          mmgrpo_differential
+        ) do
+      assert dashboard["lanes"][lane_id]["status"] == "full"
+      assert dashboard["lanes"][lane_id]["passing"]
+    end
 
     assert get_in(dashboard, [
              "lanes",
@@ -1436,6 +1454,12 @@ defmodule DashboardTest do
           bootstrap_few_shot_differential
           random_search_differential
           copro_isolation
+          avatar_actor_differential
+          avatar_optimizer_differential
+          bootstrap_finetune_differential
+          better_together_differential
+          ensemble_differential
+          mmgrpo_differential
         ) do
       lane = get_in(dashboard, ["lanes", lane_id])
       assert lane["status"] == "full"

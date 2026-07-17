@@ -227,13 +227,13 @@
     },
     {
       "id": "claim.optimizer.avatar_actor.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
-      "scope": "Provider-free typed action, result accumulation, Finish, and final-output observations shared with pinned DSPy 3.2.1 Avatar.",
-      "limitations": ["Imp's configured iteration bound, separate finisher, recoverable tool failures, prompt shape, and provider behavior are declared native differences."],
-      "statement": "The open target is a source-bound Avatar actor differential limited to the declared shared observations.",
-      "category": "optimizer", "surface": ["Avatar"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/avatar_test.exs"],
-      "requirements": [{"id": "optimizer.avatar_actor.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific Avatar actor differential passes with native differences explicit"}]
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
+      "scope": "Three provider-free typed-action, ordered successful-result, Finish, and final-output observations shared with pinned DSPy 3.2.1 Avatar.",
+      "limitations": ["Exact prompts, provider tool selection, tool-failure parity, task effectiveness, and full Avatar parity remain excluded; iteration bounds, the separate finisher, and recoverable tool failures are native Imp behavior."],
+      "statement": "Imp has source-bound C1 evidence for the three admitted Avatar actor observations against authenticated DSPy 3.2.1 source.",
+      "category": "optimizer", "surface": ["Avatar"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_actor_differential/1ad7b61692c8ae3b8d0f027999b94bf8709283d29d513923ffbee5c6de10b665.json", "test/avatar_actor_differential_test.exs"],
+      "requirements": [{"id": "optimizer.avatar_actor.semantic", "kind": "optimizer_conformance", "lane": "avatar_actor_differential", "evidence": "full", "threshold": "the canonical Avatar actor artifact verifies its three declared observations and retained exclusions"}]
     },
     {
       "id": "claim.optimizer.avatar_optimizer.api",
@@ -247,13 +247,13 @@
     },
     {
       "id": "claim.optimizer.avatar_optimizer.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
       "scope": "Provider-free threshold classification, bounded trajectory selection, feedback, and instruction-rewrite behavior against pinned DSPy 3.2.1 AvatarOptimizer.",
       "limitations": ["Imp evaluates rewritten candidates before accepting them; exact Python sampling and RNG order are excluded."],
-      "statement": "The open target is a source-bound Avatar optimizer differential with the candidate-evaluation correction declared.",
-      "category": "optimizer", "surface": ["AvatarOptimizer"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/avatar_optimizer_test.exs"],
-      "requirements": [{"id": "optimizer.avatar_optimizer.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific AvatarOptimizer differential passes with the correctness deviation explicit"}]
+      "statement": "Imp has source-bound C1 evidence for the admitted AvatarOptimizer classification, comparator, rewrite, and feedback-propagation observations, with the candidate-evaluation correction explicit.",
+      "category": "optimizer", "surface": ["AvatarOptimizer"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/01f9a17648227940142fb98b801fbabe048dc0f9ffdae540f0f32372aa882f49.json", "test/avatar_optimizer_differential_test.exs"],
+      "requirements": [{"id": "optimizer.avatar_optimizer.semantic", "kind": "optimizer_conformance", "lane": "avatar_optimizer_differential", "evidence": "full", "threshold": "the canonical AvatarOptimizer artifact verifies its declared observations, native corrections, and exclusions"}]
     },
     {
       "id": "claim.optimizer.bootstrap_finetune.api",
@@ -267,13 +267,13 @@
     },
     {
       "id": "claim.optimizer.bootstrap_finetune.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
-      "scope": "Provider-free teacher traces, metric filtering, training-row grouping, adapter options, fake-job completion, and predictor rebinding against pinned DSPy 3.2.1 BootstrapFinetune.",
-      "limitations": ["Imp corrects DSPy's pred_ind shadowing bug and adds bounded atomic lifecycle semantics; local MLX effectiveness is separate evidence."],
-      "statement": "The open target is a source-bound BootstrapFinetune semantic differential with correctness and lifecycle deviations explicit.",
-      "category": "optimizer", "surface": ["BootstrapFinetune"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/bootstrap_finetune_test.exs"],
-      "requirements": [{"id": "optimizer.bootstrap_finetune.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific BootstrapFinetune differential passes with pred_ind and lifecycle deviations explicit"}]
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
+      "scope": "Provider-free shared-LM multitask/per-predictor job topology, accepted trace-call membership, and the pred_ind corrective deviation against pinned DSPy 3.2.1 BootstrapFinetune.",
+      "limitations": ["Exact trace-row order, provider behavior, effectiveness, training-result quality, and full parity remain excluded; local MLX effectiveness is separate T2 evidence."],
+      "statement": "Imp has source-bound C1 evidence for the admitted BootstrapFinetune topology and trace-membership observations and explicitly corrects DSPy 3.2.1 pred_ind shadowing.",
+      "category": "optimizer", "surface": ["BootstrapFinetune"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_finetune_differential/fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902.json", "test/weight_composition_differential_test.exs"],
+      "requirements": [{"id": "optimizer.bootstrap_finetune.semantic", "kind": "optimizer_conformance", "lane": "bootstrap_finetune_differential", "evidence": "full", "threshold": "the canonical BootstrapFinetune artifact verifies the admitted observations, pred_ind correction, and exclusions"}]
     },
     {
       "id": "claim.optimizer.mmgrpo.api",
@@ -287,13 +287,13 @@
     },
     {
       "id": "claim.optimizer.mmgrpo.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
       "scope": "Provider-free dataset cycling, rollout grouping, predictor attribution, reward propagation, and failure rewards against pinned DSPy 3.2.1 mmGRPO.",
       "limitations": ["Exact Python RNG sequences are excluded; durable dispatch, reconciliation, bounded callbacks, and idempotency are Imp-native extensions."],
-      "statement": "The open target is a source-bound mmGRPO semantic differential against DSPy's implementation rather than generic GRPO background.",
-      "category": "optimizer", "surface": ["GRPO", "mmGRPO"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/grpo_contract_test.exs"],
-      "requirements": [{"id": "optimizer.mmgrpo.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific mmGRPO differential passes without claiming exact RNG parity"}]
+      "statement": "Imp has source-bound C1 evidence for the admitted mmGRPO dataset-cycling, rollout-grouping, predictor-attribution, reward, and format-failure observations.",
+      "category": "optimizer", "surface": ["GRPO", "mmGRPO"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/mmgrpo_differential/eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7.json", "test/mmgrpo_differential_test.exs"],
+      "requirements": [{"id": "optimizer.mmgrpo.semantic", "kind": "optimizer_conformance", "lane": "mmgrpo_differential", "evidence": "full", "threshold": "the canonical mmGRPO artifact verifies the admitted observations, native lifecycle extensions, and exclusions"}]
     },
     {
       "id": "claim.optimizer.better_together.api",
@@ -307,13 +307,13 @@
     },
     {
       "id": "claim.optimizer.better_together.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
       "scope": "Provider-free default strategy, stage order, compile arguments, holdout, prefix selection, and first-failure behavior against pinned DSPy 3.2.1 BetterTogether.",
       "limitations": ["Exact Python shuffle order is excluded; generic optimizer dispatch and bounded asynchronous cleanup are Imp-native extensions."],
-      "statement": "The open target is a source-bound BetterTogether composition differential with native lifecycle behavior explicit.",
-      "category": "optimizer", "surface": ["BetterTogether"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/better_together_test.exs"],
-      "requirements": [{"id": "optimizer.better_together.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific BetterTogether differential passes without claiming exact shuffle parity"}]
+      "statement": "Imp has source-bound C1 evidence for the admitted BetterTogether strategy parsing, prefix enumeration, stable validation tie handling, and no-validation latest-prefix observations.",
+      "category": "optimizer", "surface": ["BetterTogether"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/better_together_differential/893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51.json", "test/weight_composition_differential_test.exs"],
+      "requirements": [{"id": "optimizer.better_together.semantic", "kind": "optimizer_conformance", "lane": "better_together_differential", "evidence": "full", "threshold": "the canonical BetterTogether artifact verifies the admitted observations and retained exclusions"}]
     },
     {
       "id": "claim.optimizer.ensemble.api",
@@ -327,13 +327,13 @@
     },
     {
       "id": "claim.optimizer.ensemble.semantic_conformance",
-      "claim_state": "target", "target_rung": "C1", "release": "telos",
+      "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
       "scope": "Provider-free all-program execution, reduction, and subset-cardinality observations against pinned DSPy 3.2.1 Ensemble.",
       "limitations": ["DSPy rejects deterministic mode; Imp's seeded replay is native. Exact sampled membership, RNG sequence, and structured failure parity are excluded."],
-      "statement": "The open target is a source-bound Ensemble differential limited to shared composition observations.",
-      "category": "optimizer", "surface": ["Ensemble"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/ensemble_replay_test.exs"],
-      "requirements": [{"id": "optimizer.ensemble.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific Ensemble differential passes with deterministic replay declared native"}]
+      "statement": "Imp has source-bound C1 evidence for the admitted Ensemble all-program, reducer, and subset-cardinality observations, with deterministic replay declared native.",
+      "category": "optimizer", "surface": ["Ensemble"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
+      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/ensemble_differential/eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a.json", "test/ensemble_differential_test.exs"],
+      "requirements": [{"id": "optimizer.ensemble.semantic", "kind": "optimizer_conformance", "lane": "ensemble_differential", "evidence": "full", "threshold": "the canonical Ensemble artifact verifies the admitted shared observations, native replay, and retained exclusions"}]
     },
     {
       "id": "claim.optimizer.ensemble.effectiveness",

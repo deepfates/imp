@@ -89,6 +89,14 @@ mix imp.evidence.admit \
   --features feature_id,second_feature_id
 ```
 
+Each feature keeps its highest-tier admission as `admitted_evidence`. A valid
+lower-tier artifact from another declared protocol is retained under
+`supporting_evidence` instead of replacing that primary record. This is
+intentional: source-conformance and effectiveness artifacts can support
+different claims, and admitting one must neither discard nor inflate the
+other. Every primary and supporting record is content-addressed and replayed
+through its pure protocol validator.
+
 ## Operating Rules
 
 1. Pin authority and protocol before paid execution.

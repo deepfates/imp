@@ -1101,9 +1101,10 @@
         "avatar_actor_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/avatar_actor_differential/1ad7b61692c8ae3b8d0f027999b94bf8709283d29d513923ffbee5c6de10b665.json",
+        "artifact_sha256": "1ad7b61692c8ae3b8d0f027999b94bf8709283d29d513923ffbee5c6de10b665",
+        "protocol_id": "avatar_actor_differential"
       }
     },
     {
@@ -1125,12 +1126,21 @@
         "avatar_optimizer_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/01f9a17648227940142fb98b801fbabe048dc0f9ffdae540f0f32372aa882f49.json",
+        "artifact_sha256": "01f9a17648227940142fb98b801fbabe048dc0f9ffdae540f0f32372aa882f49",
+        "protocol_id": "avatar_optimizer_differential"
       }
     },
     {
+      "supporting_evidence": [
+        {
+          "tier": "t1",
+          "artifact": "benchmarks/evidence/admitted/bootstrap_finetune_differential/fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902.json",
+          "artifact_sha256": "fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902",
+          "protocol_id": "bootstrap_finetune_differential"
+        }
+      ],
       "id": "bootstrap_finetune",
       "name": "BootstrapFinetune and training protocol",
       "authority_family": "family.optimizer_bootstrap_finetune",
@@ -1181,9 +1191,10 @@
         "mmgrpo_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/mmgrpo_differential/eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7.json",
+        "artifact_sha256": "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7",
+        "protocol_id": "mmgrpo_differential"
       }
     },
     {
@@ -1205,9 +1216,10 @@
         "better_together_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/better_together_differential/893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51.json",
+        "artifact_sha256": "893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51",
+        "protocol_id": "better_together_differential"
       }
     },
     {
@@ -1229,9 +1241,10 @@
         "ensemble_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/ensemble_differential/eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a.json",
+        "artifact_sha256": "eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a",
+        "protocol_id": "ensemble_differential"
       }
     },
     {

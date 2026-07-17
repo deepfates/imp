@@ -1,0 +1,480 @@
+{
+  "comparison": {
+    "dspy": {
+      "all_program_count": 5,
+      "reduced_mean": 2.0,
+      "subset_count": 3
+    },
+    "imp": {
+      "all_program_count": 5,
+      "reduced_mean": 2.0,
+      "subset_count": 3
+    },
+    "matched": true
+  },
+  "dspy_receipt": {
+    "credential_environment": {
+      "provider_credential_names_present": []
+    },
+    "fixture_id": "dspy-ensemble-c1-v1",
+    "observations": {
+      "all_program_count": 5,
+      "dspy_rejects_deterministic": true,
+      "reduced_mean": 2.0,
+      "subset_count": 3
+    },
+    "provider_free": true,
+    "runtime_identity": {
+      "distribution_version": "3.2.1",
+      "git_clean": true,
+      "git_commit": "29448ae12756abdd14bd8796c819247ebb83673c"
+    },
+    "schema_version": 1,
+    "status": "passing"
+  },
+  "evidence_tier": "C1",
+  "family": "ensemble",
+  "generated_at": "2026-07-17T01:28:02Z",
+  "git_sha": "36f6635ba9af1b189a5b9424fdd4fefa8d40cca8",
+  "native_extensions": {
+    "dspy_rejects_deterministic": true,
+    "imp_deterministic_replay_supported": true
+  },
+  "protocol_id": "ensemble-c1-v1",
+  "provider_free": true,
+  "registry_protocol_id": "ensemble_differential",
+  "run_context": {
+    "code": {
+      "identity": "deepfates/imp@36f6635ba9af1b189a5b9424fdd4fefa8d40cca8",
+      "revision": "36f6635ba9af1b189a5b9424fdd4fefa8d40cca8",
+      "source": "imp"
+    },
+    "completed_at": "2026-07-17T01:28:02Z",
+    "envelope_sha256": "sha256:cf726787fdceb87bf8b8b2bbfd2fcec83a6bebb344e8bb94a647673c4bc707f6",
+    "environment": {
+      "dependencies": {
+        "mix_exs_sha256": "sha256:f5f72de5aaa03bb3b7f42a5752cb70c0715558417fcaa9dee3995a0243edca39",
+        "mix_lock_sha256": "sha256:2464cb9e6f904cce12536bfa6e86ea4f85639e4bf534f9ecaa75972b751c742d",
+        "resolved": [
+          {
+            "app": "abnf_parsec",
+            "checksum": "c4e88d5d089f1698297c0daced12be1fb404e6e577ecf261313ebba5477941f9",
+            "outer_checksum": "e0ed6290c7cc7e5020c006d1003520390c9bdd20f7c3f776bd49bfe3c5cd362a",
+            "package": "abnf_parsec",
+            "source": "hex",
+            "version": "2.1.0"
+          },
+          {
+            "app": "bandit",
+            "checksum": "6c5214daa2469644ac4ab0113b98abc24f75e348378e6a974c6343b3e5da22ef",
+            "outer_checksum": "45dac82dc86f45cf4a196dee9cc5a8b791d9c9469d996055f055e6ee36c66e20",
+            "package": "bandit",
+            "source": "hex",
+            "version": "1.12.0"
+          },
+          {
+            "app": "bunt",
+            "checksum": "081c2c665f086849e6d57900292b3a161727ab40431219529f13c4ddcf3e7a44",
+            "outer_checksum": "dc5f86aa08a5f6fa6b8096f0735c4e76d54ae5c9fa2c143e5a1fc7c1cd9bb6b5",
+            "package": "bunt",
+            "source": "hex",
+            "version": "1.0.0"
+          },
+          {
+            "app": "credo",
+            "checksum": "cc52129665fc7c15143d47838fda0f9cd6dac9ceced7bf4da6f85fcbfe64b12a",
+            "outer_checksum": "2d8bc95d5a7bb99dd2613621d4f08c6a3575c3fd4b62e6a2b48a100352a557b8",
+            "package": "credo",
+            "source": "hex",
+            "version": "1.7.19"
+          },
+          {
+            "app": "dotenvy",
+            "checksum": "00e318f3c51de9fafc4b48598447e386f19204dc18ca69886905bb8f8b08b667",
+            "outer_checksum": "c8269471b5701e9e56dc86509c1199ded2b33dce088c3471afcfef7839766d8e",
+            "package": "dotenvy",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "earmark_parser",
+            "checksum": "cba8369ab2a1342e419bc2760eec731b17be828941dcf494045d44766227e1d5",
+            "outer_checksum": "d3ec045bf122965db20c0bdb420e19ee1415843135327124918473feb4b328e8",
+            "package": "earmark_parser",
+            "source": "hex",
+            "version": "1.4.45"
+          },
+          {
+            "app": "elixir_make",
+            "checksum": "16577e2583a79bb79237bbff349619ef5d80afffc07eac6e4faf0d00e2ddaf7d",
+            "outer_checksum": "dc1f09fb7fa68866b886abd5f0f3c83553b1a19a52359a899e92af1bb3b31982",
+            "package": "elixir_make",
+            "source": "hex",
+            "version": "0.10.0"
+          },
+          {
+            "app": "ex_aws_auth",
+            "checksum": "2f4faf59dd62933c52faf5c026f22b6b9b7d143cf30ee462204a646e3304761f",
+            "outer_checksum": "42ea14c586689652f51906c797378a07822b65b32febd22067b4e93ff9dc7d4f",
+            "package": "ex_aws_auth",
+            "source": "hex",
+            "version": "1.4.1"
+          },
+          {
+            "app": "ex_doc",
+            "checksum": "4a972ffe64bc07dc605af487e98fc19b72a4185f55ca031b94c0552d6071c1d9",
+            "outer_checksum": "2756e357742fecd9749b489b85d67c9ce99c465f2e75728d9e6dc8d704b973de",
+            "package": "ex_doc",
+            "source": "hex",
+            "version": "0.40.3"
+          },
+          {
+            "app": "file_system",
+            "checksum": "31864f4685b0148f25bd3fbef2b1228457c0c89024ad67f7a81a3ffbc0bbad3a",
+            "outer_checksum": "7a15ff97dfe526aeefb090a7a9d3d03aa907e100e262a0f8f7746b78f8f87a5d",
+            "package": "file_system",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "finch",
+            "checksum": "e3f9287ac25a8832f848b144c2b57346aac65b205e2e0629a52adfe6507fd837",
+            "outer_checksum": "80e58d3f936f57e3fdf404f83a3642897ae6d9fb642934e46da4d8fe761b99d5",
+            "package": "finch",
+            "source": "hex",
+            "version": "0.23.0"
+          },
+          {
+            "app": "goth",
+            "checksum": "ee37f96e3519bdecd603f20e7f10c758287088b6d77c0147cd5ee68cf224aade",
+            "outer_checksum": "0fc2dce5bd710651ed179053d0300ce3a5d36afbdde11e500d57f05f398d5ed5",
+            "package": "goth",
+            "source": "hex",
+            "version": "1.4.5"
+          },
+          {
+            "app": "hpax",
+            "checksum": "777de5d433b0fbdc7c418159c8055910faa8047ffdb3d6b31098d2a46cd7685c",
+            "outer_checksum": "afc7cb142ebcc2d01ce7816190b98ce5dd49e799111b24249f3443d730f377ca",
+            "package": "hpax",
+            "source": "hex",
+            "version": "1.0.4"
+          },
+          {
+            "app": "idna",
+            "checksum": "1067a13043538129602d2f2ce6899d8713125c7d19734aa557ce2e3ea55bd4f1",
+            "outer_checksum": "6ae959a025bf36df61a8cab8508d9654891b5426a84c44d82deaffd6ddf8c71f",
+            "package": "idna",
+            "source": "hex",
+            "version": "7.1.0"
+          },
+          {
+            "app": "jason",
+            "checksum": "2e3a008590b0b8d7388c20293e9dcc9cf3e5d642fd2a114e4cbbb52e595d940a",
+            "outer_checksum": "b0c823996102bcd0239b3c2444eb00409b72f6a140c1950bc8b457d836b30684",
+            "package": "jason",
+            "source": "hex",
+            "version": "1.4.5"
+          },
+          {
+            "app": "jaxon",
+            "checksum": "00951a79d354260e28d7e36f956c3de94818124768a4b22e0fc55559d1b3bfe7",
+            "outer_checksum": "74532853b1126609615ea98f0ceb5009e70465ca98027afbbd8ed314d887e82d",
+            "package": "jaxon",
+            "source": "hex",
+            "version": "2.0.8"
+          },
+          {
+            "app": "jose",
+            "checksum": "06e62b467b61d3726cbc19e9b5489f7549c37993de846dfb3ee8259f9ed208b3",
+            "outer_checksum": "31e92b653e9210b696765cdd885437457de1add2a9011d92f8cf63e4641bab7b",
+            "package": "jose",
+            "source": "hex",
+            "version": "1.11.12"
+          },
+          {
+            "app": "jsv",
+            "checksum": "fb84c2a1bb5884e2b91ae66c5ed84a4db1da2bcfc1df5175c8b33c8791d39353",
+            "outer_checksum": "5963f414f9fb37c541dcebfb2df96d07ae4a40d12f52d7ac5e057969e5e7d83a",
+            "package": "jsv",
+            "source": "hex",
+            "version": "0.21.2"
+          },
+          {
+            "app": "llm_db",
+            "checksum": "2cd32be2907e72df3d72e57ad99b3963011ceb9418b46a95c4315ce1b0ba5429",
+            "outer_checksum": "9ffff8ccf4e3c268a72cbd19e0539cab618ebd3c4bc621a43c48dd2ee8af412f",
+            "package": "llm_db",
+            "source": "hex",
+            "version": "2026.7.0"
+          },
+          {
+            "app": "makeup",
+            "checksum": "882d46dc0905e9ff7abf2aab61a7e6b3dcc555533977d8a23b06019e6c89ac94",
+            "outer_checksum": "9a1a24e5b343b8ae16abea0822c10a6f75da27af7fa802ada5251f7579bfccfa",
+            "package": "makeup",
+            "source": "hex",
+            "version": "1.2.2"
+          },
+          {
+            "app": "makeup_elixir",
+            "checksum": "e928a4f984e795e41e3abd27bfc09f51db16ab8ba1aebdba2b3a575437efafc2",
+            "outer_checksum": "7284900d412a3e5cfd97fdaed4f5ed389b8f2b4cb49efc0eb3bd10e2febf9507",
+            "package": "makeup_elixir",
+            "source": "hex",
+            "version": "1.0.1"
+          },
+          {
+            "app": "makeup_erlang",
+            "checksum": "835f7e60792e08824cda445639555d7bf1bbbddb1b60b306e33cb6f6db24dc74",
+            "outer_checksum": "1cd6780fb1dd1a03979abaed0fe82712b0625118fd5257d3ebbf73f960c73c3c",
+            "package": "makeup_erlang",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "mime",
+            "checksum": "b8d739037be7cd402aee1ba0306edfdef982687ee7e9859bee6198c1e7e2f128",
+            "outer_checksum": "6171188e399ee16023ffc5b76ce445eb6d9672e2e241d2df6050f3c771e80ccd",
+            "package": "mime",
+            "source": "hex",
+            "version": "2.0.7"
+          },
+          {
+            "app": "mint",
+            "checksum": "3337184d69179695c7a9f1714d92c11e629d36c8c037a21cf490131d3d150554",
+            "outer_checksum": "5f7c9342480c069dbbc4eeac3490303c9e01870ff01a7f1d29b6107054fc1e74",
+            "package": "mint",
+            "source": "hex",
+            "version": "1.9.3"
+          },
+          {
+            "app": "mox",
+            "checksum": "a2cd96b4b80a3883e3100a221e8adc1b98e4c3a332a8fc434c39526babafd5b3",
+            "outer_checksum": "c7b92b3cc69ee24a7eeeaf944cd7be22013c52fcb580c1f33f50845ec821089a",
+            "package": "mox",
+            "source": "hex",
+            "version": "1.2.0"
+          },
+          {
+            "app": "nimble_options",
+            "checksum": "e3a492d54d85fc3fd7c5baf411d9d2852922f66e69476317787a7b2bb000a61b",
+            "outer_checksum": "821b2470ca9442c4b6984882fe9bb0389371b8ddec4d45a9504f00a66f650b44",
+            "package": "nimble_options",
+            "source": "hex",
+            "version": "1.1.1"
+          },
+          {
+            "app": "nimble_ownership",
+            "checksum": "fa8a6f2d8c592ad4d79b2ca617473c6aefd5869abfa02563a77682038bf916cf",
+            "outer_checksum": "098af64e1f6f8609c6672127cfe9e9590a5d3fcdd82bc17a377b8692fd81a879",
+            "package": "nimble_ownership",
+            "source": "hex",
+            "version": "1.0.2"
+          },
+          {
+            "app": "nimble_parsec",
+            "checksum": "8efba0122db06df95bfaa78f791344a89352ba04baedd3849593bfce4d0dc1c6",
+            "outer_checksum": "4b21398942dda052b403bbe1da991ccd03a053668d147d53fb8c4e0efe09c973",
+            "package": "nimble_parsec",
+            "source": "hex",
+            "version": "1.4.2"
+          },
+          {
+            "app": "nimble_pool",
+            "checksum": "bf9c29fbdcba3564a8b800d1eeb5a3c58f36e1e11d7b7fb2e084a643f645f06b",
+            "outer_checksum": "af2e4e6b34197db81f7aad230c1118eac993acc0dae6bc83bac0126d4ae0813a",
+            "package": "nimble_pool",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "plug",
+            "checksum": "56c480c633ec2ce10140e236e15233bf576e1d323887d7c96711bd02ab5160db",
+            "outer_checksum": "be266aee1b8536ef6409d58cf39a3121319f0ec47cfa1b24024485aa0e76ad76",
+            "package": "plug",
+            "source": "hex",
+            "version": "1.20.3"
+          },
+          {
+            "app": "plug_crypto",
+            "checksum": "19bda8184399cb24afa10be734f84a16ea0a2bc65054e23a62bb10f06bc89491",
+            "outer_checksum": "6470bce6ffe41c8bd497612ffde1a7e4af67f36a15eea5f921af71cf3e11247c",
+            "package": "plug_crypto",
+            "source": "hex",
+            "version": "2.1.1"
+          },
+          {
+            "app": "req",
+            "checksum": "b9b2024f35bcf60a92cc8cad2eaaf9d4e7aace463ff74be1afe5986830184413",
+            "outer_checksum": "cc9cd30a2ddd04989929b887178e1610c940456d962c6c3a52df6146d2eef9bf",
+            "package": "req",
+            "source": "hex",
+            "version": "0.6.2"
+          },
+          {
+            "app": "req_llm",
+            "checksum": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+            "outer_checksum": "169d77a77bac5cee7655a7a9158ebea1c2a7857670f4104b29516a25a2d24f1e",
+            "package": "req_llm",
+            "source": "hex",
+            "version": "1.17.1"
+          },
+          {
+            "app": "server_sent_events",
+            "checksum": "54606238b9182ba673a10ce90bd95f81a0939c1baa91cdf86b66acc04edd1832",
+            "outer_checksum": "8e164db8e295a2d869a8faafbf4a1eeaa749b62fe93f66271adff6394d93ce15",
+            "package": "server_sent_events",
+            "source": "hex",
+            "version": "1.1.0"
+          },
+          {
+            "app": "splode",
+            "checksum": "9843c54f84f71b7833fec3f0be06c3cfb5be6b35960ee195ea4fad84b1c25030",
+            "outer_checksum": "8f2309b6ec2ecbb01435656429ed1d9ed04ba28797a3280c3b0d1217018ecfbd",
+            "package": "splode",
+            "source": "hex",
+            "version": "0.3.1"
+          },
+          {
+            "app": "stream_data",
+            "checksum": "026f929db613aabea6208012ae9b8970d3fd5f88b3bdf26831bc536f98c42036",
+            "outer_checksum": "2b0ee3a340dcce1c8cf6302a763ee757d1e01c54d6e16d9069062509d68b1dc9",
+            "package": "stream_data",
+            "source": "hex",
+            "version": "1.4.0"
+          },
+          {
+            "app": "telemetry",
+            "checksum": "a0cb522801dffb1c49fe6e30561badffc7b6d0e180db1300df759faa22062855",
+            "outer_checksum": "928f6495066506077862c0d1646609eed891a4326bee3126ba54b60af61febb1",
+            "package": "telemetry",
+            "source": "hex",
+            "version": "1.4.2"
+          },
+          {
+            "app": "texture",
+            "checksum": "aa9097e0709652044ba500de817d60ce8a48dc0b4ffd92232fd33459a20282f6",
+            "outer_checksum": "f250de468cfe35f404faf232429f40114f83f73430e0f7086a9cc251865642e2",
+            "package": "texture",
+            "source": "hex",
+            "version": "1.2.0"
+          },
+          {
+            "app": "thousand_island",
+            "checksum": "f50a213cac97262b6d5ebb85745aa2c00fec1413191e6e66834788d45425cecb",
+            "outer_checksum": "708923d40523e43cf99041ab37a0d4b0ec426ac6438fa3716ab23d919eaeb412",
+            "package": "thousand_island",
+            "source": "hex",
+            "version": "1.5.0"
+          },
+          {
+            "app": "toml",
+            "checksum": "fbcd773caa937d0c7a02c301a1feea25612720ac3fa1ccb8bfd9d30d822911de",
+            "outer_checksum": "0690246a2478c1defd100b0c9b89b4ea280a22be9a7b313a8a058a2408a2fa70",
+            "package": "toml",
+            "source": "hex",
+            "version": "0.7.0"
+          },
+          {
+            "app": "websock",
+            "checksum": "2f69a6ebe810328555b6fe5c831a851f485e303a7c8ce6c5f675abeb20ebdadc",
+            "outer_checksum": "6105453d7fac22c712ad66fab1d45abdf049868f253cf719b625151460b8b453",
+            "package": "websock",
+            "source": "hex",
+            "version": "0.5.3"
+          },
+          {
+            "app": "websockex",
+            "checksum": "9de28d37bbe34f371eb46e29b79c94c94fff79f93c960d842fbf447253558eb4",
+            "outer_checksum": "8ef39576ed56bc3804c9cd8626f8b5d6b5721848d2726c0ccd4f05385a3c9f14",
+            "package": "websockex",
+            "source": "hex",
+            "version": "0.5.1"
+          },
+          {
+            "app": "zoi",
+            "checksum": "fc23f53d5ba6c8639fb30d9a70a80ae8fed774c180c2544bfd16f53bedf95dff",
+            "outer_checksum": "d69c2e6468752367941d0264e21cf229c1ba8757b2973eea17c12b3cb7d2d4c4",
+            "package": "zoi",
+            "source": "hex",
+            "version": "0.18.5"
+          }
+        ]
+      },
+      "fingerprint": "sha256:626a9a4fd74d449ace8bde303f68867d16c67e733c9bbd6cea712f437e928a9c",
+      "kind": "beam",
+      "runtime": {
+        "architecture": "aarch64-apple-darwin25.3.0",
+        "elixir": "1.19.5",
+        "erts": "16.3",
+        "mix_env": "dev",
+        "os": {
+          "family": "unix",
+          "name": "darwin"
+        },
+        "otp_release": "28"
+      }
+    },
+    "inputs": {
+      "authority_family_sha256": "sha256:01eec60c24a9c6fc65fa3db6052f8837ddfdf8835ddcc6d79a6f5cf1ccc38c3d",
+      "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "config_sha256": "sha256:101999ae52fafc962b692fe96a5ec0aa3b0b8f3d306db0a3cd7f06c041f36188",
+      "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+      "imp_optimizer_source_sha256": "sha256:e36789415eaa4d7cf74c85639ef2984e244a50d7abe60c0d0add502b5c7af06a",
+      "protocol_id": "ensemble-c1-v1",
+      "script_sha256": "sha256:5fbfe447e917e61537041655d53b2ee9347348f4c683edeb1d76fc430a0f9aa4",
+      "task_sha256": "sha256:0dd90b4659cc6bb6ebfa7714348c3a9e5e00fb5b673d06e5e0faa31797efc8f0"
+    },
+    "payload_sha256": "sha256:c0e6c96325b525dcd824893c60bfefca225c6b61a3b6b949494bddf4fa2f00a2",
+    "schema_version": 2,
+    "source_commits": {
+      "dspy": "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
+      "imp": "deepfates/imp@36f6635ba9af1b189a5b9424fdd4fefa8d40cca8"
+    },
+    "started_at": "2026-07-17T01:28:01Z",
+    "workspace": {
+      "reproducible": true,
+      "state": "clean"
+    }
+  },
+  "schema_version": 1,
+  "scope": {
+    "claims": [
+      "all configured programs execute when size is absent",
+      "the reducer receives all program outputs and determines the result",
+      "size limits the number of selected programs"
+    ],
+    "native_extensions": [
+      "Imp supports input-derived seeded deterministic replay; DSPy 3.2.1 rejects deterministic=true",
+      "Imp returns structured child and reducer failures"
+    ],
+    "not_claimed": [
+      "exact sampled membership or Python RNG parity",
+      "provider behavior or effectiveness",
+      "full optimizer parity",
+      "failure semantics parity"
+    ]
+  },
+  "source_bindings": {
+    "authority_family_sha256": "sha256:01eec60c24a9c6fc65fa3db6052f8837ddfdf8835ddcc6d79a6f5cf1ccc38c3d",
+    "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+    "config_sha256": "sha256:101999ae52fafc962b692fe96a5ec0aa3b0b8f3d306db0a3cd7f06c041f36188",
+    "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "imp_optimizer_source_sha256": "sha256:e36789415eaa4d7cf74c85639ef2984e244a50d7abe60c0d0add502b5c7af06a",
+    "protocol_id": "ensemble-c1-v1",
+    "script_sha256": "sha256:5fbfe447e917e61537041655d53b2ee9347348f4c683edeb1d76fc430a0f9aa4",
+    "task_sha256": "sha256:0dd90b4659cc6bb6ebfa7714348c3a9e5e00fb5b673d06e5e0faa31797efc8f0"
+  },
+  "status": "passing",
+  "summary": {
+    "authenticated_dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "matched_claim_count": 3,
+    "retained_exclusions": [
+      "exact sampled membership or Python RNG parity",
+      "provider behavior or effectiveness",
+      "full optimizer parity",
+      "failure semantics parity"
+    ]
+  }
+}
