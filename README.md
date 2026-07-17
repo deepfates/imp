@@ -7,6 +7,12 @@ The other is solid. Types, functions, and supervision trees do exactly what
 they say, every time. Most tools make you pick one and fake the other. Imp
 is for building programs out of both.
 
+<!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
+<p align="center">
+  <img src="assets/imp-with-cards.jpg" width="380"
+       alt="An imp studies a hand of cards through a lens while a smaller imp springs from its tail.">
+</p>
+
 Here is what that means in practice. You declare a task the way you would
 declare a type, with named inputs, named outputs, and constraints, and Imp
 turns the declaration into a program. The program is a value, not a prompt.

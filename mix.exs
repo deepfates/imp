@@ -12,6 +12,7 @@ defmodule Imp.MixProject do
       package: package(),
       docs: [
         main: "Imp",
+        assets: %{"assets" => "assets"},
         api_reference: true,
         extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
         filter_modules: &public_doc_module?/2,
@@ -155,6 +156,7 @@ defmodule Imp.MixProject do
         ".formatter.exs",
         "CHANGELOG.md",
         "LICENSE",
+        "assets/imp-with-cards.jpg",
         "priv/public_api.json",
         "priv/tutorial/support_tickets.json",
         "README.md",
