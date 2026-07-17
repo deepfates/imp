@@ -143,10 +143,10 @@ defmodule Imp.ReproductionRegistryTest do
     expected_admissions = %{
       "avatar" =>
         {"avatar_actor_differential",
-         "1ad7b61692c8ae3b8d0f027999b94bf8709283d29d513923ffbee5c6de10b665"},
+         "609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45"},
       "avatar_optimizer" =>
         {"avatar_optimizer_differential",
-         "01f9a17648227940142fb98b801fbabe048dc0f9ffdae540f0f32372aa882f49"},
+         "2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23"},
       "grpo" =>
         {"mmgrpo_differential",
          "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7"},
