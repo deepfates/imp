@@ -34,7 +34,7 @@ Every guide and notebook follows the same product story:
 - [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
-- [Prior Art](internal/PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
+- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
 
 ## Build With Imp

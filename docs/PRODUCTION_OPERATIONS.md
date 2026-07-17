@@ -294,6 +294,7 @@ Stable event families:
 - `[:imp, :retriever, :start | :stop | :exception]`
 - `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
+- `[:imp, :optimizer, :trial, :start | :stop | :exception]`
 - `[:imp, :optimizer, :progress]`
 
 Event metadata is redacted before dispatch. Secret-shaped values and common
