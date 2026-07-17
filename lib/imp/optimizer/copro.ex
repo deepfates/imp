@@ -137,7 +137,13 @@ defmodule Imp.Optimizer.COPRO do
             {state.evaluated[name], state.errors, state.total_calls, latest_scores, []},
             fn {pair, ordinal}, {evaluated, errors, calls, latest_scores, records} ->
               candidate = put_pair(state.current, name, pair)
-              result = evaluate!(candidate, trainset, optimizer.metric, eval_opts)
+
+              result =
+                Imp.Telemetry.span(
+                  [:imp, :optimizer, :trial],
+                  %{optimizer: :copro, predictor: name, depth: depth, trial: ordinal},
+                  fn -> evaluate!(candidate, trainset, optimizer.metric, eval_opts) end
+                )
 
               record = %{
                 score: result.score,
