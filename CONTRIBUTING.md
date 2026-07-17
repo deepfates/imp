@@ -27,6 +27,25 @@ credentials, external services, canonical datasets, or significant spend. See
 `docs/maintainers/RELEASE.md` and `docs/maintainers/EVIDENCE.md` before changing
 a provider, optimizer, benchmark, or fidelity claim.
 
+## Maintainer checks
+
+The benchmark-evidence and reproduction-registry tests are excluded from the
+default `mix test` run (tag `:evidence_infrastructure`). They validate the
+committed benchmark artifacts against full git history, the pinned DSPy Python
+environments (`scripts/setup_dspy_parity_env.sh` and friends), and in some
+lanes a `.env` with provider credentials — none of which a fresh clone has.
+To run them:
+
+```sh
+scripts/setup_dspy_parity_env.sh
+scripts/setup_dspy_current_target.sh
+scripts/setup_reference_test_env.sh
+EVIDENCE_INFRASTRUCTURE=1 mix test        # or: mix test --include evidence_infrastructure
+```
+
+They also need a full (non-shallow) clone, because the source-binding
+validators resolve ancestor commit SHAs.
+
 ## Maintainer Authority
 
 The repository authority order is deliberately narrow:

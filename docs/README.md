@@ -26,19 +26,19 @@ Every guide and notebook follows the same product story:
 
 ## Learn The Model
 
-- [Philosophy](IMP_PHILOSOPHY.md): the mental model: signatures, programs,
+- [Philosophy](internal/IMP_PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
 - [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
-- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
+- [Prior Art](internal/PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
 
 ## Build With Imp
 
 - [API Guide](API_GUIDE.md): task-oriented examples for normal application
   code.
-- [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
+- [Advanced Imp](internal/ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic test doubles.
 
 ## Learn By Running Code
@@ -55,7 +55,7 @@ you exactly what to set when it is not.
 
 ## Operate It
 
-- [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
+- [Observability and Debugging](internal/OBSERVABILITY.md): redacted inspection,
   normalized status, progress subscriptions, and trace capture.
 - [Production Operations](PRODUCTION_OPERATIONS.md): live credentials,
   redaction, security posture, and release discipline.

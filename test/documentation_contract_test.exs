@@ -152,7 +152,7 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/IMP_PHILOSOPHY.md")
+    philosophy = File.read!("docs/internal/IMP_PHILOSOPHY.md")
 
     assert readme =~ "Learning Path"
     assert docs =~ "## Manual Spine"
@@ -261,7 +261,7 @@ defmodule DocumentationContractTest do
 
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
 
     assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
@@ -284,7 +284,7 @@ defmodule DocumentationContractTest do
 
   test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
     parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
