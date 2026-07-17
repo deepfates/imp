@@ -881,8 +881,7 @@ Use `Imp.react_v2/3` when native multi-turn tool history and parallel calls are
 required. ReActV2 preserves call/result IDs in `Imp.History`, records unknown
 and failing tools as observations instead of aborting, and forces one final
 `submit` call when the normal loop ends. Existing `Imp.react/3` retains its
-fail-fast behavior. The pinned source mapping and deliberate Imp policy/redaction
-extensions are documented in `docs/internal/REACT_V2_FIDELITY.md`.
+fail-fast behavior.
 
 ### Tool Call Primitives
 
@@ -1137,4 +1136,4 @@ Imp.Streaming.incremental_fields(
 ```
 
 Provider streaming and delimiter-based field parsing are covered through
-injectable transports and deterministic chunk fixtures.
+injectable transports and scripted chunk sequences.

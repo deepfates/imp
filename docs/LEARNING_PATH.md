@@ -1,303 +1,303 @@
 # Learning Path
 
-This is the canonical Imp path. Work through it in order: each local snippet
-is deterministic and executed by `test/learning_path_contract_test.exs`. The
-only provider-backed snippet is labeled credential-gated.
+Let's build a support-ticket router and grow it, step by step, into a
+measured, tested, deployable program. Every section is a small change to code
+you have already run. You need an OpenAI key in `OPENAI_API_KEY`; a full pass
+through this page costs a few cents of model calls with `gpt-5.4-mini`.
 
-Imp follows the DSPy idea that an LM program should be a declarative,
-measurable object rather than a prompt string. Its Elixir realization is a
-struct with explicit fields, behaviours at runtime boundaries, and values that
-fit naturally in ExUnit and OTP applications.
+## 1. Make A Real Call
 
-## 1. State The Contract
-
-A signature names the inputs and outputs. `Predict` is the default module: one
-validated model call from that contract to a `Imp.Prediction`. Start here
-instead of building an agent or assembling provider messages yourself.
+Declare the task as a signature — named inputs, named outputs, types — and run
+it as a program. There is no prompt string to maintain; Imp renders the
+messages from the declaration and validates the model's output against it.
 
 ```elixir
-# learning-path-contract: predict
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
 
-program =
-  "question -> answer: short_span"
-  |> Imp.signature("Answer with the shortest correct span.")
-  |> Imp.predict(lm: lm)
+router =
+  "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
+  |> Imp.signature("Assign the support ticket to one team: billing, infrastructure, security, or product.")
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 
-{:ok, prediction} = Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
-Imp.get(prediction, :answer)
+{:ok, prediction} =
+  Imp.call(router, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
+
+Imp.get(prediction, :team)
+#=> "security"
 ```
 
-`Imp.LM.Static` makes the task contract testable without a provider. In an
-application, pass the LM to the program when its dependency should be explicit,
-or use `Imp.context/2` for a request-scoped override.
+The enums guarantee the answer is one of your teams. When the model returns
+anything else, Imp rejects it against the declared type and retries once with
+the validation error (`json_retries: 1`) instead of handing you free text.
 
 ## 2. Measure Before Changing It
 
-An evaluator applies one metric to labeled examples and returns an aggregate
-score plus per-example rows. This is the quality boundary that makes a change
-meaningful. Keep a held-out set for release decisions.
+Before touching the program, give it a number. An example is a row of named
+data; a metric scores a prediction against it. `Imp.evaluate/4` applies the
+metric across a data set and returns the aggregate plus per-example rows.
+Four live calls cost a fraction of a cent:
 
 ```elixir
-# learning-path-contract: evaluate
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
+devset =
+  [
+    Imp.example(ticket: "We were charged twice for the March invoice.", team: "billing"),
+    Imp.example(ticket: "The API is returning 502 errors intermittently.", team: "infrastructure"),
+    Imp.example(ticket: "A former employee still has access to our workspace.", team: "security"),
+    Imp.example(ticket: "Can you add a dark mode to the dashboard?", team: "product")
+  ]
+  |> Enum.map(&Imp.with_inputs(&1, :ticket))
 
-program = Imp.predict("question -> answer", lm: lm)
-
-devset = [
-  Imp.example(question: "Capital of France?", answer: "Paris")
-  |> Imp.with_inputs(:question)
-]
-
-report = Imp.evaluate(program, devset, Imp.exact_match(:answer))
+report = Imp.evaluate(router, devset, Imp.exact_match(:team), max_concurrency: 4, timeout: 60_000)
 report.score
+#=> 1.0
 ```
 
-Use `Imp.exact_match/1` when it represents the product requirement. For a
-different requirement, write a two- or three-arity metric that returns a
-boolean, number, or structured score with feedback. Inspect `report.rows` when
-the aggregate does not explain a failure.
+Four obvious tickets score 1.0 — that tells you the wiring works, not that the
+router is good. Inspect `report.rows` when the aggregate does not explain a
+result, and keep a held-out set for any decision that matters. When exact
+match is not your product requirement, pass a two- or three-arity function
+that returns a boolean, number, or structured score.
 
 ## 3. Improve With Measured Lift
 
-An optimizer compiles a program into a candidate program. `LabeledFewShot`
-attaches selected labeled demonstrations; search optimizers such as
-`RandomSearch`, `MIPROv2`, and `GEPA` use the same metric to compare candidate
-programs. The important result is a score change on data that was not used to
-select the candidate.
+An optimizer compiles your program into a better one, using training data and
+your metric. The [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) runs
+this workflow end to end on sixty labeled tickets and is the honest version of
+this section: a real baseline, a real held-out score (35% → 90% in our run,
+for about a cent), and an inspectable diff of what changed. The shape is:
 
 ```elixir
-# learning-path-contract: optimize
-lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn messages, _opts ->
-      prompt = Enum.map_join(messages, "\n", & &1.content)
-      if prompt =~ "[[ ## answer ## ]]\nParis", do: %{answer: "Paris"}, else: %{answer: "unknown"}
-    end
-  ]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
-trainset = [
-  Imp.example(question: "What is the capital of France?", answer: "Paris")
-  |> Imp.with_inputs(:question)
-]
-
-devset = [
-  Imp.example(question: "Capital of France?", answer: "Paris")
-  |> Imp.with_inputs(:question)
-]
-
-metric = Imp.exact_match(:answer)
-baseline = Imp.evaluate(program, devset, metric).score
-compiled = Imp.optimize(program, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
-lifted = Imp.evaluate(compiled, devset, metric).score
-{baseline, lifted}
+compiled = Imp.optimize(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 ```
 
-The contract returns `{0.0, 1.0}`. That is a deliberately small proof that the
-program changed and the measurement detected a lift. In a real workflow, split
-train, development, and held-out release data; do not describe an optimization
-as an improvement until the held-out score supports it.
+`LabeledFewShot` attaches labeled examples as demonstrations and costs
+nothing to compile. (This line feeds it the four measurement examples just to
+show the shape — in a real run, train on data you are not scoring against, as
+the tutorial does.) Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
+use the same `Imp.optimize` shape and the same metric to compare many
+candidate programs; they spend real model calls, so budget dollars and
+minutes for them the way you would for any experiment. Never call an
+optimization an improvement until a held-out score supports it.
 
-## 4. Give The Program Bounded Actions
+## 4. Test It Without A Provider
 
-ReAct is for tasks that need the model to choose an action, observe its result,
-and then submit typed outputs. A `Imp.Tool` is a named unary Elixir function;
-the policy is the capability boundary. The reserved `submit` tool validates the
-original signature, so a tool loop cannot bypass the output contract.
-
-```elixir
-# learning-path-contract: react
-Process.put(:learning_path_react_actions, [
-  %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
-  %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
-])
-
-try do
-  lm = %{
-    module: Imp.LM.Static,
-    opts: [
-      handler: fn _messages, _opts ->
-        [action | rest] = Process.get(:learning_path_react_actions)
-        Process.put(:learning_path_react_actions, rest)
-        action
-      end
-    ]
-  }
-
-  lookup = Imp.tool(:lookup, "Look up a capital", fn %{query: "capital-france"} -> "Paris" end)
-  program = Imp.react("question -> answer: short_span", [lookup], lm: lm, tool_policy: [:lookup, :submit])
-
-  {:ok, prediction} = Imp.call(program, %{question: "What is France's capital?"})
-  Imp.get(prediction, :answer)
-after
-  Process.delete(:learning_path_react_actions)
-end
-```
-
-Keep tool schemas, authorization, timeouts, idempotency, and audit boundaries
-in the host application. Use `ReAct` when the model needs to choose an action;
-call a regular Elixir function directly when the application already knows the
-action.
-
-## 5. Retrieve Context Deliberately
-
-Retrieval supplies context; it does not replace evaluation. `Imp.memory/2` is
-a deterministic in-memory retriever for tests and local workflows. `Imp.rag/3`
-retrieves, injects a context field, calls the wrapped program, and records the
-retrieved documents in prediction metadata.
+Your router now lives inside an application, and your test suite should not
+call OpenAI. `Imp.LM.Static` is the test double: it plays the model's part by
+returning the fields you script, while everything else — signature
+validation, adapters, metrics — runs for real.
 
 ```elixir
-# learning-path-contract: retrieval
 lm = %{
   module: Imp.LM.Static,
-  opts: [
-    handler: fn messages, _opts ->
-      prompt = Enum.map_join(messages, " ", & &1.content)
-      if prompt =~ "France has capital Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
-    end
-  ]
+  opts: [handler: fn _messages, _opts -> %{team: "security", urgency: "high"} end]
 }
 
-retriever = Imp.memory([%{id: "france", text: "France has capital Paris"}], k: 1)
-base = Imp.predict("question, context -> answer", lm: lm)
-program = Imp.rag(base, retriever, k: 1)
+router =
+  "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
+  |> Imp.signature("Assign the support ticket to one team.")
+  |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
 
-{:ok, prediction} = Imp.call(program, %{question: "capital France"})
-{Imp.get(prediction, :answer), prediction.metadata.retrieval.count}
+{:ok, prediction} =
+  Imp.call(router, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
+
+{Imp.get(prediction, :team), Imp.get(prediction, :urgency)}
+#=> {"security", "high"}
+```
+
+The same trick proves your metric wiring before you spend provider calls on a
+big evaluation — a scripted model that always answers `security` should score
+exactly the fraction of examples labeled `security`:
+
+```elixir
+always_security = %{
+  module: Imp.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{team: "security"} end]
+}
+
+program = Imp.predict("ticket -> team", lm: always_security)
+
+devset =
+  [
+    Imp.example(ticket: "Refund the March invoice.", team: "billing"),
+    Imp.example(ticket: "Suspicious login from a new device.", team: "security")
+  ]
+  |> Enum.map(&Imp.with_inputs(&1, :ticket))
+
+Imp.evaluate(program, devset, Imp.exact_match(:team)).score
+#=> 0.5
+```
+
+In application code, pass the LM to the program where the dependency should
+be explicit, or use `Imp.context/2` for a request-scoped override — that is
+also how tests swap in `Imp.LM.Static` without touching program definitions.
+
+## 5. Give The Program Bounded Actions
+
+ReAct is for tasks where the model must choose an action and observe its
+result. An `Imp.Tool` is a named Elixir function; the tool policy is the
+capability boundary, and the reserved `submit` tool validates the original
+signature, so a tool loop cannot bypass the output contract. Here the router
+also fetches the on-call engineer for the team it picks:
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+
+on_call =
+  Imp.tool(:on_call, "Look up the current on-call engineer for a team.", fn args ->
+    team = to_string(args[:team] || args["team"]) |> String.downcase()
+
+    %{
+      "billing" => "Maya",
+      "infrastructure" => "Tom",
+      "security" => "Ines",
+      "product" => "Raj"
+    }[team] || "unknown"
+  end,
+    schema: %{
+      "type" => "object",
+      "properties" => %{
+        "team" => %{"type" => "string", "enum" => ["billing", "infrastructure", "security", "product"]}
+      },
+      "required" => ["team"]
+    }
+  )
+
+escalate =
+  Imp.react(
+    Imp.signature(
+      "ticket -> team: enum[billing,infrastructure,security,product], contact: string",
+      "First call the on_call tool with the team that owns the ticket. Then call submit with that team and the contact the tool returned."
+    ),
+    [on_call],
+    lm: lm,
+    tool_policy: [:on_call, :submit],
+    max_iters: 4
+  )
+
+{:ok, prediction} = Imp.call(escalate, %{ticket: "Two-factor codes are not being accepted."})
+
+{Imp.get(prediction, :team), Imp.get(prediction, :contact)}
+#=> {"security", "Ines"}
+```
+
+Keep authorization, timeouts, and idempotency in the host application. Use
+ReAct when the model needs to choose an action; call the Elixir function
+directly when your code already knows the action.
+
+## 6. Retrieve Context Deliberately
+
+Retrieval supplies context the model cannot know; it does not replace
+evaluation. `Imp.memory/2` is a deterministic in-memory retriever, and
+`Imp.rag/3` retrieves, injects a context field, and records what it fetched
+in the prediction metadata. Give the router your team charters and it can
+apply conventions no model would guess — a gateway timeout is an
+infrastructure problem here, even though it involves a refund:
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+
+conventions = [
+  %{id: "billing", text: "billing owns charges, refunds, invoices, and plan changes."},
+  %{id: "infrastructure", text: "infrastructure owns outages, errors, and latency — including payment gateway failures and undelivered email."},
+  %{id: "security", text: "security owns accounts, credentials, sessions, and data exposure."},
+  %{id: "product", text: "product owns feature requests, how-to questions, and documentation."}
+]
+
+base =
+  Imp.predict("ticket, context -> team: enum[billing,infrastructure,security,product]",
+    lm: lm,
+    adapter: Imp.Adapter.JSON,
+    config: [json_retries: 1]
+  )
+
+routed = Imp.rag(base, Imp.memory(conventions, k: 2), k: 2)
+
+{:ok, prediction} = Imp.call(routed, %{ticket: "Refund attempts fail with a gateway timeout error."})
+
+{Imp.get(prediction, :team), prediction.metadata.retrieval.count}
+#=> {"infrastructure", 2}
 ```
 
 For an external store, implement the `Imp.Retrieve` behaviour or pass a
-two-argument retriever function that returns `{:ok, docs}`. Evaluate retrieval
-and answer quality together, including cases where the relevant document is
-missing or misleading.
+two-argument function returning `{:ok, docs}`. Evaluate retrieval and answer
+quality together, including cases where the relevant document is missing.
 
-## 6. Use RLM For Large-Context Control
+## 7. Reach For Recursive Control When Context Outgrows The Prompt
 
-RLM is a recursive controller, not a synonym for RAG. It gives a controller LM
-a constrained persistent Elixir environment and bounded operations such as
-safe evaluation, sub-LM calls, recursion, loading serializable inputs, tools,
-and `submit/1`. Budgets cover iterations, sub-LM calls, recursion depth, time,
-and interpreter work.
+RLM gives a controller model a constrained, budgeted Elixir environment —
+safe evaluation, sub-model calls, bounded recursion, and a final `submit/1`
+that still validates your signature. It is the tool for exploring or
+computing over inputs too large or too structured for one prompt, not a
+synonym for retrieval. [Livebook 04](../livebooks/04_tools_agents_mcp_rlm.livemd)
+runs it live; set budgets before exposing production data and read the
+redacted trace before raising them.
 
-```elixir
-# learning-path-contract: rlm
-controller = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "Paris"})|} end]
-}
+## 8. Persist Programs, Not Secrets
 
-program = Imp.rlm("question -> answer", lm: controller, max_iterations: 1)
-{:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
-{Imp.get(prediction, :answer), Enum.map(prediction.metadata.rlm_trace, & &1.action)}
-```
-
-Use RLM when a controller must explore or compute over context through those
-bounded actions. Set budgets before exposing production data, and inspect the
-redacted RLM trace before increasing them.
-
-## 7. Persist Programs, Not Secrets
-
-`Imp.dump/1` and `Imp.load/1` round-trip a portable, data-only program
-representation. `Imp.save!/2` and `Imp.load!/1` use checksummed JSON artifacts.
-Provider credentials are not persisted; rebind a loaded program with
-`Imp.with_lm/2` or a scoped `Imp.context/2`. Callback-bearing programs store
-trusted callback names, never closures; supply an `Imp.Saving.Registry` when
-dumping and loading them.
+A program — including one an optimizer compiled — is a value. `Imp.save!/2`
+and `Imp.load!/1` round-trip it through a checksummed JSON artifact.
+Credentials are never persisted: rebind the live model at load time with
+`Imp.with_lm/2` or a scoped `Imp.context/2`.
 
 ```elixir
-# learning-path-contract: persistence
 lm = %{
   module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+  opts: [handler: fn _messages, _opts -> %{team: "security"} end]
 }
 
-path = Path.join(System.tmp_dir!(), "imp-learning-path-#{System.unique_integer([:positive])}.json")
+path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:positive])}.json")
 
 try do
-  program = Imp.predict("question -> answer", lm: lm)
-  :ok = Imp.save!(program, path)
+  router = Imp.predict("ticket -> team", lm: lm)
+  :ok = Imp.save!(router, path)
   loaded = Imp.load!(path)
 
-  {:ok, prediction} = Imp.context([lm: lm], fn -> Imp.call(loaded, %{question: "Capital of France?"}) end)
-  Imp.get(prediction, :answer)
+  {:ok, prediction} =
+    Imp.context([lm: lm], fn ->
+      Imp.call(loaded, %{ticket: "Suspicious login from a new device."})
+    end)
+
+  Imp.get(prediction, :team)
 after
   File.rm(path)
 end
+#=> "security"
 ```
 
-Treat an artifact as deployable program state. Review and version it alongside
-the metric and evaluation data that justified promotion.
+Treat the artifact as deployable program state: review and version it
+alongside the metric and evaluation data that justified promoting it.
 
-## 8. Inspect Runtime Behavior
+## 9. Inspect Runtime Behavior
 
-`Imp.trace/2` captures selected redacted telemetry while a function runs.
-`Imp.Observability.inspect_artifact/2`, `Imp.inspect_history/2`, and
-`Imp.Observability.status/1` provide bounded, redacted views of predictions,
-tool history, RLM traces, optimizer reports, and provider state. Subscribe with
-`Imp.subscribe_optimizer_progress/1` when an interactive process needs
-optimizer progress events.
+`Imp.trace/2` captures selected redacted telemetry while a function runs, and
+`Imp.Observability.status/1` gives bounded, redacted views of provider state.
+Tool calls, retries, and model traffic all emit events you can forward to
+your metrics system:
 
 ```elixir
-# learning-path-contract: observability
-tool = Imp.tool(:lookup, "Look up a capital", fn %{country: "France"} -> "Paris" end)
+on_call = Imp.tool(:on_call, "Look up the on-call engineer", fn %{team: "security"} -> "Ines" end)
 
 trace =
   Imp.trace(fn ->
-    Imp.Tool.call(tool, %{country: "France"})
+    Imp.Tool.call(on_call, %{team: "security"})
   end)
 
 {trace.result, Enum.map(trace.events, &elem(&1, 0))}
+#=> {"Ines", [[:imp, :tool, :start], [:imp, :tool, :stop]]}
 ```
 
 Telemetry is an observation boundary, not an authorization boundary. Keep
-redaction enabled unless debugging a controlled local input, and send the
-normalized status data to the application's metrics and alerting system.
+redaction on unless you are debugging a controlled local input.
 
-## 9. Deploy The Verified Artifact
+## 10. Deploy The Verified Artifact
 
-The supplied `examples/deployment` OTP application
-loads a checksummed artifact during supervised startup, binds credentials only
-at runtime, and executes requests in bounded `Task.Supervisor` workers. It
-returns overloads and timeouts instead of letting one slow provider call block
-the program server. Its behavior is exercised by
-`test/deployment_reference_test.exs`.
+The `examples/deployment` OTP application shows the production shape: it
+loads a checksummed artifact during supervised startup, binds credentials
+only at runtime, and executes requests in bounded `Task.Supervisor` workers,
+returning overloads and timeouts instead of letting one slow provider call
+block the program server.
 
-For an application deployment, keep the artifact path, model name, API key,
-maximum concurrency, shutdown timeout, retry policy, and retention policy in
-runtime configuration. Evaluate the candidate before promotion, load the
-artifact through its trusted callback registry when needed, rebind the live LM,
-and observe status, latency, validation errors, and costs after rollout.
-
-## Live Provider Boundary
-
-The local contracts above do not use provider credentials. This snippet is
-credential-gated: execute it only when `OPENAI_API_KEY` and `OPENAI_MODEL` are
-set, and keep it out of ordinary unit tests. The program and metric APIs do not
-change.
-
-```elixir
-# learning-path-credential-gated: live_provider
-lm =
-  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
-    api_key: System.fetch_env!("OPENAI_API_KEY"),
-    temperature: 0
-  )
-
-program = Imp.predict("question -> answer: short_span", lm: lm)
-Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
-```
-
-Run the repository's opt-in provider checks with `LIVE_PROVIDER=1 mix
-live.check`. For everyday local validation, run `mix format --check-formatted`
-and `mix test test/learning_path_contract_test.exs`. From a source checkout,
-run `mix production.check` for the full quality gate.
+For your own deployment, keep the artifact path, model name, API key,
+concurrency limits, and retry policy in runtime configuration. Evaluate the
+candidate before promotion, rebind the live LM at startup, and watch status,
+latency, validation errors, and cost after rollout.

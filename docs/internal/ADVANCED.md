@@ -2,23 +2,7 @@
 
 This guide covers Imp's advanced program-building tools: arbitrary artifact
 optimization, Pareto-guided reflection, agent runtimes, MCP-style tool
-catalogs, schema constraints, and deterministic benchmark fixtures.
-
-## Gates
-
-Advanced Imp behavior is part of the source-checkout production gate. These
-commands must pass before release:
-
-```sh
-mix production.check
-mix integration.check
-LIVE_PROVIDER=1 mix live.check
-```
-
-`mix production.check` enforces warnings-as-errors compilation, formatting,
-documentation generation, public surface checks, and deterministic benchmark
-tests. The benchmark suite includes positive controls that must reach threshold
-and negative controls that must remain below threshold.
+catalogs, schema constraints, and deterministic regression coverage.
 
 ## Optimize Anything
 
@@ -117,11 +101,9 @@ review the checkpoint and launch a new run id with a fresh limit. The separate
 $15 matched-upstream research maximum is not the $0.50 ceiling for this narrow
 rerun and does not authorize an additional asserted product claim.
 
-Current implementation fidelity is pinned to GEPA v0.1.4. The exact v0.1.1
-checkout remains a historical structural differential, and new campaign
-artifacts record the v0.1.4 commit resolved from the canonical authority
-ledger. Real non-prompt effectiveness campaigns remain a separate release
-gate.
+Current implementation fidelity is pinned to GEPA v0.1.4; earlier comparisons
+against the v0.1.1 checkout are kept as history in the repository's internal
+notes, which also track how each pinned upstream commit is recorded.
 
 ## Agents And MCP
 
@@ -338,23 +320,16 @@ Supported constraints include enum, numeric bounds, string length, regex
 patterns, arrays, nested objects, and optional fields. JSON adapter parse errors
 return retry feedback suitable for another model attempt.
 
-## Release Evidence
+## What The Shipped Tests Promise
 
-Imp keeps release evidence behind Mix gates rather than presenting benchmark
-helpers as application APIs. In a source checkout:
-
-```sh
-mix production.check
-# source checkout only
-mix evidence.check
-```
-
-The deterministic evidence fixtures cover:
+Imp's repository keeps its benchmark and evidence tooling out of the
+application API; what ships is behavior covered by deterministic regression
+tests. That coverage includes:
 
 - Ax-style structured extraction with schema constraints.
 - Agent/tool execution with trace evidence.
 - GEPA prompt optimization.
-- Program optimization with a reward fixture where the baseline fails and the
+- Program optimization with a scripted reward where the baseline fails and the
   compiled program passes.
 - Arbitrary config optimization.
 
@@ -366,7 +341,7 @@ JSON-safe persistence where applicable, and keep provider credentials out of
 saved artifacts.
 
 MCP support covers catalog import plus JSON-RPC HTTP, stdio, and Streamable HTTP
-clients. The benchmark fixtures are deterministic regression fixtures for
+clients. The bundled benchmark tests are deterministic regression checks on
 Imp behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared Imp
 contracts and tested through injectable transports.
