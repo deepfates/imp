@@ -1,5 +1,11 @@
 defmodule Imp.FieldSelector do
-  @moduledoc false
+  @moduledoc """
+  Internal. Validates field-name values used in option schemas: a name is an
+  atom (excluding booleans and `nil`) or a non-blank string, and a selector is
+  a single name or a non-empty list of names. Each function returns `{:ok,
+  value}` or `{:error, message}` so it can serve as a NimbleOptions custom
+  validator, as in `Imp.Predict.ProgramOfThought`.
+  """
 
   @name_error "expected an atom/string field name"
   @selector_error "expected an atom/string field name or a non-empty list of field names"

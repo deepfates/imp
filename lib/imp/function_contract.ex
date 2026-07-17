@@ -1,5 +1,10 @@
 defmodule Imp.FunctionContract do
-  @moduledoc false
+  @moduledoc """
+  Internal. Checks that a user-supplied callback (a metric, reward, or similar
+  function) has one of the expected arities, raising an `ArgumentError` that
+  names the calling context when it does not. Optimizers and predict programs
+  use this to fail loudly at construction time instead of mid-run.
+  """
 
   def validate!(fun, arities, context, noun) when is_list(arities) do
     if Enum.any?(arities, &is_function(fun, &1)) do

@@ -290,6 +290,17 @@ defmodule Imp.Clients.ReqLLM do
           Map.get(message, :tool_calls) || Map.get(message, "tool_calls")
         )
 
+      # Messages that went through a JSON round trip (ReqLLMBatch checkpoints,
+      # anything decoded from disk or the wire) arrive with string keys and
+      # string roles. Normalize the known message keys explicitly; unknown keys
+      # are never atomized.
+      %{"role" => role, "content" => content} = message ->
+        build_message(
+          role,
+          content,
+          Map.get(message, "tool_calls") || Map.get(message, :tool_calls)
+        )
+
       other ->
         ReqLLM.Context.user(inspect(other))
     end)

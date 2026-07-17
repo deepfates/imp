@@ -75,9 +75,6 @@ Dependency policy:
 - the deterministic non-live, non-integration, non-protocol test suite
 - package-boundary checks through `mix package.check`
 - Livebook syntax validation through `mix livebook.check`
-- the retired-identity scan through `mix legacy_identity.check`
-- the deterministic failure campaign through
-  `mix benchmark.failure_campaign.check`
 - clean documentation generation with ExDoc, so renamed modules or Livebooks
   cannot leave stale pages in the ignored `doc/` output directory
 
@@ -86,12 +83,8 @@ campaigns, or parity dashboards.
 
 `mix livebook.execute.check` runs every shipped notebook. Keep it out of the
 ordinary fast gate, but run it when changing public examples, notebook code, or
-the learning path. Notebook 01's live cells run when `OPENAI_API_KEY` is set;
-notebooks 02 through 05 additionally require `LIVE_PROVIDER=1` (with
-`OPENAI_API_KEY` and `OPENAI_MODEL`) before their live-provider proof cells
-execute — without it they skip, and the gate still passes. The first run on a
-cold dependency cache can time out on notebook 01 while `Mix.install` compiles;
-rerun once warm.
+the learning path. With `OPENAI_API_KEY` and `OPENAI_MODEL` loaded, the same
+command also executes the notebooks' live-provider proof cells.
 
 `mix integration.check` runs local-service end-to-end tests. It is reserved for
 tests that may start local HTTP servers, local MCP processes, or other
@@ -131,10 +124,8 @@ test-only support.
 
 The deterministic source-checkout suite also executes the pinned Python DSPy
 reference sidecars and reads the pinned GEPA artifact source registry. CI uses
-DSPy `3.2.1` as the release baseline and `gepa-ai/gepa-artifact` commit
-`cbefbc1aa0f43dd39874ec4bf42211365dbda42e`; it additionally installs a DSPy
-`3.3.0b1` reference environment used only by the RLM and current-target
-tracking sidecars. Changing any of these pins requires an
+DSPy `3.2.1` and `gepa-ai/gepa-artifact` commit
+`cbefbc1aa0f43dd39874ec4bf42211365dbda42e`; changing either pin requires an
 upstream-conformance review rather than an incidental dependency update.
 
 In a source checkout, `mix evidence.check` runs deterministic maintainer
@@ -288,14 +279,15 @@ Stable event families:
 
 - `[:imp, :lm, :start | :stop]`
 - `[:imp, :lm, :stream, :start | :chunk | :stop]`
-- `[:imp, :adapter, :parse, :retry | :error | :json_fallback]`
+- `[:imp, :adapter, :parse, :retry | :error]`
 - `[:imp, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
 - `[:imp, :tool, :start | :stop | :exception]`
 - `[:imp, :retriever, :start | :stop | :exception]`
 - `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
-- `[:imp, :optimizer, :trial, :start | :stop | :exception]`
-- `[:imp, :optimizer, :progress]`
+- `[:imp, :optimizer, :trial, :start | :stop | :exception]` (RandomSearch,
+  COPRO, SIMBA, and MIPROv2 candidate evaluations)
+- `[:imp, :optimizer, :progress]` (GEPA generations)
 
 Event metadata is redacted before dispatch. Secret-shaped values and common
 secret keys are replaced with `[REDACTED]`.
