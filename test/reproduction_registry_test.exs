@@ -47,7 +47,7 @@ defmodule Imp.ReproductionRegistryTest do
     refute "bfcl_shaped_scorer" in react["protocol_ids"]
   end
 
-  test "COPRO isolation has a pure provider-free T1 protocol awaiting recapture" do
+  test "COPRO isolation has pure provider-free admitted T1 evidence" do
     registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
     protocol = get_in(registry, ["protocols", "copro_isolation"])
     copro = Enum.find(registry["features"], &(&1["id"] == "copro"))
@@ -69,9 +69,12 @@ defmodule Imp.ReproductionRegistryTest do
     assert "copro_isolation" in copro["protocol_ids"]
 
     assert copro["admitted_evidence"] == %{
-             "tier" => "none",
-             "artifact" => nil,
-             "protocol_id" => nil
+             "tier" => "t1",
+             "artifact" =>
+               "benchmarks/evidence/admitted/copro_isolation/6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b.json",
+             "artifact_sha256" =>
+               "6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b",
+             "protocol_id" => "copro_isolation"
            }
   end
 
@@ -95,11 +98,13 @@ defmodule Imp.ReproductionRegistryTest do
       assert protocol["manifest"] == "benchmarks/config/classical-optimizer-differential-v1.json"
       assert protocol_id in feature["protocol_ids"]
 
-      assert feature["admitted_evidence"] == %{
-               "tier" => "none",
-               "artifact" => nil,
-               "protocol_id" => nil
-             }
+      evidence = feature["admitted_evidence"]
+      assert evidence["tier"] == "t1"
+      assert evidence["protocol_id"] == protocol_id
+      assert evidence["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
+
+      assert evidence["artifact"] ==
+               ReproductionRegistry.admitted_path(protocol_id, evidence["artifact_sha256"])
     end)
   end
 

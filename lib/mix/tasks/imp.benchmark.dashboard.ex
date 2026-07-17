@@ -206,6 +206,18 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "instruction_optimizer_contract" => instruction_optimizer_contract,
       "optimizer_lift" => optimizer_lift,
+      "bootstrap_few_shot_differential" =>
+        classical_optimizer_differential_lane(
+          "bootstrap_few_shot_differential",
+          "bootstrap_few_shot",
+          max_age_hours
+        ),
+      "random_search_differential" =>
+        classical_optimizer_differential_lane(
+          "random_search_differential",
+          "bootstrap_random_search",
+          max_age_hours
+        ),
       "copro_isolation" => copro_isolation_lane(max_age_hours),
       "gepa_replication" =>
         gepa_replication_lane(
@@ -782,6 +794,45 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       missing_lane(
         "copro_isolation",
         "canonical selected COPRO isolation evidence is invalid: #{Exception.message(error)}"
+      )
+  end
+
+  defp classical_optimizer_differential_lane(protocol_id, feature_id, max_age_hours) do
+    registry = Imp.ReproductionRegistry.load!()
+    feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
+    evidence = feature && feature["admitted_evidence"]
+
+    unless is_map(evidence) and evidence["tier"] == "t1" and
+             evidence["protocol_id"] == protocol_id and is_binary(evidence["artifact"]) do
+      raise ArgumentError, "canonical #{feature_id} T1 evidence is not selected"
+    end
+
+    path = evidence["artifact"]
+    artifact = ArtifactFile.read_run_json!(path)
+    Imp.ReproductionRegistry.validate_protocol_artifact!(registry, protocol_id, artifact)
+
+    artifact_lane(protocol_id, path, artifact, max_age_hours,
+      passing: true,
+      full_evidence: true,
+      scale: "full",
+      freshness: :age,
+      summary: %{
+        "feature" => feature_id,
+        "tier" => evidence["tier"],
+        "protocol_id" => evidence["protocol_id"],
+        "artifact_sha256" => evidence["artifact_sha256"],
+        "matched" => get_in(artifact, ["comparison", "matched"]),
+        "matched_claim_count" => get_in(artifact, ["summary", "matched_claim_count"]),
+        "limitations" => get_in(artifact, ["scope", "not_claimed"])
+      },
+      limitation:
+        "This source-bound C1 fixture proves only its declared observations; retained exclusions are recorded in the artifact."
+    )
+  rescue
+    error ->
+      missing_lane(
+        protocol_id,
+        "canonical selected #{feature_id} evidence is invalid: #{Exception.message(error)}"
       )
   end
 

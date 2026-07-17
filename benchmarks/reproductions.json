@@ -765,9 +765,10 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/8afbb2c4d6acf26011c4678df07a5fd058dafe591a103707f57899a34623d692.json",
+        "artifact_sha256": "8afbb2c4d6acf26011c4678df07a5fd058dafe591a103707f57899a34623d692",
+        "protocol_id": "bootstrap_few_shot_differential"
       }
     },
     {
@@ -792,9 +793,10 @@
         "optimizer_lift"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/random_search_differential/da94412070be8943ae0a8b4dab2ba5a13afb21745cbc9cc1af45016a97a23ee9.json",
+        "artifact_sha256": "da94412070be8943ae0a8b4dab2ba5a13afb21745cbc9cc1af45016a97a23ee9",
+        "protocol_id": "random_search_differential"
       }
     },
     {
@@ -840,9 +842,10 @@
         "instruction_live"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/copro_isolation/6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b.json",
+        "artifact_sha256": "6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b",
+        "protocol_id": "copro_isolation"
       }
     },
     {

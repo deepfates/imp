@@ -5,6 +5,7 @@ defmodule ClaimsInventoryTest do
   @claim_states ["asserted", "target", "retired"]
   @gate_policies ["blocking", "informational"]
   @known_lanes ~w(
+    bootstrap_few_shot_differential
     copro_isolation
     failure_recovery
     gepa_replication
@@ -19,6 +20,7 @@ defmodule ClaimsInventoryTest do
     protocol_gates
     provider_free_overhead
     rag_tool_agent
+    random_search_differential
     rlm_benchmark
   )
 
@@ -185,16 +187,29 @@ defmodule ClaimsInventoryTest do
     for family <- ~w(bootstrap_few_shot random_search) do
       semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
       effectiveness = claims["claim.optimizer.#{family}.effectiveness"]
-      assert semantic["claim_state"] == "target"
+      assert semantic["claim_state"] == "asserted"
       assert semantic["target_rung"] == "C1"
       assert semantic["claim_type"] == "conformance"
       assert effectiveness["target_rung"] == "C3"
       assert effectiveness["claim_type"] == "functional_effectiveness"
     end
 
+    bootstrap = claims["claim.optimizer.bootstrap_few_shot.semantic_conformance"]
+    random = claims["claim.optimizer.random_search.semantic_conformance"]
+
+    assert get_in(bootstrap, ["requirements", Access.at(0), "lane"]) ==
+             "bootstrap_few_shot_differential"
+
+    assert get_in(random, ["requirements", Access.at(0), "lane"]) ==
+             "random_search_differential"
+
+    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "8afbb2c4"))
+    assert Enum.any?(random["sources"], &String.contains?(&1, "da944120"))
+
     copro = claims["claim.optimizer.copro.semantic_conformance"]
-    assert copro["claim_state"] == "target"
+    assert copro["claim_state"] == "asserted"
     assert copro["target_rung"] == "C1"
+    assert Enum.any?(copro["sources"], &String.contains?(&1, "6832262b"))
     assert get_in(copro, ["requirements", Access.at(0), "lane"]) == "copro_isolation"
     assert hd(copro["limitations"]) =~ "exact Python RNG parity"
 

@@ -246,13 +246,13 @@ mix imp.benchmark.bootstrap_few_shot_differential --require-clean --out tmp/boot
 mix imp.benchmark.random_search_differential --require-clean --out tmp/random-search-differential
 ```
 
-The previous BootstrapFewShot, RandomSearch, and COPRO receipts were correctly
-deselected when the authority ledger was split into independent weight families:
-their full-ledger source binding no longer matched. Recapture all three from the
-committed split ledger before re-admission. The protocols retain explicit
-exclusions for exact Python RNG, provider behavior/effectiveness, and full
-optimizer parity; BootstrapFewShot also excludes repeated-call sampling parity,
-and RandomSearch excludes shuffled-row-order parity.
+The canonical BootstrapFewShot (`8afbb2c4…`), RandomSearch (`da944120…`), and
+COPRO (`6832262b…`) receipts were captured from clean Imp commit `04c16a8` after
+the authority ledger was split into independent weight families. Their validators
+recompute the exact source bindings and retained scopes. The protocols exclude
+exact Python RNG, provider behavior/effectiveness, and full optimizer parity;
+BootstrapFewShot also excludes repeated-call sampling parity, and RandomSearch
+excludes shuffled-row-order parity.
 
 The canonical validator is receipt-only and provider-free by default; fresh Python
 replay is an explicit additional operation. The fixture starts COPRO in a fresh worker process after installing mutable parent

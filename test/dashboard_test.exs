@@ -344,7 +344,6 @@ defmodule DashboardTest do
     refute dashboard["profile_gate"]["passing"]
 
     assert dashboard["profile_gate"]["blocking_lanes"] == [
-             "copro_isolation",
              "failure_recovery",
              "gepa_replication",
              "live_matched_model",
@@ -370,7 +369,7 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    assert dashboard["claims"]["summary"]["informational"] == 1
+    assert dashboard["claims"]["summary"]["informational"] == 4
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -384,6 +383,9 @@ defmodule DashboardTest do
     assert [
              "claim.dspy_semantics.golden_trace",
              "claim.failure_recovery.deterministic_t0",
+             "claim.optimizer.bootstrap_few_shot.semantic_conformance",
+             "claim.optimizer.copro.semantic_conformance",
+             "claim.optimizer.random_search.semantic_conformance",
              "claim.runtime.provider_free_overhead_guard",
              "claim.product.public_api_installable",
              "claim.protocols.production_boundaries",
@@ -402,7 +404,33 @@ defmodule DashboardTest do
     assert dashboard["lanes"]["product_package"]["status"] == "full"
     assert dashboard["lanes"]["livebook_execute"]["status"] == "full"
     assert dashboard["lanes"]["protocol_gates"]["status"] == "full"
-    assert dashboard["lanes"]["copro_isolation"]["status"] == "missing"
+    assert dashboard["lanes"]["bootstrap_few_shot_differential"]["status"] == "full"
+    assert dashboard["lanes"]["bootstrap_few_shot_differential"]["passing"]
+    assert dashboard["lanes"]["random_search_differential"]["status"] == "full"
+    assert dashboard["lanes"]["random_search_differential"]["passing"]
+    assert dashboard["lanes"]["copro_isolation"]["status"] == "full"
+    assert dashboard["lanes"]["copro_isolation"]["passing"]
+
+    assert get_in(dashboard, [
+             "lanes",
+             "bootstrap_few_shot_differential",
+             "summary",
+             "matched"
+           ])
+
+    assert get_in(dashboard, [
+             "lanes",
+             "random_search_differential",
+             "summary",
+             "matched"
+           ])
+
+    assert get_in(dashboard, [
+             "lanes",
+             "copro_isolation",
+             "summary",
+             "deterministic_observations_verified"
+           ]) == 5
 
     assert dashboard["lanes"]["live_provider_smoke"]["status"] == "missing"
     assert dashboard["lanes"]["failure_recovery"]["status"] == "passing"
