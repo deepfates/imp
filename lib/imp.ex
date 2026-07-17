@@ -281,6 +281,23 @@ defmodule Imp do
   defdelegate call(program, inputs), to: Imp.Module
 
   @doc """
+  Streams one program call as an Enumerable of chunks.
+
+  Pass `provider_stream: true` to stream chunks from the provider as it
+  generates; otherwise the program runs once and the result is chunked
+  locally, so stream consumers keep working with any program or LM.
+  """
+  defdelegate stream(program, inputs, opts \\ []), to: Imp.Streaming
+
+  @doc """
+  Streams one program call and joins the chunks into a string.
+
+  If any chunk fails, collection stops and returns `{:error, reason}` rather
+  than partial output.
+  """
+  defdelegate collect(program, inputs, opts \\ []), to: Imp.Streaming
+
+  @doc """
   Returns a copy of an Imp program pinned to `lm`.
 
   This is the public rebinding path for programs loaded from portable artifacts.
