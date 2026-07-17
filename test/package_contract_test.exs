@@ -199,10 +199,12 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README starts with a resolvable Git install path and labels source-checkout installs" do
+  test "README starts with immutable release installs and labels source-checkout installs" do
     readme = File.read!("README.md")
 
-    assert readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
+    assert readme =~ ~s({:imp, "~> 0.1.0"})
+    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.1.0"})
+    refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
     assert readme =~ "source checkout"
     assert readme =~ ~s({:imp, path: "."})
   end
