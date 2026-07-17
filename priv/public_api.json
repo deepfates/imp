@@ -40,6 +40,16 @@
     },
     {
       "category": "internal",
+      "module": "Imp.FieldSelector",
+      "source": "lib/imp/field_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.FunctionContract",
+      "source": "lib/imp/function_contract.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Observability.Inspection",
       "source": "lib/imp/observability/inspection.ex"
     },
@@ -290,6 +300,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Options",
+      "source": "lib/imp/options.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Predict.Avatar.Action",
       "source": "lib/imp/predict/avatar_models.ex"
     },
@@ -315,8 +330,18 @@
     },
     {
       "category": "internal",
+      "module": "Imp.ProgramAccess",
+      "source": "lib/imp/program_access.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Tasks",
       "source": "lib/imp/tasks.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ToolPolicy",
+      "source": "lib/imp/tool_policy.ex"
     },
     {
       "category": "internal",
