@@ -19,9 +19,19 @@ jobs:
           # ancestor SHAs and fail on a shallow checkout.
           fetch-depth: 0
       - uses: erlef/setup-beam@v1
+        id: beam
         with:
           otp-version: "28"
           elixir-version: "1.19"
+      - name: Cache Elixir deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
