@@ -23,7 +23,7 @@ tests, and the conformance table below is generated from that program.
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
 | `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX fine-tuning included |
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
-| `dspy.configure(lm=...)` | No global. Pass `lm:` explicitly, or scope with `Imp.context/2` |
+| `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
 | `dspy.inspect_history()` | `Imp.trace/2` and `Imp.Observability.status/1` — redacted by default |
 | `dspy.LM("openai/gpt-...")` (LiteLLM) | `Imp.req_llm("openai:gpt-...")` ([ReqLLM](https://hex.pm/packages/req_llm) providers) |
@@ -31,11 +31,11 @@ tests, and the conformance table below is generated from that program.
 
 ## What is deliberately different
 
-**No ambient globals.** `dspy.configure` sets process-wide state; Imp has no
-global model. The LM is an explicit dependency on the program, or a
-process-scoped override via `Imp.context/2`. In a runtime built on millions
-of independent processes, ambient configuration is a bug factory; explicit
-seams are also why swapping `Imp.LM.Static` into tests requires no patching.
+**Defaults are supervised and scopeable.** Imp has a `configure/1` like DSPy
+does, but the default lives in a supervised OTP process, and `Imp.context/2`
+gives you a process-local override stack for a request or a test. The
+recommended style is still an explicit `lm:` on the program, because explicit
+seams are why swapping `Imp.LM.Static` into tests requires no patching.
 
 **Supervision is the execution model, not an add-on.** Evaluation fan-out,
 tool execution, and sandboxed code all run in bounded, supervised workers.
