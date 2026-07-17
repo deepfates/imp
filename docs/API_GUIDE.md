@@ -1136,4 +1136,4 @@ Imp.Streaming.incremental_fields(
 ```
 
 Provider streaming and delimiter-based field parsing are covered through
-injectable transports and deterministic chunk fixtures.
+injectable transports and scripted chunk sequences.

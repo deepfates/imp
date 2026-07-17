@@ -133,7 +133,7 @@ evidence. These commands are not shipped as package APIs:
 
 Source-checkout maintainer aliases:
 
-- benchmark truth fixture harness tests through `mix benchmark.truth.check`
+- benchmark truth harness tests through `mix benchmark.truth.check`
 - provider-free Imp-vs-DSPy golden trace parity through
   `mix benchmark.trace.check`
 - overhead checks through `mix benchmark.overhead.check`

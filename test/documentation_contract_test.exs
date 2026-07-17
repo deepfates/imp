@@ -105,6 +105,21 @@ defmodule DocumentationContractTest do
     assert File.read!("docs/PRODUCTION_OPERATIONS.md") =~ "mix livebook.execute.check"
   end
 
+  test "internal process vocabulary stays off user surfaces" do
+    user_surfaces =
+      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
+
+    banned = ~r/\bC1\b|authorit|\badmitted\b|tranche|differential|fixture/i
+
+    offenders =
+      for path <- user_surfaces,
+          match = Regex.run(banned, File.read!(path)),
+          do: {path, hd(match)}
+
+    assert offenders == [],
+           "internal vocabulary leaked onto user surfaces: #{inspect(offenders)}"
+  end
+
   test "learner-facing docs do not foreground maintainer evidence commands" do
     learner_text =
       ["README.md", "docs/README.md" | Path.wildcard("livebooks/*.livemd")]
@@ -280,7 +295,7 @@ defmodule DocumentationContractTest do
     assert api =~ "reject malformed\nvalues when the optimizer is built or run"
     assert advanced =~ "public frontend delegates to the production GEPA engine"
     assert advanced =~ "Current implementation fidelity is pinned to GEPA v0.1.4"
-    assert advanced =~ "v0.1.1\ncheckout remains a historical structural differential"
+    assert advanced =~ "earlier comparisons\nagainst the v0.1.1 checkout are kept as history"
     assert coverage =~ "GEPA-style reflection"
     assert parity =~ "GEPA-style optimizer rows"
   end

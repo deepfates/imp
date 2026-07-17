@@ -98,9 +98,10 @@ register a process, or persist state between calls. Their facade contracts
 cover scoring, threshold stopping, deterministic tie selection, failure
 isolation, and provenance.
 
-Finite multidimensional budgets perform ordered-prefix admission before work
-starts. `admitted_budget` is the sum of all admitted projections, while
-`observed_budget` is the sum of projections attached to completed outcomes.
+Finite multidimensional budgets decide up front, in request order, how much
+work may start. `admitted_budget` is the sum of the projections the budget let
+start, while `observed_budget` is the sum of projections attached to completed
+outcomes.
 Neither field is actual provider usage. Sequential evaluators receive prior
 ordered outcomes, which Refine uses for feedback history. Concurrent evaluators
 run under Imp's supervised task runtime, bounded by `max_concurrency`, and
