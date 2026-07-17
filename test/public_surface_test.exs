@@ -1016,8 +1016,10 @@ defmodule PublicSurfaceTest do
     refute Code.ensure_loaded?(Module.concat(Imp.Adapter, String.to_atom(borrowed_name)))
 
     docs =
-      ["README.md" | Path.wildcard("docs/*.md")]
-      |> Enum.reject(&(&1 in ["docs/PRIOR_ART.md", "docs/RESEARCH_LANDSCAPE.md"]))
+      ["README.md" | Path.wildcard("docs/**/*.md")]
+      |> Enum.reject(
+        &(&1 in ["docs/internal/PRIOR_ART.md", "docs/internal/RESEARCH_LANDSCAPE.md"])
+      )
       |> Enum.map_join("\n", &File.read!/1)
 
     refute docs =~ borrowed_name

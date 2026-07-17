@@ -1,6 +1,8 @@
 defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   alias Imp.BenchmarkTruth.RunContext
   alias Mix.Tasks.Imp.Benchmark.CoproIsolation, as: COPROArtifact
 

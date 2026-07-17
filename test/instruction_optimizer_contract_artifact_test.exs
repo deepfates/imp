@@ -1,6 +1,8 @@
 defmodule InstructionOptimizerContractArtifactTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   import ExUnit.CaptureIO
 
   @tag timeout: 120_000

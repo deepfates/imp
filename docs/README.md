@@ -20,35 +20,37 @@ Every guide and notebook follows the same product story:
 
 - [Learning Path](LEARNING_PATH.md): what to read and run in 30 minutes,
   two hours, an afternoon, and a production app.
-- [Philosophy](IMP_PHILOSOPHY.md): the mental model: signatures, programs,
+- [Philosophy](internal/IMP_PHILOSOPHY.md): the mental model: signatures, programs,
   adapters, examples, metrics, and optimizers.
 - [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
 - [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
   library.
-- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
+- [Prior Art](internal/PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
-- [Research Landscape](RESEARCH_LANDSCAPE.md): the paper lineage, neighboring
+- [Research Landscape](internal/RESEARCH_LANDSCAPE.md): the paper lineage, neighboring
   repositories, implementation comparators, and architecture implications.
 
 ## Build With Imp
 
 - [API Guide](API_GUIDE.md): task-oriented examples for normal application
   code.
-- [Tutorial And Example Parity](TUTORIAL_EXAMPLE_PARITY.md): where each
+- [Tutorial And Example Parity](internal/TUTORIAL_EXAMPLE_PARITY.md): where each
   tutorial and real-world example family belongs in the executable Imp path.
-- [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
+- [Advanced Imp](internal/ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic fixtures.
-- [RLM Fidelity](RLM_FIDELITY.md): the BEAM-native recursive-control design,
+- [RLM Fidelity](internal/RLM_FIDELITY.md): the BEAM-native recursive-control design,
   upstream invariants, evidence tiers, and remaining paper-scale blocker.
-- [Instruction Optimizer Fidelity](INSTRUCTION_OPTIMIZER_FIDELITY.md): pinned
+- [Instruction Optimizer Fidelity](internal/INSTRUCTION_OPTIMIZER_FIDELITY.md): pinned
   MIPROv2 and SIMBA algorithms, BEAM-native design, and evidence boundaries.
-- [ComBee-Style GEPA Aggregation Fidelity](COMBEE_FIDELITY.md): hierarchical
+- [ComBee-Style GEPA Aggregation Fidelity](internal/COMBEE_FIDELITY.md): hierarchical
   reflection aggregation, measured batch control, budget and timeout policy,
   and evidence boundaries.
 
 The source checkout also contains maintainer-only authority and evidence
 infrastructure. It is excluded from the consumer package because its commands
-operate on repository protocols and admitted artifacts.
+operate on repository protocols and admitted artifacts. Fidelity audits,
+parity/differential reports, and other maintainer process documents live in
+`docs/internal/`; the guides above are the user-facing manual.
 
 ## Learn By Running Code
 
@@ -67,7 +69,7 @@ credentials are loaded.
 
 ## Operate It
 
-- [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
+- [Observability and Debugging](internal/OBSERVABILITY.md): redacted inspection,
   normalized status, progress subscriptions, and trace capture.
 - [Production Operations](PRODUCTION_OPERATIONS.md): gates, live credentials,
   redaction, security posture, package shape, and release discipline.

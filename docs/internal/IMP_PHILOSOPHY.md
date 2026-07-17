@@ -119,5 +119,5 @@ LIVE_PROVIDER=1 mix live.check
 
 The first two are deterministic or local-only. The live gate is opt-in because
 provider credentials and account state are operational concerns. See
-[Production Operations](PRODUCTION_OPERATIONS.md) for the current gate
+[Production Operations](../PRODUCTION_OPERATIONS.md) for the current gate
 contract.

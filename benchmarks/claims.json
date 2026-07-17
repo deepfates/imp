@@ -84,7 +84,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
       "requirements": [
         {
           "id": "golden_trace.full",
@@ -108,7 +108,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "docs/maintainers/RELEASE.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "live_matched_model.full",
@@ -132,7 +132,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/bootstrap_few_shot_trajectory_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/bootstrap_few_shot_trajectory_test.exs"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific BootstrapFewShot semantic differential passes"}]
     },
     {
@@ -148,7 +148,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/random_search_policy_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/random_search_policy_test.exs"],
       "requirements": [{"id": "optimizer.random_search.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific RandomSearch semantic differential passes"}]
     },
     {
@@ -164,7 +164,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json", "test/copro_isolation_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json", "test/copro_isolation_artifact_test.exs"],
       "requirements": [{"id": "optimizer.copro.semantic", "kind": "optimizer_conformance", "lane": "copro_isolation", "evidence": "passing", "threshold": "the canonical COPRO isolation artifact verifies all five declared observations and retained exclusions"}]
     },
     {
@@ -180,7 +180,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out BootstrapFewShot lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -196,7 +196,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.random_search.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out RandomSearch lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -212,7 +212,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.copro.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out COPRO lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -228,7 +228,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md"],
       "requirements": [{"id": "optimizer.ensemble.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out Ensemble effectiveness satisfies the preregistered policy"}]
     },
     {
@@ -244,7 +244,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/avatar_optimizer_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/avatar_optimizer_test.exs"],
       "requirements": [{"id": "optimizer.avatar.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out Avatar effectiveness satisfies the preregistered policy"}]
     },
     {
@@ -260,7 +260,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
       "requirements": [{"id": "optimizer.bootstrap_finetune.provider_effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "a bounded provider-backed BootstrapFinetune campaign demonstrates held-out effectiveness under matched controls"}]
     },
     {
@@ -276,7 +276,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/better_together_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/better_together_test.exs"],
       "requirements": [{"id": "optimizer.better_together.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific BetterTogether held-out effectiveness satisfies the preregistered prompt/weight composition policy"}]
     },
     {
@@ -292,7 +292,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
       "requirements": [{"id": "optimizer.mmgrpo.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "a pinned mmGRPO campaign demonstrates independently scored held-out effectiveness under matched controls"}]
     },
     {
@@ -308,7 +308,7 @@
       "claim_type": "research_replication",
       "comparison": "dspy_gepa",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md"],
       "requirements": [
         {
           "id": "gepa_replication.full",
@@ -332,7 +332,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_baseline_and_authored_comparator",
       "gate_policy": "blocking",
-      "sources": ["benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json", "docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
+      "sources": ["benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json", "docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
       "requirements": [
         {
           "id": "optimize_anything.non_prompt.full",
@@ -356,7 +356,7 @@
       "claim_type": "research_replication",
       "comparison": "upstream_optimize_anything",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "benchmarks/research_portfolio.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "benchmarks/research_portfolio.json"],
       "requirements": [{"id": "optimize_anything.upstream_comparative.full", "kind": "research_replication", "lane": "optimize_anything", "evidence": "full", "threshold": "a matched multi-domain upstream comparison satisfies the preregistered paper-portfolio policy"}]
     },
     {
@@ -372,7 +372,7 @@
       "claim_type": "conformance",
       "comparison": "dspy_for_memory_retrieval_and_imp_native_elsewhere",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "rag.provider_free_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact rag_memory_retrieval, rag_multi_hop_retrieval, and http_retriever_protocol_shape rows pass in a source-bound provider-free artifact"}]
     },
     {
@@ -388,7 +388,7 @@
       "claim_type": "conformance",
       "comparison": "dspy_for_successful_lookup_and_imp_native_for_unknown_tool",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "react.provider_free_tool_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_lookup_tool and react_unknown_tool_error_trace rows pass in a source-bound provider-free artifact"}]
     },
     {
@@ -404,7 +404,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "react_v2.provider_free_recovery_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_v2_recovers_from_tool_and_submit_errors row passes and terminates by submit"}]
     },
     {
@@ -420,7 +420,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "mcp.in_process_import_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact mcp_import_agent_trace row passes in a source-bound provider-free artifact"}]
     },
     {
@@ -436,7 +436,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "agents.policy_denial_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact agent_tool_policy_denial row passes with the declared denial trace"}]
     },
     {
@@ -452,7 +452,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "code_act.provider_free_execution_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact code_act_tool_program row passes with the declared two-step trace"}]
     },
     {
@@ -468,7 +468,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "program_of_thought.safe_eval_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact program_of_thought_safe_eval and program_of_thought_rejects_unsafe_remote_call rows pass"}]
     },
     {
@@ -484,7 +484,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "streaming.incremental_field_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact streaming_incremental_fields row passes with the declared events"}]
     },
     {
@@ -500,7 +500,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "async.ordered_stream_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact tasks_async_stream_ordered_results row passes with the declared ordered results"}]
     },
     {
@@ -516,7 +516,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "persistence.credential_redaction_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact save_load_redacts_provider_secret row passes without persisting its dummy secret"}]
     },
     {
@@ -532,7 +532,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
       "requirements": [{"id": "rag.hotpot_retrieval.differential", "kind": "retrieval_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the source-bound ten-row HotPotQA retrieval differential passes exact retrieval and supporting-fact checks"}]
     },
     {
@@ -548,7 +548,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json"],
       "requirements": [{"id": "rag.hotpot_retrieval.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "held-out HotPotQA answer and supporting-fact quality satisfy the preregistered matched comparison"}]
     },
     {
@@ -564,7 +564,7 @@
       "claim_type": "conformance",
       "comparison": "independent_reference_scorer",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/bfcl-adapted-differential-v1.json", "test/bfcl_adapted_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/bfcl-adapted-differential-v1.json", "test/bfcl_adapted_artifact_test.exs"],
       "requirements": [{"id": "tools.bfcl_scorer.conformance", "kind": "scorer_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all twelve positive fixtures and nine mutations agree across the Elixir and independent Python scorers"}]
     },
     {
@@ -580,7 +580,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/bfcl-adapted-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/bfcl-adapted-differential-v1.json"],
       "requirements": [{"id": "tools.bfcl_selection.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "a pinned BFCL protocol scores model-produced tool calls and satisfies the preregistered matched policy"}]
     },
     {
@@ -596,7 +596,7 @@
       "claim_type": "operational_contract",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/rag_tool_failure_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/rag_tool_failure_differential_test.exs"],
       "requirements": [{"id": "agents.failure_injected.runtime_differential", "kind": "operational_contract", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all six source-authenticated queued-action scenarios match exact observations and terminals"}]
     },
     {
@@ -612,7 +612,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/rag-tool-failure-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/rag-tool-failure-differential-v1.json"],
       "requirements": [{"id": "agents.failure_recovery.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "an identical model-selected matched failure schedule satisfies preregistered recovery and task-completion thresholds"}]
     },
     {
@@ -631,7 +631,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
       "requirements": [
         {
           "id": "rlm_benchmark.full",
@@ -655,7 +655,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json", "test/auto_evaluation_contract_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json", "test/auto_evaluation_contract_test.exs"],
       "requirements": [{"id": "evaluation.auto_evaluation.semantic_conformance", "kind": "evaluation_conformance", "lane": "live_matched_model", "evidence": "full", "threshold": "a dedicated source-bound claim lane validates the admitted T1 auto-evaluation artifact against current committed source"}]
     },
     {
@@ -671,7 +671,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "independent_labels_and_dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "benchmarks/config/auto-evaluation-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "benchmarks/config/auto-evaluation-differential-v1.json"],
       "requirements": [{"id": "evaluation.natural_judge.effectiveness", "kind": "evaluation_effectiveness", "lane": "live_matched_model", "evidence": "full", "threshold": "a preregistered natural-task campaign establishes judge agreement, calibration, and bias against independent labels"}]
     },
     {
@@ -687,7 +687,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "first_attempt_and_dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "test/refine_feedback_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "test/refine_feedback_test.exs"],
       "requirements": [{"id": "evaluation.refine_advice.effectiveness", "kind": "evaluation_effectiveness", "lane": "live_matched_model", "evidence": "full", "threshold": "a preregistered natural-task campaign shows independent held-out lift under equal candidate and advice-call budgets"}]
     },
     {
@@ -703,7 +703,7 @@
       "claim_type": "performance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/maintainers/RELEASE.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "provider_free_overhead.full",
@@ -727,7 +727,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/ADVANCED.md", "docs/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "sources": ["docs/internal/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
           "id": "local_mlx_weight_training.full",

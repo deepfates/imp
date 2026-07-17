@@ -882,7 +882,7 @@ required. ReActV2 preserves call/result IDs in `Imp.History`, records unknown
 and failing tools as observations instead of aborting, and forces one final
 `submit` call when the normal loop ends. Existing `Imp.react/3` retains its
 fail-fast behavior. The pinned source mapping and deliberate Imp policy/redaction
-extensions are documented in `docs/REACT_V2_FIDELITY.md`.
+extensions are documented in `docs/internal/REACT_V2_FIDELITY.md`.
 
 ### Tool Call Primitives
 
@@ -960,7 +960,7 @@ policies for anything with side effects.
 The normal provider path for inference is `Imp.req_llm/2`. Imp also ships
 explicit protocol clients for application boundaries that are not ordinary LM
 inference: HTTP retrievers, MCP transports, and provider training jobs. Those
-clients are documented in [Advanced Imp](ADVANCED.md) and
+clients are documented in [Advanced Imp](internal/ADVANCED.md) and
 [Production Operations](PRODUCTION_OPERATIONS.md) because they require explicit
 service ownership, credentials, payload contracts, and protocol-specific tests.
 

@@ -35,7 +35,7 @@ GSM8K and HotPotQA. Imp should not claim benchmark parity until it has run
 real provider/model comparisons over fixed train/dev/test manifests.
 
 The broader benchmark backlog is intentionally larger than this minimum. See
-`docs/BENCHMARK_CATALOG.md` for classification/factuality, retrieval-indexed
+`docs/internal/BENCHMARK_CATALOG.md` for classification/factuality, retrieval-indexed
 QA, hard math, optimizer-lift, tool-use, and deferred long-form writing lanes.
 Current source-checkout smoke evidence includes local IFBench-style rows with
 executable constraint verifiers and local AIME/MATH-style rows with normalized

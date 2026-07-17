@@ -31,7 +31,7 @@ module hierarchy or deprecated command surface.
 Raw research, append-only events, and frozen benchmark artifacts retain the
 names and bytes under which they were produced. Readers normalize legacy
 serialized fields only at explicit, tested compatibility boundaries; writers
-emit only Imp identities. See `docs/IDENTITY_COMPATIBILITY.md` for the artifact
+emit only Imp identities. See `docs/internal/IDENTITY_COMPATIBILITY.md` for the artifact
 migration policy.
 
 Other unrelated software projects using the ordinary word `Imp` are an

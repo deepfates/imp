@@ -1,6 +1,8 @@
 defmodule RagToolFailureDifferentialTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential, as: Differential
