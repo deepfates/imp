@@ -61,14 +61,25 @@ defmodule LivebookContractTest do
     assert body =~ "OPENAI_MODEL"
   end
 
-  test "each Livebook has a live-provider proof path" do
+  test "the front-door Livebook runs real calls with a key and guides setup without one" do
+    body = File.read!("livebooks/01_real_lm_front_door.livemd")
+
+    # A key alone unlocks the payoff: no extra opt-in flag, no skip tuples,
+    # and no raise-on-failure proof assertions in reader-facing cells.
+    assert body =~ "OPENAI_API_KEY"
+    refute body =~ "LIVE_PROVIDER"
+    refute body =~ "{:skip"
+    refute body =~ "proof failed"
+    refute body =~ ~r/^\s*raise /m
+
+    # Missing credentials produce friendly setup guidance, not a bare tuple.
+    assert body =~ "setup_guidance"
+    assert body =~ "Secrets panel"
+    assert body =~ "Add OPENAI_API_KEY (see the setup cell) to watch this run."
+  end
+
+  test "each later Livebook has a live-provider proof path" do
     expected = %{
-      "livebooks/01_real_lm_front_door.livemd" => [
-        "live extraction proof failed",
-        "live ChainOfThought proof failed",
-        "live ReAct proof failed",
-        "live save/load proof failed"
-      ],
       "livebooks/02_programming_not_prompting.livemd" => [
         "## Live Provider Proof",
         "live provider returned an invalid typed prediction"
