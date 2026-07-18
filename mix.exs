@@ -247,7 +247,6 @@ defmodule Imp.MixProject do
         "legacy_identity.check",
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "benchmark.failure_campaign.check",
-        "reproduction.check",
         "package.check",
         "livebook.check",
         "docs.clean",
