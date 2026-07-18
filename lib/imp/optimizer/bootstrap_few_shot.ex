@@ -14,6 +14,11 @@ defmodule Imp.Optimizer.BootstrapFewShot do
   if it already has manual demos. Teacher settings are dynamic Imp settings for
   each teacher execution and never become predictor generation config.
 
+  `timeout` bounds each teacher execution (default 5000ms) and is a BEAM-native
+  execution option: upstream DSPy runs teachers synchronously and unbounded.
+  Pass a larger value or `:infinity` when teacher programs are slow — agentic
+  or environment-backed teachers routinely run for minutes.
+
   Seed lifecycles follow DSPy 3.2.1, but `Imp.Optimizer.Sampling` is a
   deterministic BEAM-native RNG and does not reproduce Python MT19937 draws.
   Repeated calls to one predictor retain DSPy's one-demo earlier-or-final branch.
@@ -30,7 +35,8 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     max_bootstrapped_demos: 4,
     max_labeled_demos: 16,
     max_rounds: 1,
-    max_errors: nil
+    max_errors: nil,
+    timeout: 5_000
   ]
 
   @option_schema [
@@ -39,7 +45,8 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],
-    max_errors: [type: {:custom, __MODULE__, :validate_optional_max_errors, []}, default: nil]
+    max_errors: [type: {:custom, __MODULE__, :validate_optional_max_errors, []}, default: nil],
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5_000]
   ]
 
   def new, do: new(nil, [])
@@ -231,7 +238,8 @@ defmodule Imp.Optimizer.BootstrapFewShot do
           [trajectory] =
             TrajectoryRunner.run(stripped_teacher, [example], metric,
               runtime: :evaluation,
-              rollout_id: round
+              rollout_id: round,
+              timeout: optimizer.timeout
             )
 
           trajectory

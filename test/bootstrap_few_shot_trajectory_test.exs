@@ -778,4 +778,54 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     assert report.metadata.sampling_rng == :beam_native
     assert report.metadata.sampling_schedule == :dspy_3_2_1_seed_lifecycle
   end
+
+  defmodule SlowTeacherProgram do
+    defstruct [:main, sleep_ms: 200]
+
+    def optimizer_predictors(program), do: [main: program.main]
+
+    def update_optimizer_predictor(program, :main, update),
+      do: %{program | main: update.(program.main)}
+
+    def call(program, %{question: question}) do
+      Process.sleep(program.sleep_ms)
+
+      trace = [
+        %{predictor: :main, inputs: %{question: question}, outputs: %{answer: "generated"}}
+      ]
+
+      {:ok, Imp.Prediction.new(%{answer: "generated"}, metadata: %{optimizer_trace: trace})}
+    end
+  end
+
+  describe "teacher timeout threading" do
+    test "a teacher slower than the configured timeout bootstraps nothing" do
+      program = %SlowTeacherProgram{main: Imp.predict("question -> answer"), sleep_ms: 200}
+      example = Imp.example(question: "q", answer: "generated") |> Imp.with_inputs(:question)
+
+      compiled =
+        Imp.Optimizer.BootstrapFewShot.new(nil, timeout: 20, max_labeled_demos: 0)
+        |> Imp.Optimizer.BootstrapFewShot.compile(program, [example])
+
+      report = Imp.Optimizer.Report.fetch(compiled.main)
+      assert report.metadata.predictor_demo_counts == %{main: 0}
+    end
+
+    test "raising timeout past teacher latency bootstraps the demo (the 5s default was previously not threadable)" do
+      program = %SlowTeacherProgram{main: Imp.predict("question -> answer"), sleep_ms: 200}
+      example = Imp.example(question: "q", answer: "generated") |> Imp.with_inputs(:question)
+
+      compiled =
+        Imp.Optimizer.BootstrapFewShot.new(nil, timeout: 2_000, max_labeled_demos: 0)
+        |> Imp.Optimizer.BootstrapFewShot.compile(program, [example])
+
+      report = Imp.Optimizer.Report.fetch(compiled.main)
+      assert report.metadata.predictor_demo_counts == %{main: 1}
+    end
+
+    test ":infinity is a valid teacher timeout" do
+      assert %Imp.Optimizer.BootstrapFewShot{timeout: :infinity} =
+               Imp.Optimizer.BootstrapFewShot.new(nil, timeout: :infinity)
+    end
+  end
 end
