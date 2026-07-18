@@ -1682,6 +1682,71 @@ defmodule DashboardTest do
     assert lane["full_evidence"]
   end
 
+  # The timestamp slug is second-granular, so two runs inside one wall-clock
+  # second used to write the SAME filename and the second silently overwrote
+  # the first (the ambiguity behind the CI race fixed in PR #14 on the reader
+  # side). The task must allocate exclusively: every run yields its own file.
+  # Sentinels pre-planted at every slug the runs could pick force the collision
+  # deterministically instead of hoping both runs land in one second.
+  @tag :evidence_infrastructure
+  test "back-to-back runs into one out dir write two distinct dashboard files" do
+    root = tmp_dir("dashboard-no-clobber")
+    out_dir = Path.join(root, "out")
+    results_dir = Path.join(root, "results")
+    Enum.each([out_dir, results_dir], &File.mkdir_p!/1)
+
+    sentinel_payload = ~s({"sentinel":true})
+    start = DateTime.truncate(DateTime.utc_now(), :second)
+
+    sentinels =
+      for offset <- 0..30 do
+        slug =
+          start
+          |> DateTime.add(offset)
+          |> DateTime.to_iso8601()
+          |> String.replace(~r/[^0-9A-Za-z]/, "")
+
+        path = Path.join(out_dir, "parity-dashboard-#{slug}.json")
+        File.write!(path, sentinel_payload)
+        path
+      end
+
+    announced =
+      Enum.map(1..2, fn _run ->
+        output =
+          capture_io(fn ->
+            Mix.Task.reenable("imp.benchmark.dashboard")
+
+            Mix.Tasks.Imp.Benchmark.Dashboard.run([
+              "--results-dir",
+              results_dir,
+              "--out",
+              out_dir
+            ])
+          end)
+
+        case Regex.run(~r/parity dashboard: (\S+)/, output) do
+          [_line, path] -> path
+          nil -> flunk("dashboard task did not announce its output path: #{inspect(output)}")
+        end
+      end)
+
+    assert [first, second] = announced
+    refute first == second, "second run reused the first run's path: #{first}"
+
+    for path <- sentinels do
+      assert File.read!(path) == sentinel_payload,
+             "dashboard run clobbered a pre-existing artifact: #{path}"
+    end
+
+    written = Path.wildcard(Path.join(out_dir, "parity-dashboard-*.json"))
+    assert Enum.sort(written) == Enum.sort(sentinels ++ announced)
+
+    for path <- announced do
+      assert %{"profile_ready" => _} = path |> File.read!() |> Jason.decode!()
+    end
+  end
+
   defp write_json!(path, value), do: File.write!(path, Jason.encode!(value, pretty: true))
 
   defp write_overhead_artifact!(dir, opts \\ []) do
