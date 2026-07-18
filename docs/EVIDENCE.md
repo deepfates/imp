@@ -59,6 +59,17 @@ repository and reproducible with one script.
   recomputes claim state from evidence rather than trusting this page — if
   this page and the dashboard ever disagree, the dashboard wins.
 
+## Why the counts differ
+
+A skeptic reading these docs meets three different numbers, and each counts a
+different thing. **Surfaces** are the grouped upstream capability areas the
+[conformance report](CONFORMANCE.md) totals — 23 of them. **Claims** are the
+graded rows in this ledger — 64, each targeting a rung and each attached to one
+surface. **Requirement ids** are the individual checks nested inside claims, so
+with the 64 claim ids they account for the 130 `id` fields in
+`benchmarks/claims.json`. These numbers are current as of v0.2.0 and are
+asserted nowhere but here — the dashboard is the authority if it disagrees.
+
 The discipline behind the ledger is simple: an unclaimed surface is a place
 a silent bug can live, so every public surface carries a claim, every claim
 carries its evidence state, and the numbers in the docs are required to cite
