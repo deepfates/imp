@@ -72,12 +72,24 @@ which grows this same router end to end.
   and tool step. The [deployment example](examples/deployment) is a
   complete OTP application.
 
-You will use one or two capabilities at first; the rest are there when a
-task earns them. The full menu, twenty program shapes and about as many
-optimizers, from `ChainOfThought` and the ReAct family through `GEPA`,
-`MIPROv2`, weight-level training with local MLX fine-tuning, and
-Optimize-Anything for arbitrary text artifacts, lives in the
-[API Guide](docs/API_GUIDE.md).
+## The whole surface, stage by stage
+
+Nearly everything is one call on the `Imp` module. This is the map of what
+you can reach and where it belongs; the [API Guide](docs/API_GUIDE.md) has
+a worked example for every row.
+
+| Stage | What you can use |
+| --- | --- |
+| **Declare** | `signature` (string DSL or map form with constraints), `example`, `with_inputs`, `prediction`, `get`, `to_map`, conversation `history` and `append_history` |
+| **Run** | `call`, `stream` and `collect` (provider token streaming, honest local fallback), `req_llm` (any ReqLLM provider), `configure` / `settings` / `context` for defaults and scoped overrides |
+| **Test** | `context` swaps a scripted model into any program with no patching, so signatures, adapters, and metrics run for real in your suite |
+| **Measure** | `evaluate` (score plus every row), `exact_match`, `extractive_qa`, `classification`, `classification_report`, `majority` voting |
+| **Improve** | `optimize`, `train` (weights are deliberately separate), `with_demos`, `with_playbook`, `with_lm`, `optimizer_capabilities`; optimizers: `LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `KNNFewShot`, `COPRO`, `SIMBA`, `MIPROv2`, `GEPA`, `InferRules`, `SignatureOptimizer`, `Ensemble`, `BetterTogether`, `BootstrapFinetune`, `GRPO` (local MLX included), and Optimize-Anything for arbitrary text artifacts |
+| **Extend** | program shapes: `predict`, `chain_of_thought`, `react` and `react_v2`, `avatar`, `code_act`, `program_of_thought`, `rlm` with `rlm_serializable` handles; composition: `best_of_n`, `refine`, `assert` / `assertion`, `multi_chain_comparison`, `parallel`; tools and context: `tool`, `Imp.MCP.import_tools`, `memory`, `retrieve`, `rag`, `knn` / `nearest`, `Imp.Datasets` loaders, `Imp.Embeddings` |
+| **Operate** | `save!` / `load!` (checksummed artifacts) and `dump` / `load` (state as data), `trace`, `inspect_history`, `subscribe_optimizer_progress`, `enable_logging` / `disable_logging` |
+
+You will use one or two rows at first; the rest are there when a task
+earns them.
 
 ## The port is verified, and you can run the receipts
 
