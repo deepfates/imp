@@ -790,7 +790,9 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     def call(program, %{question: question}) do
       Process.sleep(program.sleep_ms)
 
-      trace = [%{predictor: :main, inputs: %{question: question}, outputs: %{answer: "generated"}}]
+      trace = [
+        %{predictor: :main, inputs: %{question: question}, outputs: %{answer: "generated"}}
+      ]
 
       {:ok, Imp.Prediction.new(%{answer: "generated"}, metadata: %{optimizer_trace: trace})}
     end
