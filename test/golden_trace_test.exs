@@ -96,6 +96,69 @@ defmodule GoldenTraceTest do
     assert parity_by_case["react_tool_lookup"] == false
     assert parity_by_case["react_multi_tool_transform"] == false
     assert parity_by_case["react_tool_argument_error"] == false
+
+    # Request-envelope fidelity (dee-idig). The old instrument compared only
+    # message role+content, so it reported false parity while Imp shipped
+    # response_format:json_object on JSON cases and DSPy (capability-gated)
+    # shipped nothing. envelope_parity is a NEW dimension: the PER-CALL request
+    # options (LM opts on the Imp side, adapter kwargs on the DSPy side). These
+    # values are LOCKED to their REAL measured truth — false where Imp and DSPy
+    # actually diverge — and are NOT faked true. The underlying capability-
+    # gating product fix (Imp sends response_format regardless of LM support) is
+    # a SEPARATE ticket; this harness only refuses to hide the divergence.
+    envelope_by_case = report["summary"]["envelope_parity_by_case"]
+    assert map_size(envelope_by_case) == report["summary"]["total"]
+
+    # Pure chat / faithful-ReAct cases send no extra request options on either
+    # side -> the envelopes match, so these stay fully parity.
+    assert envelope_by_case["predict_chat_basic"] == true
+    assert envelope_by_case["chain_of_thought_basic"] == true
+    assert envelope_by_case["typed_fields_chat"] == true
+    assert envelope_by_case["enum_literal_chat"] == true
+    assert envelope_by_case["list_str_field_chat"] == true
+    assert envelope_by_case["dict_field_chat"] == true
+    assert envelope_by_case["react_dspy_tool_lookup"] == true
+
+    # The four JSON-adapter cases: Imp sends response_format:{type:json_object}
+    # while DSPy's capability-gated JSONAdapter sends nothing for the fixture LM.
+    # This request divergence was MASKED by the message-only instrument and is
+    # now VISIBLE. message-parity stays true; the envelope honestly reads false.
+    assert envelope_by_case["json_adapter_basic"] == false
+    assert envelope_by_case["list_str_field_json"] == false
+    assert envelope_by_case["list_int_field_json"] == false
+    assert envelope_by_case["dict_field_json"] == false
+
+    # The surfaced per-call envelopes make the JSON divergence legible in the
+    # report itself (nothing silent), not just as a boolean.
+    json_case = Enum.find(report["cases"], &(&1["id"] == "json_adapter_basic"))
+    assert json_case["imp_call_envelopes"] == [%{"response_format" => %{"type" => "json_object"}}]
+    assert json_case["dspy_call_envelopes"] == [%{}]
+
+    # The ChatAdapter->JSONAdapter parse-failure fallback (missing_output_error)
+    # retries the second call with response_format on the Imp side only, so its
+    # envelope diverges on that call even though messages match per call.
+    assert envelope_by_case["missing_output_error"] == false
+
+    # The three provider-native ReAct cases already diverge on messages
+    # (documented deviation); they also diverge on the envelope because Imp
+    # sends tools/tool_choice where DSPy's text-trajectory ReAct sends nothing.
+    assert envelope_by_case["react_tool_lookup"] == false
+    assert envelope_by_case["react_multi_tool_transform"] == false
+    assert envelope_by_case["react_tool_argument_error"] == false
+
+    # The honest faithful-port count: byte-identical messages AND identical
+    # request envelope, per call. Seven of fifteen cases fully match today; the
+    # eight message-only matches (four JSON + fallback + three native ReAct) are
+    # no longer allowed to read as full parity.
+    assert report["summary"]["envelope_parity_cases"] == 7
+    assert report["summary"]["full_parity_cases"] == 7
+    assert report["summary"]["message_envelope_parity"] == false
+
+    full_by_case = report["summary"]["full_parity_by_case"]
+    assert map_size(full_by_case) == report["summary"]["total"]
+    assert full_by_case["json_adapter_basic"] == false
+    assert full_by_case["predict_chat_basic"] == true
+
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 

@@ -229,6 +229,12 @@ def normalize_tool_trace(prediction_map: Optional[Dict[str, Any]]) -> List[Dict[
 
 
 def normalize_history(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    # `kwargs` is DSPy's PER-CALL request envelope: the extra options the
+    # adapter passed to this LM call (response_format, tools, tool_choice, ...),
+    # logged by dspy.BaseLM._process_lm_response minus base sampling params. The
+    # Elixir harness compares this per call against Imp's recorded LM opts to
+    # measure envelope_parity (dee-idig). Preserving it PER ENTRY keeps call
+    # boundaries intact so a differently-split trajectory cannot be masked.
     normalized = []
     for entry in history:
         normalized.append(

@@ -252,9 +252,30 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         # known divergences (CoT reasoning desc dee-l9vm, typed-field type
         # hints dee-3zun, whitespace dee-qtzk, ReAct dee-kzop, JSON dee-ye3h)
         # are being fixed; enforcement lands in dee-3e4v once resolved.
+        #
+        # template_parity is boundary-aware (dee-idig): messages are compared
+        # PER CALL, so two different call-splittings with the same concatenated
+        # text no longer compare EQUAL.
         "template_parity_cases" => Enum.count(comparisons, & &1["template_parity"]),
         "message_template_parity" => Enum.all?(comparisons, & &1["template_parity"]),
-        "template_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["template_parity"]})
+        "template_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["template_parity"]}),
+        # Request-envelope fidelity (dee-idig): are the PER-CALL request options
+        # Imp sends (response_format, tools, tool_choice, temperature, ...)
+        # identical to what DSPy sends for the same fixture? The old instrument
+        # compared only message role+content and so reported false parity while
+        # Imp shipped `response_format: json_object` on JSON cases and DSPy
+        # (capability-gated) shipped nothing. This dimension makes that
+        # divergence VISIBLE. It is measured, not yet enforced: the underlying
+        # capability-gating product fix is a separate ticket.
+        "envelope_parity_cases" => Enum.count(comparisons, & &1["envelope_parity"]),
+        "message_envelope_parity" => Enum.all?(comparisons, & &1["envelope_parity"]),
+        "envelope_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["envelope_parity"]}),
+        # Fully parity = byte-identical messages AND identical request envelope,
+        # per call. The honest "faithful port for this case" number.
+        "full_parity_cases" =>
+          Enum.count(comparisons, &(&1["template_parity"] and &1["envelope_parity"])),
+        "full_parity_by_case" =>
+          Map.new(comparisons, &{&1["id"], &1["template_parity"] and &1["envelope_parity"]})
       },
       "imp_semantic_checks" => semantic_checks,
       "cases" => comparisons
@@ -269,6 +290,13 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     expected_tool_trace = normalize(fixture["expected_tool_trace"])
     imp_tool_trace = normalize(imp && imp["tool_trace"])
     dspy_tool_trace = normalize(dspy && dspy["tool_trace"])
+
+    # The comparable unit for prompt parity is the ordered list of LM CALLS,
+    # each carrying its rendered messages AND its request envelope. Building
+    # this once (instead of flat-mapping messages) preserves call boundaries so
+    # a differently-split trajectory can no longer masquerade as identical.
+    imp_calls = rendered_calls(imp)
+    dspy_calls = rendered_calls(dspy)
 
     status_parity =
       (imp && dspy && imp["status"] == expected_status) and dspy["status"] == expected_status
@@ -306,34 +334,59 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       # byte-identical to what DSPy sends for the same fixture? The prompt IS
       # the behavior; a divergence here means Imp instructs the model
       # differently than DSPy and is not a faithful port for this case.
-      # (epic dee-8zev)
+      # (epic dee-8zev). Boundary-aware (dee-idig): messages are compared PER
+      # CALL, so a divergence in how work is split across calls is not masked.
       "template_parity" =>
-        canonical_messages(rendered_messages(imp)) ==
-          canonical_messages(rendered_messages(dspy)),
+        canonical(call_messages(imp_calls)) == canonical(call_messages(dspy_calls)),
+      # New dimension (dee-idig): the PER-CALL request envelope (LM opts on the
+      # Imp side, adapter kwargs on the DSPy side — response_format, tools,
+      # tool_choice, temperature, ...). This is the request divergence the
+      # message-only instrument was blind to. It is locked to its REAL measured
+      # value: false where Imp and DSPy actually send different options.
+      "envelope_parity" =>
+        canonical(call_envelopes(imp_calls)) == canonical(call_envelopes(dspy_calls)),
+      # Surfaced so a divergence is legible in the report itself, not buried in
+      # raw history (nothing silent).
+      "imp_call_envelopes" => call_envelopes(imp_calls),
+      "dspy_call_envelopes" => call_envelopes(dspy_calls),
       "imp" => imp,
       "dspy" => dspy,
       "intentional_deviations" => List.wrap(fixture["intentional_deviations"])
     }
   end
 
-  # The rendered prompt messages Imp/DSPy actually sent to the model, across
-  # every LM call, as [%{role, content}] — the comparable unit for prompt
-  # parity. Nil side (missing run) yields [], which will not match a real run.
-  defp rendered_messages(nil), do: []
+  # The ordered list of LM CALLS Imp/DSPy actually made, each as
+  # %{"messages" => [%{role, content}], "envelope" => <request-opts>} — the
+  # comparable unit for prompt AND envelope parity. Preserving call boundaries
+  # (instead of flat-mapping every message together) is what lets the
+  # comparison notice a differently-split trajectory (ReAct, retries) and a
+  # per-call request-option divergence (dee-idig). Nil side (missing run)
+  # yields [], which will not match a real run.
+  defp rendered_calls(nil), do: []
 
-  defp rendered_messages(side) do
-    (side["history"] || [])
-    |> Enum.flat_map(fn entry -> entry["messages"] || [] end)
-    |> Enum.map(fn message -> Map.take(message, ["role", "content"]) end)
+  defp rendered_calls(side) do
+    Enum.map(side["history"] || [], fn entry ->
+      %{
+        "messages" => (entry["messages"] || []) |> Enum.map(&Map.take(&1, ["role", "content"])),
+        # Imp records the LM opts under "opts"; the DSPy runner records the
+        # adapter kwargs under "kwargs". Either is the request envelope.
+        "envelope" => entry["opts"] || entry["kwargs"] || %{}
+      }
+    end)
   end
 
-  # Canonical form for prompt comparison. The Imp side is in-memory Elixir
-  # (message role can be an atom like `:system`) while the DSPy side is
-  # JSON-decoded (role is the string "system"); Elixir `==` distinguishes
-  # those but they are the same wire value. Round-tripping both through JSON
-  # compares exactly what gets sent to the model, matching the report's own
-  # serialized view.
-  defp canonical_messages(messages), do: messages |> Jason.encode!() |> Jason.decode!()
+  # Per-call projections used by the two parity dimensions. Keeping them as a
+  # list-of-lists (outer = calls) means an unequal number of calls, or a
+  # per-call difference, can never compare EQUAL.
+  defp call_messages(calls), do: Enum.map(calls, & &1["messages"])
+  defp call_envelopes(calls), do: Enum.map(calls, & &1["envelope"])
+
+  # Canonical form for comparison. The Imp side is in-memory Elixir (a role can
+  # be an atom like `:system`, opts can be a keyword list) while the DSPy side
+  # is JSON-decoded (strings, maps); Elixir `==` distinguishes those but they
+  # are the same wire value. Round-tripping both through JSON compares exactly
+  # what gets sent to the model, matching the report's own serialized view.
+  defp canonical(value), do: value |> Jason.encode!() |> Jason.decode!()
 
   defp error_contains?(_error, nil), do: true
   defp error_contains?(nil, _text), do: false
