@@ -236,6 +236,16 @@ defmodule ClaimsInventoryTest do
     refute "GRPO" in claim["surface"]
   end
 
+  test "every claim source resolves to a real file, directory, or glob in the repo" do
+    Enum.each(read_claims!(), fn claim ->
+      Enum.each(claim["sources"], fn source ->
+        assert File.exists?(source) or Path.wildcard(source) != [],
+               "#{claim["id"]} cites source #{inspect(source)} which does not exist; " <>
+                 "a claim whose evidence file disappears must fail loudly"
+      end)
+    end)
+  end
+
   defp read_claims! do
     inventory = @claims_path |> File.read!() |> Jason.decode!()
     assert inventory["schema_version"] == 2
