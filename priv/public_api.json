@@ -369,6 +369,7 @@
         "classification/3",
         "classification_report/2",
         "code_act/3",
+        "collect/3",
         "configure/1",
         "context/2",
         "disable_logging/0",
@@ -413,6 +414,7 @@
         "save!/3",
         "settings/0",
         "signature/2",
+        "stream/3",
         "subscribe_optimizer_progress/1",
         "to_map/1",
         "tool/4",
@@ -458,6 +460,9 @@
           ],
           "code_act/3": [
             "code_act(signature, tools \\\\ [], opts \\\\ [])"
+          ],
+          "collect/3": [
+            "collect(program, inputs, opts \\\\ [])"
           ],
           "configure/1": [
             "configure(opts)"
@@ -590,6 +595,9 @@
           ],
           "signature/2": [
             "signature(spec, instructions \\\\ nil)"
+          ],
+          "stream/3": [
+            "stream(program, inputs, opts \\\\ [])"
           ],
           "subscribe_optimizer_progress/1": [
             "subscribe_optimizer_progress(opts \\\\ [])"
@@ -7487,7 +7495,7 @@
       ]
     }
   ],
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "schema_version": 3,
   "scope": "Curated Imp API compiled from package-shipped sources. Exports come from non-hidden documentation entries; callbacks, types, and struct fields are category- and policy-gated."
 }
