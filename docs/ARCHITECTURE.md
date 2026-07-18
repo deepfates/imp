@@ -341,8 +341,10 @@ Arbitrary artifact optimization lives under `Imp.Optimize.*`:
 
 ## Agents, Tools, MCP
 
-`Imp.Tool` wraps callable functionality. `Imp.Agent` composes tools, child
-agents, memory/context, policies, and traces.
+`Imp.Tool` wraps callable functionality; the react-family programs compose
+tools under explicit policies. An explicit agent runtime exists internally,
+but the packaged surface is the react/rlm spectrum plus your own supervised
+Elixir around `Imp.Tool.call/2`.
 
 `Imp.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
 into `Imp.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,

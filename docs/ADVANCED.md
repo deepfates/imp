@@ -105,19 +105,11 @@ Current implementation fidelity is pinned to GEPA v0.1.4; earlier comparisons
 against the v0.1.1 checkout are kept as history in the repository's internal
 notes, which also track how each pinned upstream commit is recorded.
 
-## Agents And MCP
+## Tools And MCP
 
-```elixir
-tool = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
-
-agent =
-  Imp.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
-    Imp.Agent.call_tool(agent, :double, %{x: x}, runtime)
-  end, tools: [tool])
-
-{:ok, %{y: 8}, runtime} = Imp.Agent.run(agent, %{x: 4})
-runtime.traces
-```
+Tools are ordinary structs called directly or handed to react-family
+programs under a `tool_policy:`; the API guide's agent-spectrum section
+covers when each loop shape earns its place.
 
 MCP-style catalogs import external schemas into ordinary `Imp.Tool` structs:
 
