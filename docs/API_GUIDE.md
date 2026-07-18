@@ -381,8 +381,8 @@ signature =
 
 ## Streaming
 
-`Imp.Streaming.stream/3` returns an Enumerable of chunks from one program
-call, and `Imp.Streaming.collect/3` joins a stream back into a string —
+`Imp.stream/3` returns an Enumerable of chunks from one program
+call, and `Imp.collect/3` joins a stream back into a string —
 returning `{:error, reason}` rather than partial output if any chunk fails.
 
 With a ReqLLM-backed LM and `provider_stream: true`, chunks arrive from the
@@ -395,7 +395,7 @@ lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_K
 program = Imp.predict("question -> answer", lm: lm)
 
 program
-|> Imp.Streaming.stream(%{question: "Name the Galilean moons."}, provider_stream: true)
+|> Imp.stream(%{question: "Name the Galilean moons."}, provider_stream: true)
 |> Enum.each(&IO.write(if is_binary(&1), do: &1, else: ""))
 ```
 
@@ -408,7 +408,7 @@ def handle_event("ask", %{"q" => q}, socket) do
 
   Task.Supervisor.start_child(MyApp.TaskSupervisor, fn ->
     MyApp.Router.program()
-    |> Imp.Streaming.stream(%{question: q}, provider_stream: true)
+    |> Imp.stream(%{question: q}, provider_stream: true)
     |> Enum.each(&send(view, {:answer_chunk, &1}))
 
     send(view, :answer_done)
@@ -435,7 +435,7 @@ lm = %{
 
 program = Imp.predict("question -> answer", lm: lm)
 
-Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
+Imp.stream(program, %{question: "q"}) |> Enum.to_list()
 #=> ["P", "a", "r", "i", "s"]
 ```
 

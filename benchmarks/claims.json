@@ -834,6 +834,281 @@
           "threshold": "verified deterministic T0 authority plus a valid completed retrieval_and_tool_agent_recovery_live row"
         }
       ]
+    },
+    {
+      "id": "claim.clients.req_llm_batch.durable_execution_contract",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "Deterministic operational contract for Imp.Clients.ReqLLMBatch: checkpointed dispatch, bounded retries, resume semantics, concurrency bounds, and the documented transport payload shape, exercised through real checkpoint files and an injected transport.",
+      "limitations": [
+        "No live provider batch campaign is claimed; transports are injected and no throughput or cost behavior is established."
+      ],
+      "statement": "Imp.Clients.ReqLLMBatch executes durable batches through its real checkpoint and client boundaries: transient failures retry within bounds, terminal and malformed outcomes are explicit, resume fails closed for uncommitted post-dispatch requests, concurrency never exceeds its bound, and JSON-round-tripped messages reach the transport with roles preserved.",
+      "category": "runtime",
+      "surface": [
+        "ReqLLMBatch",
+        "ReqLLM"
+      ],
+      "claim_type": "operational_contract",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/clients/req_llm_batch.ex",
+        "test/req_llm_batch_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "clients.req_llm_batch.durable_execution",
+          "kind": "operational_contract",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/req_llm_batch_test.exs passes in the source-checkout suite gated by mix production.check, including the round-tripped message-role regression, and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.observability.telemetry_trace_contract",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "Redacted telemetry through the real :telemetry boundary: Imp.Telemetry.execute/span, Imp.trace ordered capture, optimizer progress subscriptions including [:imp, :optimizer, :trial] spans, inspect_history redaction, and logging controls.",
+      "limitations": [
+        "No exporter, collector, or provider-side observability integration is claimed; the failure-campaign lane validates span balance and secret-free metadata, not the full subscription surface."
+      ],
+      "statement": "Imp emits redacted, balanced telemetry through the real :telemetry runtime: trace captures ordered events with the operation result, optimizer progress subscriptions deliver baseline, generation, and trial events, and metadata stays secret-free under the deterministic failure campaign's telemetry audit.",
+      "category": "runtime",
+      "surface": [
+        "telemetry",
+        "observability",
+        "redaction"
+      ],
+      "claim_type": "operational_contract",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/telemetry.ex",
+        "lib/imp/observability.ex",
+        "test/observability_test.exs",
+        "test/optimizer_trial_telemetry_test.exs",
+        "docs/PRODUCTION_OPERATIONS.md"
+      ],
+      "requirements": [
+        {
+          "id": "observability.telemetry_trace_contract",
+          "kind": "operational_contract",
+          "lane": "failure_recovery",
+          "evidence": "passing",
+          "threshold": "the verified deterministic failure-campaign artifact reports detached handlers, balanced spans, and secret-free metadata, and test/observability_test.exs plus test/optimizer_trial_telemetry_test.exs pass in the source-checkout suite"
+        }
+      ]
+    },
+    {
+      "id": "claim.core.history_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.History public API: immutable signature-shaped conversation turns with append, messages, truncation, and serialization behavior as documented.",
+      "limitations": [
+        "No pinned DSPy History differential exists; conformance to upstream History semantics beyond the documented Imp behavior is not claimed."
+      ],
+      "statement": "Imp.History exists and is callable as documented: turns are immutable signature-keyed maps that the Chat adapter renders as prior conversation turns.",
+      "category": "runtime",
+      "surface": [
+        "history",
+        "signature"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/history.ex",
+        "test/history_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "core.history_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/history_test.exs passes in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.playbook.transactional_delta_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.Playbook public API: the Imp.with_playbook/2 facade and the module delta API with transactional commit, policy bounds, provenance, tombstones, and hash-chained revisions.",
+      "limitations": [
+        "No pinned external authority exists for the playbook contract, and playbook optimizer effectiveness is not claimed here; live playbook campaign artifacts in benchmarks/results are recorded runs, not an admitted effectiveness claim."
+      ],
+      "statement": "Imp.Playbook exists and is callable as documented: deltas are evaluated against a private candidate and committed atomically only when every operation and policy bound succeeds, with exact content equality after normalization.",
+      "category": "optimizer",
+      "surface": [
+        "playbook"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/playbook.ex",
+        "lib/imp/optimizer/playbook.ex",
+        "test/playbook_test.exs",
+        "test/playbook_with_context_test.exs",
+        "test/playbook_optimizer_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "playbook.transactional_delta_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/playbook_test.exs, test/playbook_with_context_test.exs, and test/playbook_optimizer_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.embeddings.boundary_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.Embeddings behaviour and the deterministic Imp.Embeddings.BagOfWords baseline: shape validation that every input text receives exactly one numeric vector in order.",
+      "limitations": [
+        "No embedding quality, provider-backed embedding behavior, or retrieval effectiveness is claimed."
+      ],
+      "statement": "Imp.Embeddings exists and is callable: the boundary rejects mispaired or malformed provider output and the BagOfWords baseline embeds deterministically.",
+      "category": "tools_agents_rag",
+      "surface": [
+        "embeddings",
+        "retrieval"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/embeddings.ex",
+        "test/completion_surface_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "embeddings.boundary_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "the Imp.Embeddings boundary tests in test/completion_surface_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.logprobs.extraction_conformance",
+      "claim_state": "asserted",
+      "target_rung": "C1",
+      "release": "v0.1",
+      "scope": "Joint token logprob extraction for one enum-constrained JSON field using the exact overlap rule of llm-structured-confidence 0.4.5 as used by GEPA commit 65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe, with the declared deviation that empty overlap is an error rather than confidence 1.0.",
+      "limitations": [
+        "The authority is pinned by module documentation and deterministic tests, not by an executed cross-runtime differential artifact; provider logprob quality and calibration are separate claims."
+      ],
+      "statement": "Imp.Logprobs implements the pinned overlap rule for enum-constrained field extraction, resolves enum alternatives, and reports empty overlap as unavailable instead of a misleading numeric zero.",
+      "category": "evaluation",
+      "surface": [
+        "logprobs",
+        "confidence"
+      ],
+      "claim_type": "conformance",
+      "comparison": "llm_structured_confidence_and_gepa",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/logprobs.ex",
+        "test/logprobs_capabilities_test.exs",
+        "test/req_llm_confidence_metadata_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "logprobs.extraction_conformance",
+          "kind": "conformance",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/logprobs_capabilities_test.exs and test/req_llm_confidence_metadata_test.exs pass in the source-checkout suite gated by mix production.check"
+        }
+      ]
+    },
+    {
+      "id": "claim.confidence.scoring_conformance",
+      "claim_state": "asserted",
+      "target_rung": "C1",
+      "release": "v0.1",
+      "scope": "Confidence-aware evaluation for enum-constrained JSON classification following GEPA commit 65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe for joint logprob, scoring formulas, feedback buckets, and alternative formatting, with fail-closed handling of missing logprobs.",
+      "limitations": [
+        "The authority is pinned by module documentation and deterministic tests, not by an executed cross-runtime differential artifact; live calibration artifacts in benchmarks/results are recorded measurements, not an admitted calibration claim."
+      ],
+      "statement": "Imp.Confidence scores enum-constrained predictions by the pinned GEPA formulas, treats raw confidence as diagnostic metadata, gives incorrect predictions zero confidence quality, and fails closed on missing logprobs unless accuracy fallback is selected explicitly.",
+      "category": "evaluation",
+      "surface": [
+        "confidence",
+        "evaluation"
+      ],
+      "claim_type": "conformance",
+      "comparison": "llm_structured_confidence_and_gepa",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/confidence.ex",
+        "lib/imp/confidence/scoring.ex",
+        "test/confidence_test.exs",
+        "test/confidence_scoring_test.exs",
+        "test/confidence_calibration_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "confidence.scoring_conformance",
+          "kind": "conformance",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/confidence_test.exs, test/confidence_scoring_test.exs, and test/confidence_calibration_test.exs pass in the source-checkout suite gated by mix production.check"
+        }
+      ]
+    },
+    {
+      "id": "claim.docs.tutorial_ticket_routing.optimizer_lift",
+      "claim_state": "asserted",
+      "target_rung": "C3",
+      "release": "v0.1",
+      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: LabeledFewShot(k: 8) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-cleared live repeats.",
+      "limitations": [
+        "One task, one dataset, one model; no generalization beyond the shipped support-ticket dataset, no search-optimizer effectiveness, and no DSPy-matched comparison is claimed.",
+        "The tutorial's headline single draw (0.35 -> 0.90) was not reproduced exactly; the committed repeats measured 0.25-0.30 -> 0.85, inside the doc's published repeat ranges (baseline 0.20-0.40, optimized 0.85-0.90)."
+      ],
+      "statement": "The tutorial's optimizer lift reproduces live: in the committed three-repeat artifact every cache-cleared repeat improves held-out routing accuracy, measuring baseline 0.25-0.30 against optimized 0.85 on the twenty held-out tickets with a minimum absolute lift of 0.55.",
+      "category": "optimizer",
+      "surface": [
+        "docs",
+        "LabeledFewShot",
+        "predict",
+        "signature"
+      ],
+      "claim_type": "functional_effectiveness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "docs/TUTORIAL_TICKET_ROUTING.md",
+        "scripts/tutorial_ticket_routing_experiment.exs",
+        "benchmarks/evidence/admitted/tutorial_ticket_routing/55af30010802d1625a1b800bc3ae905b80b383f7613673c5d11f69b10daff031.json",
+        "test/tutorial_ticket_routing_artifact_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "docs.tutorial_ticket_routing.optimizer_lift",
+          "kind": "optimizer_effectiveness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance and positive held-out lift with zero cache hits in every recorded repeat, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix production.check"
+        }
+      ]
     }
   ]
 }

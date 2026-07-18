@@ -4,14 +4,18 @@ Let's take the support-ticket router from the [README](../README.md) and do
 what you cannot do with a prompt string: score it on held-out data, improve it
 with an optimizer, and prove the improvement on tickets it has never seen.
 
-In this run the zero-shot router scored **35%** on twenty held-out tickets.
-The optimized router scored **90%** on the same twenty. The whole experiment —
-baseline, optimization, and held-out evaluation — cost about **$0.01** and ran
-in under **20 seconds** with `gpt-5.4-mini`.
+In the committed benchmark runs the zero-shot router scored **25–30%** on
+twenty held-out tickets. The optimized router scored **85%** on the same
+twenty — in all three repeats. Each full experiment — baseline, optimization,
+and held-out evaluation — cost about **$0.01** and ran in about **ten
+seconds** with `gpt-5.4-mini`.
 
-Those are real numbers from a real run, and the gain has a plain-English
-reason: our routing labels encode conventions the model cannot guess, and the
-optimizer put examples of those conventions into the program.
+Those numbers come from a committed, content-addressed run artifact in the
+repository, produced by `scripts/tutorial_ticket_routing_experiment.exs` —
+you can rerun it yourself and compare.
+The gain has a plain-English reason: our routing labels encode conventions
+the model cannot guess, and the optimizer put examples of those conventions
+into the program.
 
 ## The Task
 
@@ -82,10 +86,10 @@ metric = Imp.exact_match(:team)
 
 baseline = Imp.evaluate(router, testset, metric, max_concurrency: 8, timeout: 60_000)
 baseline.score
-#=> 0.35
+#=> 0.3
 ```
 
-The zero-shot router got 7 of 20 right. `baseline.rows` shows every miss, and
+The zero-shot router got 6 of 20 right. `baseline.rows` shows every miss, and
 the misses are not random — they are the model guessing what squad names mean:
 
 ```text
@@ -97,7 +101,7 @@ the misses are not random — they are the model guessing what squad names mean:
 
 It reads the tickets fine. It cannot know that atlas is the money squad. On a
 task this small the exact score moves a little between runs — our repeats
-landed between 0.20 and 0.40 — but every run tells the same story.
+landed between 0.25 and 0.30 — but every run tells the same story.
 
 ## Improve With Measured Lift
 
@@ -127,13 +131,14 @@ The only score that counts comes from tickets the optimizer never saw:
 optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout: 60_000)
 
 {baseline.score, optimized.score}
-#=> {0.35, 0.9}
+#=> {0.3, 0.85}
 ```
 
-35% → 90% on held-out tickets: 55 points, or eleven more tickets out of
-twenty reaching the right squad. Across three repeat runs the optimized
-router scored 0.85–0.90 while the baseline stayed at 0.20–0.40. Each full
-run cost roughly $0.01 (42 calls, ~13k tokens) and finished in 9–22 seconds.
+30% → 85% on held-out tickets: 55 points, or eleven more tickets out of
+twenty reaching the right squad. Across the three committed repeats the
+optimized router scored 0.85 every time while the baseline stayed at
+0.25–0.30. Each full run cost about $0.01 (~12,300 tokens) and finished in
+8–10 seconds.
 
 It is not a magic button. The remaining misses are genuinely marginal tickets
 ("Scheduled reports did not run last night" — a platform failure that reads
