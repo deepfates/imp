@@ -47,33 +47,6 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
 
   defp render(report, "json"), do: Jason.encode!(report, pretty: true)
 
-  # The report ships inside the Hex package at docs/CONFORMANCE.md, so doc
-  # evidence references must render package-aware: packaged files keep
-  # relative references that resolve from docs/, while repository-only files
-  # become absolute GitHub links labeled as such. This keeps the checked-in
-  # report byte-reproducible by the generator (no hand-curated link edits).
-  defp render_doc_reference(path) do
-    packaged = packaged_file_set()
-
-    cond do
-      MapSet.member?(packaged, path) and String.contains?(path, "/") ->
-        "- docs: `#{path}`"
-
-      MapSet.member?(packaged, path) ->
-        "- docs: `../#{path}`"
-
-      true ->
-        "- docs: [#{path}](https://github.com/deepfates/imp/blob/main/#{path}) (repository only, not shipped in the package)"
-    end
-  end
-
-  defp packaged_file_set do
-    Mix.Project.config()
-    |> Keyword.fetch!(:package)
-    |> Keyword.fetch!(:files)
-    |> MapSet.new()
-  end
-
   defp render(report, "markdown") do
     rows =
       report.surfaces
@@ -130,6 +103,33 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
 
   defp gate_label(%{status: :tracking}), do: "tracked"
   defp gate_label(_surface), do: "satisfied"
+
+  # The report ships inside the Hex package at docs/CONFORMANCE.md, so doc
+  # evidence references must render package-aware: packaged files keep
+  # relative references that resolve from docs/, while repository-only files
+  # become absolute GitHub links labeled as such. This keeps the checked-in
+  # report byte-reproducible by the generator (no hand-curated link edits).
+  defp render_doc_reference(path) do
+    packaged = packaged_file_set()
+
+    cond do
+      MapSet.member?(packaged, path) and String.contains?(path, "/") ->
+        "- docs: `#{path}`"
+
+      MapSet.member?(packaged, path) ->
+        "- docs: `../#{path}`"
+
+      true ->
+        "- docs: [#{path}](https://github.com/deepfates/imp/blob/main/#{path}) (repository only, not shipped in the package)"
+    end
+  end
+
+  defp packaged_file_set do
+    Mix.Project.config()
+    |> Keyword.fetch!(:package)
+    |> Keyword.fetch!(:files)
+    |> MapSet.new()
+  end
 
   defp render_surface(surface) do
     invariants = Enum.map_join(surface.invariants, "\n", &"- #{&1}")
