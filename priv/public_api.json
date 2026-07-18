@@ -3409,7 +3409,8 @@
         "max_rounds",
         "metric",
         "metric_threshold",
-        "teacher_settings"
+        "teacher_settings",
+        "timeout"
       ],
       "types": []
     },
