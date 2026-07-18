@@ -1,8 +1,13 @@
 defmodule ProgramOfThoughtFidelityTest do
-  use ExUnit.Case, async: true
+  # async: false — this module mutates the global Imp.Settings Agent in setup;
+  # running it concurrently would race that shared state with other async
+  # modules (e.g. the BootstrapFewShot trajectory suite reads global defaults).
+  # See dee-fqsr.
+  use ExUnit.Case, async: false
 
   setup do
     Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    on_exit(&Imp.Settings.reset/0)
     :ok
   end
 

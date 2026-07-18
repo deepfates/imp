@@ -3,6 +3,10 @@ defmodule ImpTest do
 
   setup do
     Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    # Restore the global Imp.Settings Agent to defaults after every test so a
+    # non-default :lm (set by tests here) cannot leak into a later module's
+    # BootstrapFewShot demo capture. See dee-fqsr (order-dependent digest flake).
+    on_exit(&Imp.Settings.reset/0)
     :ok
   end
 
