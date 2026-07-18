@@ -20,7 +20,7 @@ router =
   |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 
 {:ok, prediction} =
-  Imp.call(router, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
+  Imp.call(router, %{ticket: "A customer noticed they can open other users' invoices by changing the number in the URL."})
 
 Imp.get(prediction, :team)
 #=> "security"
@@ -99,7 +99,7 @@ router =
   |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON)
 
 {:ok, prediction} =
-  Imp.call(router, %{ticket: "Customers are seeing other users' invoices in the billing portal."})
+  Imp.call(router, %{ticket: "A customer noticed they can open other users' invoices by changing the number in the URL."})
 
 {Imp.get(prediction, :team), Imp.get(prediction, :urgency)}
 #=> {"security", "high"}
