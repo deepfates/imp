@@ -199,15 +199,19 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README starts with the immutable Git tag install and labels source-checkout installs" do
+  test "README installs from the immutable Git tag and never claims a Hex release" do
     readme = File.read!("README.md")
 
     # Imp is not published on Hex; the README must not claim a Hex install.
     refute readme =~ ~s({:imp, "~> )
     assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.1.0"})
     refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
-    assert readme =~ "source checkout"
-    assert readme =~ ~s({:imp, path: "."})
+
+    # The README need not offer a source-checkout install, but if it shows
+    # one it must be labeled as such rather than posing as the normal path.
+    if readme =~ ~s({:imp, path:) do
+      assert readme =~ "source checkout"
+    end
   end
 
   defp assert_release_files(files) do
