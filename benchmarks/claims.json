@@ -132,7 +132,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_few_shot_differential/90348d4bcb9efa653e5b15060f767664e2153ecf82ddc475fa25bc18e92b0af2.json", "test/classical_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_few_shot_differential/7ed813e9e8ead6664615807ad253ba5a8c7c2e99c1d33f08ecd9569a7be7743c.json", "test/classical_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.semantic", "kind": "optimizer_conformance", "lane": "bootstrap_few_shot_differential", "evidence": "full", "threshold": "the canonical BootstrapFewShot artifact verifies the admitted observations and retained exclusions"}]
     },
     {
@@ -272,7 +272,7 @@
       "limitations": ["Exact trace-row order, provider behavior, effectiveness, training-result quality, and full parity remain excluded; local MLX effectiveness is separate T2 evidence."],
       "statement": "Imp has source-bound C1 evidence for the admitted BootstrapFinetune topology and trace-membership observations and explicitly corrects DSPy 3.2.1 pred_ind shadowing.",
       "category": "optimizer", "surface": ["BootstrapFinetune"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_finetune_differential/fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902.json", "test/weight_composition_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_finetune_differential/8a226901c3fc2f02f005a2d6bd3057a80d73ae230205cf13f0ecf1617084ae9d.json", "test/weight_composition_differential_test.exs"],
       "requirements": [{"id": "optimizer.bootstrap_finetune.semantic", "kind": "optimizer_conformance", "lane": "bootstrap_finetune_differential", "evidence": "full", "threshold": "the canonical BootstrapFinetune artifact verifies the admitted observations, pred_ind correction, and exclusions"}]
     },
     {
@@ -292,7 +292,7 @@
       "limitations": ["Exact Python RNG sequences are excluded; durable dispatch, reconciliation, bounded callbacks, and idempotency are Imp-native extensions."],
       "statement": "Imp has source-bound C1 evidence for the admitted mmGRPO dataset-cycling, rollout-grouping, predictor-attribution, reward, and format-failure observations.",
       "category": "optimizer", "surface": ["GRPO", "mmGRPO"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/mmgrpo_differential/eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7.json", "test/mmgrpo_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/mmgrpo_differential/a6ed8d44d8b1dad7a608b411829c2a09cae630726658da38f1db1c400f6dac9f.json", "test/mmgrpo_differential_test.exs"],
       "requirements": [{"id": "optimizer.mmgrpo.semantic", "kind": "optimizer_conformance", "lane": "mmgrpo_differential", "evidence": "full", "threshold": "the canonical mmGRPO artifact verifies the admitted observations, native lifecycle extensions, and exclusions"}]
     },
     {

@@ -277,6 +277,8 @@ defmodule PublicSurfaceTest do
 
   setup do
     Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    # Restore global Imp.Settings to defaults on exit (test isolation). See dee-fqsr.
+    on_exit(&Imp.Settings.reset/0)
     :ok
   end
 

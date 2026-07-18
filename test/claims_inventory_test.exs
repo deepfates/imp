@@ -210,7 +210,7 @@ defmodule ClaimsInventoryTest do
     assert get_in(random, ["requirements", Access.at(0), "lane"]) ==
              "random_search_differential"
 
-    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "90348d4b"))
+    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "7ed813e9"))
     assert Enum.any?(random["sources"], &String.contains?(&1, "5701ab79"))
 
     copro = claims["claim.optimizer.copro.semantic_conformance"]
