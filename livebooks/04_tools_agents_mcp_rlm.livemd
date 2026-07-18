@@ -2,7 +2,14 @@
 
 ```elixir
 repo = if File.exists?("mix.exs"), do: File.cwd!(), else: Path.expand("..", __DIR__)
-Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+
+if File.exists?(Path.join(repo, "mix.exs")) do
+  # Running inside a source checkout: use the local code and lockfile.
+  Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, "mix.lock"))
+else
+  # Standalone notebook: install the Hex release.
+  Mix.install([{:imp, "~> 0.2.0"}])
+end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 

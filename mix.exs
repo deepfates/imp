@@ -127,7 +127,8 @@ defmodule Imp.MixProject do
       files: package_files(),
       licenses: ["MIT"],
       links: %{
-        "Source" => "https://github.com/deepfates/imp"
+        "Source" => "https://github.com/deepfates/imp",
+        "Changelog" => "https://github.com/deepfates/imp/blob/main/CHANGELOG.md"
       }
     ]
   end

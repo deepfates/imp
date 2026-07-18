@@ -87,7 +87,7 @@ against a pinned current upstream, with the receipts executable.
 ## Coming from DSPy: the five-minute version
 
 ```elixir
-# pip install dspy            →  {:imp, github: "deepfates/imp", tag: "v0.2.0"}
+# pip install dspy            →  {:imp, "~> 0.2.0"}
 # dspy.configure(lm=lm)       →  lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: ...)
 # dspy.Predict("q -> a")      →  program = Imp.predict("q -> a", lm: lm)
 # program(q="...")            →  {:ok, pred} = Imp.call(program, %{q: "..."})
