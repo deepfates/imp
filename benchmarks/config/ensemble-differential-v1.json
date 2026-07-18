@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "fixture_id": "dspy-ensemble-c1-v1",
+  "source": {
+    "authority_family": "family.optimizer_ensemble",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "ensemble_source": {
+      "path": "dspy/teleprompt/ensemble.py",
+      "sha256": "f206b5891d79b11590dc3ab41a9c22e249d3fa015f3c410d801f42759ef90793"
+    },
+    "upstream_test": {
+      "path": "tests/teleprompt/test_ensemble.py",
+      "sha256": "280a644c4469d22d32720f2f925cb45c65e6e5305d7e84c10c5dcab69ad78fbb"
+    }
+  },
+  "scope": {
+    "claims": [
+      "all configured programs execute when size is absent",
+      "the reducer receives all program outputs and determines the result",
+      "size limits the number of selected programs"
+    ],
+    "not_claimed": [
+      "exact sampled membership or Python RNG parity",
+      "provider behavior or effectiveness",
+      "full optimizer parity",
+      "failure semantics parity"
+    ],
+    "native_extensions": [
+      "Imp supports input-derived seeded deterministic replay; DSPy 3.2.1 rejects deterministic=true",
+      "Imp returns structured child and reducer failures"
+    ]
+  },
+  "fixture": {
+    "program_values": [0, 1, 2, 3, 4],
+    "subset_program_values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "subset_size": 3,
+    "expected": {
+      "all_program_count": 5,
+      "reduced_mean": 2.0,
+      "subset_count": 3,
+      "dspy_rejects_deterministic": true
+    }
+  }
+}

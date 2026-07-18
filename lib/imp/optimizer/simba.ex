@@ -22,7 +22,7 @@ defmodule Imp.Optimizer.SIMBA do
     max_demos: 4,
     demo_input_field_maxlen: 100_000,
     max_concurrency: 1,
-    timeout: 5_000,
+    timeout: :infinity,
     sampling_temperature: 0.2,
     candidate_temperature: 0.2,
     seed: 0
@@ -63,7 +63,7 @@ defmodule Imp.Optimizer.SIMBA do
       teacher_lm: opts[:teacher_lm],
       demo_input_field_maxlen: Keyword.get(opts, :demo_input_field_maxlen, 100_000),
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
-      timeout: Keyword.get(opts, :timeout, 5_000),
+      timeout: Keyword.get(opts, :timeout, :infinity),
       sampling_temperature: Keyword.get(opts, :sampling_temperature, 0.2),
       candidate_temperature: Keyword.get(opts, :candidate_temperature, 0.2),
       seed: Keyword.get(opts, :seed, 0)

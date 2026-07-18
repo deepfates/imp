@@ -49,7 +49,7 @@ defmodule Imp.ReproductionRegistryTest do
     refute "bfcl_shaped_scorer" in react["protocol_ids"]
   end
 
-  test "COPRO isolation has a pure provider-free T1 admission protocol" do
+  test "COPRO isolation has pure provider-free admitted T1 evidence" do
     registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
     protocol = get_in(registry, ["protocols", "copro_isolation"])
     copro = Enum.find(registry["features"], &(&1["id"] == "copro"))
@@ -69,13 +69,15 @@ defmodule Imp.ReproductionRegistryTest do
            }
 
     assert "copro_isolation" in copro["protocol_ids"]
-    evidence = copro["admitted_evidence"]
-    assert evidence["tier"] == "t1"
-    assert evidence["protocol_id"] == "copro_isolation"
-    assert evidence["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
 
-    assert evidence["artifact"] ==
-             "benchmarks/evidence/admitted/copro_isolation/#{evidence["artifact_sha256"]}.json"
+    assert copro["admitted_evidence"] == %{
+             "tier" => "t1",
+             "artifact" =>
+               "benchmarks/evidence/admitted/copro_isolation/23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125.json",
+             "artifact_sha256" =>
+               "23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125",
+             "protocol_id" => "copro_isolation"
+           }
   end
 
   test "classical optimizer families have separate provider-free T1 protocols" do
@@ -83,14 +85,12 @@ defmodule Imp.ReproductionRegistryTest do
 
     expected = [
       {"bootstrap_few_shot", "bootstrap_few_shot_differential",
-       "imp.benchmark.bootstrap_few_shot_differential",
-       "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9"},
+       "imp.benchmark.bootstrap_few_shot_differential"},
       {"bootstrap_random_search", "random_search_differential",
-       "imp.benchmark.random_search_differential",
-       "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318"}
+       "imp.benchmark.random_search_differential"}
     ]
 
-    Enum.each(expected, fn {feature_id, protocol_id, task, sha256} ->
+    Enum.each(expected, fn {feature_id, protocol_id, task} ->
       feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
       protocol = get_in(registry, ["protocols", protocol_id])
       assert protocol["mode"] == "provider_free"
@@ -100,12 +100,101 @@ defmodule Imp.ReproductionRegistryTest do
       assert protocol["manifest"] == "benchmarks/config/classical-optimizer-differential-v1.json"
       assert protocol_id in feature["protocol_ids"]
 
-      assert feature["admitted_evidence"] == %{
-               "tier" => "t1",
-               "artifact" => "benchmarks/evidence/admitted/#{protocol_id}/#{sha256}.json",
-               "artifact_sha256" => sha256,
-               "protocol_id" => protocol_id
-             }
+      evidence = feature["admitted_evidence"]
+      assert evidence["tier"] == "t1"
+      assert evidence["protocol_id"] == protocol_id
+      assert evidence["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
+
+      assert evidence["artifact"] ==
+               ReproductionRegistry.admitted_path(protocol_id, evidence["artifact_sha256"])
+    end)
+  end
+
+  test "weight and composition reproductions own six independent authority families" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+    features = Map.new(registry["features"], &{&1["id"], &1})
+
+    assert %{
+             "avatar" => "family.optimizer_avatar_actor",
+             "avatar_optimizer" => "family.optimizer_avatar_optimizer",
+             "bootstrap_finetune" => "family.optimizer_bootstrap_finetune",
+             "grpo" => "family.optimizer_mmgrpo",
+             "better_together" => "family.optimizer_better_together",
+             "ensemble" => "family.optimizer_ensemble"
+           } ==
+             Map.new(
+               ~w(avatar avatar_optimizer bootstrap_finetune grpo better_together ensemble),
+               &{&1, features[&1]["authority_family"]}
+             )
+
+    bootstrap = features["bootstrap_finetune"]["admitted_evidence"]
+
+    assert bootstrap["artifact"] ==
+             "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
+
+    assert bootstrap["artifact_sha256"] ==
+             "7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d"
+
+    assert [bootstrap_c1] = features["bootstrap_finetune"]["supporting_evidence"]
+    assert bootstrap_c1["tier"] == "t1"
+    assert bootstrap_c1["protocol_id"] == "bootstrap_finetune_differential"
+
+    assert bootstrap_c1["artifact_sha256"] ==
+             "fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902"
+
+    expected_admissions = %{
+      "avatar" =>
+        {"avatar_actor_differential",
+         "609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45"},
+      "avatar_optimizer" =>
+        {"avatar_optimizer_differential",
+         "2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23"},
+      "grpo" =>
+        {"mmgrpo_differential",
+         "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7"},
+      "better_together" =>
+        {"better_together_differential",
+         "893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51"},
+      "ensemble" =>
+        {"ensemble_differential",
+         "eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a"}
+    }
+
+    Enum.each(expected_admissions, fn {id, {protocol_id, sha256}} ->
+      evidence = features[id]["admitted_evidence"]
+      assert evidence["tier"] == "t1"
+      assert evidence["protocol_id"] == protocol_id
+      assert evidence["artifact_sha256"] == sha256
+      assert evidence["artifact"] == ReproductionRegistry.admitted_path(protocol_id, sha256)
+    end)
+
+    expected_protocols = [
+      {"avatar", "avatar_actor_differential", "imp.benchmark.avatar_actor_differential",
+       "benchmarks/config/avatar-actor-differential-v1.json"},
+      {"avatar_optimizer", "avatar_optimizer_differential",
+       "imp.benchmark.avatar_optimizer_differential",
+       "benchmarks/config/avatar-optimizer-differential-v1.json"},
+      {"bootstrap_finetune", "bootstrap_finetune_differential",
+       "imp.benchmark.bootstrap_finetune_differential",
+       "benchmarks/config/weight-composition-differential-v1.json"},
+      {"better_together", "better_together_differential",
+       "imp.benchmark.better_together_differential",
+       "benchmarks/config/weight-composition-differential-v1.json"},
+      {"ensemble", "ensemble_differential", "imp.benchmark.ensemble_differential",
+       "benchmarks/config/ensemble-differential-v1.json"},
+      {"grpo", "mmgrpo_differential", "imp.benchmark.mmgrpo_differential",
+       "benchmarks/config/mmgrpo-differential-v1.json"}
+    ]
+
+    Enum.each(expected_protocols, fn {feature_id, protocol_id, task, manifest} ->
+      protocol = get_in(registry, ["protocols", protocol_id])
+      assert protocol["mode"] == "provider_free"
+      assert protocol["max_tier"] == "t1"
+      assert protocol["task"] == task
+      assert protocol["args"] == ["--require-clean"]
+      assert protocol["manifest"] == manifest
+      assert protocol_id in features[feature_id]["protocol_ids"]
+      assert protocol["artifact_validator"]["function"] == "validate!"
     end)
   end
 

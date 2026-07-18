@@ -144,6 +144,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     profile = opts |> Keyword.fetch!(:profile) |> ReleaseProfile.fetch!()
     claims_path = Keyword.get(opts, :claims_file, @default_claims_file)
     code_revision = git_sha()
+    reproduction_registry = load_reproduction_registry()
 
     instruction_optimizer_contract =
       instruction_optimizer_contract_lane(
@@ -213,7 +214,65 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         ),
       "instruction_optimizer_contract" => instruction_optimizer_contract,
       "optimizer_lift" => optimizer_lift,
-      "copro_isolation" => copro_isolation_lane(max_age_hours),
+      "auto_evaluation_contract" =>
+        auto_evaluation_contract_lane(reproduction_registry, max_age_hours),
+      "bootstrap_few_shot_differential" =>
+        classical_optimizer_differential_lane(
+          "bootstrap_few_shot_differential",
+          "bootstrap_few_shot",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "random_search_differential" =>
+        classical_optimizer_differential_lane(
+          "random_search_differential",
+          "bootstrap_random_search",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "avatar_actor_differential" =>
+        classical_optimizer_differential_lane(
+          "avatar_actor_differential",
+          "avatar",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "avatar_optimizer_differential" =>
+        classical_optimizer_differential_lane(
+          "avatar_optimizer_differential",
+          "avatar_optimizer",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "bootstrap_finetune_differential" =>
+        classical_optimizer_differential_lane(
+          "bootstrap_finetune_differential",
+          "bootstrap_finetune",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "better_together_differential" =>
+        classical_optimizer_differential_lane(
+          "better_together_differential",
+          "better_together",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "ensemble_differential" =>
+        classical_optimizer_differential_lane(
+          "ensemble_differential",
+          "ensemble",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "mmgrpo_differential" =>
+        classical_optimizer_differential_lane(
+          "mmgrpo_differential",
+          "grpo",
+          reproduction_registry,
+          max_age_hours
+        ),
+      "copro_isolation" => copro_isolation_lane(reproduction_registry, max_age_hours),
       "gepa_replication" =>
         gepa_replication_lane(
           Keyword.get(opts, :gepa_dir, "tmp/gepa-replication"),
@@ -752,8 +811,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     end
   end
 
-  defp copro_isolation_lane(max_age_hours) do
-    registry = Imp.ReproductionRegistry.load!()
+  defp copro_isolation_lane(registry_result, max_age_hours) do
+    registry = verified_registry!(registry_result)
     feature = Enum.find(registry["features"], &(&1["id"] == "copro"))
     evidence = feature && feature["admitted_evidence"]
 
@@ -765,13 +824,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
     path = evidence["artifact"]
     artifact = ArtifactFile.read_run_json!(path)
-    Imp.ReproductionRegistry.validate_protocol_artifact!(registry, "copro_isolation", artifact)
 
     artifact_lane("copro_isolation", path, artifact, max_age_hours,
       passing: true,
       full_evidence: true,
       scale: "full",
-      freshness: :age,
+      freshness: :immutable_admission,
       summary: %{
         "feature" => "copro",
         "tier" => evidence["tier"],
@@ -791,6 +849,116 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         "canonical selected COPRO isolation evidence is invalid: #{Exception.message(error)}"
       )
   end
+
+  defp auto_evaluation_contract_lane(registry_result, max_age_hours) do
+    registry = verified_registry!(registry_result)
+
+    evidence =
+      registry["features"]
+      |> Enum.filter(&(&1["id"] in ~w(semantic_f1 complete_and_grounded)))
+      |> Enum.map(& &1["admitted_evidence"])
+      |> Enum.uniq()
+      |> case do
+        [selected] -> selected
+        _other -> raise ArgumentError, "auto-evaluation features do not share one admission"
+      end
+
+    unless evidence["tier"] == "t1" and
+             evidence["protocol_id"] == "auto_evaluation_contract" and
+             is_binary(evidence["artifact"]) do
+      raise ArgumentError, "canonical auto-evaluation T1 evidence is not selected"
+    end
+
+    path = evidence["artifact"]
+    artifact = ArtifactFile.read_run_json!(path)
+
+    artifact_lane("auto_evaluation_contract", path, artifact, max_age_hours,
+      passing: true,
+      full_evidence: true,
+      scale: "full",
+      freshness: :immutable_admission,
+      summary: %{
+        "features" => ~w(semantic_f1 complete_and_grounded),
+        "tier" => evidence["tier"],
+        "protocol_id" => evidence["protocol_id"],
+        "artifact_sha256" => evidence["artifact_sha256"],
+        "required_cases" => get_in(artifact, ["summary", "required_cases"]),
+        "passing_cases" => get_in(artifact, ["summary", "passing_cases"]),
+        "contract_complete" => get_in(artifact, ["summary", "contract_complete"]),
+        "natural_data_quality" => get_in(artifact, ["summary", "natural_data_quality"]),
+        "provider_calls" => get_in(artifact, ["summary", "provider_calls"]),
+        "current_validator_replay" => true
+      },
+      limitation:
+        "This provider-free C1 artifact proves deterministic SemanticF1 and CompleteAndGrounded semantics only; it does not establish natural-judge calibration, task quality, Refine advice quality, or Best-of-N lift."
+    )
+  rescue
+    error ->
+      missing_lane(
+        "auto_evaluation_contract",
+        "canonical selected auto-evaluation evidence is invalid: #{Exception.message(error)}"
+      )
+  end
+
+  defp classical_optimizer_differential_lane(
+         protocol_id,
+         feature_id,
+         registry_result,
+         max_age_hours
+       ) do
+    registry = verified_registry!(registry_result)
+    feature = Enum.find(registry["features"], &(&1["id"] == feature_id))
+
+    evidence =
+      feature &&
+        Enum.find(
+          [feature["admitted_evidence"] | feature["supporting_evidence"] || []],
+          &(&1["tier"] == "t1" and &1["protocol_id"] == protocol_id and
+              is_binary(&1["artifact"]))
+        )
+
+    unless is_map(evidence) do
+      raise ArgumentError, "canonical #{feature_id} T1 evidence is not selected"
+    end
+
+    path = evidence["artifact"]
+    artifact = ArtifactFile.read_run_json!(path)
+
+    artifact_lane(protocol_id, path, artifact, max_age_hours,
+      passing: true,
+      full_evidence: true,
+      scale: "full",
+      freshness: :immutable_admission,
+      summary: %{
+        "feature" => feature_id,
+        "tier" => evidence["tier"],
+        "protocol_id" => evidence["protocol_id"],
+        "artifact_sha256" => evidence["artifact_sha256"],
+        "matched" =>
+          get_in(artifact, ["comparison", "matched"]) ||
+            get_in(artifact, ["comparison", "shared_matched"]),
+        "matched_claim_count" => get_in(artifact, ["summary", "matched_claim_count"]),
+        "limitations" => get_in(artifact, ["scope", "not_claimed"])
+      },
+      limitation:
+        "This source-bound C1 fixture proves only its declared observations; retained exclusions are recorded in the artifact."
+    )
+  rescue
+    error ->
+      missing_lane(
+        protocol_id,
+        "canonical selected #{feature_id} evidence is invalid: #{Exception.message(error)}"
+      )
+  end
+
+  defp load_reproduction_registry do
+    {:ok, Imp.ReproductionRegistry.load!()}
+  rescue
+    error -> {:error, Exception.message(error)}
+  end
+
+  defp verified_registry!({:ok, registry}), do: registry
+  defp verified_registry!({:error, message}), do: raise(ArgumentError, message)
 
   defp latest_valid_local_mlx_artifact(glob) do
     paths = glob |> Path.wildcard() |> Enum.sort_by(&mtime_unix!/1, :desc)
@@ -2368,6 +2536,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp fresh?(artifact, path, max_age_hours, :source_and_age),
     do: current_git_sha_bound?(artifact) and fresh_by_age?(artifact, path, max_age_hours)
 
+  # Content-addressed admitted evidence is revalidated through its current pure
+  # protocol validator before reaching artifact_lane/5. Its scientific validity
+  # therefore does not expire with wall-clock age or an unrelated Git revision.
+  defp fresh?(_artifact, _path, _max_age_hours, :immutable_admission), do: true
+
   defp policy_candidate?(artifact, _path, :source_revision),
     do: current_git_sha_bound?(artifact)
 
@@ -2376,7 +2549,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   defp policy_candidate?(artifact, _path, :source_and_age),
     do: current_git_sha_bound?(artifact) and valid_artifact_time?(artifact)
 
+  defp policy_candidate?(_artifact, _path, :immutable_admission), do: true
+
   defp candidate_eligibility(artifact, path, max_age_hours, policy) do
+    immutable_admission = policy == :immutable_admission
     recency_valid = fresh_by_age?(artifact, path, max_age_hours)
     source_compatible = current_git_sha_bound?(artifact)
     eligible = fresh?(artifact, path, max_age_hours, policy)
@@ -2394,6 +2570,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       "eligible" => eligible,
       "recency_valid" => recency_valid,
       "source_compatible" => source_compatible,
+      "validator_revalidated" => immutable_admission,
       "max_age_hours" => max_age_hours,
       "rejection_reasons" => rejection_reasons
     }

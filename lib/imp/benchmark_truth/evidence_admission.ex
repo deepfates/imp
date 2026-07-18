@@ -24,12 +24,15 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
 
     protocol = validate_admission!(registry, protocol_id, tier, feature_ids)
 
+    {primary_feature_ids, supporting_feature_ids} =
+      partition_feature_ids(registry, feature_ids, tier)
+
     # A source-bound artifact can become invalid precisely because its canonical
     # authority or implementation binding advanced. Validate every unaffected
     # feature while temporarily clearing only the records being atomically
     # replaced; otherwise a valid refresh is impossible to admit.
     registry
-    |> clear_target_admissions(feature_ids)
+    |> clear_target_admissions(primary_feature_ids)
     |> ReproductionRegistry.validate!(authorities, root)
 
     artifact_bytes = File.read!(artifact_path)
@@ -40,7 +43,15 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
     relative_path = ReproductionRegistry.admitted_path(protocol_id, sha256)
     destination = Path.join(root, relative_path)
     record = admission_record(tier, relative_path, sha256, protocol_id)
-    updated_ordered = update_features!(ordered_registry, feature_ids, record)
+
+    updated_ordered =
+      update_features!(
+        ordered_registry,
+        primary_feature_ids,
+        supporting_feature_ids,
+        record
+      )
+
     updated_bytes = Jason.encode!(updated_ordered, pretty: true) <> "\n"
     updated_registry = Jason.decode!(updated_bytes)
 
@@ -59,6 +70,8 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
       artifact: relative_path,
       artifact_sha256: sha256,
       features: feature_ids,
+      primary_features: primary_feature_ids,
+      supporting_features: supporting_feature_ids,
       max_tier: protocol["max_tier"],
       protocol_id: protocol_id,
       tier: tier
@@ -104,13 +117,6 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
         raise ArgumentError,
               "feature #{feature_id} does not declare protocol #{protocol_id}"
       end
-
-      existing_tier = get_in(feature, ["admitted_evidence", "tier"])
-
-      if tier_rank(existing_tier) > tier_rank(tier) do
-        raise ArgumentError,
-              "admission would downgrade feature #{feature_id} from #{existing_tier} to #{tier}"
-      end
     end)
 
     unless is_map(protocol["artifact_validator"]),
@@ -119,18 +125,32 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
     protocol
   end
 
-  defp update_features!(ordered_registry, feature_ids, record) do
-    selected = MapSet.new(feature_ids)
+  defp update_features!(ordered_registry, primary_feature_ids, supporting_feature_ids, record) do
+    primary = MapSet.new(primary_feature_ids)
+    supporting = MapSet.new(supporting_feature_ids)
+    selected = MapSet.union(primary, supporting)
     features = ordered_registry["features"]
 
     {updated, found} =
       Enum.map_reduce(features, MapSet.new(), fn feature, found ->
         feature_id = feature["id"]
 
-        if MapSet.member?(selected, feature_id) do
-          {put_in(feature["admitted_evidence"], record), MapSet.put(found, feature_id)}
-        else
-          {feature, found}
+        cond do
+          MapSet.member?(primary, feature_id) ->
+            {put_in(feature["admitted_evidence"], record), MapSet.put(found, feature_id)}
+
+          MapSet.member?(supporting, feature_id) ->
+            records = feature["supporting_evidence"] || []
+
+            records =
+              if Enum.any?(records, &same_record?(&1, record)),
+                do: records,
+                else: records ++ [record]
+
+            {put_in(feature["supporting_evidence"], records), MapSet.put(found, feature_id)}
+
+          true ->
+            {feature, found}
         end
       end)
 
@@ -138,6 +158,19 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
       do: raise(ArgumentError, "ordered registry is missing requested features")
 
     put_in(ordered_registry["features"], updated)
+  end
+
+  defp partition_feature_ids(%{"features" => features}, feature_ids, tier) do
+    by_id = Map.new(features, &{&1["id"], &1})
+
+    Enum.split_with(feature_ids, fn feature_id ->
+      existing_tier = get_in(by_id, [feature_id, "admitted_evidence", "tier"])
+      tier_rank(existing_tier) <= tier_rank(tier)
+    end)
+  end
+
+  defp same_record?(left, right) do
+    Enum.all?(~w(tier artifact artifact_sha256 protocol_id), &(&1 && left[&1] == right[&1]))
   end
 
   defp clear_target_admissions(%{"features" => features} = registry, feature_ids) do

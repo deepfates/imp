@@ -23,22 +23,22 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | CompleteAndGrounded auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
 | Best-of-N and refinement | adaptation | confidence_calibration | NONE | none |
 | LabeledFewShot | replication | optimizer_lift | NONE | none |
-| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9.json |
-| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318.json |
+| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/90348d4bcb9efa653e5b15060f767664e2153ecf82ddc475fa25bc18e92b0af2.json |
+| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/5701ab79b7984b9a07e23ac383cb8970641c7f37549f76ba49785fee7cd1cb3f.json |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125.json |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |
 | MIPROv2 | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | SIMBA | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | GEPA | replication | gepa_contract<br>gepa_live | NONE | none |
-| Avatar actor | adaptation | provider_training | NONE | none |
-| Avatar optimizer | adaptation | provider_training | NONE | none |
-| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
-| GRPO | adaptation | provider_training | NONE | none |
-| BetterTogether | adaptation | provider_training | NONE | none |
-| Ensemble | adaptation | optimizer_lift | NONE | none |
+| Avatar actor | adaptation | provider_training<br>avatar_actor_differential | T1 | benchmarks/evidence/admitted/avatar_actor_differential/609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45.json |
+| Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | T1 | benchmarks/evidence/admitted/avatar_optimizer_differential/2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23.json |
+| BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training<br>bootstrap_finetune_differential | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
+| GRPO | adaptation | provider_training<br>mmgrpo_differential | T1 | benchmarks/evidence/admitted/mmgrpo_differential/eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7.json |
+| BetterTogether | adaptation | provider_training<br>better_together_differential | T1 | benchmarks/evidence/admitted/better_together_differential/893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51.json |
+| Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a.json |
 | Fast-Slow training and CISPO | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |

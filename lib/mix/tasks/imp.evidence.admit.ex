@@ -37,6 +37,12 @@ defmodule Mix.Tasks.Imp.Evidence.Admit do
     Mix.shell().info("admitted evidence: #{result.artifact}")
     Mix.shell().info("sha256: #{result.artifact_sha256}")
     Mix.shell().info("features: #{Enum.join(result.features, ", ")}")
+
+    if result.supporting_features != [] do
+      Mix.shell().info(
+        "retained as complementary evidence without downgrading: #{Enum.join(result.supporting_features, ", ")}"
+      )
+    end
   rescue
     error in [ArgumentError, KeyError] -> Mix.raise(Exception.message(error))
   end

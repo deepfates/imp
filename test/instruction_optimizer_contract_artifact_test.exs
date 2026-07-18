@@ -234,7 +234,15 @@ defmodule InstructionOptimizerContractArtifactTest do
   end
 
   defp tmp_dir(name) do
-    path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
+    # System.unique_integer/1 restarts at small values in every VM, so a bare
+    # counter suffix collides with directories left by earlier test runs; a
+    # stale artifact then satisfies the wildcard and gets asserted against.
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-#{name}-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
+
     File.mkdir_p!(path)
     path
   end

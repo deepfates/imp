@@ -245,7 +245,20 @@ defmodule Imp.ReproductionRegistry do
             "feature #{id} must not cache mutable constraints or claim state; use tk and the dashboard"
     end
 
-    validate_evidence!(feature["admitted_evidence"], feature, protocols, root)
+    primary = feature["admitted_evidence"]
+    supporting = feature["supporting_evidence"] || []
+
+    unless is_list(supporting),
+      do: raise(ArgumentError, "feature #{id} supporting evidence must be a list")
+
+    validate_evidence!(primary, feature, protocols, root)
+    Enum.each(supporting, &validate_evidence!(&1, feature, protocols, root))
+
+    records = [primary | supporting]
+    identities = Enum.map(records, &{&1["tier"], &1["protocol_id"], &1["artifact_sha256"]})
+
+    unless identities == Enum.uniq(identities),
+      do: raise(ArgumentError, "feature #{id} evidence records must be unique")
   end
 
   defp validate_evidence!(evidence, feature, protocols, root) when is_map(evidence) do

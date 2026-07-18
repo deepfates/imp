@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "fixture_id": "dspy-mmgrpo-c1-v1",
+  "source": {
+    "authority_family": "family.optimizer_mmgrpo",
+    "repository": "https://github.com/stanfordnlp/dspy",
+    "version": "3.2.1",
+    "git_ref": "refs/tags/3.2.1",
+    "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "source_manifest": {
+      "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
+      "file_count": 296
+    },
+    "grpo_source": {
+      "path": "dspy/teleprompt/grpo.py",
+      "sha256": "da7f570df12bafc46ab9dc68b1e99cf2e233a30b7c08bd35e284b9c8738b96df"
+    },
+    "upstream_test": {
+      "path": "tests/teleprompt/test_grpo.py",
+      "sha256": "29a8d0e827e90ff199c207fa1cd97f7fe4f0a54b25a41a68b9b26b718ab43d32"
+    }
+  },
+  "scope": {
+    "claims": [
+      "dataset cycling balances a three-row trainset across six two-example steps",
+      "two rollouts form one group per selected example and preserve two-predictor attribution",
+      "the program-level reward is propagated to every successful completion",
+      "a failed structured parse receives the configured format-failure reward"
+    ],
+    "not_claimed": [
+      "exact shuffled order or Python RNG parity",
+      "provider job, transport, or model behavior",
+      "training effectiveness or model quality",
+      "variable-invocation fill strategy parity",
+      "execution-failure behavior or full optimizer parity"
+    ],
+    "native_extensions": [
+      "Imp uses durable dispatch journals, bounded callbacks, reconciliation, and stable idempotency identities",
+      "Imp atomically rebinds the returned training artifact instead of mutating a Python LM in place"
+    ]
+  },
+  "fixture": {
+    "train_ids": ["alpha", "beta", "gamma"],
+    "num_train_steps": 6,
+    "examples_per_step": 2,
+    "rollouts_per_step": 2,
+    "success_reward": 0.75,
+    "format_failure_reward": -5.0,
+    "expected": {
+      "selected_id_counts": {"alpha": 4, "beta": 4, "gamma": 4},
+      "selected_example_count": 12,
+      "successful_group_count": 12,
+      "successful_group_size": 2,
+      "successful_rewards": [0.75],
+      "predictor_group_names": ["first", "second"],
+      "format_failure_group_size": 2,
+      "format_failure_rewards": [-5.0]
+    }
+  }
+}
