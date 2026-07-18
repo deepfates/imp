@@ -383,5 +383,42 @@
         "k": 1
       }
     }
+  },
+  {
+    "id": "list_str_field_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> tags: array[string]",
+    "instructions": "Return the tags as a list of strings.",
+    "inputs": {
+      "question": "Tag this: beam and elixir."
+    },
+    "responses": [
+      "[[ ## tags ## ]]\n[\"beam\", \"elixir\"]\n[[ ## completed ## ]]"
+    ],
+    "expected_prediction": {
+      "tags": [
+        "beam",
+        "elixir"
+      ]
+    }
+  },
+  {
+    "id": "dict_field_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> meta: object",
+    "instructions": "Return the metadata as a JSON object.",
+    "inputs": {
+      "question": "Key k has value 1."
+    },
+    "responses": [
+      "[[ ## meta ## ]]\n{\"k\": 1}\n[[ ## completed ## ]]"
+    ],
+    "expected_prediction": {
+      "meta": {
+        "k": 1
+      }
+    }
   }
 ]
