@@ -572,7 +572,7 @@ defmodule DocumentationContractTest do
 
     program = Imp.predict("question -> answer", lm: lm)
 
-    assert Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list() == [
+    assert Imp.stream(program, %{question: "q"}) |> Enum.to_list() == [
              "P",
              "a",
              "r",

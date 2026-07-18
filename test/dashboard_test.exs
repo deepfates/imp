@@ -2196,47 +2196,48 @@ defmodule DashboardTest do
   end
 
   defp run_instruction_optimizer_dashboard!(contract_dir, out_dir) do
-    capture_io(fn ->
-      Mix.Task.reenable("imp.benchmark.dashboard")
-
-      Mix.Tasks.Imp.Benchmark.Dashboard.run([
-        "--instruction-optimizer-dir",
-        contract_dir,
-        "--out",
-        out_dir,
-        "--max-age-hours",
-        "1"
-      ])
-    end)
-
-    out_dir
-    |> Path.join("parity-dashboard-*.json")
-    |> Path.wildcard()
-    |> Enum.max_by(&File.stat!(&1).mtime)
-    |> File.read!()
-    |> Jason.decode!()
+    run_dashboard_and_read_output!([
+      "--instruction-optimizer-dir",
+      contract_dir,
+      "--out",
+      out_dir,
+      "--max-age-hours",
+      "1"
+    ])
   end
 
   defp run_local_mlx_dashboard!(local_mlx_dir, out_dir) do
-    capture_io(fn ->
-      Mix.Task.reenable("imp.benchmark.dashboard")
+    run_dashboard_and_read_output!([
+      "--local-mlx-dir",
+      local_mlx_dir,
+      "--out",
+      out_dir,
+      "--max-age-hours",
+      "100000"
+    ])
+  end
 
-      Mix.Tasks.Imp.Benchmark.Dashboard.run([
-        "--local-mlx-dir",
-        local_mlx_dir,
-        "--out",
-        out_dir,
-        "--max-age-hours",
-        "100000"
-      ])
-    end)
+  # Read exactly the file THIS run announced. Selecting "the newest
+  # parity-dashboard-*.json by mtime" is ambiguous when two runs in one test
+  # land in adjacent wall-clock seconds: File.stat! mtimes are second-granular,
+  # and an mtime tie resolves to the alphabetically first (oldest) slug, so the
+  # reader silently returns the PREVIOUS run's dashboard (CI-only failure of
+  # "instruction optimizer full evidence requires the dashboard code revision",
+  # run 29622004461).
+  defp run_dashboard_and_read_output!(args) do
+    output =
+      capture_io(fn ->
+        Mix.Task.reenable("imp.benchmark.dashboard")
+        Mix.Tasks.Imp.Benchmark.Dashboard.run(args)
+      end)
 
-    out_dir
-    |> Path.join("parity-dashboard-*.json")
-    |> Path.wildcard()
-    |> Enum.max_by(&File.stat!(&1).mtime)
-    |> File.read!()
-    |> Jason.decode!()
+    case Regex.run(~r/parity dashboard: (\S+)/, output) do
+      [_line, path] ->
+        path |> File.read!() |> Jason.decode!()
+
+      nil ->
+        flunk("dashboard task did not announce its output path; captured: #{inspect(output)}")
+    end
   end
 
   defp write_local_mlx_artifact!(dir, opts \\ []) do
