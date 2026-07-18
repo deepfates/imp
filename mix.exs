@@ -51,6 +51,8 @@ defmodule Imp.MixProject do
   defp source_checkout_preferred_envs do
     base_preferred_envs = [
       "production.check": :test,
+      "fast.check": :test,
+      "docs.check": :test,
       "public_surface.check": :test,
       "integration.check": :test,
       "protocol.check": :test,

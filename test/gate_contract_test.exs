@@ -38,6 +38,15 @@ defmodule GateContractTest do
     assert [docs_clean] = Keyword.fetch!(aliases, :"docs.clean")
     assert is_function(docs_clean, 1)
 
+    # fast.check and docs.check run `test`/`livebook.check`, which only work in
+    # the :test env. Mix does NOT auto-switch MIX_ENV for a `test` step nested
+    # inside an alias, so both MUST be pinned in preferred_envs or they silently
+    # run in :dev and blow up ("mix test is running in the dev environment").
+    # This regressed once (dee-4g0z); pin it so it can't again.
+    preferred = Imp.MixProject.cli() |> Keyword.fetch!(:preferred_envs)
+    assert Keyword.get(preferred, :"fast.check") == :test
+    assert Keyword.get(preferred, :"docs.check") == :test
+
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "reproduction.check",
              "research.portfolio.check",
